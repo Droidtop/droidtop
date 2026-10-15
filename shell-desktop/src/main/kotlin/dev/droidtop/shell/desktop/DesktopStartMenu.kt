@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
@@ -37,13 +38,20 @@ import kotlinx.coroutines.withContext
 internal val START_MENU_KINDS: Set<LibraryEntryKind> = LibraryEntryKind.entries.toSet()
 
 /** What a Start-menu row stands for: a Linux app of the container or a library entry, and the pin that names it. */
+/**
+ * A Start menu row's height: compact, so about twice as many rows fit as at Gaming's 72 dp, and never under a
+ * 48 dp touch target (Droidtop/tracker#555 D4, from the pad user's review).
+ */
+internal val START_ROW_HEIGHT = 56.dp
+
 private class StartTarget(val pin: TaskbarPin, val entry: LibraryEntry?, val linux: ContainerApp?)
 
 /**
  * The Start menu (docs/SPEC.md 2b), as one sheet a pad and a finger both drive ([HostedListSheet],
- * Droidtop/tracker#350). Sections, top to bottom: Pinned (what is on the taskbar), droidtop (the places),
- * Linux apps (the container's own desktop entries), a plugin's shelves, then the library's Games (with their
- * artwork), Windows (Wine shortcuts) and Android apps (Droidtop/tracker#348). A takes the row's own action
+ * Droidtop/tracker#350). Sections, top to bottom: Pinned (what is on the taskbar), Linux apps (the
+ * container's own desktop entries, right after Pinned, Droidtop/tracker#555 D4), System (the taskbar's own
+ * buttons), droidtop (the places), a plugin's shelves, then the library's Games (with their artwork), Windows
+ * (Wine shortcuts) and Android apps (Droidtop/tracker#348). Its rows are compact (56 dp, [START_ROW_HEIGHT]). A takes the row's own action
  * (a PC or engine game takes Gaming's primary-action rule, a store game that is not installed offers the
  * install); X pins it to the taskbar or takes it off; Y and a long press open the row's menu: Open, the
  * game page of a PC or engine game, and pin or unpin.
@@ -161,6 +169,27 @@ internal fun StartMenu(
                 out.add(rowFor(target, key = "pinned:" + pin.key, section = "Pinned", art = pin.art != null, showPinned = false))
             }
         }
+        // The primary container's own applications, right after Pinned: what the desktop runs
+        // (Droidtop/tracker#555 D4). Launched into the session, so
+        // their windows appear on the desktop behind this menu.
+        if (sessionLive) {
+            linuxAppsError?.let { message ->
+                out.add(
+                    HostedRow(
+                        key = "linux-apps-error",
+                        title = "Couldn't read the installed apps",
+                        subtitle = message,
+                        section = "Linux apps",
+                        onSelect = {},
+                    ),
+                )
+            }
+            linuxApps.forEach { app ->
+                val target = StartTarget(TaskbarPin(TaskbarPins.linuxKey(app.id), app.name), null, app)
+                // The app's own name, and under it what kind of program it is when the entry says (foot: "Terminal").
+                out.add(rowFor(target, key = "linux:" + app.id, section = "Linux apps", subtitle = app.genericName))
+            }
+        }
         // The taskbar's own buttons, for a pad that has no way to the bar itself.
         terminal?.let { openTerminal ->
             out.add(
@@ -191,26 +220,6 @@ internal fun StartMenu(
                     },
                 ),
             )
-        }
-        // The primary container's own applications: what the desktop runs. Launched into the session, so
-        // their windows appear on the desktop behind this menu.
-        if (sessionLive) {
-            linuxAppsError?.let { message ->
-                out.add(
-                    HostedRow(
-                        key = "linux-apps-error",
-                        title = "Couldn't read the installed apps",
-                        subtitle = message,
-                        section = "Linux apps",
-                        onSelect = {},
-                    ),
-                )
-            }
-            linuxApps.forEach { app ->
-                val target = StartTarget(TaskbarPin(TaskbarPins.linuxKey(app.id), app.name), null, app)
-                // The app's own name, and under it what kind of program it is when the entry says (foot: "Terminal").
-                out.add(rowFor(target, key = "linux:" + app.id, section = "Linux apps", subtitle = app.genericName))
-            }
         }
         pluginShelves.forEach { shelf ->
             shelf.shelf.entryIds.mapNotNull { byId[it] }.forEach { entry ->
@@ -248,6 +257,7 @@ internal fun StartMenu(
             title = "Start",
             rows = rows,
             onClose = onDismiss,
+            rowMinHeight = START_ROW_HEIGHT,
             selectLabel = "Open",
             toggleLabel = "Pin or unpin",
             detailLabel = "Options",
@@ -304,6 +314,7 @@ internal fun StartMenu(
             title = target.pin.title,
             rows = menuRows,
             onClose = { menuFor = null },
+            rowMinHeight = START_ROW_HEIGHT,
             selectLabel = "Choose",
         )
     }
