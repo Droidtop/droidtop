@@ -19946,6 +19946,10 @@ describes.
   the same rows regardless.
 - **`app_status`** (`PluginAppStatus`, `library-core`): first real
   caller of both `invoke(APP_STATUS, {"action": "status"/"launch"})`.
+  Launch opens an app Android knows (`package` installed, with a launcher
+  entry) through droidtop's own launch path; `launch` goes to the plugin
+  only for an app it installs some other way (Droidtop/tracker#558: the
+  Shizuku plugin answers no `launch`, and nothing ever required one).
   `PluginAppStatus.sourcesFor(context, packageName)` answers "which
   installed app_status plugins currently report managing this package"
   by calling each one's own `status` action and matching its returned
