@@ -6,14 +6,17 @@ enum class PluginTier {
     CONTAINED,
 
     /**
-     * A process of its own under droidtop's UID, kept to the broker-only context and the sandbox class loader like a
-     * contained plugin, but NOT an isolated process, so the graphics chip is reachable (an isolated process may not open
-     * it: sepolicy isolated_app_all.te). The one hole `gpu.render` opens. A system-call filter takes the network away
-     * ([PluginSyscallFilter]) and sends every path to a file broker ([SandboxBroker]); what the process still shares
-     * with droidtop's UID (its own native code could ask Android's services for things as droidtop) cannot be walled off
-     * by an app on Android, so the permission carries a plain warning ([PluginTiers.caution], docs/plugin-api.md 5.3).
+     * An open process (docs/plugin-api.md 5.3, "Open processes: one hole per permission"): a process of its own under
+     * droidtop's UID, kept to the broker-only context and the sandbox class loader like a contained plugin, but NOT an
+     * isolated process, so it can be given what an isolated process never has. Each granted hole permission
+     * ([PluginTiers.holes]) opens only its own hole: `gpu.render` the graphics chip (an isolated process may not open
+     * it: sepolicy isolated_app_all.te), `net.sockets` internet sockets. The system-call filter ([PluginSyscallFilter])
+     * takes away everything else, the network included unless granted, and sends every path to a file broker
+     * ([SandboxBroker]). What the process still shares with droidtop's UID (its own native code could ask Android's
+     * services for things as droidtop) cannot be walled off by an app on Android, so each hole permission carries a
+     * plain warning ([PluginTiers.caution]). One process serves one plugin and ends with it, so no hole outlives it.
      */
-    GPU_RENDER,
+    OPEN,
 
     /** A process of its own under droidtop's UID: anything droidtop can do, beyond the broker's sight. */
     FULL_TRUST,
@@ -28,6 +31,16 @@ enum class PluginTier {
 object PluginTiers {
     const val FULL_TRUST = "host.full_trust"
     const val GPU_RENDER = "gpu.render"
+    const val NET_SOCKETS = "net.sockets"
+
+    /** The permissions that each open one hole in an open process ([PluginTier.OPEN]); nothing else does. */
+    val HOLES = listOf(GPU_RENDER, NET_SOCKETS)
+
+    /**
+     * The manifest key droidtop writes when it hands an open process its plugin: the granted holes ([holes]), which the
+     * process turns into its filter and rendering. droidtop's alone: a plugin's own manifest value is always replaced.
+     */
+    internal const val HOLES_KEY = "_droidtopHoles"
 
     fun declaresFullTrust(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == FULL_TRUST }
 
@@ -46,17 +59,30 @@ object PluginTiers {
     fun declaresGpu(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == GPU_RENDER }
 
     /**
+     * The holes [record] gets in its open process: the hole permissions it declared and the person granted ([HOLES]).
+     * Empty for a plugin that runs contained or with full access, where none applies.
+     */
+    fun holes(record: PluginRecord, grants: PluginGrants.Snapshot): Set<String> = when {
+        record.manifest.contractVersion < 2 -> emptySet()
+        declaresFullTrust(record.manifest) && PluginGrants.stateOf(record, grants, FULL_TRUST) == GrantState.GRANTED -> emptySet()
+        containmentBlocker(record.manifest) != null -> emptySet()
+        else -> HOLES.filterTo(LinkedHashSet()) { hole ->
+            record.manifest.v2.permissions.any { it.id == hole } && PluginGrants.stateOf(record, grants, hole) == GrantState.GRANTED
+        }
+    }
+
+    /**
      * The tier [record] runs in with the grants in [grants]. Full access is the `host.full_trust` grant and nothing
-     * else; the graphics chip is the `gpu.render` grant and nothing else (a plugin the broker keeps to its own data,
-     * now in a process that may draw with hardware). A plugin that cannot run contained at all ([containmentBlocker])
-     * is left CONTAINED here, where [refusal] blocks it until it is allowed full access; `gpu.render` never substitutes
-     * for the privilege such a plugin needs.
+     * else; an open process is any granted hole permission and nothing else ([holes]: a plugin the broker keeps to its
+     * own data, in a process that may draw with hardware or use the network, each only when granted). A plugin that
+     * cannot run contained at all ([containmentBlocker]) is left CONTAINED here, where [refusal] blocks it until it is
+     * allowed full access; a hole permission never substitutes for the privilege such a plugin needs.
      */
     fun of(record: PluginRecord, grants: PluginGrants.Snapshot): PluginTier = when {
         record.manifest.contractVersion < 2 -> PluginTier.FULL_TRUST
         declaresFullTrust(record.manifest) && PluginGrants.stateOf(record, grants, FULL_TRUST) == GrantState.GRANTED -> PluginTier.FULL_TRUST
         containmentBlocker(record.manifest) != null -> PluginTier.CONTAINED
-        declaresGpu(record.manifest) && PluginGrants.stateOf(record, grants, GPU_RENDER) == GrantState.GRANTED -> PluginTier.GPU_RENDER
+        holes(record, grants).isNotEmpty() -> PluginTier.OPEN
         else -> PluginTier.CONTAINED
     }
 
@@ -81,14 +107,16 @@ object PluginTiers {
      */
     /**
      * The warning of a granted permission whose grant lets the plugin's own code reach past droidtop's checks
-     * ([PluginPermission.caution]; today `gpu.render`), for the plugin's page while it is granted, or null. A full-access
+     * ([PluginPermission.caution]; the hole permissions `gpu.render` and `net.sockets`), for the plugin's page while it is
+     * granted, or null. A full-access
      * plugin carries the "Full access" warning instead, which already says more.
      */
     fun caution(record: PluginRecord, grants: PluginGrants.Snapshot): String? {
         if (of(record, grants) == PluginTier.FULL_TRUST) return null
-        return record.manifest.v2.permissions.firstNotNullOfOrNull { declared ->
+        // Each granted hole says its own warning: a plugin with the graphics chip and the network gets both.
+        return record.manifest.v2.permissions.mapNotNull { declared ->
             PluginPermissions.find(declared.id)?.caution?.takeIf { PluginGrants.stateOf(record, grants, declared.id) == GrantState.GRANTED }
-        }
+        }.distinct().joinToString(" ").ifEmpty { null }
     }
 
     fun badge(record: PluginRecord, grants: PluginGrants.Snapshot): String? = when {

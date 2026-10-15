@@ -123,18 +123,26 @@ class PluginGrants(private val dir: File) {
     /** Every explicit state of [pluginId]; a permission without an entry is not here, see [stateOf] for the effective one. */
     fun grantsFor(pluginId: String): Map<String, GrantState> = read(pluginId).states
 
-    /** Sets one state, as the user's own choice: it also clears "wanted" and "wants new access" for that item. */
-    fun set(pluginId: String, permission: String, state: GrantState) = synchronized(LOCK) {
-        val snap = readLocked(pluginId)
-        writeLocked(
-            pluginId,
-            snap.copy(
-                states = if (snap.corrupt) mapOf(permission to state) else snap.states + (permission to state),
-                wanted = snap.wanted - permission,
-                fresh = snap.fresh - permission,
-                corrupt = false,
-            ),
-        )
+    /**
+     * Sets one state, as the user's own choice: it also clears "wanted" and "wants new access" for that item. A changed
+     * hole permission ([PluginTiers.HOLES]) retires the plugin's process, whose filter can never change: the next call
+     * starts it afresh with the holes granted now, so a refused network is gone at once (docs/plugin-api.md 5.3).
+     */
+    fun set(pluginId: String, permission: String, state: GrantState) {
+        val changedHole = synchronized(LOCK) {
+            val snap = readLocked(pluginId)
+            writeLocked(
+                pluginId,
+                snap.copy(
+                    states = if (snap.corrupt) mapOf(permission to state) else snap.states + (permission to state),
+                    wanted = snap.wanted - permission,
+                    fresh = snap.fresh - permission,
+                    corrupt = false,
+                ),
+            )
+            permission in PluginTiers.HOLES && snap.states[permission] != state
+        }
+        if (changedHole) runCatching { PluginProcesses.retire(pluginId) }
     }
 
     /** Stores a category choice in the plugin's grant file. */

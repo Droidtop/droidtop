@@ -52,13 +52,16 @@ internal object SandboxBroker {
         return File(data, "app-data").apply { mkdirs() } to File(data, "app-data-de").apply { mkdirs() }
     }
 
-    /** The rules for [pluginId]'s process of [tier]. */
-    fun rules(context: Context, pluginId: String, tier: PluginTier): Map<String, Int> {
+    /**
+     * The rules for [pluginId]'s process of [tier]. An open process reads the system and the few devices ART needs;
+     * the graphics devices only with the `gpu.render` hole in [holes] (docs/plugin-api.md 5.3, "Open processes").
+     */
+    fun rules(context: Context, pluginId: String, tier: PluginTier, holes: Set<String> = emptySet()): Map<String, Int> {
         val rules = LinkedHashMap<String, Int>()
         val (credential, device) = appDataFor(context, pluginId)
         rules[credential.path] = READ or WRITE
         rules[device.path] = READ or WRITE
-        if (tier == PluginTier.GPU_RENDER) {
+        if (tier == PluginTier.OPEN) {
             val info = context.applicationInfo
             listOf(
                 "/system", "/system_ext", "/product", "/vendor", "/odm", "/apex", "/linkerconfig",
@@ -68,12 +71,15 @@ internal object SandboxBroker {
                 File(info.sourceDir).parent ?: info.sourceDir,
                 info.nativeLibraryDir,
             ).forEach { rules[it] = READ }
-            // Devices ART and a graphics driver open after the fact (/dev/ashmem<boot id> is allowed by the broker's decider).
-            listOf(
-                "/dev/null", "/dev/zero", "/dev/random", "/dev/urandom", "/dev/ashmem", "/dev/ion", "/dev/dma_heap",
-                "/dev/kgsl-3d0", "/dev/dri", "/dev/mali0", "/dev/goldfish_pipe", "/dev/goldfish_pipe_dprctd",
-                "/dev/goldfish_sync", "/dev/goldfish_address_space", "/dev/qemu_pipe",
-            ).forEach { rules[it] = READ or WRITE }
+            // Devices ART opens after the fact (/dev/ashmem<boot id> is allowed by the broker's decider).
+            listOf("/dev/null", "/dev/zero", "/dev/random", "/dev/urandom", "/dev/ashmem").forEach { rules[it] = READ or WRITE }
+            // The graphics driver's devices, only for the gpu.render hole: a networked process does not get the GPU.
+            if (PluginTiers.GPU_RENDER in holes) {
+                listOf(
+                    "/dev/ion", "/dev/dma_heap", "/dev/kgsl-3d0", "/dev/dri", "/dev/mali0", "/dev/goldfish_pipe",
+                    "/dev/goldfish_pipe_dprctd", "/dev/goldfish_sync", "/dev/goldfish_address_space", "/dev/qemu_pipe",
+                ).forEach { rules[it] = READ or WRITE }
+            }
         }
         return rules
     }
@@ -85,9 +91,9 @@ internal object SandboxBroker {
         return credential.map { it to ownCredential.path } + device.map { it to ownDevice.path }
     }
 
-    /** Starts a broker for [pluginId]'s process of [tier]; returns that process's end of its socket, or null. */
-    fun serve(context: Context, pluginId: String, tier: PluginTier): ParcelFileDescriptor? {
-        val rules = rules(context, pluginId, tier)
+    /** Starts a broker for [pluginId]'s process of [tier] with [holes]; returns that process's end of its socket, or null. */
+    fun serve(context: Context, pluginId: String, tier: PluginTier, holes: Set<String> = emptySet()): ParcelFileDescriptor? {
+        val rules = rules(context, pluginId, tier, holes)
         val aliases = aliases(context, pluginId)
         val fd = nativeServe(
             pluginId, rules.keys.toTypedArray(), rules.values.toIntArray(),

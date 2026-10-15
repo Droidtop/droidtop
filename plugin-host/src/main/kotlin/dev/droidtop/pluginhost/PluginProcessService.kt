@@ -89,6 +89,12 @@ abstract class PluginProcessService : Service() {
      */
     protected val runUnprotected: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
 
+    /**
+     * The holes droidtop granted each plugin this process loads ([PluginTiers.HOLES_KEY], set by :app, never by the
+     * plugin): what an open process's filter and rendering allow (docs/plugin-api.md 5.3, "Open processes").
+     */
+    protected val holes: MutableMap<String, Set<String>> = ConcurrentHashMap()
+
     /** Anything this process knows about how its plugins loaded, added to [reachabilityReport]. */
     protected open fun loadNotes(): JSONObject = JSONObject()
 
@@ -118,6 +124,10 @@ abstract class PluginProcessService : Service() {
                     loadErrors.remove(pluginId)
                     val manifest = runCatching { PluginManifest.fromJson(JSONObject(manifestJson)) }.getOrNull()
                         ?: return failLoad(pluginId, "its manifest could not be read")
+                    holes[pluginId] = runCatching {
+                        val array = JSONObject(manifestJson).optJSONArray(PluginTiers.HOLES_KEY)
+                        buildSet { if (array != null) for (i in 0 until array.length()) array.optString(i).takeIf { it in PluginTiers.HOLES }?.let(::add) }
+                    }.getOrDefault(emptySet())
                     if (runCatching { JSONObject(manifestJson).optBoolean(PluginDangers.RUN_UNPROTECTED_KEY) }.getOrDefault(false)) {
                         runUnprotected += pluginId
                     } else {

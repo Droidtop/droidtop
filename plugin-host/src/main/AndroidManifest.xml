@@ -47,25 +47,27 @@
         <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot7" android:process=":plugin_sandbox7" android:exported="false" android:isolatedProcess="true" />
 
         <!--
-          A gpu.render plugin: the same broker-only, descriptor-loaded plugin
-          as the contained sandbox, but in a process of droidtop's own UID that
-          is NOT isolated, so it may open the graphics chip (an isolated process
-          may not: sepolicy isolated_app_all.te). That is the one hole the
-          gpu.render permission opens. A system-call filter keeps it off the
-          network and sends every path it names to a file broker in :app, but
-          it shares droidtop's UID, so its own native code could still ask
-          Android's services for things as droidtop. The approval line and
-          the plugin's page warn about that in plain words (docs/plugin-api.md
-          5.3). Eight slots, one plugin each.
+          An open process (docs/plugin-api.md 5.3, "Open processes: one hole
+          per permission"): the same broker-only, descriptor-loaded plugin as
+          the contained sandbox, but in a process of droidtop's own UID that is
+          NOT isolated, so the holes the person granted can be opened: the
+          graphics chip for gpu.render (an isolated process may not open it:
+          sepolicy isolated_app_all.te), internet sockets for net.sockets, and
+          nothing else. A system-call filter takes away every other socket and
+          sends every path it names to a file broker in :app, but the process
+          shares droidtop's UID, so its own native code could still ask
+          Android's services for things as droidtop. The approval line and the
+          plugin's page warn about that in plain words. Eight slots, one plugin
+          each; a slot's process ends with its plugin.
         -->
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot0" android:process=":plugin_gpu0" android:exported="false" android:isolatedProcess="false" />
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot1" android:process=":plugin_gpu1" android:exported="false" android:isolatedProcess="false" />
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot2" android:process=":plugin_gpu2" android:exported="false" android:isolatedProcess="false" />
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot3" android:process=":plugin_gpu3" android:exported="false" android:isolatedProcess="false" />
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot4" android:process=":plugin_gpu4" android:exported="false" android:isolatedProcess="false" />
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot5" android:process=":plugin_gpu5" android:exported="false" android:isolatedProcess="false" />
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot6" android:process=":plugin_gpu6" android:exported="false" android:isolatedProcess="false" />
-        <service android:name="dev.droidtop.pluginhost.PluginGpuSlot7" android:process=":plugin_gpu7" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot0" android:process=":plugin_open0" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot1" android:process=":plugin_open1" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot2" android:process=":plugin_open2" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot3" android:process=":plugin_open3" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot4" android:process=":plugin_open4" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot5" android:process=":plugin_open5" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot6" android:process=":plugin_open6" android:exported="false" android:isolatedProcess="false" />
+        <service android:name="dev.droidtop.pluginhost.PluginOpenSlot7" android:process=":plugin_open7" android:exported="false" android:isolatedProcess="false" />
 
         <!--
           A plugin's own full-screen UI (ui.main, docs/plugin-api.md 1.7),
