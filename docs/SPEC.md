@@ -6055,6 +6055,29 @@ lock is deliberately not read as shift: the Caps Lock key is forwarded like
 any other and toggles the container's own caps state, which a synthesized
 Shift on top of it would cancel.
 
+**Modifiers (decided 2026-10-14, Droidtop/tracker#147, #555 D1).** A key event
+alone never changed a modifier in the container. wlroots handles
+`zwp_virtual_keyboard_v1.key` with `update_state = false`
+(`types/wlr_virtual_keyboard_v1.c`, `virtual_keyboard_key`), so a Shift, Ctrl,
+Alt or Super press reached the focused client as a key while the keyboard's
+modifier state, which every other key is read through, stayed empty: on
+emulator-5560 (build 1771) `Abc_X|Y>Z*:1` arrived as `abc-x\y.z8;1`, Ctrl+C in
+foot typed `c`, and no sway binding with a modifier could fire. The synthesized
+Shift above was sent and had no effect for the same reason. The state changes
+only through `zwp_virtual_keyboard_v1.modifiers`, so `HostBridge` keeps it for
+each of its two virtual keyboards (`KeyboardModifiers`, `:host-bridge`): a held
+modifier key is depressed, a Caps Lock or Num Lock press toggles its modifier in
+the locked set, and after a key that changes them the new masks are sent, the
+order a physical keyboard's compositor uses. Which modifier a key sets is read
+from the keymap that keyboard was given (`XkbModifierMap`: its `modifier_map`
+lines, and a key whose first symbol is a mapped modifier symbol, such as a
+layout's right Alt that is `ISO_Level3_Shift`, sets what that symbol's key is
+mapped to), never assumed, so the German layout's AltGr is Mod5 where the US
+map's right Alt is Mod1. The US map is read from the same embedded text the
+compositor gets; a layout set later (Keyboard layout below) replaces the layout
+keyboard's map, and keys still held are re-read under it. A new connection
+starts with nothing held.
+
 **Gamepad.** The right stick drives the pointer and the two stick clicks are
 left/right button; the D-pad, face buttons, shoulders and left stick are left
 alone. The shell around the surface — taskbar, start menu, settings — is

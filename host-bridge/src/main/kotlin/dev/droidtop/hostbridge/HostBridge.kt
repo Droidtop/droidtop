@@ -49,8 +49,26 @@ data class Toplevel(
 class HostBridge : HostBridgeInput {
     private var connected = false
 
+    /** The embedded US keymap's modifiers, read from the text the compositor was given. */
+    private val usModifiers by lazy { XkbModifierMap.parse(String(nativeDefaultKeymap(), Charsets.UTF_8)) }
+
+    /**
+     * The modifier state of the two virtual keyboards, the layout one and the text one ([injectKey]'s `typed`).
+     * Both start with the US map; the layout one takes the map of whatever [setKeymap] gives it. Guarded by
+     * itself: keys arrive on the input thread, a layout from a coroutine.
+     */
+    private val modifiers by lazy { mapOf(false to KeyboardModifiers(usModifiers), true to KeyboardModifiers(usModifiers)) }
+
     fun connect(waylandSocketPath: String): Boolean {
         connected = nativeConnect(waylandSocketPath)
+        // A new connection's keyboards are new: nothing is held or locked there, and the layout one has the US
+        // map again until the layout is set.
+        synchronized(modifiers) {
+            modifiers.values.forEach {
+                it.reset()
+                it.replaceMap(usModifiers)
+            }
+        }
         return connected
     }
 
@@ -118,7 +136,16 @@ class HostBridge : HostBridgeInput {
 
     /** [evdevKeyCode]: Linux evdev keycode (KEY_* from linux/input-event-codes.h), not an Android KeyEvent code. */
     override fun injectKey(evdevKeyCode: Int, pressed: Boolean, typed: Boolean) {
-        nativeInjectKey(evdevKeyCode, pressed, typed)
+        synchronized(modifiers) {
+            nativeInjectKey(evdevKeyCode, pressed, typed)
+            // The compositor does not follow modifier keys itself (KeyboardModifiers), so the state they leave
+            // is sent after them, as a physical keyboard's compositor would send it.
+            modifiers.getValue(typed).onKey(evdevKeyCode, pressed)?.let { sendModifiers(it, typed) }
+        }
+    }
+
+    private fun sendModifiers(masks: KeyboardModifiers.Masks, typed: Boolean) {
+        nativeInjectModifiers(masks.depressed, 0, masks.locked, 0, typed)
     }
 
     /**
@@ -126,7 +153,16 @@ class HostBridge : HostBridgeInput {
      * prints), in place of the US map it starts with (docs/SPEC.md 6b "Keyboard layout"). False when there is no
      * connection or the compositor's keymap file could not be made.
      */
-    fun setKeymap(keymap: String): Boolean = keymap.isNotBlank() && nativeSetKeymap(keymap.toByteArray(Charsets.UTF_8))
+    fun setKeymap(keymap: String): Boolean {
+        if (keymap.isBlank()) return false
+        val map = XkbModifierMap.parse(keymap)
+        synchronized(modifiers) {
+            if (!nativeSetKeymap(keymap.toByteArray(Charsets.UTF_8))) return false
+            // Which modifier a held key sets can differ under the new map (a right Alt that is now AltGr).
+            modifiers.getValue(false).replaceMap(map)?.let { sendModifiers(it, typed = false) }
+        }
+        return true
+    }
 
     // ---- Windows, over wlr-foreign-toplevel-management-unstable-v1 ----
     //
@@ -205,6 +241,8 @@ class HostBridge : HostBridgeInput {
     private external fun nativeInjectPointerButton(linuxButtonCode: Int, pressed: Boolean)
     private external fun nativeInjectPointerAxis(horizontal: Double, vertical: Double)
     private external fun nativeInjectKey(evdevKeyCode: Int, pressed: Boolean, typed: Boolean)
+    private external fun nativeInjectModifiers(depressed: Int, latched: Int, locked: Int, group: Int, typed: Boolean)
+    private external fun nativeDefaultKeymap(): ByteArray
     private external fun nativeSetKeymap(utf8: ByteArray): Boolean
     private external fun nativeOfferClipboardText(utf8: ByteArray): Boolean
     private external fun nativeGetToplevels(): Array<Toplevel>
