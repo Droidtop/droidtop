@@ -540,8 +540,9 @@ object PluginCatalogScreen {
         installed: PluginRecord?,
     ): CatalogItem {
         val subtitle = buildString {
-            append(plugin.description ?: "No description")
-            if (source.official) append(" - ").append(origin.origin) else append(" - from ").append(source.name)
+            append(plugin.summary ?: plugin.description ?: "No description")
+            if (source.official) append(" - ").append(plugin.publisher ?: origin.origin)
+            else append(" - ").append(plugin.publisher?.let { "$it, " }.orEmpty()).append("from ").append(source.name)
             if (PluginCatalog.hasOrderConflict(plugin)) {
                 append(" - the catalog lists releases whose versions and dates disagree, so none is offered until it is fixed")
             }

@@ -1836,8 +1836,8 @@ object AppSettingsCatalogs {
         return NestedScreenItem(
             id = "plugin_${m.id}",
             title = m.label,
-            subtitle = listOfNotNull(pluginSummary(m, enabledPoints), trustBadge, PluginTiers.badge(record, grants)).joinToString(" - "),
-            inline = pluginDetailScreen(m.id, m.label),
+            subtitle = listOfNotNull(m.presentation.summary ?: pluginSummary(m, enabledPoints), trustBadge, PluginTiers.badge(record, grants)).joinToString(" - "),
+            inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
             valueLabel = { state },
             chip = if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
         )
@@ -1861,9 +1861,10 @@ object AppSettingsCatalogs {
      * back always shows the current record, never one captured when the
      * parent list was built.
      */
-    private fun pluginDetailScreen(pluginId: String, label: String) = CatalogScreen(
+    private fun pluginDetailScreen(pluginId: String, label: String, summary: String? = null) = CatalogScreen(
         id = "plugin_detail_$pluginId",
         title = label,
+        subtitle = summary,
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val record = PluginStore.installed(context).firstOrNull { it.manifest.id == pluginId }
@@ -2335,6 +2336,25 @@ object AppSettingsCatalogs {
             )
         }
 
+        // The plugin's own facts in droidtop's layout (docs/plugin-api.md 1.2 "Presentation", Droidtop/tracker#521 item 2),
+        // so a plugin never writes its maker or its site into its description.
+        val about = m.presentation
+        val aboutGroup = listOfNotNull(
+            about.publisher?.let { ActionItem(id = "plugin_${m.id}_publisher", title = "Made by", value = it, run = {}) },
+            about.category?.let { ActionItem(id = "plugin_${m.id}_category", title = "Kind", value = categoryLabel(it), run = {}) },
+            about.homepage?.let { url ->
+                ActionItem(
+                    id = "plugin_${m.id}_homepage",
+                    title = "Its page",
+                    subtitle = url.removePrefix("https://").removeSuffix("/"),
+                    value = "Open",
+                    run = { ctx ->
+                        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    },
+                )
+            },
+        )
+
         val advancedGroup = listOf(
             ActionItem(id = "plugin_${m.id}_id", title = "Plugin id", subtitle = m.id, run = {}),
             ActionItem(id = "plugin_${m.id}_origin", title = "Origin", subtitle = m.origin, run = {}),
@@ -2393,6 +2413,7 @@ object AppSettingsCatalogs {
             permissionsGroup,
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
             runtimeGroupItem.takeIf { runtimeNeed == null },
+            aboutGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_about_group", title = "About", items = it) },
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
             CatalogGroup(
                 id = "plugin_${m.id}_uninstall_group",
@@ -2764,6 +2785,18 @@ object AppSettingsCatalogs {
                 },
             ),
         )
+    }
+
+    /** A manifest `category` in the person's words ([dev.droidtop.pluginhost.PluginPresentation.CATEGORIES]). */
+    private fun categoryLabel(category: String): String = when (category) {
+        "sources" -> "Game sources"
+        "emulators" -> "Emulators"
+        "games" -> "Games"
+        "tools" -> "Tools"
+        "system" -> "System"
+        "themes" -> "Themes"
+        "social" -> "Friends and chat"
+        else -> "Other"
     }
 
     /** What a plugin adds, in plain words, for the installed-list row and the detail page's provides row. */
