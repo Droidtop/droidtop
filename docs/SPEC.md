@@ -5864,7 +5864,11 @@ closes the screen, and Back on the failure screen leaves it.
 `droidtop-wine-stop` thread, never the main one: killing Wine, the audio daemon
 and `wineserver -k` (bounded to 5 s) are process work, and on the main thread
 under memory pressure they were an ANR with the game still running. The next
-launch waits for the previous teardown. Every component's `stop` is attempted
+launch waits for the previous teardown. A game left with Back is paused with
+SIGSTOP, so the teardown first continues every Wine process (a stopped
+wineserver cannot answer `wineserver -k`, and the pause's verifier must not stop
+anything again) and ends by killing whatever Wine is still listed, the same sweep
+the next launch makes (tracker#249: after Back, Wine stayed in state T). Every component's `stop` is attempted
 even when an earlier one throws, so the Wine launcher (added last) is always
 reached. What the stop kills is found from `/proc` (`ProcessHelper.listSubProcesses`):
 processes of the app's own user id that are not droidtop's own processes (the
