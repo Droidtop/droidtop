@@ -11,6 +11,7 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.runtime.ContainerApplications
+import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerExports
 import dev.droidtop.runtime.ContainerLauncher
 import dev.droidtop.runtime.ContainerLayout
@@ -83,8 +84,14 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         writeIfChanged(File(applicationsDir, "mimeapps.list"), ContainerLauncher.mimeApps())
         // Other containers' apps exported into the desktop (Droidtop/tracker#555 D5): their entries, stale ones gone.
         ContainerExports.writeEntries(filesDir, ContainerExports.read(filesDir))
+        // Other containers' exported commands and the enter helper they run through (Droidtop/tracker#555 D5, D7).
+        ContainerEnter.writeWrappers(filesDir, ContainerEnter.read(filesDir))
         // Requests from a session that has ended are not this session's to answer.
-        requestsDir.listFiles()?.forEach { it.delete() }
+        // An enter request is a folder of FIFOs and small files; it is emptied first (one level, no walk), then removed.
+        requestsDir.listFiles()?.forEach { request ->
+            if (request.isDirectory) request.listFiles()?.forEach { it.delete() }
+            request.delete()
+        }
     }
 
     @Suppress("DEPRECATION") // FileObserver(File, Int) needs API 29; the String form works on every level.
@@ -92,6 +99,8 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         val watched = object : FileObserver(requestsDir.absolutePath, FileObserver.MOVED_TO) {
             override fun onEvent(event: Int, path: String?) {
                 val name = path ?: return
+                // A command of another container, run with its streams on the request's FIFOs (docs/SPEC.md 3d).
+                if (ContainerEnterRequests.handle(context, requestsDir, name)) return
                 if (ContainerLauncher.isViewRequest(name)) {
                     openOnAndroid(File(requestsDir, name))
                     return

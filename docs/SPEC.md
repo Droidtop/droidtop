@@ -2346,6 +2346,41 @@ the `ContainerRuntime` interface that already exists (§3):
   are not exported yet: a request carries no arguments and no terminal,
   so they wait for the container-enter path (D7). An export keeps the
   container name it had when it was switched on.
+  **Entering another container and exported commands (built 2026-10-15,
+  Droidtop/tracker#555 D7 and D5).** The enter path is the plan's
+  shared-binds option, built before its measuring spike on the owner's go
+  (coordinator, 2026-10-15): droidtop runs the command in the other
+  container as its own session, and the two containers meet in a folder
+  both already see. `droidtop-enter <token> [arguments]`
+  (`ContainerEnter.HELPER`, in droidtop's launcher directory) makes a
+  request directory in the request channel (2a) holding three FIFOs (the
+  command's stdin, stdout and stderr), its arguments (NUL-ended, at most
+  64 KB) and the working folder, and renames it into place. droidtop marks
+  it taken at once (the helper gives up after 10 s with "droidtop did not
+  answer" when nobody does), looks the token up in its own list, starts
+  the other container where the backend needs that, and runs the command
+  there by name with its arguments as argv entries and its streams on the
+  FIFOs (`ContainerEnter.execCommand`); then it writes the exit status,
+  which the helper exits with. The bytes go from container to container;
+  nothing passes through Android and nothing the container wrote is run by
+  Android. A refused request (a token droidtop did not publish, a
+  container whose commands are switched off, no session) says why on the
+  command's stderr and exits 127, 126 or 125. Pipes, not a terminal: a
+  program that needs a terminal (an editor, `top`) does not get one yet.
+  Every request is logged with its timing (tag `droidtop.Enter`: seen how
+  long after it was written, the other container's start, the run), so the
+  option can be measured on a rig.
+  A sibling's page has **Commands in the desktop's terminal**: **Run its
+  commands from the desktop** (on by default, per container,
+  `ContainerEnter.allowed`), **Add a command** (a program's name), and one
+  row per exported command (`ExportedCommand`, kept in
+  `desktop-launcher/commands.list`). Each is a wrapper of that name in
+  `desktop-launcher/commands`, which is on every container's `PATH` after
+  the standard directories (`ContainerLayout.clientEnvironment`), so a
+  container's own program of the same name wins; the wrapper runs the
+  helper with the command's token, as distrobox-export `--bin` writes one.
+  One name belongs to one container. Deleting a container removes its
+  commands; each desktop start rewrites the wrappers from the list.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy

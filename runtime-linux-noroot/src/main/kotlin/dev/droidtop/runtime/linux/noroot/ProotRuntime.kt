@@ -839,7 +839,7 @@ class ProotRuntime(
             "HOME" to "/root",
             "USER" to "root",
             "LOGNAME" to "root",
-            "PATH" to "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PATH" to ContainerLayout.GUEST_PATH,
             "TERM" to "xterm-256color",
             "LANG" to "C.UTF-8",
             "TMPDIR" to "/tmp",
