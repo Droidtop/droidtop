@@ -58,9 +58,9 @@ class ChainSignatureTest {
     }
 
     @Test
-    fun `a chain that includes Core or reaches past it is refused`() {
-        assertTrue(refusedFor(verify(TestPki.detached(pluginTyp, listOf(leaf, core), leafKey.private, manifest))).contains("Droidtop Core"))
-        // Signed by the owner's wider CA, not by Core: untrusted, even with the UCM root in the chain.
+    fun `a chain that includes the signing root or reaches past it is refused`() {
+        assertTrue(refusedFor(verify(TestPki.detached(pluginTyp, listOf(leaf, core), leafKey.private, manifest))).contains("signing root"))
+        // Signed by a key above the root (Core, the owner's CA), not by the root: untrusted, even with that key in the chain.
         val underRoot = TestPki.pluginLeaf(leafKey, "droidtop", ucmRoot, ucmRootKey.private)
         assertTrue(verify(TestPki.detached(pluginTyp, listOf(underRoot), leafKey.private, manifest)) is ChainSignature.Result.Refused)
         assertTrue(verify(TestPki.detached(pluginTyp, listOf(underRoot, ucmRoot), leafKey.private, manifest)) is ChainSignature.Result.Refused)
