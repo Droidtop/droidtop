@@ -71,6 +71,8 @@ dependencies {
     // both together, never independently.
     implementation("io.flutter:flutter_embedding_release:1.0.0-af7e796e161ae0bb1ff0758c71a7105418bd9ded")
     testImplementation(libs.junit)
+    // Throwaway certificates for the signature tests (docs/SPEC.md 12a); test-only, never shipped.
+    testImplementation(project(":test-pki"))
     // android.jar's org.json is a set of stubs that throw at runtime; the
     // main sourceset relies on the real implementation bundled in the
     // Android platform, but a plain JVM unit test needs a real jar (same

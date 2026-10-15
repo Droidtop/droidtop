@@ -1,120 +1,147 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.runtime.util.ChainSignature
+import dev.droidtop.runtime.util.DroidtopCore
+import dev.droidtop.runtime.util.RevocationList
 import dev.droidtop.runtime.util.Sha256
-
-import java.security.KeyPairGenerator
-import java.security.Signature
-import java.security.spec.ECGenParameterSpec
+import dev.droidtop.testpki.TestPki
+import java.security.KeyPair
+import java.security.cert.X509Certificate
 import java.util.Base64
-import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
+/**
+ * The one bundle-trust decision over `manifest.jws` (docs/SPEC.md 12a "Signatures: certificate chains to
+ * Droidtop Core"). Core is a stand-in generated here; so is every other key.
+ */
 class BundleSignatureTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private fun generateKeyPair() = KeyPairGenerator.getInstance("EC").apply {
-        initialize(ECGenParameterSpec("secp256r1"))
-    }.generateKeyPair()
+    private val coreKey = TestPki.rsa()
+    private val core = TestPki.core(coreKey)
+    private val manifest = "hello plugin manifest".toByteArray()
+    private val typ = ChainSignature.Purpose.PLUGIN.typ
 
-    private fun sign(privateKey: java.security.PrivateKey, data: ByteArray): String =
-        Base64.getEncoder().encodeToString(
-            Signature.getInstance("SHA256withECDSA").apply {
-                initSign(privateKey)
-                update(data)
-            }.sign(),
-        )
+    private fun b64(pair: KeyPair) = Base64.getEncoder().encodeToString(pair.public.encoded)
 
-    /** The manifest signature through the one bundle-trust decision, with no certificate. */
-    private fun verifies(data: ByteArray, signatureBase64: String, origin: String, userKeys: Map<String, String> = emptyMap()): Boolean =
-        BundleSignature.verifyBundle(data, signatureBase64, origin, "$origin.sample", null, userKeys) is BundleVerdict.Verified
+    private fun jws(chain: List<X509Certificate>, pair: KeyPair, data: ByteArray = manifest) = TestPki.detached(typ, chain, pair.private, data)
+
+    private fun verdict(
+        jws: String,
+        origin: String,
+        pluginId: String = "$origin.sample",
+        userKeys: Map<String, String> = emptyMap(),
+        revocations: PluginRevocationList = PluginRevocationList.NONE,
+    ) = DroidtopCore.withPinned(core) { BundleSignature.verifyBundle(manifest, jws, origin, pluginId, userKeys, revocations) }
 
     @Test
-    fun `verifies a real ECDSA P-256 signature against the pinned key`() {
-        val pair = generateKeyPair()
-        val data = "hello plugin manifest".toByteArray()
-        val publicKeyBase64 = Base64.getEncoder().encodeToString(pair.public.encoded)
+    fun `an official bundle verifies through a leaf Core issued for the official origin`() {
+        val leafKey = TestPki.ec()
+        val leaf = TestPki.pluginLeaf(leafKey, "droidtop", core, coreKey.private)
+        val result = verdict(jws(listOf(leaf), leafKey), "droidtop")
+        assertEquals(Sha256.hex(core.publicKey.encoded), (result as BundleVerdict.Verified).anchorSha256)
+    }
 
-        PluginOriginKeys.withOrigin("testorigin", publicKeyBase64) {
-            assertTrue(verifies(data, sign(pair.private, data), "testorigin"))
+    @Test
+    fun `a Core leaf for another origin cannot sign official bundles`() {
+        val leafKey = TestPki.ec()
+        val gamegrab = TestPki.pluginLeaf(leafKey, "gamegrab", core, coreKey.private)
+        assertTrue(verdict(jws(listOf(gamegrab), leafKey), "droidtop") is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `a leaf naming plugins signs only those`() {
+        val leafKey = TestPki.ec()
+        val leaf = TestPki.cert("repo", leafKey.public).eku(TestPki.PLUGIN)
+            .uri(ChainSignature.ORIGIN_URN + "droidtop", ChainSignature.PLUGIN_URN + "droidtop.one").issuedBy(core, coreKey.private).build()
+        assertTrue(verdict(jws(listOf(leaf), leafKey), "droidtop", "droidtop.one") is BundleVerdict.Verified)
+        assertTrue(verdict(jws(listOf(leaf), leafKey), "droidtop", "droidtop.two") is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `with no Core pinned an official bundle is refused, saying so`() {
+        val leafKey = TestPki.ec()
+        val leaf = TestPki.pluginLeaf(leafKey, "droidtop", core, coreKey.private)
+        val result = DroidtopCore.withPinned(null) { BundleSignature.verifyBundle(manifest, jws(listOf(leaf), leafKey), "droidtop", "droidtop.sample") }
+        assertTrue((result as BundleVerdict.Refused).reason.contains("Droidtop Core"))
+    }
+
+    @Test
+    fun `a user-trusted key anchors its origin, and an unknown origin is refused`() {
+        val pair = TestPki.ec()
+        val cert = TestPki.cert("acme", pair.public).eku(TestPki.PLUGIN).uri(ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
+        val keys = mapOf("acme" to b64(pair))
+        assertTrue(verdict(jws(listOf(cert), pair), "acme", userKeys = keys) is BundleVerdict.Verified)
+        assertTrue(verdict(jws(listOf(cert), pair), "acme") is BundleVerdict.Refused)
+        // The same certificate cannot speak for another origin the person trusts with the same key.
+        assertTrue(verdict(jws(listOf(cert), pair), "other", userKeys = mapOf("other" to b64(pair))) is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `an origin trusted at Core's key verifies a Core leaf for that origin`() {
+        val leafKey = TestPki.ec()
+        val gamegrab = TestPki.pluginLeaf(leafKey, "gamegrab", core, coreKey.private)
+        val keys = mapOf("gamegrab" to Base64.getEncoder().encodeToString(core.publicKey.encoded))
+        val result = verdict(jws(listOf(gamegrab), leafKey), "gamegrab", userKeys = keys)
+        assertEquals(Sha256.hex(core.publicKey.encoded), (result as BundleVerdict.Verified).anchorSha256)
+        // Through Core's own anchor, the chain may not carry Core.
+        assertTrue(verdict(jws(listOf(gamegrab, core), leafKey), "gamegrab", userKeys = keys) is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `the official origin resolves to Core even when a user key claims it`() {
+        val forger = TestPki.ec()
+        val cert = TestPki.cert("forger", forger.public).eku(TestPki.PLUGIN).uri(ChainSignature.ORIGIN_URN + "droidtop").selfSigned(forger.private).build()
+        assertTrue(verdict(jws(listOf(cert), forger), "droidtop", userKeys = mapOf("droidtop" to b64(forger))) is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `Core's list revokes Core-anchored chains, an origin's own list only that origin`() {
+        val leafKey = TestPki.ec()
+        val leaf = TestPki.pluginLeaf(leafKey, "droidtop", core, coreKey.private)
+        val revokesLeaf = RevocationList(1, setOf(Sha256.hex(leaf.encoded)), emptySet())
+        assertTrue(verdict(jws(listOf(leaf), leafKey), "droidtop", revocations = PluginRevocationList(revokesLeaf)) is BundleVerdict.Refused)
+
+        val pair = TestPki.ec()
+        val acme = TestPki.cert("acme", pair.public).eku(TestPki.PLUGIN).uri(ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
+        val keys = mapOf("acme" to b64(pair))
+        val byKey = RevocationList(1, emptySet(), setOf(Sha256.hex(pair.public.encoded)))
+        // droidtop's list does not reach a user-anchored origin; that origin's own list does.
+        assertTrue(verdict(jws(listOf(acme), pair), "acme", userKeys = keys, revocations = PluginRevocationList(byKey)) is BundleVerdict.Verified)
+        val own = PluginRevocationList(RevocationList.NONE, mapOf("acme" to byKey))
+        assertTrue(verdict(jws(listOf(acme), pair), "acme", userKeys = keys, revocations = own) is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `approval carries across official anchors, not across other keys`() {
+        DroidtopCore.withPinned(core) {
+            val coreSha = Sha256.hex(core.publicKey.encoded)
+            val legacy = LegacyBundleSignature.officialFingerprints()
+            assertTrue(legacy.isNotEmpty())
+            legacy.forEach { assertTrue(PluginOriginKeys.sameTrustAnchor(it, coreSha)) }
+            assertFalse(PluginOriginKeys.sameTrustAnchor("a".repeat(64), coreSha))
+            assertFalse(PluginOriginKeys.sameTrustAnchor("", coreSha))
         }
-    }
-
-    @Test
-    fun `rejects a signature from the wrong key`() {
-        val pair = generateKeyPair()
-        val impostor = generateKeyPair()
-        val data = "hello plugin manifest".toByteArray()
-
-        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
-            assertFalse(verifies(data, sign(impostor.private, data), "testorigin"))
-        }
-    }
-
-    @Test
-    fun `rejects an unpinned origin outright`() {
-        assertFalse(verifies("data".toByteArray(), Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3)), "no-such-origin"))
-    }
-
-    @Test
-    fun `sha256 matches a known vector`() {
-        // echo -n "" | sha256sum
-        assertTrue(Sha256.hex(ByteArray(0)) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
-    }
-
-    @Test
-    fun `the official origin verifies through the pinned-key path`() {
-        val pair = generateKeyPair()
-        val data = "hello plugin manifest".toByteArray()
-        // The test hook stands in for the official private half, which
-        // never leaves the coordination machine: what this exercises is
-        // that origin "droidtop" resolves and verifies through exactly
-        // the path a shipped official bundle takes.
-        PluginOriginKeys.withOrigin(PluginOriginKeys.OFFICIAL_ORIGIN, Base64.getEncoder().encodeToString(pair.public.encoded)) {
-            assertTrue(verifies(data, sign(pair.private, data), PluginOriginKeys.OFFICIAL_ORIGIN))
-        }
-    }
-
-    @Test
-    fun `a user-trusted key verifies a manifest no official key covers, and is refused without it`() {
-        val pair = generateKeyPair()
-        val data = "hello plugin manifest".toByteArray()
-        val userKeys = mapOf("acme" to Base64.getEncoder().encodeToString(pair.public.encoded))
-
-        assertTrue(verifies(data, sign(pair.private, data), "acme", userKeys))
-        // Without the user key the origin is unknown -- refused, not downgraded.
-        assertFalse(verifies(data, sign(pair.private, data), "acme"))
-    }
-
-    @Test
-    fun `the official pinned key wins over a user key claiming the same origin`() {
-        val attacker = generateKeyPair()
-        val data = "forged manifest".toByteArray()
-        val userKeys = mapOf(PluginOriginKeys.OFFICIAL_ORIGIN to Base64.getEncoder().encodeToString(attacker.public.encoded))
-
-        // Official-first resolution: even with a "droidtop" entry in the
-        // user keys (only constructible by hand-editing the store, since
-        // add refuses it), resolve returns the real pinned key...
-        val resolved = PluginOriginKeys.resolve(PluginOriginKeys.OFFICIAL_ORIGIN, userKeys)
-        assertArrayEquals(Base64.getDecoder().decode(PluginOriginKeys.officialKeyBase64()), resolved?.encoded)
-        // ... so the forged signature does not verify.
-        assertFalse(verifies(data, sign(attacker.private, data), PluginOriginKeys.OFFICIAL_ORIGIN, userKeys))
     }
 
     @Test
     fun `a user key removed from the store no longer verifies`() {
-        val pair = generateKeyPair()
-        val data = "hello plugin manifest".toByteArray()
+        val pair = TestPki.ec()
+        val cert = TestPki.cert("acme", pair.public).eku(TestPki.PLUGIN).uri(ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
         val store = tmp.newFile("plugin-user-keys.json")
-
-        UserOriginKeys.add(store, "acme", Base64.getEncoder().encodeToString(pair.public.encoded), source = "https://example.com/plugins")
-        assertTrue(verifies(data, sign(pair.private, data), "acme", UserOriginKeys.loadBase64(store)))
-
+        UserOriginKeys.add(store, "acme", TestPki.pem(cert), source = "https://example.com/plugins")
+        assertTrue(verdict(jws(listOf(cert), pair), "acme", userKeys = UserOriginKeys.loadBase64(store)) is BundleVerdict.Verified)
         assertTrue(UserOriginKeys.remove(store, "acme"))
-        // The origin is unknown again: refused, exactly like a never-trusted one.
-        assertFalse(verifies(data, sign(pair.private, data), "acme", UserOriginKeys.loadBase64(store)))
+        assertTrue(verdict(jws(listOf(cert), pair), "acme", userKeys = UserOriginKeys.loadBase64(store)) is BundleVerdict.Refused)
+    }
+
+    @Test
+    fun `sha256 matches a known vector`() {
+        assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", Sha256.hex(ByteArray(0)))
     }
 }

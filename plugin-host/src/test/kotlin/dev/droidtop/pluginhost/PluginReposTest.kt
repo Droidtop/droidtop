@@ -21,8 +21,8 @@ class PluginReposTest {
     /** The RFC 6979 A.2.5 P-256 public key, as SPKI. */
     private val keyA = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYP7UuiVanTHJYet0xjVtaMBJuJI7Yfps5mliLmDyn7Z5A/4QCLi8maQa6elWKLxk8vGyDC1+n1F3o8KU1EYimQ=="
 
-    /** A second, different valid P-256 public key: the one pinned in the app. */
-    private val keyB get() = PluginOriginKeys.officialKeyBase64()
+    /** A second, different valid P-256 public key: the old official origin key (public material). */
+    private val keyB = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYs1dY+vQaHC/tj9XEfv2KxHfCzLtsgyIi/ANwdSuKyoGcp7kCNXoy0sYhOaOdFUTpV4tnkKsICv/EY8q+zM5Dw=="
 
     private fun published(origin: String = "acme", key: String = keyA) = PluginSourceKeys.PublishedKey(origin, key)
 

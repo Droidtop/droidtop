@@ -64,8 +64,9 @@ data class PluginCatalogInfo(
     /** "unofficial" for every catalog but droidtop's own. */
     val trust: String,
     /**
-     * The organisation's plugin master, P-256 SPKI base64, or null for a catalog without one: trusted on first use
-     * as its own origin's key ([origin]), which certifies each of its repositories' keys.
+     * The catalog's anchor key, SPKI base64, or null for a catalog without one: trusted on first use as its own
+     * origin's key ([origin]); its index signature and revocation list chain to it. For a catalog Droidtop Core
+     * certified it is Core's own key.
      */
     val keyBase64: String?,
     /** The organisation's own origin id (e.g. "gamegrab"), listed under [keyBase64]; null without a master. */
@@ -99,6 +100,13 @@ data class PluginCatalogIndex(
 object PluginCatalogIndexParser {
     const val SCHEMA_VERSION = 1
     private val HEX_64 = Regex("^[0-9a-fA-F]{64}$")
+
+    /**
+     * A key block's `algorithm`: `droidtop-chain-v1` names the anchor certificate chains end at (P-256 or RSA,
+     * Droidtop Core's own key for an origin Core certified; docs/SPEC.md 12a "Signatures: certificate chains to
+     * Droidtop Core"); `SHA256withECDSA` is the older spelling for a P-256 key, read the same way.
+     */
+    private val KEY_ALGORITHMS = setOf("droidtop-chain-v1", "SHA256withECDSA")
     private val STREAMS = setOf("stable", "testing", "unstable")
     private val CATALOG_ID = Regex("[A-Za-z0-9._-]{1,100}/[A-Za-z0-9._-]{1,100}")
     private const val MAX_DISCLAIMER_CHARS = 4000
@@ -125,7 +133,7 @@ object PluginCatalogIndexParser {
             // path is where trust is decided.
             val keyDocument = runCatching {
                 val key = originJson.optJSONObject("key") ?: return@runCatching null
-                if (key.optString("algorithm") != "SHA256withECDSA") return@runCatching null
+                if (key.optString("algorithm") !in KEY_ALGORITHMS) return@runCatching null
                 if (key.optString("origin") != origin) return@runCatching null
                 val spki = key.optString("publicKeySpki")
                 val declared = key.optString("keySha256")
@@ -203,7 +211,7 @@ object PluginCatalogIndexParser {
             null
         } else {
             val key = json.optJSONObject("key") ?: return null
-            if (key.optString("algorithm") != "SHA256withECDSA") return null
+            if (key.optString("algorithm") !in KEY_ALGORITHMS) return null
             val spki = key.optString("publicKeySpki")
             val der = runCatching { java.util.Base64.getDecoder().decode(spki) }.getOrNull() ?: return null
             if (!Sha256.hex(der).equals(key.optString("keySha256"), ignoreCase = true)) return null

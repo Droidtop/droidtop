@@ -1,13 +1,14 @@
 package dev.droidtop.library.integrations
 
 import dev.droidtop.pluginhost.UserOriginKey
-import dev.droidtop.runtime.util.CatalogSignature
+import dev.droidtop.runtime.util.ChainSignature
 import dev.droidtop.runtime.util.Sha256
 import java.security.KeyPair
-import java.security.Signature
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec
+import java.security.cert.X509Certificate
 import java.util.Base64
+import dev.droidtop.testpki.TestPki
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -168,32 +169,24 @@ class PluginCatalogSourcesTest {
     private val now = 1_800_000_000L
     private val url = "https://example.com/index.json"
 
-    private fun pair(): KeyPair = KeyPairGenerator.getInstance("EC").apply { initialize(ECGenParameterSpec("secp256r1")) }.generateKeyPair()
-
     private fun b64(bytes: ByteArray) = Base64.getEncoder().encodeToString(bytes)
 
-    private fun sign(pair: KeyPair, data: ByteArray) =
-        b64(Signature.getInstance("SHA256withECDSA").apply { initSign(pair.private); update(data) }.sign())
-
-    /** index.cert as the catalog workflow publishes it: the catalog key, certified by the organisation's master. */
-    private fun catalogCert(master: KeyPair, catalogKey: KeyPair, idField: String = "certId"): String {
-        val spki = b64(catalogKey.public.encoded)
-        val signed = CatalogSignature.signedBytes("someone/catalog#catalog0", listOf("someone/catalog"), spki, now - 86_400, now + 86_400 * 365)
-        return JSONObject()
-            .put("formatVersion", 1)
-            .put(idField, "someone/catalog#catalog0")
-            .put("catalogs", org.json.JSONArray(listOf("someone/catalog")))
-            .put("publicKeySpki", spki)
-            .put("keySha256", Sha256.hex(catalogKey.public.encoded))
-            .put("notBefore", now - 86_400)
-            .put("notAfter", now + 86_400 * 365)
-            .put("issuer", JSONObject().put("keySha256", Sha256.hex(master.public.encoded)).put("signature", sign(master, signed)))
-            .toString()
+    /** An organisation's master: its own CA certificate, whose key the catalog names and the person accepts. */
+    private class Master(val pair: KeyPair = TestPki.rsa()) {
+        val cert: X509Certificate = TestPki.cert("master", pair.public).ca(0).selfSigned(pair.private).build()
     }
 
-    private fun signedIndex(master: KeyPair): String {
-        val masterSpki = b64(master.public.encoded)
-        val key = JSONObject().put("formatVersion", 1).put("algorithm", "SHA256withECDSA").put("publicKeySpki", masterSpki).put("keySha256", sha(masterSpki))
+    /** `index.json.jws` as the catalog workflow publishes it: a detached signature by a catalog-signing leaf the master issued. */
+    private fun indexSignature(master: Master, text: String, catalog: String = "someone/catalog"): String {
+        val leafKey = TestPki.ec()
+        val leaf = TestPki.cert("catalog", leafKey.public).eku(TestPki.CATALOG).uri(ChainSignature.CATALOG_URN + catalog)
+            .valid(java.util.Date((now - 86_400) * 1000), java.util.Date((now + 86_400 * 365) * 1000)).issuedBy(master.cert, master.pair.private).build()
+        return TestPki.detached(ChainSignature.Purpose.CATALOG.typ, listOf(leaf), leafKey.private, text.toByteArray())
+    }
+
+    private fun signedIndex(master: Master): String {
+        val masterSpki = b64(master.pair.public.encoded)
+        val key = JSONObject().put("formatVersion", 1).put("algorithm", "droidtop-chain-v1").put("publicKeySpki", masterSpki).put("keySha256", sha(masterSpki))
         return index(catalogBlock.put("origin", "gamegrab").put("key", key), disclaimerBlock)
     }
 
@@ -205,54 +198,40 @@ class PluginCatalogSourcesTest {
 
     @Test
     fun `a signed catalog is accepted, and an unsigned copy is refused afterwards`() {
-        val master = pair()
-        val catalogKey = pair()
+        val master = Master()
         val text = signedIndex(master)
-        val files = mapOf(
-            PluginCatalogSources.INDEX_SIGNATURE_FILE to sign(catalogKey, text.toByteArray()),
-            PluginCatalogSources.INDEX_CERTIFICATE_FILE to catalogCert(master, catalogKey),
-        )
+        val files = mapOf(PluginCatalogSources.INDEX_SIGNATURE_FILE to indexSignature(master, text))
 
-        // Adding: the signature verifies under the master the index names, which the person then accepts.
+        // Adding: the signature chains to the master the index names, which the person then accepts.
         val first = check(text, expected = null, files = files)
         assertTrue(first.signed)
         assertEquals("gamegrab", first.index.catalog?.origin)
-        val accepted = added.copy(masterKeyBase64 = b64(master.public.encoded), indexSigned = true)
+        val accepted = added.copy(masterKeyBase64 = b64(master.pair.public.encoded), indexSigned = true)
         assertTrue(check(text, accepted, files).signed)
 
-        // Afterwards: no signature, a changed index, or a signature from a key the master did not certify is refused.
+        // Afterwards: no signature, a changed index, or a signature chained to another key is refused.
         assertTrue(refused(text, accepted, emptyMap()))
         assertTrue(refused(text.replace("Someone", "Somebody"), accepted, files))
-        assertTrue(refused(text, accepted, files + (PluginCatalogSources.INDEX_SIGNATURE_FILE to sign(pair(), text.toByteArray()))))
+        assertTrue(refused(text, accepted, mapOf(PluginCatalogSources.INDEX_SIGNATURE_FILE to indexSignature(Master(), text))))
         // Before any signature was seen an unsigned copy is fine (the review says it is not signed).
-        assertFalse(check(text, added.copy(masterKeyBase64 = b64(master.public.encoded)), emptyMap()).signed)
+        assertFalse(check(text, added.copy(masterKeyBase64 = b64(master.pair.public.encoded)), emptyMap()).signed)
     }
 
     @Test
     fun `another master is refused once one was accepted, even with a valid signature under it`() {
-        val master = pair()
-        val other = pair()
-        val catalogKey = pair()
+        val master = Master()
+        val other = Master()
         val text = signedIndex(other)
-        val files = mapOf(
-            PluginCatalogSources.INDEX_SIGNATURE_FILE to sign(catalogKey, text.toByteArray()),
-            PluginCatalogSources.INDEX_CERTIFICATE_FILE to catalogCert(other, catalogKey),
-        )
+        val files = mapOf(PluginCatalogSources.INDEX_SIGNATURE_FILE to indexSignature(other, text))
         assertTrue(check(text, expected = null, files = files).signed)
-        assertTrue(refused(text, added.copy(masterKeyBase64 = b64(master.public.encoded), indexSigned = true), files))
+        assertTrue(refused(text, added.copy(masterKeyBase64 = b64(master.pair.public.encoded), indexSigned = true), files))
     }
 
-    /** The certificate format reads `certId`; a certificate whose id field is spelled otherwise is not one. */
     @Test
-    fun `a certificate whose id field is not certId is refused`() {
-        val master = pair()
-        val catalogKey = pair()
+    fun `a signing certificate for another catalog is refused`() {
+        val master = Master()
         val text = signedIndex(master)
-        val files = mapOf(
-            PluginCatalogSources.INDEX_SIGNATURE_FILE to sign(catalogKey, text.toByteArray()),
-            PluginCatalogSources.INDEX_CERTIFICATE_FILE to catalogCert(master, catalogKey, idField = "id"),
-        )
-        assertTrue(refused(text, expected = null, files = files))
+        assertTrue(refused(text, expected = null, files = mapOf(PluginCatalogSources.INDEX_SIGNATURE_FILE to indexSignature(master, text, catalog = "someone/else"))))
     }
 
     @Test

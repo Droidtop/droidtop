@@ -58,4 +58,6 @@ dependencies {
     // store's installs and a source's unpacked downloads.
     implementation(libs.libarchive.android)
     testImplementation(libs.junit)
+    // Throwaway certificates for the signature tests (docs/SPEC.md 12a); test-only, never shipped.
+    testImplementation(project(":test-pki"))
 }

@@ -107,15 +107,11 @@ object PluginRepos {
 
     // ----- Updates -----
 
-    /**
-     * A bundle's manifest and signature, read without extracting anything. No certificate: a
-     * repository here is a user-trusted origin, never the official one, and a certificate only
-     * speaks for the official origin ([BundleSignature.verifyBundle]).
-     */
-    class Peeked(val manifest: PluginManifest, val manifestBytes: ByteArray, val signatureBase64: String)
+    /** A bundle's manifest and its `manifest.jws`, read without extracting anything. */
+    class Peeked(val manifest: PluginManifest, val manifestBytes: ByteArray, val jws: String)
 
     /**
-     * Reads `manifest.json` and `manifest.sig` out of a `.droidplugin.tar.xz` and stops; nothing is
+     * Reads `manifest.json` and `manifest.jws` out of a `.droidplugin.tar.xz` and stops; nothing is
      * written. The result is only a reason to look closer: [PluginBundleInstaller.install] still
      * verifies everything before anything is on disk. Null when the file is not a bundle.
      */
@@ -128,7 +124,7 @@ object PluginRepos {
                 if (!entry.isDirectory && entry.size <= MAX_MANIFEST_BYTES) {
                     when (File(entry.name).path) {
                         "manifest.json" -> manifestBytes = tar.readBytes()
-                        "manifest.sig" -> signature = tar.readBytes().toString(Charsets.US_ASCII)
+                        BundleSignature.FILE_NAME -> signature = tar.readBytes().toString(Charsets.US_ASCII)
                     }
                 }
                 entry = tar.nextTarEntry
@@ -170,7 +166,7 @@ object PluginRepos {
         installed: List<PluginRecord>,
         /** The signature check; replaceable so the eligibility rules are tested without any key material. */
         signatureValid: (Peeked) -> Boolean = {
-            BundleSignature.verifyBundle(it.manifestBytes, it.signatureBase64, it.manifest.origin, it.manifest.id, null, userKeys) is BundleVerdict.Verified
+            BundleSignature.verifyBundle(it.manifestBytes, it.jws, it.manifest.origin, it.manifest.id, userKeys) is BundleVerdict.Verified
         },
     ): UpdateDecision {
         val manifest = peeked.manifest

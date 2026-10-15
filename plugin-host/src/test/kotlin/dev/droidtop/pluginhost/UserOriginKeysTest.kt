@@ -71,13 +71,13 @@ class UserOriginKeysTest {
     }
 
     @Test
-    fun `add refuses a key that is not a P-256 SPKI`() {
+    fun `add refuses a key that is neither P-256 nor RSA of 2048 bits or more`() {
         val file = store()
 
         val garbage = UserOriginKeys.add(file, "acme", "this is not base64 !!!", source = null)
         assertTrue(garbage is AddKeyOutcome.Refused)
 
-        val rsa = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
+        val rsa = KeyPairGenerator.getInstance("RSA").apply { initialize(1024) }.generateKeyPair()
         assertTrue(UserOriginKeys.add(file, "acme", Base64.getEncoder().encodeToString(rsa.public.encoded), source = null) is AddKeyOutcome.Refused)
 
         val p384 = UserOriginKeys.add(file, "acme", spkiBase64(freshKeyPair("secp384r1")), source = null)
@@ -169,7 +169,7 @@ class UserOriginKeysTest {
 
         assertTrue(outcome is AddKeyOutcome.Added)
         assertEquals(spkiBase64(pair), UserOriginKeys.load(file)["acme"]?.keyBase64)
-        assertNotNull(PluginOriginKeys.resolve("acme", UserOriginKeys.loadBase64(file)))
+        assertNotNull(PluginOriginKeys.anchorFor("acme", UserOriginKeys.loadBase64(file)))
     }
 
     @Test
@@ -194,5 +194,36 @@ class UserOriginKeysTest {
         assertTrue(UserOriginKeys.attachCatalog(file, "other", "someone/catalog"))
         assertEquals("someone/catalog", UserOriginKeys.load(file)["other"]?.catalog)
         assertFalse(UserOriginKeys.attachCatalog(file, "missing", "someone/catalog"))
+    }
+
+    // ----- Adding an origin as a certificate (docs/SPEC.md 12a "Signatures: certificate chains to Droidtop Core") -----
+
+    @Test
+    fun `a publisher's certificate stores its own key, and must name the origin if it names any`() {
+        val pair = freshKeyPair()
+        val named = dev.droidtop.testpki.TestPki.cert("acme", pair.public).eku(dev.droidtop.testpki.TestPki.PLUGIN)
+            .uri(dev.droidtop.runtime.util.ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
+        assertEquals(spkiBase64(pair), UserOriginKeys.anchorKey("acme", dev.droidtop.testpki.TestPki.pem(named)))
+        assertNull(UserOriginKeys.anchorKey("other", dev.droidtop.testpki.TestPki.pem(named)))
+        val unnamed = dev.droidtop.testpki.TestPki.cert("plain", pair.public).selfSigned(pair.private).build()
+        assertEquals(spkiBase64(pair), UserOriginKeys.anchorKey("acme", Base64.getEncoder().encodeToString(unnamed.encoded)))
+        val file = store()
+        assertTrue(UserOriginKeys.add(file, "acme", dev.droidtop.testpki.TestPki.pem(named), source = null) is AddKeyOutcome.Added)
+        assertEquals(spkiBase64(pair), UserOriginKeys.load(file)["acme"]?.keyBase64)
+    }
+
+    @Test
+    fun `a certificate Droidtop Core issued for the origin anchors it at Core`() {
+        val coreKey = dev.droidtop.testpki.TestPki.rsa()
+        val core = dev.droidtop.testpki.TestPki.core(coreKey)
+        val leaf = dev.droidtop.testpki.TestPki.pluginLeaf(freshKeyPair(), "gamegrab", core, coreKey.private)
+        dev.droidtop.runtime.util.DroidtopCore.withPinned(core) {
+            assertEquals(Base64.getEncoder().encodeToString(core.publicKey.encoded), UserOriginKeys.anchorKey("gamegrab", dev.droidtop.testpki.TestPki.pem(leaf)))
+            assertNull(UserOriginKeys.anchorKey("romgi", dev.droidtop.testpki.TestPki.pem(leaf)))
+        }
+        // With no Core pinned it is just a certificate: its own key.
+        dev.droidtop.runtime.util.DroidtopCore.withPinned(null) {
+            assertEquals(Base64.getEncoder().encodeToString(leaf.publicKey.encoded), UserOriginKeys.anchorKey("gamegrab", dev.droidtop.testpki.TestPki.pem(leaf)))
+        }
     }
 }

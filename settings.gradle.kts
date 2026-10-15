@@ -111,6 +111,9 @@ include(":stores")
 // a plugin call site hands it plain values, never a database handle.
 include(":plugin-host")
 
+// Test-only certificate builder for the plugin, catalog and revocation signature tests.
+include(":test-pki")
+
 // Secondary-display behaviour for EVERY mode, in one place: the single
 // SECONDARY_HOME activity plus the mode registry that selects what it
 // renders. Exists because shell-default's forked Launcher3 and the

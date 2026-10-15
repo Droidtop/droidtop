@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.runtime.util.ChainSignature
+import dev.droidtop.runtime.util.DroidtopCore
 import dev.droidtop.runtime.util.Sha256
 
 import android.content.Context
@@ -10,8 +12,9 @@ import org.json.JSONObject
 
 /**
  * One origin the USER chose to trust (docs/SPEC.md 12a "Keys you trust"):
- * the origin's own id, its P-256 verification key (SPKI, base64 -- the
- * same shape [PluginOriginKeys.OFFICIAL_ORIGIN]'s pinned key uses), and
+ * the origin's own id, the anchor key its signatures' certificate chains
+ * must end at (SPKI, base64: P-256 or RSA; Droidtop Core's own key for an
+ * origin Core certified, [UserOriginKeys.anchorKey]), and
  * the source URL the key was fetched from when it was, so the row can
  * show provenance. Never the official origin: [UserOriginKeys.add]
  * refuses that id outright, and nothing here ever feeds
@@ -81,7 +84,7 @@ object UserOriginKeys {
         }
     }
 
-    /** The same store as verification consumes it: origin -> SPKI base64, passed as [PluginOriginKeys.resolve]'s `userKeys`. */
+    /** The same store as verification consumes it: origin -> SPKI base64, passed as [PluginOriginKeys.anchorFor]'s `userKeys`. */
     fun loadBase64(file: File): Map<String, String> = load(file).mapValues { it.value.keyBase64 }
 
     private fun save(file: File, keys: Map<String, UserOriginKey>) {
@@ -128,20 +131,38 @@ object UserOriginKeys {
     }
 
     /**
-     * Validates and canonicalizes a pasted/fetched key: parses it as a
-     * P-256 SPKI (lenient about base64 line breaks a paste can carry)
-     * and returns the SAME key re-encoded as single-line base64 -- so
-     * the store only ever holds one form of a key and comparisons and
-     * [PluginOriginKeys.resolve] can be exact. Null when the blob is
-     * not a P-256 SPKI at all.
+     * The anchor key to store for [origin] from what a source publishes or a
+     * person pastes (docs/SPEC.md 12a "Keys you trust"): a certificate (PEM or
+     * base64 DER) or a bare SubjectPublicKeyInfo, P-256 or RSA of 2048 bits or
+     * more, lenient about the line breaks a paste carries. A certificate that
+     * Droidtop Core issued and that names [origin] gives Core's own key: that
+     * origin's chains then end at Core, which certified it, while the person
+     * still chose to trust it. Any other certificate gives its own key, and
+     * must name [origin] when it names origins at all. The result is single-line
+     * base64, so the store only ever holds one form of a key and comparisons
+     * can be exact. Null when nothing usable is there.
      */
-    private fun canonicalKey(keyBase64: String): String? {
-        val parsed = PluginOriginKeys.parseSpki(keyBase64) ?: return null
-        return Base64.getEncoder().encodeToString(parsed.encoded)
+    fun anchorKey(origin: String, text: String): String? {
+        val certificate = ChainSignature.parseCertificate(text)
+        val key = if (certificate != null) {
+            val names = ChainSignature.uris(certificate).filter { it.startsWith(ChainSignature.ORIGIN_URN) }
+            if (names.isNotEmpty() && ChainSignature.ORIGIN_URN + origin !in names) return null
+            if (DroidtopCore.issued(certificate)) {
+                if (names.isEmpty()) return null
+                DroidtopCore.certificate()!!.publicKey
+            } else {
+                certificate.publicKey.takeIf(ChainSignature::acceptableKey)
+            }
+        } else {
+            PluginOriginKeys.parseSpki(text)
+        } ?: return null
+        return Base64.getEncoder().encodeToString(key.encoded)
     }
 
+    private const val UNUSABLE = "that isn't a certificate or public key droidtop can use (P-256 or RSA of 2048 bits or more, and naming this origin if it names any)"
+
     /**
-     * Trusts `keyBase64` for `origin`, never overwriting. Same key as
+     * Trusts `keyBase64` (a certificate or key, [anchorKey]) for `origin`, never overwriting. Same key as
      * already trusted -> [AddKeyOutcome.AlreadyTrustedSameKey] (compared
      * by the decoded SPKI bytes, so a re-encoded paste of the same key
      * is the same key); a DIFFERENT key for a trusted origin ->
@@ -150,8 +171,7 @@ object UserOriginKeys {
     fun add(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null, catalog: String? = null): AddKeyOutcome {
         val id = origin.trim()
         originProblem(id)?.let { return AddKeyOutcome.Refused(it) }
-        val key = canonicalKey(keyBase64)
-            ?: return AddKeyOutcome.Refused("that key isn't a valid P-256 public key (base64 of the X.509 SubjectPublicKeyInfo)")
+        val key = anchorKey(id, keyBase64) ?: return AddKeyOutcome.Refused(UNUSABLE)
         val stored = load(file)
         val existing = stored[id]
         if (existing != null) {
@@ -176,8 +196,7 @@ object UserOriginKeys {
     fun replace(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null): AddKeyOutcome {
         val id = origin.trim()
         originProblem(id)?.let { return AddKeyOutcome.Refused(it) }
-        val key = canonicalKey(keyBase64)
-            ?: return AddKeyOutcome.Refused("that key isn't a valid P-256 public key (base64 of the X.509 SubjectPublicKeyInfo)")
+        val key = anchorKey(id, keyBase64) ?: return AddKeyOutcome.Refused(UNUSABLE)
         val stored = load(file)
         val existing = stored[id] ?: return AddKeyOutcome.Refused("no trusted key for origin \"$id\" to replace")
         if (fingerprint(key) == fingerprint(existing.keyBase64)) return AddKeyOutcome.AlreadyTrustedSameKey

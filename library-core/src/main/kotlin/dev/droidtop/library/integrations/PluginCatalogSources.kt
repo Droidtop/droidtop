@@ -27,9 +27,10 @@ data class PluginCatalogSource(
     val homepage: String? = null,
     val official: Boolean = false,
     /**
-     * The catalog's organisation plugin master (SPKI, base64), trusted on first use when the person accepted
-     * the catalog; null for a catalog without one. It is also its own origin's trusted key, certifies that
-     * origin's repository keys, signs its revocation list and certifies the key its index is signed with.
+     * The catalog's anchor key (SPKI, base64; its "master"), trusted on first use when the person accepted the
+     * catalog; null for a catalog without one. It is also its own origin's trusted key, and the chains of that
+     * origin's bundles, of its index signature and of its revocation list end at it (Droidtop Core's own key for
+     * a catalog Core certified).
      */
     val masterKeyBase64: String? = null,
     /** Whether an index signature has verified; from then on an unsigned copy is refused. */
@@ -52,9 +53,8 @@ object PluginCatalogSources {
 
     private const val STORE_NAME = "plugin-catalogs.json"
     const val INDEX_FILE = "index.json"
-    const val INDEX_SIGNATURE_FILE = "index.json.sig"
-    const val INDEX_CERTIFICATE_FILE = "index.cert"
-    const val REVOCATIONS_FILE = "revocations.json"
+    const val INDEX_SIGNATURE_FILE = "index.json.jws"
+    const val REVOCATIONS_FILE = dev.droidtop.runtime.util.RevocationList.FILE_NAME
 
     fun storeFile(context: Context): File = File(context.filesDir, STORE_NAME)
 
