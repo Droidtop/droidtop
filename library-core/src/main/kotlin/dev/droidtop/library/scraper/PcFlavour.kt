@@ -25,6 +25,8 @@ internal data class PcRecord(
     val hero: Sourced<String>? = null,
     val logo: Sourced<String>? = null,
     val icon: Sourced<String>? = null,
+    /** Every id the sources named for this game, kept as `game_ids` (docs/SPEC.md 7o "Saves"). */
+    val ids: PcGameIds = PcGameIds(),
 ) {
     companion object {
         /**
@@ -144,7 +146,7 @@ internal class PcFlavour(context: Context) {
         return PcRecord.of(
             text = listOfNotNull(igdbRecord, steamRecord, lutrisRecord, identity).distinct(),
             art = listOfNotNull(steamGridDbRecord, steamRecord, igdbRecord, identity).distinct(),
-        )
+        ).copy(ids = ids)
     }
 
     /**

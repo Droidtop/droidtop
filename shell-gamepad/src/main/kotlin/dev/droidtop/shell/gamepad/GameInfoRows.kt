@@ -18,7 +18,12 @@ import dev.droidtop.library.gameinfo.CompatResult
 import dev.droidtop.library.gameinfo.EmulatorCompat
 import dev.droidtop.library.gameinfo.HowLongToBeat
 import dev.droidtop.library.gameinfo.HltbResult
+import dev.droidtop.library.saves.SaveDetector
+import dev.droidtop.library.saves.SaveLines
+import dev.droidtop.library.saves.SaveReport
+import dev.droidtop.library.saves.SaveStatus
 import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import kotlinx.coroutines.Dispatchers
@@ -58,23 +63,91 @@ internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true):
         var achievements = emptyList<GameInfoRow>()
         var playTime = emptyList<GameInfoRow>()
         var compatibility = emptyList<GameInfoRow>()
+        var saves = emptyList<GameInfoRow>()
         coroutineScope {
             launch {
                 achievements = withContext(Dispatchers.IO) { achievementRows(context, entry) }
-                value = achievements + playTime + compatibility
+                value = saves + achievements + playTime + compatibility
             }
             launch {
                 playTime = withContext(Dispatchers.IO) { playTimeRows(context, entry) }
-                value = achievements + playTime + compatibility
+                value = saves + achievements + playTime + compatibility
             }
             launch {
                 compatibility = withContext(Dispatchers.IO) { compatibilityRows(context, entry) }
-                value = achievements + playTime + compatibility
+                value = saves + achievements + playTime + compatibility
+            }
+            launch {
+                saves = saveRows(context, entry)
+                value = saves + achievements + playTime + compatibility
             }
         }
     }
     return rows
 }
+
+/**
+ * What droidtop knows of this game's saves: found, none found, no rule, or a rule it cannot apply to this game yet
+ * (docs/SPEC.md 7o "Saves"). Worked out off the main thread when the page opens, never while a list draws. A thing
+ * with no saves to speak of (an app) has no row.
+ */
+internal suspend fun saveRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
+    val report = SaveDetector.report(context, entry) ?: return emptyList()
+    val now = System.currentTimeMillis()
+    return listOf(
+        GameInfoRow(
+            title = "Saves",
+            value = SaveLines.value(report.status, now),
+            subtitle = SaveLines.subtitle(report, now),
+            screen = savesScreen(entry, report, now),
+            chip = "Saves",
+        ),
+    )
+}
+
+/** The details of a game's saves, and the two ways the person corrects droidtop. */
+internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long): CatalogScreen = CatalogScreen(
+    id = "saves_${entry.id}",
+    title = GameNaming.displayName(entry.title),
+    subtitle = SaveLines.value(report.status, nowMs),
+    groups = {
+        val facts = SaveLines.details(report, nowMs).mapIndexed { index, (name, value) ->
+            ActionItem(id = "saves_fact_$index", title = name, subtitle = value, run = {})
+        }
+        val turnedOff = report.status is SaveStatus.TurnedOff
+        listOfNotNull(
+            CatalogGroup("saves_about", null, listOf(ActionItem(id = "saves_summary", title = SaveLines.value(report.status, nowMs), subtitle = SaveLines.subtitle(report, nowMs), run = {}))),
+            CatalogGroup("saves_facts", "Where droidtop looked", facts).takeIf { facts.isNotEmpty() },
+            CatalogGroup(
+                "saves_fix",
+                "Not right?",
+                listOf(
+                    if (turnedOff) {
+                        AsyncActionItem(
+                            id = "saves_again",
+                            title = "Look for this game's saves again",
+                            subtitle = "droidtop goes back to working out where they are",
+                            run = { ctx, _ ->
+                                SaveDetector.matchAgain(ctx, entry.id)
+                                "droidtop will look for this game's saves again"
+                            },
+                        )
+                    } else {
+                        AsyncActionItem(
+                            id = "saves_off",
+                            title = "Don't look for this game's saves",
+                            subtitle = "For a game whose rule is wrong. Nothing is deleted",
+                            run = { ctx, _ ->
+                                SaveDetector.turnOff(ctx, entry.id)
+                                "droidtop will not look for this game's saves"
+                            },
+                        )
+                    },
+                ),
+            ),
+        )
+    },
+)
 
 private fun offline(message: String) = message.startsWith("No connection")
 

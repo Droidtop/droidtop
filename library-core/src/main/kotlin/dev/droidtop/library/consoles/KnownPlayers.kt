@@ -36,6 +36,8 @@ data class KnownPlayerPreset(
     val player: Player.AmStart,
     /** The row's optional `setup` object: what the emulator needs beyond the launch (docs/SPEC.md "Emulator setup helper"). */
     val setup: EmulatorSetupSpec? = null,
+    /** The row's optional `saves` object: where the emulator keeps a game's saves (docs/SPEC.md 7o "Saves"). */
+    val saves: dev.droidtop.library.saves.EmulatorSaves? = null,
 )
 
 object KnownPlayers {
@@ -65,6 +67,10 @@ object KnownPlayers {
     fun setupFor(context: Context, packageName: String): EmulatorSetupSpec? =
         all(context).firstOrNull { it.pkg == packageName && it.setup != null }?.setup
 
+    /** The save rule the database gives [packageName]'s emulator: the first of its rows that carries one. */
+    fun savesFor(context: Context, packageName: String): dev.droidtop.library.saves.EmulatorSaves? =
+        all(context).firstOrNull { it.pkg == packageName && it.saves != null }?.saves
+
     /** Drops the parse cache — called after [PlayersDatabaseUpdater] writes a fresh database. */
     fun invalidate() {
         cached = null
@@ -92,6 +98,7 @@ object KnownPlayers {
                     storagePathTemplate = p.optString("storagePathTemplate").takeIf { it.isNotEmpty() },
                 ),
                 setup = EmulatorSetup.parse(p.optJSONObject("setup"), pkg),
+                saves = dev.droidtop.library.saves.EmulatorSaves.parse(p.optJSONObject("saves"), pkg),
             )
         }
     }
