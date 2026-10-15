@@ -42,6 +42,8 @@ dependencies {
     // StoreLibrary, StoreLibraries and the install job (and, through it,
     // plugin-host's one jobs list) are library-core's.
     implementation(project(":library-core"))
+    // Computers, the paired computers' agents (Steam Link streaming asks one to start a game).
+    implementation(project(":net-core"))
     // SafeDelete, the one symlink-safe delete an uninstall goes through.
     implementation(project(":runtime-common"))
     implementation(libs.androidx.core.ktx)

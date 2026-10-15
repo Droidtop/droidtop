@@ -16091,6 +16091,52 @@ agents, not droidtop's features.
   new versions by itself, and asking to remove older version folders when
   space runs short.
 
+### Starting a game on a computer: Stream with Steam Link (Droidtop/tracker#552)
+
+Owner, 2026-10-14: "Steam link streaming is actually a pretty huge gap for us".
+Asked whether the agent may start games and where the option lives, the owner
+answered: "Yep. Wire it into the steam module specifically, because that
+controls how we handle steam games. Simplifies stuff".
+
+- **Why two steps.** Steam Link 1.3.32 takes no link that picks a computer or
+  a game (rig run on the Retroid Pocket 5: every `steamlink://`, connect and
+  remote play link ends in "Couldn't locate Remote Play invitation"); a plain
+  launch shows the paired computer and its games. So droidtop has the
+  computer start the game, then launches Steam Link plainly. No link is sent.
+  droidtop streams nothing itself (streaming code is windowcast's, 7a).
+- **The agent side** is `launch_game` (droidtop-agent docs/DESIGN.md section
+  17, hello feature `launch`): the agent builds `steam://rungameid/<id>`
+  itself from a `steam:<digits>` key, refuses any other key, and starts
+  nothing for a handheld the person has not allowed on that computer (a
+  per-handheld switch, off by default). `AgentNative` reaches it as the
+  operation `launch_game`; the reply is `{"result": started | not_allowed |
+  unknown_game | steam_not_running | failed (message) | agent_too_old}` or
+  the usual `error` and `unreachable`.
+- **It lives in the Steam module.** `StoreLibrary.playOptions` lists a
+  store's other ways to play a game and `playWith` does one; Steam offers
+  "Stream with Steam Link" (`SteamLinkStream`, `:stores`). It is a row in the
+  Play part of a Steam game's menu, on every Steam game. Its detail line says
+  what pressing it will do or what is missing.
+- **What pressing it does.** Steam Link installed? Else the store page of
+  `com.valvesoftware.steamlink` opens (droidtop installs nothing). Then the
+  paired computers that list the game as installed (the library file the sync
+  keeps, `ComputerLibrary.computersWith`) are asked in turn, the primary
+  computer first, then the one met most recently; a computer that does not
+  answer is skipped for the next, and any other answer ends the asking. On
+  `started`, Steam Link is launched and the row says to choose that computer
+  and Start Playing.
+- **Honest states**, each in plain words with the next step, and logged:
+  Steam Link not installed; no paired computer; no paired computer has the
+  game; computer offline (with the paths that were tried); agent too old
+  (update it); this handheld not allowed (where to tick it on the computer);
+  the computer's scan does not list the game; Steam not running there
+  (start it and sign in). A signed-out Steam is not detected: `started` means
+  Steam was asked, and Steam Link then shows what Steam allows. Steam Link not
+  yet paired with the computer is not detectable and is Steam Link's own screen.
+- **Not built:** the `computers.list` and `computers.launch_game` plugin
+  operations. The owner approved them but they are not needed until
+  something outside droidtop wants them.
+
 ### Transports
 
 The design's order (droidtop-agent docs/DESIGN.md section 10) holds:

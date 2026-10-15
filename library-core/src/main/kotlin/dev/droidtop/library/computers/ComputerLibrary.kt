@@ -269,6 +269,16 @@ object ComputerLibrary {
         }.toSet()
     }
 
+    /** Whether the state's [games] list [key] as installed on the computer [device]. */
+    internal fun installedOn(games: JSONObject?, key: String, device: String): Boolean =
+        games?.optJSONObject(key)?.optJSONObject("installs")?.optJSONObject(device)?.optJSONObject("install")?.optBoolean("installed") == true
+
+    /** Those of [computers] that have [key] installed, as the last exchange left it. Reads a file: never on the main thread. */
+    fun computersWith(context: Context, key: String, computers: List<Computer>): List<Computer> {
+        val games = runCatching { JSONObject(stateFile(context).readText()).optJSONObject("games") }.getOrNull() ?: return emptyList()
+        return computers.filter { installedOn(games, key, it.id) }
+    }
+
     /** The platform the agent gives a computer's installed applications. */
     const val APP_PLATFORM = "app"
 

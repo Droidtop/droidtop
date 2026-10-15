@@ -181,7 +181,8 @@ object PcRunnerOptions {
         }
     }
 
-    private fun openStorePage(context: Context, packageName: String): String? = try {
+    /** Opens the device's app store on [packageName]; null when it opened, else the line saying it could not. */
+    fun openStorePage(context: Context, packageName: String): String? = try {
         context.startActivity(
             android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=$packageName"))
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),

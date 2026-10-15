@@ -188,6 +188,13 @@ data class StoreUpdateCheck(val update: StoreUpdate, val latest: String? = null)
 /** How a store itself starts one of its games, when its own data says. */
 data class StoreLaunch(val executable: File, val workingDir: File, val arguments: List<String> = emptyList())
 
+/**
+ * A way to play one game that a store offers beside running its files here
+ * (Steam's "Stream with Steam Link"): a row on the game's Play list. [detail]
+ * says what pressing it will do, or what it still needs.
+ */
+data class StorePlayOption(val id: String, val title: String, val detail: String)
+
 /** The account a store game is played as ([StoreLibrary.player]): its 64-bit id, its name, and the DLC ids of the game it has. */
 data class StorePlayer(val steamId64: Long, val name: String, val dlc: Set<String>)
 
@@ -317,6 +324,17 @@ interface StoreLibrary {
 
     /** How the store itself starts [gameId], or null to let droidtop find the executable in the folder. */
     suspend fun launch(context: Context, gameId: String): StoreLaunch? = null
+
+    /**
+     * The other ways the store offers to play [gameId] (Steam: stream it from
+     * a paired computer with Steam Link), listed on the game's Play list. Reads
+     * droidtop's own files, no network, but not for the main thread. None by default.
+     */
+    fun playOptions(context: Context, gameId: String): List<StorePlayOption> = emptyList()
+
+    /** Plays [gameId] the way [optionId] says; the one line to show when it has started or why it has not. */
+    suspend fun playWith(context: Context, gameId: String, optionId: String, title: String): String =
+        "$label has no way to play $title called $optionId"
 
     /**
      * What the person can choose about [gameId]'s content: which extras (DLC)

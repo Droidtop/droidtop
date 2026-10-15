@@ -550,11 +550,31 @@ internal fun PcGameMenu(
             runCatching { ownStore.contentOptions(context, (entry.pcInfo?.storeId ?: entry.id).substringAfter(':')) }.getOrNull()
         } != null
     }
+    // The store's other ways to play (Steam's "Stream with Steam Link"): files read, so on IO.
+    val playOptions by produceState(emptyList<dev.droidtop.library.stores.StorePlayOption>(), entry.id) {
+        value = if (ownStore == null) {
+            emptyList()
+        } else {
+            withContext(Dispatchers.IO) {
+                runCatching { ownStore.playOptions(context, (entry.pcInfo?.storeId ?: entry.id).substringAfter(':')) }.getOrNull().orEmpty()
+            }
+        }
+    }
     val ownStoreRows = ownStore?.let { store ->
         val key = entry.pcInfo?.storeId ?: entry.id
         val gameId = key.substringAfter(':')
         val installed = entry.pcInfo?.installed == true
         buildList {
+            playOptions.forEach { option ->
+                add(
+                    PcActionRow(option.title, option.detail, {
+                        scope.launch {
+                            status = "Working…"
+                            status = store.playWith(context, gameId, option.id, GameNaming.displayName(entry.title))
+                        }
+                    }),
+                )
+            }
             if (hasContent) {
                 add(PcActionRow("DLC and versions", "Which DLC to have and which version to follow", { contentOpen = true }))
             }

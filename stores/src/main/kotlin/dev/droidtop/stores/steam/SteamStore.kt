@@ -14,6 +14,7 @@ import dev.droidtop.library.stores.StoreGame
 import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.stores.StoreLaunch
 import dev.droidtop.library.stores.StoreLibrary
+import dev.droidtop.library.stores.StorePlayOption
 import dev.droidtop.library.stores.StorePlayer
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
@@ -431,6 +432,11 @@ class SteamStore : StoreLibrary {
             ?: exe.parentFile ?: dir
         StoreLaunch(exe, workingDir, entry?.arguments?.let(EpicGameLauncher::tokenizeArgs).orEmpty())
     }
+
+    override fun playOptions(context: Context, gameId: String): List<StorePlayOption> = listOf(SteamLinkStream.option(context, gameId))
+
+    override suspend fun playWith(context: Context, gameId: String, optionId: String, title: String): String =
+        if (optionId == SteamLinkStream.OPTION_ID) SteamLinkStream.stream(context, gameId, title) else super.playWith(context, gameId, optionId, title)
 
     override fun changeStamp(context: Context): Long =
         StoreFiles.stamp(SteamDatabase.files(context) + SteamCredentials.file(context) + SteamOwnedGames.file(context))
