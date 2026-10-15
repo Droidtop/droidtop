@@ -131,12 +131,6 @@ class RiskyActionsTest {
 
         val write = RiskyPrompts.writeFileConfirm("RetroArch", "/storage/emulated/0/Android/data/com.retroarch/files/retroarch.cfg")
         assertTrue("RetroArch" in write && "retroarch.cfg" in write)
-
-        val core = RiskyPrompts.placeCoreConfirm("mgba", "RetroArch", "/data/user/0/com.retroarch/cores/mgba_libretro_android.so")
-        assertTrue("mgba_libretro_android.so" in core && "root" in core)
-
-        val cores = RiskyPrompts.placeCoresConfirm((1..6).map { "/cores/c$it.so" }, "RetroArch")
-        assertTrue("6 cores" in cores && "and 2 more" in cores)
     }
 
     @Test

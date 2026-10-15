@@ -5,25 +5,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
-import java.util.zip.ZipEntry
-import java.util.zip.ZipOutputStream
 
-/** The pure parts of the touchless RetroArch core install (Droidtop/tracker#271). */
+/** The pure parts of getting a RetroArch core in (Droidtop/tracker#271). */
 class RetroArchCoresTest {
     private fun elf(is64: Boolean, machine: Int): ByteArray = ByteArray(64).also {
         it[0] = 0x7F.toByte(); it[1] = 'E'.code.toByte(); it[2] = 'L'.code.toByte(); it[3] = 'F'.code.toByte()
         it[4] = (if (is64) 2 else 1).toByte()
         it[18] = (machine and 0xFF).toByte(); it[19] = (machine shr 8).toByte()
     }
-
-    private fun zipOf(vararg entries: Pair<String, ByteArray>): File =
-        File.createTempFile("core", ".zip").also { file ->
-            ZipOutputStream(file.outputStream()).use { out ->
-                entries.forEach { (name, bytes) -> out.putNextEntry(ZipEntry(name)); out.write(bytes); out.closeEntry() }
-            }
-            file.deleteOnExit()
-        }
 
     @Test
     fun `the generated launch names a core droidtop can install`() {
@@ -59,31 +48,6 @@ class RetroArchCoresTest {
     }
 
     @Test
-    fun `the download is the official buildbot over https`() {
-        assertEquals(
-            "https://buildbot.libretro.com/nightly/android/latest/arm64-v8a/mgba_libretro_android.so.zip",
-            RetroArchCores.buildbotUrl("arm64-v8a", "mgba"),
-        )
-    }
-
-    @Test
-    fun `the ABI is the one Android runs RetroArch as`() {
-        assertEquals("arm64-v8a", RetroArchCores.abiFor("/data/app/x/com.retroarch.aarch64-y/lib/arm64", listOf("x86_64")))
-        assertEquals("armeabi-v7a", RetroArchCores.abiFor("/data/app/x/lib/arm", listOf("arm64-v8a")))
-        assertEquals("arm64-v8a", RetroArchCores.abiFor(null, listOf("arm64-v8a", "armeabi-v7a")))
-        assertNull(RetroArchCores.abiFor(null, listOf("mips")))
-    }
-
-    @Test
-    fun `only an ELF for the right architecture passes`() {
-        assertTrue(RetroArchCores.elfMatches(elf(true, 183), "arm64-v8a"))
-        assertFalse(RetroArchCores.elfMatches(elf(true, 62), "arm64-v8a"))
-        assertFalse(RetroArchCores.elfMatches(elf(false, 40), "arm64-v8a"))
-        assertTrue(RetroArchCores.elfMatches(elf(false, 40), "armeabi-v7a"))
-        assertFalse(RetroArchCores.elfMatches("PK".toByteArray() + ByteArray(30), "arm64-v8a"))
-    }
-
-    @Test
     fun `a core whose section table ends past the end of the file is incomplete`() {
         // ELF64: e_shoff 0x1000, e_shentsize 64, e_shnum 10, so the table ends at 0x1000 + 640.
         val header = elf(true, 183).also {
@@ -97,23 +61,39 @@ class RetroArchCoresTest {
         assertTrue(RetroArchCores.missingMessage(RetroArchCores.Need("com.retroarch.aarch64", "gambatte", "/x"), RetroArchCores.State.PARTIAL).contains("incomplete"))
     }
 
+
     @Test
-    fun `the archive must hold exactly the named core`() {
-        val dest = File.createTempFile("core", ".so").also { it.deleteOnExit() }
-        RetroArchCores.extractCore(zipOf("mgba_libretro_android.so" to elf(true, 183)), "mgba", "arm64-v8a", dest)
-        assertTrue(dest.length() > 0)
-        assertTrue(runCatching { RetroArchCores.extractCore(zipOf("other.so" to elf(true, 183)), "mgba", "arm64-v8a", dest) }.isFailure)
-        assertTrue(runCatching { RetroArchCores.extractCore(zipOf("mgba_libretro_android.so" to elf(true, 62)), "mgba", "arm64-v8a", dest) }.isFailure)
-        assertFalse(dest.exists())
+    fun `the warning names the core, the RetroArch package and the file it checked`() {
+        val need = RetroArchCores.Need("com.retroarch.aarch64", "mupen64plus_next_gles3", "/data/user/0/com.retroarch.aarch64/cores/mupen64plus_next_gles3_libretro_android.so")
+        val line = RetroArchCores.missingMessage(need, RetroArchCores.State.MISSING)
+        assertTrue(line, line.contains("mupen64plus_next_gles3 in com.retroarch.aarch64, /data/user/0/com.retroarch.aarch64/cores/mupen64plus_next_gles3_libretro_android.so"))
+        assertTrue(RetroArchCores.troubleHint(need).contains("com.retroarch.aarch64"))
     }
 
     @Test
-    fun `placing never replaces a core and never leaves a half copy`() {
-        val commands = RetroArchCores.placeCommands("/src/mgba.so", "/data/user/0/com.retroarch/cores/mgba_libretro_android.so", 10115, "u:object_r:app_data_file:s0:c115,c256,c512,c768")
-        val staged = "/data/user/0/com.retroarch/cores/mgba_libretro_android.so.droidtop-new"
-        assertEquals(listOf("cp", "/src/mgba.so", staged), commands.first())
-        assertTrue(listOf("chown", "10115:10115", staged) in commands)
-        assertTrue(listOf("mv", "-n", staged, "/data/user/0/com.retroarch/cores/mgba_libretro_android.so") in commands)
-        assertEquals(listOf("rm", "-f", staged), commands.last())
+    fun `only a legacy-storage RetroArch with storage access can sideload a core droidtop leaves in Download`() {
+        // The buildbot builds target SDK 28; the Play Store builds target 35 (pkg/android/phoenix/build.gradle, 1.22.0).
+        assertTrue(RetroArchCores.canSideload(targetSdk = 28, storageGranted = true))
+        assertFalse(RetroArchCores.canSideload(targetSdk = 28, storageGranted = false))
+        assertFalse(RetroArchCores.canSideload(targetSdk = 35, storageGranted = true))
+        val need = RetroArchCores.Need("com.retroarch.aarch64", "mgba", "/data/user/0/com.retroarch.aarch64/cores/mgba_libretro_android.so")
+        // RetroArch's sideload keeps the file's own name in its cores folder, so the copy carries the name a launch loads.
+        assertEquals(
+            "/storage/emulated/0/Download/droidtop-cores/mgba_libretro_android.so",
+            RetroArchCores.sharedCorePath("/storage/emulated/0/Download", need),
+        )
+    }
+
+    @Test
+    fun `the manager's downloaded core is read only from its own data folder`() {
+        val data = java.nio.file.Files.createTempDirectory("plugin-data").toFile()
+        val core = java.io.File(data, "cores/arm64-v8a/mgba_libretro_android.so").apply { parentFile.mkdirs(); writeBytes(ByteArray(8)) }
+        val outside = java.io.File(data.parentFile, "outside-${data.name}.so").apply { writeBytes(ByteArray(8)); deleteOnExit() }
+        assertEquals(core.canonicalFile, RetroArchCores.managerFile(data, "cores/arm64-v8a/mgba_libretro_android.so"))
+        assertNull(RetroArchCores.managerFile(data, "../${outside.name}"))
+        assertNull(RetroArchCores.managerFile(data, outside.absolutePath))
+        assertNull(RetroArchCores.managerFile(data, "cores/arm64-v8a/missing_libretro_android.so"))
+        // One file and its folders, one level at a time.
+        core.delete(); core.parentFile.delete(); core.parentFile.parentFile.delete(); data.delete()
     }
 }
