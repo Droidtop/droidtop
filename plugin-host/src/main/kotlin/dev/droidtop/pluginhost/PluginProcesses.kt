@@ -37,10 +37,19 @@ internal object PluginProcesses {
         PluginSandboxSlot0::class.java, PluginSandboxSlot1::class.java, PluginSandboxSlot2::class.java, PluginSandboxSlot3::class.java,
         PluginSandboxSlot4::class.java, PluginSandboxSlot5::class.java, PluginSandboxSlot6::class.java, PluginSandboxSlot7::class.java,
     )
-    private val GPU_SLOTS: List<Class<out PluginProcessService>> = listOf(
-        PluginGpuSlot0::class.java, PluginGpuSlot1::class.java, PluginGpuSlot2::class.java, PluginGpuSlot3::class.java,
-        PluginGpuSlot4::class.java, PluginGpuSlot5::class.java, PluginGpuSlot6::class.java, PluginGpuSlot7::class.java,
+    private val OPEN_SLOTS: List<Class<out PluginProcessService>> = listOf(
+        PluginOpenSlot0::class.java, PluginOpenSlot1::class.java, PluginOpenSlot2::class.java, PluginOpenSlot3::class.java,
+        PluginOpenSlot4::class.java, PluginOpenSlot5::class.java, PluginOpenSlot6::class.java, PluginOpenSlot7::class.java,
     )
+
+    /**
+     * Open slots whose process was ended ([endOpenLocked]) and has not died yet. A bind to such a slot could land in the
+     * old process, under the old plugin's filter and broker, so the slot is not used until its death is seen.
+     */
+    private val dyingOpen = HashSet<String>()
+
+    /** When each open slot's process was last ended, so a fresh process goes to the slot ended longest ago. */
+    private val openEndedAt = HashMap<String, Long>()
 
     private class Process(val key: String, val tier: PluginTier, val service: Class<out PluginProcessService>, val instance: String?) {
         var runtime: IPluginRuntime? = null
@@ -141,7 +150,7 @@ internal object PluginProcesses {
         byPlugin[pluginId]?.let {
             val where = when (it.tier) {
                 PluginTier.CONTAINED -> "sealed, in a process of its own"
-                PluginTier.GPU_RENDER -> "a process of its own with graphics access, sharing droidtop's user id"
+                PluginTier.OPEN -> "an open process of its own, sharing droidtop's user id, with only the holes it was granted"
                 PluginTier.FULL_TRUST -> "a process of its own, sharing droidtop's user id"
             }
             "${it.key} ($where)"
@@ -158,7 +167,7 @@ internal object PluginProcesses {
             val key = "contained:$pluginId"
             processes.getOrPut(key) { Process(key, tier, PluginSandboxService::class.java, instanceName(pluginId)) }
         } else {
-            // GPU and full-trust processes are not isolated, so there is no per-instance bindIsolatedService form; below
+            // Open and full-trust processes are not isolated, so there is no per-instance bindIsolatedService form; below
             // API 29 a contained plugin falls here too. All three draw from a fixed pool of declared slot services.
             pooled(tier) ?: return null
         }
@@ -169,9 +178,10 @@ internal object PluginProcesses {
 
     /** A free slot, else the least recently used idle one (its plugins leave it), else for full trust the least recently used one, shared. */
     private fun pooled(tier: PluginTier): Process? {
+        if (tier == PluginTier.OPEN) return pooledOpen()
         val (services, prefix) = when (tier) {
             PluginTier.CONTAINED -> SANDBOX_SLOTS to "contained-slot"
-            PluginTier.GPU_RENDER -> GPU_SLOTS to "gpu-slot"
+            PluginTier.OPEN -> OPEN_SLOTS to "open-slot"
             PluginTier.FULL_TRUST -> FULL_TRUST_SLOTS to "full-slot"
         }
         val slots = services.indices.map { processes["$prefix$it"] }
@@ -183,7 +193,61 @@ internal object PluginProcesses {
         return processes.getOrPut("$prefix$index") { Process("$prefix$index", tier, services[index], null) }
     }
 
+    /**
+     * An open slot for one plugin (docs/plugin-api.md 5.3, "Open processes"): never shared, since its filter and broker
+     * would be the first plugin's. A slot with no process and none dying, the one ended longest ago; else the least
+     * recently used idle slot is ended to free one for the next call, and this call gets none.
+     */
+    private fun pooledOpen(): Process? {
+        val prefix = "open-slot"
+        val free = OPEN_SLOTS.indices.map { "$prefix$it" }.filter { processes[it] == null && it !in dyingOpen }
+        val key = free.minByOrNull { openEndedAt[it] ?: 0L }
+        if (key == null) {
+            OPEN_SLOTS.indices.mapNotNull { processes["$prefix$it"] }.filter { it.users == 0 }.minByOrNull { it.lastUsedMs }?.let(::endOpenLocked)
+            return null
+        }
+        val index = key.removePrefix(prefix).toInt()
+        return Process(key, PluginTier.OPEN, OPEN_SLOTS[index], null).also { processes[key] = it }
+    }
+
+    /**
+     * Ends an open process: it leaves the pool at once (so its death is not reported as a crash), its plugins are unloaded
+     * and then it is unbound, which ends it ([PluginOpenService]). Its slot stays out of use until the process has died.
+     * Under [lock].
+     */
+    private fun endOpenLocked(process: Process) {
+        processes.remove(process.key)
+        openEndedAt[process.key] = System.currentTimeMillis()
+        val held = process.plugins.toList()
+        held.forEach { if (byPlugin[it] === process) byPlugin.remove(it) }
+        process.plugins.clear()
+        val runtime = process.runtime
+        process.runtime = null
+        process.connecting?.complete(null)
+        process.connecting = null
+        process.idle?.let { main.removeCallbacks(it) }
+        process.idle = null
+        val connection = process.connection
+        process.connection = null
+        val app = process.app
+        if (runtime != null) {
+            val key = process.key
+            dyingOpen += key
+            val watched = runCatching { runtime.asBinder().linkToDeath({ synchronized(lock) { dyingOpen -= key } }, 0) }.isSuccess
+            if (!watched) dyingOpen -= key
+        }
+        unloads.execute {
+            held.forEach { id -> runCatching { runtime?.unloadPlugin(id) } }
+            if (connection != null && app != null) runCatching { app.unbindService(connection) }
+        }
+    }
+
     private fun detach(pluginId: String, process: Process) {
+        // An open process is its plugin's alone: leaving it ends it, so no hole or broker outlives the plugin.
+        if (process.tier == PluginTier.OPEN) {
+            endOpenLocked(process)
+            return
+        }
         process.plugins.remove(pluginId)
         if (byPlugin[pluginId] === process) byPlugin.remove(pluginId)
         // Off the lock: a plugin's onUnload is its own code and may be slow; nothing waits for it.
@@ -271,6 +335,11 @@ internal object PluginProcesses {
         synchronized(lock) {
             process.idle = null
             if (process.users > 0 || processes[process.key] !== process) return
+            // An open process ends with its plugin's last use; the next call starts it afresh with the holes granted then.
+            if (process.tier == PluginTier.OPEN) {
+                endOpenLocked(process)
+                return
+            }
             val connection = process.connection
             process.connection = null
             process.runtime = null

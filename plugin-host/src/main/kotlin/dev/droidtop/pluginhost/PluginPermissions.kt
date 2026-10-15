@@ -16,8 +16,9 @@ enum class PermissionTier { NORMAL, DANGEROUS, CRITICAL }
  * row under that Android name, and droidtop asks Android for it on first use.
  * [caution] is a plain warning shown with the label wherever the person
  * decides on the permission or sees it granted: for a permission whose grant
- * lets a plugin's own code reach past what droidtop can check (`gpu.render`,
- * docs/plugin-api.md 5.3, "The graphics tier").
+ * lets a plugin's own code reach past what droidtop can check (the hole
+ * permissions `gpu.render` and `net.sockets`, docs/plugin-api.md 5.3, "Open
+ * processes: one hole per permission").
  */
 data class PluginPermission(
     val id: String,
@@ -61,6 +62,14 @@ object PluginPermissions {
         PluginPermission("net.domains", PermissionTier.NORMAL, "Connect to: listed domains"),
         PluginPermission("net.any", PermissionTier.DANGEROUS, "Connect to any site on the internet", android = AndroidNeed("android.permission.INTERNET")),
         PluginPermission("net.local", PermissionTier.DANGEROUS, "Find and connect to devices on your local network"),
+        // The network hole of an open process (docs/plugin-api.md 5.3, "Open processes"): the plugin's own code makes
+        // its own connections and listens for others, not through net.http; the filter cannot tell one address from
+        // another, so this device's own services are reachable too.
+        PluginPermission(
+            "net.sockets", PermissionTier.DANGEROUS, "Make its own connections to other devices and the internet",
+            android = AndroidNeed("android.permission.INTERNET"),
+            caution = "A plugin with this connects by itself, also to other apps on this device, so only allow it for a plugin from a source you trust",
+        ),
         PluginPermission("storage.volumes", PermissionTier.NORMAL, "See your storage devices and free space"),
         PluginPermission("files.picker", PermissionTier.NORMAL, "Ask you to choose files or folders"),
         PluginPermission("files.shared.read", PermissionTier.DANGEROUS, "Read all files on shared storage"),

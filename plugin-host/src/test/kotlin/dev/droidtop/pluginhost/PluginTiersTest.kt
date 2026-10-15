@@ -15,6 +15,7 @@ import org.junit.Test
 class PluginTiersTest {
     private val fullTrust = obj("id" to PluginTiers.FULL_TRUST, "reason" to "Talks to Shizuku")
     private val gpu = obj("id" to PluginTiers.GPU_RENDER, "reason" to "Draws with hardware")
+    private val net = obj("id" to PluginTiers.NET_SOCKETS, "reason" to "Syncs with your other devices")
 
     private fun grants(vararg states: Pair<String, GrantState>) = PluginGrants.Snapshot(states = states.toMap())
 
@@ -103,8 +104,8 @@ class PluginTiersTest {
         assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.DENIED)))
         assertNull(PluginTiers.badge(r, grants()))
         assertNull(PluginTiers.refusal(r, grants()))
-        // Ticked: it runs in a graphics process, still not full access and still no badge the person must read.
-        assertEquals(PluginTier.GPU_RENDER, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+        // Ticked: it runs in an open process with that one hole, still not full access and still no badge the person must read.
+        assertEquals(PluginTier.OPEN, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
         assertNull(PluginTiers.badge(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
         assertNull(PluginTiers.refusal(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
     }
@@ -139,5 +140,39 @@ class PluginTiersTest {
             PluginTier.FULL_TRUST,
             PluginTiers.of(r, grants(PluginTiers.FULL_TRUST to GrantState.GRANTED, PluginTiers.GPU_RENDER to GrantState.GRANTED)),
         )
+    }
+
+    @Test
+    fun `each granted hole permission opens only its own hole`() {
+        // Owner's decision (Droidtop/tracker#553): one open process type, each grant opening only its own hole.
+        val r = record(manifest { it.put("permissions", arr(gpu, net)) })
+        assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants()))
+        assertTrue(PluginTiers.holes(r, grants()).isEmpty())
+        assertEquals(setOf(PluginTiers.NET_SOCKETS), PluginTiers.holes(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
+        assertEquals(PluginTier.OPEN, PluginTiers.of(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
+        assertEquals(setOf(PluginTiers.GPU_RENDER), PluginTiers.holes(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.DENIED)))
+        assertEquals(
+            setOf(PluginTiers.GPU_RENDER, PluginTiers.NET_SOCKETS),
+            PluginTiers.holes(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED)),
+        )
+        assertNull(PluginTiers.badge(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
+        // A hole the plugin did not declare is never opened, whatever the store says.
+        val undeclared = record(manifest { it.put("permissions", arr(gpu)) })
+        assertEquals(setOf(PluginTiers.GPU_RENDER), PluginTiers.holes(undeclared, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
+        // Full access, and a plugin that cannot run contained, get no holes.
+        val full = record(manifest { it.put("permissions", arr(fullTrust, net)) })
+        assertTrue(PluginTiers.holes(full, grants(PluginTiers.FULL_TRUST to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED)).isEmpty())
+        val binds = record(manifest { it.put("permissions", arr(obj("id" to "apps.bind"), net)) })
+        assertTrue(PluginTiers.holes(binds, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED)).isEmpty())
+    }
+
+    @Test
+    fun `the network hole warns in plain words, and both holes warn together`() {
+        val r = record(manifest { it.put("permissions", arr(gpu, net)) })
+        val network = PluginTiers.caution(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED))!!
+        assertTrue(network.contains("other apps on this device"))
+        listOf("tier", "socket", "sandbox", "seccomp").forEach { assertTrue(it, !network.contains(it, ignoreCase = true)) }
+        val both = PluginTiers.caution(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED))!!
+        assertTrue(both.contains("reach past droidtop's checks") && both.contains("other apps on this device"))
     }
 }

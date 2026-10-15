@@ -2469,6 +2469,7 @@ wording the host uses, so it is identical in every mode.
 | `overlay.toast` | normal | Show short messages during games | B4 |
 | `retroarch.commands` | normal | Send commands to RetroArch while you play: save and load states, slots, shaders, fast-forward | B8 |
 | `gpu.render` | dangerous | Use the graphics chip to draw its screen | §5.3 |
+| `net.sockets` | dangerous | Make its own connections to other devices and the internet | §5.3 ("Open processes") |
 | `notify.post` | normal | Send you notifications | C6 |
 | `net.state` | normal | See whether you are online | D1 |
 | `net.wifi_details` | dangerous | See the name of your Wi-Fi network | D1 |
@@ -2708,11 +2709,11 @@ tick.
 Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 (§5.3), and what is enforced depends on which:
 
-| | Contained (the default for contract 2) | Graphics (`gpu.render`) | Full trust (`host.full_trust`, and contract 1) |
+| | Contained (the default for contract 2) | Open process (`gpu.render`, `net.sockets`: each grant one hole) | Full trust (`host.full_trust`, and contract 1) |
 | --- | --- | --- | --- |
 | Process | an isolated process of its own: a random UID, no permissions, the `isolated_app` SELinux domain | a process of its own (one of eight slots) under droidtop's UID, **not** isolated, so it may open the GPU | a process of its own (one of eight slots) under droidtop's UID |
 | Graphics chip | no: an isolated process may not open `gpu_device` (sepolicy), so Flutter draws in software | yes: hardware rendering into a droidtop-owned surface | yes |
-| Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | none of its own: droidtop's system-call filter refuses every socket but a local datagram one (§5.3), so `net.http`/`net.download` only, as contained; **but** its own code could ask Android's services (the system download manager, say) to fetch something as droidtop, unseen | droidtop's `INTERNET`: any socket, unseen by droidtop |
+| Network | none: not in the `inet` group, so `socket()` is refused; `net.http`/`net.download` only, checked against `net.domains`/`net.any`/`net.local` per hop and logged | none of its own unless `net.sockets` is granted: droidtop's system-call filter refuses every socket but a local datagram one (§5.3), so `net.http`/`net.download` only, as contained; with `net.sockets`, internet sockets of its own and no other socket; **but** its own code could ask Android's services (the system download manager, say) to fetch something as droidtop, unseen | droidtop's `INTERNET`: any socket, unseen by droidtop |
 | droidtop's files (databases, preferences, sign-in tokens, other plugins' data) | none | none by path: every call that names a path goes to its file broker in :app, whose rules hold none of them (§5.3, since 2026-10-10); **but** its own code could still ask Android's services for files as droidtop over binder | all of them |
 | Its own files | the `data` API on its own folder only | the `data` API on its own folder only (same binder caveat) | its own folder by path, and everything else droidtop's UID reaches |
 | Shared storage | `files.shared` within its declared folders, `files.pick` documents, logged | the same as contained through the broker (same binder caveat) | all of it (`MANAGE_EXTERNAL_STORAGE`) |
@@ -2758,9 +2759,11 @@ plugin runs contained, Flutter and native libraries included (§5.3,
 "Guarded hooks"). Where a plugin needs one risky capability and nothing
 more, it declares that one permission and the person ticks it on the usual
 list; granting it opens that one hole, never full access. The first such
-permission is `gpu.render` (§5.3, "The graphics tier"): one permission, one
-hole, following the rule the owner set on 2026-10-09 ("Granting a single
-risky permission does NOT automatically grant everything").
+permission was `gpu.render` (§5.3, "The graphics tier"), and the second is
+`net.sockets`; both open their hole in the one open process type (§5.3,
+"Open processes: one hole per permission"): one permission, one hole,
+following the rule the owner set on 2026-10-09 ("Granting a single risky
+permission does NOT automatically grant everything").
 Whether the contained tier holds on a given device is what the Containment
 check (§5.3) shows.
 
@@ -2945,7 +2948,7 @@ engine's `dlsym` and window hooks. A virtual path nobody registered is
 many import slots.
 
 **The plugin's own folder by path (2026-10-14, Droidtop/tracker#470).**
-Every plugin process loaded from descriptors, contained or `gpu.render`,
+Every plugin process loaded from descriptors, contained or open,
 gets a file broker in :app (`SandboxBroker`, `native/src/plugin_broker.c`),
 and its lockdown sends droidtop's private folder to it under every name
 code uses for it (`/data/user/<n>/<package>`, `/data/data/<package>`, the
@@ -2959,7 +2962,7 @@ contained tier (emulator-5560, 2026-10-14): SELinux lets an isolated
 process use a file the app hands it but not list a folder it hands it
 (`avc: denied { read } ... app-data/code_cache ... isolated_app`), so code
 that lists its folder fails there (ART then skips its vdex cache); a
-`gpu.render` process, under droidtop's UID, lists them. A contained process locks down in passthrough
+open process, under droidtop's UID, lists them. A contained process locks down in passthrough
 (`SBX_LOCK_PASSTHROUGH`): only those names go to the broker, and every
 other path is made by the handler with the kernel deciding, where the
 isolated UID and SELinux keep droidtop's files out as before. The
@@ -2967,6 +2970,51 @@ Containment check's "droidtop's files" line looks for droidtop's
 `files/plugins` folder by its own name, which in a plugin process is the
 plugin's folder, where there is none. Writes there do not count against
 the data store's quota yet.
+**Open processes: one hole per permission (2026-10-15,
+Droidtop/tracker#553).** The graphics tier below became the first of a
+family. The owner's decision for Syncthing (a plugin that dials peers and
+listens for them itself): one non-isolated plugin process type, where each
+granted permission opens only its own hole, never a separate process family
+per permission. So `PluginTier.OPEN` is a process of droidtop's UID that is
+**not** isolated (`PluginOpenService`, slots `:plugin_open0..7`), loaded
+exactly as a contained plugin is, and its holes are the hole permissions
+the plugin declared and the person granted (`PluginTiers.holes`):
+
+| Hole permission | What it opens | What stays shut |
+| --- | --- | --- |
+| `gpu.render` | the graphics chip: its device nodes in the broker's rules and opened before the lockdown; Flutter draws with hardware | the network, every socket but liblog's datagram one |
+| `net.sockets` | internet sockets: the sandbox library's `SBX_LOCK_INET` (`AF_INET` and `AF_INET6` stream and datagram sockets, `bind`, `connect`) | the graphics devices; every other socket family, Unix sockets included (so no logd socket, and no stream socket to a daemon on the device); netlink |
+
+- **Each hole is its own grant.** A plugin with only `net.sockets` gets no
+  graphics device; one with only `gpu.render` gets no socket; both, both.
+  A hole the plugin did not declare is never opened. Full access and a
+  plugin that cannot run contained get none (`PluginTiers.holes`).
+- **Who decides.** :app writes the granted holes into the load request
+  (`_droidtopHoles`, replacing anything a plugin's own manifest says) and
+  the process builds its filter from them (`PluginSyscallFilter.install`).
+- **One process, one plugin, for its whole life.** A seccomp filter can
+  never be lifted, so an open slot is never shared: the process serves the
+  plugin it started for and ends when :app lets it go (`PluginOpenService`
+  ends itself when unbound; `PluginProcesses.endOpenLocked`), and its slot
+  is not used again until that process's death has been seen. A changed
+  grant, an update or an idle minute therefore starts a fresh process with
+  the holes granted then.
+- **What the network hole cannot tell apart.** seccomp cannot read the
+  address `connect` or `bind` is given, so a plugin with `net.sockets`
+  reaches this device's own services on loopback as well as the internet;
+  the permission's warning says so ("also to other apps on this device").
+  Android's own resolver and bionic's `connect` talk to netd over Unix
+  stream sockets, which stay refused, so a networked plugin resolves names
+  itself against the DNS servers of the active network (Go's pure resolver)
+  and makes its system calls directly, as Go does. Interface listing
+  through netlink stays refused. Handing the plugin the DNS servers and the
+  interfaces it needs for local discovery is a host API still to build (the
+  next #553 step), so until then a networked plugin dials addresses it
+  already knows.
+- **The Containment check** names the holes ("A process of its own with
+  graphics access and its own internet connections ...") and its network
+  line shows what the filter reported.
+
 **The graphics tier (`gpu.render`, built plugin-enforce-4, 2026-10-09;
 narrowed plugin-enforce-6, 2026-10-09).**
 Some plugins need the GPU and nothing else: a Flutter screen that janks in
@@ -2979,7 +3027,8 @@ the plugin declares and the person ticks on the usual approval list, and it
 opens that one hole:
 
 - **The platform shape.** Granting it runs the plugin in a droidtop-owned
-  process (`PluginGpuService`, slots `:plugin_gpu0..7`) that is **not**
+  open process (`PluginOpenService`, slots `:plugin_open0..7`, until
+  2026-10-15 `PluginGpuService` on `:plugin_gpu0..7`) that is **not**
   `android:isolatedProcess`. That is the only process an app may run that
   can open the GPU (see "Narrowing it further" below for every alternative
   looked at). droidtop's application classes start nothing in it
@@ -3490,6 +3539,10 @@ version was bumped.
   plugin still works.
 
 **Changelog (additive changes; no version moved).**
+
+- 2026-10-15 (Droidtop/tracker#553): the `net.sockets` permission, the
+  network hole of the open process type that `gpu.render` now shares
+  (§5.3, "Open processes: one hole per permission").
 
 - 2026-10-15 (Droidtop/tracker#521 item 1): the `danger` tone for a
   view's `notice` and for `ui.prompt confirm`.

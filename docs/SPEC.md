@@ -18110,10 +18110,34 @@ Advanced.
   already decides. A process that cannot take the lockdown does not run
   the plugin (an unsandboxed run waits for its red warning,
   Droidtop/tracker#481).
+- **Open processes: one hole per permission** (2026-10-15, Droidtop/tracker#553;
+  coordinator for the owner: "one non-isolated plugin process type, where each
+  granted permission opens only its own hole. No separate :plugin_net slot
+  family"). The graphics tier below is now the `gpu.render` hole of one open
+  process type (`PluginTier.OPEN`, `PluginOpenService`, slots
+  `:plugin_open0..7`, renamed from `:plugin_gpu0..7`), and `net.sockets`
+  (dangerous, "Make its own connections to other devices and the internet")
+  is the second hole: the sandbox library's `SBX_LOCK_INET` (owner's
+  bi0shacker001/sandbox 467c429, vendored), internet stream and datagram
+  sockets with `bind` and `connect`, and no other socket at all (no Unix
+  socket, so no logd socket; no netlink). Each hole is granted on its own
+  and opens nothing else: a networked plugin gets no graphics device, a
+  drawing one no socket (`PluginTiers.holes`, the broker's rules, the
+  filter's flags). :app writes the granted holes into the load request
+  (`_droidtopHoles`), never the plugin. An open slot serves one plugin for
+  its process's life and is never shared; the process ends when unbound and
+  its slot waits for that death before reuse, since a filter can never be
+  lifted. The filter cannot read a socket address, so the permission's
+  warning says the plugin reaches "other apps on this device" too. The DNS
+  servers and interfaces a networked plugin needs (Android's resolver is a
+  refused Unix socket) are the next #553 step, a host API; then the
+  Syncthing plugin itself, paired through droidtop's own device pairing
+  (Droidtop/tracker#556).
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process
-  that is NOT `android:isolatedProcess` (slots `:plugin_gpu0..7`) — the only
+  that is NOT `android:isolatedProcess` (slots `:plugin_open0..7`, the open
+  process type above) — the only
   process an app may run that can open the GPU (`isolated_compute_app` is
   system-only and grants no GPU either). droidtop starts nothing of its own
   in that process. Its code still loads from descriptors through the guarded
