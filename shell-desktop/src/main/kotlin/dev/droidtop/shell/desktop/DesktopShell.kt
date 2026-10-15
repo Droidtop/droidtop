@@ -730,7 +730,9 @@ private fun rememberHiddenWindows(windows: DesktopWindows?) =
 
 /** Minimizes [toplevel], and says so when the compositor could not be asked. */
 private suspend fun minimizeWindow(context: Context, windows: DesktopWindows?, toplevel: Toplevel) {
-    if (windows?.minimize(toplevel) != true) Toast.makeText(context, "Couldn't minimize this window", Toast.LENGTH_SHORT).show()
+    if (windows?.minimize(toplevel) != true) {
+        dev.droidtop.library.settings.Notices.flash("Couldn't minimize this window", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
+    }
 }
 
 /**

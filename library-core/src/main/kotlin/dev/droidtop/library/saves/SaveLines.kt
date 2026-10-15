@@ -1,5 +1,7 @@
 package dev.droidtop.library.saves
 
+import dev.droidtop.library.format.ValueFormat
+
 /**
  * The words a person reads about a game's saves (docs/SPEC.md 7o "Saves"): the value column, the line under it, and
  * the lines of the details page. Plain words only: no token, rule or manifest names outside the details page.
@@ -15,12 +17,6 @@ object SaveLines {
             seconds < 86_400L * 60 -> "${seconds / 86_400} days ago"
             else -> "${seconds / (86_400L * 30)} months ago"
         }
-    }
-
-    fun size(bytes: Long): String = when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> "${bytes / 1024} KB"
-        else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
     }
 
     private fun files(count: Int) = if (count == 1) "1 file" else "$count files"
@@ -49,7 +45,7 @@ object SaveLines {
             is SaveStatus.Found -> {
                 val first = status.places.firstOrNull() ?: status.cards.first()
                 val more = (status.places.size + status.cards.size - 1).let { if (it > 0) " and $it more place${if (it == 1) "" else "s"}" else "" }
-                "In ${folder(first.folder)} (${first.label})$more: ${files(status.files)}, ${size(status.bytes)}, newest ${ago(status.newestMs, nowMs)}." +
+                "In ${folder(first.folder)} (${first.label})$more: ${files(status.files)}, ${ValueFormat.size(status.bytes)}, newest ${ago(status.newestMs, nowMs)}." +
                     (if (status.truncated) " Only the first ${SaveTemplates.MAX_FILES} files are counted." else "") +
                     (status.note?.let { " Not everywhere could be searched: $it." } ?: "")
             }
@@ -63,8 +59,8 @@ object SaveLines {
         val out = ArrayList<Pair<String, String>>()
         val status = report.status
         if (status is SaveStatus.Found) {
-            status.places.forEach { out += "Saves: ${it.label}" to "${folder(it.folder)}: ${files(it.files)}, ${size(it.bytes)}, newest ${ago(it.newestMs, nowMs)}" }
-            status.cards.forEach { out += "Memory card: ${it.label}" to "${folder(it.folder)}: ${files(it.files)}, ${size(it.bytes)}, newest ${ago(it.newestMs, nowMs)}. Shared by every game on this emulator." }
+            status.places.forEach { out += "Saves: ${it.label}" to "${folder(it.folder)}: ${files(it.files)}, ${ValueFormat.size(it.bytes)}, newest ${ago(it.newestMs, nowMs)}" }
+            status.cards.forEach { out += "Memory card: ${it.label}" to "${folder(it.folder)}: ${files(it.files)}, ${ValueFormat.size(it.bytes)}, newest ${ago(it.newestMs, nowMs)}. Shared by every game on this emulator." }
             status.states.forEach { out += "Save states: ${it.label}" to "${folder(it.folder)}: ${files(it.files)}. Not counted as saves: a state only loads in the same emulator version." }
         }
         if (status is SaveStatus.NoneFound) {
