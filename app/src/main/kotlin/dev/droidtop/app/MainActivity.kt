@@ -358,8 +358,10 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             // capture, 2026-09-11: the OS bar read 5:14 and the theme's
             // own clock 17:14). A themed view owns its whole surface, so
             // in Gaming mode droidtop goes immersive and the theme's clock
-            // is the only one. Every other mode keeps the system bars: a
-            // home screen and a desktop both want them.
+            // is the only one. Desktop is immersive too: its sheets hid the
+            // bars and closing one showed them again, so the desktop resized
+            // under the person (Droidtop/tracker#555 D4); its own bar carries
+            // what the status bar did. Standard keeps the system bars.
             LaunchedEffect(mode) { applySystemBars(mode) }
             // Signed-in stores last read longer ago than the person's interval are read again as
             // the Gaming shell opens, on an unmetered network only (SPEC 7g, "Stores"); no timer.
@@ -540,7 +542,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     private fun applySystemBars(mode: Mode?) {
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        if (mode == Mode.GAMING) {
+        if (mode == Mode.GAMING || mode == Mode.DESKTOP) {
             WindowCompat.setDecorFitsSystemWindows(window, false)
             controller.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
