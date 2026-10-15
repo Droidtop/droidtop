@@ -119,6 +119,16 @@ internal object LaunchWatchPolicy {
      */
     const val STALL_CPU_MS = 1_000L
 
+    /**
+     * Whether [trouble] from [packageName] means the person left before a game started, not that anything failed:
+     * Enginehost's launch screen asks first (the no-sandbox warning, a configuration question) and reports its own
+     * failures on screens of its own, so an Enginehost launch that hands straight back to droidtop with none of them
+     * open was cancelled there (Droidtop/tracker#289: Cancel on the warning raised "Enginehost closed straight after
+     * it started" and left a Playing session). No alert, and the session ends: no game ever ran.
+     */
+    fun leftBeforePlaying(packageName: String, trouble: LaunchTrouble): Boolean =
+        packageName == EngineHost.PACKAGE_NAME && trouble == LaunchTrouble.EXITED_AT_ONCE
+
     fun judge(o: WatchObservation): WatchVerdict = when {
         o.notResponding -> WatchVerdict.Trouble(LaunchTrouble.NOT_RESPONDING)
         o.cpuMs != null && o.cpuMs < STALL_CPU_MS && o.elapsedMs >= STALL_CHECK_MS && !o.shellCameBack ->
@@ -272,6 +282,11 @@ object LaunchWatchdog {
                     WatchVerdict.Settled -> settled = true
                     WatchVerdict.Stop -> return@launch
                     is WatchVerdict.Trouble -> {
+                        if (LaunchWatchPolicy.leftBeforePlaying(packageName, verdict.trouble)) {
+                            ScanLog.write("launch watchdog: $packageName returned after $elapsed ms with nothing open: left before playing, no alert")
+                            if (LaunchDisplay.runningPackageName == packageName) LaunchDisplay.clearRunning()
+                            return@launch
+                        }
                         ScanLog.write("launch watchdog: $packageName ${verdict.trouble} after $elapsed ms")
                         val core = retroArchCorePath?.let { runCatching { RetroArchCores.suspect(packageName, it) }.getOrNull() }
                         alertFlow.value = LaunchAlert(
