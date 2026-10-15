@@ -679,10 +679,22 @@ object AppSettingsCatalogs {
                             )
                         },
                     ),
-                )
+                ) + listOfNotNull(getBiosGroup(context, gamesRoot, spec))
             }
         },
     )
+
+    // The same "Get the BIOS for this system" row the emulator setup helper shows, here for the games folder's own
+    // bios folder: without it the files were only reachable from Game sources (Droidtop/tracker#270).
+    private fun getBiosGroup(context: android.content.Context, gamesRoot: File, spec: SystemBiosSpec): CatalogGroup? {
+        val folder = File(gamesRoot, "bios").absolutePath
+        val reach = dev.droidtop.library.consoles.EmulatorSetup.writeReach("$folder/x")
+        val viaHelper = reach == dev.droidtop.library.consoles.EmulatorSetup.Reach.HELPER
+        if (reach != dev.droidtop.library.consoles.EmulatorSetup.Reach.DIRECT && !viaHelper) return null
+        val row = dev.droidtop.library.integrations.PluginBios.row(context, spec.systemId, spec.name, spec, folder, "the games folder", viaHelper)
+            ?: return null
+        return CatalogGroup(id = "bios_get", title = null, items = listOf(row))
+    }
 
     internal fun installPackageAction(pkg: String): (Context) -> Unit = { ctx ->
         val market = android.content.Intent(
