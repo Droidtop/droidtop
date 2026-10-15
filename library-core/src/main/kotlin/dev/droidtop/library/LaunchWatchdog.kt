@@ -4,7 +4,6 @@ import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import android.view.Display
 import dev.droidtop.library.consoles.RetroArchCores
 import dev.droidtop.runtime.tasks.CloseOutcome
 import dev.droidtop.runtime.tasks.Fidelity
@@ -334,12 +333,13 @@ object LaunchWatchdog {
         }
     }
 
-    /** The alert's "Return to droidtop": brings the shell back to the built-in screen. */
+    /** The alert's "Return to droidtop": brings the shell back to the screen it was on. */
     fun returnToShell(context: Context) {
         val intent = Intent().setClassName(context.packageName, SHELL_ACTIVITY)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
         runCatching {
-            context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(Display.DEFAULT_DISPLAY).toBundle())
+            val display = LaunchScreenResolution.resolveDisplay(null, LaunchDisplay.shellDisplayId)
+            context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(display).toBundle())
         }.onFailure { Log.w(TAG, "Could not bring the shell back", it) }
     }
 

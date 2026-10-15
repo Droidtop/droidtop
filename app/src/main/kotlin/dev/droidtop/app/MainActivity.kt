@@ -809,10 +809,12 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     }
 
     override fun publishLaunchTargeting(
+        shellDisplayId: Int,
         secondDisplayId: Int?,
         targetDisplayId: Int?,
         askOptions: List<DualScreenOrchestration.ChooserCandidate>?,
     ) {
+        dev.droidtop.library.LaunchDisplay.shellDisplayId = shellDisplayId
         dev.droidtop.library.LaunchDisplay.secondDisplayId = secondDisplayId
         dev.droidtop.library.LaunchDisplay.targetDisplayId = targetDisplayId
         // Relative first, absolute only as the clarifier (docs/SPEC.md

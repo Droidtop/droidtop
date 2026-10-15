@@ -141,7 +141,8 @@ class DualScreenOrchestrationTest {
         val shellOnAddon = DualScreenOrchestration.chooserCandidates(listOf(0, 9), names, shellDisplayId = 9, secondDisplayId = 9)
         assertEquals(9, shellOnAddon.first().displayId)
         assertEquals("Top screen (this one)", shellOnAddon.first().label)
-        assertEquals(null, shellOnAddon[1].displayId)
+        // The built-in screen is named by its id: no choice (null) is the shell's own screen.
+        assertEquals(0, shellOnAddon[1].displayId)
         assertEquals("Bottom screen (the other one)", shellOnAddon[1].label)
 
         val shellOnBuiltIn = DualScreenOrchestration.chooserCandidates(listOf(0, 9), names, shellDisplayId = 0, secondDisplayId = 9)
@@ -154,7 +155,7 @@ class DualScreenOrchestrationTest {
     fun `three screens are all offered, only the two roles can be remembered`() {
         val names = mapOf(0 to "Top screen", 4 to "Bottom screen", 9 to "DELL U2415")
         val rows = DualScreenOrchestration.chooserCandidates(listOf(0, 9, 4), names, shellDisplayId = 0, secondDisplayId = 4)
-        assertEquals(listOf(4, 9, null), rows.map { it.displayId })
+        assertEquals(listOf(4, 9, 0), rows.map { it.displayId })
         assertEquals(listOf("Bottom screen", "DELL U2415", "Top screen (this one)"), rows.map { it.label })
         assertEquals(listOf(true, false, true), rows.map { it.rememberable })
     }
