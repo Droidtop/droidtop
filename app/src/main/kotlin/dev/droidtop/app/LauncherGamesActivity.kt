@@ -3,7 +3,6 @@ package dev.droidtop.app
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -174,7 +173,7 @@ class LauncherGamesActivity : AppCompatActivity() {
          */
         private fun pin(context: Context, entry: LibraryEntry) {
             if (!ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
-                Toast.makeText(context, "This home screen cannot pin games", Toast.LENGTH_LONG).show()
+                dev.droidtop.library.settings.Notices.flash("This home screen cannot pin games", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
                 return
             }
             pinScope.launch {
@@ -194,7 +193,7 @@ class LauncherGamesActivity : AppCompatActivity() {
                     .getOrDefault(false)
                 if (!asked) {
                     withContext(Dispatchers.Main) {
-                        Toast.makeText(context, "${entry.title} could not be pinned", Toast.LENGTH_LONG).show()
+                        dev.droidtop.library.settings.Notices.flash("${entry.title} could not be pinned", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
                     }
                 }
             }

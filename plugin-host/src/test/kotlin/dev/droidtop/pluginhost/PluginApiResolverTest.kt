@@ -115,8 +115,8 @@ class PluginApiResolverTest {
         // The system-level export keeps the plain key an installed provider already has; root gets its own.
         assertEquals("priv.shell", adb.grantKey)
         assertEquals("priv.shell@root", root.grantKey)
-        assertEquals("Other plugins may: Run commands as the system (adb)", adb.offerLabel())
-        assertEquals("Other plugins may: Run commands as root", root.offerLabel())
+        assertEquals("Other plugins may: Run system commands", adb.offerLabel())
+        assertEquals("Other plugins may: Full control of the device", root.offerLabel())
     }
 
     @Test

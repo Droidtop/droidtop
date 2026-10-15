@@ -82,7 +82,6 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PcGameStandalone
 import dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet
-import android.widget.Toast
 import dev.droidtop.library.TaskbarPin
 import dev.droidtop.library.TaskbarPins
 import dev.droidtop.library.tasks.TaskActions
@@ -239,7 +238,7 @@ fun DesktopShell(
             if (app != null && launch != null) {
                 launch(app)
             } else {
-                Toast.makeText(context, "${pin.title} runs on the desktop, which is not running.", Toast.LENGTH_LONG).show()
+                dev.droidtop.library.settings.Notices.flash("${pin.title} runs on the desktop, which is not running.", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
             }
         } else {
             val entry = library.backgroundScanState(START_MENU_KINDS).value?.firstOrNull { it.id == entryId }
@@ -277,7 +276,7 @@ fun DesktopShell(
         )
 
         launchFailure?.let { message ->
-            LaunchFailureBanner(message = message, onDismiss = onDismissLaunchFailure)
+            LaunchFailureNotice(message = message, onDismiss = onDismissLaunchFailure)
         }
 
         if (startMenuOpen) {
@@ -342,43 +341,29 @@ fun DesktopShell(
 }
 
 /**
- * A program that never appeared (or exited badly) has to say why. The
- * text comes from where the failure is understood --
- * [dev.droidtop.runtime.ContainerTerminal.failureMessage] tells "the
- * package isn't in this container" apart from anything else,
- * [dev.droidtop.runtime.ContainerApplications.launch] quotes the program's
- * own last output -- rather than being invented here.
+ * A program that never appeared (or exited badly) has to say why, as a caution notice at the top of the desktop
+ * (docs/SPEC.md 7k, "Notices"). The text comes from where the failure is understood --
+ * [dev.droidtop.runtime.ContainerTerminal.failureMessage] tells "the package isn't in this container" apart from
+ * anything else, [dev.droidtop.runtime.ContainerApplications.launch] quotes the program's own last output -- rather
+ * than being invented here. Dismiss clears the failure it reports.
  */
 @Composable
-private fun BoxScope.LaunchFailureBanner(message: String, onDismiss: () -> Unit) {
-    Column(
+private fun BoxScope.LaunchFailureNotice(message: String, onDismiss: () -> Unit) {
+    dev.droidtop.ui.shared.NoticeCard(
+        notice = dev.droidtop.library.settings.Notice(
+            tone = dev.droidtop.library.settings.NoticeTone.Caution,
+            title = "A program didn't run",
+            body = message.take(dev.droidtop.library.settings.Notice.BODY_MAX),
+            details = message,
+            action = dev.droidtop.library.settings.NoticeAction("Dismiss") { onDismiss() },
+        ),
+        placement = dev.droidtop.library.settings.NoticePlacement.Page,
+        onAction = onDismiss,
         modifier = Modifier
             .align(Alignment.TopCenter)
-            .padding(top = 64.dp)
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .clickable(onClick = onDismiss)
-            .padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            "A program didn't run",
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            message,
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 4.dp),
-        )
-        Text(
-            "Tap to dismiss",
-            color = MaterialTheme.colorScheme.onErrorContainer,
-            style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-    }
+            .padding(top = 64.dp, start = 16.dp, end = 16.dp)
+            .widthIn(max = 640.dp),
+    )
 }
 
 /** Mirrors dev.droidtop.app.DesktopSessionState without :shell-desktop depending on :app. */
@@ -818,14 +803,14 @@ private fun rememberAndroidApps(): List<RunningApp> {
 
 private fun openAndroidApp(context: Context, app: RunningApp) {
     TaskActions.bringTo(context, app.packageName, app.displayId)?.let {
-        Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+        dev.droidtop.library.settings.Notices.flash(it, context = context)
     }
 }
 
 /** Closes through the task manager's strongest path and says so only when that did not end it. */
 private suspend fun closeAndroidApp(context: Context, app: RunningApp) {
     val outcome = TaskManager.close(context, app.packageName)
-    if (outcome !is CloseOutcome.Closed) Toast.makeText(context, outcome.text, Toast.LENGTH_LONG).show()
+    if (outcome !is CloseOutcome.Closed) dev.droidtop.library.settings.Notices.flash(outcome.text, context = context)
 }
 
 /**

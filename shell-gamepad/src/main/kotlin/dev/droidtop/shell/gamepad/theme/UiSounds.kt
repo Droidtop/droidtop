@@ -70,16 +70,6 @@ enum class UiSound(val themeName: String?, val move: Boolean = false) {
     val packFile: String get() = name.lowercase()
 }
 
-/**
- * The shell's one toast (docs/SPEC.md "Interface sounds"): the toast cue, then Android's own toast.
- * The platform's toast is kept on purpose: Android draws it above every window, so it is seen over
- * a menu or the game page, where a toast drawn in the shell's own window would sit underneath them.
- */
-fun shellToast(context: android.content.Context, text: String, long: Boolean = false) {
-    EsDeNavigationSounds.play(UiSound.TOAST)
-    android.widget.Toast.makeText(context, text, if (long) android.widget.Toast.LENGTH_LONG else android.widget.Toast.LENGTH_SHORT).show()
-}
-
 /** Where a role's sound comes from: the theme's sample, droidtop's bundled one, or nowhere. */
 sealed interface UiSoundSource {
     data class Theme(val name: String) : UiSoundSource

@@ -39,6 +39,18 @@ what it learned last.
   pad and touch (droidtop Quick Menu, 2026-09-11; the user called it "amazing").
 - Every "press X again" or hold gesture has a visible affordance on touch.
 
+- Modals: the safe choice comes first (left) and has the focus, so a mashed A cancels; a danger dialog has no second-press arm (Steam's shape: Cancel left and focused, the risky button right in the danger fill). The two-step confirm above is for rows in a list, not for dialogs (droidtop, Droidtop/tracker#485).
+
+## Copy
+- Labels are three words or fewer: verbs for actions, nouns for settings.
+- A warning is a notice: a tone, a title (40 characters or fewer, the condition, never "Warning:"), a body (90 or fewer, the outcome, not the mechanism), one action, and details in Info (Y). Not a grey paragraph, not a "(high risk)" suffix, not a red banner.
+- The why goes in Info; a hint that only restates its title is deleted.
+- A field's label is its title; placeholders are noun phrases; fields hold no instructions; an input error says what is allowed.
+- No machinery words where a person must read (sandbox, root, signing, fingerprint, helper, host, index, catalog, digest, IME, provider, tier, seccomp, adb); details may be exact.
+- A recommendation is one "We recommend <button>." sentence, on danger only, naming a button.
+- Never tell a person to do something they cannot do from where they are: give them the action.
+- Acknowledgements are past tense with no period ("Saved", "Copied").
+
 ## System integration
 - A disabled mode or feature runs no code (droidtop modes, 2026-09-11).
 - Recovery paths that do not depend on any screen working (an adb/broadcast "update now").

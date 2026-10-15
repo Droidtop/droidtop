@@ -44,6 +44,8 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePress
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SettingsSearchIndex
 import dev.droidtop.library.settings.SettingsSearchResult
@@ -56,6 +58,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.NoticeViews
 
 /**
  * The Preference-surface renderer for the shared settings catalogs
@@ -196,7 +199,7 @@ class CatalogPreferenceNavigator(
             // onPicked reads or writes the document: never on the main thread.
             fragment.lifecycleScope.launch {
                 val outcome = withContext(Dispatchers.IO) { item.onPicked(context, uri) }
-                android.widget.Toast.makeText(context, outcome, android.widget.Toast.LENGTH_LONG).show()
+                dev.droidtop.library.settings.Notices.flash(outcome, context = context)
                 rebuild()
             }
         }
@@ -209,6 +212,7 @@ class CatalogPreferenceNavigator(
 
     init {
         fragment.requireActivity().onBackPressedDispatcher.addCallback(fragment, backCallback)
+        attachNoticeDialogHost()
         // The recreate restore: pushed screens come back as their registry
         // ids, resolved through the same registry that resolves pushes,
         // stopping at the first id nothing registers (the same rule the
@@ -502,6 +506,93 @@ class CatalogPreferenceNavigator(
     }
 
     /** Runs [action] at once, or after an OK when [confirmTitle] asks for one. */
+    /**
+     * This surface's host for droidtop's danger and confirm dialogs (docs/SPEC.md 7k, "Notices") while the fragment
+     * is started: the question, Cancel as the dialog's first and default button and the risky one beside it, and the
+     * recommendation and details in the message. Back and a tap outside are Cancel, as on every surface.
+     */
+    private fun attachNoticeDialogHost() {
+        val token = Any()
+        fragment.lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
+            private var shown: AlertDialog? = null
+            private var job: kotlinx.coroutines.Job? = null
+
+            override fun onStart(owner: androidx.lifecycle.LifecycleOwner) {
+                dev.droidtop.library.settings.NoticeDialogs.attachHost(token)
+                job = fragment.lifecycleScope.launch {
+                    kotlinx.coroutines.flow.combine(
+                        dev.droidtop.library.settings.NoticeDialogs.pending,
+                        dev.droidtop.library.settings.NoticeDialogs.hostTokens,
+                    ) { request, hosts -> request?.takeIf { hosts.lastOrNull() === token } }.collect { request ->
+                        shown?.dismiss()
+                        shown = request?.let { showNoticeDialog(fragment.requireContext(), it) }
+                    }
+                }
+            }
+
+            override fun onStop(owner: androidx.lifecycle.LifecycleOwner) {
+                job?.cancel()
+                shown?.dismiss()
+                shown = null
+                dev.droidtop.library.settings.NoticeDialogs.detachHost(token)
+            }
+        })
+    }
+
+    private fun showNoticeDialog(context: Context, request: dev.droidtop.library.settings.NoticeDialogs.Request): AlertDialog {
+        val notice = request.notice
+        val message = listOfNotNull(
+            notice.body,
+            notice.recommendation,
+            request.items.takeIf { it.isNotEmpty() }?.joinToString("\n") { "\u2022 $it" },
+            notice.details?.takeIf { it.isNotBlank() }?.let { "Details: $it" },
+        ).joinToString("\n\n")
+        var answered = false
+        fun answer(a: dev.droidtop.library.settings.ConfirmAnswer) {
+            if (answered) return
+            answered = true
+            dev.droidtop.library.settings.NoticeDialogs.answer(request, a)
+        }
+        return AlertDialog.Builder(context)
+            .setTitle(notice.title)
+            .setMessage(message)
+            .setNegativeButton(request.cancelLabel) { _, _ -> answer(dev.droidtop.library.settings.ConfirmAnswer.Cancel) }
+            .setPositiveButton(request.proceedLabel) { _, _ -> answer(dev.droidtop.library.settings.ConfirmAnswer.Proceed) }
+            .setOnDismissListener { answer(dev.droidtop.library.settings.ConfirmAnswer.Cancel) }
+            .create()
+            .also { dialog ->
+                dialog.setOnShowListener { dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.requestFocus() }
+                dialog.show()
+            }
+    }
+
+    private fun runNoticeAction(context: Context, action: dev.droidtop.library.settings.NoticeAction) {
+        fragment.lifecycleScope.launch {
+            action.run(context)
+            rebuild()
+        }
+    }
+
+    /** A notice's Info: its body and details, with Copy for the details (docs/SPEC.md 7k, "Notices"). */
+    private fun showNoticeInfo(context: Context, item: NoticeItem) {
+        val notice = item.notice
+        val details = notice.details?.takeIf { it.isNotBlank() }
+        val message = listOfNotNull(notice.source?.let { "from $it" }, notice.body, details).joinToString("\n\n")
+        AlertDialog.Builder(context)
+            .setTitle(notice.title)
+            .setMessage(message)
+            .apply {
+                if (details != null) {
+                    setNeutralButton("Copy") { _, _ ->
+                        val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(android.content.ClipData.newPlainText(notice.title, details))
+                    }
+                }
+            }
+            .setPositiveButton("Close", null)
+            .show()
+    }
+
     private fun confirmThen(context: Context, confirmTitle: String?, action: () -> Unit) {
         if (confirmTitle == null) {
             action()
@@ -652,6 +743,33 @@ class CatalogPreferenceNavigator(
                 confirmThen(context, item.confirmTitle) {
                     item.run(context)
                     rebuild()
+                }
+                true
+            }
+        }
+        // The shared notice card (docs/SPEC.md 7k, "Notices"), drawn into the row by a ComposeView. A notice
+        // with nothing to press or read is not a stop of the list.
+        is NoticeItem -> object : Preference(context) {
+            override fun onBindViewHolder(holder: PreferenceViewHolder) {
+                super.onBindViewHolder(holder)
+                NoticeViews.bind(
+                    holder.itemView as ViewGroup,
+                    item.notice,
+                    item.placement,
+                    onAction = item.notice.action?.let { action -> { item.opens?.let { push(it) } ?: runNoticeAction(context, action) } },
+                    onInfo = { showNoticeInfo(context, item) },
+                )
+            }
+        }.apply {
+            key = item.id
+            layoutResource = NoticeViews.LAYOUT
+            isSelectable = item.notice.takesFocus()
+            isIconSpaceReserved = false
+            setOnPreferenceClickListener {
+                when (item.notice.aPress()) {
+                    NoticePress.ACTION -> item.opens?.let { push(it) } ?: item.notice.action?.let { runNoticeAction(context, it) }
+                    NoticePress.INFO -> showNoticeInfo(context, item)
+                    NoticePress.NONE -> {}
                 }
                 true
             }

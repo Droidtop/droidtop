@@ -1,5 +1,9 @@
 package dev.droidtop.library.integrations
 
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
 import android.content.Context
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -280,12 +284,18 @@ object AppCatalogScreen {
         title = "Review before adding",
         chips = listOf(CatalogChip("From ${record.manifest.label}")),
         items = buildList<CatalogItem> {
+            // U2 (docs/SPEC.md 7k, "Notices"): the caution banner; the address and key are the rows below.
             add(
-                TextBlockItem(
+                NoticeItem(
                     id = "apps_review_who",
-                    title = review.name,
-                    text = "This source is not part of droidtop and droidtop has not checked its apps. Add it only if you trust " +
-                        "the people who run it. Each app is still checked against the key this source names before Android installs it.",
+                    notice = Notice(
+                        tone = NoticeTone.Caution,
+                        title = "Unofficial list",
+                        body = "Add from it only if someone you trust pointed you to it.",
+                        details = "${review.name} is not part of droidtop and droidtop has not checked its apps. Each app is still " +
+                            "checked against the key this source names before Android installs it.\nAddress: ${review.address}",
+                    ),
+                    placement = NoticePlacement.Page,
                 ),
             )
             review.description?.let { add(TextBlockItem(id = "apps_review_description", title = "", text = it)) }

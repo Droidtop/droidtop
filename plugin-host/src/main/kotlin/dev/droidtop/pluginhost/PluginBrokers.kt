@@ -215,11 +215,18 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
     }
 
     override fun toast(pluginLabel: String, text: String): Boolean {
-        // Posted, never run on the binder thread; the plugin's name leads so it is never mistaken for droidtop's own words.
-        return android.os.Handler(android.os.Looper.getMainLooper()).post {
-            android.widget.Toast.makeText(appContext, "$pluginLabel: $text", android.widget.Toast.LENGTH_SHORT).show()
-        }
+        // A flash led by the plugin's name, so it is never mistaken for droidtop's own words (docs/SPEC.md 7k, "Notices");
+        // the whole text goes to Recent. Over a game, where no droidtop surface is on screen, it is a platform toast.
+        dev.droidtop.library.settings.Notices.flash(text, source = pluginLabel, context = appContext)
+        return true
     }
+
+    override fun confirm(notice: dev.droidtop.library.settings.Notice, proceed: String, cancel: String): Boolean =
+        kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withTimeoutOrNull(CONFIRM_TIMEOUT_MS) {
+                dev.droidtop.library.settings.NoticeDialogs.confirm(notice, cancelLabel = cancel, proceedLabel = proceed)
+            } == dev.droidtop.library.settings.ConfirmAnswer.Proceed
+        }
 
     override fun librarySystems(): JSONObject = PluginBrokers.librarySystemsProvider()
 
@@ -649,3 +656,6 @@ object PluginBrokers {
 
     fun chainServedBy(pluginId: String): List<String> = served[pluginId]?.lastOrNull().orEmpty()
 }
+
+/** How long a plugin's confirm waits for the person before it counts as Cancel. */
+private const val CONFIRM_TIMEOUT_MS = 120_000L

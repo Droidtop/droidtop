@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
@@ -28,7 +32,6 @@ import dev.droidtop.library.stores.StoreExtra
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.shell.gamepad.LocalShellWindow
-import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
@@ -211,7 +214,7 @@ internal fun StoreContentSheet(
                 )
             }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MenuTokens.Value) }
-            if (working) MenuHint("Working")
+            if (working) NoticeCard(Notice(NoticeTone.Info, "Working"), NoticePlacement.Group)
         }
     }
 }

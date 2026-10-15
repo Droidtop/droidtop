@@ -240,6 +240,8 @@ dependencies {
     // a real circular dependency. runtime-common has no dependency on
     // anything else in the repo, so this direction is always safe.
     implementation project(':runtime-common')
+    // Notice rows in the settings Preference list draw the shared NoticeCard (docs/SPEC.md 7k, "Notices").
+    implementation project(':ui-shared')
     implementation project(':IconLoader')
     implementation project(':Animation')
     implementation project(':Shared')

@@ -14,7 +14,6 @@ import android.os.UserHandle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.preference.EditTextPreference
@@ -313,7 +312,7 @@ class AppInfoPreferenceFragment : SettingsBasePreferenceFragment() {
     private fun copyToClipboard(ctx: Context, label: CharSequence?, text: CharSequence?) {
         val clipboard = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-        Toast.makeText(ctx, R.string.app_info_copied_toast, Toast.LENGTH_SHORT).show()
+        dev.droidtop.library.settings.Notices.flash(ctx.getString(R.string.app_info_copied_toast), context = ctx)
     }
 
     @Suppress("RestrictedApi")

@@ -39,6 +39,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.NoticeItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
@@ -48,6 +49,7 @@ import dev.droidtop.shell.gamepad.QuickTiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.NoticeCard
 
 /**
  * One card of the companion's System tab (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): a titled
@@ -117,6 +119,7 @@ internal fun CompanionCatalogItems(
                     if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
                 }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
+                is NoticeItem -> CompanionNotice(item, onChanged, onOpen = { nested = it })
                 is TextBlockItem -> Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                     if (item.title.isNotBlank()) Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                     Text(item.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -301,6 +304,34 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp), modifier = Modifier.padding(top = 6.dp)) {
                 CompanionPill("Cancel", selected = true) { asking = false }
                 CompanionPill(item.title) { run() }
+            }
+        }
+    }
+}
+
+/**
+ * A notice on the companion (docs/SPEC.md 7k, "Notices"): the shared card, its action a tap, and its Info
+ * opened in place under it (the details, which a long press of the text can copy) rather than in a sheet,
+ * as the companion's rows open in place.
+ */
+@Composable
+private fun CompanionNotice(item: NoticeItem, onChanged: () -> Unit, onOpen: (CatalogScreen) -> Unit) {
+    val context = LocalContext.current
+    var info by remember(item.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        NoticeCard(
+            notice = item.notice,
+            placement = item.placement,
+            onAction = item.notice.action?.let { action ->
+                { item.opens?.let(onOpen) ?: scope.launch { action.run(context); onChanged() } }
+            },
+            onInfo = { info = !info },
+        )
+        val details = item.notice.details
+        if (info && !details.isNullOrBlank()) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 8.dp))
             }
         }
     }

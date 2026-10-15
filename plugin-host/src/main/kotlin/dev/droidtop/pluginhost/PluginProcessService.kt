@@ -83,6 +83,12 @@ abstract class PluginProcessService : Service() {
     /** Contained: loads [pluginId] from [files], the descriptors :app opened for it, by name. Called with the files still open; they are closed after it returns, so a loader keeps what it needs by detaching it. */
     protected abstract fun loadFromFiles(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, broker: IPluginHostBroker): Boolean
 
+    /**
+     * Plugins the person chose to run this time although their protection did not start (docs/SPEC.md 12a, "Full
+     * access asks in red"): :app marks the load request, never the plugin's own manifest file.
+     */
+    protected val runUnprotected: MutableSet<String> = java.util.Collections.synchronizedSet(HashSet())
+
     /** Anything this process knows about how its plugins loaded, added to [reachabilityReport]. */
     protected open fun loadNotes(): JSONObject = JSONObject()
 
@@ -112,6 +118,11 @@ abstract class PluginProcessService : Service() {
                     loadErrors.remove(pluginId)
                     val manifest = runCatching { PluginManifest.fromJson(JSONObject(manifestJson)) }.getOrNull()
                         ?: return failLoad(pluginId, "its manifest could not be read")
+                    if (runCatching { JSONObject(manifestJson).optBoolean(PluginDangers.RUN_UNPROTECTED_KEY) }.getOrDefault(false)) {
+                        runUnprotected += pluginId
+                    } else {
+                        runUnprotected -= pluginId
+                    }
                     val fds = files.orEmpty()
                     val labels = names.orEmpty()
                     if (fds.size != labels.size) return failLoad(pluginId, "its files arrived without names")

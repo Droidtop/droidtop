@@ -34,32 +34,66 @@ data class PluginView(
 
     companion object {
         const val VERSION = 1
-        const val MAX_SECTIONS = 12
-        const val MAX_NODES = 200
-        const val MAX_OPTIONS = 100
-        const val MAX_TITLE = 200
-        const val MAX_SUBTITLE = 500
-        const val MAX_ARGS_BYTES = 16 * 1024
 
-        /** A view, or null when [json] is not one (no `sections`, or a `view` version this build does not draw). */
-        fun parse(json: JSONObject?): PluginView? {
+        // The limits are the limits file's (docs/view-limits/plugin-view-limits.json), never restated here.
+        val MAX_SECTIONS: Int get() = PluginViewLimits.count("sections")
+        val MAX_NODES: Int get() = PluginViewLimits.count("nodes")
+        val MAX_OPTIONS: Int get() = PluginViewLimits.count("options")
+        val MAX_TITLE: Int get() = PluginViewLimits.length("title")
+        val MAX_SUBTITLE: Int get() = PluginViewLimits.length("subtitle")
+        val MAX_ARGS_BYTES: Int get() = PluginViewLimits.length("argsBytes")
+
+        /**
+         * A view, or null when [json] is not one (no `sections`, or a `view` version this build does not draw).
+         * What the host had to change to draw it (a cut, a dropped or moved notice, an unknown tone, a reserved
+         * title) is added to [messages] in plain words, for the plugin's message log (docs/SPEC.md 7k, "Notices").
+         */
+        fun parse(json: JSONObject?, messages: MutableList<String>? = null): PluginView? {
             if (json == null) return null
             val version = json.optInt("view", VERSION)
             if (version != VERSION) return null
             val sectionsJson = json.optJSONArray("sections") ?: return null
             var budget = MAX_NODES
+            var noticesLeft = PluginViewLimits.count("noticesPerView")
+            var bannersLeft = PluginViewLimits.count("bannersPerPage")
             val sections = buildList {
                 for (i in 0 until minOf(sectionsJson.length(), MAX_SECTIONS)) {
                     val s = sectionsJson.optJSONObject(i) ?: continue
                     val items = s.optJSONArray("items") ?: JSONArray()
-                    val nodes = buildList {
+                    val parsed = buildList {
                         for (j in 0 until items.length()) {
                             if (budget <= 0) break
-                            val node = ViewNode.parse(items.optJSONObject(j)) ?: continue
+                            val node = ViewNode.parse(items.optJSONObject(j), messages) ?: continue
                             add(node)
                             budget--
                         }
                     }
+                    // Notices go first in their section, at most two there and only of different tones, three in a view,
+                    // and one banner a page; the rest is dropped or made a section notice, and said in the message log.
+                    val notices = mutableListOf<ViewNode.Notice>()
+                    parsed.forEachIndexed { index, node ->
+                        if (node !is ViewNode.Notice) return@forEachIndexed
+                        if (index != notices.size) messages?.add("notice \"${node.id}\" was moved to the top of its section")
+                        when {
+                            notices.size >= PluginViewLimits.count("noticesPerSection") ->
+                                messages?.add("notice \"${node.id}\" was dropped: at most ${PluginViewLimits.count("noticesPerSection")} notices in a section")
+                            notices.any { it.tone == node.tone } ->
+                                messages?.add("notice \"${node.id}\" was dropped: a section's two notices must differ in tone")
+                            noticesLeft <= 0 ->
+                                messages?.add("notice \"${node.id}\" was dropped: at most ${PluginViewLimits.count("noticesPerView")} notices in a view")
+                            node.banner && bannersLeft <= 0 -> {
+                                messages?.add("notice \"${node.id}\" was drawn in its section: one banner a page")
+                                notices += node.copy(banner = false)
+                                noticesLeft--
+                            }
+                            else -> {
+                                if (node.banner) bannersLeft--
+                                notices += node
+                                noticesLeft--
+                            }
+                        }
+                    }
+                    val nodes = notices + parsed.filterNot { it is ViewNode.Notice }
                     add(ViewSection(id = s.text("id") ?: "s$i", title = s.text("title")?.cut(MAX_TITLE), nodes = nodes))
                 }
             }
@@ -162,10 +196,28 @@ sealed interface ViewNode {
     /** [percent] is 0..100, or -1 when the plugin does not know. */
     data class Progress(override val id: String, override val title: String, override val subtitle: String?, val percent: Int) : ViewNode
 
+    /**
+     * A plugin's notice (docs/SPEC.md 7k, "Notices"; docs/plugin-api.md 1.6): [tone] is `info` or `caution` (a plugin
+     * has no danger), [banner] puts it under the page header, [details] is what Info shows, and [action] has the shape
+     * of a row's. Drawn by droidtop as its own notice card with "from <plugin>".
+     */
+    data class Notice(
+        override val id: String,
+        override val title: String,
+        override val subtitle: String?,
+        val details: String?,
+        val tone: String,
+        val banner: Boolean,
+        val action: ViewAction?,
+        /** Set by the host only (an error reply's declared permission): the notice opens the plugin's Permissions. */
+        val opensPermissions: Boolean = false,
+    ) : ViewNode
+
     companion object {
-        fun parse(json: JSONObject?): ViewNode? {
+        fun parse(json: JSONObject?, messages: MutableList<String>? = null): ViewNode? {
             if (json == null) return null
             val id = json.text("id") ?: return null
+            if (json.optString("type") == "notice") return parseNotice(id, json, messages)
             val title = json.text("title")?.cut(PluginView.MAX_TITLE) ?: return null
             val subtitle = json.text("subtitle")?.cut(PluginView.MAX_SUBTITLE)
             val action = ViewAction.parse(json.optJSONObject("action"))
@@ -204,6 +256,37 @@ sealed interface ViewNode {
             }
         }
 
+        private fun parseNotice(id: String, json: JSONObject, messages: MutableList<String>?): ViewNode? {
+            fun cutLogged(key: String, limit: Int): String? {
+                val text = json.text(key) ?: return null
+                if (text.length > limit) messages?.add("notice \"$id\": $key was cut at $limit characters")
+                return text.cut(limit)
+            }
+            val title = cutLogged("title", PluginViewLimits.length("noticeTitle")) ?: return null
+            val subtitle = cutLogged("subtitle", PluginViewLimits.length("noticeSubtitle"))
+            val details = cutLogged("details", PluginViewLimits.length("noticeDetails"))
+            if (title.lowercase() in PluginViewLimits.reservedTitles) {
+                messages?.add("notice \"$id\" uses droidtop's own title \"$title\" and was drawn as a plain row")
+                return Info(id, title, subtitle, null)
+            }
+            val rawTone = json.optString("tone", "info")
+            val tone = if (rawTone in PluginViewLimits.tones) {
+                rawTone
+            } else {
+                messages?.add("notice \"$id\": tone \"$rawTone\" is not info or caution and was drawn as info")
+                "info"
+            }
+            val placement = json.optString("placement", "section")
+            if (placement !in PluginViewLimits.placements) messages?.add("notice \"$id\": placement \"$placement\" is not section or banner and was drawn in its section")
+            val action = ViewAction.parse(json.optJSONObject("action"))?.let { a ->
+                val label = a.title ?: return@let a
+                val limit = PluginViewLimits.length("actionLabel")
+                if (label.length > limit) messages?.add("notice \"$id\": its action's label was cut at $limit characters")
+                a.copy(title = label.cut(limit))
+            }
+            return Notice(id, title, subtitle, details, tone, placement == "banner", action)
+        }
+
         private fun parseBoolean(value: Any?): Boolean = when (value) {
             is Boolean -> value
             is String -> value.equals("true", ignoreCase = true)
@@ -228,7 +311,43 @@ object PluginViewCall {
     }
 
     /** A `call` or `job` reply may carry a whole new view for the page that ran it; null when it does not. */
-    fun replyView(data: JSONObject): PluginView? = PluginView.parse(data.optJSONObject("view"))
+    fun replyView(data: JSONObject, messages: MutableList<String>? = null): PluginView? = PluginView.parse(data.optJSONObject("view"), messages)
+
+    /** A reply's `data.notice` (docs/plugin-api.md 1.6): drawn instead of `data.message` by a host that knows notices. */
+    fun replyNotice(data: JSONObject, messages: MutableList<String>? = null): ViewNode.Notice? =
+        ViewNode.parse(data.optJSONObject("notice")?.let { JSONObject(it.toString()).put("type", "notice").apply { if (!has("id")) put("id", "reply") } }, messages) as? ViewNode.Notice
+
+    /**
+     * An error reply as the caution notice droidtop draws for it (docs/plugin-api.md 1.3): the error's own title and
+     * subtitle in plain words when it gave them, its code and message in Info. PERMISSION_DENIED naming a permission
+     * the plugin [declared] opens its Permissions; naming one it did not is logged, not trusted. SIGN_IN_REQUIRED
+     * offers the error's action as "Sign in".
+     */
+    fun errorNotice(reply: PluginReply, declared: Set<String>, fallbackTitle: String, messages: MutableList<String>? = null): ViewNode.Notice {
+        val title = (reply.title ?: fallbackTitle).cut(PluginViewLimits.length("noticeTitle"))
+        val body = (reply.subtitle ?: reply.message?.takeIf { reply.title == null && it.isNotBlank() })?.cut(PluginViewLimits.length("noticeSubtitle"))
+        var opensPermissions = false
+        var action: ViewAction? = null
+        when (reply.code) {
+            PluginErrorCode.PERMISSION_DENIED -> reply.permission?.let { permission ->
+                if (permission in declared) {
+                    opensPermissions = true
+                } else {
+                    messages?.add("an error named the permission \"$permission\", which this plugin does not declare")
+                }
+            }
+            PluginErrorCode.SIGN_IN_REQUIRED -> action = ViewAction.parse(reply.action)?.copy(title = "Sign in")
+            else -> Unit
+        }
+        val details = listOfNotNull(reply.code?.name, reply.message?.takeIf { it.isNotBlank() }).joinToString(": ")
+        return ViewNode.Notice("error", title, body, details.cut(PluginViewLimits.length("noticeDetails")), "caution", banner = false, action = action, opensPermissions = opensPermissions)
+    }
+
+    /**
+     * The features this host's view renderer understands, sent as `host.viewFeatures` in every call envelope
+     * (docs/plugin-api.md 1.6), so a plugin in any language can fall back for an older droidtop.
+     */
+    val VIEW_FEATURES: List<String> = listOf("notice", "confirm")
 
     /** The sentence a `call` reply asks droidtop to show, if any. */
     fun replyMessage(data: JSONObject): String? = data.text("message")?.cut(PluginView.MAX_SUBTITLE)

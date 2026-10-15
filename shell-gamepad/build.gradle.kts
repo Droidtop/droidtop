@@ -63,6 +63,8 @@ dependencies {
     // Keyboard grid): drawn under the shell's own text fields on a screen
     // Android draws no keyboard on (docs/SPEC.md 4c, tracker#314).
     implementation(project(":input-keyboard"))
+    // The notice card and palette every surface shares (docs/SPEC.md 7k, "Notices").
+    implementation(project(":ui-shared"))
     implementation(libs.androidx.core.ktx)
 
     implementation(platform(libs.androidx.compose.bom))

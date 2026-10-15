@@ -116,6 +116,7 @@ class PluginGrants(private val dir: File) {
         val tmp = File(dir, "$pluginId.json.tmp")
         tmp.writeText(json.toString())
         Files.move(tmp.toPath(), fileFor(pluginId).toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        changed()
         PluginEpoch.bump()
     }
 
@@ -268,6 +269,15 @@ class PluginGrants(private val dir: File) {
 
     companion object {
         const val EXPORT_PREFIX = "export:"
+
+        private val _changes = kotlinx.coroutines.flow.MutableStateFlow(0L)
+
+        /** Bumps on every write, so a screen of grants (a plugin's page, its Permissions) is read again when one changes. */
+        val changes: kotlinx.coroutines.flow.StateFlow<Long> = _changes
+
+        internal fun changed() {
+            _changes.value = _changes.value + 1
+        }
         private val LOCK = Any()
 
         fun forPluginsRoot(pluginsRoot: File): PluginGrants = PluginGrants(File(pluginsRoot.parentFile ?: pluginsRoot, "plugin-grants"))

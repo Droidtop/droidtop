@@ -257,6 +257,18 @@ object PluginBundleInstaller {
             enabled = carriedOver && (existingState!!.enabled || (!sameBytes && existingState.disabledReason != null)),
             rootApproved = carriedOver && existingState!!.rootApproved && manifest.requestsRoot,
             disabledReason = null,
+            // An approved version replaced by one from a different maker: kept until the person decides (D3). A pending
+            // version replaced again keeps what it replaced.
+            replacedKeySha256 = when {
+                sameBytes || carriedOver -> existingState?.replacedKeySha256
+                existingState?.trust == PluginTrustState.APPROVED -> existingState.approvedKeySha256
+                else -> existingState?.replacedKeySha256
+            },
+            replacedOrigin = when {
+                sameBytes || carriedOver -> existingState?.replacedOrigin
+                existingState?.trust == PluginTrustState.APPROVED -> existingState.manifest.origin
+                else -> existingState?.replacedOrigin
+            },
         )
         writeRecord(pluginsRoot, record)
         // A same-key update keeps the grants it effectively had; what it adds that is dangerous waits at `ask` (docs/plugin-api.md 1.5).

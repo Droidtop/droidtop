@@ -3,7 +3,6 @@ package dev.droidtop.library.computers
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
@@ -79,7 +78,7 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
         val computerId = entry.id.removePrefix("computer:").substringBefore(':')
         val name = Computers.list(context).firstOrNull { it.id == computerId }?.name ?: "one of your computers"
         val text = "${entry.title} is installed on $name, not on this device"
-        Handler(Looper.getMainLooper()).post { Toast.makeText(context, text, Toast.LENGTH_LONG).show() }
+        Handler(Looper.getMainLooper()).post { dev.droidtop.library.settings.Notices.flash(text, context = context) }
     }
 
     private companion object {

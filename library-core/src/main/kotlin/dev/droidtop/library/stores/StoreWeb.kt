@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.widget.Toast
 import dev.droidtop.pluginhost.WebSessionActivity
 import dev.droidtop.pluginhost.WebSessionRequest
 import dev.droidtop.pluginhost.WebSessions
@@ -180,7 +179,7 @@ object StoreWeb {
             StoreChanges.announce(context)
             val after = gamesOf(context, store)
             val line = addedLine(store.label, added(known.getAndSet(after), after)) ?: return
-            Handler(Looper.getMainLooper()).post { Toast.makeText(context, line, Toast.LENGTH_LONG).show() }
+            Handler(Looper.getMainLooper()).post { dev.droidtop.library.settings.Notices.flash(line, context = context) }
         }
     }
 }

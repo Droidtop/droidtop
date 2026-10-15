@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad.query
 
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.getGamesScreen
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -68,7 +72,6 @@ import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.shell.gamepad.CatalogNavigator
-import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
@@ -292,7 +295,7 @@ internal fun LibraryFilterSheet(
             entries.forEach { entry ->
                 when (entry) {
                     is FilterEntry.Header -> MenuSectionLabel(entry.text)
-                    is FilterEntry.Note -> MenuHint(entry.text)
+                    is FilterEntry.Note -> NoticeCard(Notice(NoticeTone.Info, entry.text), NoticePlacement.Group)
                     is FilterEntry.Row -> MenuRow(
                         title = entry.title,
                         value = entry.value,

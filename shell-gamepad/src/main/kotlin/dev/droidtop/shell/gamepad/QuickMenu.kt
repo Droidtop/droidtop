@@ -50,6 +50,8 @@ import dev.droidtop.library.message
 import dev.droidtop.pluginhost.JobsSummary
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.runtime.systemstatus.NotificationsStore
+import dev.droidtop.ui.shared.LocalNoticePalette
+import dev.droidtop.ui.shared.glyph
 import dev.droidtop.runtime.systemstatus.OverlayLevel
 import dev.droidtop.runtime.systemstatus.PerformanceMonitor
 import dev.droidtop.runtime.systemstatus.PerformanceOverlay
@@ -177,9 +179,11 @@ internal fun QuickMenu(
         }
         // What is waiting, for the rail's dots: read while the sheet is open, never polled.
         val notifications by NotificationsStore.items.collectAsState()
+        val recentUnread by dev.droidtop.library.settings.Notices.unread.collectAsState()
         val jobs by PluginJobsCenter.entries().collectAsState()
         val dots = buildSet {
             if (granted && notifications.isNotEmpty()) add(QuickSection.NOTIFICATIONS)
+            if (recentUnread > 0) add(QuickSection.NOTIFICATIONS)
             if (JobsSummary.runningCount(jobs) > 0) add(QuickSection.DOWNLOADS)
         }
 
@@ -530,6 +534,11 @@ private fun DownloadsSection(onDismiss: () -> Unit) {
     CatalogNavigator(root = remember { PluginJobsScreen.screen(headed = false) }, onExit = onDismiss)
 }
 
+/**
+ * The Notifications section: droidtop's own Recent group first (docs/SPEC.md 7k, "Notices": every flash, with an
+ * unread dot, Copy all on Select; it needs no notification access), then Android's notifications from
+ * [NotificationsStore] once access is granted. One cursor runs over both.
+ */
 @Composable
 private fun NotificationsTab(onDismiss: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -548,6 +557,20 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
         }
     }
     val items by NotificationsStore.items.collectAsState()
+    val recent by dev.droidtop.library.settings.Notices.recent.collectAsState()
+    // The dot says what was new when the tab opened; leaving the tab marks it read.
+    val unreadAtOpen = remember { dev.droidtop.library.settings.Notices.unread.value }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { dev.droidtop.library.settings.Notices.markRead() } }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    val copyAll = {
+        if (recent.isNotEmpty()) {
+            clipboard.setText(androidx.compose.ui.text.AnnotatedString(dev.droidtop.library.settings.Notices.recentAsText()))
+            dev.droidtop.library.settings.Notices.flash("Copied")
+        }
+    }
+    // The cursor runs over Recent, then the access row or Android's notifications.
+    val systemRows = if (granted) items.size else 1
+    val rowCount = recent.size + systemRows
     var focusIndex by remember { mutableStateOf(0) }
     val listState = rememberLazyListState()
     val focusRequester = remember { FocusRequester() }
@@ -560,9 +583,13 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     var heldStep by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
-    LaunchedEffect(focusIndex, items.size) {
-        if (items.isNotEmpty()) listState.keepInView(focusIndex.coerceIn(0, items.size - 1), animate = !heldStep)
+    // List items: the Recent heading (when there is Recent), its rows, then the system rows.
+    val headingOffset = if (recent.isNotEmpty()) 1 else 0
+    LaunchedEffect(focusIndex, rowCount) {
+        if (rowCount > 0) listState.keepInView(focusIndex.coerceIn(0, rowCount - 1) + headingOffset, animate = !heldStep)
     }
+    val systemIndex = focusIndex - recent.size
+    val current = if (granted) items.getOrNull(systemIndex) else null
 
     Column(
         modifier = Modifier
@@ -572,14 +599,14 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
             // Every press is this tab's: the sheet above has already
             // taken the tabs and the close.
             .onPad { press ->
-                val current = items.getOrNull(focusIndex)
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> {
                         heldStep = press.repeat
-                        focusIndex = menuStep(focusIndex, items.size, if (press.action == GamepadAction.UP) -1 else 1)
+                        focusIndex = menuStep(focusIndex, rowCount, if (press.action == GamepadAction.UP) -1 else 1)
                     }
                     GamepadAction.B -> onDismiss()
                     GamepadAction.A -> when {
+                        systemIndex < 0 -> Unit
                         !granted -> {
                             grantStep()
                             onDismiss()
@@ -592,48 +619,85 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                             onDismiss()
                         }
                     }
+                    GamepadAction.SELECT -> copyAll()
                     GamepadAction.X -> if (current?.clearable == true) NotificationsStore.controller?.dismiss(current.key)
-                    GamepadAction.Y -> if (items.any { it.clearable }) NotificationsStore.controller?.clearAll()
+                    GamepadAction.Y -> if (granted && items.any { it.clearable }) NotificationsStore.controller?.clearAll()
                     else -> Unit
                 }
                 true
             },
     ) {
-        val showList = granted && items.isNotEmpty()
-        when {
-            !granted -> MenuRow(
-                title = "Notification access",
-                value = if (restricted) dev.droidtop.runtime.systemstatus.RestrictedSettings.TITLE else "Needs permission",
-                selected = focusIndex == 0,
-                onClick = {
-                    grantStep()
-                    onDismiss()
-                },
-            )
-            items.isEmpty() -> Text(
-                "No notifications.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MenuTokens.OnSurfaceMuted,
-                modifier = Modifier.padding(vertical = 12.dp),
-            )
-            else -> Unit
-        }
-        // The hint row is docked at the bottom of the sheet on every tab.
-        // With no list to take the room it used to float directly under
-        // "No notifications." while the System tab's sat at the bottom
-        // (UI pass 2026-09-24, M12).
-        if (!showList) {
-            Spacer(Modifier.weight(1f))
-        } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                // The hint bar's own room (MenuTokens.HintBarRoom).
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
-            ) {
-                itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            // The hint bar's own room (MenuTokens.HintBarRoom).
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
+        ) {
+            if (recent.isNotEmpty()) {
+                item(key = "recent_heading") {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
+                        MenuSectionLabel("droidtop")
+                        if (unreadAtOpen > 0) {
+                            Box(
+                                Modifier
+                                    .padding(start = 6.dp)
+                                    .size(8.dp)
+                                    .background(MenuTokens.Accent, androidx.compose.foundation.shape.CircleShape)
+                                    .semantics { contentDescription = "$unreadAtOpen new" },
+                            )
+                        }
+                    }
+                }
+                itemsIndexed(recent, key = { index, entry -> "recent_${entry.atMillis}_$index" }) { index, entry ->
                     val focused = index == focusIndex
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectionFrame(focused, MenuTokens.RowShape)
+                            .clickable { focusIndex = index }
+                            .padding(10.dp),
+                    ) {
+                        androidx.compose.material3.Icon(
+                            entry.tone.glyph(),
+                            contentDescription = null,
+                            tint = LocalNoticePalette.current.ink(entry.tone),
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Column(Modifier.padding(start = 10.dp)) {
+                            Text(
+                                listOfNotNull(entry.source, recentTime(entry.atMillis)).joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MenuTokens.OnSurfaceMuted,
+                            )
+                            Text(entry.text, style = MaterialTheme.typography.bodyMedium, color = MenuTokens.OnSurface)
+                        }
+                    }
+                }
+            }
+            when {
+                !granted -> item(key = "access") {
+                    MenuRow(
+                        title = "Notification access",
+                        value = if (restricted) dev.droidtop.runtime.systemstatus.RestrictedSettings.TITLE else "Needs permission",
+                        selected = systemIndex == 0,
+                        onClick = {
+                            focusIndex = recent.size
+                            press(GamepadAction.A)
+                        },
+                    )
+                }
+                items.isEmpty() && recent.isEmpty() -> item(key = "empty") {
+                    Text(
+                        "No notifications.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MenuTokens.OnSurfaceMuted,
+                        modifier = Modifier.padding(vertical = 12.dp),
+                    )
+                }
+                else -> itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
+                    val focused = index == systemIndex
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -645,7 +709,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                             // background, so the press indication is
                             // drawn over it rather than under it.
                             .clickable {
-                                focusIndex = index
+                                focusIndex = recent.size + index
                                 press(GamepadAction.A)
                             }
                             .padding(10.dp),
@@ -681,27 +745,32 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                 }
             }
         }
-        // The legend here named X (dismiss one) and Y (clear all),
-        // neither of which had any touch route. As a hint bar the same
-        // line IS the route, dispatching into this dialog's own window.
-        // Built from gated bindings, like every other row: only what
-        // dispatches right now is named -- Open and Dismiss need a
-        // notification under the cursor, Dismiss and Clear all need one
-        // that can be cleared, and an empty list offers none of them.
+        // The legend is the touch route too, dispatching into this dialog's
+        // own window. Built from gated bindings, like every other row: only
+        // what dispatches right now is named.
         HintRow(
             bindings = listOf(
-                HintBinding(GamepadAction.A, "Grant access") { !granted },
-                HintBinding(GamepadAction.A, "Open") { granted && items.getOrNull(focusIndex) != null },
-                HintBinding(GamepadAction.X, "Dismiss") {
-                    granted && items.getOrNull(focusIndex)?.clearable == true
-                },
+                HintBinding(GamepadAction.A, "Grant access") { !granted && systemIndex == 0 },
+                HintBinding(GamepadAction.A, "Open") { granted && current != null },
+                HintBinding(GamepadAction.X, "Dismiss") { granted && current?.clearable == true },
                 HintBinding(GamepadAction.Y, "Clear all") { granted && items.any { it.clearable } },
+                HintBinding(GamepadAction.SELECT, "Copy all") { recent.isNotEmpty() },
                 HintBinding(GamepadAction.B, "Close"),
             ),
             background = androidx.compose.ui.graphics.Color.Transparent,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
+}
+
+/** A Recent entry's time: the clock time today, else the date. */
+private fun recentTime(atMillis: Long): String {
+    val now = java.util.Calendar.getInstance()
+    val then = java.util.Calendar.getInstance().apply { timeInMillis = atMillis }
+    val sameDay = now.get(java.util.Calendar.YEAR) == then.get(java.util.Calendar.YEAR) &&
+        now.get(java.util.Calendar.DAY_OF_YEAR) == then.get(java.util.Calendar.DAY_OF_YEAR)
+    val pattern = if (sameDay) "HH:mm" else "d MMM HH:mm"
+    return java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(java.util.Date(atMillis))
 }
 
 
