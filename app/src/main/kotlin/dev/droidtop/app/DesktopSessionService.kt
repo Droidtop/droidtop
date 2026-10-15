@@ -221,6 +221,8 @@ class DesktopSessionService : Service() {
             primary,
         )
         libraryEntries = DesktopLibraryEntries(applicationContext, LibraryCore.library(applicationContext)).also { it.start(scope) }
+        // App containers whose program starts with the desktop (docs/SPEC.md 3, "The image's own program").
+        scope.launch { runCatching { ContainerPrograms.startWithDesktop(applicationContext, runtime) } }
         // Fonts for all languages are a Downloads job, not part of the boot (Droidtop/tracker#390): started only
         // when this desktop does not have them yet, which one cheap test in the container answers.
         // The physical keyboard's layout, compiled in the container (docs/SPEC.md 6b, Droidtop/tracker#387).
