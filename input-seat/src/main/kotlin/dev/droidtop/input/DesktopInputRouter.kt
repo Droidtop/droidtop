@@ -421,7 +421,9 @@ class DesktopInputRouter {
      * Both reached the container unshifted — '!' as '1', capitals as
      * lowercase (Droidtop/tracker#147) — so when the meta state says Shift
      * is part of the keystroke and the container does not already see a
-     * Shift, one is sent around the key.
+     * Shift, one is sent around the key. The container sees it as Shift
+     * because host-bridge follows every modifier key with the keyboard's
+     * modifier state (KeyboardModifiers; docs/SPEC.md 6b "Modifiers").
      *
      * Shift's own events are exempt (a Shift press carries META_SHIFT_ON
      * too) and so is a Shift already down, whether the user's press was

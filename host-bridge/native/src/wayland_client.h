@@ -125,6 +125,10 @@ public:
     // [typed]: the key was derived from a character (an on-screen keyboard), so it goes through the
     // US-keymap text keyboard; otherwise through the layout keyboard (docs/SPEC.md 6b "Keyboard layout").
     void injectKey(uint32_t evdevKeyCode, bool pressed, bool typed);
+    // The modifier state of the same keyboard [typed] names, as zwp_virtual_keyboard_v1.modifiers takes it.
+    // wlroots does not derive it from key events (update_state = false in wlr_virtual_keyboard_v1.c), so
+    // HostBridge.kt tracks it per keyboard and sends it after each key that changes it (docs/SPEC.md 6b).
+    void injectModifiers(uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group, bool typed);
 
     // Replaces the layout keyboard's XKB keymap with [keymap] (XKB text, [length] bytes, no NUL needed).
     bool setKeymap(const char* keymap, size_t length);
