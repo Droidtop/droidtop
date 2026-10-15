@@ -411,7 +411,11 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   6b has it. Start opens the Start menu (Gaming's left menu), R2 the Quick Menu (Gaming's R2; Select stays the
   container's, coordinator, 2026-10-08), L1 the list of windows, R1 the search.
   `DesktopPadRoutes` (`:shell-desktop`) claims them in `MainActivity.dispatchKeyEvent`, before any view,
-  and only from a gamepad: a keyboard's keys are the container's. `DesktopShell` collects them.
+  and only from a gamepad: a keyboard's keys are the container's. With no live session (a desktop still to
+  be set up or started) there is no container to give them to, so the four are taken from any source
+  (rig 2026-10-15). `DesktopShell` collects them. A screen droidtop opens from Desktop (the Switch mode
+  sheet, a plugin's permission sheet, a settings page of its own) takes the Gaming theme as Desktop's chrome
+  does (`rememberGamingThemed`: last mode Gaming or Desktop).
 - **Each is a sheet that is a window of its own** (a Dialog), so the one input pipeline (6e) runs in it.
   `HostedListSheet` (`:shell-gamepad`, `hosted/`) is `MenuPanel` over a lazy list of `MenuRow`s with
   Gaming's sliding focus ring: Up and Down stop at the ends and keep the row on screen, A takes the row,
