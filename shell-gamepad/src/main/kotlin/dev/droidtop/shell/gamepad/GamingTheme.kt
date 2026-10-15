@@ -396,7 +396,7 @@ fun GamingTheme(content: @Composable () -> Unit) {
     DisposableEffect(context) {
         val prefs = dev.droidtop.library.settings.CatalogPrefs.prefs(context)
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            if (key in dev.droidtop.library.settings.ReadingPrefs.PALETTE_KEYS) ShellThemePrefs.version++
+            if (key in dev.droidtop.library.settings.ReadingPrefs.PALETTE_KEYS) ShellThemePrefs.bump()
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }

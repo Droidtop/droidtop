@@ -37,6 +37,11 @@ object ThemePrefs {
         LibraryThemePrefs.addOnChangeListener { version++ }
     }
 
+    /** A setting the palette reads changed outside the theme choice (High contrast, Sentence case): re-read it. */
+    fun bump() {
+        version++
+    }
+
     fun get(context: Context): String? = LibraryThemePrefs.get(context)
 
     fun set(context: Context, themeName: String) {
