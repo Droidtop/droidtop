@@ -54,11 +54,15 @@ data class ContainerApp(
 object ContainerApplications {
     private const val FILE_MARKER = "@@droidtop-desktop-file "
 
-    /** Prints every desktop file, each preceded by a marker line naming it. */
+    /**
+     * Prints every desktop file, each preceded by a marker line naming it: the container's own, then the apps
+     * other containers exported into the desktop ([ContainerExports]), which launch through droidtop's helper.
+     */
     private val LIST_SCRIPT = listOf(
         "/bin/sh",
         "-c",
-        "for f in /usr/share/applications/*.desktop /usr/local/share/applications/*.desktop; do " +
+        "for f in /usr/share/applications/*.desktop /usr/local/share/applications/*.desktop " +
+            "${ContainerLauncher.DATA_DIR}/applications/${ContainerExports.ENTRY_PREFIX}*.desktop; do " +
             "[ -f \"\$f\" ] && { printf '\\n$FILE_MARKER%s\\n' \"\$f\"; cat \"\$f\"; }; done; true",
     )
 
@@ -67,6 +71,13 @@ object ContainerApplications {
         check(result.succeeded) { "couldn't list applications: ${result.stderr.ifBlank { result.stdout }.trim()}" }
         return parseListing(result.stdout)
     }
+
+    /** [container]'s own apps only, without what other containers exported into the desktop: what it can export. */
+    suspend fun ownApps(runtime: ContainerRuntime, container: Container): List<ContainerApp> =
+        list(runtime, container).filterNot { isExported(it) }
+
+    /** Whether [app] is another container's app exported into the desktop ([ContainerExports]). */
+    fun isExported(app: ContainerApp): Boolean = app.id.startsWith(ContainerExports.ENTRY_PREFIX)
 
     /**
      * Runs [app] in [container] and waits until it exits (its window

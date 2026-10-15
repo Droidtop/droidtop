@@ -2308,6 +2308,27 @@ the `ContainerRuntime` interface that already exists (§3):
   a colon is left out). Setup and the settings preview of the letters use
   that one rule. A prefix's home is its own `xuser-<id>` (Private). Next
   in D3: an app container (D6) defaults to Private.
+  **Exported apps (built 2026-10-15, Droidtop/tracker#555 D5).** A
+  sibling's apps can be shown in the desktop's menus, distrobox-export
+  style: its page has "In the desktop's menus", one switch per app it has
+  installed (`ContainerApplications.ownApps`, which leaves out what other
+  containers exported). An exported app (`ExportedApp`, kept in
+  `desktop-launcher/exports.list` by `ContainerExports`) is a desktop
+  entry `dtexport-<token>.desktop` in droidtop's data directory (on every
+  container's `XDG_DATA_DIRS`), named "<app> (on <container>)" as
+  distrobox-export names it, whose `Exec` is the launch helper with the
+  export's token. So the panel's launcher (wofi) shows it, and so does
+  droidtop's Start menu, whose Linux apps listing reads these entries
+  beside the primary's own. A launch comes back over the one request
+  channel (2a); droidtop looks the token up in its own list, starts the
+  sibling where the backend needs that, and runs the app there
+  (`ContainerApplications.launch`), its window on the shared desktop.
+  Nothing the container wrote is run: the token only names an export
+  droidtop published. Deleting a container removes its exports; each
+  desktop start rewrites the entries from the list. Command-line programs
+  are not exported yet: a request carries no arguments and no terminal,
+  so they wait for the container-enter path (D7). An export keeps the
+  container name it had when it was switched on.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy
