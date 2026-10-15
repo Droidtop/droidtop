@@ -448,6 +448,16 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
 - **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
   Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
   Settings or the mode switcher and then give the pad back to the container by closing the sheet.
+- **One bar, in droidtop's look** (Droidtop/tracker#555 D4, 2026-10-15). The whole Desktop shell is
+  wrapped in `GamingTheme {}`, so the bar, its sheets and the Quick Menu read the palette Gaming reads (the
+  active theme's), through `MaterialTheme` and `MenuTokens` alike; the bar's ground is `MenuTokens.Ground`
+  and its buttons are flat chips (`MenuTokens.Card`, `RowShape`), not Material's filled pills. droidtop's bar
+  keeps what only Android can do: Start, pins, the running windows and Android apps, Modes, the plugin,
+  companion and clipboard items, and the tray (network, VPN, battery, notifications), which opens the Quick
+  Menu. Terminal, Containers and Settings are Start's System rows, not bar buttons. There is no second clock:
+  the clock is the panel's (Waybar's `custom/clock`, or swaybar's status line from the stock sway config),
+  and the panel choice is unchanged. The container's windows stay in the bar's list, because Waybar's
+  config has no window list and a finger needs a way to raise, minimise and close one.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
   then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and
