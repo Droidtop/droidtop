@@ -448,6 +448,11 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
 - **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
   Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
   Settings or the mode switcher and then give the pad back to the container by closing the sheet.
+- **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
+  Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
+  then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and
+  on to `MenuRow`'s `minHeight`), never under a 48 dp touch target, so about twice as many fit as at Gaming's
+  72 dp; a row with more text still grows.
 - **Search is the one search** (12a "One search"; Droidtop/tracker#351). The Start menu's first row, and R1,
   open `LauncherSearchScreen`, the dialog the launcher's drawer and Standard use, with the local rows of this
   surface: the library's entries (the scan the Start menu observes, collected only while the search is open)

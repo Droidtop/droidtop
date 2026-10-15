@@ -152,6 +152,8 @@ fun HostedListSheet(
     extraBindings: List<HintBinding> = emptyList(),
     cursor: HostedCursor = remember { HostedCursor() },
     onTyped: ((String) -> Unit)? = null,
+    // A shorter row than Gaming's [MenuTokens.RowMinHeight] for a dense list (Desktop's Start menu); null keeps it.
+    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
 ) {
     val window = currentShellWindow()
     val currentRows by rememberUpdatedState(rows)
@@ -241,6 +243,7 @@ fun HostedListSheet(
                                     onLongClick = item.row.onDetail ?: item.row.onToggle,
                                     ownScrollKeeping = true,
                                     leading = item.row.leading,
+                                    minHeight = rowMinHeight,
                                 )
                             }
                         }
