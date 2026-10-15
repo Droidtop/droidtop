@@ -41,7 +41,9 @@ import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
+import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ExtraMount
+import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ImageTags
 import dev.droidtop.runtime.KnownImageRepository
@@ -266,7 +268,9 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "vpn", title = "VPN", items = vpnItems(context, runtime, info))
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
-        groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info))
+        val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
+        groups += CatalogGroup(id = "home", title = "Home", items = homeItems(runtime, info, mounts))
+        groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info, mounts))
         groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
@@ -449,11 +453,51 @@ object ContainersCatalog {
         )
     }
 
+    // ---- home (docs/SPEC.md 3d "Home and folders") ----
+
+    /** Which home the container's programs see at /root: one row per choice, the current one marked. */
+    private fun homeItems(runtime: ContainerRuntime, info: ContainerInfo, current: EnvironmentMounts): List<CatalogItem> {
+        val container = info.container
+        fun choose(home: HomeChoice): suspend (Context, (String) -> Unit) -> String = { _, _ ->
+            withContext(Dispatchers.IO) { runtime.setMounts(container, current.copy(home = home)) }
+            "From its next start."
+        }
+        val chosen = current.home as? HomeChoice.Chosen
+        return listOf(
+            AsyncActionItem(
+                id = "container_home_shared",
+                title = "Your files (shared with the desktop)",
+                subtitle = "The same home folder as every container that shares it",
+                value = "Current".takeIf { current.home == HomeChoice.Shared },
+                run = choose(HomeChoice.Shared),
+            ),
+            AsyncActionItem(
+                id = "container_home_private",
+                title = "Its own files only",
+                subtitle = "A home of its own that no other container sees",
+                value = "Current".takeIf { current.home == HomeChoice.Private },
+                run = choose(HomeChoice.Private),
+            ),
+            FolderPickItem(
+                id = "container_home_chosen",
+                title = "A folder you choose",
+                subtitle = chosen?.let { "Current: ${it.hostPath}" } ?: "A folder on this device becomes its home",
+                onPicked = { _, uri ->
+                    val resolved = withContext(Dispatchers.IO) { GamesRootPrefs.resolveStoragePath(uri) }
+                        ?: return@FolderPickItem "Couldn't resolve that folder to a real path on this device"
+                    withContext(Dispatchers.IO) {
+                        runCatching { runtime.setMounts(container, current.copy(home = HomeChoice.Chosen(resolved.absolutePath))) }
+                    }.exceptionOrNull()?.let { userFacingErrorMessage(it) }
+                },
+            ),
+        )
+    }
+
     // ---- mounts (docs/SPEC.md 3d) ----
 
-    private suspend fun mountItems(runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
+    private fun mountItems(runtime: ContainerRuntime, info: ContainerInfo, current: EnvironmentMounts): List<CatalogItem> {
         val container = info.container
-        val mounts = runCatching { runtime.extraMounts(container) }.getOrDefault(emptyList())
+        val mounts = current.folders
         return buildList {
             add(
                 FolderPickItem(
@@ -465,7 +509,7 @@ object ContainersCatalog {
                             ?: return@FolderPickItem "Couldn't resolve that folder to a real path on this device"
                         val name = uniqueMountName(resolved.name.ifBlank { "folder" }, mounts.map { it.name })
                         val outcome = withContext(Dispatchers.IO) {
-                            runCatching { runtime.setExtraMounts(container, mounts + ExtraMount(resolved.absolutePath, name)) }
+                            runCatching { runtime.setMounts(container, current.copy(folders = mounts + ExtraMount(resolved.absolutePath, name))) }
                         }
                         val exc = outcome.exceptionOrNull()
                         Log.w("droidtop.containers", "Extra mount failed", exc)
@@ -484,7 +528,7 @@ object ContainersCatalog {
                         subtitle = "${mount.hostPath} \u2192 ${mount.containerPath}",
                         confirmTitle = "Stop sharing ${mount.name}?",
                         run = { _, _ ->
-                            runtime.setExtraMounts(container, mounts - mount)
+                            runtime.setMounts(container, current.copy(folders = mounts - mount))
                             "Removed."
                         },
                     ),

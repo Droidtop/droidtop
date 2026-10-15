@@ -51,8 +51,8 @@ class ContainerTerminalTest {
         override suspend fun sockets(container: Container): ContainerSockets = error("not used")
         override suspend fun setSockets(container: Container, sockets: ContainerSockets) = error("not used")
         override val audioSharingUnavailableReason: String? = null
-        override suspend fun extraMounts(container: Container): List<ExtraMount> = error("not used")
-        override suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>) = error("not used")
+        override suspend fun mounts(container: Container): EnvironmentMounts = error("not used")
+        override suspend fun setMounts(container: Container, mounts: EnvironmentMounts) = error("not used")
     }
 
     private val primary = Container(

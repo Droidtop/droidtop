@@ -92,6 +92,12 @@ object ContainerLayout {
     const val EXTRA_MOUNTS_DIR = "/run/droidtop-mounts"
 
     /**
+     * droidtop's one shared home folder on the host (docs/SPEC.md 3d "Home and folders"): bound at `/root` in every
+     * container whose home is Shared, so a file saved in one is there in the others, distrobox's default.
+     */
+    fun sharedHomeDir(appStorageDir: File): File = File(appStorageDir, "desktop-home")
+
+    /**
      * Every plan ([planId]) whose install has completed in this container,
      * one per line. Provisioning runs when the current plan is not among
      * them, so a package added to a plan reaches containers made before

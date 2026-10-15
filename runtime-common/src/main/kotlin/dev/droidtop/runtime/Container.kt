@@ -249,11 +249,11 @@ interface ContainerRuntime {
     suspend fun importData(container: Container, input: java.io.InputStream): Unit =
         error(dataBackupUnavailableReason ?: "not supported")
 
-    /** Extra host folders bound into [container] beyond the standard shared-storage set (docs/SPEC.md 3d Mounts row). */
-    suspend fun extraMounts(container: Container): List<ExtraMount>
+    /** [container]'s home and the extra host folders bound into it beyond the standard set (docs/SPEC.md 3d "Home and folders"). */
+    suspend fun mounts(container: Container): EnvironmentMounts
 
-    /** Replaces [container]'s extra mounts; bound from its next start/exec. */
-    suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>)
+    /** Replaces [container]'s home and extra folders; bound from its next start/exec. */
+    suspend fun setMounts(container: Container, mounts: EnvironmentMounts)
 
     /**
      * Whether this device can run this backend at all, answered by running
