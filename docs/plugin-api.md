@@ -190,7 +190,7 @@ the same envelope in both directions:
 Error codes are a closed set: `INVALID_ARGS`, `UNSUPPORTED`,
 `NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`, `TIMEOUT`,
 `PROVIDER_UNAVAILABLE`, `PROVIDER_CRASHED`, `CANCELLED`, `FAILED`,
-`SIGN_IN_REQUIRED`. A plugin's own ordinary failure ("no network",
+`SIGN_IN_REQUIRED`, `BROWSER_CHECK_REQUIRED`. A plugin's own ordinary failure ("no network",
 "nothing found") is an error reply, not a crash. This keeps today's
 distinction in `PluginCrashPolicy`.
 
@@ -205,6 +205,31 @@ Permissions; naming one it did not declare is drawn as a plain notice and
 logged as a plugin message. `SIGN_IN_REQUIRED` offers its `action` (a view
 action) as "Sign in". The helpers write it (`gg.error(code, title, ...)`,
 `PluginReply.error(code, title, subtitle, permission, action)`).
+
+**A failure is one plain sentence (2026-10-15, Droidtop/tracker#544 item 8).**
+An error's `message` is one plain sentence for the person: what happened, in
+their words, with no HTTP status, no exception or stack trace, no markup and
+no site's page text ("The site did not answer" is a message; "f95zone
+answered HTTP 403" and "JavaScript is disabled. For a better experience..."
+are not). What the code saw goes in the optional `detail` field (plain text,
+at most 400 characters are kept, markup removed), which droidtop shows only
+behind "Technical details". droidtop still guards a message that breaks the
+rule (a source's search shows droidtop's own sentence instead), and the
+conformance script (Droidtop/tracker#71) flags messages with `HTTP`, a stack
+trace or markup.
+
+**Sign-in and browser checks are droidtop's to draw (2026-10-15,
+Droidtop/tracker#544 item 1).** A plugin whose site needs the person signed
+in answers `SIGN_IN_REQUIRED`; one whose site shows a browser check first
+("Checking your browser") answers `BROWSER_CHECK_REQUIRED`. Neither
+needs a title, a sentence about how to sign in, or a made-up result
+row: droidtop says it in its own words and offers **Sign in** or **Open the
+site** itself, in a source's search (under the source's name, searching
+again after) and on any view page (as the notice's action, reading the page
+again after). It opens the plugin's `web.session` in droidtop's web view: the
+`signIn` page the plugin declared (G3) for a sign-in, that site's home page
+for a browser check. This needs `web.session` with a site; for a plugin
+without one, a `SIGN_IN_REQUIRED`'s own `action` is still offered as before.
 
 **Plugin → host (the broker):**
 
@@ -516,11 +541,15 @@ no destination, such as the PC library). Ops:
   is `{id, title, subtitle?, columns?[], badges?[], platform?, ref?}`.
   `limit` is how many results the host will show (ten per source in the one
   search): send at most that many, a page and not the whole answer; the host
-  cuts a longer list to it. A failing search answers `ok: false` with a short
-  plain `message`; the host shows its own sentence ("This site needs a
-  sign-in in the browser", "It could not reach the site"), never the message,
-  and keeps the message, with markup removed, behind "Technical details", so a
-  site's page text is not a good message.
+  cuts a longer list to it. A failing search answers `ok: false` with one
+  plain `message` and, optionally, a `detail` (§1.3); the host shows its own
+  sentence when the message is not a plain one ("It could not reach the
+  site"), and keeps the `detail` (or the message), with markup removed, behind
+  "Technical details", so a site's page text is never a good message. A
+  source that needs a sign-in or a browser check answers `SIGN_IN_REQUIRED` or
+  `BROWSER_CHECK_REQUIRED` (§1.3) and returns no result row about it: the
+  host shows "Sign in to search here" or "The site checks the browser first"
+  with its own Sign in / Open the site under the source's name.
   `ref` is any JSON object; droidtop hands it back unread in `detail` and
   `acquire` and never parses it (12a checklist point 5). droidtop renders a
   result as a `row` that opens `detail`. At most 200 results are shown.
@@ -1738,6 +1767,14 @@ Risk low.
     owns (P2);
   - D: the tray (C8).
 - **Permission:** none.
+- **While a game runs (2026-10-15, Droidtop/tracker#544 item 6).** A tile
+  entry (`ui.quick_tile` or `ui.status_tile`) may declare
+  `"whileGame": true`: it is shown only while a game is running. With
+  `"gamePackages": ["com.retroarch", ...]` (the `ui.panel` entry's field) it
+  is shown only while one of those apps runs the game. A tile with neither
+  is shown whatever runs. RetroArch's Save state and Fast-forward are the
+  case: `{"point": "ui.quick_tile", "id": "save_state", "gamePackages":
+  ["com.retroarch", "com.retroarch.aarch64"]}`.
 - **Status:** built in the Quick Menu; since 2026-10-07 its rows are in
   the plugin's panel. A `status_tile` counts as a read-only quick tile
   (§6).
@@ -2159,8 +2196,8 @@ droidtop's own Android permissions, gated per plugin by the broker.
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| F1 | App bridges | a plugin that represents another installed app (Syncthing, Key Mapper, Obtainium, Discord, #15): status, actions, and **droidtop's own fallback when the app is absent** | EP `apps.bridge@1` (today's `app_status`): `status {package}` → {installed, version, state, actions[]}; `action {id}` (quick call or **job**) | A/G/D: the app's row wherever droidtop shows that app (the Player screen today), Accounts and sources, C3 tiles | `provide:apps.bridge` + `apps.check` (declared packages) + `apps.bind` (for live connections) | medium | built as `app_status` (`PluginAppStatus`) |
-| F2 | Intents out | start another app, share to it, hand it a link or a file | `apps.launch {package}` (exists); `apps.intent {package, action, extras(strings), data?}` → the host builds and fires it; `apps.view {uri, title?}` → `{opened, reason?}`: droidtop builds `ACTION_VIEW` for the link and shows Android's own chooser (a magnet to a torrent app, a web page to a browser); the allowed schemes are `https`, `http` and `magnet` only (no `file`, `content`, `intent`, `javascript` or droidtop's own), at most 8192 characters, and only during a call the person started (a button's job); when no app takes the link the answer is `{opened: false, reason: "no app opens magnet links"}`, not an error, and the plugin shows the link to copy; every use is in the activity log (the kind of link and a web page's host, never a query or a magnet's contents); `apps.share {text \| file token}` → the system share sheet | — | `apps.launch` (normal) / `apps.view` (normal: "Open links in other apps") / `apps.intents.out` (normal for declared packages; dangerous for any package) | medium | partial (`launchApp`, `launchAppWithExtras`; `apps.view` built 2026-10-09, `AppLinks`, Droidtop/tracker#418) |
+| F1 | App bridges | a plugin that represents another installed app (Syncthing, Key Mapper, Obtainium, Discord, #15): status, actions, and **droidtop's own fallback when the app is absent** | EP `apps.bridge@1` (today's `app_status`): `status` → `{package, installed?, status?, version?}` (2026-10-15, Droidtop/tracker#544 item 5, #521 item 4): `package` is the managed app, whose name, installed state and version droidtop reads from Android itself; `installed` only when the plugin knows better than Android; `status` one plain sentence about the app's state; `version` when Android does not know it. droidtop draws the app's row (its name, Installed / Not installed, the status sentence, the version, Launch); any other value is never shown as "Key: value", only behind "Technical details"; `action {id}` (quick call or **job**) | A/G/D: the app's row wherever droidtop shows that app (the Player screen today), Accounts and sources, C3 tiles | `provide:apps.bridge` + `apps.check` (declared packages) + `apps.bind` (for live connections) | medium | built as `app_status` (`PluginAppStatus`) |
+| F2 | Intents out | start another app, share to it, hand it a link or a file | `apps.launch {package}` (exists); `apps.intent {package, action, extras(strings), data?}` → the host builds and fires it; `apps.view {uri, title?}` → `{opened, reason?}`: droidtop builds `ACTION_VIEW` for the link and shows Android's own chooser (a magnet to a torrent app, a web page to a browser); the allowed schemes are `https`, `http` and `magnet` only (no `file`, `content`, `intent`, `javascript` or droidtop's own), at most 8192 characters, and only during a call the person started (a button's job); when no app takes the link the answer is `{opened: false, reason: "no app opens magnet links", copied}`, not an error, and **droidtop shows its own fallback** (2026-10-15, Droidtop/tracker#544 item 3): the link is put on the clipboard and droidtop says why and that it is ready to paste; when the person has turned "Open links in other apps" off, droidtop says so (and that it can be allowed in the plugin's Permissions) and copies the link the same way, and the plugin gets the usual `PERMISSION_DENIED`. A plugin only calls `apps.view`: it builds no copy page and no sentence about a refused permission; every use is in the activity log (the kind of link and a web page's host, never a query or a magnet's contents); `apps.share {text \| file token}` → the system share sheet | — | `apps.launch` (normal) / `apps.view` (normal: "Open links in other apps") / `apps.intents.out` (normal for declared packages; dangerous for any package) | medium | partial (`launchApp`, `launchAppWithExtras`; `apps.view` built 2026-10-09, `AppLinks`, Droidtop/tracker#418) |
 | F3 | Intents in | let links reach a plugin: a third-party scheme (fdroidrepos://), a site (`f95zone.to`), a path on any host (`/fdroid/repo`), share *to* droidtop; and ops callable from droidtop's own action links (`droidtop://call?v=2&...`, docs/SPEC.md 12a "Links", "Action links") | a `provides` entry's `links: [{scheme, host?, pathPrefix?, pathSuffix?, query?}]` → droidtop's one router (`LinkRouter`) calls `open_link {link}` on that point; `linkOps: [{op, label, description, risk, args}]` → that op, called literally on that point after the person approved the call | "Open this link with" when several handlers match (remembered per kind of link); an action link's call-by-call review, showing the plugin's description and the permissions the call could use | `intents.in` (dangerous: other apps can trigger it) | high | built 2026-10-10 (Droidtop/tracker#459); droidtop declares the scheme aliases, the links-helper APK for other schemes is not built |
 | F4 | Installed apps | know what is installed (to find emulators, detect a bridge target) | `apps.check {packages[] declared}`; `apps.list()` → all packages | data | `apps.check` (normal, declared list) / `apps.list` (dangerous: the full list is personal) | low / high | partial (`isAppInstalled`) |
 | F5 | Install apps | install or update an APK (an Obtainium-style updater) | `apps.install {file token}` → Android's own installer UI | Android's confirmation | `apps.install` (dangerous) | high | not built |
@@ -2240,7 +2277,7 @@ database on the PC follows.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | G1 | Secure vault | per-plugin secrets (API keys, refresh tokens) | `vault.put {key, value}` → `{stored}`, `vault.get {key}` → `{value \| null}`, `vault.delete {key}` → `{deleted}`, `vault.keys` → `{keys}`; keys 1 to 128 of `[A-Za-z0-9._-]`, values up to 16 KiB, 256 per plugin; sealed with droidtop's one at-rest cipher (`KeystoreSecretCipher`, AES-GCM) under a Keystore key per plugin; in `noBackupFilesDir`, so **never in a backup**; file and key deleted on uninstall; a value whose key is gone reads as null | — | `vault.own` (normal; own namespace only) | low | built (2026-10-08, `PluginVault`) |
 | G2 | OAuth helper | sign in to a service without the plugin handling a password | `auth.oauth {authUrl, tokenUrl, clientId, scopes, pkce: true}` → the host opens a Custom Tab, catches the redirect on its own scheme, exchanges the code and stores the tokens in G1 → returns a vault key | A/G/D: a host sign-in sheet | `auth.oauth` (normal: the user sees and does the sign-in) | medium | not built |
-| G3 | Web session | sources that need a real browser session: a site sign-in, a "click to download" page, a protected link (#9, Droidtop/tracker#380) | Declared as `web.session` with the plugin's sites: `{"id": "web.session", "domains": ["f95zone.to"]}` (each covers its subdomains; https only). `web.session sign_in {url, doneCookie?}` → `{signedIn}`: droidtop's own web view (`WebSessionActivity`, the one view droidtop shows signed-in pages in, also a store's own pages, SPEC 7g) opens `url` (a declared site) during a call the person started; the person signs in on the site's own page and presses Done, or the site setting `doneCookie` ends it; the cookies of the declared sites are sealed in the plugin's vault under a host key the plugin can neither read nor list (`@web.session`). `status` → `{signedIn}`; `clear` → `{cleared}`. `fetch {url, method?, headers?, body?, as?}` → the `net.http` answer plus `signedIn`: one request to a declared site with the session's cookies and the web view's user agent added by droidtop (they replace any the plugin sent), refused if it would be redirected off the declared sites; it also needs `net.domains` for the site. `open_in_session {url}` → `{captured, download: {url, fileName, size?, mimeType?, session}}`: any https link (a thread on a declared site, or a file host it links to; the session's cookies still go only to the declared sites) opens in the web view with the session; the first download the page starts is captured (address, the cookies it needs, user agent, referrer) and the view closes; the plugin returns that `download` as its `acquire` reply's `values.download`, and droidtop adds the captured headers by the one-use `session` token (its own plugin, the same address, within 30 minutes) and runs it through the Downloads job like any acquire download, with the cookies held in memory only. The session's cookies are in droidtop's shared cookie store only while the web view is open. Deleted with the plugin's vault on uninstall. | droidtop's web view, headed with the plugin's name and the site the page is on, with Done (sign-in) and Close; B goes back a page | `web.session` (dangerous: authenticated access to your accounts on those sites) | high | built (2026-10-09, `HostWebApis`, `WebSessions`, `WebSessionActivity`) |
+| G3 | Web session | sources that need a real browser session: a site sign-in, a "click to download" page, a protected link (#9, Droidtop/tracker#380) | Declared as `web.session` with the plugin's sites and, optionally, the site's sign-in page: `{"id": "web.session", "domains": ["f95zone.to"], "signIn": "https://f95zone.to/login/"}` (each domain covers its subdomains; https only; `signIn` must be on a declared site). **droidtop draws the account (2026-10-15, Droidtop/tracker#544 items 1 and 2):** the plugin's page carries "<site> account: Signed in / Not signed in" with Sign in (the `signIn` page) or Sign out, from the session droidtop keeps, and says that the plugin never sees the password; `SIGN_IN_REQUIRED` and `BROWSER_CHECK_REQUIRED` get droidtop's own Sign in / Open the site (§1.3). A plugin draws no account row, no "never sees your password" line and no sign-out of its own. Pressing droidtop's Sign in is the person allowing `web.session`, so an unanswered grant becomes allowed when a session is kept; one the person turned off stays off. `web.session sign_in {url, doneCookie?}` → `{signedIn}`: droidtop's own web view (`WebSessionActivity`, the one view droidtop shows signed-in pages in, also a store's own pages, SPEC 7g) opens `url` (a declared site) during a call the person started; the person signs in on the site's own page and presses Done, or the site setting `doneCookie` ends it; the cookies of the declared sites are sealed in the plugin's vault under a host key the plugin can neither read nor list (`@web.session`). `status` → `{signedIn}`; `clear` → `{cleared}`. `fetch {url, method?, headers?, body?, as?}` → the `net.http` answer plus `signedIn`: one request to a declared site with the session's cookies and the web view's user agent added by droidtop (they replace any the plugin sent), refused if it would be redirected off the declared sites; it also needs `net.domains` for the site. `open_in_session {url}` → `{captured, download: {url, fileName, size?, mimeType?, session}}`: any https link (a thread on a declared site, or a file host it links to; the session's cookies still go only to the declared sites) opens in the web view with the session; the first download the page starts is captured (address, the cookies it needs, user agent, referrer) and the view closes; the plugin returns that `download` as its `acquire` reply's `values.download`, and droidtop adds the captured headers by the one-use `session` token (its own plugin, the same address, within 30 minutes) and runs it through the Downloads job like any acquire download, with the cookies held in memory only. The session's cookies are in droidtop's shared cookie store only while the web view is open. Deleted with the plugin's vault on uninstall. | droidtop's web view, headed with the plugin's name and the site the page is on, with Done (sign-in) and Close; B goes back a page | `web.session` (dangerous: authenticated access to your accounts on those sites) | high | built (2026-10-09, `HostWebApis`, `WebSessions`, `WebSessionActivity`) |
 | G4 | GitHub token | higher API limits and private repositories for sources on GitHub (#16) | `github.request {path, headers?, as?, timeoutMs?}` → the `net.request` answer: a GET to `https://api.github.com<path>` made by the host with the person's token (set once in Accounts and sources; unauthenticated when there is none). The token never reaches the plugin; GitHubAuth decides on every redirect hop whether it may go there. The plugin's headers (a `Range`, `If-None-Match`) go on every hop. A download descriptor's `"auth": "github"` (A12) asks the same for a file. `github.token()` (the raw token) is not offered | Accounts and sources | `github.api` (normal, through the host request) / `github.token.read` (dangerous: the raw token, not built) | medium / high | `github.request` built 2026-10-10 (Droidtop/tracker#261) |
 | G5 | Accounts registry | a plugin's account shown as a row in Accounts and sources (signed in or not, sign out) | EP `accounts.provider@1`: `status → {signedIn, name}`; `sign_in` (runs G2/G3), `sign_out` | A/G/D: Accounts and sources | `provide:accounts.provider` | low | not built |
 | G6 | Identity of the device user | "who is this" | not offered: plugins get no Android account list, no email, no device ids. `host.info()` gives a **per-plugin random install id** only | — | — | — | by design |
@@ -2249,7 +2286,7 @@ database on the PC follows.
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in the full-trust tier, a host-backed fd API in the contained tier); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 128 KiB, as}`, `list {prefix}`, `delete`, `move {from, to}`, `usage`, `open {name, mode}` → fd, `path {name}` (droidtop's path of the file, only to hand to a provider plugin), names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
+| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in the full-trust tier, a host-backed fd API in the contained tier); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 48 KiB, as}` (2026-10-15, Droidtop/tracker#544 item 4: the reply crosses the broker as UTF-16 text and base64 adds a third, so 120 KiB came back as a 327808-byte binder reply; a longer `length` is answered with 48 KiB and `eof: false`, so a reader that loops until `eof` is unchanged; a large file is opened instead, `open` → fd; writes stay at 128 KiB), `list {prefix}`, `delete`, `move {from, to}`, `usage`, `open {name, mode}` → fd, `path {name}` (droidtop's path of the file, only to hand to a provider plugin), names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
 | H2 | Shared databases | data other plugins or droidtop may read: droidtop's library index (A1), and a plugin's own published dataset | droidtop's own databases: only through A1 APIs, never a handle. A plugin publishing data does it as a plugin-provided API (§2), e.g. `acme.playlog.query` | — | per API | varies | by design |
 | H3 | Import and export | move a plugin's settings or data between devices | EP `data.export@1`: `export → job writing into a host-chosen fd`; `import {fd}` | A/G/D: Accounts and sources → Plugins → <plugin> → Export / Import | none (user-initiated) | low | not built |
 | H4 | Backup and restore | droidtop's own backup includes plugin data | manifest `backup: {include: ["prefs", "data/<subpath>"]}`; vault entries never included; restore re-verifies the plugin and asks before re-granting dangerous permissions | Settings → Backup | none | medium | not built (#46 is the credentials-in-backup issue) |
@@ -3345,6 +3382,17 @@ version was bumped.
   plugin still works.
 
 **Changelog (additive changes; no version moved).**
+
+- 2026-10-15 (Droidtop/tracker#544): the error code `BROWSER_CHECK_REQUIRED`
+  and the error field `detail`; a failure `message` is one plain sentence
+  (§1.3); droidtop draws Sign in / Open the site for `SIGN_IN_REQUIRED` and
+  `BROWSER_CHECK_REQUIRED`, and a `web.session` plugin's account row, from
+  the new optional `signIn` on its `web.session` entry (G3); `apps.view`
+  copies the link and says why when it cannot open it (F2); `data.read`
+  answers at most 48 KiB per call (H1; a longer `length` is answered
+  shorter with `eof: false`); `apps.bridge` `status` fields `status` and
+  `version` and droidtop reading the app from Android (F1); tile entries'
+  `whileGame` and `gamePackages` (C2).
 
 - 2026-10-14 (Droidtop/tracker#485): the `notice` view node and a reply's
   `data.notice`; `host.viewFeatures` in every call envelope; error replies

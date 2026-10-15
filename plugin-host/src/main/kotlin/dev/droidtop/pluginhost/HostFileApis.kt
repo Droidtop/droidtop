@@ -200,7 +200,7 @@ internal object HostFileApis {
             if (!file.isFile) throw BrokerException(PluginErrorCode.NOT_FOUND, "no file at that path")
             val size = file.length()
             val offset = args.optLong("offset", 0L).coerceIn(0L, size)
-            val count = minOf(args.optInt("length", HostDataApis.MAX_CHUNK).coerceIn(0, HostDataApis.MAX_CHUNK).toLong(), size - offset).toInt()
+            val count = minOf(args.optInt("length", HostDataApis.MAX_READ).coerceIn(0, HostDataApis.MAX_READ).toLong(), size - offset).toInt()
             val bytes = ByteArray(count)
             java.io.RandomAccessFile(file, "r").use { it.seek(offset); it.readFully(bytes) }
             val out = JSONObject().put("size", size).put("eof", offset + count >= size)

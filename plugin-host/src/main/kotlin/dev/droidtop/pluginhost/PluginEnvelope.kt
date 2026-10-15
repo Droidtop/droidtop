@@ -20,8 +20,14 @@ enum class PluginErrorCode {
     CANCELLED,
     FAILED,
 
-    /** The source needs the person signed in; the error's `action` (a `web.session` sign-in) is offered as "Sign in". */
+    /**
+     * The source needs the person signed in on its site. droidtop offers its own "Sign in" (the plugin's declared
+     * `web.session` sign-in page, [PluginWebAccount]); an older reply's `action` is still offered when there is none.
+     */
     SIGN_IN_REQUIRED,
+
+    /** The site shows a browser check (a "checking your browser" page) first: droidtop offers "Open the site" in the plugin's session. */
+    BROWSER_CHECK_REQUIRED,
     ;
 
     companion object {
@@ -104,6 +110,11 @@ class PluginReply private constructor(
     val subtitle: String? = null,
     val permission: String? = null,
     val action: JSONObject? = null,
+    /**
+     * What the plugin saw, for the "Technical details" row behind the plain sentence (docs/plugin-api.md 1.3): never
+     * on a row, markup stripped and bounded by droidtop. The message itself is one plain sentence for the person.
+     */
+    val detail: String? = null,
 ) {
     fun toJson(): JSONObject = if (ok) {
         JSONObject().put("ok", true).put("data", data)
@@ -115,6 +126,7 @@ class PluginReply private constructor(
                 subtitle?.let { put("subtitle", it) }
                 permission?.let { put("permission", it) }
                 action?.let { put("action", it) }
+                detail?.let { put("detail", it) }
             },
         )
     }
@@ -138,6 +150,10 @@ class PluginReply private constructor(
         fun error(code: PluginErrorCode, title: String, subtitle: String? = null, permission: String? = null, action: JSONObject? = null): PluginReply =
             PluginReply(false, JSONObject(), code, title, title, subtitle, permission, action)
 
+        /** A failure the person reads as one plain [message], with what the code saw in [detail] for "Technical details". */
+        fun failed(code: PluginErrorCode, message: String, detail: String?): PluginReply =
+            PluginReply(false, JSONObject(), code, message, detail = detail)
+
         /** Reads a reply from a plugin. A reply that is not JSON of the right shape is FAILED, and an error code outside the closed set is read as FAILED. */
         fun parse(text: String?): PluginReply {
             if (text == null) return error(PluginErrorCode.FAILED, "plugin returned no reply")
@@ -158,6 +174,7 @@ class PluginReply private constructor(
                         subtitle = text("subtitle"),
                         permission = text("permission"),
                         action = err?.optJSONObject("action"),
+                        detail = text("detail"),
                     )
                 }
             } catch (e: Exception) {

@@ -222,11 +222,17 @@ object PluginTiles {
 
     private val lastState = ConcurrentHashMap<String, TileState>()
 
-    /** The tiles for [surface], from manifests only; call it off the main thread. */
-    fun tilesFor(context: Context, surface: String = QUICK_MENU_SURFACE, mode: String? = null): List<Tile> =
-        (providersOf(context, STATUS_POINT, mode) + providersOf(context, QUICK_POINT, mode))
-            .filter { (_, entry) -> PluginTileProtocol.onSurface(entry, surface) }
+    /**
+     * The tiles for [surface], from manifests only; call it off the main thread. A tile scoped to a running game
+     * ([PluginTileProtocol.forGame]) is left out while none (or another app's) runs.
+     */
+    fun tilesFor(context: Context, surface: String = QUICK_MENU_SURFACE, mode: String? = null): List<Tile> {
+        val gameRunning = dev.droidtop.library.LaunchDisplay.running.value != null
+        val runningPackage = dev.droidtop.library.LaunchDisplay.runningPackageName
+        return (providersOf(context, STATUS_POINT, mode) + providersOf(context, QUICK_POINT, mode))
+            .filter { (_, entry) -> PluginTileProtocol.onSurface(entry, surface) && PluginTileProtocol.forGame(entry, gameRunning, runningPackage) }
             .map { (record, entry) -> Tile(record, entry) }
+    }
 
     /** The last state seen for [tile], for drawing before the refresh answers. */
     fun cached(tile: Tile): TileState? = lastState[tile.key]

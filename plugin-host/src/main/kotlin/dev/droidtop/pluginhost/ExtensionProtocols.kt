@@ -217,6 +217,19 @@ object PluginTileProtocol {
         return surfaces.isEmpty() || surface in surfaces
     }
 
+    /**
+     * A tile's game filter (docs/plugin-api.md 3 C2, Droidtop/tracker#544 item 6): `"whileGame": true` shows it only
+     * while a game is running, and `"gamePackages": [...]` (the `ui.panel` entry's field) only while one of those apps
+     * runs the game. A tile with neither shows whatever runs. Pure: [gameRunning] and [runningPackage] are the host's.
+     */
+    fun forGame(entry: ProvidedPoint, gameRunning: Boolean, runningPackage: String?): Boolean {
+        val packages = PluginCompanion.gamePackages(entry)
+        val whileGame = runCatching { JSONObject(entry.extra).optBoolean("whileGame", false) }.getOrDefault(false)
+        if (packages.isEmpty() && !whileGame) return true
+        if (!gameRunning) return false
+        return packages.isEmpty() || runningPackage in packages
+    }
+
     /** `state` answers `{label, value, on?, severity?}`. A missing label falls back to the tile's own. */
     fun state(data: JSONObject, fallbackLabel: String): TileState = TileState(
         label = data.optString("label").takeIf { it.isNotBlank() && !data.isNull("label") } ?: fallbackLabel,

@@ -17,17 +17,17 @@ import dev.droidtop.pluginhost.PluginStore
  * screen (docs/SPEC.md 12a: "status and actions for ONE OTHER INSTALLED
  * APP the plugin manages"). First real UI caller of this capability.
  *
- * **The wire contract** (deliberately generic -- no plugin-specific
- * field names, same rule [AcquireContentSources] already follows for
- * `acquire_content`): `invoke(APP_STATUS, {"action": "status"})` ->
- * `PluginResult.success`, where droidtop reads:
- * - `installed` ("true"/"false") and `package` (the detected package
- *   name) -- droidtop's own summary line, and how [sourcesFor] matches a
- *   plugin to a specific installed app;
- * - every OTHER value is shown as its own read-only detail row, same
- *   "plugin writes a complete sentence, droidtop just displays it"
- *   convention [PluginSettingsRows] uses;
- * - optionally `job`, `jobArgKey` and `jobLabel`: when a plugin offers
+ * **The wire contract** (docs/plugin-api.md 3 C, `apps.bridge`; Droidtop/tracker#544 item 5, #521 item 4):
+ * `invoke(APP_STATUS, {"action": "status"})` -> `PluginResult.success` with these documented fields:
+ * - `package`: the managed app's package name. droidtop reads the app's own name and whether it is installed from
+ *   Android itself, so a plugin cannot get either wrong;
+ * - `installed` ("true"/"false"): only when the plugin knows better than Android (an app it installs some other way);
+ *   without it droidtop asks Android about `package`;
+ * - `status`: one plain sentence about the app's state for the person ("Running, 3 cores downloaded");
+ * - `version`: the app's version, when the plugin knows it and Android does not say;
+ * - optionally `job`, `jobArgKey` and `jobLabel`: one free-text job (below).
+ * Any other value is never put on the page as "Key: value"; it is kept behind "Technical details".
+ * `job`, `jobArgKey` and `jobLabel`: when a plugin offers
  *   ONE free-text-argument job from this screen (e.g. "download a named
  *   core"), it names the job, the single arg key the job takes, and the
  *   button label; droidtop renders exactly one generic text-entry action
@@ -42,11 +42,16 @@ import dev.droidtop.pluginhost.PluginStore
  * signature; a plugin returning a failure just shows that failure).
  */
 object PluginAppStatus {
-    /** "downloadedCoreCount" -> "Downloaded core count" -- best-effort camelCase splitter, only used for the generic detail rows above. */
-    private fun humanizeKey(key: String): String {
-        val spaced = key.replace(Regex("([a-z0-9])([A-Z])"), "$1 $2").lowercase()
-        return spaced.replaceFirstChar { it.uppercase() }
-    }
+    /** The fields droidtop reads itself; anything else a plugin sends is technical detail. */
+    private val DOCUMENTED = setOf("installed", "package", "status", "version", "job", "jobArgKey", "jobLabel")
+
+    /** What droidtop knows about [pkg] from Android: its name and version, or null when it is not installed. */
+    private fun androidApp(context: Context, pkg: String): Pair<String, String?>? = runCatching {
+        val pm = context.packageManager
+        val info = pm.getPackageInfo(pkg, 0)
+        val name = info.applicationInfo?.loadLabel(pm)?.toString() ?: pkg
+        name to info.versionName
+    }.getOrNull()
 
     /**
      * Every installed+approved [PluginCapability.APP_STATUS] plugin
@@ -94,9 +99,13 @@ object PluginAppStatus {
                         ),
                     )
                 }
-                val installed = result.values["installed"] == "true"
-                val pkg = result.values["package"]
-                val detailKeys = result.values.keys - setOf("installed", "package", "job", "jobArgKey", "jobLabel")
+                val pkg = result.values["package"]?.takeIf { it.isNotBlank() }
+                val app = pkg?.let { androidApp(context, it) }
+                // The plugin's own `installed` wins only when it gave one; otherwise Android answers for the package.
+                val installed = result.values["installed"]?.toBooleanStrictOrNull() ?: (app != null)
+                val version = result.values["version"]?.takeIf { it.isNotBlank() } ?: app?.second
+                val status = result.values["status"]?.trim()?.takeIf { it.isNotEmpty() }
+                val technical = (result.values.keys - DOCUMENTED).sorted().map { "$it: ${result.values.getValue(it)}" }
                 listOf(
                     CatalogGroup(
                         id = "plugin_app_status_${m.id}_status",
@@ -105,24 +114,31 @@ object PluginAppStatus {
                             add(
                                 ActionItem(
                                     id = "plugin_app_status_${m.id}_summary",
-                                    title = if (installed) "Installed${pkg?.let { " ($it)" } ?: ""}" else "Not installed",
+                                    title = app?.first ?: pkg ?: "The app ${m.label} manages",
+                                    subtitle = status,
+                                    value = if (installed) "Installed" else "Not installed",
                                     run = {},
                                 ),
                             )
-                            detailKeys.sorted().forEach { key ->
+                            if (installed && version != null) {
+                                add(ActionItem(id = "plugin_app_status_${m.id}_version", title = "Version", value = version, run = {}))
+                            }
+                            // Undocumented values never reach the page as "Key: value" (Droidtop/tracker#544 item 5).
+                            if (technical.isNotEmpty()) {
                                 add(
-                                    ActionItem(
-                                        id = "plugin_app_status_${m.id}_$key",
-                                        // A bare value with no label read as an
-                                        // unlabelled "0"/"false" row on the rig
-                                        // (dq-pluginui-01, 2026-09-27) -- humanize
-                                        // the plugin's own camelCase key so every
-                                        // row reads as a full sentence, matching
-                                        // PluginSettingsRows' "plugin writes a
-                                        // complete sentence" convention as closely
-                                        // as a single opaque value can.
-                                        title = "${humanizeKey(key)}: ${result.values.getValue(key)}",
-                                        run = {},
+                                    dev.droidtop.library.settings.NestedScreenItem(
+                                        id = "plugin_app_status_${m.id}_technical",
+                                        title = "Technical details",
+                                        subtitle = "What ${m.label} reported",
+                                        inline = CatalogScreen(
+                                            id = "plugin_app_status_${m.id}_technical_screen",
+                                            title = "Technical details",
+                                            groups = {
+                                                listOf(CatalogGroup(id = "plugin_app_status_${m.id}_technical_rows", title = null, items = technical.mapIndexed { i, line ->
+                                                    ActionItem(id = "plugin_app_status_${m.id}_technical_$i", title = line, run = {})
+                                                }))
+                                            },
+                                        ),
                                     ),
                                 )
                             }

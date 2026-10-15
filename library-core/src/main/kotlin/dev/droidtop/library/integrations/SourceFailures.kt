@@ -18,6 +18,12 @@ object SourceFailures {
     const val TIMED_OUT = "It did not answer in time; try again in a moment"
     const val GENERIC = "It did not answer. Try again in a moment"
 
+    /** A source that answered SIGN_IN_REQUIRED (docs/plugin-api.md 1.3); droidtop's Sign in follows it. */
+    const val NEEDS_SIGN_IN = "Sign in to search here"
+
+    /** A source that answered BROWSER_CHECK_REQUIRED; droidtop's Open the site follows it. */
+    const val NEEDS_BROWSER_CHECK = "The site checks the browser first"
+
     /** A reason that is a short plain sentence already is left as it is. */
     private const val PLAIN_MAX_CHARS = 140
     private const val TECHNICAL_MAX_CHARS = 400

@@ -2260,6 +2260,37 @@ object AppSettingsCatalogs {
                     ),
                 )
             }
+            // The site account a web.session plugin signs in to (docs/plugin-api.md 3 G3, Droidtop/tracker#544 item 2):
+            // droidtop draws it from the session it keeps, so no plugin draws its own Sign in / Sign out row.
+            if (record.runnable()) {
+                dev.droidtop.pluginhost.PluginWebAccount.of(context, record)?.let { account ->
+                    add(
+                        AsyncActionItem(
+                            id = "plugin_${m.id}_web_account",
+                            title = "${account.site} account",
+                            subtitle = when {
+                                !account.allowed -> "Sign-in is turned off for ${m.label} in its Permissions"
+                                account.signedIn -> "Your sign-in stays in droidtop: ${m.label} never sees your password. Press to sign out"
+                                account.signInUrl == null -> "${m.label} asks you to sign in when it needs to"
+                                else -> "Your sign-in stays in droidtop: ${m.label} never sees your password"
+                            },
+                            value = if (account.signedIn) "Signed in" else "Not signed in",
+                            confirmTitle = if (account.signedIn) "Sign out of ${account.site}?" else null,
+                            run = { ctx, _ ->
+                                // Sign-in waits for the web view to close: never on the main thread.
+                                withContext(Dispatchers.IO) { when {
+                                    !account.allowed -> "Turn sign-in on in ${m.label}'s Permissions first"
+                                    account.signedIn ->
+                                        if (dev.droidtop.pluginhost.PluginWebAccount.signOut(ctx, record)) "Signed out of ${account.site}" else "Already signed out"
+                                    account.signInUrl == null -> "${m.label} asks you to sign in when it needs to"
+                                    dev.droidtop.pluginhost.PluginWebAccount.open(ctx, record, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN) -> "Signed in to ${account.site}"
+                                    else -> dev.droidtop.pluginhost.PluginWebAccount.notKept(m.label, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN)
+                                } }
+                            },
+                        ),
+                    )
+                }
+            }
             if (record.runnable() && PluginCapability.APP_STATUS in m.capabilities) {
                 add(
                     NestedScreenItem(
