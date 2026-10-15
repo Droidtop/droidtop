@@ -145,8 +145,7 @@ object ChainSignature {
         val usage = leaf.keyUsage ?: return "the signing certificate has no key usage"
         if (!usage.getOrElse(0) { false }) return "the signing certificate is not for digital signatures"
         if (usage.getOrElse(5) { false }) return "the signing certificate may sign certificates"
-        val eku = runCatching { leaf.extendedKeyUsage }.getOrNull().orEmpty()
-        if (purpose.oid !in eku) return "the signing certificate is not for ${purpose.typ.removeSuffix("+jws")} signing"
+        if (!hasExtendedKeyUsage(leaf, purpose.oid)) return "the signing certificate is not for ${purpose.typ.removeSuffix("+jws")} signing"
         chain.drop(1).forEachIndexed { index, ca ->
             val pathLen = ca.basicConstraints
             if (pathLen < 0) return "an intermediate certificate is not a CA certificate"
@@ -168,6 +167,59 @@ object ChainSignature {
             return "the chain does not lead to the key you trust"
         }
         return null
+    }
+
+    /**
+     * Whether [cert]'s extendedKeyUsage names [oid], read from the extension's DER rather than
+     * [X509Certificate.getExtendedKeyUsage]: Android's provider (Conscrypt, BoringSSL) cannot turn
+     * droidtop's UUID arc, wider than 64 bits, into text and throws ("Unknown BoringSSL error"), which
+     * would refuse every droidtop certificate on a device.
+     */
+    private fun hasExtendedKeyUsage(cert: X509Certificate, oid: String): Boolean {
+        val wanted = oidContent(oid)
+        val outer = cert.getExtensionValue("2.5.29.37") ?: return false
+        return runCatching {
+            val (sequence, _) = derElement(outer, 0, 0x04)
+            val (body, _) = derElement(sequence, 0, 0x30)
+            var at = 0
+            while (at < body.size) {
+                val (content, next) = derElement(body, at, 0x06)
+                if (content.contentEquals(wanted)) return true
+                at = next
+            }
+            false
+        }.getOrDefault(false)
+    }
+
+    /** The content of the DER element of [tag] at [at] in [bytes], and the offset after it. */
+    private fun derElement(bytes: ByteArray, at: Int, tag: Int): Pair<ByteArray, Int> {
+        require(bytes[at].toInt() and 0xff == tag)
+        var length = bytes[at + 1].toInt() and 0xff
+        var start = at + 2
+        if (length >= 0x80) {
+            val count = length and 0x7f
+            require(count in 1..3)
+            length = 0
+            repeat(count) { length = (length shl 8) or (bytes[start++].toInt() and 0xff) }
+        }
+        require(start + length <= bytes.size)
+        return bytes.copyOfRange(start, start + length) to start + length
+    }
+
+    /** The DER content octets of a dotted OID, arcs of any size. */
+    private fun oidContent(oid: String): ByteArray {
+        val arcs = oid.split('.').map { BigInteger(it) }
+        val out = java.io.ByteArrayOutputStream()
+        (listOf(arcs[0] * BigInteger.valueOf(40) + arcs[1]) + arcs.drop(2)).forEach { arc ->
+            val groups = mutableListOf<Int>()
+            var rest = arc
+            do {
+                groups.add(rest.and(BigInteger.valueOf(0x7f)).toInt())
+                rest = rest.shiftRight(7)
+            } while (rest.signum() > 0)
+            groups.reversed().forEachIndexed { i, group -> out.write(if (i < groups.size - 1) group or 0x80 else group) }
+        }
+        return out.toByteArray()
     }
 
     private fun signedBy(cert: X509Certificate, key: PublicKey): Boolean = runCatching { cert.verify(key) }.isSuccess

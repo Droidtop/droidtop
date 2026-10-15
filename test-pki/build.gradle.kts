@@ -12,4 +12,6 @@ java {
 
 dependencies {
     api(libs.bouncycastle.bcpkix)
+    // Conscrypt is the provider on a device; ChainSignatureTest runs the verifier under it too.
+    api(libs.conscrypt.openjdk.uber)
 }
