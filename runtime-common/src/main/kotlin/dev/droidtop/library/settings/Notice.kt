@@ -3,10 +3,11 @@ package dev.droidtop.library.settings
 import android.content.Context
 
 /**
- * How serious a [Notice] is (docs/SPEC.md 7k, "Notices"). Danger is the
- * host's own: only droidtop raises it, and only in the danger dialog, at the
- * moment something changes (an install, an update from a different maker,
- * protection failing to start). A plugin's notice is Info or Caution.
+ * How serious a [Notice] is (docs/SPEC.md 7k, "Notices"). Danger is for what
+ * the person is about to lose or risk now: droidtop's danger dialog (an
+ * install, an update from a different maker, protection failing to start)
+ * and, since 2026-10-15 (Droidtop/tracker#521 item 1), a plugin's own danger
+ * notice, still marked as from the plugin. Never a flash.
  */
 enum class NoticeTone { Info, Caution, Danger }
 

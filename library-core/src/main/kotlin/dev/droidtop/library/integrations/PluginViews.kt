@@ -503,7 +503,11 @@ private class PluginPage(
         return NoticeItem(
             id = itemId,
             notice = Notice(
-                tone = if (node.tone == "caution") NoticeTone.Caution else NoticeTone.Info,
+                tone = when (node.tone) {
+                    "caution" -> NoticeTone.Caution
+                    "danger" -> NoticeTone.Danger
+                    else -> NoticeTone.Info
+                },
                 title = node.title,
                 body = node.subtitle,
                 details = node.details,

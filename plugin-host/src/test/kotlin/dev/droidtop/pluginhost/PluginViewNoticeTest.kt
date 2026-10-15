@@ -43,10 +43,10 @@ class PluginViewNoticeTest {
     @Test
     fun `an unknown tone is drawn as info and said once`() {
         val messages = mutableListOf<String>()
-        val n = PluginView.parse(view(section("s", notice("n", "danger"))), messages)!!.sections.single().nodes.single() as ViewNode.Notice
+        val n = PluginView.parse(view(section("s", notice("n", "alarm"))), messages)!!.sections.single().nodes.single() as ViewNode.Notice
         assertEquals("info", n.tone)
         assertEquals(1, messages.size)
-        assertTrue(messages.single().contains("danger"))
+        assertTrue(messages.single().contains("alarm"))
     }
 
     @Test
@@ -149,19 +149,19 @@ class PluginViewNoticeTest {
     }
 
     @Test
-    fun `the schema has the notice node with no danger tone, and the limits file is the one source`() {
+    fun `the schema has the notice node with its three tones, and the limits file is the one source`() {
         val schemaFile = listOf(File("../docs/plugin-view.schema.json"), File("docs/plugin-view.schema.json")).first { it.exists() }
         val schema = JSONObject(schemaFile.readText())
         val arms = schema.getJSONObject("\$defs").getJSONObject("item").getJSONArray("oneOf")
         val noticeArm = (0 until arms.length()).map { arms.getJSONObject(it) }
             .single { it.getJSONObject("properties").getJSONObject("type").optString("const") == "notice" }
         val tones = noticeArm.getJSONObject("properties").getJSONObject("tone").getJSONArray("enum")
-        assertEquals(listOf("info", "caution"), (0 until tones.length()).map { tones.getString(it) })
+        assertEquals(listOf("info", "caution", "danger"), (0 until tones.length()).map { tones.getString(it) })
         // The packaged limits are the file in docs, not a copy.
         val limitsFile = listOf(File("../docs/view-limits/plugin-view-limits.json"), File("docs/view-limits/plugin-view-limits.json")).first { it.exists() }
         val limits = JSONObject(limitsFile.readText())
         assertEquals(limits.getJSONObject("lengths").getInt("noticeTitle"), PluginViewLimits.length("noticeTitle"))
-        assertEquals(PluginViewLimits.tones, setOf("info", "caution"))
+        assertEquals(PluginViewLimits.tones, setOf("info", "caution", "danger"))
         assertTrue("has full access" in PluginViewLimits.reservedTitles)
     }
 }

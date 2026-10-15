@@ -211,8 +211,8 @@ sealed interface ViewNode {
     data class Progress(override val id: String, override val title: String, override val subtitle: String?, val percent: Int) : ViewNode
 
     /**
-     * A plugin's notice (docs/SPEC.md 7k, "Notices"; docs/plugin-api.md 1.6): [tone] is `info` or `caution` (a plugin
-     * has no danger), [banner] puts it under the page header, [details] is what Info shows, and [action] has the shape
+     * A plugin's notice (docs/SPEC.md 7k, "Notices"; docs/plugin-api.md 1.6): [tone] is `info`, `caution` or `danger`
+     * (danger since 2026-10-15, Droidtop/tracker#521 item 1), [banner] puts it under the page header, [details] is what Info shows, and [action] has the shape
      * of a row's. Drawn by droidtop as its own notice card with "from <plugin>".
      */
     data class Notice(
@@ -292,7 +292,7 @@ sealed interface ViewNode {
             val tone = if (rawTone in PluginViewLimits.tones) {
                 rawTone
             } else {
-                messages?.add("notice \"$id\": tone \"$rawTone\" is not info or caution and was drawn as info")
+                messages?.add("notice \"$id\": tone \"$rawTone\" is not info, caution or danger and was drawn as info")
                 "info"
             }
             val placement = json.optString("placement", "section")
