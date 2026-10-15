@@ -5,6 +5,7 @@ import dev.droidtop.runtime.util.Sha256
 import java.io.ByteArrayOutputStream
 import java.io.File
 import dev.droidtop.runtime.util.ChainSignature
+import dev.droidtop.runtime.util.DroidtopCore
 import dev.droidtop.testpki.TestPki
 import java.security.KeyPair
 import java.security.PrivateKey
