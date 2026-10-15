@@ -29,8 +29,8 @@ class ChainSignatureTest {
     private val now = System.currentTimeMillis() / 1000
     private val pluginTyp = ChainSignature.Purpose.PLUGIN.typ
 
-    private fun verify(jws: String, content: ByteArray? = manifest, on: ChainSignature.Anchor = anchor, at: Long? = now) =
-        ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, on, content, at)
+    private fun verify(jws: String, content: ByteArray? = manifest, on: ChainSignature.Anchor = anchor) =
+        ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, on, content)
 
     private fun refusedFor(result: ChainSignature.Result): String = (result as ChainSignature.Result.Refused).reason
 
@@ -98,12 +98,18 @@ class ChainSignatureTest {
     }
 
     @Test
-    fun `validity is checked only when a time is given`() {
+    fun `expiry never invalidates a signature, only revocation does`() {
+        // Owner, 2026-10-15: "Can we ignore its expiration date? We don't want older plugins to be invalidated".
         val expired = TestPki.cert("old", leafKey.public).eku(TestPki.PLUGIN).uri("urn:droidtop:origin:droidtop")
             .valid(Date((now - 86_400 * 30) * 1000), Date((now - 86_400) * 1000)).issuedBy(core, coreKey.private).build()
-        val jws = TestPki.detached(pluginTyp, listOf(expired), leafKey.private, manifest)
-        assertTrue(verify(jws) is ChainSignature.Result.Refused)
-        assertTrue(verify(jws, at = null) is ChainSignature.Result.Verified)
+        val notYet = TestPki.cert("future", leafKey.public).eku(TestPki.PLUGIN).uri("urn:droidtop:origin:droidtop")
+            .valid(Date((now + 86_400) * 1000), Date((now + 86_400 * 30) * 1000)).issuedBy(core, coreKey.private).build()
+        for (cert in listOf(expired, notYet)) {
+            val jws = TestPki.detached(pluginTyp, listOf(cert), leafKey.private, manifest)
+            assertTrue(verify(jws) is ChainSignature.Result.Verified)
+            val revoked = RevocationList(1, setOf(Sha256.hex(cert.encoded)), emptySet())
+            assertTrue(ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifest, revoked::revokes) is ChainSignature.Result.Refused)
+        }
     }
 
     @Test
@@ -111,8 +117,8 @@ class ChainSignatureTest {
         val jws = TestPki.detached(pluginTyp, listOf(leaf), leafKey.private, manifest)
         val byCert = RevocationList(1, setOf(Sha256.hex(leaf.encoded)), emptySet())
         val byKey = RevocationList(1, emptySet(), setOf(Sha256.hex(leaf.publicKey.encoded)))
-        assertTrue(ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifest, now, byCert::revokes) is ChainSignature.Result.Refused)
-        assertTrue(ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifest, now, byKey::revokes) is ChainSignature.Result.Refused)
+        assertTrue(ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifest, byCert::revokes) is ChainSignature.Result.Refused)
+        assertTrue(ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifest, byKey::revokes) is ChainSignature.Result.Refused)
     }
 
     @Test
@@ -183,14 +189,14 @@ class ChainSignatureTest {
         val key = TestPki.ec()
         val bytes = """{"format":1}""".toByteArray()
         val good = TestPki.detached(ChainSignature.Purpose.CATALOG.typ, listOf(catalogLeaf(key, CatalogSignature.CATALOG_ID)), key.private, bytes)
-        assertTrue(CatalogSignature.verify(bytes, good, anchor, now) is CatalogSignature.Verdict.Verified)
+        assertTrue(CatalogSignature.verify(bytes, good, anchor) is CatalogSignature.Verdict.Verified)
         val other = TestPki.detached(ChainSignature.Purpose.CATALOG.typ, listOf(catalogLeaf(key, "Someone/else")), key.private, bytes)
-        assertTrue(CatalogSignature.verify(bytes, other, anchor, now) is CatalogSignature.Verdict.Refused)
-        assertTrue(CatalogSignature.verify(bytes, null, anchor, now) is CatalogSignature.Verdict.Refused)
-        assertEquals(CatalogSignature.Verdict.Unpinned, CatalogSignature.verify(bytes, null, null, now))
+        assertTrue(CatalogSignature.verify(bytes, other, anchor) is CatalogSignature.Verdict.Refused)
+        assertTrue(CatalogSignature.verify(bytes, null, anchor) is CatalogSignature.Verdict.Refused)
+        assertEquals(CatalogSignature.Verdict.Unpinned, CatalogSignature.verify(bytes, null, null))
         // A plugin signature over the same bytes is not a catalog signature.
         val plugin = TestPki.detached(pluginTyp, listOf(leaf), leafKey.private, bytes)
-        assertTrue(CatalogSignature.verify(bytes, plugin, anchor, now) is CatalogSignature.Verdict.Refused)
+        assertTrue(CatalogSignature.verify(bytes, plugin, anchor) is CatalogSignature.Verdict.Refused)
     }
 
     // ----- Revocation lists -----
@@ -207,14 +213,14 @@ class ChainSignatureTest {
 
     @Test
     fun `a revocation list verifies under its anchor and names its catalog`() {
-        val parsed = RevocationList.parse(list(), anchor, "droidtop", now)!!
+        val parsed = RevocationList.parse(list(), anchor, "droidtop")!!
         assertEquals(2L, parsed.sequence)
         assertTrue(parsed.revokes(leaf))
         assertTrue(parsed.revokesKey("a".repeat(64)))
-        assertNull(RevocationList.parse(list(signerCatalog = "someone/else"), anchor, "droidtop", now))
-        assertNull(RevocationList.parse(list(catalog = "someone/else", signerCatalog = "droidtop"), anchor, "droidtop", now))
-        assertNull(RevocationList.parse(list(sequence = 0), anchor, "droidtop", now))
-        assertNull(RevocationList.parse(list(), ChainSignature.Anchor(TestPki.rsa().public), "droidtop", now))
+        assertNull(RevocationList.parse(list(signerCatalog = "someone/else"), anchor, "droidtop"))
+        assertNull(RevocationList.parse(list(catalog = "someone/else", signerCatalog = "droidtop"), anchor, "droidtop"))
+        assertNull(RevocationList.parse(list(sequence = 0), anchor, "droidtop"))
+        assertNull(RevocationList.parse(list(), ChainSignature.Anchor(TestPki.rsa().public), "droidtop"))
     }
 
     /**
@@ -230,7 +236,7 @@ class ChainSignatureTest {
             assertTrue(parsed.javaClass.name, parsed.javaClass.name.startsWith("org.conscrypt"))
             assertTrue(verify(TestPki.detached(pluginTyp, listOf(leaf), leafKey.private, manifest)) is ChainSignature.Result.Verified)
             val catalogTyp = TestPki.detached(ChainSignature.Purpose.CATALOG.typ, listOf(leaf), leafKey.private, manifest)
-            assertTrue(ChainSignature.verify(catalogTyp, ChainSignature.Purpose.CATALOG, anchor, manifest, now) is ChainSignature.Result.Refused)
+            assertTrue(ChainSignature.verify(catalogTyp, ChainSignature.Purpose.CATALOG, anchor, manifest) is ChainSignature.Result.Refused)
             val rsa = TestPki.rsa()
             val rsaLeaf = TestPki.pluginLeaf(rsa, "droidtop", core, coreKey.private)
             assertTrue(verify(TestPki.detached(pluginTyp, listOf(rsaLeaf), rsa.private, manifest)) is ChainSignature.Result.Verified)

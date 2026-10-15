@@ -55,7 +55,6 @@ object PluginBundleInstaller {
         bundleFile: File,
         pluginsRoot: File,
         userKeys: Map<String, String> = emptyMap(),
-        nowEpochSeconds: Long = System.currentTimeMillis() / 1000,
         /** The permissions droidtop's own manifest requests ([AndroidPermissions.heldBy]); null skips that check (tests). */
         hostPermissions: Set<String>? = null,
     ): PluginInstallResult {
@@ -64,7 +63,7 @@ object PluginBundleInstaller {
         // (Droidtop/tracker#545). Only the small trust files are read into memory, each under its cap.
         val staging = File(pluginsRoot.absoluteFile.parentFile ?: pluginsRoot, ".plugin-install-" + System.nanoTime()).also { it.mkdirs() }
         try {
-            return installStaged(bundleFile, pluginsRoot, staging, userKeys, nowEpochSeconds, hostPermissions)
+            return installStaged(bundleFile, pluginsRoot, staging, userKeys, hostPermissions)
         } finally {
             staging.deleteRecursively()
         }
@@ -78,7 +77,6 @@ object PluginBundleInstaller {
         pluginsRoot: File,
         staging: File,
         userKeys: Map<String, String>,
-        nowEpochSeconds: Long,
         hostPermissions: Set<String>?,
     ): PluginInstallResult {
         val small = linkedMapOf<String, ByteArray>()
@@ -168,7 +166,7 @@ object PluginBundleInstaller {
         // Checklist point 3: signature and schema before anything else touches disk as "the plugin".
         val verdict = BundleSignature.verifyBundle(
             manifestBytes, jws, manifest.origin, manifest.id,
-            userKeys, PluginRevocations.load(pluginsRoot), nowEpochSeconds,
+            userKeys, PluginRevocations.load(pluginsRoot),
         )
         // The fingerprint approval binds to: the anchor the chain ended at,
         // Droidtop Core's or the user-trusted key's ([BundleVerdict.Verified.anchorSha256]).

@@ -39,12 +39,11 @@ object CatalogSignature {
         catalogBytes: ByteArray,
         jws: String?,
         anchor: ChainSignature.Anchor?,
-        nowEpochSeconds: Long,
         catalogId: String = CATALOG_ID,
     ): Verdict {
         if (anchor == null) return Verdict.Unpinned
         if (jws.isNullOrBlank()) return Verdict.Refused("the catalog has no signature beside it, and one is required")
-        return when (val result = ChainSignature.verify(jws, ChainSignature.Purpose.CATALOG, anchor, catalogBytes, nowEpochSeconds)) {
+        return when (val result = ChainSignature.verify(jws, ChainSignature.Purpose.CATALOG, anchor, catalogBytes)) {
             is ChainSignature.Result.Refused -> Verdict.Refused(result.reason)
             is ChainSignature.Result.Verified ->
                 if (ChainSignature.names(result.leaf, ChainSignature.CATALOG_URN, catalogId)) {

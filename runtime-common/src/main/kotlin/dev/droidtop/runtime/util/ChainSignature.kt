@@ -11,7 +11,6 @@ import java.security.interfaces.ECPublicKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.X509EncodedKeySpec
 import java.util.Base64
-import java.util.Date
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -81,9 +80,10 @@ object ChainSignature {
     /**
      * Verifies [jws] for [purpose] under [anchor]. [detached] is the content for
      * a detached signature (a manifest or an index, exact bytes), null for one
-     * with an attached payload (a revocation list). [nowEpochSeconds] checks every
-     * certificate's validity when given (install, update and fetch time; an
-     * installed plugin is not stopped by expiry). [revoked] refuses the chain
+     * with an attached payload (a revocation list). No certificate's validity
+     * dates are read: expiry never invalidates a signature, only revocation does
+     * (owner, 2026-10-15: "Can we ignore its expiration date? We don't want older
+     * plugins to be invalidated"; docs/SPEC.md 12a). [revoked] refuses the chain
      * when it names any certificate in it. Who the leaf speaks for (its origin
      * or catalog) is the caller's check: [uris], [names], [coversPlugin].
      */
@@ -92,7 +92,6 @@ object ChainSignature {
         purpose: Purpose,
         anchor: Anchor,
         detached: ByteArray?,
-        nowEpochSeconds: Long?,
         revoked: (X509Certificate) -> Boolean = { false },
     ): Result {
         val text = jws.trim()
@@ -121,7 +120,7 @@ object ChainSignature {
         }
         val signature = runCatching { b64url(parts[2]) }.getOrNull() ?: return Result.Refused("the signature value is unreadable")
 
-        chainProblem(chain, purpose, anchor, nowEpochSeconds)?.let { return Result.Refused(it) }
+        chainProblem(chain, purpose, anchor)?.let { return Result.Refused(it) }
         if (chain.any(revoked)) return Result.Refused("a certificate in the signature's chain has been revoked")
         if (!verifySignature(alg, chain.first().publicKey, signingInput, signature)) {
             return Result.Refused("the signature does not verify against its signing certificate")
@@ -130,15 +129,11 @@ object ChainSignature {
     }
 
     /** Why [chain] does not lead from a [purpose] leaf to [anchor], or null when it does. */
-    private fun chainProblem(chain: List<X509Certificate>, purpose: Purpose, anchor: Anchor, nowEpochSeconds: Long?): String? {
-        val now = nowEpochSeconds?.let { Date(it * 1000) }
+    private fun chainProblem(chain: List<X509Certificate>, purpose: Purpose, anchor: Anchor): String? {
         chain.forEach { cert ->
             if (cert.version != 3) return "a certificate in the chain is not X.509 v3"
             if (cert.sigAlgOID !in CERT_SIG_ALGS) return "a certificate in the chain uses a signature algorithm droidtop does not accept"
             if (!acceptableKey(cert.publicKey)) return "a certificate in the chain holds a key that is not P-256 or RSA of at least $MIN_RSA_BITS bits"
-            if (now != null && runCatching { cert.checkValidity(now) }.isFailure) {
-                return "the certificate \"${cert.subjectX500Principal.name}\" is not valid now (check the device's date)"
-            }
         }
         val leaf = chain.first()
         if (leaf.basicConstraints != -1) return "the signing certificate is a CA certificate"

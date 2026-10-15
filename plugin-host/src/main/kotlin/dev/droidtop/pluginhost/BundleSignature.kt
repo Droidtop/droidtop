@@ -117,9 +117,9 @@ object BundleSignature {
      * ([PluginOriginKeys.anchorFor]), its leaf must be a plugin-signing
      * certificate naming [origin] (`urn:droidtop:origin:<origin>`) and, when it
      * names plugins, [pluginId]; no certificate in it may be revoked; and the
-     * manifest signature must verify against the leaf. Validity is checked when
-     * [nowEpochSeconds] is given (install and update); an installed plugin is
-     * not stopped by its certificate expiring, only by revocation.
+     * manifest signature must verify against the leaf. A certificate's expiry
+     * never refuses it, at install, update or activation: only revocation does
+     * (docs/SPEC.md 12a, owner 2026-10-15).
      *
      * Revocation: droidtop's own list ([PluginRevocationList] built from
      * Core-signed `revocations.jws`) applies to every chain that ends at
@@ -133,7 +133,6 @@ object BundleSignature {
         pluginId: String,
         userKeys: Map<String, String> = emptyMap(),
         revocations: PluginRevocationList = PluginRevocationList.NONE,
-        nowEpochSeconds: Long? = null,
     ): BundleVerdict {
         val anchor = PluginOriginKeys.anchorFor(origin, userKeys) ?: return BundleVerdict.Refused(
             if (PluginOriginKeys.isOfficial(origin)) {
@@ -145,7 +144,7 @@ object BundleSignature {
         val core = anchor.pinned
         val own = revocations.forOrigin(origin)
         val revoked = { cert: X509Certificate -> (core && revocations.revokes(cert)) || own.revokes(cert) }
-        val result = ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifestBytes, nowEpochSeconds, revoked)
+        val result = ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifestBytes, revoked)
         val verified = when (result) {
             is ChainSignature.Result.Refused -> return BundleVerdict.Refused("${result.reason} (origin \"$origin\")")
             is ChainSignature.Result.Verified -> result

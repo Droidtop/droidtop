@@ -191,7 +191,7 @@ class PluginCatalogSourcesTest {
     }
 
     private fun check(text: String, expected: PluginCatalogSource?, files: Map<String, String>) =
-        PluginCatalog.checkAddedIndex(url, text, expected, now) { files[it] }
+        PluginCatalog.checkAddedIndex(url, text, expected) { files[it] }
 
     private fun refused(text: String, expected: PluginCatalogSource?, files: Map<String, String>): Boolean =
         runCatching { check(text, expected, files) }.exceptionOrNull() is IllegalStateException
@@ -209,9 +209,9 @@ class PluginCatalogSourcesTest {
         assertEquals(sha(b64(master.pair.public.encoded)), dev.droidtop.pluginhost.UserOriginKeys.keySha256(declared))
         val anchor = dev.droidtop.pluginhost.PluginOriginKeys.anchorForKey(declared)
         assertNotNull(anchor)
-        val leafOnly = ChainSignature.verify(files.getValue(PluginCatalogSources.INDEX_SIGNATURE_FILE), ChainSignature.Purpose.CATALOG, anchor!!, text.toByteArray(Charsets.UTF_8), now)
+        val leafOnly = ChainSignature.verify(files.getValue(PluginCatalogSources.INDEX_SIGNATURE_FILE), ChainSignature.Purpose.CATALOG, anchor!!, text.toByteArray(Charsets.UTF_8))
         assertTrue(leafOnly.toString(), leafOnly is ChainSignature.Result.Verified)
-        assertTrue(dev.droidtop.runtime.util.CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), files.getValue(PluginCatalogSources.INDEX_SIGNATURE_FILE), anchor, now, "someone/catalog") is dev.droidtop.runtime.util.CatalogSignature.Verdict.Verified)
+        assertTrue(dev.droidtop.runtime.util.CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), files.getValue(PluginCatalogSources.INDEX_SIGNATURE_FILE), anchor, "someone/catalog") is dev.droidtop.runtime.util.CatalogSignature.Verdict.Verified)
 
         // Adding: the signature chains to the master the index names, which the person then accepts.
         val first = check(text, expected = null, files = files)

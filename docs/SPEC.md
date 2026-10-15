@@ -19064,9 +19064,17 @@ the same format; the format as posted for it is the #550 comment of
   (`Droidtop/droidtop-components`, an added catalog's `owner/name`, and
   `droidtop` for droidtop's own plugin catalog). Intermediates, when a
   publisher's own CA uses them, are CA certificates with keyCertSign within
-  their path length. Validity is checked at install, update and fetch; an
-  installed plugin is not stopped by its certificate expiring (a device
-  with a wrong clock must not lose its plugins), only by revocation.
+  their path length. **Expiry never invalidates a signature** (owner,
+  2026-10-15: "Can we ignore its expiration date? We don't want older
+  plugins to be invalidated"): no certificate's notBefore or notAfter is
+  read, at install, update, catalog fetch or activation, for bundles,
+  catalogs and revocation lists alike. A signature carries no trusted
+  timestamp, so "valid when it was signed" cannot be checked either; the
+  only way a signature stops verifying is the signed revocation list.
+  Droidtop Core itself is pinned as a public key, so its certificate's
+  dates never played a part; a renewal that keeps Core's RSA key changes
+  nothing, while a new Core key would need the old public key kept pinned
+  beside it for plugins signed under it.
 - **Per-origin keys stay derived; their certificates come from Core.**
   Every official plugin repository, droidtop-components' catalog, droidtop's
   revocation signer, and the gamegrab and romgi origins sign with their own

@@ -498,7 +498,7 @@ object PluginCatalog {
         val text = runCatching {
             PlatformDatabaseTransport.getOrNull(PlatformDatabaseSource.urlFor(context, REVOCATIONS_RELATIVE_PATH), token(context))
         }.getOrNull() ?: return
-        PluginRevocations.accept(PluginStore.root(context), text, System.currentTimeMillis() / 1000)
+        PluginRevocations.accept(PluginStore.root(context), text)
     }
 
     // ------------------------------------------------------------------
@@ -522,7 +522,7 @@ object PluginCatalog {
      */
     private fun checkAdded(context: Context, url: String, text: String, expected: PluginCatalogSource?): Checked {
         val token = token(context)
-        return checkAddedIndex(url, text, expected, System.currentTimeMillis() / 1000) { name ->
+        return checkAddedIndex(url, text, expected) { name ->
             runCatching { PlatformDatabaseTransport.getOrNull(PluginCatalogSources.siblingUrl(url, name), token) }.getOrNull()
         }
     }
@@ -532,7 +532,6 @@ object PluginCatalog {
         url: String,
         text: String,
         expected: PluginCatalogSource?,
-        nowEpochSeconds: Long,
         sibling: (String) -> String?,
     ): Checked {
         val index = PluginCatalogIndexParser.parse(text)
@@ -572,7 +571,7 @@ object PluginCatalog {
             if (expected?.indexSigned == true) error("the catalog's index was signed before and this copy is not, so it was not read")
             return Checked(index, signed = false)
         }
-        val verdict = CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), signature.trim(), master, nowEpochSeconds, info.id)
+        val verdict = CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), signature.trim(), master, info.id)
         if (verdict is CatalogSignature.Verdict.Refused) error("the catalog's signature was refused: ${verdict.reason}")
         return Checked(index, signed = true)
     }
@@ -721,9 +720,8 @@ object PluginCatalog {
         val url = PluginCatalogSources.siblingUrl(indexUrl, PluginCatalogSources.REVOCATIONS_FILE)
         val text = runCatching { PlatformDatabaseTransport.getOrNull(url, token(context)) }.getOrNull() ?: return
         val root = PluginStore.root(context)
-        val now = System.currentTimeMillis() / 1000
         userKeys(context).values.filter { it.catalog == source.id }.forEach { entry ->
-            PluginRevocations.acceptForOrigin(root, entry.origin, text, master, source.id, now)
+            PluginRevocations.acceptForOrigin(root, entry.origin, text, master, source.id)
         }
     }
 }
