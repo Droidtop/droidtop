@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -433,6 +434,9 @@ internal fun MenuRow(
     // The row has Info (a sentence beyond its title): a 20dp glyph says so, and a screen reader hears
     // "More info available" (docs/SPEC.md 7k, "Explanations").
     info: Boolean = false,
+    // A tap on the info glyph: Info, never the row's own action. Without it the glyph was part of the row, so a tap
+    // meant to read about an armed confirm row confirmed it (rig, build 1908, trusting a plugin origin).
+    onInfo: (() -> Unit)? = null,
 ) {
     val window = LocalShellWindow.current
     // Real bug this fixes (owner, 2026-09-27): every menu built from
@@ -607,7 +611,16 @@ internal fun MenuRow(
                 Icons.Outlined.Info,
                 contentDescription = "More info available",
                 tint = MenuTokens.OnSurfaceMuted,
-                modifier = Modifier.size(20.dp),
+                modifier = if (onInfo != null) {
+                    Modifier
+                        .clip(Corners.Pill)
+                        .clickable(onClick = onInfo)
+                        .size(if (window.touchFirst) window.minTouchTarget else 20.dp)
+                        .wrapContentSize()
+                        .size(20.dp)
+                } else {
+                    Modifier.size(20.dp)
+                },
             )
         }
         if (chevron) {

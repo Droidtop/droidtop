@@ -8702,8 +8702,11 @@ Two checks, both required:
    droidtop's preferences on a background thread at start and answer from memory; **until they have loaded the
    answer is no**.
 2. **The confirmation, every use.** A row that would use a class is a confirm row (`confirmTitle`): the Gaming
-   surface arms it and shows the sentence in place of the hint, with "press A again to confirm"; the Preference
-   surface asks in a dialog. The sentence (`RiskyPrompts`) names the app and the exact thing: the package and the
+   surface arms it and shows the sentence in place of the hint, with "press A again to confirm" ("tap again"
+   under touch, where the sentence shows too: it used not to, so a tapped trust row never showed the key it
+   trusted, Droidtop/tracker#270); its info glyph is a target of its own that opens Info and disarms the row,
+   never a second press; the Preference surface asks in a dialog. A trust question names the key's fingerprint
+   first, so it survives the two lines a row's title gets. The sentence (`RiskyPrompts`) names the app and the exact thing: the package and the
    appop or permission name, or the file path (for "Add a BIOS file", the folder, since the file is picked after),
    or the core files and RetroArch's folder, and says how to undo it. Wherever a row is shown without its class,
    it says where to turn it on in plain words and keeps its manual steps.
