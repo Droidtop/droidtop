@@ -8076,6 +8076,15 @@ exit code, how long it ran and the last 12 lines Wine printed. A game that ran a
 returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit, however soon it
 ended, and the words say "program".
 
+**Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
+first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
+on screens of its own (its failure screen, its crash watch, its problem report). So an Enginehost launch that
+hands straight back with none of them open (`EXITED_AT_ONCE`) was left there, by Cancel, B or Back:
+`LaunchWatchPolicy.leftBeforePlaying` makes it no alert, a scan-log line, and the end of the session
+(`LaunchDisplay.clearRunning`), since no game ever ran. Before, Cancel raised "Enginehost closed straight after
+it started", pointed at the scan log, and left a Playing session with Resume and Kill. Every other trouble of
+Enginehost's, and an emulator that returns at once, is still an alert.
+
 Considered and not built (Droidtop/tracker#270): a timed "taking a long time" notice for an emulator that is open
 and responsive but never draws. Time alone does not tell it from a healthy long-running game, so it would fire on
 every game; the processor-time check above is the signal that does, and it needs the helper. The verdict is published once
