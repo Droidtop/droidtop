@@ -21,6 +21,7 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginTrustState
+import dev.droidtop.pluginhost.SourceSystems
 import java.io.File
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -75,6 +76,9 @@ sealed interface AcquireContentSource {
     val label: String
     val description: String?
 
+    /** Whether this source is listed under [systemId] and asked by a search scoped to it (a blank id: every source). A JSON integration names no systems, so it serves all. */
+    fun serves(systemId: String?): Boolean = true
+
     data class Json(val integration: Integration) : AcquireContentSource {
         override val id get() = "json_${integration.id}"
         override val label get() = integration.label
@@ -85,7 +89,31 @@ sealed interface AcquireContentSource {
         override val id get() = "plugin_${record.manifest.id}"
         override val label get() = record.manifest.label
         override val description get() = record.manifest.description
+
+        /** The systems the plugin's `library.sources` entries declare (docs/plugin-api.md 1.6); a plugin that declares none serves every system, as every source did before. */
+        val systems: SourceSystems get() = SourceSystems.of(record.manifest)
+
+        override fun serves(systemId: String?) = systems.serves(systemId)
     }
+}
+
+/** Where an installed source plugin stands, for the Game sources list and the "not ready" notes. */
+enum class SourceState { READY, WAITING_FOR_APPROVAL, DENIED, DISABLED, TURNED_OFF }
+
+/** One installed source plugin as the Game sources place lists it (Droidtop/tracker#540): ready or not, and why. */
+data class SourceListing(val record: PluginRecord, val state: SourceState) {
+    val label: String get() = record.manifest.label
+    val pluginId: String get() = record.manifest.id
+
+    /** The row's value: a person's word for the state. */
+    val stateLabel: String
+        get() = when (state) {
+            SourceState.READY -> "Ready"
+            SourceState.WAITING_FOR_APPROVAL -> "Waiting for your approval"
+            SourceState.DENIED -> "Denied"
+            SourceState.DISABLED -> "Disabled"
+            SourceState.TURNED_OFF -> "Turned off"
+        }
 }
 
 /**
@@ -200,11 +228,41 @@ object AcquireContentSources {
     private fun pointState(record: PluginRecord, grants: PluginGrants): GrantState =
         PluginGrants.provideState(record, grants.read(record.manifest.id), SOURCES_POINT)
 
-    /** Installed plugins that declare ACQUIRE_CONTENT but are not runnable (waiting for approval, denied, turned off, disabled after a failure). Reads the plugin store: off the main thread. */
-    fun unavailablePlugins(context: Context): List<UnavailableSource> {
+    /** The state of an installed plugin that is not runnable; [SourceState.READY] only for one that is (the bundle's integrity is checked by [PluginStore.runnableFor], not here). */
+    internal fun stateOf(record: PluginRecord): SourceState = when {
+        record.trust == PluginTrustState.PENDING -> SourceState.WAITING_FOR_APPROVAL
+        record.trust == PluginTrustState.DENIED -> SourceState.DENIED
+        record.disabledReason != null -> SourceState.DISABLED
+        record.runnable() -> SourceState.READY
+        else -> SourceState.TURNED_OFF
+    }
+
+    /**
+     * Every installed plugin that offers downloads, with its state: what Game sources lists so a source can be reached
+     * from the first minute, with an empty library and no folders (Droidtop/tracker#540). Ready ones are those
+     * [PluginStore.runnableFor] vouches for (their bundle is re-verified); a bundle that fails that check is left out,
+     * as it is from every other list. Reads the plugin store: off the main thread.
+     */
+    fun listings(context: Context): List<SourceListing> {
+        val ready = PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT).map { it.manifest.id }.toSet()
+        return PluginStore.installed(context)
+            .filter { PluginCapability.ACQUIRE_CONTENT in it.manifest.capabilities }
+            .mapNotNull { record ->
+                when {
+                    record.manifest.id in ready -> SourceListing(record, SourceState.READY)
+                    record.runnable() -> null
+                    else -> SourceListing(record, stateOf(record))
+                }
+            }
+            .sortedBy { it.label.lowercase() }
+    }
+
+    /** Installed plugins that declare ACQUIRE_CONTENT but are not runnable (waiting for approval, denied, turned off, disabled after a failure), only those serving [systemId] when given. Reads the plugin store: off the main thread. */
+    fun unavailablePlugins(context: Context, systemId: String? = null): List<UnavailableSource> {
         val grants = PluginGrants.forContext(context)
         return PluginStore.installed(context)
             .filter { PluginCapability.ACQUIRE_CONTENT in it.manifest.capabilities }
+            .filter { SourceSystems.of(it.manifest).serves(systemId) }
             .mapNotNull { record ->
                 UnavailableSource.of(
                     record.manifest.label,
@@ -217,17 +275,24 @@ object AcquireContentSources {
             }
     }
 
-    /** Every available source for a "Get games" surface: installed+approved plugins declaring ACQUIRE_CONTENT, plus JSON integrations of the same capability. Plugins first -- a real result list beats a one-way launch. */
-    fun available(context: Context): List<AcquireContentSource> =
-        availablePlugins(context) +
-            IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Json(it) }
+    /**
+     * Every available source for a "Get games" surface: installed+approved plugins declaring ACQUIRE_CONTENT, plus JSON
+     * integrations of the same capability. Plugins first -- a real result list beats a one-way launch. With [systemId],
+     * only the sources that serve that system (a plugin's declared `systems`, Droidtop/tracker#543).
+     */
+    fun available(context: Context, systemId: String? = null): List<AcquireContentSource> =
+        (
+            availablePlugins(context) +
+                IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Json(it) }
+            ).filter { it.serves(systemId) }
 
-    /** Just the plugin sources -- what [PluginSearchAggregator] fans a query out to; JSON integrations stay one-way/fire-and-forget and have no results to merge. */
-    fun availablePlugins(context: Context): List<AcquireContentSource.Plugin> {
+    /** Just the plugin sources -- what [PluginSearchAggregator] fans a query out to; JSON integrations stay one-way/fire-and-forget and have no results to merge. [systemId] scopes it to the sources serving that system ("pc": the PC library). */
+    fun availablePlugins(context: Context, systemId: String? = null): List<AcquireContentSource.Plugin> {
         val grants = PluginGrants.forContext(context)
         return PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT)
             .filter { pointState(it, grants) == GrantState.GRANTED }
             .map { AcquireContentSource.Plugin(it) }
+            .filter { it.serves(systemId) }
     }
 
     /**
@@ -244,9 +309,9 @@ object AcquireContentSources {
         subtitle = "for $systemName",
         groups = { context ->
             withContext(Dispatchers.IO) {
-                val sources = available(context)
+                val sources = available(context, systemId)
                 if (sources.isEmpty()) {
-                    listOf(noSourceGroup(context, systemId))
+                    if (available(context).isEmpty()) listOf(noSourceGroup(context, systemId)) else listOf(noSourceForSystemGroup(systemId, systemName))
                 } else {
                     listOf(
                         CatalogGroup(
@@ -316,6 +381,26 @@ object AcquireContentSources {
         )
     }
 
+    /** Sources are installed, but none of them declares this system: said so, with the way to the plugins that could be added. */
+    private fun noSourceForSystemGroup(systemId: String, systemName: String): CatalogGroup = CatalogGroup(
+        id = "acquire_empty",
+        title = null,
+        items = listOf(
+            ActionItem(
+                id = "acquire_empty_system_$systemId",
+                title = "No source gets $systemName games",
+                subtitle = "The sources you have list the systems they serve, and $systemName is not one of them.",
+                run = {},
+            ),
+            NestedScreenItem(
+                id = "acquire_empty_system_plugins_$systemId",
+                title = "Plugins",
+                subtitle = "Install a plugin that offers downloads",
+                registryId = PLUGINS_SCREEN_ID,
+            ),
+        ),
+    )
+
     /**
      * A row that opens Plugins, at [pluginId]'s own page when it names one and the page is known, else at the list.
      * The one way a "waiting for approval" line becomes something a person can press (also the search dialog's).
@@ -350,11 +435,14 @@ object AcquireContentSources {
                     listOf(noSourceGroup(context, "all"))
                 } else {
                     val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
+                    val sources = available(context)
+                    // Only the systems some installed source serves (Droidtop/tracker#543): a list of every system
+                    // would lead to pages that say nothing can be found there.
                     val (yours, others) = downloadTargets(
                         existing = SystemFolders.all(context, systemsById),
                         all = systemsById.values,
                         root = GamesRoots.current(context).first(),
-                    )
+                    ).let { (a, b) -> a.filter { (_, s) -> sources.any { it.serves(s.id) } } to b.filter { (_, s) -> sources.any { it.serves(s.id) } } }
                     fun item(folder: File, system: ConsoleSystemDef) = NestedScreenItem(
                         id = "acquire_pick_${system.id}",
                         title = system.displayName,

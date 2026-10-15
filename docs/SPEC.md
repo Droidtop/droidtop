@@ -14614,7 +14614,16 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
   "Not signed in", Folders "3 folders · 412 games". The column can be scanned by glyph: the
   stores keep the globe, Folders the folder, Add a game and Imported the game controller, Storage the
-  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. A store page's holding rows
+  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. Under the heading **Get games** the place lists every installed
+  source plugin (`AcquireContentSources.listings`), ready or not, with its state as the row's value
+  (Ready, Waiting for your approval, Denied, Turned off, Disabled), so a newcomer with no folders and an
+  empty library reaches a search from the first minute, which is the one route PC Games takes with no game
+  folder too (Droidtop/tracker#540). A ready source opens its search with no library system needed
+  (`SourceScreens.entryScreen`): a source that serves only PC systems opens straight on the PC search,
+  any other asks "PC games" or the system, listing only the systems it serves; a source that is not ready
+  opens its page in Plugins, where approving or turning it on is. With no source installed the group is
+  one row to Plugins, never a blank. The provider stays a detail: this is a row among where games come
+  from, with its state in the value column, not a screen of its own. A store page's holding rows
   ("Shared with you · 573", Free to play) are pressable like Open library:
   the shell opens PC Games filtered to that store and that holding
   (`PcSource.holdingItemId`), and the pill says so. **Folders**
@@ -20305,6 +20314,15 @@ without its runtime said "Running". Decisions:
   and the catalog screen says "No catalog is published yet" and points at
   Install plugin file; any other failure still shows its reason. The
   droidtop-platforms generator for the index is still not built (above).
+- **A source declares the systems it serves (Droidtop/tracker#543).** A `library.sources` entry's
+  `systems` (docs/plugin-api.md 1.6) is read from the manifest by `SourceSystems`
+  (`ExtensionProtocols.kt`, pure, unit-tested), and one rule uses it everywhere:
+  `AcquireContentSource.serves(systemId)`. A system's Get games page and the "Your/Other systems" choice list
+  only what some source serves, the one search asks `GameSources.plugins(context, platform)` (so PC Games, which
+  searches as `pc`, asks only sources naming a PC system and a console list asks the sources naming that
+  system), and a "not ready" note is shown only for a source that would have served. An entry with no
+  `systems` serves everything, as before. When sources exist but none serves a system, its page says so
+  ("No source gets <system> games") with the way to Plugins; it is never blank.
 - **"Get games" is offered everywhere, and it runs in search (owner,
   2026-10-01: "Get Games should be offered from EVERY menu, and it should
   also run in the global search bar").** One registered screen

@@ -425,6 +425,35 @@ page for a plugin.
 | `ui.panel@1` (C17) | `panel {context:{surface, game?}}` | the plugin's Quick Menu panel, under its tiles (1.8) |
 | `ui.game_section@1` (C18) | `section {context:{target, sectionId}}` | rows on a game's page; the whole section opens as a page for its inputs (1.8) |
 
+**Which systems a source serves (`systems`, Droidtop/tracker#543).** A
+`library.sources` entry in `provides` may declare the systems it can give
+games for, next to `point` and `id`:
+
+```json
+{ "point": "library.sources", "version": 1, "id": "f95",
+  "label": "F95zone", "systems": ["windows", "linux"] }
+```
+
+`systems` is a list of droidtop system ids (the ES-DE short names, as in
+`system.id` below), or `"*"` (alone or in the list) for every system. droidtop
+decides from the manifest alone, without loading the plugin:
+
+- a system's Get games page lists the source only if it names that system;
+- the PC library (PC Games, search scoped to `pc`) asks only the sources that
+  name a PC system (`pc`, `windows`, `windows3x`, `windows9x`, `dos`, `linux`,
+  `mac`, `macos`); a source naming `pc` serves all of them, and a source that
+  names only consoles is not asked by a PC search;
+- a search with no system of its own (the launcher's) asks every source;
+- Game sources opens a source that serves only PC systems straight on the PC
+  search, and asks which system for any other.
+
+An entry **without** `systems`, or with an empty or malformed one, keeps the
+behaviour every source had before the field: listed under every system and
+asked by every search. Adding `systems` is not a breaking change and needs no
+contract bump; a build that does not know the field ignores it. Several
+`library.sources` entries in one plugin serve the union of their `systems`
+(one entry without it makes the plugin undeclared).
+
 **`library.sources` with views (the Get games flow).** Every call on this
 point carries `context: {system: {id, name}, destination}`; `system.id` is
 droidtop's system id (the ES-DE short name, `snes`), `destination` the
@@ -1203,6 +1232,8 @@ Names elsewhere in this document that predate 2.1 mean the op in this table.
   configured library folder. This is **`pluginsearch`'s Sources API**
   (`GameSourceProvider`, `library-core`). It is folded in here unchanged:
   a plugin source is one implementation, and built-in stores are others.
+- **Manifest:** `systems` on the `provides` entry (1.6, "Which systems a
+  source serves"): which systems it is listed under and which searches ask it.
 - **Ops:**
   - `search {query, platform}`;
   - `lookup {title, platform, ids}` (defaults to `search`);
