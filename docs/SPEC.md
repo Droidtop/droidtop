@@ -1573,7 +1573,26 @@ differ only in the `RootfsUnpacker` that writes the tree.
   "Its own program" (the program as a shell line, its working folder and
   environment, and a note when the image asks for a user other than root,
   since containers here run everything as root) when the image names one.
-  Running it, with a log and a lifecycle, is D6b.
+  **Running it** (D6b, 2026-10-15). The section has **Start it** / **Stop
+  it** with what the program is doing (running, restarting in N s,
+  exited with a code, stopped after failing, couldn't start), **Restart
+  when it fails** (on by default: a server is expected to stay up; the
+  wait doubles from 2 s to a minute after each failure that came sooner
+  than 30 s after its start, and after 5 such failures in a row it stays
+  stopped and says so), **Start with the desktop** (off by default;
+  `ContainerPrograms.startWithDesktop` once the session is up), and the
+  log's last 40 lines. `ContainerPrograms` runs each program as one job in
+  the process scope (`ContainerProgram.command`: `/bin/sh` changes to the
+  working folder, marks the start in the log and execs the program with
+  its output appended to `files/container-logs/<id>.log`, which every
+  container sees under app storage; the image's `Env` is its
+  environment). Stop cancels the job, which ends the program's session.
+  The log is kept under 1 MB, trimmed every 30 s to its last 512 KB in
+  place (`ContainerProgram.trim`; the running program's append lands at
+  the new end). A program ends with droidtop's process. Not yet: an image
+  without `/bin/sh` (a distroless one), the user an image asks for, its
+  ports as links (the next D6 step), and app containers made from the
+  create screen with Private homes.
 - *The flattener* reads the layers top first, so the first time a path is
   seen is its final version, and applies whiteouts (`.wh.<name>`, and
   `.wh..wh..opq` for an opaque directory) to the layers below theirs. What

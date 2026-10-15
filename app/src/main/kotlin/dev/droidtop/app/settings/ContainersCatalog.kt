@@ -8,6 +8,7 @@ import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.net.VpnService
 import android.provider.Settings
+import dev.droidtop.app.ContainerPrograms
 import dev.droidtop.app.ContainerRuntimeFactory
 import dev.droidtop.app.DesktopSessionService
 import dev.droidtop.app.DesktopSessionState
@@ -45,6 +46,7 @@ import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.ContainerApplications
 import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerExports
+import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ExportedApp
 import dev.droidtop.runtime.ExportedCommand
@@ -277,7 +279,7 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
         runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
             ?.takeIf { it.program().isNotEmpty() }
-            ?.let { groups += CatalogGroup(id = "program", title = "Its own program", items = programItems(it)) }
+            ?.let { groups += CatalogGroup(id = "program", title = "Its own program", items = programItems(context, runtime, info, it)) }
         val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
         groups += CatalogGroup(id = "home", title = "Home", items = homeItems(runtime, info, mounts))
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info, mounts))
@@ -469,8 +471,49 @@ object ContainersCatalog {
 
     // ---- the image's own program (docs/SPEC.md 3, "The image's own program", Droidtop/tracker#555 D6a) ----
 
-    /** What the image says it runs, read from its config and kept with the container: shown, not yet run. */
-    private fun programItems(config: ImageRunConfig): List<CatalogItem> = buildList {
+    /**
+     * What the image says it runs, read from its config and kept with the container, and droidtop running it: Start or
+     * Stop with what it is doing, restart when it fails, start with the desktop, and its log (D6b).
+     */
+    private suspend fun programItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo, config: ImageRunConfig): List<CatalogItem> = buildList {
+        val container = info.container
+        val app = context.applicationContext
+        val state = ContainerPrograms.state(container.id)
+        val running = ContainerPrograms.isRunning(container.id)
+        add(
+            AsyncActionItem(
+                id = "container_program_run",
+                title = if (running) "Stop it" else "Start it",
+                value = programStateLabel(state),
+                confirmTitle = if (running) "Stop ${info.displayName}'s program?" else null,
+                run = { ctx, _ ->
+                    if (running) {
+                        ContainerPrograms.stop(container.id)
+                        "Stopped."
+                    } else {
+                        ContainerPrograms.start(ctx, runtime, container)
+                        "Started; its output is in the log below."
+                    }
+                },
+            ),
+        )
+        add(
+            ToggleItem(
+                id = "container_program_restart",
+                title = "Restart when it fails",
+                subtitle = "Waits longer after each quick failure, and stops trying after ${ContainerProgram.MAX_FAILURES_IN_A_ROW}",
+                current = withContext(Dispatchers.IO) { ContainerPrograms.restartOnFailure(app, container.id) },
+                onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerPrograms.setRestartOnFailure(app, container.id, on) } },
+            ),
+        )
+        add(
+            ToggleItem(
+                id = "container_program_autostart",
+                title = "Start with the desktop",
+                current = withContext(Dispatchers.IO) { ContainerPrograms.autostart(app, container.id) },
+                onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerPrograms.setAutostart(app, container.id, on) } },
+            ),
+        )
         add(TextBlockItem(id = "container_program", title = "Program", text = ImageRunConfig.shellWords(config.program())))
         config.workingDir?.let { add(TextBlockItem(id = "container_program_dir", title = "Working folder", text = it)) }
         if (config.env.isNotEmpty()) {
@@ -479,6 +522,16 @@ object ContainersCatalog {
         if (!config.runsAsRoot) {
             add(TextBlockItem(id = "container_program_user", title = "User", text = "The image asks for ${config.user}; containers here run everything as root"))
         }
+        val log = withContext(Dispatchers.IO) { ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, container.id)) }
+        add(TextBlockItem(id = "container_program_log", title = "Log", text = log.joinToString("\n").ifEmpty { "Nothing yet" }, last = true))
+    }
+
+    private fun programStateLabel(state: ContainerPrograms.State): String = when (state) {
+        ContainerPrograms.State.Stopped -> "Stopped"
+        is ContainerPrograms.State.Running -> "Running"
+        is ContainerPrograms.State.Waiting -> "Restarting in ${state.restartInMs / 1000} s (it exited with ${state.lastExit})"
+        is ContainerPrograms.State.Ended -> if (state.gaveUp) "Stopped after failing ${ContainerProgram.MAX_FAILURES_IN_A_ROW} times (exit ${state.exitCode})" else "Exited with ${state.exitCode}"
+        is ContainerPrograms.State.Failed -> "Couldn't start: ${state.message}"
     }
 
     // ---- exported commands (docs/SPEC.md 3d "Exported commands", Droidtop/tracker#555 D5, D7) ----
@@ -733,6 +786,7 @@ object ContainersCatalog {
                 withContext(Dispatchers.IO) {
                     ContainerExports.save(ctx.filesDir, ContainerExports.without(ContainerExports.read(ctx.filesDir), info.container.id))
                     ContainerEnter.save(ctx.filesDir, ContainerEnter.without(ContainerEnter.read(ctx.filesDir), info.container.id))
+                    ContainerPrograms.forget(ctx, info.container.id)
                 }
                 "Deleted. Go back to Containers."
             },
