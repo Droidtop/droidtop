@@ -3303,7 +3303,11 @@ app, or Sui (the Magisk module, same API), through the Shizuku API in droidtop's
 arrives in `:pluginhost` and `ShizukuTransport` shares it with the main process through Shizuku's built-in
 multi-process support (Sui is asked directly); droidtop asks Shizuku for permission with
 `Shizuku.requestPermission`, and commands run through `Shizuku.newProcess` (private since Shizuku 13, reached
-by reflection as the plugin does). The **Shizuku plugin** backend (`PluginPrivilegedOps`) adapts the plugin
+by reflection as the plugin does). A command is waited for by `RemoteProcessWait`, never `Process.waitFor(timeout)`:
+Java's default wait takes only `IllegalThreadStateException` as "still running", and Shizuku's remote process
+delivers that across Binder as a plain `IllegalArgumentException`, so the default wait threw on the first poll of
+any command still running and Kill reported "process hasn't exited" (tracker#412, rig on 0.2.0-dev.1908). The
+**Shizuku plugin** backend (`PluginPrivilegedOps`) adapts the plugin
 broker (`priv.packages`, `priv.shell`). The owner's trade-off: the plugin integrates more directly with
 droidtop; the official app gives control and independent updates, updated by its own developers and working
 as it normally would. Auto takes the first backend that is ready, the app before the plugin; a named backend
