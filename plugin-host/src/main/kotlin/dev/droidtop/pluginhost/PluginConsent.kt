@@ -88,7 +88,7 @@ object PluginConsent {
             // One tick box per point, under the first mode it shows in.
             val mode = entry.surfaces().mapNotNull { modeOf(it) }.distinct().minByOrNull { MODE_ORDER.indexOf(it) } ?: MODE_ANY
             val line = ConsentLine(
-                title = entry.label ?: point.label,
+                title = entry.titled(point.label),
                 detail = point.lets.ifEmpty { null },
                 id = PluginPermissions.PROVIDE_PREFIX + entry.point,
                 highRisk = point.risk.needsConsent,

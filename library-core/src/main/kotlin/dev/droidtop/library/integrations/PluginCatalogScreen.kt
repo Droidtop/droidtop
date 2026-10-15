@@ -46,6 +46,10 @@ import kotlinx.coroutines.withContext
 object PluginCatalogScreen {
     const val ID = "plugins_catalogs"
 
+    /** The caution card over a catalog's notice; reserved, so no plugin notice can pose as one (plugin-view-limits.json). */
+    const val NOTICE_TITLE = "Notice from the list"
+    const val CHANGED_NOTICE_TITLE = "The list's notice changed"
+
     // Buffers between the address field and its action, and the fetched catalog awaiting the person's
     // decision: the same pending-buffer shape "Keys you trust" uses.
     @Volatile private var pendingAddress = ""
@@ -215,7 +219,7 @@ object PluginCatalogScreen {
                         placement = NoticePlacement.Page,
                     ),
                 )
-                addAll(noticeItems("plugins_catalogs_proposal_notice", "Notice from the catalog", proposal.disclaimer.text, gate))
+                addAll(noticeItems("plugins_catalogs_proposal_notice", proposal.info.name, false, proposal.disclaimer.text, gate))
                 add(ActionItem(id = "plugins_catalogs_proposal_address", title = proposal.indexUrl.removePrefix("https://"), subtitle = "Where droidtop reads it from", run = {}))
                 add(
                     ActionItem(
@@ -267,13 +271,27 @@ object PluginCatalogScreen {
         )
     }
 
-    /** A text shown whole, a paragraph per row (the pad steps through them), the last one marking the end of the text for [gate]. */
-    private fun noticeItems(idPrefix: String, heading: String, text: String, gate: String?): List<CatalogItem> {
+    /**
+     * A catalog's notice (its `disclaimer`, Droidtop/tracker#521 item 10): droidtop's own caution card titled
+     * [NOTICE_TITLE] and marked as from [catalogName], then the text shown whole, a paragraph per row (the pad steps
+     * through them), the last one marking the end of the text for [gate]. The card says the condition in droidtop's
+     * words; the text is the catalog's own, which a plugin never repeats ([NOTICE_TITLE] is reserved).
+     */
+    private fun noticeItems(idPrefix: String, catalogName: String, changed: Boolean, text: String, gate: String?): List<CatalogItem> {
         val paragraphs = text.trim().split(Regex("\\n+")).map { it.trim() }.filter { it.isNotEmpty() }.ifEmpty { listOf(text.trim()) }
-        return paragraphs.mapIndexed { index, paragraph ->
+        val card = NoticeItem(
+            id = "${idPrefix}_card",
+            notice = Notice(
+                tone = NoticeTone.Caution,
+                title = if (changed) CHANGED_NOTICE_TITLE else NOTICE_TITLE,
+                body = if (gate != null) "Read it to the end: Accept opens there" else null,
+                source = catalogName,
+            ),
+        )
+        return listOf(card) + paragraphs.mapIndexed { index, paragraph ->
             TextBlockItem(
                 id = "${idPrefix}_$index",
-                title = if (index == 0) heading else "",
+                title = "",
                 text = paragraph,
                 gate = gate,
                 last = index == paragraphs.lastIndex,
@@ -432,7 +450,7 @@ object PluginCatalogScreen {
             id = "plugins_catalog_disclaimer_changed",
             title = "The notice changed",
             chips = listOf(CatalogChip("Unofficial")),
-            items = noticeItems("plugins_catalog_disclaimer_new", "New notice from the catalog", disclaimer.text, gate) + listOf(
+            items = noticeItems("plugins_catalog_disclaimer_new", source.name, true, disclaimer.text, gate) + listOf(
                 AsyncActionItem(
                     id = "plugins_catalog_disclaimer_accept",
                     title = "Accept",
@@ -495,7 +513,7 @@ object PluginCatalogScreen {
                     run = {},
                 ),
             )
-            index?.disclaimer?.let { addAll(noticeItems("plugins_catalog_about_disclaimer", "Notice from the catalog", it.text, null)) }
+            index?.disclaimer?.let { addAll(noticeItems("plugins_catalog_about_disclaimer", source.name, false, it.text, null)) }
             add(
                 AsyncActionItem(
                     id = "plugins_catalog_remove",

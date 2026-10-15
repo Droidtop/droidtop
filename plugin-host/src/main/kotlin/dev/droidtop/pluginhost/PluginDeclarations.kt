@@ -88,6 +88,17 @@ data class ProvidedPoint(
         mergeExtra(this, extra)
     }
 
+    /**
+     * How droidtop names this entry to the person (Droidtop/tracker#521 item 3): the point's own name, then the entry's
+     * `label` when it has one ("Quick Menu tile: Save state"), cut at [LABEL_MAX]. The point's name always leads, so a
+     * plugin's title can say which of its entries this is but never pose as a different point.
+     */
+    fun titled(pointLabel: String): String {
+        val own = label?.trim()?.takeIf { it.isNotEmpty() && !it.equals(pointLabel, ignoreCase = true) } ?: return pointLabel
+        val cut = if (own.length > LABEL_MAX) own.take(LABEL_MAX - 1).trimEnd() + "\u2026" else own
+        return "$pointLabel: $cut"
+    }
+
     /** The `surfaces` a plugin declared for this entry (`gaming.quick_menu`, ...), empty when it declared none. */
     fun surfaces(): List<String> {
         val array = runCatching { JSONObject(extra).optJSONArray("surfaces") }.getOrNull() ?: return emptyList()
@@ -96,6 +107,9 @@ data class ProvidedPoint(
 
     companion object {
         private val KNOWN = setOf("point", "version", "id", "label")
+
+        /** The longest entry title droidtop shows after the point's name ([titled]); longer is cut with an ellipsis. */
+        const val LABEL_MAX = 40
 
         fun fromJson(json: JSONObject): ProvidedPoint? {
             val point = json.optString("point").takeIf { it.isNotBlank() } ?: return null
