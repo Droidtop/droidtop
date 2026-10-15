@@ -254,6 +254,35 @@ class GamingThemeMappingTest {
     }
 
     @Test
+    fun `high contrast holds body text at 7 to 1`() {
+        val hc = GamingThemeMapping.highContrast(GamingThemeColors.DEFAULT)
+        val surfaces = listOf(hc.ground, hc.overlaySurface, hc.card, hc.cardFocused, hc.cardInset, hc.hintBar)
+        listOf(hc.onSurface, hc.onSurfaceMuted, hc.value, hc.sectionLabel).forEach { fg ->
+            surfaces.forEach { bg ->
+                val r = ColorMath.ratio(fg, bg)
+                assertTrue("${Integer.toHexString(fg)} is $r:1 on ${Integer.toHexString(bg)}", r >= GamingThemeMapping.HIGH_CONTRAST_FLOOR - 0.01)
+            }
+        }
+    }
+
+    @Test
+    fun `the two-tone focus ring stands out by 3 to 1 over white, black and the palette's own surfaces`() {
+        val m = ColorMath
+        val d = GamingThemeColors.DEFAULT
+        // droidtop's accent and the hardest accents a theme can declare: white, black, mid grey, pure hues.
+        val accents = listOf(d.accent, m.WHITE, m.BLACK, argb("777777"), argb("FFFF00"), argb("0000FF"), argb("FF0000"), argb("00FF00"))
+        for (accent in accents) {
+            for (bg in listOf(m.WHITE, m.BLACK, d.ground, d.card, d.cardFocused, accent)) {
+                val v = FocusRingInks.visibility(accent, bg)
+                assertTrue("ring ${Integer.toHexString(accent)} is $v:1 over ${Integer.toHexString(bg)}", v >= FocusRingInks.FLOOR)
+            }
+        }
+        assertEquals(m.BLACK, FocusRingInks.inner(m.WHITE))
+        assertEquals(m.WHITE, FocusRingInks.inner(m.BLACK))
+        assertEquals(4f, FocusRingInks.outerDp(highContrast = true), 0f)
+    }
+
+    @Test
     fun `droidtop's own palette is itself accessible`() {
         val d = GamingThemeColors.DEFAULT
         val m = ColorMath

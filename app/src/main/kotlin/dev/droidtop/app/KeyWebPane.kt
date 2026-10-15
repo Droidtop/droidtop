@@ -51,7 +51,6 @@ import dev.droidtop.library.scraper.ScraperKeyCheck
 import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.runtime.prefs.PrefsFile
-import dev.droidtop.shell.gamepad.HintTip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -222,20 +221,20 @@ internal fun KeyWebPane(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Text(service.title, style = MaterialTheme.typography.titleLarge)
-            HintTip(service.credit) { Text(service.gets, style = MaterialTheme.typography.labelLarge) }
+            Text(service.gets, style = MaterialTheme.typography.labelLarge)
+            Text(service.credit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             page.steps.forEachIndexed { index, item ->
-                HintTip(item.hint) {
-                    Text(
-                        "${index + 1}  ${item.label}",
-                        style = if (index == step) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
-                        color = if (index == step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                Text(
+                    "${index + 1}  ${item.label}",
+                    style = if (index == step) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                    color = if (index == step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                // The current step's how-to, under it (it used to be a bubble).
+                if (index == step) item.hint?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             if (notice != PaneNotice.NONE) {
-                HintTip("This site would not sign in inside droidtop. Open it in the browser and send the key from your phone.") {
-                    Button(onClick = onFallback) { Text("Use browser and phone") }
-                }
+                Text("This site won't sign in here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onFallback) { Text("Use browser and phone") }
             }
             service.fields.forEach { field ->
                 val candidate = found[field.id]
@@ -272,9 +271,7 @@ internal fun KeyWebPane(
                 },
             ) { Text("Test") }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HintTip("Keeps your sign-in on this page for next time. Off: it is deleted when you close this.") {
-                    Text("Stay signed in", style = MaterialTheme.typography.bodyMedium)
-                }
+                Text("Stay signed in", style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = stay, onCheckedChange = {
                     stay = it
                     PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putBoolean(KeyWebProfiles.stayKey(service), it)

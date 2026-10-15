@@ -679,7 +679,7 @@ internal fun PcGameMenu(
                         PcActionRow(
                             if (updateSources.size > 1) "Check ${source.label} now" else "Check for an update now",
                             it.answer?.takeIf { a -> a.checkedAtEpochMs > 0 }
-                                ?.let { a -> "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(a.checkedAtEpochMs) }
+                                ?.let { a -> "Last checked " + dev.droidtop.library.format.ValueFormat.ago(System.currentTimeMillis(), a.checkedAtEpochMs).replaceFirstChar { c -> c.lowercase() } }
                                 ?: "Not checked yet",
                             {
                                 scope.launch {
@@ -1183,7 +1183,7 @@ private fun LibraryEntry.identityLine(update: String?): String = if (missing) "b
     val size = pcInfo?.sizeBytes ?: 0L
     if (size > 0) {
         append(" · ")
-        append(String.format("%.1f GB", size / 1_000_000_000.0))
+        append(dev.droidtop.library.format.ValueFormat.size(size))
         append(if (pcInfo?.installed == true) " installed" else " to download")
     } else if (pcInfo?.installed == false) {
         append(" · not installed")

@@ -73,6 +73,7 @@ internal fun CatalogIcon.glyph(): ImageVector = when (this) {
 
 /** The glyph a left-menu row draws, from the same Material set (docs/SPEC.md 7j, "Gaming controls"). */
 internal fun LeftMenuEntry.glyph(): ImageVector = when {
+    search -> Icons.Outlined.Search
     home -> Icons.Outlined.Home
     else -> when (section) {
         GamingSection.PC_GAMES -> Icons.Outlined.Laptop

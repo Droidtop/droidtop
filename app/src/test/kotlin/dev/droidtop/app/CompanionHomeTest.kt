@@ -22,10 +22,4 @@ class CompanionHomeTest {
     fun `a clock that went backwards never shows a negative session`() {
         assertEquals("Just started", sessionLabel(start, start - 5_000))
     }
-
-    @Test
-    fun `playtime is minutes under an hour and whole hours above`() {
-        assertEquals("45 min played", playtimeLabel(45 * 60L))
-        assertEquals("12 h played", playtimeLabel(12 * 3600L + 59 * 60L))
-    }
 }

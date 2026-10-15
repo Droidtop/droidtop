@@ -221,13 +221,17 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `home keeps the recent shelves across libraries and leaves the rest to PC Games`() {
+    fun `home keeps one recent games row across libraries and leaves the rest to PC Games`() {
         val pc = game("/pc", lastPlayed = now - 30, firstSeen = now - 300, favorite = true, update = "2.0")
         val rom = game("/rom", kind = LibraryEntryKind.CONSOLE_ROM, lastPlayed = now - 10).copy(systemId = "snes")
 
         val home = homeShelves(listOf(pc, game("/other")), listOf(rom), now)
-        assertEquals(listOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED, SHELF_UPDATES), home.map { it.id })
+        assertEquals(listOf(SHELF_RECENT_GAMES), home.map { it.id })
+        assertEquals("Recent games", home.single().title)
         assertEquals(listOf("/rom", "/pc"), home.first().entries.map { it.id })
+        // Nothing played yet: the row is what was added most recently.
+        val fresh = homeShelves(listOf(game("/new", firstSeen = now - 5)), emptyList(), now)
+        assertEquals(listOf("/new"), fresh.single().entries.map { it.id })
 
         // PC Games' Overview is the PC fold's own, Retro games never on it.
         val overview = pcShelves(listOf(pc, game("/other")), now)

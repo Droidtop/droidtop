@@ -14,6 +14,6 @@ class PlaytimeLabelTest {
     }
 
     @Test fun `a known duration is formatted as hours and minutes`() {
-        assertEquals("1h 1m", playtimeLabel(3660, 1L, 1))
+        assertEquals("1 h 1 min", playtimeLabel(3660, 1L, 1))
     }
 }

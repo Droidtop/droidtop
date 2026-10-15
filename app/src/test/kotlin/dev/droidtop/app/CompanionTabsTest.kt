@@ -128,10 +128,6 @@ class CompanionTabsTest {
         assertNull(tabForGameStart("social", game, slots(gamingDefault, UiMode.KID, game, 0f, emptyMap())))
     }
 
-    @Test fun storageTextReadsInGigabytes() {
-        assertEquals("12.3 GB free of 128.0 GB", storageText(12_300_000_000L, 128_000_000_000L))
-    }
-
     @Test fun aRunningJobOnHomeHoldsTheCompanionOn() {
         assertTrue(jobShownOnHome(CompanionTab.HOME.id, jobRunning = true))
         assertFalse(jobShownOnHome(CompanionTab.HOME.id, jobRunning = false))

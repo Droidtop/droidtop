@@ -209,8 +209,10 @@ fun SharedRunningAppsList(
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(app.label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                     val rowText = rowMessage(i)
-                    HintTip(if (rowText == TaskPolicy.NOT_CONFIRMED) TaskPolicy.NOT_CONFIRMED_TIP else null) {
-                        Text(rowText ?: TaskPolicy.displayLabel(app.displayId), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    Text(rowText ?: TaskPolicy.displayLabel(app.displayId), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                    // What "not confirmed" means, in the row while it is the selected one (it used to be a bubble).
+                    if (selected && rowText == TaskPolicy.NOT_CONFIRMED) {
+                        Text(TaskPolicy.NOT_CONFIRMED_TIP, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 // A tap on the row switches to the app; this asks for it on the other screen.

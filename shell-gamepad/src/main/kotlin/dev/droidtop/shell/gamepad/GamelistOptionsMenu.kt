@@ -141,7 +141,13 @@ internal fun GamelistOptionsMenu(
         systemId != null -> GetGamesContext.SYSTEM
         else -> GetGamesContext.COLLECTION
     }
-    val searchRowLabel = if (searchText.isBlank()) "Search" else "Search: ${searchText.trim()}"
+    // A system's list searches that system ("Search SNES", the owner's per-console search, 2026-10-14): its
+    // games and the sources that serve it, a download landing in its folder (docs/SPEC.md 12a).
+    val searchRowLabel = when {
+        systemId != null && !libraryScope -> dev.droidtop.shell.gamepad.query.SearchEntry.systemLabel(groupLabel, searchText)
+        searchText.isBlank() -> "Search"
+        else -> "Search: ${searchText.trim()}"
+    }
     var searchOpen by remember { mutableStateOf(false) }
     val actions = buildList {
         if (libraryScope) {

@@ -826,9 +826,10 @@ private fun GamepadShellBody(
             },
             onSelect = { entry ->
                 leftMenuOpen = false
-                // Home and PC Games are one section: the row says which view.
-                if (entry.section == GamingSection.PC_GAMES) pcGames.open(entry.home)
+                // Home and PC Games are one section: the row says which view. Search opens Home's global search.
+                if (entry.section == GamingSection.PC_GAMES) pcGames.open(entry.home || entry.search)
                 selectSection(entry.section)
+                if (entry.search) pcGames.searchOpen = true
             },
             onOpenQuickMenu = {
                 leftMenuOpen = false
@@ -1438,6 +1439,7 @@ private fun GamepadShellBody(
                                     if (target == GamingSection.PC_GAMES) pcGames.open(home = false)
                                     selectSection(target)
                                 },
+                                onOpenQuickMenu = { quickMenuOpen = true },
                             )
                             GamingSection.APPS -> {
                                 canGoBack = false
@@ -1485,11 +1487,9 @@ private fun GamepadShellBody(
             // band; it is a readout and the tap route to the Quick Menu.
             // On Retro Games it yields to a theme that draws its own clock
             // or system status (docs/SPEC.md 7k2), so the two never overlap.
-            if (!screensaverOn && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
-                // Home's shelves scroll up under the cluster: a strip of their own for it (tracker#494).
-                if (section == GamingSection.PC_GAMES && pcGames.home && nav.place is ShellPlace.Section) {
-                    StatusScrim(Modifier.align(Alignment.TopStart))
-                }
+            // Home's top band draws the status facts itself (docs/SPEC.md 7i, "Home"; Droidtop/tracker#494, #485 F7a).
+            val homeBand = section == GamingSection.PC_GAMES && pcGames.home && nav.place is ShellPlace.Section
+            if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
                 FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
             }
             // A theme that draws its own help legend (a pad is attached, so

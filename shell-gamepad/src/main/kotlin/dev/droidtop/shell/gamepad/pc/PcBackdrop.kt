@@ -49,6 +49,8 @@ import dev.droidtop.shell.gamepad.Motion
  */
 @Composable
 internal fun PcBackdrop(art: String?, modifier: Modifier = Modifier) {
+    // High contrast pins the backdrop to the plain ground: no art behind text (docs/SPEC.md 7k).
+    if (dev.droidtop.shell.gamepad.GamingTheme.palette.highContrast) return
     val context = LocalContext.current
     Box(modifier = modifier.fillMaxSize()) {
         Crossfade(targetState = art, animationSpec = Motion.backdrop(), label = "pc backdrop") { shown ->

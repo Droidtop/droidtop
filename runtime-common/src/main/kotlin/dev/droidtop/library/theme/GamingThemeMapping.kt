@@ -164,6 +164,27 @@ object GamingThemeMapping {
         }
     }
 
+    /** Body text under High contrast (docs/SPEC.md 7k, "High contrast"): WCAG AAA. */
+    const val HIGH_CONTRAST_FLOOR = 7.0
+
+    /**
+     * [colors] under High contrast: every text role moved the shortest way to 7:1 over every surface it is drawn
+     * on (contrast wins over the theme's hue when both cannot hold). Pure.
+     */
+    fun highContrast(colors: GamingThemeColors): GamingThemeColors {
+        val m = ColorMath
+        val surfaces = listOf(colors.ground, colors.overlaySurface, colors.card, colors.cardFocused, colors.cardInset, colors.hintBar)
+        fun strong(fg: Int) = m.ensure(fg, surfaces, HIGH_CONTRAST_FLOOR)
+        return colors.copy(
+            onSurface = strong(colors.onSurface),
+            onSurfaceMuted = strong(colors.onSurfaceMuted),
+            value = strong(colors.value),
+            placeholder = strong(colors.placeholder),
+            sectionLabel = strong(colors.sectionLabel),
+            accent = strong(colors.accent),
+        )
+    }
+
     fun map(theme: EsDeTheme?): GamingThemeColors {
         if (theme == null) return GamingThemeColors.DEFAULT
         val declared = read(theme)

@@ -157,13 +157,6 @@ class PcCapsuleStateTest {
         )
     }
 
-    @Test
-    fun `download sizes read as megabytes or gigabytes`() {
-        assertEquals("1.5 GB", downloadSizeLabel(1_500_000_000L))
-        assertEquals("420 MB", downloadSizeLabel(420_000_000L))
-        assertEquals("1 MB", downloadSizeLabel(10L))
-    }
-
     private val scope = LibraryQueryScope(
         id = "pc",
         facets = listOf(LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES, LibraryFacet.UPDATE, LibraryFacet.RECENTLY_PLAYED),

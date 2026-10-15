@@ -44,7 +44,10 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.ButtonBarItem
 import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.PageButton
+import dev.droidtop.library.settings.PageHeaderItem
 import dev.droidtop.library.settings.NoticePress
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SettingsSearchIndex
@@ -59,6 +62,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.ui.shared.NoticeViews
+import dev.droidtop.ui.shared.PageViews
 
 /**
  * The Preference-surface renderer for the shared settings catalogs
@@ -505,6 +509,24 @@ class CatalogPreferenceNavigator(
         })
     }
 
+    /** A page button: nothing while it cannot act (its label says why), else run after its confirm, then rebuild. */
+    private fun pressPageButton(context: Context, button: PageButton) {
+        if (!button.enabled) return
+        confirmThen(context, button.confirmTitle) {
+            button.run(context)
+            rebuild()
+        }
+    }
+
+    /** A page's More: its other buttons as a list. */
+    private fun showMoreButtons(context: Context, bar: ButtonBarItem) {
+        AlertDialog.Builder(context)
+            .setTitle(ButtonBarItem.MORE_LABEL)
+            .setItems(bar.more.map { it.shownLabel }.toTypedArray()) { _, which -> bar.more.getOrNull(which)?.let { pressPageButton(context, it) } }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     /** Runs [action] at once, or after an OK when [confirmTitle] asks for one. */
     /**
      * This surface's host for droidtop's danger and confirm dialogs (docs/SPEC.md 7k, "Notices") while the fragment
@@ -773,6 +795,33 @@ class CatalogPreferenceNavigator(
                 }
                 true
             }
+        }
+        // A page's header and button bar (docs/SPEC.md 7k, "Page anatomy"), drawn by the shared Compose pieces.
+        is PageHeaderItem -> object : Preference(context) {
+            override fun onBindViewHolder(holder: PreferenceViewHolder) {
+                super.onBindViewHolder(holder)
+                PageViews.bindHeader(holder.itemView as ViewGroup, item.header)
+            }
+        }.apply {
+            key = item.id
+            layoutResource = PageViews.LAYOUT
+            isSelectable = false
+            isIconSpaceReserved = false
+        }
+        is ButtonBarItem -> object : Preference(context) {
+            override fun onBindViewHolder(holder: PreferenceViewHolder) {
+                super.onBindViewHolder(holder)
+                PageViews.bindButtonBar(holder.itemView as ViewGroup, item) { slot ->
+                    val button = item.slots.getOrNull(slot)
+                    if (button != null) pressPageButton(context, button) else showMoreButtons(context, item)
+                }
+            }
+        }.apply {
+            key = item.id
+            layoutResource = PageViews.LAYOUT
+            // The buttons inside take the taps; the row itself is not a second target.
+            isSelectable = false
+            isIconSpaceReserved = false
         }
         is TextBlockItem -> object : Preference(context) {
             override fun onBindViewHolder(holder: PreferenceViewHolder) {

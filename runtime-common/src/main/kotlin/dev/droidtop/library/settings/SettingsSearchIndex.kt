@@ -53,7 +53,8 @@ object SettingsSearchIndex {
                 // neither does its search.
                 if (group.quickOnly) continue
                 for (item in group.items) {
-                    if (item is TextBlockItem) continue
+                    // A page's header names the page itself, and its bar's buttons are actions, not settings.
+                    if (item is TextBlockItem || item is PageHeaderItem || item is ButtonBarItem) continue
                     results += SettingsSearchResult(
                         target = screen,
                         screenTitle = screen.title,

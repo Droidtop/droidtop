@@ -47,7 +47,6 @@ import dev.droidtop.library.credentials.web.KeyPages
 import dev.droidtop.library.scraper.ScraperKeyCheck
 import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.scraper.ScraperKeyState
-import dev.droidtop.shell.gamepad.HintTip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -215,9 +214,8 @@ private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserP
     }
 
     Text(service.title, style = MaterialTheme.typography.headlineMedium)
-    HintTip(service.credit) {
-        Text(result ?: state, style = MaterialTheme.typography.titleMedium)
-    }
+    Text(result ?: state, style = MaterialTheme.typography.titleMedium)
+    Text(service.credit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Text(service.gets, style = MaterialTheme.typography.labelLarge)
     if (browserPaneAvailable) {
         Button(onClick = onBrowserPane) { Text("Open the key page here") }
@@ -251,9 +249,7 @@ private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserP
     val current = handoff
     if (current == null) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            HintTip("Shows a code. Scan it with a phone or PC on the same network and paste the key there.") {
-                Button(onClick = { startPhone() }) { Text("Use my phone") }
-            }
+            Button(onClick = { startPhone() }) { Text("Use my phone") }
             phoneError?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
         }
     } else {

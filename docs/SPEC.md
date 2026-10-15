@@ -3764,6 +3764,8 @@ on touch, rest the pointer for a mouse, a short focus dwell for the pad. A tip i
 only inside the topmost layer on the hint bar (`FocusedHints.tipsAllowedFor`): the page's tip goes while the Quick Menu,
 the Start menu or a dialog is open over it. Sentences are for real errors only;
 there are no "Info" links. The rest of the app follows the same rule.
+explanation that still has to exist is on the focus line and in Info (Y) (7k, "Explanations: no tooltips";
+the tooltip bubble was deleted 2026-10-14). Sentences are for real errors only; there are no "Info" links. The rest of the app follows the same rule.
 
 ### iiSU uses Android's own secondary-display home
 
@@ -7104,8 +7106,8 @@ owns it, found by the rig's new-user pass and fixed there.
 
 Use labels and short values across screens, dialogs, settings, launcher and desktop. No explanatory
 sentences on screens; row subtitles are values or 2–4 words. Remove "what this does" and "why"
-text. Put useful explanations in one shared tooltip: pointer hover, delayed pad focus or touch
-long-press. No Info links or parallel detail sheets. Hide Shizuku/Sui actions while unavailable.
+text. Put useful explanations on the focus line and in Info (Y); the tooltip this once named is gone
+(7k, "Explanations: no tooltips"). No Info links or parallel detail sheets. Hide Shizuku/Sui actions while unavailable.
 Errors and confirmations may use one short sentence; empty states use 2–3 words. Keep one-line
 warnings for deletion, trust and sign-in. Use sentence case, one name per concept, verb labels on
 buttons, no developer notation or backend errors. Keep ids, package names, URLs and paths out of
@@ -12750,7 +12752,7 @@ it:
 
 | Steam Deck / Big Picture | Others | PC Games |
 | --- | --- | --- |
-| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps only recent activity across every library: Continue playing, Recently added and Update available (`homeShelves`, `HOME_SHELF_IDS`). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
+| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps one row of games, Recent games (Continue playing, else Recently added, `homeShelves`); updates and additions are its What's new cards ("Home" below). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
 | Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (Select). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **Select on a pinned tab** opens its Options: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first. The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are one row of Overview, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) take this page's row when they exist. |
@@ -12957,6 +12959,22 @@ Install, Update and Downloading verbs of the primary action (#223), which
 land in `PcPlayState` and appear here without a change to the page. No
 version rollback (#231).
 
+### Home (decided 2026-10-14, Droidtop/tracker#485 F7a; the final design's section B)
+
+What I was playing, what changed, who is around, and the way into my library. Home is not a list, so it has no Filter and no Sort By: X does nothing there, **Y is Search**, L1/R1 step the strip, Select is the focused game's Options, A plays or opens. Top to bottom:
+
+- **The top band** (48 dp, `HomeTopBand`): touch only, in the accessibility tree, never a stop of the pad. Over a scrim from the ground at 60 percent to clear, right to left: the status facts (`StatusCluster` itself, on a solid plate in full ink; tapping them opens the Quick Menu), a divider, Friends (the avatar, with a ring while the person's own presence on a service is not Offline; shown while a social service is on), the bell (unread messages; opens the Quick Menu), Search, and Downloads with a progress ring while a job runs (`PluginJobsCenter.entries()`). Every target is 48 dp with a content description. The floating status cluster is not drawn on Home: the band carries the facts.
+- **Recent games**, headed: Continue playing, else Recently added, across every library (`homeShelves`, one row, id `recent-games`). Up from it does nothing.
+- **The strip** (`HomeStripRow`): What's new, Friends · n and Downloads · n, stepped with L1/R1 from anywhere on Home; the pills are not a stop, Down from Recent games goes to the active tab's first card, and Up goes back. What's new is always there ("You're up to date" when empty); Friends while a social service is on; Downloads while a job runs or is paused.
+  - **What's new** (`HomeModel.whatsNew`): at most 12 cards, newest first: a game update ("v0.9.6", opens the game's page), games one scan added to one place ("212 games added to SNES", counted as the library counts, hidden games left out; one game reads by its name, "Added 2 days ago"; opens that library), one card for plugin updates, "+N more" past the cap (opens Updates), and **last, at most one Needs attention card** ("3 things need attention"). Chores are never news.
+  - **Friends**: in game first, then unread, then online ("Playing Hades"); A opens Social.
+  - **Downloads**: name, progress and state ("45% · Paused"); A opens Downloads.
+- **Shelves** a plugin asks for (plugin-api C11), then **Your library** (the Retro Games and PC Games tiles) as the last stop.
+
+**Needs attention** (`needsAttentionScreen`): one row per item, each with one verb as its value. A system that has games in the library and is missing a BIOS file ("PlayStation needs a BIOS") or has one that matches no known good dump ("PlayStation BIOS doesn't match") are separate items with **Set up PlayStation**, which opens that system's settings (its BIOS files); the check reads every game folder's `bios` files against `BiosDatabase`, off the main thread, once per change in the set of systems with games. Games with no artwork are one item, **Find artwork**, which starts the scrape job. A seen item is meant to stay quiet until its state changes (`HomeModel.unseen`, keyed by the item's state).
+
+Not built yet (tracked on tracker#485): the unrecognised-files item (the scan does not keep its unmatched files), plugin update counts on the card, the hero following focus and the art order (F7b), Your library's systems and Random game (F7b), the Shelves page and the shelf cap (F7b), and sending the items to Notifications (needs S1's Recent list on main).
+
 ### Home art
 
 Droidtop/tracker#253, 2026-10-02. The PC Games home is led by the player's
@@ -12979,9 +12997,8 @@ own games, in droidtop's own treatment:
   which used to bring the shell back on the last view, the Retro games
   (Droidtop/tracker#361). Home has
   no strip and the shoulders do nothing there; B does nothing on Home (it is
-  the root). Home carries no chrome of its own: the shelves, a destination row
-  and the shell footer, its first row starting under the floating status
-  cluster (the band Steam's top bar takes).
+  the root). Home's chrome is its top band, which carries the status facts
+  ("Home" above), its strip and the shell footer.
 - **Home links to the libraries** (owner, 2026-10-03, Droidtop/tracker#273: Home
   is the hub and links to the Retro and PC menus): a row of two tiles, Retro
   Games and PC Games (`HOME_DESTINATIONS`), is the last stop of Home's one list,
@@ -12992,8 +13009,9 @@ own games, in droidtop's own treatment:
   from any other section whose own handlers have nothing left to close (Retro
   Games' system list, Apps, a place, Settings) to Home; on Home it does nothing.
 - **Home shows all recent activity, and only that** (Droidtop/tracker#273):
-  its shelves are Continue playing, Recently added and Update available; the
-  library's other shelves are PC Games' Overview. Continue playing
+  its games row is Continue playing, else Recently added, and updates and
+  additions are What's new cards ("Home" above); the library's other shelves
+  are PC Games' Overview. Continue playing
   and Recently added also take the Retro library and the launcher apps that
   are games (`AppCategoryRules`: Android's flag and the person's marks),
   merged with the PC games by last-played and by added time (`pcShelves(...,
@@ -14603,6 +14621,10 @@ setting (section 7b), which is what lets it use the shell's own menu row anatomy
 tokens are absolute against the menu overlay surface and legible over a dark ground and
 nothing else.
 
+
+### The hint bar fits (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+The bar names every button that acts, and Start and R2 always sit first, on the left. When the hints do not fit on one line at the current text size (measured, not estimated), the bar gives up room in a fixed order (`HintFit`): first Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2), then L1/R1 drop (the strip they step shows its own shoulder glyphs), then Select drops. **A and B never drop.** Whatever still does not fit wraps in a sheet's bar and scrolls in a full-width one, as before. A screen reader hears the whole set as the bar's description, however much was folded, and the bar offers the custom action **Read controls**. Long-press Select is not used for this: it is the Quick Menu fallback.
 ### Places: stores, friends, downloads, updates and plugins (directed 2026-10-01, Droidtop/tracker#258)
 
 The left menu is where things live. Beside the three tabs it lists five
@@ -15031,7 +15053,20 @@ A condition the person should know about (an unofficial plugin, a feature that i
 9. In a modal the safe choice comes first (left) and has the focus.
 10. Never tell a person to do something they cannot do from where they are; give them the action.
 
-**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; and `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`. Each rule is switched on in the commit that clears its last site.
+**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`; and byte, duration and relative-time formatting outside `ValueFormat` ("Values" below). Each rule is switched on in the commit that clears its last site.
+
+### Values: one formatter (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+Every value a person reads that is a size, a time or a state goes through one formatter, `ValueFormat` (`runtime-common`, `dev.droidtop.library.format`). It is in `runtime-common`, not `:ui-shared`, because `:library-core` formats too (store sizes, free space) and cannot depend on a Compose module. The rules:
+
+- **Sizes** are decimal, as storage is sold and as Android's Settings counts it: whole KB and MB (never "0 MB" for something that exists), one decimal for GB and TB ("12 KB", "420 MB", "1.5 GB"). Free space reads "12.3 GB free of 128.0 GB".
+- **Durations** leave out what is zero: "2 h 5 min", "2 h", "45 min", "Under a minute". The caller says what absence means ("Not played yet", or nothing); a duration never reads "0 min". A screen reader hears whole words ("2 hours 5 minutes").
+- **Time left** is never more exact than the rate behind it: whole minutes under an hour, quarter hours above ("About 8 min left").
+- **How long ago**: "today", "yesterday", "5 days ago", "3 weeks ago", "4 months ago", "over a year ago"; a recent check reads "Just now", "5 min ago", "2 h ago".
+- **Clock times** follow the device's 12 or 24 hour setting. **Percentages** are whole numbers. **Counts** are grouped ("1,234").
+- **States** have one word each: On, Off, Running, Stopped, Installed, Not installed, Connected, Disconnected, Waiting, Failed, Unknown. A plugin's typed `state` value maps onto these, and anything else reads Unknown.
+
+Digits use the root locale, so a decimal point never becomes a comma inside English copy. The per-screen copies this replaced (Containers' storage, the companion's sizes and play time, the PC game page's play time and "last played", the theme renderer's `playtime` text, the store content sheet's sizes, the download size on capsules, the companion's free space, and Android's `Formatter`/`DateUtils` calls) are deleted; `check-ui-rules.sh` rule `formatters` (on) fails a new one. The ported store code under `stores/` keeps its own.
 
 ### Asking before a change, and the flash (decided 2026-10-14, Droidtop/tracker#485)
 
@@ -15040,6 +15075,38 @@ A condition the person should know about (an unofficial plugin, a feature that i
 **The flash** (`Notices.flash`): a corner card at the bottom right above the hint row, at most 320 dp wide, the tone's glyph and up to two lines (four at font scale 1.3 and above) of 14 sp text, led by the plugin's name for a plugin's flash. It is drawn in a window that never takes focus, so the page's focus and hints are untouched; it stays for the longer of 4 s and Android's recommended accessibility timeout and never less than 1.5 s, and is announced politely. Nothing in a flash needs action; acknowledgements are past tense with no period ("Saved", "Copied").
 
 **Recent**: every flash is also kept in memory (the last 50, with time, source and tone) unless it was marked private, and shown as a "droidtop" group at the top of the Quick Menu's Notifications tab, with an unread dot on the group and the tab, and Copy all on Select. It is a source of its own, so it shows without notification access.
+
+### Page anatomy (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+Every catalog page is built the same way, top to bottom (the final design on tracker#485, section C.1):
+
+1. **The header** (`PageHeader`): the thing's picture (64 dp, its own art or a glyph), its name, a byline ("Droidtop · v1.4.0") and its fact chips. Not a stop of the cursor; a screen reader hears it as one heading.
+2. **A search field**, when the page has one, above the bar, reached with Up.
+3. **The button bar** (`ButtonBarItem`): at most three buttons that do the page's job, then **More** for the rest. It is the first stop and has the cursor when the page opens (on the primary button). One primary at most, drawn in the launch fill; destructive buttons sit in More or after a rule and always confirm, Cancel first. A button that cannot act says why in its label ("Needs Wi-Fi"), in full ink; only its plate dims. Buttons are at least 48 dp tall and 120 dp wide (the primary 160 dp), and a label is never cut: it wraps and the bar grows.
+4. **One page banner** at most (a notice, "Notices" above).
+5. **Sections**: a label, then rows.
+6. **The focus line** (`FocusLine`): the focused row's sentence in 16 sp under the list, with room kept for three lines so the list never changes size as the cursor moves; past three lines it ends "Y Info", never a silent cut. Not a live region.
+7. **The hint bar**, with its fit rule (section 7j, "The hint bar fits").
+
+The model is `CatalogPage(header, buttons, more, groups)`, built once per refresh by `pageScreen(...)`. Every renderer reads it through the `groups` it always read: the header and the bar become the first group's two rows (`PageHeaderItem`, `ButtonBarItem`), so search, the companion and Standard's Preference rows need no second loading path, and the search index skips both. Gaming draws them with its own cursor (Left and Right move along the bar), the companion by touch, Standard through `PageViews` in a ComposeView. `CatalogScreen.layout` says whether a screen is one list, the two-pane category layout (three or more sections) or a strip of views of one list.
+
+**Empty, loading and error** are one `StateBlock`: a 48 dp glyph, a title of at most 32 characters, one body line and a next action (an empty state always has one); loading names what is slow after two seconds, never a bare title or an endless spinner; an error is a caution notice with one action and the raw text in Details.
+
+**The focus ring** (`FocusRingInks`) is two opaque edges: a 3 dp outer edge in the theme's accent (4 dp with high contrast) and a 1 dp inner edge in black or white, whichever is farther from the accent. Whatever the ring lands on, pure white, pure black or the accent's own colour, one of the two edges stands out by at least 3:1 (`GamingThemeMappingTest`). It no longer fades or breathes: a 60 percent ring that breathed to 24 percent vanished over light capsule art (low-vision review, R.4 #7).
+
+### Explanations: no tooltips (decided 2026-10-14, Droidtop/tracker#485 F2b)
+
+The tooltip bubble (`HintTip`) is deleted. A row's explanation is on the **focus line** under the list while the row is selected, and in **Info** (Y) with the rest; a row that has one shows a 20 dp info glyph, the hint row says `Y Info`, and a screen reader hears "More info available". **Accessibility > Info text** chooses where it shows: **Bottom line** (the default) or **Under each row** (`ReadingPrefs`; every renderer reads the one value). A screen's own explanation is the focus line's text when the selected row has none. The other bubbles moved to visible text: the PC game page's full paths and links are on its detail strip, the task manager's "not confirmed" reason shows under the selected row, the companion's heat card says "Battery temperature", and the key setup screens show their credit line and the current step's how-to. Every screen must make sense with every optional setting off and without pressing Y (rig check C11). The search index still reads the explanations. `check-ui-rules.sh` rule `hint-tip` (on) fails a new one.
+
+### High contrast, sentence case and the reading settings (decided 2026-10-14, Droidtop/tracker#485 F11)
+
+Settings > Appearance > Accessibility holds the reading settings (`ReadingPrefs`, read by every renderer):
+
+- **Info text**: Bottom line (default) or Under each row ("Explanations: no tooltips").
+- **High contrast** (off by default; Android's own high-contrast text turns it on too): every text role is moved the shortest way to 7:1 over every surface it is drawn on (`GamingThemeMapping.highContrast`), the notices hold 7:1, the focus ring's outer edge is 4 dp, the theme's texture is not drawn and the PC and Home backdrop is the plain ground (no art behind text), and labels are in sentence case. The separate "plain background" idea is this setting.
+- **Sentence case labels**: section labels, tabs, chips and eyebrows that a theme draws in capitals are drawn as written (`labelCase`; all caps is harder to read). Off by default, always on under High contrast; `ReadingPrefs.SENTENCE_CASE_DEFAULT` is the one constant to flip (owner question 4 on tracker#485). It never applies to data: a game's name and anything typed keep their own case.
+
+A change to either re-reads the palette at once (a preferences listener held by the Gaming theme's composition). **UI sounds** stay as decided in "Interface sounds": on by default (owner question 3, the coordinator's default), from the bundled Kenney Interface Sounds set (CC0, NOTICE.md), with the edge bump at list ends; a separate error tone is not bundled yet (it needs one more file from the same pack). The companion's own text size is the companion slice (F8).
 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
@@ -15265,10 +15332,10 @@ theme's roles (section 7k2).
   cursor moves, the edge on the side it heads springs ahead and the trailing edge follows 30 ms
   later, so the ring stretches and snaps onto the new control's shape; a held direction (moves
   under 180 ms apart) runs it as one piece; a single move further than 360dp carries it across as a
-  drop. Its look is Steam's: 2dp in the theme's accent at 60 percent, landing from 12dp outside the
-  control over 400 ms when it appears, then breathing to 24 percent and back every 1.2 s, twenty
-  times, before it rests; a capsule carries it 2dp outside its edge. It draws in an overlay of its
-  own, so a moving or breathing ring redraws nothing under it, and it re-measures its control every
+  drop. Its look is two opaque edges (7k, "Page anatomy": the accent outside, black or white
+  inside), landing from 12dp outside the control over 400 ms when it appears and then staying at full
+  strength (it breathed once; a fading ring is one a low-vision eye loses); a capsule carries it 2dp
+  outside its edge. It draws in an overlay of its own, so a moving ring redraws nothing under it, and it re-measures its control every
   frame only for 450 ms after a change. A window with no host (a one-off dialog) draws a still ring
   on the control. With motion off the ring jumps. The per-control landing outline it replaces is
   gone. Buttons follow Steam in the theme's colours: a quiet chip turns solid (`Selected`) under
@@ -19995,6 +20062,14 @@ device's rows, then a separate "Get more" group that appeared only after every
 plugin had answered, then a row per plugin to open its own screen. The
 search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 (`shell-gamepad/query/LibraryQueryUi.kt`):
+
+**One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
+
+- **Everything**: the left menu's **Search** row (second, under Home), **Y on Home**, and the search target in Home's top band. The device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope.
+- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). Home's system tiles and the Quick Menu's Game section get the same row with Your library's systems (F7b) and the Quick Menu work.
+- **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
+
+The cursor never opens on Search in the left menu: it is an action, not a place.
 
 - **One list.** The device's rows (installed apps, library games; the caller
   matches them over lists it already holds in memory, no disk lookups per

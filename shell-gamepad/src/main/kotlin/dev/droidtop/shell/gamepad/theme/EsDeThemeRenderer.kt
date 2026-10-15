@@ -4314,7 +4314,7 @@ private const val ES_DE_MAX_TILE_PX = 4096
 
 /** The theme `playtime` text: real time when known, "Played" when launches are recorded without a duration. */
 internal fun playtimeLabel(seconds: Long, lastPlayedEpochMs: Long?, playCount: Int): String = when {
-    seconds > 0 -> "${seconds / 3600}h ${(seconds % 3600) / 60}m"
+    seconds > 0 -> dev.droidtop.library.format.ValueFormat.duration(seconds)
     lastPlayedEpochMs != null || playCount > 0 -> "Played"
     else -> "Never played"
 }

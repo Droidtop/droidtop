@@ -120,6 +120,9 @@ internal fun CompanionCatalogItems(
                 }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
                 is NoticeItem -> CompanionNotice(item, onChanged, onOpen = { nested = it })
+                // A page's header and bar (docs/SPEC.md 7k, "Page anatomy"): the shared pieces, touch only.
+                is dev.droidtop.library.settings.PageHeaderItem -> dev.droidtop.ui.shared.PageHeaderView(item.header)
+                is dev.droidtop.library.settings.ButtonBarItem -> CompanionButtonBar(item, onChanged)
                 is TextBlockItem -> Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                     if (item.title.isNotBlank()) Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                     Text(item.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -332,6 +335,49 @@ private fun CompanionNotice(item: NoticeItem, onChanged: () -> Unit, onOpen: (Ca
         if (info && !details.isNullOrBlank()) {
             androidx.compose.foundation.text.selection.SelectionContainer {
                 Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 8.dp))
+            }
+        }
+    }
+}
+
+/** A page's button bar on the companion: a tap presses; a button that asks first asks in place; More lists the rest. */
+@Composable
+private fun CompanionButtonBar(bar: dev.droidtop.library.settings.ButtonBarItem, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    var asking by remember { mutableStateOf<dev.droidtop.library.settings.PageButton?>(null) }
+    var moreOpen by remember { mutableStateOf(false) }
+    fun press(button: dev.droidtop.library.settings.PageButton) {
+        if (!button.enabled) return
+        if (button.confirmTitle != null) {
+            asking = button
+            return
+        }
+        button.run(context)
+        onChanged()
+    }
+    dev.droidtop.ui.shared.ButtonBarView(bar, selected = null, onPress = { slot ->
+        val button = bar.slots.getOrNull(slot)
+        if (button != null) press(button) else moreOpen = !moreOpen
+    })
+    if (moreOpen) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            bar.more.forEach { button ->
+                CatalogRow(button.shownLabel, null, null) {
+                    moreOpen = false
+                    press(button)
+                }
+            }
+        }
+    }
+    asking?.let { button ->
+        // The safe answer first (docs/SPEC.md 7k, copy rule 9).
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(button.confirmTitle.orEmpty(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            CatalogRow("Cancel", null, null) { asking = null }
+            CatalogRow(button.label, null, null) {
+                asking = null
+                button.run(context)
+                onChanged()
             }
         }
     }

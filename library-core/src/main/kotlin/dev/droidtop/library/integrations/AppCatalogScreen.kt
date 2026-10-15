@@ -528,5 +528,5 @@ object AppCatalogScreen {
     internal fun grouped(hex: String): String = hex.lowercase().chunked(4).joinToString(" ").take(80)
 
     private fun relative(time: Long): String =
-        android.text.format.DateUtils.getRelativeTimeSpanString(time, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString()
+        dev.droidtop.library.format.ValueFormat.ago(System.currentTimeMillis(), time).replaceFirstChar { it.lowercase() }
 }

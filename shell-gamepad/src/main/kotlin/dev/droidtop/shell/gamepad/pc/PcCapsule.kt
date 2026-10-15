@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.labelCase
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -251,7 +253,7 @@ internal fun PcCapsule(
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
                     Text(
-                        entry.kindLine().uppercase(),
+                        entry.kindLine().labelCase(),
                         color = MenuTokens.Accent,
                         style = TypeRole.eyebrow,
                         maxLines = 1,
@@ -422,9 +424,9 @@ private fun KindMark(badge: KindBadge, modifier: Modifier) {
     val muted = MenuTokens.OnSurfaceMuted
     Text(
         buildAnnotatedString {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(badge.kind.word.uppercase()) }
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(badge.kind.word.labelCase()) }
             badge.detail?.let { detail ->
-                withStyle(SpanStyle(color = muted)) { append(" · ${detail.uppercase()}") }
+                withStyle(SpanStyle(color = muted)) { append(" · ${detail.labelCase()}") }
             }
         },
         color = MenuTokens.OnSurface,
@@ -479,6 +481,6 @@ internal fun focusLine(
     // The version-management fact a shelf or the grid owes the focused game:
     // a version a source knows of that this device does not have (docs/SPEC.md 7g).
     entry.availableUpdate?.let { add(GameUpdates.line(it)) }
-    entry.pcInfo?.sizeBytes?.takeIf { it > 0 }?.let { add(downloadSizeLabel(it)) }
+    entry.pcInfo?.sizeBytes?.takeIf { it > 0 }?.let { add(dev.droidtop.library.format.ValueFormat.size(it)) }
     if (parts > 1) add("$parts copies")
 }.joinToString(" · ")

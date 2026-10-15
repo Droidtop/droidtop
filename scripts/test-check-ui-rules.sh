@@ -22,6 +22,8 @@ fixture hex-colour app/src/main/kotlin/A.kt 'val c = Color(0xFF123456)'
 fixture deleted-names shell-gamepad/src/main/kotlin/A.kt 'MenuHint("Working")'
 fixture banned-words app/src/main/kotlin/A.kt 'Notice(NoticeTone.Caution, "The sandbox did not start")'
 fixture text-fields app/src/main/kotlin/A.kt 'BasicTextField(value = v, onValueChange = {})'
+fixture formatters app/src/main/kotlin/A.kt 'val s = String.format("%.1f GB", b / 1e9)'
+fixture hint-tip shell-gamepad/src/main/kotlin/A.kt 'HintTip("Why") { Text("Row") }'
 fixture permission-titles plugin-host/src/main/kotlin/A.kt 'PluginPermission("x", PermissionTier.DANGEROUS, "Run adb commands")'
 
 status=0
@@ -37,6 +39,7 @@ done
 # Allowlisted: the notice palette may set error roles in :ui-shared, and TextEntry is the one text field.
 fixture allowed ui-shared/src/main/kotlin/A.kt 'val c = MaterialTheme.colorScheme.error'
 fixture allowed ui-shared/src/main/kotlin/TextEntry.kt 'BasicTextField(value = v, onValueChange = {})'
+fixture allowed runtime-common/src/main/kotlin/ValueFormat.kt 'val s = String.format("%.1f GB", b / 1e9)'
 if ! "$check" --check --all --root "$tmp/allowed" >/dev/null; then echo "FAIL: an allowlisted site failed"; status=1; fi
 
 mkdir -p "$tmp/clean/app"
