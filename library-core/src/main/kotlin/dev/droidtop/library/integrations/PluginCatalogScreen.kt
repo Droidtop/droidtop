@@ -475,7 +475,8 @@ object PluginCatalogScreen {
                     id = "plugins_catalog_trust_${origin.origin}",
                     title = "Trust origin \"${origin.origin}\"",
                     subtitle = "New in this catalog. Key fingerprint $fingerprint: third-party, not official, and droidtop has not vetted it",
-                    confirmTitle = "Trust origin \"${origin.origin}\" ($fingerprint) from \"${source.name}\"?",
+                    // The fingerprint first: an armed row on the handheld shows this question in two lines at most.
+                    confirmTitle = "Trust key $fingerprint for origin \"${origin.origin}\" from \"${source.name}\"?",
                     run = { ctx, _ -> PluginCatalog.trustOrigin(ctx, source, origin.origin, origin.keyBase64) },
                 )
                 is PluginCatalog.OriginState.KeyChanged -> {
@@ -485,7 +486,7 @@ object PluginCatalogScreen {
                         title = "\"${origin.origin}\" has a new key",
                         subtitle = "You trust $trusted; this catalog now names $fingerprint. Its plugins here are not offered " +
                             "until you decide. Trust the new key only if its publisher said it changed it",
-                        confirmTitle = "Trust \"${origin.origin}\"'s new key $fingerprint in place of $trusted? Its plugins keep " +
+                        confirmTitle = "Trust new key $fingerprint for \"${origin.origin}\" in place of $trusted? Its plugins keep " +
                             "their approval and permissions." + if (source.indexSigned) "" else " This catalog's index is not signed.",
                         run = { ctx, _ -> PluginCatalog.replaceOriginKey(ctx, source, origin.origin, origin.keyBase64) },
                     )
