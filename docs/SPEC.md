@@ -19939,9 +19939,17 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   passes the apps and games as `local`). The PC library passes its games as
   `local` too, so the one list holds them (a row opens the game's page) and
   the grid behind still narrows to the same text, which is the Filter sheet's
-  Search row; the PC search also drops a source's result that names a console
-  system (`SourceDestinations.isPcResult`, so a Nyaa PSP or Vita torrent is
-  not a PC result). A console gamelist has its list on screen under the dialog
+  Search row; the PC search asks the sources for PC games
+  (`SourceDestinations.PC_PLATFORM`, the plugin API's `windows`) and also drops
+  a source's result that names a console system (`SourceDestinations.isPcResult`,
+  so a Nyaa PSP or Vita torrent is not a PC result). The result is judged by
+  everything it says about its platform, its platform field and its badges, and
+  a system is named whole or by a distinctive word of its name ("Vita",
+  "PlayStation"; "Sony", "Games" and numbers name nothing), because a source
+  writes a system the way its own site does. A section searches its own
+  systems: a console list asks for its system, the PC library for PC games
+  (Droidtop/tracker#485, 2026-10-14: PC Games search showed Nyaa PSP and Vita
+  results). A console gamelist has its list on screen under the dialog
   and narrows it live through `matchesSearchText`, so it passes no `local` and
   shows the match count above the sources' rows (the Select row reads "Search:
   <text>" while a search is on, and the search lasts as long as the gamelist

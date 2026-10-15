@@ -485,6 +485,9 @@ internal fun LibrarySearchDialog(
     switches: List<SearchSwitch> = emptyList(),
     // Drops a source's result this surface has no use for, before it is ranked.
     sourceFilter: ((dev.droidtop.library.integrations.AcquireContentResult) -> Boolean)? = null,
+    // What the sources are asked for when it is not a console system (the PC library asks for PC games), so they can
+    // narrow their own answer. A console list leaves it null and asks for its [systemId].
+    sourcePlatform: String? = null,
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
     // (Droidtop/tracker#376: a plain String field put the caret at the start).
@@ -537,11 +540,11 @@ internal fun LibrarySearchDialog(
 
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
-    LaunchedEffect(text, systemId, searchTick, localKey) {
+    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey) {
         UnifiedSearch.search(
             context = context,
             query = text,
-            platform = systemId,
+            platform = sourcePlatform ?: systemId,
             local = { q -> currentLocal?.invoke(q).orEmpty() },
             carry = state.sourceHits,
             keep = { result -> currentFilter?.invoke(result) ?: true },
