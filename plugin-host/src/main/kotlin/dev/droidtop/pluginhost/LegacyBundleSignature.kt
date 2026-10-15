@@ -22,7 +22,7 @@ import org.json.JSONObject
  * change keep running until they update. It is never used to install or
  * update: those need `manifest.jws` ([BundleSignature]).
  *
- * Revocation still reaches it: droidtop's Core-signed list stops a legacy
+ * Revocation still reaches it: droidtop's own list (signed under its root) stops a legacy
  * plugin by naming the legacy origin key's, the old master's or a certified
  * key's SPKI SHA-256, and the old stored lists ([OLD_REVOCATIONS],
  * [OLD_ORIGIN_REVOCATIONS]) are read as they are (nothing can extend them:

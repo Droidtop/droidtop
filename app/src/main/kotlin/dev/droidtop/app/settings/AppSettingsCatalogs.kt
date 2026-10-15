@@ -2934,8 +2934,8 @@ object AppSettingsCatalogs {
             "any other is one YOU chose to trust: third-party, not official, and droidtop has not vetted it",
         groups = { context ->
             val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
-            // The pinned Core key is read from the APK's resources on first use: off the main thread.
-            val coreFingerprint = withContext(Dispatchers.IO) { dev.droidtop.runtime.util.DroidtopCore.keySha256() }
+            // The pinned signing root is read from the APK's resources on first use: off the main thread.
+            val rootFingerprint = withContext(Dispatchers.IO) { dev.droidtop.runtime.util.DroidtopSigningRoot.keySha256() }
             val proposal = pendingKeyProposal
             listOf(
                 CatalogGroup(
@@ -2946,8 +2946,8 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "plugin_keys_official",
                                 title = PluginOriginKeys.OFFICIAL_ORIGIN,
-                                subtitle = "Official: certified inside droidtop itself. Droidtop Core key " +
-                                    (coreFingerprint?.take(16)?.chunked(4)?.joinToString(" ") ?: "not pinned in this build"),
+                                subtitle = "Official: certified inside droidtop itself. Signing root " +
+                                    (rootFingerprint?.take(16)?.chunked(4)?.joinToString(" ") ?: "not pinned in this build"),
                                 run = {},
                             ),
                         )

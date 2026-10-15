@@ -7,10 +7,10 @@ package dev.droidtop.runtime.util
  * (`catalog.json.jws` for the component catalog, `index.json.jws` for an added
  * plugin catalog), whose catalog-signing leaf names the catalog
  * (`urn:droidtop:catalog:<id>`). The component catalog's chain ends at
- * Droidtop Core ([DroidtopCore]); an added catalog's at the key the person
+ * droidtop's signing root ([DroidtopSigningRoot]); an added catalog's at the key the person
  * accepted for it. One format and one decision for every signed catalog.
  *
- * While this build pins no Droidtop Core the component catalog is accepted
+ * While this build pins no signing root the component catalog is accepted
  * unsigned ([Verdict.Unpinned]); once one is pinned a catalog without a valid
  * signature is refused, whatever the catalog says about itself, so removing
  * the file cannot downgrade a device to unsigned.

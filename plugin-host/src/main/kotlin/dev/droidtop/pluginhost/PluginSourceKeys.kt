@@ -70,9 +70,9 @@ object PluginSourceKeys {
      * DER) string fields, or `key` (a bare SubjectPublicKeyInfo) instead of
      * `certificate` -- the entire documented contract, so anything else is
      * "doesn't publish a key", not a versioned format to guess at. The anchor
-     * key returned is [UserOriginKeys.anchorKey]'s, so a certificate Droidtop
-     * Core issued for the origin anchors it at Core; what cannot be read is
-     * passed through for [fetchKey] to refuse.
+     * key returned is [UserOriginKeys.anchorKey]'s: the published root
+     * certificate's own key; what cannot be read is passed through for
+     * [fetchKey] to refuse.
      */
     fun parsePublishedKey(text: String): PublishedKey? {
         val json = runCatching { org.json.JSONObject(text) }.getOrNull() ?: return null

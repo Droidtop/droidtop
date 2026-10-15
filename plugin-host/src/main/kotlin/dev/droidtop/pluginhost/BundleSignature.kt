@@ -1,33 +1,32 @@
 package dev.droidtop.pluginhost
 
 import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.DroidtopCore
+import dev.droidtop.runtime.util.DroidtopSigningRoot
 import java.security.PublicKey
 import java.security.cert.X509Certificate
 
 /**
  * Where plugin trust is anchored (docs/SPEC.md 12a "Signatures: certificate
- * chains to Droidtop Core"). Keys are public material; no private key ever
- * appears in this repo.
+ * chains to droidtop's signing root"). Keys are public material; no private
+ * key ever appears in this repo.
  *
- * - The official origin's anchor is the pinned Droidtop Core public key
- *   ([DroidtopCore]). Every official plugin repository signs with its own key,
- *   derived from a master seed, whose certificate Core issued naming the
- *   origin; the bundle carries that chain in `manifest.jws`.
+ * - The official origin's anchor is droidtop's pinned signing root
+ *   ([DroidtopSigningRoot]). Every official plugin repository signs with its
+ *   own key, derived from that root, whose certificate the root issued naming
+ *   the origin; the bundle carries that chain in `manifest.jws`.
  * - Any other origin's anchor is the key the person confirmed for it in "Keys
  *   you trust" ([UserOriginKeys]), never this object's own: the person adds the
- *   source (or accepts a catalog) and droidtop reads the certificate it
- *   publishes. When that certificate was issued by Droidtop Core the stored
- *   anchor is Core's key, so an origin the owner certifies (gamegrab, romgi)
- *   verifies to Core while still being one the person chose to trust. Only the
- *   official origin ever yields "Official".
+ *   source (or accepts a catalog) and droidtop reads the root certificate it
+ *   publishes, whose own key becomes the anchor. gamegrab is one of these: it
+ *   has its own root, and is trusted only because the person added it. Only
+ *   the official origin ever yields "Official".
  */
 object PluginOriginKeys {
     /**
      * The one origin droidtop itself certifies. Shown as "Official" on the
      * Plugins screen, and the one id a user-trusted origin may never claim
      * (docs/SPEC.md 12a "Keys you trust"): [UserOriginKeys.add] refuses it,
-     * and [anchorFor] answers it from Droidtop Core before user keys are
+     * and [anchorFor] answers it from the signing root before user keys are
      * looked at, so even a hand-edited store entry can never shadow it.
      */
     const val OFFICIAL_ORIGIN = "droidtop"
@@ -36,7 +35,7 @@ object PluginOriginKeys {
     fun isOfficial(origin: String): Boolean = origin == OFFICIAL_ORIGIN
 
     /**
-     * The fingerprints official approval is bound to: Droidtop Core's and the
+     * The fingerprints official approval is bound to: the signing root's and the
      * legacy anchors' ([LegacyBundleSignature.officialFingerprints]). An
      * official plugin approved under any of them keeps its approval across an
      * update verified under another, so moving it to the certificate format is
@@ -44,7 +43,7 @@ object PluginOriginKeys {
      * updates").
      */
     fun officialAnchorFingerprints(): Set<String> =
-        (listOfNotNull(DroidtopCore.keySha256()) + LegacyBundleSignature.officialFingerprints()).toSet()
+        (listOfNotNull(DroidtopSigningRoot.keySha256()) + LegacyBundleSignature.officialFingerprints()).toSet()
 
     /** Whether approval under [approved] carries over to a bundle verified under [verified]: the same anchor, or both official anchors. */
     fun sameTrustAnchor(approved: String, verified: String): Boolean {
@@ -56,25 +55,25 @@ object PluginOriginKeys {
 
     /**
      * The ONE resolution path for the anchor an origin's chains must end at:
-     * Droidtop Core for the official origin, checked FIRST (null while this
+     * droidtop's signing root for the official origin, checked FIRST (null while this
      * build pins none), otherwise the user-trusted key `userKeys` carries
      * (origin -> SPKI base64, from [UserOriginKeys.loadBase64] -- nothing is
      * trusted from anywhere else) through [anchorForKey].
      */
     fun anchorFor(origin: String, userKeys: Map<String, String> = emptyMap()): ChainSignature.Anchor? {
-        val core = DroidtopCore.anchor()
+        val core = DroidtopSigningRoot.anchor()
         if (isOfficial(origin)) return core
         return userKeys[origin]?.let(::anchorForKey)
     }
 
     /**
-     * The anchor for a trusted key (an origin's, or an added catalog's master): Droidtop Core's pinned anchor when
-     * it is Core's own key, so the chain must stop below Core; otherwise the key itself. Null when it is not a key
+     * The anchor for a trusted key (an origin's, or an added catalog's master): the pinned signing root's anchor
+     * when it is the root's own key, so the chain must stop below it; otherwise the key itself. Null when it is not a key
      * droidtop can use.
      */
     fun anchorForKey(keyBase64: String): ChainSignature.Anchor? {
         val key = parseSpki(keyBase64) ?: return null
-        val core = DroidtopCore.anchor()
+        val core = DroidtopSigningRoot.anchor()
         return if (core != null && key.encoded.contentEquals(core.key.encoded)) core else ChainSignature.Anchor(key)
     }
 
@@ -122,8 +121,8 @@ object BundleSignature {
      * (docs/SPEC.md 12a, owner 2026-10-15).
      *
      * Revocation: droidtop's own list ([PluginRevocationList] built from
-     * Core-signed `revocations.jws`) applies to every chain that ends at
-     * Droidtop Core; an origin's own catalog list
+     * `revocations.jws` signed under the root) applies to every chain that
+     * ends at droidtop's signing root; an origin's own catalog list
      * ([PluginRevocationList.forOrigin]) applies to that origin alone.
      */
     fun verifyBundle(
@@ -136,7 +135,7 @@ object BundleSignature {
     ): BundleVerdict {
         val anchor = PluginOriginKeys.anchorFor(origin, userKeys) ?: return BundleVerdict.Refused(
             if (PluginOriginKeys.isOfficial(origin)) {
-                "this build of droidtop pins no Droidtop Core key to check official plugins with"
+                "this build of droidtop pins no signing root to check official plugins with"
             } else {
                 "no key you trust for origin \"$origin\""
             },
