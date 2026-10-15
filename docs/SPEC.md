@@ -14998,8 +14998,11 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   empty library reaches a search from the first minute, which is the one route PC Games takes with no game
   folder too (Droidtop/tracker#540). A ready source opens its search with no library system needed
   (`SourceScreens.entryScreen`): a source that serves only PC systems opens straight on the PC search,
-  any other asks "PC games" or the system, listing only the systems it serves; a source that is not ready
-  opens its page in Plugins, where approving or turning it on is. With no source installed the group is
+  any other asks "PC games" or the system, listing only the systems it serves; a source that is not ready,
+  or not allowed the `library.sources` point, opens a page that says why in one notice with the one way on
+  at the top (`AcquireContentSources.blockedScreen`): Allow it to get games (the point sheet) when only the
+  point waits, else Review and approve or Open its page in Plugins. It used to open that page straight
+  away, whose approval list is permission rows only, so the source looked empty (Droidtop/tracker#270). With no source installed the group is
   one row to Plugins, never a blank. The provider stays a detail: this is a row among where games come
   from, with its state in the value column, not a screen of its own. A store page's holding rows
   ("Shared with you · 573", Free to play) are pressable like Open library:
