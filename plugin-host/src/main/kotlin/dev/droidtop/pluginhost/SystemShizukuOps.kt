@@ -123,9 +123,9 @@ class SystemShizukuOps : ElevatedBackend {
         val err = Capture(process.errorStream).also { it.start() }
         return try {
             val bytes = process.inputStream.use { input -> input.readNBytesCompat(ElevatedFiles.MAX_READ_BYTES + 1) }
-            if (!process.waitFor(EXEC_TIMEOUT_MS, TimeUnit.MILLISECONDS)) return null
+            val exit = RemoteProcessWait.exitWithin(process, EXEC_TIMEOUT_MS) ?: return null
             err.join(STREAM_JOIN_MS)
-            bytes.takeIf { process.exitValue() == 0 && it.size <= ElevatedFiles.MAX_READ_BYTES }
+            bytes.takeIf { exit == 0 && it.size <= ElevatedFiles.MAX_READ_BYTES }
         } catch (t: Throwable) {
             null
         } finally {
@@ -146,7 +146,7 @@ class SystemShizukuOps : ElevatedBackend {
         val err = Capture(process.errorStream).also { it.start() }
         val written = try {
             process.outputStream.use { it.write(data) }
-            process.waitFor(FILE_TIMEOUT_MS, TimeUnit.MILLISECONDS) && process.exitValue() == 0
+            RemoteProcessWait.exitWithin(process, FILE_TIMEOUT_MS) == 0
         } catch (t: Throwable) {
             false
         } finally {
@@ -194,12 +194,11 @@ class SystemShizukuOps : ElevatedBackend {
         out.start()
         err.start()
         return try {
-            if (!process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)) {
-                null
-            } else {
+            // Not process.waitFor(timeout): see RemoteProcessWait.
+            RemoteProcessWait.exitWithin(process, timeoutMs)?.let { exit ->
                 out.join(STREAM_JOIN_MS)
                 err.join(STREAM_JOIN_MS)
-                ShellOutput(process.exitValue(), out.text(), err.text())
+                ShellOutput(exit, out.text(), err.text())
             }
         } finally {
             runCatching { process.destroy() }
