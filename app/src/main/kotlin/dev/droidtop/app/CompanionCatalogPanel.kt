@@ -275,8 +275,11 @@ private fun CatalogChoiceRow(item: ChoiceItem, onChanged: () -> Unit) {
 private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst: Boolean) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var status by remember(item) { mutableStateOf<String?>(null) }
-    var asking by remember(item) { mutableStateOf(false) }
+    // Keyed by the row's id, not the item: finishing an action re-reads the screen (onChanged), which builds new item
+    // objects, and a status kept per object vanished the moment the result arrived, so a tap on Check now showed
+    // nothing at all (rig, build 1809). The gamepad's Settings keeps statusById the same way.
+    var status by remember(item.id) { mutableStateOf<String?>(null) }
+    var asking by remember(item.id) { mutableStateOf(false) }
     val state = (item as? ActionItem)?.state
     val value = status ?: item.value ?: state?.let { if (it) "On" else "Off" }
     fun run() {
