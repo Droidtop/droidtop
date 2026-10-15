@@ -344,7 +344,7 @@ object PluginCatalog {
             val label = args[ARG_LABEL] ?: "The plugin"
             val version = args[ARG_VERSION].orEmpty()
             // The user-trusted keys too: a bundle from an origin the person trusted verifies like an official one.
-            when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)), hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context))) {
+            when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)), hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
                 is PluginInstallResult.Installed ->
                     if (result.record.trust == PluginTrustState.APPROVED) {
                         "Updated $label to $version"
@@ -679,6 +679,28 @@ object PluginCatalog {
             is AddKeyOutcome.KeyChanged ->
                 "\"$origin\" NOT trusted from this catalog: you trust a different key for it (${UserOriginKeys.fingerprint(outcome.stored.keyBase64)}, " +
                     "this catalog names ${UserOriginKeys.fingerprint(keyBase64)}), so its plugins here are not offered."
+            is AddKeyOutcome.Refused -> "\"$origin\" refused: ${outcome.reason}."
+        }
+    }
+
+    /**
+     * The person confirmed, seeing both fingerprints, that [origin]'s new key named by the added catalog [source] is
+     * its publisher's rotation and not someone else's key: [UserOriginKeys.replace] remembers the old key as this
+     * one's predecessor, so the origin's plugins update under it keeping their approval and grants, and the ones an
+     * update already sent back to waiting are approved again ([PluginStore.keyReplaced]). One decision for a publisher's
+     * key change, where it used to be removing the key, adding it again and approving every plugin (Droidtop/tracker#270).
+     */
+    fun replaceOriginKey(context: Context, source: PluginCatalogSource, origin: String, keyBase64: String?): String {
+        if (keyBase64 == null) return "\"$origin\": the catalog gives no usable key for it."
+        val file = UserOriginKeys.storeFile(context)
+        return when (val outcome = UserOriginKeys.replace(file, origin, keyBase64, source = source.indexUrl, catalog = source.id)) {
+            is AddKeyOutcome.Added -> {
+                val restored = PluginStore.keyReplaced(context, origin)
+                "Trusted \"$origin\"'s new key (${UserOriginKeys.fingerprint(keyBase64)})." +
+                    if (restored > 0) " $restored of its plugins waiting because of the change are approved again." else ""
+            }
+            AddKeyOutcome.AlreadyTrustedSameKey -> "\"$origin\" is already trusted with this same key."
+            is AddKeyOutcome.KeyChanged -> "\"$origin\"'s key changed again meanwhile. Open the catalog again to compare."
             is AddKeyOutcome.Refused -> "\"$origin\" refused: ${outcome.reason}."
         }
     }

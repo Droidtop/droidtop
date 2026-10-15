@@ -132,6 +132,39 @@ class UserOriginKeysTest {
     }
 
     @Test
+    fun `a confirmed replace makes the new key the old one's successor, and only that`() {
+        val file = store()
+        val first = freshKeyPair()
+        val second = freshKeyPair()
+        val third = freshKeyPair()
+        val firstSha = UserOriginKeys.keySha256(spkiBase64(first))!!
+        val secondSha = UserOriginKeys.keySha256(spkiBase64(second))!!
+        UserOriginKeys.add(file, "acme", spkiBase64(first), source = null)
+        assertFalse(UserOriginKeys.succeeds(file, "acme", firstSha, secondSha))
+
+        UserOriginKeys.replace(file, "acme", spkiBase64(second), source = null)
+
+        assertEquals(listOf(firstSha), UserOriginKeys.load(file)["acme"]?.previous)
+        assertTrue(UserOriginKeys.succeeds(file, "acme", firstSha, secondSha))
+        assertFalse("not for another origin", UserOriginKeys.succeeds(file, "other", firstSha, secondSha))
+        assertFalse("not for a key that is not the trusted one", UserOriginKeys.succeeds(file, "acme", firstSha, UserOriginKeys.keySha256(spkiBase64(third))!!))
+        // A second rotation keeps the whole line.
+        UserOriginKeys.replace(file, "acme", spkiBase64(third), source = null)
+        assertTrue(UserOriginKeys.succeeds(file, "acme", firstSha, UserOriginKeys.keySha256(spkiBase64(third))!!))
+    }
+
+    @Test
+    fun `removing a key and adding another records no succession`() {
+        val file = store()
+        val first = freshKeyPair()
+        val second = freshKeyPair()
+        UserOriginKeys.add(file, "acme", spkiBase64(first), source = null)
+        UserOriginKeys.remove(file, "acme")
+        UserOriginKeys.add(file, "acme", spkiBase64(second), source = null)
+        assertFalse(UserOriginKeys.succeeds(file, "acme", UserOriginKeys.keySha256(spkiBase64(first))!!, UserOriginKeys.keySha256(spkiBase64(second))!!))
+    }
+
+    @Test
     fun `remove stops trusting an origin, and only one that was trusted`() {
         val file = store()
         val pair = freshKeyPair()

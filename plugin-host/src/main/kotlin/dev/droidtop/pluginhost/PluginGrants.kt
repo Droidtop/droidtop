@@ -183,7 +183,7 @@ class PluginGrants(private val dir: File) {
      * and the rest follow [ticked] like any other.
      */
     fun initialiseOnApproval(record: PluginRecord, ticked: Set<String>? = null) = synchronized(LOCK) {
-        val on = ticked ?: defaultTicked(record)
+        val on = ticked ?: approvalTicked(record, readLocked(record.manifest.id))
         val states = linkedMapOf<String, GrantState>()
         for (declared in record.manifest.v2.permissions) {
             if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
@@ -321,6 +321,30 @@ class PluginGrants(private val dir: File) {
                 if (!v2 || !point.risk.needsConsent) add(PluginPermissions.PROVIDE_PREFIX + entry.point)
             }
             for (export in record.manifest.v2.exports) add(EXPORT_PREFIX + export.grantKey)
+        }
+
+        /**
+         * What the approval list starts as for [record] given what was stored for it before ([snapshot]): an item the
+         * person had answered keeps that answer (allowed ticked, blocked unticked), and only what was never answered
+         * starts as [defaultTicked]. A plugin sent back to waiting by an update signed with another key, or approved
+         * again after it was denied, is not reset to the defaults that block every high-risk point
+         * (Droidtop/tracker#270); the person still sees every tick before approving.
+         */
+        fun approvalTicked(record: PluginRecord, snapshot: Snapshot): Set<String> {
+            val defaults = defaultTicked(record)
+            if (snapshot.corrupt || snapshot.states.isEmpty()) return defaults
+            val items = buildList {
+                record.manifest.v2.permissions.filterNot { it.id.startsWith(PluginPermissions.PROVIDE_PREFIX) }.forEach { add(it.id) }
+                record.manifest.v2.provides.forEach { add(PluginPermissions.PROVIDE_PREFIX + it.point) }
+                record.manifest.v2.exports.forEach { add(EXPORT_PREFIX + it.grantKey) }
+            }
+            return items.filterTo(LinkedHashSet()) { item ->
+                when (snapshot.states[item]) {
+                    GrantState.GRANTED -> true
+                    GrantState.DENIED -> false
+                    else -> item in defaults
+                }
+            }
         }
 
         /** The tier a declared permission is asked at. An id the registry does not know is a provider's own permission: asked like a dangerous one. */

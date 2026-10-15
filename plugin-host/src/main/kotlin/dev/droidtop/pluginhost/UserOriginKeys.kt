@@ -34,6 +34,12 @@ data class UserOriginKey(
      * person accepted to get this key, or null. A plugin from such an origin is badged "Unofficial".
      */
     val catalog: String? = null,
+    /**
+     * The SHA-256 (lowercase hex of the SPKI) of every key this origin's key replaced through [UserOriginKeys.replace],
+     * the person's confirmed rotation: a plugin approved under one of them that is now signed by this key is an update
+     * of the same publisher, not a new trust decision ([UserOriginKeys.succeeds], Droidtop/tracker#270).
+     */
+    val previous: List<String> = emptyList(),
 )
 
 /** What [UserOriginKeys.add] (or [UserOriginKeys.replace]) decided, verbatim on the settings screen. */
@@ -64,6 +70,8 @@ sealed interface AddKeyOutcome {
 object UserOriginKeys {
     private const val STORE_NAME = "plugin-user-keys.json"
     private const val MAX_ORIGIN_ID_LEN = 64
+    private const val MAX_PREVIOUS = 16
+    private val HEX64 = Regex("[0-9a-f]{64}")
 
     fun storeFile(context: Context): File = File(context.filesDir, STORE_NAME)
 
@@ -78,7 +86,8 @@ object UserOriginKeys {
                 val source = if (entry.isNull("source")) null else entry.optString("source").takeIf { it.isNotBlank() }
                 val repo = if (entry.isNull("repo")) null else entry.optString("repo").takeIf { it.isNotBlank() }
                 val catalog = if (entry.isNull("catalog")) null else entry.optString("catalog").takeIf { it.isNotBlank() }
-                put(key, UserOriginKey(origin = key, keyBase64 = keyBase64, source = source, repo = repo, catalog = catalog))
+                val previous = entry.optJSONArray("previous")?.let { list -> (0 until list.length()).mapNotNull { list.optString(it).lowercase().takeIf { h -> h.matches(HEX64) } } }.orEmpty()
+                put(key, UserOriginKey(origin = key, keyBase64 = keyBase64, source = source, repo = repo, catalog = catalog, previous = previous))
             }
         }
     }
@@ -95,6 +104,7 @@ object UserOriginKeys {
                     entry.source?.let { put("source", it) }
                     entry.repo?.let { put("repo", it) }
                     entry.catalog?.let { put("catalog", it) }
+                    if (entry.previous.isNotEmpty()) put("previous", org.json.JSONArray(entry.previous))
                 },
             )
         }
@@ -189,17 +199,44 @@ object UserOriginKeys {
      * (docs/SPEC.md 12a), which showed both fingerprints first. Same
      * validation and same-key shortcut as [add].
      */
-    fun replace(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null): AddKeyOutcome {
+    fun replace(file: File, origin: String, keyBase64: String, source: String?, repo: String? = null, catalog: String? = null): AddKeyOutcome {
         val id = origin.trim()
         originProblem(id)?.let { return AddKeyOutcome.Refused(it) }
         val key = anchorKey(id, keyBase64) ?: return AddKeyOutcome.Refused(UNUSABLE)
         val stored = load(file)
         val existing = stored[id] ?: return AddKeyOutcome.Refused("no trusted key for origin \"$id\" to replace")
         if (fingerprint(key) == fingerprint(existing.keyBase64)) return AddKeyOutcome.AlreadyTrustedSameKey
-        val entry = UserOriginKey(origin = id, keyBase64 = key, source = source?.trim()?.takeIf { it.isNotBlank() }, repo = repo)
+        // The replaced key is remembered as this one's predecessor: plugins approved under it carry over (Droidtop/tracker#270).
+        val replaced = listOfNotNull(keySha256(existing.keyBase64)) + existing.previous
+        val entry = UserOriginKey(
+            origin = id,
+            keyBase64 = key,
+            source = source?.trim()?.takeIf { it.isNotBlank() },
+            repo = repo,
+            catalog = catalog ?: existing.catalog,
+            previous = replaced.distinct().take(MAX_PREVIOUS),
+        )
         runCatching { save(file, stored + (id to entry)) }
             .onFailure { return AddKeyOutcome.Refused("couldn't save the key: ${it.message}") }
         return AddKeyOutcome.Added(entry)
+    }
+
+    /**
+     * Whether [verifiedKeySha256], the key a plugin of [origin] is signed by now, is the person's confirmed successor of
+     * [approvedKeySha256], the key it was approved under: the origin's trusted key now, with the approved one among the
+     * keys it replaced ([UserOriginKey.previous]). Removing the origin and adding it again records nothing, so it stays
+     * a new trust decision.
+     */
+    fun succeeds(file: File, origin: String, approvedKeySha256: String, verifiedKeySha256: String): Boolean {
+        val entry = load(file)[origin] ?: return false
+        if (keySha256(entry.keyBase64) != verifiedKeySha256.lowercase()) return false
+        return approvedKeySha256.lowercase() in entry.previous
+    }
+
+    /** [succeeds] against this device's store, in the shape [PluginBundleInstaller.install] takes. */
+    fun successorCheck(context: Context): (String, String, String) -> Boolean {
+        val file = storeFile(context)
+        return { origin, approved, verified -> succeeds(file, origin, approved, verified) }
     }
 
     /** The repository ("owner/name") whose key [origin] is trusted under, for the "Verified by" badge; null for a key not added through a repository. */

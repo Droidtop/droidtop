@@ -322,6 +322,28 @@ class PluginBundleInstallerTest {
     }
 
     @Test
+    fun `an update signed by the confirmed successor of the approved key carries approval and grants over`() {
+        val pair = freshKeyPair()
+        val rotated = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        val first = trusting("testorigin", pair) {
+            (install(buildBundle("testorigin", pair), pluginsRoot) as PluginInstallResult.Installed).record
+        }
+        approve(pluginsRoot, first)
+        PluginGrants.forPluginsRoot(pluginsRoot).setCategory(first.manifest.id, "network", GrantState.DENIED)
+        trusting("testorigin", rotated) {
+            val updated = buildBundle("testorigin", rotated, payloadBytes = "payload, version two".toByteArray())
+            val result = PluginBundleInstaller.install(updated, pluginsRoot, trusted, succeeds = { origin, approved, verified ->
+                origin == "testorigin" && approved == first.approvedKeySha256 && verified != approved
+            })
+            val record = (result as PluginInstallResult.Installed).record
+            assertEquals(PluginTrustState.APPROVED, record.trust)
+            assertTrue(record.enabled)
+            assertEquals(GrantState.DENIED, PluginGrants.forPluginsRoot(pluginsRoot).read(record.manifest.id).states[PluginPermissionPolicy.categoryKey("network")])
+        }
+    }
+
+    @Test
     fun `an update of a denied plugin does not carry the denial state over, but never approves either`() {
         val pair = freshKeyPair()
         val pluginsRoot = tmp.newFolder("plugins")
