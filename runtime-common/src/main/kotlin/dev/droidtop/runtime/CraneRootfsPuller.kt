@@ -58,7 +58,7 @@ class CraneRootfsPuller(
     override suspend fun resolve(reference: String): RootfsImage =
         RootfsImage(reference = reference, digest = Crane.digest(binaryPath(), reference))
 
-    override suspend fun pullAndUnpack(image: RootfsImage, destinationPath: String, policy: ImageCachePolicy) {
+    override suspend fun pullAndUnpack(image: RootfsImage, destinationPath: String, policy: ImageCachePolicy): ImageRunConfig? {
         val resolved = if (image.digest != null) image else resolve(image.reference)
         val digest = resolved.digest!!
 
@@ -70,14 +70,17 @@ class CraneRootfsPuller(
         // extracting over an existing tree silently merges two images into
         // one broken rootfs. Checked before pulling, so a restart never
         // touches the registry.
-        if (unpacker.isCurrent(destinationPath, digest)) return
+        if (unpacker.isCurrent(destinationPath, digest)) return null
 
         val stored = store.pull(resolved)
+        // Read before the cache policy may evict it (docs/SPEC.md 3, "The image's own program").
+        val runConfig = runCatching { ImageRunConfig.fromImageConfig(store.blob(stored.config.digest).readText()) }.getOrNull()
         unpacker.wipe(destinationPath)
         unpacker.extract(RootfsContent { sink -> OciFlattener.flatten(store, stored, sink) }, destinationPath)
         unpacker.markComplete(destinationPath, digest)
 
         if (policy.enabled) store.evictToFit(policy, keep = digest) else store.remove(digest)
+        return runConfig
     }
 
     companion object {

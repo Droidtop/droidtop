@@ -13,6 +13,7 @@ import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerSockets
 import dev.droidtop.runtime.EnvironmentMounts
+import dev.droidtop.runtime.ImageRunConfig
 import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
@@ -144,7 +145,8 @@ class DroidSpacesRuntime(
         // leaked 08-27 processes were still mounted over.
         RootProcess.run(binaryPath, "--name=$name", "stop")
         val rootfsPath = File(rootfsDir, name).absolutePath
-        rootfsPuller.pullAndUnpack(image, rootfsPath, cachePolicy)
+        val runConfig = rootfsPuller.pullAndUnpack(image, rootfsPath, cachePolicy)
+        runConfig?.let { withContext(Dispatchers.IO) { runConfigFile(name).apply { parentFile?.mkdirs() }.writeText(ImageRunConfig.encode(it)) } }
         writeInit(rootfsPath, provisioning)
         withContext(Dispatchers.IO) { writeImageRecord(name, image) }
         if (provisioning != null) withContext(Dispatchers.IO) { writeProvisioning(name, provisioning) }
@@ -364,6 +366,7 @@ class DroidSpacesRuntime(
         provisioningFile(container.id).delete()
         socketsFile(container.id).delete()
         mountsFile(container.id).delete()
+        runConfigFile(container.id).delete()
         names.remove(container.id)
         // Root-owned tree, symlinks inside, possible live bind mounts
         // over it: exactly the job RootfsDelete exists for. A refusal
@@ -440,6 +443,13 @@ class DroidSpacesRuntime(
     // ---- home and folders (docs/SPEC.md 3d "Home and folders") ----
 
     private fun mountsFile(name: String) = File(configsDir, "$name.mounts")
+
+    /** How the image says its own program runs, kept from creation (docs/SPEC.md 3, "The image's own program"). */
+    private fun runConfigFile(name: String) = File(configsDir, "$name.imageconfig")
+
+    override suspend fun imageRunConfig(container: Container): ImageRunConfig? = withContext(Dispatchers.IO) {
+        runConfigFile(container.id).takeIf { it.isFile }?.let { ImageRunConfig.fromImageConfig(it.readText()) }
+    }
 
     private fun readMounts(name: String): EnvironmentMounts =
         EnvironmentMounts.decode(mountsFile(name).takeIf { it.isFile }?.readText().orEmpty())

@@ -1545,7 +1545,7 @@ differ only in the `RootfsUnpacker` that writes the tree.
   `blobs/sha256/`), which `crane pull --format=oci --platform <this ABI>`
   appends to. Blobs are content-addressed, so a layer shared by two images
   is downloaded and stored once, and the image config (Env, User,
-  Entrypoint) is kept; nothing reads it yet. It replaced a `.tar` per image
+  Entrypoint) is kept (read since 2026-10-15, below). It replaced a `.tar` per image
   from `crane export`, which duplicated every shared layer and threw the
   config away; the old `files/image-cache` is deleted on first use. Each
   `index.json` entry is annotated with the digest it was pulled by (for a
@@ -1557,6 +1557,19 @@ differ only in the `RootfsUnpacker` that writes the tree.
   including an interrupted pull's leftovers; all layout changes run under
   one process-wide lock, since a collection beside a pull would delete the
   layers it just wrote.
+- *The image's own program* (Droidtop/tracker#555 D6a, 2026-10-15). After
+  unpacking, `CraneRootfsPuller.pullAndUnpack` reads the image config's
+  `config` object (`ImageRunConfig`: Env, Entrypoint, Cmd, WorkingDir,
+  User) before the cache policy can evict it, and the container keeps it
+  beside its own config (proot `image-config.json`, droidspaces
+  `<name>.imageconfig`), read back through `ContainerRuntime.imageRunConfig`.
+  The program is the entrypoint followed by the command, and arguments
+  replace the command, never the entrypoint, as Docker runs it. A base
+  image (alpine, debian) names none. The container page shows a section
+  "Its own program" (the program as a shell line, its working folder and
+  environment, and a note when the image asks for a user other than root,
+  since containers here run everything as root) when the image names one.
+  Running it, with a log and a lifecycle, is D6b.
 - *The flattener* reads the layers top first, so the first time a path is
   seen is its final version, and applies whiteouts (`.wh.<name>`, and
   `.wh..wh..opq` for an opaque directory) to the layers below theirs. What
