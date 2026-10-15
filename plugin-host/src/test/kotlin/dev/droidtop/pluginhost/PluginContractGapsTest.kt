@@ -65,4 +65,23 @@ class PluginContractGapsTest {
         val none = TestPlugins.record(TestPlugins.manifest(id = "acme.none"))
         assertNull(PluginWebAccount.checkUrl(none))
     }
+
+    @Test
+    fun `an entry's title follows the point's name and is cut`() {
+        assertEquals("Status tiles and widgets", ProvidedPoint("ui.status_tile").titled("Status tiles and widgets"))
+        assertEquals("Status tiles and widgets", ProvidedPoint("ui.status_tile", label = " status tiles and widgets ").titled("Status tiles and widgets"))
+        assertEquals("Status tiles and widgets: Save state", ProvidedPoint("ui.status_tile", label = "Save state").titled("Status tiles and widgets"))
+        val long = ProvidedPoint("ui.status_tile", label = "x".repeat(60)).titled("Tiles")
+        assertEquals("Tiles: ".length + ProvidedPoint.LABEL_MAX, long.length)
+        assertTrue(long.endsWith("\u2026"))
+    }
+
+    @Test
+    fun `a view's empty sentence is read and cut`() {
+        val view = PluginView.parse(JSONObject().put("view", 1).put("sections", JSONArray()).put("empty", "Saves you make appear here"))!!
+        assertEquals("Saves you make appear here", view.empty)
+        assertNull(PluginView.parse(JSONObject().put("view", 1).put("sections", JSONArray()))!!.empty)
+        val long = PluginView.parse(JSONObject().put("view", 1).put("sections", JSONArray()).put("empty", "y".repeat(400)))!!
+        assertEquals(PluginViewLimits.length("noticeSubtitle"), long.empty!!.length)
+    }
 }

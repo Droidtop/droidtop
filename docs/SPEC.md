@@ -15332,6 +15332,13 @@ A condition the person should know about (an unofficial plugin, a feature that i
 - **Tiles that need a game.** A tile entry with `"whileGame": true` shows only while a game runs; with `gamePackages` only while one of those apps runs it (`PluginTileProtocol.forGame`, read from `LaunchDisplay`).
 All of it is additive to the contract (plugin-api.md 7 changelog): an older plugin keeps working, and loses only the hand-made versions once it moves to these.
 
+**The rest of the plugin page is droidtop's too (Droidtop/tracker#521 items 3, 6, 9 and 10, decided 2026-10-15).** The same rule, applied to what the dual-screen review found every plugin drawing in its own words:
+- **An entry's name.** A `provides` entry's `label` follows the point's name and never replaces it ("Status tiles and widgets: VPN", `ProvidedPoint.titled`, the label cut at 40), on the approval list and Permissions, so a plugin can say which of its entries a row is but never pose as another point.
+- **An empty page** is droidtop's Info notice "Nothing here yet" from the plugin with Refresh, carrying the view's optional `empty` sentence; no plugin "No items" row.
+- **A finished job** says so on the page that started it: the job's own `notice`, or droidtop's Info notice "Finished" with the job's `message` as its body (a bare "Done" adds nothing). There is no success tone: the tones stay Info, Caution and Danger, as #485 decided.
+- **A list's notice** (a catalog's `disclaimer`) is drawn under droidtop's caution card "Notice from the list" (or "The list's notice changed"), marked as from the list, with the text in full below it as before and Accept still opening only once it was read. Both titles are reserved, so no plugin notice can pose as one.
+Not in this step, and why: item 1's danger and success tones for plugins (danger is droidtop's own by the #485 decision, and a success tone needs a colour in Droidtop/notices); items 2, 5, 7 and 8 change the manifest and view schema and come as their own step; a host loading state with a timeout stays the renderers' "Loading <title>".
+
 **Copy rules** (every string a person reads in a notice, a dialog or a field; also in DESIGN-LANGUAGE "Copy"):
 
 1. Labels are three words or fewer: verbs for actions, nouns for settings.
@@ -19401,8 +19408,9 @@ what the index says is display data, never a trust decision.
   - **Adding is fetch, review, Accept.** Fetching replaces the screen
     with the review (the add form is not under it): the catalog's name with
     an "Unofficial" chip and "not part of droidtop and not vetted by it",
-    its disclaimer text IN FULL as paragraphs on the screen above Accept
-    (`TextBlockItem`, scrolled with the pad or the finger; never a hint, a
+    its disclaimer text IN FULL as paragraphs on the screen above Accept,
+    under droidtop's caution card "Notice from the list" (Droidtop/tracker#521
+    item 10; `TextBlockItem`, scrolled with the pad or the finger; never a hint, a
     tooltip or a sheet behind Y), and under it as rows its address,
     whether it is signed, the catalog key's fingerprint and one row per
     publisher (origin) with its key fingerprint in the value column and in

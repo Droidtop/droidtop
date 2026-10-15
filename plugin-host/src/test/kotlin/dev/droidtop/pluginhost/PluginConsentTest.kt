@@ -71,7 +71,8 @@ class PluginConsentTest {
 
         // One tick box per point, under the first mode it shows in.
         assertEquals(listOf("Gaming", "Wherever it fits"), view.adds.map { it.first })
-        assertEquals("VPN", view.adds[0].second.single().title)
+        // The point's name leads and the entry's own title follows it (Droidtop/tracker#521 item 3).
+        assertEquals("Status tiles and widgets: VPN", view.adds[0].second.single().title)
         val sources = view.adds[1].second.single()
         assertEquals("Get games from a source", sources.title)
         assertEquals("provide:library.sources", sources.id)

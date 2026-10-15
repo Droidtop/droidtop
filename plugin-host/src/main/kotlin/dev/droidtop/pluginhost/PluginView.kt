@@ -18,6 +18,11 @@ data class PluginView(
     val title: String?,
     val subtitle: String?,
     val sections: List<ViewSection>,
+    /**
+     * The plugin's one sentence for a view with nothing in it ("Saves you make appear here"), shown in droidtop's own
+     * "Nothing here yet" notice (Droidtop/tracker#521 item 6); null for droidtop's words alone.
+     */
+    val empty: String? = null,
 ) {
     /** Every input node's current value as the string droidtop sends back in `values`. */
     fun initialValues(): Map<String, String> = buildMap {
@@ -101,6 +106,7 @@ data class PluginView(
                 title = json.text("title")?.cut(MAX_TITLE),
                 subtitle = json.text("subtitle")?.cut(MAX_SUBTITLE),
                 sections = sections,
+                empty = json.text("empty")?.cut(PluginViewLimits.length("noticeSubtitle")),
             )
         }
     }

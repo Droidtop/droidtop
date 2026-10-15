@@ -9,6 +9,7 @@
     "view": { "const": 1 },
     "title": { "type": ["string", "null"] },
     "subtitle": { "type": ["string", "null"] },
+    "empty": { "type": ["string", "null"], "description": "One sentence for a view with nothing in it, shown in droidtop's own \"Nothing here yet\" notice (at most the notice subtitle length; cut beyond). Optional: without it droidtop's words stand alone." },
     "sections": {
       "type": "array",
       "maxItems": 12,
