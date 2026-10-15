@@ -5575,6 +5575,14 @@ class -- a delete that can leave the tree it was pointed at:
   still removed, links stay plain entries that are unlinked and never
   entered, and `SafeDelete.clearWithin` returns the first reason so setup
   says why instead of "nothing was deleted".
+  Fence (Droidtop/tracker#249, console 2026-10-14): gamenative's
+  installer makes `imagefs/home` a symlink to `imagefs_shared/home`, so a
+  half-made prefix is really in `imagefs_shared/home/xuser-1` and a fence
+  of `imagefs` refuses it ("is not inside"). The fence is the home root
+  itself (`ImageFsHome.root`): the image's own `home` when it is a real
+  directory, `imagefs_shared/home` only when the link resolves to exactly
+  that directory, and a refusal (setup says why) for a link anywhere else.
+  The fence is never widened to `files/` or to a link's target.
 - **`DroidSpacesRuntime.destroy` / `CraneRootfsPuller` stale-rootfs
   wipe**: both previously hazardous. `destroy` used Kotlin's
   `deleteRecursively` on a Linux rootfs -- a tree full of symlinks,
