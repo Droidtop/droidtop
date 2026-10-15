@@ -957,6 +957,8 @@ fun CatalogNavigator(
                 onLongClick = { index ->
                     inColumn = false
                     setSelected(index)
+                    // Reading about a row never leaves it armed: the next press after Info is a fresh first press.
+                    confirmArmedId = null
                     rows.getOrNull(index)?.let { infoRow = it.item }
                 },
                 // The touch route to Left/Right. A SliderItem does nothing
@@ -1030,7 +1032,12 @@ private fun CatalogPane(
     // The selected row's explanation goes in a strip of its own under the list, never in a bubble over
     // the next row (Droidtop/tracker#495); armed, the row says what pressing again will do (the app and
     // the exact permission or file) in place of its hint, at once.
-    val tipRow = rows.getOrNull(selected)?.takeIf { active && PadModality.showsFocus && it.item !is TextBlockItem }
+    // An armed row says what pressing again does under touch too: tapped, it used to arm with only "press A again" in
+    // its title, so a person never saw the key fingerprint they were trusting, and the next tap on the row confirmed
+    // (rig, build 1908, Droidtop/tracker#270).
+    val tipRow = rows.getOrNull(selected)?.takeIf {
+        active && (PadModality.showsFocus || (confirmArmedId == it.item.id && it.item.confirmText != null)) && it.item !is TextBlockItem
+    }
     val tipArmed = tipRow != null && confirmArmedId == tipRow.item.id && tipRow.item.confirmText != null
     // With "Info text: Under each row" a row's sentence is on the row itself, and the focus line keeps only
     // what changes (a status, an armed confirmation); the screen's own explanation is the line's fallback.
@@ -1575,7 +1582,7 @@ private fun CatalogRowView(
     val value = if (toggle != null) null else catalogRowValue(item, context)
     val placeholder = status == null && value == null && item is TextInputItem
     MenuRow(
-        title = if (confirmArmed) "${item.title}: press A again to confirm" else item.title,
+        title = if (confirmArmed) "${item.title}: ${if (PadModality.showsFocus) "press A" else "tap"} again to confirm" else item.title,
         value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
         chip = item.chip,
         placeholder = placeholder,
@@ -1599,6 +1606,7 @@ private fun CatalogRowView(
         subtitle = item.subtitle.takeIf { infoUnderRow },
         uniformSummaryLines = if (infoUnderRow && item.subtitle != null) 2 else 0,
         info = !infoUnderRow && hasInfo(item),
+        onInfo = onLongClick,
         // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
         switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
         sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },

@@ -3100,8 +3100,8 @@ object AppSettingsCatalogs {
                     } else {
                         "You trusted fingerprint $existingFingerprint; this fetch publishes $fingerprint. A changed key can " +
                             "mean the source rotated it, or that the source or this fetch is compromised, and droidtop cannot " +
-                            "tell the two apart. Nothing has been changed yet; replacing the stored key means plugins signed " +
-                            "by the OLD key stop running."
+                            "tell the two apart. Nothing has been changed yet. Replacing the stored key keeps its plugins " +
+                            "approved: each runs again once it updates to a version signed by the new key."
                     },
                     run = {},
                 ),
@@ -3117,10 +3117,12 @@ object AppSettingsCatalogs {
                     } else {
                         "Only do this if you have reason to believe the source really rotated its key"
                     },
+                    // The fingerprints first: an armed row on the handheld shows this question in two lines at most.
                     confirmTitle = if (proposal.existing == null) {
-                        "Trust origin \"${proposal.origin}\" and everything it signs?"
+                        "Trust key $fingerprint for origin \"${proposal.origin}\" and everything it signs?"
                     } else {
-                        "Replace the trusted key for \"${proposal.origin}\"? Plugins signed by the old key will stop running."
+                        "Trust new key $fingerprint for \"${proposal.origin}\" in place of $existingFingerprint? Its plugins keep " +
+                            "their approval when they update."
                     },
                     run = { ctx, _ -> commitTrustedKey(ctx, proposal) },
                 ),
