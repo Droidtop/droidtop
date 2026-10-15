@@ -116,7 +116,7 @@ abstract class PluginProcessService : Service() {
                     val labels = names.orEmpty()
                     if (fds.size != labels.size) return failLoad(pluginId, "its files arrived without names")
                     val started = android.os.SystemClock.uptimeMillis()
-                    Log.i("droidtop.plugin", "$pluginId: loading ${manifest.kind.id} from ${fds.size} descriptors, ${started - android.os.Process.getStartUptimeMillis()} ms after this process started")
+                    Log.i("droidtop.plugin", "$pluginId ${manifest.version}: loading ${manifest.kind.id} from ${fds.size} descriptors, ${started - android.os.Process.getStartUptimeMillis()} ms after this process started")
                     return loadFromFiles(pluginId, manifest, labels.zip(fds).toMap(), broker).also {
                         Log.i("droidtop.plugin", "$pluginId: load ${if (it) "done" else "refused"} in ${android.os.SystemClock.uptimeMillis() - started} ms")
                     }

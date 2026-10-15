@@ -3,6 +3,7 @@ package dev.droidtop.pluginhost
 import dev.droidtop.runtime.util.Sha256
 
 import java.io.File
+import java.security.MessageDigest
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
@@ -43,6 +44,11 @@ object PluginBundleInstaller {
     private const val MAX_MANIFEST_BYTES = 64 * 1024
     private const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
 
+    /** The bundle's trust files: small, read whole; every other entry is payload and is streamed to disk. */
+    private val TRUST_FILES = setOf("manifest.json", "manifest.sig", PluginCertificates.FILE_NAME)
+
+    private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
+
     fun install(
         bundleFile: File,
         pluginsRoot: File,
@@ -51,10 +57,35 @@ object PluginBundleInstaller {
         /** The permissions droidtop's own manifest requests ([AndroidPermissions.heldBy]); null skips that check (tests). */
         hostPermissions: Set<String>? = null,
     ): PluginInstallResult {
-        val entries = linkedMapOf<String, ByteArray>()
+        // Entries are streamed to a staging folder on disk and hashed as they go: a bundle carrying both ABIs of an
+        // engine is tens of MiB, and several installs run at once (Update all), so none of it is held in the heap
+        // (Droidtop/tracker#545). Only the three small trust files are read into memory, each under its cap.
+        val staging = File(pluginsRoot.absoluteFile.parentFile ?: pluginsRoot, ".plugin-install-" + System.nanoTime()).also { it.mkdirs() }
+        try {
+            return installStaged(bundleFile, pluginsRoot, staging, userKeys, nowEpochSeconds, hostPermissions)
+        } finally {
+            staging.deleteRecursively()
+        }
+    }
+
+    /** One non-trust bundle entry after it was streamed to disk: where it is and its SHA-256. */
+    private class Staged(val file: File, val sha256: String)
+
+    private fun installStaged(
+        bundleFile: File,
+        pluginsRoot: File,
+        staging: File,
+        userKeys: Map<String, String>,
+        nowEpochSeconds: Long,
+        hostPermissions: Set<String>?,
+    ): PluginInstallResult {
+        val small = linkedMapOf<String, ByteArray>()
+        val staged = linkedMapOf<String, Staged>()
         try {
             TarArchiveInputStream(XZCompressorInputStream(bundleFile.inputStream().buffered())).use { tar ->
                 var entry: TarArchiveEntry? = tar.nextTarEntry
+                var count = 0
+                val buffer = ByteArray(64 * 1024)
                 while (entry != null) {
                     if (!entry.isDirectory) {
                         if (entry.size > MAX_ENTRY_BYTES) {
@@ -68,21 +99,46 @@ object PluginBundleInstaller {
                         if (File(name).normalize().path.startsWith("..")) {
                             return PluginInstallResult.Refused(PluginInstallError("bundle entry escapes its own directory: ${entry.name}"))
                         }
-                        entries[name] = tar.readBytes()
+                        if (name in TRUST_FILES) {
+                            if (entry.size > MAX_MANIFEST_BYTES) {
+                                return PluginInstallResult.Refused(PluginInstallError("$name exceeds the ${MAX_MANIFEST_BYTES / 1024} KiB cap"))
+                            }
+                            small[name] = tar.readBytes()
+                        } else {
+                            // Staged under a counter, never under the bundle's own name: the name is only a key.
+                            val target = File(staging, "f" + count++)
+                            val digest = MessageDigest.getInstance("SHA-256")
+                            target.outputStream().buffered().use { out ->
+                                var left = MAX_ENTRY_BYTES
+                                while (true) {
+                                    val read = tar.read(buffer)
+                                    if (read < 0) break
+                                    left -= read
+                                    if (left < 0) return PluginInstallResult.Refused(PluginInstallError("$name is larger than the ${MAX_ENTRY_BYTES / (1024 * 1024)} MiB per-file cap"))
+                                    digest.update(buffer, 0, read)
+                                    out.write(buffer, 0, read)
+                                }
+                            }
+                            staged.remove(name)?.file?.delete()
+                            staged[name] = Staged(target, digest.digest().toHexString())
+                        }
                     }
                     entry = tar.nextTarEntry
                 }
             }
+        } catch (e: OutOfMemoryError) {
+            // The xz dictionary a bundle asks for is the one thing left that sizes memory: a refusal on its row, never a crash.
+            return PluginInstallResult.Refused(PluginInstallError("couldn't read the bundle: it needs more memory than droidtop can spare"))
         } catch (e: Exception) {
             return PluginInstallResult.Refused(PluginInstallError("couldn't read the bundle: ${e.message}"))
         }
 
-        val manifestBytes = entries["manifest.json"]
+        val manifestBytes = small["manifest.json"]
             ?: return PluginInstallResult.Refused(PluginInstallError("bundle has no manifest.json"))
         if (manifestBytes.size > MAX_MANIFEST_BYTES) {
             return PluginInstallResult.Refused(PluginInstallError("manifest.json exceeds the ${MAX_MANIFEST_BYTES / 1024} KiB cap"))
         }
-        val signatureBase64 = entries["manifest.sig"]?.toString(Charsets.US_ASCII)
+        val signatureBase64 = small["manifest.sig"]?.toString(Charsets.US_ASCII)
             ?: return PluginInstallResult.Refused(PluginInstallError("bundle has no manifest.sig"))
 
         val manifest = runCatching { PluginManifest.fromJson(JSONObject(manifestBytes.toString(Charsets.UTF_8))) }
@@ -99,7 +155,7 @@ object PluginBundleInstaller {
         }
 
         // Checklist point 3: signature and schema before anything else touches disk as "the plugin".
-        val certificateText = entries[PluginCertificates.FILE_NAME]?.toString(Charsets.UTF_8)
+        val certificateText = small[PluginCertificates.FILE_NAME]?.toString(Charsets.UTF_8)
         val verdict = BundleSignature.verifyBundle(
             manifestBytes, signatureBase64, manifest.origin, manifest.id, certificateText,
             userKeys, PluginRevocations.load(pluginsRoot), nowEpochSeconds,
@@ -125,15 +181,14 @@ object PluginBundleInstaller {
 
         // Checklist point 1: every declared payload file present with a matching hash, and no extra files smuggled in unaccounted for.
         val declaredPaths = manifest.payload.map { it.path }.toSet()
-        val extraFiles = entries.keys - declaredPaths - setOf("manifest.json", "manifest.sig", PluginCertificates.FILE_NAME)
+        val extraFiles = staged.keys - declaredPaths
         if (extraFiles.isNotEmpty()) {
             return PluginInstallResult.Refused(PluginInstallError("bundle contains files not declared in the manifest: ${extraFiles.joinToString()}"))
         }
         for (file in manifest.payload) {
-            val bytes = entries[file.path]
+            val entry = staged[file.path]
                 ?: return PluginInstallResult.Refused(PluginInstallError("manifest declares ${file.path} but the bundle doesn't contain it"))
-            val actual = Sha256.hex(bytes)
-            if (!actual.equals(file.sha256, ignoreCase = true)) {
+            if (!entry.sha256.equals(file.sha256, ignoreCase = true)) {
                 return PluginInstallResult.Refused(PluginInstallError("hash mismatch for ${file.path}"))
             }
         }
@@ -147,7 +202,12 @@ object PluginBundleInstaller {
         for (file in manifest.payload) {
             val target = File(existingRoot, file.path)
             target.parentFile?.mkdirs()
-            target.writeBytes(entries.getValue(file.path))
+            val from = staged.getValue(file.path).file
+            // A rename within one volume; the copy is the fallback if the staging folder were elsewhere.
+            if (!from.renameTo(target)) {
+                from.copyTo(target, overwrite = true)
+                from.delete()
+            }
             // Android 10+ refuses to DexClassLoader a writable file
             // ("Writable dex file ... is not allowed") -- confirmed live
             // on emulator-5560 (Android 14): a native_bundle plugin
@@ -163,6 +223,8 @@ object PluginBundleInstaller {
         }
 
         val digest = Sha256.hex(manifestBytes)
+        // Other bytes than the installed ones: any process still running the old code lets go of it (Droidtop/tracker#539).
+        if (existingState != null && existingState.archiveDigest != digest) runCatching { PluginProcesses.retire(manifest.id) }
         // Approval carries over to an update verified under the SAME trust
         // anchor the plugin was approved under (docs/SPEC.md 12a, "Trust
         // over updates"): a re-install of the exact same bytes keeps
@@ -235,7 +297,7 @@ object PluginBundleInstaller {
         }
         for (file in record.manifest.payload) {
             val target = File(dir, file.path)
-            if (!target.isFile || Sha256.hex(target.readBytes()) != file.sha256) {
+            if (!target.isFile || !Sha256.hex(target).equals(file.sha256, ignoreCase = true)) {
                 return PluginInstallError("${file.path} changed on disk since approval")
             }
         }

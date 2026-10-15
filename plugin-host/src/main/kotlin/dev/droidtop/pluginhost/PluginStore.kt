@@ -46,12 +46,13 @@ object PluginStore {
      * like an official one.
      */
     fun importFromPicker(context: Context, uri: Uri): String {
-        val bytes = runCatching {
-            context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        }.getOrNull() ?: return "Couldn't read that file"
         val tmp = File.createTempFile("plugin-import", ".droidplugin.tar.xz", context.cacheDir)
         return try {
-            tmp.writeBytes(bytes)
+            // Copied to disk, never read whole into the heap (Droidtop/tracker#545).
+            val copied = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input -> tmp.outputStream().use { input.copyTo(it) } } != null
+            }.getOrDefault(false)
+            if (!copied) return "Couldn't read that file"
             val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
             when (val result = PluginBundleInstaller.install(tmp, root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context))) {
                 is PluginInstallResult.Installed ->
@@ -83,6 +84,7 @@ object PluginStore {
                 disabledReason = null,
             )
         PluginBundleInstaller.writeRecord(dir, updated)
+        runCatching { PluginProcesses.retire(pluginId) }
         if (approved) PluginGrants.forContext(context).initialiseOnApproval(updated, ticked)
     }
 
@@ -140,6 +142,7 @@ object PluginStore {
         PluginRecording.clear(pluginId)
         ProviderLevels.forContext(context).forget(pluginId)
         File(root(context), pluginId).deleteRecursively()
+        runCatching { PluginProcesses.retire(pluginId) }
         PluginEpoch.bump()
     }
 }

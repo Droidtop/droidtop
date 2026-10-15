@@ -19062,6 +19062,18 @@ what the index says is display data, never a trust decision.
 2026-09-02 text, now checked against `PluginBundleInstaller` and
 `PluginStore` instead of Enginehost's install path):
 
+0. **A bundle is never held in the heap (Droidtop/tracker#545).** `PluginBundleInstaller` streams each
+   payload entry to a staging folder beside the plugins folder while hashing it, keeps only the three small
+   trust files (manifest, signature, certificate) in memory, verifies everything, and only then replaces the
+   installed files by renaming the staged ones into place; the staging folder is removed whether the install
+   succeeded or was refused, and a refused update leaves the installed version untouched. A picked file is
+   copied to disk, not read whole. Peak heap during an install does not grow with the bundle.
+0. **A changed plugin leaves its process (Droidtop/tracker#539).** A plugin process loads a plugin once and
+   answers a repeated load with "already loaded", so an update used to keep answering with the old code until
+   droidtop restarted. `PluginProcesses.retire` drops the plugin from whatever process holds it on an install of
+   other bytes, an uninstall and an approval or denial: a contained plugin's own isolated process is ended,
+   a plugin in a shared slot is unloaded, and the next call loads what is on disk. The process logs the version
+   it loads (`<id> <version>: loading ...`).
 1. A hash is always required and always verified — every payload file's
    SHA-256, checked at install AND re-checked before every activation
    (`PluginBundleInstaller.verifyInstalled`), so a file edited on disk

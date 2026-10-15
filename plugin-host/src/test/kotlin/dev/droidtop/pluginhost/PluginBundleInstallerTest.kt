@@ -95,6 +95,22 @@ class PluginBundleInstallerTest {
     }
 
     @Test
+    fun `streams payload through a staging folder that is gone afterwards, refused or installed`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins-staging")
+        PluginOriginKeys.withOrigin("testorigin", Base64.getEncoder().encodeToString(pair.public.encoded)) {
+            val big = ByteArray(3 * 1024 * 1024) { (it * 31).toByte() }
+            assertTrue(PluginBundleInstaller.install(buildBundle("testorigin", pair.private, payloadBytes = big), pluginsRoot) is PluginInstallResult.Installed)
+            assertTrue(File(pluginsRoot, "testorigin.statustile/classes.jar").readBytes().contentEquals(big))
+            val refused = PluginBundleInstaller.install(buildBundle("testorigin", pair.private, tamperPayloadAfterSigning = true), pluginsRoot)
+            assertTrue(refused is PluginInstallResult.Refused)
+            // A refused update leaves the installed version exactly as it was.
+            assertTrue(File(pluginsRoot, "testorigin.statustile/classes.jar").readBytes().contentEquals(big))
+            assertEquals(emptyList<String>(), pluginsRoot.parentFile.list().orEmpty().filter { it.startsWith(".plugin-install-") })
+        }
+    }
+
+    @Test
     fun `refuses a bundle whose signature does not verify`() {
         val pair = freshKeyPair()
         val impostor = freshKeyPair()

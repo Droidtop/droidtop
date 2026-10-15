@@ -50,6 +50,7 @@ internal object PluginProcesses {
         var users = 0
         var lastUsedMs = 0L
         var idle: Runnable? = null
+        var app: Context? = null
     }
 
     private val lock = Any()
@@ -66,6 +67,7 @@ internal object PluginProcesses {
         val (process, wait) = synchronized(lock) {
             val process = processFor(pluginId, tier) ?: return null
             process.users++
+            process.app = app
             process.lastUsedMs = System.currentTimeMillis()
             process.idle?.let { main.removeCallbacks(it) }
             process.idle = null
@@ -99,6 +101,39 @@ internal object PluginProcesses {
                 main.postDelayed(countdown, IDLE_MS)
             }
         }
+    }
+
+    /**
+     * [pluginId]'s code or trust changed (an install of other bytes, an uninstall, an approval or denial): whatever
+     * process holds it stops holding it, so the next call loads what is on disk now. A process only loads a plugin once
+     * ("already loaded is already loaded", [PluginProcessService]), so without this the old version answered until droidtop
+     * restarted (Droidtop/tracker#539). A contained plugin's own isolated process is ended; a plugin in a shared slot is
+     * unloaded and the slot goes on. No-op when no process holds it. Safe from any thread.
+     */
+    fun retire(pluginId: String) {
+        val ended = synchronized(lock) {
+            val process = byPlugin[pluginId] ?: return
+            Log.i("droidtop.plugin", "$pluginId: changed on disk or in trust, dropping it from ${process.key} so the next call loads it afresh")
+            if (process.tier == PluginTier.CONTAINED && process.instance != null) {
+                processes.remove(process.key)
+                process.plugins.forEach { if (byPlugin[it] === process) byPlugin.remove(it) }
+                process.plugins.clear()
+                process.runtime = null
+                process.connecting?.complete(null)
+                process.connecting = null
+                process.idle?.let { main.removeCallbacks(it) }
+                process.idle = null
+                val connection = process.connection
+                process.connection = null
+                // The isolated process ends with its last binding; the death recipient ignores a process no longer registered.
+                connection to process.app
+            } else {
+                detach(pluginId, process)
+                return
+            }
+        }
+        val (connection, context) = ended
+        if (connection != null && context != null) runCatching { context.unbindService(connection) }
     }
 
     /** Which plugin processes exist now and what each holds, for the containment check. */

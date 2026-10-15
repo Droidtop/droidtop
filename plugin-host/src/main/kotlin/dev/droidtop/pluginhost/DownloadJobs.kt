@@ -233,9 +233,13 @@ object DownloadJobs {
     }
 
     /** Names the post-processing step a job's `post` argument refers to. Registered at process start, so a restored job finds it. */
-    fun registerPost(name: String, post: DownloadPost) {
+    fun registerPost(name: String, keepFile: Boolean = false, post: DownloadPost) {
         posts[name] = post
+        if (keepFile) keptPosts += name else keptPosts -= name
     }
+
+    /** Post steps that decide for themselves whether the downloaded file stays (the self-update keeps its APK until Android installed it). */
+    private val keptPosts: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     /** Where a download named [name] lands: droidtop's own external files directory. */
     fun fileFor(context: Context, name: String): File {
@@ -391,7 +395,7 @@ object DownloadJobs {
         verifyDigest(file, args)
         report(100, "Finishing…", null)
         val summary = post.process(context, file, args)
-        if (postName != POST_KEEP) withContext(Dispatchers.IO) { file.delete() }
+        if (postName != POST_KEEP && postName !in keptPosts) withContext(Dispatchers.IO) { file.delete() }
         return summary
     }
 
