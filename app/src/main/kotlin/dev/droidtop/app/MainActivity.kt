@@ -185,7 +185,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // This instance's companion tap-to-launch seam -- kept so onDestroy
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
-    private var companionQuitSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
 
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
@@ -310,6 +309,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         companionLaunchSeam = { entry ->
             lifecycleScope.launch {
                 CompanionState.launchError.value = null
+                CompanionState.stopStatus.value = null
                 runCatching { library.launch(entry) }
                     .onFailure {
                         android.util.Log.e("droidtop.MainActivity", "Companion launch of ${entry.title} failed", it)
@@ -319,20 +319,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             }
         }
         CompanionState.onLaunchEntry = companionLaunchSeam
-        // Quit from the companion's Now card: the one quit path (Library.quitRunning), and a quit that could
-        // not end the game says why where the tap was made.
-        companionQuitSeam = { entry ->
-            // The process scope, not this activity's: ending a game opens a sheet or moves the game off the screen, either
-            // of which can recreate the activity, and a cancelled scope lost the answer (rig, build 1809).
-            CompanionState.scope.launch {
-                CompanionState.launchError.value = when (val outcome = library.quitRunning(applicationContext, entry)) {
-                    dev.droidtop.library.QuitResult.Ended -> null
-                    is dev.droidtop.library.QuitResult.NotEnded -> outcome.message
-                    is dev.droidtop.library.QuitResult.Unresolvable -> outcome.message
-                }
-            }
-        }
-        CompanionState.onQuitEntry = companionQuitSeam
         CompanionState.onRestartEntry = { entry ->
             CompanionState.scope.launch {
                 when (val outcome = library.quitRunning(applicationContext, entry)) {
@@ -928,9 +914,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // and the old one must not tear the new one's seam down.
         if (CompanionState.onLaunchEntry === companionLaunchSeam) {
             CompanionState.onLaunchEntry = null
-        }
-        if (CompanionState.onQuitEntry === companionQuitSeam) {
-            CompanionState.onQuitEntry = null
         }
         clipboardBridge?.stop()
         clipboardBridge = null
