@@ -1139,8 +1139,10 @@ internal fun PcGamesSection(
                 }
             },
             sourceFilter = { result ->
-                consoleNames?.let { dev.droidtop.library.integrations.SourceDestinations.isPcResult(result.platform, it) } ?: true
+                consoleNames?.let { dev.droidtop.library.integrations.SourceDestinations.isPcResult(result, it) } ?: true
             },
+            // PC games are what the sources are asked for, so a source narrows its own answer before the filter does.
+            sourcePlatform = dev.droidtop.library.integrations.SourceDestinations.PC_PLATFORM,
         )
     }
     if (state.optionsOpen) {

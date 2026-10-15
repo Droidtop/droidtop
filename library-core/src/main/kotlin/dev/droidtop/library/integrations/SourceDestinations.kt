@@ -26,6 +26,7 @@ object SourceDestinations {
 
     private val PC_IDS = setOf("pc", "windows")
     private val PLATFORM_SPLIT = Regex("[,/;|&·]")
+    private val WORD_SPLIT = Regex("[\\s\\-_.:()]+")
 
     /** [pick] with the system and folder lists read off the main thread: only when a result is picked, never while typing. */
     suspend fun resolve(context: Context, listSystemId: String?, listFolder: File?, platform: String?): Pick {
@@ -65,17 +66,51 @@ object SourceDestinations {
      * Whether a source result belongs in a PC list: one that names a console system (and no PC platform) is not a PC game.
      * A result that names no platform, or one nobody knows, stays (a PC source rarely says). Pure.
      */
-    fun isPcResult(platform: String?, consoleNames: Set<String>): Boolean {
-        val words = platform.orEmpty().split(PLATFORM_SPLIT).map { it.trim().lowercase() }.filter { it.isNotEmpty() }
-        if (words.isEmpty()) return true
-        if (words.any { it in PC_WORDS }) return true
-        return words.none { it in consoleNames }
+    fun isPcResult(platform: String?, consoleNames: Set<String>): Boolean = isPcResult(listOfNotNull(platform), consoleNames)
+
+    /**
+     * [isPcResult] over everything a result says about its platform: the platform field and its badges (a torrent
+     * site tags its category there). A name counts whole ("Sony PlayStation Vita") or by a distinctive word of it
+     * ("Vita", "PlayStation"), because a source writes the system the way its own site does.
+     */
+    fun isPcResult(platforms: List<String>, consoleNames: Set<String>): Boolean {
+        val parts = platforms.flatMap { it.split(PLATFORM_SPLIT) }.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+        if (parts.isEmpty()) return true
+        val said = parts + parts.flatMap { it.split(WORD_SPLIT) }.filter { it.isNotEmpty() }
+        if (said.any { it in PC_WORDS }) return true
+        return said.none { it in consoleNames }
     }
 
-    /** The names (ids and display names, lower case) of every console system that is not the PC: what [isPcResult] weeds out. */
+    /** [isPcResult] for one source result: its platform and its badges. */
+    fun isPcResult(result: AcquireContentResult, consoleNames: Set<String>): Boolean =
+        isPcResult(listOfNotNull(result.platform) + result.badges, consoleNames)
+
+    /**
+     * The names (ids, display names and the distinctive words of the display names, lower case) of every console
+     * system that is not the PC: what [isPcResult] weeds out. A word that says nothing about the system ("Sony",
+     * "Games", a number) is not one.
+     */
     fun consoleNamesOf(systems: List<ConsoleSystemDef>): Set<String> =
-        systems.filter { it.id !in PC_IDS }.flatMap { listOf(it.id.lowercase(), it.displayName.lowercase()) }.toSet()
+        systems.filter { it.id !in PC_IDS }.flatMap { system ->
+            val name = system.displayName.lowercase()
+            listOf(system.id.lowercase(), name) + name.split(WORD_SPLIT).filter { word ->
+                word.length >= 3 && word !in GENERIC_WORDS && word !in PC_WORDS && !word.all(Char::isDigit)
+            }
+        }.toSet()
 
     private const val PC_SYSTEM_ID = "pc"
+
+    /**
+     * The platform id the plugin API (docs/plugin-api.md 1.8) uses for PC games: what a PC list asks the sources
+     * for, so a source can narrow its own answer before droidtop narrows it again with [isPcResult].
+     */
+    const val PC_PLATFORM = "windows"
+
+    /** Words in a system's name that name a maker or a kind of machine, not the system. */
+    private val GENERIC_WORDS = setOf(
+        "sony", "nintendo", "sega", "microsoft", "atari", "nec", "snk", "bandai", "commodore", "amstrad",
+        "game", "games", "system", "systems", "computer", "computers", "console", "consoles", "entertainment",
+        "home", "video", "family", "personal", "classic", "arcade", "the", "and", "for", "plus", "mini",
+    )
     private val PC_WORDS = setOf("pc", "windows", "win", "linux", "mac", "macos", "osx", "steam")
 }

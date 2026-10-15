@@ -76,6 +76,7 @@ fun CompanionSurface(
             // Status line, always the first row (the controls live in the System section and tab).
             CompanionSystemBar()
             LaunchErrorLine()
+            if (shows(dev.droidtop.library.settings.ControlRow.LIBRARY)) CompanionSearchPill()
             if (shows(dev.droidtop.library.settings.ControlRow.PINS)) CompanionPinsSection()
             if (shows(dev.droidtop.library.settings.ControlRow.NOW_PLAYING)) CompanionNowPlayingCard()
             val library = shows(dev.droidtop.library.settings.ControlRow.LIBRARY)
@@ -100,6 +101,26 @@ fun CompanionSurface(
                 CompanionWidgetsSection(layout, widgetIds, widgetManager, widgetHost)
             }
             CompanionProviderLine()
+        }
+    }
+}
+
+/**
+ * The companion's way into the one search (docs/SPEC.md 12a "One search", Droidtop/tracker#12): the same
+ * search window Standard's drawer opens, started on the screen the tap was on, so its rows, its sources
+ * and its settings are the same ones. The companion draws no search of its own.
+ */
+@Composable
+private fun CompanionSearchPill() {
+    val context = LocalContext.current
+    androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        CompanionPill("Search games, apps and sources") {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(context, LauncherSearchActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayIdOf(context)).toBundle(),
+                )
+            }
         }
     }
 }

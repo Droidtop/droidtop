@@ -118,6 +118,26 @@ class LeftMenuTest {
     }
 
     @Test
+    fun `Search sits between Resume and the destinations, and the cursor still opens where the user is`() {
+        assertEquals(1, leftMenuRowsAbove(running = false, searchable = true))
+        assertEquals(2, leftMenuRowsAbove(running = true, searchable = true))
+        assertEquals(0, leftMenuRowsAbove(running = false, searchable = false))
+        all.forEachIndexed { index, entry ->
+            assertEquals(index + 2, leftMenuStartIndex(all, entry.section, atHome = entry.home, rowsAbove = leftMenuRowsAbove(true, true)))
+        }
+    }
+
+    @Test
+    fun `a row index says what the row is`() {
+        assertTrue(leftMenuRowAt(0, running = true, searchable = true) is LeftMenuRow.Resume)
+        assertTrue(leftMenuRowAt(1, running = true, searchable = true) is LeftMenuRow.Search)
+        assertEquals(0, (leftMenuRowAt(2, running = true, searchable = true) as LeftMenuRow.Destination).index)
+        assertTrue(leftMenuRowAt(0, running = false, searchable = true) is LeftMenuRow.Search)
+        assertEquals(0, (leftMenuRowAt(0, running = false, searchable = false) as LeftMenuRow.Destination).index)
+        assertEquals(2, (leftMenuRowAt(4, running = true, searchable = true) as LeftMenuRow.Destination).index)
+    }
+
+    @Test
     fun `a screen that is no place, or a place the mode hides, stays a nested screen`() {
         assertEquals(null, placeForScreen("android_settings", menuSectionsFor(UiMode.FULL)))
         assertEquals(null, placeForScreen(PLACE_UPDATES_SCREEN_ID, menuSectionsFor(UiMode.KIOSK)))

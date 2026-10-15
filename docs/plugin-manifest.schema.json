@@ -53,7 +53,7 @@
           "surfaces": { "type": "array", "items": { "type": "string" } },
           "target": { "type": "string" },
           "targets": { "type": "array", "items": { "enum": ["game", "app", "file", "folder", "system", "container", "window"] } },
-          "systems": { "type": "array", "items": { "type": "string" } },
+          "systems": { "oneOf": [ { "type": "array", "items": { "type": "string" } }, { "const": "*" } ], "description": "ui.context_action: the systems the action is offered on. library.sources: the droidtop system ids the source serves (PC systems pc, windows, windows3x, windows9x, dos, linux, mac, macos are the PC library), or \"*\" (alone or in the list) for all; absent, empty or malformed keeps the old behaviour of serving every system." },
           "packages": { "type": "array", "items": { "type": "string" } },
           "job": { "type": "boolean" },
           "tab": { "enum": ["overview", "versions", "extras", "details"], "description": "ui.game_section only: the PC game page tab its rows go under; Extras when absent." },

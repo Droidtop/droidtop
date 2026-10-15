@@ -13920,8 +13920,10 @@ view strip, the game page's tabs, the Quick Menu's rail). The D-pad never reache
 a header or status cluster. The hint row and the left menu are touch routes to
 their corresponding actions.
 
-The left menu's order is Home, PC Games, Retro Games, Apps, the places, then
-Settings. Home (the PC section's shelves, §7i "Home art") is the first row;
+The left menu's order is a Search row (not in Kiosk and Kid), Home, PC Games, Retro Games,
+Apps, the places, then Settings. Search opens the one search (12a "One search"), is
+not a destination, and carries no "you are here" mark; while a game runs, Resume leads
+and Search follows it. Home (the PC section's shelves, §7i "Home art") is the first row;
 the current-destination mark follows which of Home and PC Games is showing.
 
 The left menu is Steam's main menu, measured (Droidtop/tracker#273 slice 4;
@@ -14612,7 +14614,16 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
   "Not signed in", Folders "3 folders · 412 games". The column can be scanned by glyph: the
   stores keep the globe, Folders the folder, Add a game and Imported the game controller, Storage the
-  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. A store page's holding rows
+  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. Under the heading **Get games** the place lists every installed
+  source plugin (`AcquireContentSources.listings`), ready or not, with its state as the row's value
+  (Ready, Waiting for your approval, Denied, Turned off, Disabled), so a newcomer with no folders and an
+  empty library reaches a search from the first minute, which is the one route PC Games takes with no game
+  folder too (Droidtop/tracker#540). A ready source opens its search with no library system needed
+  (`SourceScreens.entryScreen`): a source that serves only PC systems opens straight on the PC search,
+  any other asks "PC games" or the system, listing only the systems it serves; a source that is not ready
+  opens its page in Plugins, where approving or turning it on is. With no source installed the group is
+  one row to Plugins, never a blank. The provider stays a detail: this is a row among where games come
+  from, with its state in the value column, not a screen of its own. A store page's holding rows
   ("Shared with you · 573", Free to play) are pressable like Open library:
   the shell opens PC Games filtered to that store and that holding
   (`PcSource.holdingItemId`), and the pill says so. **Folders**
@@ -19905,6 +19916,18 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   the plugin's page in Settings, Plugins (the whole list when there are
   several); one that is turned off or denied is a row that opens its page.
   None of them is a line of text that looks pressable and is not.
+  **Waiting means two things, and a source in either is not asked**
+  (`UnavailableSource.of`, Droidtop/tracker#485): the plugin is not approved yet,
+  or it is approved but the person has not allowed it the `library.sources`
+  point (Settings, Plugins, Permissions). The second used to be asked anyway and
+  came back as "X has not been allowed to get games from a source", one block
+  with a Technical details row per plugin. Now it counts in the one "N sources
+  are waiting for your approval" row. The "Get games" screens say the same thing
+  the same way (`UnavailableSource.waitingTitle`): when no source can answer, ONE
+  row names the waiting ones and opens Plugins (the plugin's own page when it is
+  one), never a block per plugin. "Get apps" with a catalog plugin installed but
+  not allowed is a row that opens that plugin's page, and with none installed
+  has a Plugins row, so neither is a dead end.
   **A failure is a sentence the person can act on** (`SourceFailures.plain`,
   Droidtop/tracker#375, #485): what a source reports (a site's own page text
   such as "JavaScript is disabled...", a platform exception, a socket error)
@@ -19927,18 +19950,42 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   passes the apps and games as `local`). The PC library passes its games as
   `local` too, so the one list holds them (a row opens the game's page) and
   the grid behind still narrows to the same text, which is the Filter sheet's
-  Search row; the PC search also drops a source's result that names a console
-  system (`SourceDestinations.isPcResult`, so a Nyaa PSP or Vita torrent is
-  not a PC result). A console gamelist has its list on screen under the dialog
+  Search row; the PC search asks the sources for PC games
+  (`SourceDestinations.PC_PLATFORM`, the plugin API's `windows`) and also drops
+  a source's result that names a console system (`SourceDestinations.isPcResult`,
+  so a Nyaa PSP or Vita torrent is not a PC result). The result is judged by
+  everything it says about its platform, its platform field and its badges, and
+  a system is named whole or by a distinctive word of its name ("Vita",
+  "PlayStation"; "Sony", "Games" and numbers name nothing), because a source
+  writes a system the way its own site does. A section searches its own
+  systems: a console list asks for its system, the PC library for PC games
+  (Droidtop/tracker#485, 2026-10-14: PC Games search showed Nyaa PSP and Vita
+  results). A console gamelist has its list on screen under the dialog
   and narrows it live through `matchesSearchText`, so it passes no `local` and
   shows the match count above the sources' rows (the Select row reads "Search:
   <text>" while a search is on, and the search lasts as long as the gamelist
   stays open; the PC Games tab keeps its own query, 7i); the launcher has no
   list under it, so the device's rows are in the one list; so are Desktop's
   (its Start menu and R1 open it, with the library and the container's apps as
-  the device's rows, 2b "Desktop chrome with a pad"). Settings has its own search over
-  settings rows (`SettingsSearchIndex`, 7k), which is a different thing being
-  searched, not a plugin mode.
+  the device's rows, 2b "Desktop chrome with a pad"). **Every mode has a normal way in**
+  (Droidtop/tracker#12, #315, #351): Gaming's left menu has a **Search** row right
+  under Resume (Start, then A; a tap works too), which opens the dialog with the
+  shell's games and apps as the device's rows (`LauncherSearchScreen`, so the
+  shell and Standard share the one wiring); Kiosk and Kid have no such row, as they
+  have no downloads or settings. Standard's drawer search field, Desktop's Start menu,
+  and the companion's Home (a **Search** pill under the status line, touch only, which
+  starts the same search window on the companion's screen) open the same dialog.
+  Settings has its own full search over settings rows (`SettingsSearchIndex`, 7k),
+  a different thing being searched, not a plugin mode; where a surface has settings
+  of its own (Gaming, Standard's Global settings, Desktop's) the one search also
+  shows the matching ones, at most five, as a **Settings** section after the
+  rows (`LibrarySearchDialog.settingsRoot`; the index is built once, off the main
+  thread, when the text first reaches two letters). A press opens the screen the
+  setting lives on, in the window a source's page uses. The rows of the library,
+  the apps and the sources stay one ranked list told apart by their detail line,
+  as decided on 2026-10-07; the one separate section is the one that searches
+  another kind of thing. The PC library and a console list do not offer Settings:
+  they search their own games.
 - **Picking.** A device row opens the app or plays the game (the PC library's
   opens the game's page). A source row always opens its detail
   (`GameSourceProvider.detailScreen`); the destination is worked out when it is
@@ -19947,6 +19994,13 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   soft keyboard goes away), Up from the first row returns to the field, A
   opens the row, and typing puts the cursor back in the field. The cursor
   follows a row by its key, so a source answering above it does not move it.
+- **A page a row opens replaces the search, it is not drawn over it**
+  (Droidtop/tracker#542). Get games, a source's detail and a plugin's settings
+  open in a window of their own while the search panel is not composed; what was
+  typed, the answers and the cursor stay in the dialog's state and are there
+  when the page closes (the search runs again then, so an approval or an
+  installed runtime shows). Two translucent windows had put the page's text on
+  the search's text. Back from the page leaves the soft keyboard away.
 - **The field and the keyboard.** The field asks for the soft keyboard
   explicitly when it opens (`SoftwareKeyboardController.show`; Compose's own
   request on focus is implicit, and Android drops an implicit request while a
@@ -20260,6 +20314,15 @@ without its runtime said "Running". Decisions:
   and the catalog screen says "No catalog is published yet" and points at
   Install plugin file; any other failure still shows its reason. The
   droidtop-platforms generator for the index is still not built (above).
+- **A source declares the systems it serves (Droidtop/tracker#543).** A `library.sources` entry's
+  `systems` (docs/plugin-api.md 1.6) is read from the manifest by `SourceSystems`
+  (`ExtensionProtocols.kt`, pure, unit-tested), and one rule uses it everywhere:
+  `AcquireContentSource.serves(systemId)`. A system's Get games page and the "Your/Other systems" choice list
+  only what some source serves, the one search asks `GameSources.plugins(context, platform)` (so PC Games, which
+  searches as `pc`, asks only sources naming a PC system and a console list asks the sources naming that
+  system), and a "not ready" note is shown only for a source that would have served. An entry with no
+  `systems` serves everything, as before. When sources exist but none serves a system, its page says so
+  ("No source gets <system> games") with the way to Plugins; it is never blank.
 - **"Get games" is offered everywhere, and it runs in search (owner,
   2026-10-01: "Get Games should be offered from EVERY menu, and it should
   also run in the global search bar").** One registered screen
