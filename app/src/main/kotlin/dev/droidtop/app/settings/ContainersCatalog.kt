@@ -43,9 +43,11 @@ import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerTerminal
 import dev.droidtop.runtime.CraneImageCatalogResolver
 import dev.droidtop.runtime.ContainerApplications
+import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerExports
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ExportedApp
+import dev.droidtop.runtime.ExportedCommand
 import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.ImageRunConfig
@@ -281,6 +283,7 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "mounts", title = "Mounts", items = mountItems(runtime, info, mounts))
         if (info.container.role == ContainerRole.SIBLING) {
             groups += CatalogGroup(id = "exports", title = "In the desktop's menus", items = exportItems(context, runtime, info))
+            groups += CatalogGroup(id = "commands", title = "Commands in the desktop's terminal", items = commandItems(context, info))
         }
         groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
@@ -478,6 +481,69 @@ object ContainersCatalog {
         }
     }
 
+    // ---- exported commands (docs/SPEC.md 3d "Exported commands", Droidtop/tracker#555 D5, D7) ----
+
+    /** Why the last command name typed on a container's page was not exported, by container id; shown once, under the field. */
+    private val commandProblems = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
+     * Whether the desktop may run this container's commands, the commands it exports by name (each then runs in the
+     * desktop's terminal as if installed there, through droidtop-enter), and a field to add one.
+     */
+    private suspend fun commandItems(context: Context, info: ContainerInfo): List<CatalogItem> {
+        val container = info.container
+        val filesDir = context.filesDir
+        val (allowed, exported) = withContext(Dispatchers.IO) {
+            ContainerEnter.allowed(filesDir, container.id) to ContainerEnter.read(filesDir).filter { it.containerId == container.id }
+        }
+        return buildList {
+            add(
+                ToggleItem(
+                    id = "container_enter_allowed",
+                    title = "Run its commands from the desktop",
+                    subtitle = "Commands shown below run here when typed in the desktop's terminal",
+                    current = allowed,
+                    onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerEnter.setAllowed(filesDir, container.id, on) } },
+                ),
+            )
+            add(
+                TextInputItem(
+                    id = "container_command_add",
+                    title = "Add a command",
+                    subtitle = commandProblems.remove(container.id) ?: "A program's name, for example htop; it then runs from the desktop's terminal",
+                    value = "",
+                    onChange = { _, value ->
+                        val name = value.trim()
+                        if (!ContainerEnter.validName(name)) {
+                            commandProblems[container.id] = "Not added: \"$name\" is not a program's name"
+                        } else {
+                            withContext(Dispatchers.IO) {
+                                val command = ExportedCommand(container.id, info.displayName, name)
+                                ContainerEnter.save(filesDir, ContainerEnter.with(ContainerEnter.read(filesDir), command, true))
+                            }
+                        }
+                    },
+                ),
+            )
+            exported.forEach { command ->
+                add(
+                    AsyncActionItem(
+                        id = "container_command:${command.name}",
+                        title = command.name,
+                        subtitle = "Runs in ${info.displayName} from the desktop's terminal",
+                        confirmTitle = "Stop offering ${command.name} on the desktop?",
+                        run = { ctx, _ ->
+                            withContext(Dispatchers.IO) {
+                                ContainerEnter.save(ctx.filesDir, ContainerEnter.with(ContainerEnter.read(ctx.filesDir), command, false))
+                            }
+                            "Removed."
+                        },
+                    ),
+                )
+            }
+        }
+    }
+
     // ---- exported apps (docs/SPEC.md 3d "Exported apps", Droidtop/tracker#555 D5) ----
 
     /** One switch per app of this sibling: shown in the desktop's menus as "<app> (on <container>)", or not. */
@@ -666,6 +732,7 @@ object ContainersCatalog {
                 // What it exported into the desktop goes with it (docs/SPEC.md 3d "Exported apps").
                 withContext(Dispatchers.IO) {
                     ContainerExports.save(ctx.filesDir, ContainerExports.without(ContainerExports.read(ctx.filesDir), info.container.id))
+                    ContainerEnter.save(ctx.filesDir, ContainerEnter.without(ContainerEnter.read(ctx.filesDir), info.container.id))
                 }
                 "Deleted. Go back to Containers."
             },
