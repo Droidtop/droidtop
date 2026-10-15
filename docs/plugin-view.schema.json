@@ -85,19 +85,43 @@
         "type": { "type": "string" },
         "id": { "type": "string", "minLength": 1 },
         "title": { "type": "string" },
-        "subtitle": { "type": ["string", "null"] }
+        "subtitle": { "type": ["string", "null"] },
+        "needs": { "type": "string", "description": "A permission id the plugin declared (optional, not required). While the person has it turned off, droidtop draws this node as an inert row saying so, with Permissions; the rest of the page is unchanged (docs/plugin-api.md 1.6, Droidtop/tracker#521 item 5)." }
       }
+    },
+    "typedValue": {
+      "description": "A value droidtop writes in its own words (docs/plugin-api.md 1.6 \"Typed values\", Droidtop/tracker#521 item 7). An object droidtop cannot read shows no value.",
+      "oneOf": [
+        { "type": ["string", "null"] },
+        { "type": "object", "required": ["bool"], "properties": { "bool": { "type": "boolean" } } },
+        {
+          "type": "object",
+          "required": ["number"],
+          "properties": {
+            "number": { "type": "number" },
+            "unit": { "type": "string", "description": "bytes, seconds, percent (0 to 100), or any other unit written after the number (at most 12 characters)." }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["enum"],
+          "properties": {
+            "enum": { "type": "string" },
+            "options": { "type": "array", "items": { "type": "object", "required": ["value", "label"], "properties": { "value": { "type": "string" }, "label": { "type": "string" } } } }
+          }
+        }
+      ]
     },
     "item": {
       "allOf": [{ "$ref": "#/$defs/common" }],
       "oneOf": [
-        { "properties": { "type": { "const": "info" }, "value": { "type": ["string", "null"] } } },
+        { "properties": { "type": { "const": "info" }, "value": { "$ref": "#/$defs/typedValue" } } },
         {
           "properties": {
             "type": { "const": "row" },
             "columns": { "type": "array", "items": { "type": "string" } },
             "badges": { "type": "array", "items": { "type": "string" } },
-            "value": { "type": ["string", "null"] },
+            "value": { "$ref": "#/$defs/typedValue" },
             "action": { "$ref": "#/$defs/action" }
           }
         },

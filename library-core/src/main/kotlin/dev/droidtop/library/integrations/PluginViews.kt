@@ -19,6 +19,9 @@ import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.pluginhost.PluginWebAccount
+import dev.droidtop.pluginhost.PluginPermissions
+import dev.droidtop.pluginhost.PluginGrants
+import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.LegacyManifest
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginErrorCode
@@ -269,6 +272,9 @@ private class PluginPage(
     @Volatile private var stale: Boolean = initial == null
     @Volatile private var notice: String? = null
 
+    /** The permissions this page's nodes name with `needs` that the person turned off (#521 item 5), read each time the page is drawn. */
+    @Volatile private var turnedOff: Set<String> = emptySet()
+
     /** A reply's notice (or an action's error notice): shown until the page's next action, never cleared by a refetch. */
     @Volatile private var replyNotice: ViewNode.Notice? = null
 
@@ -287,6 +293,7 @@ private class PluginPage(
         groups = { context ->
             withContext(Dispatchers.IO) {
                 load(context)
+                turnedOff = turnedOff(context)
                 leadGroups(context) + groups(id) + extraGroups(context, HashMap(values))
             }
         },
@@ -387,11 +394,39 @@ private class PluginPage(
                 CatalogGroup(
                     id = "pv_${screenId}_${section.id}",
                     title = section.title,
-                    items = section.nodes.map { item(screenId, it) },
+                    items = section.nodes.map { node ->
+                        section.needs[node.id]?.takeIf { it in turnedOff }?.let { permission -> turnedOffItem(screenId, node, permission) }
+                            ?: item(screenId, node)
+                    },
                 )
             }
         }
         return (if (head.isEmpty()) emptyList() else listOf(CatalogGroup(id = "pv_${screenId}_head", title = null, items = head))) + body
+    }
+
+    /**
+     * Which permissions named by this page's `needs` are turned off: declared by the plugin and DENIED. One that is still
+     * unanswered (ASK) is asked when the node is used, as any call is; one the plugin did not declare is ignored.
+     */
+    private fun turnedOff(context: Context): Set<String> {
+        val named = view?.sections?.flatMap { it.needs.values }?.toSet().orEmpty()
+        if (named.isEmpty()) return emptySet()
+        val snapshot = PluginGrants.forContext(context).read(record.manifest.id)
+        return named.filterTo(HashSet()) { PluginGrants.stateOf(record, snapshot, it) == GrantState.DENIED }
+    }
+
+    /**
+     * A node whose permission is turned off (#521 item 5): its own title, droidtop's sentence instead of what it does,
+     * and pressing it opens the plugin's Permissions. Only this node changes; the page and its other nodes stay.
+     */
+    private fun turnedOffItem(screenId: String, node: ViewNode, permission: String): CatalogItem {
+        val what = PluginPermissions.labelFor(permission) ?: permission
+        return NestedScreenItem(
+            id = "pv_${screenId}_${node.id}_off",
+            title = node.title,
+            subtitle = "Off: turn on \"$what\" in its Permissions to use this",
+            inline = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id),
+        )
     }
 
     private fun item(screenId: String, node: ViewNode): CatalogItem {
