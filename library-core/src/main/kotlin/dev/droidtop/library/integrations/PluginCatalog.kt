@@ -17,6 +17,7 @@ import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.runtime.util.CatalogSignature
+import dev.droidtop.runtime.util.RevocationList
 import dev.droidtop.runtime.util.Sha256
 import dev.droidtop.runtime.util.Versions
 import java.io.File
@@ -45,8 +46,8 @@ object PluginCatalog {
     /** Relative to the platform-database base URL (SPEC 12a "The index"). */
     const val INDEX_RELATIVE_PATH = "droidtop-plugins/index.json"
 
-    /** The master-signed revocation list, beside the index (SPEC 12a "Revocation"). */
-    const val REVOCATIONS_RELATIVE_PATH = "droidtop-plugins/revocations.json"
+    /** droidtop's revocation list, signed under Droidtop Core, beside the index (SPEC 12a "Revocation"). */
+    const val REVOCATIONS_RELATIVE_PATH = "droidtop-plugins/" + RevocationList.FILE_NAME
 
     /** The only stream droidtop offers (SPEC 12a "What the catalog offers"). */
     const val STREAM_STABLE = "stable"
@@ -163,9 +164,9 @@ object PluginCatalog {
     /**
      * Whether this build of droidtop will accept bundles for [origin] from
      * the OFFICIAL catalog: it is the official origin AND the index's key
-     * document for it names one of the keys this build pins for it -- the
-     * legacy origin key or the plugin master (SPEC 12a "The index": "the
-     * key block is cross-checked, not trusted"). A tampered index cannot
+     * document for it names one of the official anchors this build knows --
+     * Droidtop Core, or a legacy one (SPEC 12a "The index": "the key block
+     * is cross-checked, not trusted"). A tampered index cannot
      * rebind the origin to a new key, and an origin this build does not pin
      * is not installable no matter what the index says.
      */
@@ -487,17 +488,17 @@ object PluginCatalog {
     }
 
     /**
-     * The plugin master's revocation list, published beside the index
-     * (SPEC 12a "Revocation") and fetched with it. [PluginRevocations.accept]
-     * keeps it only when the master signed it and its sequence is newer than
-     * the one on file; a missing, unreadable or unsigned list changes
+     * droidtop's revocation list, published beside the index (SPEC 12a
+     * "Revocation") and fetched with it. [PluginRevocations.accept] keeps it
+     * only when it verifies under Droidtop Core and its sequence is newer
+     * than the one on file; a missing, unreadable or unsigned list changes
      * nothing, and never fails the catalog fetch it rides along with.
      */
     private fun refreshRevocations(context: Context) {
         val text = runCatching {
             PlatformDatabaseTransport.getOrNull(PlatformDatabaseSource.urlFor(context, REVOCATIONS_RELATIVE_PATH), token(context))
         }.getOrNull() ?: return
-        PluginRevocations.accept(PluginStore.root(context), text)
+        PluginRevocations.accept(PluginStore.root(context), text, System.currentTimeMillis() / 1000)
     }
 
     // ------------------------------------------------------------------
@@ -515,8 +516,8 @@ object PluginCatalog {
      * same master the person accepted (a changed master stops dead: the
      * person removes the catalog and adds it again to trust another one),
      * and, when an index signature is published or was seen before, signed
-     * under that master ([CatalogSignature.verify], the component catalog's
-     * own check, with this catalog's master and id).
+     * with a chain to that master ([CatalogSignature.verify], the component
+     * catalog's own check, with this catalog's anchor and id).
      * Throws [IllegalStateException] with the sentence to show.
      */
     private fun checkAdded(context: Context, url: String, text: String, expected: PluginCatalogSource?): Checked {
@@ -558,21 +559,20 @@ object PluginCatalog {
             if (info.origin != null) error("the catalog names its origin \"${info.origin}\" but no master key for it")
             return Checked(index, signed = false)
         }
-        val masterSha256 = UserOriginKeys.keySha256(declared) ?: error("the catalog's master key is not a P-256 public key")
+        val masterSha256 = UserOriginKeys.keySha256(declared) ?: error("the catalog's master key is not a key droidtop can use")
         info.origin?.let { own ->
             val listed = index.origins.firstOrNull { it.origin == own }
             if (listed != null && listed.keySha256?.lowercase() != masterSha256) {
                 error("the catalog lists its own origin \"$own\" under a key other than its master, so it was not read")
             }
         }
-        val master = PluginOriginKeys.parseSpki(declared)!!
+        val master = PluginOriginKeys.anchorForKey(declared)!!
         val signature = sibling(PluginCatalogSources.INDEX_SIGNATURE_FILE)
         if (signature == null) {
             if (expected?.indexSigned == true) error("the catalog's index was signed before and this copy is not, so it was not read")
             return Checked(index, signed = false)
         }
-        val certificate = sibling(PluginCatalogSources.INDEX_CERTIFICATE_FILE)
-        val verdict = CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), signature.trim(), certificate, master, nowEpochSeconds, info.id)
+        val verdict = CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), signature.trim(), master, nowEpochSeconds, info.id)
         if (verdict is CatalogSignature.Verdict.Refused) error("the catalog's signature was refused: ${verdict.reason}")
         return Checked(index, signed = true)
     }
@@ -705,9 +705,8 @@ object PluginCatalog {
 
     /**
      * An added catalog's revocation list, beside its index
-     * (`revocations.json`): the plugin master's own format and signed bytes
-     * ([PluginRevocations]: `sequence`, `certIds`, `keySha256`, `signature`),
-     * signed by THIS catalog's master. It is kept for each origin the person
+     * (`revocations.jws`): droidtop's own format ([RevocationList]), with a
+     * chain to THIS catalog's master and a signer that names the catalog. It is kept for each origin the person
      * trusts through this catalog ([PluginRevocations.acceptForOrigin]: only
      * when the master signed it and its sequence is higher than the one on
      * file) and checked by [dev.droidtop.pluginhost.BundleSignature.verifyBundle]
@@ -718,12 +717,13 @@ object PluginCatalog {
      */
     private fun refreshAddedRevocations(context: Context, source: PluginCatalogSource) {
         val indexUrl = source.indexUrl ?: return
-        val master = source.masterKeyBase64?.let(PluginOriginKeys::parseSpki) ?: return
+        val master = source.masterKeyBase64?.let(PluginOriginKeys::anchorForKey) ?: return
         val url = PluginCatalogSources.siblingUrl(indexUrl, PluginCatalogSources.REVOCATIONS_FILE)
         val text = runCatching { PlatformDatabaseTransport.getOrNull(url, token(context)) }.getOrNull() ?: return
         val root = PluginStore.root(context)
+        val now = System.currentTimeMillis() / 1000
         userKeys(context).values.filter { it.catalog == source.id }.forEach { entry ->
-            PluginRevocations.acceptForOrigin(root, entry.origin, text, master)
+            PluginRevocations.acceptForOrigin(root, entry.origin, text, master, source.id, now)
         }
     }
 }

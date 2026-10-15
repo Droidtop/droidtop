@@ -25,10 +25,10 @@ sealed interface PluginInstallResult {
  * approved. Signature and hashes are re-checked by [verifyInstalled]
  * before every activation too (checklist point 1's "not only at
  * install"), not just here. `userKeys` carries the user-trusted origin
- * keys ("Keys you trust", [UserOriginKeys.loadBase64]): signature
- * verification resolves the official pinned key first, then those,
- * so a bundle from an origin the user trusted verifies here exactly
- * like an official one and an origin no key resolves for is still
+ * anchors ("Keys you trust", [UserOriginKeys.loadBase64]): signature
+ * verification resolves the official origin to Droidtop Core first, then
+ * those, so a bundle from an origin the user trusted verifies here exactly
+ * like an official one and an origin no anchor resolves for is still
  * refused outright.
  *
  * Bundle layout (tar, then xz -- same tar.xz choice as enginehost's
@@ -36,8 +36,10 @@ sealed interface PluginInstallResult {
  * user of that tool combination, not a new one):
  *
  *   manifest.json     the [PluginManifest], UTF-8
- *   manifest.sig      base64 ECDSA-P256/SHA-256 signature over manifest.json's raw bytes
- *   origin.cert       optional: the plugin master's certificate for the signing key ([PluginCertificates])
+ *   manifest.jws      detached JWS over manifest.json's raw bytes, carrying its certificate chain ([BundleSignature])
+ *   manifest.sig, origin.cert
+ *                     optional, ignored: the old format's files, which a publisher may keep so older
+ *                     droidtop builds still install the bundle ([LegacyBundleSignature])
  *   <payload files>   exactly the paths [PluginManifest.payload] declares, nothing more, nothing fewer
  */
 object PluginBundleInstaller {
@@ -45,7 +47,7 @@ object PluginBundleInstaller {
     private const val MAX_ENTRY_BYTES = 64L * 1024 * 1024
 
     /** The bundle's trust files: small, read whole; every other entry is payload and is streamed to disk. */
-    private val TRUST_FILES = setOf("manifest.json", "manifest.sig", PluginCertificates.FILE_NAME)
+    private val TRUST_FILES = setOf("manifest.json", BundleSignature.FILE_NAME, LegacyBundleSignature.SIGNATURE_FILE, LegacyBundleSignature.CERTIFICATE_FILE)
 
     private fun ByteArray.toHexString(): String = joinToString("") { "%02x".format(it) }
 
@@ -59,7 +61,7 @@ object PluginBundleInstaller {
     ): PluginInstallResult {
         // Entries are streamed to a staging folder on disk and hashed as they go: a bundle carrying both ABIs of an
         // engine is tens of MiB, and several installs run at once (Update all), so none of it is held in the heap
-        // (Droidtop/tracker#545). Only the three small trust files are read into memory, each under its cap.
+        // (Droidtop/tracker#545). Only the small trust files are read into memory, each under its cap.
         val staging = File(pluginsRoot.absoluteFile.parentFile ?: pluginsRoot, ".plugin-install-" + System.nanoTime()).also { it.mkdirs() }
         try {
             return installStaged(bundleFile, pluginsRoot, staging, userKeys, nowEpochSeconds, hostPermissions)
@@ -138,8 +140,17 @@ object PluginBundleInstaller {
         if (manifestBytes.size > MAX_MANIFEST_BYTES) {
             return PluginInstallResult.Refused(PluginInstallError("manifest.json exceeds the ${MAX_MANIFEST_BYTES / 1024} KiB cap"))
         }
-        val signatureBase64 = small["manifest.sig"]?.toString(Charsets.US_ASCII)
-            ?: return PluginInstallResult.Refused(PluginInstallError("bundle has no manifest.sig"))
+        // Only the certificate format installs; the old one verifies only what is already installed (SPEC 12a "Migration from raw keys").
+        val jws = small[BundleSignature.FILE_NAME]?.toString(Charsets.US_ASCII)
+            ?: return PluginInstallResult.Refused(
+                PluginInstallError(
+                    if (LegacyBundleSignature.SIGNATURE_FILE in small) {
+                        "this bundle is signed the old way, which droidtop no longer installs: its publisher has to sign it again with a certificate (${BundleSignature.FILE_NAME})"
+                    } else {
+                        "bundle has no ${BundleSignature.FILE_NAME}"
+                    },
+                ),
+            )
 
         val manifest = runCatching { PluginManifest.fromJson(JSONObject(manifestBytes.toString(Charsets.UTF_8))) }
             .getOrNull() ?: return PluginInstallResult.Refused(PluginInstallError("manifest.json isn't a complete plugin manifest"))
@@ -155,14 +166,12 @@ object PluginBundleInstaller {
         }
 
         // Checklist point 3: signature and schema before anything else touches disk as "the plugin".
-        val certificateText = small[PluginCertificates.FILE_NAME]?.toString(Charsets.UTF_8)
         val verdict = BundleSignature.verifyBundle(
-            manifestBytes, signatureBase64, manifest.origin, manifest.id, certificateText,
+            manifestBytes, jws, manifest.origin, manifest.id,
             userKeys, PluginRevocations.load(pluginsRoot), nowEpochSeconds,
         )
-        // The fingerprint approval binds to: the master's for a certified
-        // bundle, the legacy official key's, or the user-trusted key's
-        // ([BundleVerdict.Verified.anchorSha256]).
+        // The fingerprint approval binds to: the anchor the chain ended at,
+        // Droidtop Core's or the user-trusted key's ([BundleVerdict.Verified.anchorSha256]).
         val verified = when (verdict) {
             is BundleVerdict.Refused -> return PluginInstallResult.Refused(PluginInstallError(verdict.reason))
             is BundleVerdict.Verified -> verdict
@@ -196,9 +205,8 @@ object PluginBundleInstaller {
         // Everything verified -- now, and only now, write to disk.
         if (!existingRoot.isDirectory) existingRoot.mkdirs() else existingRoot.listFiles()?.forEach { it.deleteRecursively() }
         File(existingRoot, "manifest.json").writeBytes(manifestBytes)
-        File(existingRoot, "manifest.sig").writeText(signatureBase64)
         // Kept beside the manifest so every re-verification checks the same chain the install did.
-        if (verified.certificate != null && certificateText != null) File(existingRoot, PluginCertificates.FILE_NAME).writeText(certificateText)
+        File(existingRoot, BundleSignature.FILE_NAME).writeText(jws)
         for (file in manifest.payload) {
             val target = File(existingRoot, file.path)
             target.parentFile?.mkdirs()
@@ -231,8 +239,8 @@ object PluginBundleInstaller {
         // whatever state it had, and a different digest keeps APPROVED --
         // with its enabled and root-approved bits -- when it verifies under
         // that same anchor: the same user-trusted key, or for the official
-        // origin droidtop's own anchors (the legacy key or the plugin
-        // master, [PluginOriginKeys.sameTrustAnchor]). Everything else
+        // origin droidtop's own anchors (Droidtop Core, or the legacy key or
+        // old plugin master it was approved under, [PluginOriginKeys.sameTrustAnchor]). Everything else
         // starts PENDING: a first install, an update of a plugin that was
         // only ever PENDING, an update signed by a different user key (a
         // rotation is a new trust decision), and any update of a DENIED
@@ -285,25 +293,32 @@ object PluginBundleInstaller {
      * happened -- fails this and [PluginStore] refuses to run it; so
      * does a plugin whose origin's user-trusted key was removed from
      * "Keys you trust", since [userKeys] is the same store
-     * [install] verified against, and an official plugin whose
-     * certificate or key the master's revocation list has since withdrawn.
-     * A certificate that merely expired does not stop an installed plugin.
+     * [install] verified against, and a plugin whose certificate or key a
+     * revocation list has since withdrawn. A certificate that merely expired
+     * does not stop an installed plugin. A plugin installed before the
+     * certificate format (`manifest.sig`, no `manifest.jws`) is checked on
+     * the bounded legacy path ([LegacyBundleSignature]) until it updates.
      */
     fun verifyInstalled(pluginsRoot: File, record: PluginRecord, userKeys: Map<String, String> = emptyMap()): PluginInstallError? {
         val dir = File(pluginsRoot, record.manifest.id)
         val manifestFile = File(dir, "manifest.json")
-        val sigFile = File(dir, "manifest.sig")
-        if (!manifestFile.isFile || !sigFile.isFile) return PluginInstallError("plugin files are missing")
+        val jwsFile = File(dir, BundleSignature.FILE_NAME)
+        val legacySigFile = File(dir, LegacyBundleSignature.SIGNATURE_FILE)
+        if (!manifestFile.isFile || (!jwsFile.isFile && !legacySigFile.isFile)) return PluginInstallError("plugin files are missing")
         val manifestBytes = manifestFile.readBytes()
         if (Sha256.hex(manifestBytes) != record.archiveDigest) {
             return PluginInstallError("manifest.json changed on disk since approval")
         }
-        val certificateFile = File(dir, PluginCertificates.FILE_NAME)
-        val certificateText = if (certificateFile.isFile) certificateFile.readText() else null
-        val verdict = BundleSignature.verifyBundle(
-            manifestBytes, sigFile.readText(), record.manifest.origin, record.manifest.id, certificateText,
-            userKeys, PluginRevocations.load(pluginsRoot),
-        )
+        val revocations = PluginRevocations.load(pluginsRoot)
+        val verdict = if (jwsFile.isFile) {
+            BundleSignature.verifyBundle(manifestBytes, jwsFile.readText(), record.manifest.origin, record.manifest.id, userKeys, revocations)
+        } else {
+            val certificateFile = File(dir, LegacyBundleSignature.CERTIFICATE_FILE)
+            LegacyBundleSignature.verifyInstalled(
+                manifestBytes, legacySigFile.readText(), record.manifest.origin, record.manifest.id,
+                if (certificateFile.isFile) certificateFile.readText() else null, userKeys, pluginsRoot, revocations,
+            )
+        }
         if (verdict is BundleVerdict.Refused) {
             return PluginInstallError("signature no longer verifies: ${verdict.reason}")
         }

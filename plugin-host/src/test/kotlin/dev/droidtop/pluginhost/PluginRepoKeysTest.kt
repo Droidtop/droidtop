@@ -8,7 +8,7 @@ import org.junit.Test
 /** The committed root key is the reference; the release copy only cross-checks it (docs/SPEC.md 12a "Plugin repositories"). No key material is made: the keys are a published test vector and the app's pinned public key. */
 class PluginRepoKeysTest {
     private val keyA = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYP7UuiVanTHJYet0xjVtaMBJuJI7Yfps5mliLmDyn7Z5A/4QCLi8maQa6elWKLxk8vGyDC1+n1F3o8KU1EYimQ=="
-    private val keyB get() = PluginOriginKeys.officialKeyBase64()
+    private val keyB = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEYs1dY+vQaHC/tj9XEfv2KxHfCzLtsgyIi/ANwdSuKyoGcp7kCNXoy0sYhOaOdFUTpV4tnkKsICv/EY8q+zM5Dw=="
 
     private fun file(origin: String, key: String) = """{"origin":"$origin","key":"$key"}""".toByteArray()
     private fun root(origin: String = "acme", key: String = keyA): () -> PluginSourceKeys.FetchResult =
