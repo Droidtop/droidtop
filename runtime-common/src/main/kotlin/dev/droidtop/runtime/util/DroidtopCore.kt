@@ -1,57 +1,72 @@
 package dev.droidtop.runtime.util
 
+import java.security.PublicKey
 import java.security.cert.X509Certificate
 
 /**
- * The Droidtop Core certificate (docs/SPEC.md 12a "Signatures: certificate
- * chains to Droidtop Core", Droidtop/tracker#550): droidtop's one pinned trust
- * anchor. It is the owner's RSA "Droidtop Core" certificate, issued by their
- * UCM CA, and it is pinned by itself: verification walks a signature's chain up
- * to it and stops ("We do NOT want to chain the signature past this key"), so
- * nothing above it, the UCM root included, is trusted, needed or read.
+ * Droidtop Core (docs/SPEC.md 12a "Signatures: certificate chains to Droidtop
+ * Core", Droidtop/tracker#550): droidtop's one pinned trust anchor, the public
+ * key of the owner's RSA "Droidtop Core" key, whose certificate their UCM CA
+ * issued. Only the public key is pinned: the certificate stays on the owner's
+ * machine, and none is needed here, because a chain is anchored by checking
+ * that its last certificate verifies under this key. Verification stops there
+ * ("We do NOT want to chain the signature past this key"), so nothing above
+ * Core, the UCM root included, is trusted, needed or read.
  *
- * It ships as the resource [RESOURCE] (public material). Until the owner
- * commits the real certificate there the file is a placeholder and
- * [certificate] is null: official bundles in the certificate format are
- * refused with a reason that says so, and the component catalog is accepted
- * unsigned ([CatalogSignature.Verdict.Unpinned]).
+ * It ships as the resource [RESOURCE]: a PEM `PUBLIC KEY` block (or bare
+ * base64 SubjectPublicKeyInfo), public material, which the coordinator
+ * commits. Until then the file is a placeholder and [key] is null: official
+ * bundles in the certificate format are refused with a reason that says so,
+ * and the component catalog is accepted unsigned
+ * ([CatalogSignature.Verdict.Unpinned]).
  */
 object DroidtopCore {
-    const val RESOURCE = "dev/droidtop/runtime/util/droidtop-core.pem"
+    const val RESOURCE = "dev/droidtop/runtime/util/droidtop-core.pub"
 
-    private val pinned: X509Certificate? by lazy { load() }
+    private val pinned: PublicKey? by lazy { load() }
 
     @Volatile private var overridden = false
-    @Volatile private var override: X509Certificate? = null
+    @Volatile private var override: PublicKey? = null
 
-    /** The pinned Droidtop Core certificate, or null while this build pins none. */
-    fun certificate(): X509Certificate? = if (overridden) override else pinned
+    /** The pinned Droidtop Core public key, or null while this build pins none. */
+    fun key(): PublicKey? = if (overridden) override else pinned
 
     /** The anchor droidtop's own signatures must chain to, or null while none is pinned. */
-    fun anchor(): ChainSignature.Anchor? = certificate()?.let { ChainSignature.Anchor(it.publicKey, it) }
+    fun anchor(): ChainSignature.Anchor? = key()?.let { ChainSignature.Anchor(it, pinned = true) }
 
     /** Lowercase hex SHA-256 of Droidtop Core's SubjectPublicKeyInfo, or null while none is pinned. */
-    fun keySha256(): String? = certificate()?.let { Sha256.hex(it.publicKey.encoded) }
+    fun keySha256(): String? = key()?.let { Sha256.hex(it.encoded) }
 
-    /** Whether [cert] was issued by Droidtop Core: its issuer is Core's subject and Core's key signed it. */
+    /** Whether Droidtop Core's key signed [cert] (and [cert] is not Core's own). */
     fun issued(cert: X509Certificate): Boolean {
-        val core = certificate() ?: return false
-        return cert.issuerX500Principal == core.subjectX500Principal && runCatching { cert.verify(core.publicKey) }.isSuccess
+        val core = key() ?: return false
+        if (cert.publicKey.encoded.contentEquals(core.encoded)) return false
+        return runCatching { cert.verify(core) }.isSuccess
     }
 
-    private fun load(): X509Certificate? {
+    /** The key in [text]: a PEM `PUBLIC KEY` block or bare base64 SPKI; null for the placeholder (comment lines only). */
+    internal fun parse(text: String): PublicKey? {
+        val body = if (text.contains("-----BEGIN PUBLIC KEY-----")) {
+            text.substringAfter("-----BEGIN PUBLIC KEY-----").substringBefore("-----END PUBLIC KEY-----")
+        } else {
+            text.lines().filterNot { it.trimStart().startsWith("#") }.joinToString("")
+        }
+        if (body.isBlank()) return null
+        return ChainSignature.parseSpki(body)
+    }
+
+    private fun load(): PublicKey? {
         val text = runCatching {
             DroidtopCore::class.java.classLoader?.getResourceAsStream(RESOURCE)?.use { it.readBytes().toString(Charsets.US_ASCII) }
         }.getOrNull() ?: return null
-        if (!text.contains("-----BEGIN CERTIFICATE-----")) return null
-        return ChainSignature.parseCertificate(text)?.takeIf { ChainSignature.acceptableKey(it.publicKey) }
+        return parse(text)
     }
 
-    /** Test hook: pins [certificate] (or, with null, none at all) for the duration of [block]. */
-    fun <T> withPinned(certificate: X509Certificate?, block: () -> T): T {
+    /** Test hook: pins [key] (or, with null, none at all) for the duration of [block]. */
+    fun <T> withPinned(key: PublicKey?, block: () -> T): T {
         val previousOverridden = overridden
         val previous = override
-        override = certificate
+        override = key
         overridden = true
         try {
             return block()

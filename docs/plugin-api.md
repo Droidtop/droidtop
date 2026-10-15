@@ -2487,7 +2487,7 @@ Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 
 - **Install integrity.** Signature (`manifest.jws`, a JWS carrying the
   signing certificate chain), per-repository keys certified by the pinned
-  Droidtop Core certificate (with revocation), the key the person trusts
+  Droidtop Core public key (with revocation), the key the person trusts
   for any other origin, the trust tiers,
   every payload hash, re-verification before every activation, id
   namespacing and ABI coverage. Official bundles are signed by CI

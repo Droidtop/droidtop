@@ -149,7 +149,7 @@ object UserOriginKeys {
             if (names.isNotEmpty() && ChainSignature.ORIGIN_URN + origin !in names) return null
             if (DroidtopCore.issued(certificate)) {
                 if (names.isEmpty()) return null
-                DroidtopCore.certificate()!!.publicKey
+                DroidtopCore.key()!!
             } else {
                 certificate.publicKey.takeIf(ChainSignature::acceptableKey)
             }

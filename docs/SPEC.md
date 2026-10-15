@@ -16441,7 +16441,7 @@ redistributables downloaded to read their terms):
   catalog. The old `catalog.cert`/`catalog.json.sig` pair under the old
   P-256 master is gone (its seed was lost). Owner steps: derive the catalog
   key in the provisioning tool, issue its leaf from the Core key, set the
-  two secrets; commit the Core certificate at the pinned path (12a).
+  two secrets; the coordinator commits Core's public key at the pinned path (12a).
 
 ## 10. Build order
 
@@ -18253,7 +18253,7 @@ the secondary path for sources that publish no key.
 
 - **Three tiers, one resolution order.** An origin is OFFICIAL
   ("droidtop": its bundles' certificate chains end at the Droidtop Core
-  certificate pinned in the app binary; "Signatures: certificate chains to
+  public key pinned in the app binary; "Signatures: certificate chains to
   Droidtop Core" below), USER-TRUSTED (an origin the user chose to
   trust, stored in droidtop's own private storage, never in the pinned
   set), or unknown (refused outright, as always). `PluginOriginKeys.
@@ -18523,17 +18523,21 @@ certificate, Droidtop Core, and nothing above it. Enginehost implements
 the same format; the format as posted for it is the #550 comment of
 2026-10-15.
 
-- **The anchor.** The Droidtop Core certificate (the owner's RSA "Droidtop
-  Core" key, issued by their UCM CA) is pinned in the binary as the
-  resource `runtime-common/src/main/resources/dev/droidtop/runtime/util/droidtop-core.pem`
-  (`DroidtopCore`, `:runtime-common`). It is public material; the
-  committed file is a PLACEHOLDER until the owner or coordinator replaces
-  it with the real certificate, and while it holds no certificate the
-  build pins no Core: no certificate-format official bundle installs (the
-  refusal says so) and the component catalog is accepted unsigned.
-  Verification walks from the signing certificate up to Core and STOPS:
-  the chain's last certificate must name Core as issuer and verify under
-  Core's key; the chain may not carry Core itself; the UCM root above Core
+- **The anchor.** Droidtop Core's PUBLIC KEY (the owner's RSA "Droidtop
+  Core" key, whose certificate their UCM CA issued) is pinned in the binary
+  as the resource `runtime-common/src/main/resources/dev/droidtop/runtime/util/droidtop-core.pub`
+  (a PEM `PUBLIC KEY` block; `DroidtopCore`, `:runtime-common`). Owner,
+  2026-10-15: the certificate "exists on the local machine. It will not be
+  uploaded", and "Pubkeys will be committed, but allow the coordinator to
+  do that". So the app pins the key, not the certificate, and needs no
+  certificate of its own: a chain is anchored by its last certificate
+  verifying under that key. The committed file is a PLACEHOLDER until the
+  coordinator replaces it (`openssl x509 -in <core.crt> -noout -pubkey`),
+  and while it holds no key the build pins no Core: no certificate-format
+  official bundle installs (the refusal says so) and the component catalog
+  is accepted unsigned. Verification walks from the signing certificate up
+  to Core and STOPS: the chain's last certificate must verify under Core's
+  key; the chain may not carry a certificate holding Core's key; the UCM root above Core
   is never trusted, needed or read, so a chain that reaches only the
   owner's wider CA is refused. Core signs certificates only, never a
   bundle, a catalog or a list.
@@ -19248,7 +19252,7 @@ what the index says is display data, never a trust decision.
 4. Signing is real, not a placeholder gesture: a JWS over the exact
    manifest bytes, signed by a certificate whose chain ends at the
    origin's anchor (`BundleSignature.verifyBundle`): an official bundle's
-   at the pinned Droidtop Core certificate, its leaf naming the official
+   at the pinned Droidtop Core key, its leaf naming the official
    origin ("Signatures: certificate chains to Droidtop Core" above; plugins
    installed before the change verify on the bounded legacy path until
    they update), any other origin's at the key "Keys you trust" stores. Approval is bound to the

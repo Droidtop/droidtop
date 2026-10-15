@@ -23,7 +23,7 @@ import kotlinx.serialization.json.jsonObject
  * chains to Droidtop Core", Droidtop/tracker#550): a JWS (RFC 7515) in compact
  * serialization whose protected header carries the signing certificate chain
  * as `x5c`, verified up to one trust [Anchor] and no further. For droidtop's
- * own signatures the anchor is the pinned Droidtop Core certificate
+ * own signatures the anchor is the pinned Droidtop Core public key
  * ([DroidtopCore]); for an origin or catalog the person trusts it is the key
  * they confirmed. Plugin bundles, catalog indexes and revocation lists all use
  * it, told apart by [Purpose] (the header's `typ` and the leaf's extended key
@@ -48,13 +48,13 @@ object ChainSignature {
     }
 
     /**
-     * What a chain must end at. [certificate] is set for Droidtop Core, whose
-     * certificate is pinned: the chain's last certificate must name it as
-     * issuer, and the chain may not carry it. A key the person trusts has no
-     * certificate here, and the chain's last certificate may hold that key
-     * itself (a publisher's self-signed certificate).
+     * What a chain must end at. [pinned] is set for Droidtop Core, whose key is
+     * pinned in the binary: the chain's last certificate must verify under it,
+     * and no certificate in the chain may hold it (the chain stops below Core).
+     * For a key the person trusts, the chain's last certificate may instead hold
+     * that key itself (a publisher's self-signed certificate).
      */
-    class Anchor(val key: PublicKey, val certificate: X509Certificate? = null) {
+    class Anchor(val key: PublicKey, val pinned: Boolean = false) {
         val sha256: String = Sha256.hex(key.encoded)
     }
 
@@ -159,14 +159,11 @@ object ChainSignature {
             }
         }
         val top = chain.last()
-        val pinned = anchor.certificate
-        if (pinned != null) {
+        if (anchor.pinned) {
             if (chain.any { it.publicKey.encoded.contentEquals(anchor.key.encoded) }) {
                 return "the chain carries Droidtop Core itself; it must stop below it"
             }
-            if (top.issuerX500Principal != pinned.subjectX500Principal || !signedBy(top, anchor.key)) {
-                return "the chain does not lead to Droidtop Core"
-            }
+            if (!signedBy(top, anchor.key)) return "the chain does not lead to Droidtop Core"
         } else if (!top.publicKey.encoded.contentEquals(anchor.key.encoded) && !signedBy(top, anchor.key)) {
             return "the chain does not lead to the key you trust"
         }
