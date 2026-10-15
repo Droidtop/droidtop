@@ -13,17 +13,15 @@ class LeftMenuTest {
 
     @Test
     fun `every destination the mode allows is a row after Home, named as the top bar names it`() {
-        assertEquals(menuSectionsFor(UiMode.FULL), all.drop(2).map { it.section })
-        assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.drop(2).map { it.label })
+        assertEquals(menuSectionsFor(UiMode.FULL), all.drop(1).map { it.section })
+        assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.drop(1).map { it.label })
         assertEquals(GamingSection.entries.toSet(), all.map { it.section }.toSet())
     }
 
     @Test
     fun `Home is the first row and opens the PC section's shelves`() {
         assertEquals(LeftMenuEntry(GamingSection.PC_GAMES, "Home", home = true), all.first())
-        assertEquals(listOf("Home", "Search", "PC Games", "Retro Games", "Apps"), all.take(5).map { it.label })
-        // Search is an action: the cursor never opens on it as "where you are".
-        assertFalse(all[1].isAt(GamingSection.PC_GAMES, atHome = true))
+        assertEquals(listOf("Home", "PC Games", "Retro Games", "Apps"), all.take(4).map { it.label })
         assertEquals(all.size, all.map { it.key }.toSet().size)
     }
 
@@ -67,14 +65,14 @@ class LeftMenuTest {
     @Test
     fun `the cursor opens on the destination the user is on`() {
         all.forEachIndexed { index, entry ->
-            if (!entry.search) assertEquals(index, leftMenuStartIndex(all, entry.section, atHome = entry.home))
+            assertEquals(index, leftMenuStartIndex(all, entry.section, atHome = entry.home))
         }
     }
 
     @Test
     fun `Home and PC Games are told apart by which view the PC section shows`() {
         assertEquals(0, leftMenuStartIndex(all, GamingSection.PC_GAMES, atHome = true))
-        assertEquals(2, leftMenuStartIndex(all, GamingSection.PC_GAMES, atHome = false))
+        assertEquals(1, leftMenuStartIndex(all, GamingSection.PC_GAMES, atHome = false))
     }
 
     @Test
@@ -87,7 +85,7 @@ class LeftMenuTest {
     @Test
     fun `with a game running the Resume row leads and the cursor still opens on where the user is`() {
         all.forEachIndexed { index, entry ->
-            if (!entry.search) assertEquals(index + 1, leftMenuStartIndex(all, entry.section, atHome = entry.home, rowsAbove = 1))
+            assertEquals(index + 1, leftMenuStartIndex(all, entry.section, atHome = entry.home, rowsAbove = 1))
         }
     }
 

@@ -17,9 +17,6 @@ internal object SearchEntry {
     fun systemLabel(systemName: String, text: String = ""): String =
         if (text.isBlank()) "Search $systemName" else "Search $systemName: ${text.trim()}"
 
-    /** The label of the row that opens the global search. */
-    const val GLOBAL_LABEL = "Search"
-
     /**
      * The systems whose name or id the text matches, for the global search's system rows: a whole-word or prefix
      * match, case-insensitive ("snes" finds "SNES", "super nin" finds "Super Nintendo"). [systems] is id to name.
