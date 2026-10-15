@@ -198,17 +198,6 @@ object GameEngineDetector {
             .map { File(facts.folder, it) }
             .any { file -> file.readTwineHead()?.let(::looksLikeTwine) == true }
 
-    private fun ByteArray.indexOfSubsequence(needle: ByteArray): Int {
-        if (needle.isEmpty() || needle.size > size) return -1
-        outer@ for (i in 0..size - needle.size) {
-            for (j in needle.indices) {
-                if (this[i + j] != needle[j]) continue@outer
-            }
-            return i
-        }
-        return -1
-    }
-
     private val UNITY_PLAYER_FILENAMES = setOf("UnityPlayer.dll", "UnityPlayer.so", "UnityPlayer.dylib")
 
     private fun isUnity(facts: FolderListing): Boolean = hasUnityPlayerRuntime(facts, maxDepth = 3)
