@@ -2413,6 +2413,31 @@ the `ContainerRuntime` interface that already exists (§3):
   helper with the command's token, as distrobox-export `--bin` writes one.
   One name belongs to one container. Deleting a container removes its
   commands; each desktop start rewrites the wrappers from the list.
+  **The docker command (built 2026-10-15, Droidtop/tracker#555 D6c,
+  first slice).** Every container has `docker` on its `PATH`, a thin
+  client of droidtop's one engine, not a second runtime. It is one more
+  wrapper in `desktop-launcher/commands`, running the same enter helper
+  with droidtop's own token (`DockerCli.TOKEN`), so it travels the one
+  request channel with the same 64 KB argument bound, streams and exit
+  status (the review's "one channel, a new request kind"); no exported
+  command may be named `docker`. droidtop reads the arguments into a
+  closed set (`DockerCli.parse`, `DockerCommand`) and answers from its
+  own state: `ps [-a] [-q]` (NAME, IMAGE, STATUS from the container's
+  program first, PORTS from its image; without `-a`, the ones whose
+  program runs or whose container is started), `images [-q]` (the image
+  store), `logs [-n N] CONTAINER` (the program's log, at most 2000
+  lines; no `-f` yet), `start` and `stop CONTAINER...` (the container's
+  own program, as its page's Start it and Stop it; a container whose
+  image names no program says so), and `exec [-e K=V] [-w DIR] CONTAINER
+  COMMAND...` (the enter path with any command, behind the same
+  per-container "Run its commands from the desktop" switch; `-i` and
+  `-t` are taken, and it runs on pipes). A container is named by its name
+  or its id. `run`, `pull`, `rm` and `compose` answer "not built in
+  droidtop yet"; what needs namespaces, a daemon or image building
+  (`build`, `network`, `volume`, `push`, ...) answers that droidtop's
+  containers do not have it. Docker words stay in the command; droidtop's
+  screens keep "app" and "program". Nothing the container wrote reaches
+  Android as a command, a path or an argv.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy
