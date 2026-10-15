@@ -60,6 +60,7 @@ import dev.droidtop.library.integrations.LocalSearchRow
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.SourceDestinations
 import dev.droidtop.library.integrations.SourceHit
+import dev.droidtop.library.integrations.UnavailableSource
 import dev.droidtop.library.integrations.UnifiedSearch
 import dev.droidtop.library.integrations.UnifiedState
 import dev.droidtop.library.settings.CatalogScreen
@@ -615,8 +616,8 @@ internal fun LibrarySearchDialog(
                     add(
                         SearchLine.Entry(
                             "waiting",
-                            if (waiting.size == 1) "${waiting.first().label} is waiting for your approval" else "${waiting.size} sources are waiting for your approval",
-                            subtitle = if (waiting.size == 1) "Open it to approve" else "Open to approve them",
+                            UnavailableSource.waitingTitle(waiting),
+                            subtitle = UnavailableSource.waitingSubtitle(waiting),
                         ) { openPlugin(waiting.singleOrNull()?.pluginId) },
                     )
                 }

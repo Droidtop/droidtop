@@ -19905,6 +19905,18 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   the plugin's page in Settings, Plugins (the whole list when there are
   several); one that is turned off or denied is a row that opens its page.
   None of them is a line of text that looks pressable and is not.
+  **Waiting means two things, and a source in either is not asked**
+  (`UnavailableSource.of`, Droidtop/tracker#485): the plugin is not approved yet,
+  or it is approved but the person has not allowed it the `library.sources`
+  point (Settings, Plugins, Permissions). The second used to be asked anyway and
+  came back as "X has not been allowed to get games from a source", one block
+  with a Technical details row per plugin. Now it counts in the one "N sources
+  are waiting for your approval" row. The "Get games" screens say the same thing
+  the same way (`UnavailableSource.waitingTitle`): when no source can answer, ONE
+  row names the waiting ones and opens Plugins (the plugin's own page when it is
+  one), never a block per plugin. "Get apps" with a catalog plugin installed but
+  not allowed is a row that opens that plugin's page, and with none installed
+  has a Plugins row, so neither is a dead end.
   **A failure is a sentence the person can act on** (`SourceFailures.plain`,
   Droidtop/tracker#375, #485): what a source reports (a site's own page text
   such as "JavaScript is disabled...", a platform exception, a socket error)

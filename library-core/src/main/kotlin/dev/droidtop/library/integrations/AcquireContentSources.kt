@@ -11,9 +11,12 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
+import dev.droidtop.pluginhost.PluginGrants
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
@@ -142,7 +145,44 @@ data class UnavailableSource(
     val pluginId: String,
     /** True while the plugin only waits for the person's approval (the sentence "is waiting for your approval"). */
     val waitingForApproval: Boolean,
-)
+) {
+    companion object {
+        /**
+         * Why an installed source plugin cannot answer, or null when it can (docs/SPEC.md 12a "One search"). The plugin
+         * itself must be approved and on, and the person must have allowed it the `library.sources` point ([point]):
+         * a plugin approved as a whole but not yet allowed to give games used to be asked anyway and answered with
+         * "has not been allowed to ...", one block per plugin (Droidtop/tracker#485). Pure.
+         */
+        fun of(
+            label: String,
+            pluginId: String,
+            trust: PluginTrustState,
+            enabled: Boolean,
+            disabledReason: String?,
+            point: GrantState,
+        ): UnavailableSource? {
+            val waiting = trust == PluginTrustState.PENDING ||
+                (trust == PluginTrustState.APPROVED && enabled && disabledReason == null && point == GrantState.ASK)
+            val reason = when {
+                waiting -> "is waiting for your approval"
+                trust == PluginTrustState.DENIED -> "was denied"
+                trust != PluginTrustState.APPROVED -> "is turned off"
+                disabledReason != null -> "is disabled: $disabledReason"
+                !enabled -> "is turned off"
+                point == GrantState.DENIED -> "was not allowed to give games"
+                else -> return null
+            }
+            return UnavailableSource(label, reason, pluginId, waiting)
+        }
+
+        /** The one row that stands for every source waiting for the person, in the search and in Get games alike. */
+        fun waitingTitle(waiting: List<UnavailableSource>): String =
+            if (waiting.size == 1) "${waiting.first().label} is waiting for your approval" else "${waiting.size} sources are waiting for your approval"
+
+        /** What the row under [waitingTitle] says it does. */
+        fun waitingSubtitle(waiting: List<UnavailableSource>): String = if (waiting.size == 1) "Open it to approve" else "Open to approve them"
+    }
+}
 
 object AcquireContentSources {
     /** The registered settings screen id of Accounts and sources > Plugins: where "no source" and "needs approval" lead. */
@@ -154,32 +194,41 @@ object AcquireContentSources {
     /** The registered settings screen id of Accounts and sources > App integrations. */
     const val INTEGRATIONS_SCREEN_ID = "integrations"
 
+    /** The extension point a contract 2 plugin gives games through; the person allows it per plugin. */
+    const val SOURCES_POINT = "library.sources"
+
+    private fun pointState(record: PluginRecord, grants: PluginGrants): GrantState =
+        PluginGrants.provideState(record, grants.read(record.manifest.id), SOURCES_POINT)
+
     /** Installed plugins that declare ACQUIRE_CONTENT but are not runnable (waiting for approval, denied, turned off, disabled after a failure). Reads the plugin store: off the main thread. */
-    fun unavailablePlugins(context: Context): List<UnavailableSource> =
-        PluginStore.installed(context)
-            .filter { PluginCapability.ACQUIRE_CONTENT in it.manifest.capabilities && !it.runnable() }
-            .map { record ->
-                UnavailableSource(
+    fun unavailablePlugins(context: Context): List<UnavailableSource> {
+        val grants = PluginGrants.forContext(context)
+        return PluginStore.installed(context)
+            .filter { PluginCapability.ACQUIRE_CONTENT in it.manifest.capabilities }
+            .mapNotNull { record ->
+                UnavailableSource.of(
                     record.manifest.label,
-                    when {
-                        record.trust == PluginTrustState.PENDING -> "is waiting for your approval"
-                        record.trust == PluginTrustState.DENIED -> "was denied"
-                        record.disabledReason != null -> "is disabled: ${record.disabledReason}"
-                        else -> "is turned off"
-                    },
-                    pluginId = record.manifest.id,
-                    waitingForApproval = record.trust == PluginTrustState.PENDING,
+                    record.manifest.id,
+                    record.trust,
+                    record.enabled,
+                    record.disabledReason,
+                    pointState(record, grants),
                 )
             }
+    }
 
     /** Every available source for a "Get games" surface: installed+approved plugins declaring ACQUIRE_CONTENT, plus JSON integrations of the same capability. Plugins first -- a real result list beats a one-way launch. */
     fun available(context: Context): List<AcquireContentSource> =
-        PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Plugin(it) } +
+        availablePlugins(context) +
             IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Json(it) }
 
     /** Just the plugin sources -- what [PluginSearchAggregator] fans a query out to; JSON integrations stay one-way/fire-and-forget and have no results to merge. */
-    fun availablePlugins(context: Context): List<AcquireContentSource.Plugin> =
-        PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Plugin(it) }
+    fun availablePlugins(context: Context): List<AcquireContentSource.Plugin> {
+        val grants = PluginGrants.forContext(context)
+        return PluginStore.runnableFor(context, PluginCapability.ACQUIRE_CONTENT)
+            .filter { pointState(it, grants) == GrantState.GRANTED }
+            .map { AcquireContentSource.Plugin(it) }
+    }
 
     /**
      * The one "Get games" screen for one system -- lists every source
@@ -227,35 +276,57 @@ object AcquireContentSources {
      * App integrations from right there. Reads the plugin store: call off the main thread.
      */
     private fun noSourceGroup(context: Context, key: String): CatalogGroup {
-        val waiting = unavailablePlugins(context)
+        val unavailable = unavailablePlugins(context)
+        val waiting = unavailable.filter { it.waitingForApproval }
+        val others = unavailable.filter { !it.waitingForApproval }
         return CatalogGroup(
             id = "acquire_empty",
             title = null,
-            items = listOf(
-                ActionItem(
-                    id = "acquire_empty_$key",
-                    title = if (waiting.isEmpty()) "No download source is installed" else "No download source is ready",
-                    subtitle = if (waiting.isEmpty()) {
-                        "A download source is a plugin or an app integration that finds games for you."
-                    } else {
-                        waiting.joinToString("\n") { "${it.label} ${it.reason}" }
-                    },
-                    run = {},
-                ),
-                NestedScreenItem(
-                    id = "acquire_empty_plugins_$key",
-                    title = "Plugins",
-                    subtitle = "Install a plugin that offers downloads, or approve one you already added",
-                    registryId = PLUGINS_SCREEN_ID,
-                ),
-                NestedScreenItem(
-                    id = "acquire_empty_integrations_$key",
-                    title = "App integrations",
-                    subtitle = "Hook another installed app in as a download source",
-                    registryId = INTEGRATIONS_SCREEN_ID,
-                ),
-            ),
+            items = buildList {
+                add(
+                    ActionItem(
+                        id = "acquire_empty_$key",
+                        title = if (unavailable.isEmpty()) "No download source is installed" else "No download source is ready",
+                        subtitle = if (unavailable.isEmpty()) "A download source is a plugin or an app integration that finds games for you." else null,
+                        run = {},
+                    ),
+                )
+                // Every source waiting for the person is ONE row that leads to where they are approved, however many there are.
+                if (waiting.isNotEmpty()) {
+                    add(pluginsLink("acquire_empty_waiting_$key", UnavailableSource.waitingTitle(waiting), UnavailableSource.waitingSubtitle(waiting), waiting.singleOrNull()?.pluginId))
+                }
+                others.forEach { off -> add(pluginsLink("acquire_empty_off_${off.pluginId}_$key", "${off.label} ${off.reason}", "Open its page", off.pluginId)) }
+                add(
+                    NestedScreenItem(
+                        id = "acquire_empty_plugins_$key",
+                        title = "Plugins",
+                        subtitle = "Install a plugin that offers downloads, or approve one you already added",
+                        registryId = PLUGINS_SCREEN_ID,
+                    ),
+                )
+                add(
+                    NestedScreenItem(
+                        id = "acquire_empty_integrations_$key",
+                        title = "App integrations",
+                        subtitle = "Hook another installed app in as a download source",
+                        registryId = INTEGRATIONS_SCREEN_ID,
+                    ),
+                )
+            },
         )
+    }
+
+    /**
+     * A row that opens Plugins, at [pluginId]'s own page when it names one and the page is known, else at the list.
+     * The one way a "waiting for approval" line becomes something a person can press (also the search dialog's).
+     */
+    fun pluginsLink(id: String, title: String, subtitle: String?, pluginId: String?): NestedScreenItem {
+        val page = pluginId?.let { SettingsScreenRegistry.get(PLUGINS_SCREEN_ID, it) }
+        return if (page != null) {
+            NestedScreenItem(id = id, title = title, subtitle = subtitle, inline = page)
+        } else {
+            NestedScreenItem(id = id, title = title, subtitle = subtitle, registryId = PLUGINS_SCREEN_ID)
+        }
     }
 
     /**

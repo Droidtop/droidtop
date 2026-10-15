@@ -81,23 +81,33 @@ object AppCatalogScreen {
     private suspend fun rootGroups(context: Context): List<CatalogGroup> {
         val providers = AppCatalogs.providers(context)
         if (providers.isEmpty()) {
-            val waiting = PluginStore.installed(context).any { record -> record.manifest.v2.provides.any { it.point == AppCatalogs.POINT } }
+            val waiting = PluginStore.installed(context).filter { record -> record.manifest.v2.provides.any { it.point == AppCatalogs.POINT } }
             return listOf(
                 CatalogGroup(
                     "apps_none",
                     null,
-                    listOf(
-                        ActionItem(
-                            "apps_none_row",
-                            if (waiting) "An app catalog plugin is installed but not allowed yet" else "No app catalog is added",
-                            subtitle = if (waiting) {
-                                "Open it on the Plugins screen and allow \"Android apps from a catalog\""
-                            } else {
-                                "Apps come from catalog plugins, such as one that reads F-Droid repositories. Plugins > Add lists them"
-                            },
-                            run = {},
-                        ),
-                    ),
+                    if (waiting.isNotEmpty()) {
+                        // The row is the way there: it opens the plugin's own page (the list when several wait), where "Android apps
+                        // from a catalog" is allowed.
+                        listOf(
+                            AcquireContentSources.pluginsLink(
+                                "apps_none_row",
+                                if (waiting.size == 1) "${waiting.first().manifest.label} is installed but not allowed yet" else "${waiting.size} app catalogs are installed but not allowed yet",
+                                "Open it to allow \"Android apps from a catalog\"",
+                                waiting.singleOrNull()?.manifest?.id,
+                            ),
+                        )
+                    } else {
+                        listOf(
+                            ActionItem("apps_none_row", "No app catalog is added", subtitle = "Apps come from catalog plugins, such as one that reads F-Droid repositories", run = {}),
+                            NestedScreenItem(
+                                "apps_none_plugins",
+                                "Plugins",
+                                subtitle = "Add a plugin that offers an app catalog",
+                                registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
+                            ),
+                        )
+                    },
                 ),
             )
         }
