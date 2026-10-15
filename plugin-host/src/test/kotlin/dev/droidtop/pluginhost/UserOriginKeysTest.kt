@@ -217,7 +217,7 @@ class UserOriginKeysTest {
         val coreKey = dev.droidtop.testpki.TestPki.rsa()
         val core = dev.droidtop.testpki.TestPki.core(coreKey)
         val leaf = dev.droidtop.testpki.TestPki.pluginLeaf(freshKeyPair(), "gamegrab", core, coreKey.private)
-        dev.droidtop.runtime.util.DroidtopCore.withPinned(core) {
+        dev.droidtop.runtime.util.DroidtopCore.withPinned(core.publicKey) {
             assertEquals(Base64.getEncoder().encodeToString(core.publicKey.encoded), UserOriginKeys.anchorKey("gamegrab", dev.droidtop.testpki.TestPki.pem(leaf)))
             assertNull(UserOriginKeys.anchorKey("romgi", dev.droidtop.testpki.TestPki.pem(leaf)))
         }

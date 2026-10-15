@@ -37,7 +37,7 @@ class BundleSignatureTest {
         pluginId: String = "$origin.sample",
         userKeys: Map<String, String> = emptyMap(),
         revocations: PluginRevocationList = PluginRevocationList.NONE,
-    ) = DroidtopCore.withPinned(core) { BundleSignature.verifyBundle(manifest, jws, origin, pluginId, userKeys, revocations) }
+    ) = DroidtopCore.withPinned(core.publicKey) { BundleSignature.verifyBundle(manifest, jws, origin, pluginId, userKeys, revocations) }
 
     @Test
     fun `an official bundle verifies through a leaf Core issued for the official origin`() {
@@ -119,7 +119,7 @@ class BundleSignatureTest {
 
     @Test
     fun `approval carries across official anchors, not across other keys`() {
-        DroidtopCore.withPinned(core) {
+        DroidtopCore.withPinned(core.publicKey) {
             val coreSha = Sha256.hex(core.publicKey.encoded)
             val legacy = LegacyBundleSignature.officialFingerprints()
             assertTrue(legacy.isNotEmpty())

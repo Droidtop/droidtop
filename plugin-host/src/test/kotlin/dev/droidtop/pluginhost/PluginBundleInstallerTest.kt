@@ -392,7 +392,7 @@ class PluginBundleInstallerTest {
             val refused = install(bundle, pluginsRoot)
             assertTrue((refused as PluginInstallResult.Refused).error.reason.contains("Droidtop Core"))
         }
-        DroidtopCore.withPinned(core) {
+        DroidtopCore.withPinned(core.publicKey) {
             val record = (install(bundle, pluginsRoot) as PluginInstallResult.Installed).record
             assertEquals(Sha256.hex(core.publicKey.encoded), record.approvedKeySha256)
             assertTrue(File(pluginsRoot, "droidtop.statustile/manifest.jws").isFile)

@@ -10,7 +10,7 @@ import java.security.cert.X509Certificate
  * chains to Droidtop Core"). Keys are public material; no private key ever
  * appears in this repo.
  *
- * - The official origin's anchor is the pinned Droidtop Core certificate
+ * - The official origin's anchor is the pinned Droidtop Core public key
  *   ([DroidtopCore]). Every official plugin repository signs with its own key,
  *   derived from a master seed, whose certificate Core issued naming the
  *   origin; the bundle carries that chain in `manifest.jws`.
@@ -137,12 +137,12 @@ object BundleSignature {
     ): BundleVerdict {
         val anchor = PluginOriginKeys.anchorFor(origin, userKeys) ?: return BundleVerdict.Refused(
             if (PluginOriginKeys.isOfficial(origin)) {
-                "this build of droidtop pins no Droidtop Core certificate to check official plugins with"
+                "this build of droidtop pins no Droidtop Core key to check official plugins with"
             } else {
                 "no key you trust for origin \"$origin\""
             },
         )
-        val core = anchor.certificate != null
+        val core = anchor.pinned
         val own = revocations.forOrigin(origin)
         val revoked = { cert: X509Certificate -> (core && revocations.revokes(cert)) || own.revokes(cert) }
         val result = ChainSignature.verify(jws, ChainSignature.Purpose.PLUGIN, anchor, manifestBytes, nowEpochSeconds, revoked)

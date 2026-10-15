@@ -22,7 +22,7 @@ class ChainSignatureTest {
 
     /** Core as the owner's CA issues it: under the UCM root, which droidtop must never need. */
     private val core = TestPki.cert("Droidtop Core (test)", coreKey.public).ca(0).issuedBy(ucmRoot, ucmRootKey.private).build()
-    private val anchor = ChainSignature.Anchor(core.publicKey, core)
+    private val anchor = ChainSignature.Anchor(core.publicKey, pinned = true)
     private val leafKey = TestPki.ec()
     private val leaf = TestPki.pluginLeaf(leafKey, "droidtop", core, coreKey.private)
     private val manifest = """{"id":"droidtop.example","origin":"droidtop"}""".toByteArray()
@@ -218,11 +218,14 @@ class ChainSignatureTest {
     }
 
     @Test
-    fun `the pinned Core is the resource, and a placeholder pins none`() {
-        // The repository ships a placeholder until the owner commits the real certificate.
+    fun `the pinned Core is a public key resource, and a placeholder pins none`() {
+        // The repository ships a placeholder until the coordinator commits Core's public key.
         val shipped = DroidtopCore::class.java.classLoader!!.getResourceAsStream(DroidtopCore.RESOURCE)!!.use { it.readBytes().toString(Charsets.US_ASCII) }
-        if (!shipped.contains("BEGIN CERTIFICATE")) assertNull(DroidtopCore.certificate())
-        DroidtopCore.withPinned(core) {
+        if (!shipped.contains("BEGIN PUBLIC KEY")) assertNull(DroidtopCore.key())
+        assertNull(DroidtopCore.parse(shipped.lines().filter { it.startsWith("#") }.joinToString("\n")))
+        val pem = "-----BEGIN PUBLIC KEY-----\n" + java.util.Base64.getMimeEncoder(64, "\n".toByteArray()).encodeToString(core.publicKey.encoded) + "\n-----END PUBLIC KEY-----\n"
+        assertEquals(Sha256.hex(core.publicKey.encoded), Sha256.hex(DroidtopCore.parse(pem)!!.encoded))
+        DroidtopCore.withPinned(core.publicKey) {
             assertEquals(Sha256.hex(core.publicKey.encoded), DroidtopCore.keySha256())
             assertTrue(DroidtopCore.issued(leaf))
             assertFalse(DroidtopCore.issued(core))

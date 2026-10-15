@@ -43,7 +43,7 @@ class PluginRevocationsTest {
     @Test
     fun `droidtop's list is kept only under Core, newer, and re-verified on every read`() {
         val root = tmp.newFolder("plugins")
-        DroidtopCore.withPinned(core) {
+        DroidtopCore.withPinned(core.publicKey) {
             assertTrue(PluginRevocations.accept(root, list(2, keys = listOf("a".repeat(64))), now))
             assertTrue(PluginRevocations.load(root).revokesKey("a".repeat(64)))
             // Not newer, another catalog's signer, or a chain to another key: nothing changes.
@@ -55,7 +55,7 @@ class PluginRevocationsTest {
             assertEquals(2L, PluginRevocations.load(root).sequence)
         }
         // Under another pinned Core (or none) the stored list no longer verifies, so it counts as none.
-        DroidtopCore.withPinned(TestPki.core(TestPki.rsa())) { assertEquals(0L, PluginRevocations.load(root).sequence) }
+        DroidtopCore.withPinned(TestPki.rsa().public) { assertEquals(0L, PluginRevocations.load(root).sequence) }
         DroidtopCore.withPinned(null) { assertFalse(PluginRevocations.accept(root, list(5), now)) }
     }
 
