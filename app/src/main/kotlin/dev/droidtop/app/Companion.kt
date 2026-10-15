@@ -13,7 +13,9 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.LifecycleOwner
 import androidx.savedstate.SavedStateRegistryOwner
 import dev.droidtop.library.LibraryEntry
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * NOTE: the `SecondScreenPresentation` class that used to head this file
@@ -85,9 +87,38 @@ object CompanionState {
     @Volatile
     var onLaunchEntry: ((LibraryEntry) -> Unit)? = null
 
-    /** Quit for the running game (the Now card), installed by MainActivity beside [onLaunchEntry]: `Library.quitRunning`. */
-    @Volatile
-    var onQuitEntry: ((LibraryEntry) -> Unit)? = null
+    /**
+     * What the last Quit or Kill from the companion came to, shown where it was pressed (the Game tab, the Now
+     * card): "Ending <game>…" at once, then nothing when it ended or the reason it did not. Never silent
+     * (Droidtop/tracker#412: Kill and Quit left RetroArch running and said nothing).
+     */
+    val stopStatus = MutableStateFlow<String?>(null)
+
+    /** How long a stop runs before the companion says it has not ended yet; the stop itself goes on. */
+    private const val STOP_WAIT_MS = 15_000L
+
+    /**
+     * Quit or Kill the running game from the companion: the one quit path (`Library.quitRunning`, the task
+     * manager's strongest close), run by the companion itself in the process scope. It used to be a seam that
+     * MainActivity installed, so with no MainActivity alive a press did nothing at all.
+     */
+    fun quit(context: android.content.Context, entry: LibraryEntry) {
+        val app = context.applicationContext
+        stopStatus.value = "Ending ${entry.title}…"
+        launchError.value = null
+        scope.launch {
+            val stop = async(kotlinx.coroutines.Dispatchers.IO) { LibraryCore.library(app).quitRunning(app, entry) }
+            val outcome = kotlinx.coroutines.withTimeoutOrNull(STOP_WAIT_MS) { stop.await() }
+            if (outcome == null) stopStatus.value = "${entry.title} has not ended yet; droidtop is still trying to end it"
+            val text = when (val result = outcome ?: stop.await()) {
+                dev.droidtop.library.QuitResult.Ended -> null
+                is dev.droidtop.library.QuitResult.NotEnded -> result.message
+                is dev.droidtop.library.QuitResult.Unresolvable -> result.message
+            }
+            stopStatus.value = text
+            launchError.value = text
+        }
+    }
 
     /**
      * Where the seams above run what outlives a screen: ending a game can open a sheet or move the game off the screen,
