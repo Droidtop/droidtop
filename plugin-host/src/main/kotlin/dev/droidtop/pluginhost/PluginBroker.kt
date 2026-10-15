@@ -117,6 +117,13 @@ interface BrokerEnvironment {
     /** D1 (docs/plugin-api.md 3): `{online, type, metered, vpn}`. */
     fun netState(): JSONObject = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no network state")
 
+    /**
+     * D12 (docs/plugin-api.md 3, `net.get_links`): the device's networks as a `net.sockets` plugin needs them to make its
+     * own connections ([NetLinks]): each interface with its addresses, and the DNS servers to resolve names with, since
+     * Android's resolver is out of an open process's reach.
+     */
+    fun netLinks(): List<NetLinks.Link> = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no network links")
+
     /** The addresses [host] resolves to; asked only once the plugin may reach [host]. */
     fun addressesOf(host: String): List<java.net.InetAddress> = emptyList()
 

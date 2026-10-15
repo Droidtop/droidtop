@@ -18130,8 +18130,11 @@ Advanced.
   lifted. The filter cannot read a socket address, so the permission's
   warning says the plugin reaches "other apps on this device" too. The DNS
   servers and interfaces a networked plugin needs (Android's resolver is a
-  refused Unix socket) are the next #553 step, a host API; then the
-  Syncthing plugin itself, paired through droidtop's own device pairing
+  refused Unix socket, netlink is refused) come from droidtop: `net.get_links`
+  (docs/plugin-api.md D12, `NetLinks`, under `net.sockets`) lists every
+  network's interface, addresses, DNS servers and search domains from
+  Android's `LinkProperties`, the active one first. Next: the Syncthing
+  plugin itself, paired through droidtop's own device pairing
   (Droidtop/tracker#556).
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
