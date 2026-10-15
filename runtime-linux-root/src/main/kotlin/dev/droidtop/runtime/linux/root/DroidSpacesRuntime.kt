@@ -12,7 +12,7 @@ import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerSockets
-import dev.droidtop.runtime.ExtraMount
+import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ImageCachePolicy
 import dev.droidtop.runtime.PrimaryProvisioning
 import dev.droidtop.runtime.RootfsImage
@@ -134,6 +134,7 @@ class DroidSpacesRuntime(
         role: ContainerRole,
         image: RootfsImage,
         provisioning: PrimaryProvisioning? = null,
+        mounts: EnvironmentMounts = EnvironmentMounts.NEW_CONTAINER,
     ): Container {
         // Best-effort stale-instance stop BEFORE touching the rootfs, not
         // only in start(): a leaked instance from a force-stopped previous
@@ -147,6 +148,9 @@ class DroidSpacesRuntime(
         writeInit(rootfsPath, provisioning)
         withContext(Dispatchers.IO) { writeImageRecord(name, image) }
         if (provisioning != null) withContext(Dispatchers.IO) { writeProvisioning(name, provisioning) }
+        // A new container shares the home; a recreated one is handed the
+        // home and folders it had ([recreateFromImage]).
+        withContext(Dispatchers.IO) { writeMounts(name, mounts) }
 
         writeConfig(name, rootfsPath)
 
@@ -166,8 +170,10 @@ class DroidSpacesRuntime(
         val imageRef = info.image ?: error("${container.id} has no recorded image reference to recreate from")
         val provisioning = if (container.role == ContainerRole.PRIMARY) readProvisioning(container.id) else null
         val displayName = info.displayName
+        // The home and shared folders are the person's choice, not the image's: they survive a recreate.
+        val mounts = withContext(Dispatchers.IO) { readMounts(container.id) }
         destroy(container)
-        val created = createContainer(container.id, container.role, RootfsImage(reference = imageRef), provisioning)
+        val created = createContainer(container.id, container.role, RootfsImage(reference = imageRef), provisioning, mounts)
         if (container.role == ContainerRole.SIBLING) {
             withContext(Dispatchers.IO) { names.set(created.id, displayName) }
         }
@@ -210,10 +216,11 @@ class DroidSpacesRuntime(
                 devicesFile(name).takeIf { it.isFile }?.readLines().orEmpty()
                     .filter { it.isNotBlank() }
                     .map { it to it } +
-                // The person's own extra Mounts (docs/SPEC.md 3d), each at
-                // its own path -- droidspaces skips a bind whose host side
-                // is gone the same way it skips an unplugged device.
-                readExtraMounts(name).filter { File(it.hostPath).isDirectory }.map { it.hostPath to it.containerPath },
+                // The container's home and the person's own extra folders
+                // (docs/SPEC.md 3d "Home and folders"), from the one
+                // description both backends read; a folder that is gone is
+                // left out.
+                readMounts(name).binds(ContainerLayout.sharedHomeDir(appStorageDir)),
             envFilePath = envFile.absolutePath,
             // The one place this backend already bridges host audio in --
             // droidspaces' own PulseAudio bridge, used as-is (see this
@@ -430,23 +437,21 @@ class DroidSpacesRuntime(
     // see this class's own doc comment and [writeConfig].
     override val audioSharingUnavailableReason: String? = null
 
-    // ---- extra mounts (docs/SPEC.md 3d) ----
+    // ---- home and folders (docs/SPEC.md 3d "Home and folders") ----
 
     private fun mountsFile(name: String) = File(configsDir, "$name.mounts")
 
-    private fun readExtraMounts(name: String): List<ExtraMount> =
-        mountsFile(name).takeIf { it.isFile }?.readLines().orEmpty()
-            .mapNotNull { line ->
-                val parts = line.split("\t", limit = 2)
-                if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) ExtraMount(parts[0], parts[1]) else null
-            }
+    private fun readMounts(name: String): EnvironmentMounts =
+        EnvironmentMounts.decode(mountsFile(name).takeIf { it.isFile }?.readText().orEmpty())
 
-    override suspend fun extraMounts(container: Container): List<ExtraMount> = withContext(Dispatchers.IO) { readExtraMounts(container.id) }
+    private fun writeMounts(name: String, mounts: EnvironmentMounts) {
+        mountsFile(name).apply { parentFile?.mkdirs() }.writeText(EnvironmentMounts.encode(mounts))
+    }
 
-    override suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>) = withContext(Dispatchers.IO) {
-        mountsFile(container.id).apply { parentFile?.mkdirs() }
-            .writeText(mounts.joinToString("") { "${it.hostPath}\t${it.name}\n" })
-        Unit
+    override suspend fun mounts(container: Container): EnvironmentMounts = withContext(Dispatchers.IO) { readMounts(container.id) }
+
+    override suspend fun setMounts(container: Container, mounts: EnvironmentMounts) = withContext(Dispatchers.IO) {
+        writeMounts(container.id, mounts)
     }
 
     // ---- image reference + provisioning plan, for recreateFromImage ----

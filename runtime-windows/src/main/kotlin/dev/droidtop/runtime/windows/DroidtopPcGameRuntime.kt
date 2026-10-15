@@ -17,12 +17,12 @@ import dev.droidtop.library.PcLaunchResult
 import dev.droidtop.library.PcPrefixState
 import dev.droidtop.library.GameLaunchOptions
 import dev.droidtop.library.PcProvisionResult
-import dev.droidtop.library.WineDriveMapping
 import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.lutris.DllOverrides
 import dev.droidtop.library.lutris.WinePrefixChanges
 import dev.droidtop.runtime.NativeLinuxGameSession
 import dev.droidtop.runtime.PrimaryContainerSession
+import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.SafeDelete
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -284,7 +284,16 @@ class DroidtopPcGameRuntime(
         // Nothing in it is the user's: no container is registered, so
         // nothing has ever been launched in it.
         if (existing == null) {
-            val halfMade = File(imageFs.rootDir, "home/${ImageFs.USER}-$CONTAINER_ID")
+            // imagefs/home is gamenative's symlink to imagefs_shared/home, so the prefix is really there and the
+            // delete is fenced by that directory, never by whatever the link happens to point at (ImageFsHome).
+            val homeRoot = when (val root = ImageFsHome.root(imageFs.rootDir, File(ImageFs.getImageFsSharedDir(context), "home"))) {
+                is ImageFsHome.Root.Found -> root.dir
+                is ImageFsHome.Root.Refused -> return@withContext PcProvisionResult(
+                    false,
+                    "couldn't check the unfinished setup: ${root.why}",
+                )
+            }
+            val halfMade = File(homeRoot, "${ImageFs.USER}-$CONTAINER_ID")
             if (halfMade.isDirectory) {
                 onStatus("Clearing an unfinished setup…")
                 // NEVER a plain recursive walk here. A Wine prefix
@@ -296,7 +305,9 @@ class DroidtopPcGameRuntime(
                 // target is inside the ImageFs before deleting and its
                 // walk cannot follow a symlink at all -- containment is
                 // verified, not delegated to a helper that refuses.
-                SafeDelete.clearWithin(imageFs.rootDir, halfMade)?.let { why ->
+                // Fenced by the home root itself, which is tighter than
+                // the whole image.
+                SafeDelete.clearWithin(homeRoot, halfMade)?.let { why ->
                     return@withContext PcProvisionResult(
                         false,
                         "couldn't clear the unfinished setup at ${halfMade.absolutePath}: $why",
@@ -385,7 +396,7 @@ class DroidtopPcGameRuntime(
     /**
      * Wine drive mappings, as `<letter>:<path>` entries concatenated --
      * the format [Container.drivesIterator] parses. The assignment
-     * itself lives in [WineDriveMapping] so the settings screen previews
+     * itself is [EnvironmentMounts.wineDrives] so the settings screen previews
      * the same letters this actually writes.
      *
      * Deliberately not [Container.DEFAULT_DRIVES]: that hardcodes
@@ -396,7 +407,7 @@ class DroidtopPcGameRuntime(
      * SD card were exactly the case upstream never handled.
      */
     private fun drivesFor(gamesRoots: List<File>): String =
-        WineDriveMapping.assign(gamesRoots.map { it.absolutePath })
+        EnvironmentMounts.ofFolders(gamesRoots.map { it.absolutePath }).wineDrives()
             .joinToString("") { (letter, path) -> "$letter:$path" }
 
     override suspend fun launchWindows(

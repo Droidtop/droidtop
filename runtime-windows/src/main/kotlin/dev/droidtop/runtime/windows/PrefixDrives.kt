@@ -30,7 +30,7 @@ object PrefixDrives {
      * Makes [folder] reachable from the prefix: the letter of a drive that already holds it, else a new
      * drive on the first free letter from D to Y (C: is the prefix, Z: is Wine's own system folder).
      * Null for a folder that cannot be mapped: a path with a colon in it would corrupt every drive after
-     * it in the string (the rule [dev.droidtop.library.WineDriveMapping] keeps), and there are only so
+     * it in the string (the rule [dev.droidtop.runtime.EnvironmentMounts.wineDrives] keeps), and there are only so
      * many letters.
      */
     fun withFolder(drives: String, folder: File): Mapped? {
@@ -40,7 +40,7 @@ object PrefixDrives {
             val base = root.trimEnd('/')
             base.isNotEmpty() && (path == base || path.startsWith("$base/"))
         }?.let { return Mapped(drives, it.first, added = false) }
-        val letter = ('D'..'Y').firstOrNull { !drives.contains("$it:") } ?: return null
+        val letter = dev.droidtop.runtime.EnvironmentMounts.WINE_DRIVE_LETTERS.firstOrNull { !drives.contains("$it:") } ?: return null
         return Mapped(drives + "$letter:$path", letter, added = true)
     }
 }
