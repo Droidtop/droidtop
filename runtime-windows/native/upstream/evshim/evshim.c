@@ -77,9 +77,9 @@ static SDL_JoystickID vjoy_instances[MAX_GAMEPADS];
 static size_t g_shm_map_size = 0;
 static int g_is_wine = 0;
 
-// [base] is EVSHIM_BASE_PATH in a Wine process. The Java process names it
-// through WinHandler.attachSharedMemory, because the library is loaded there
-// before anything could set that variable.
+// [base] is EVSHIM_BASE_PATH, in a Wine process and in the Java process alike:
+// WinHandler.loadEvshim sets it before it loads this library, which is the
+// only way that also reaches GameNative's prebuilt arm64 build.
 static void build_gamepad_dir(const char *base, char *out, size_t size)
 {
     // fallback
@@ -434,30 +434,6 @@ static void initialize_all_pads(void)
     } else {
         ALOGI("evshim: Java process init (%d player(s))\n", players);
     }
-}
-
-/*
- * Maps the controller files under [base_path]/gamepad_shm in the Java process.
- * The constructor above can only use the hardcoded app.gamenative fallback
- * there; in any other package that directory is not ours, every slot stays
- * unmapped, waitForRumble returns at once and each rumble poller spins a core.
- * Returns whether every slot is mapped.
- */
-JNIEXPORT jboolean JNICALL
-Java_com_winlator_winhandler_WinHandler_attachSharedMemory(JNIEnv *env, jclass cls, jstring base_path)
-{
-    const char *base = (*env)->GetStringUTFChars(env, base_path, NULL);
-    if (!base) return JNI_FALSE;
-    setup_shm(base, MAX_GAMEPADS);
-    (*env)->ReleaseStringUTFChars(env, base_path, base);
-
-    for (int i = 0; i < MAX_GAMEPADS; i++) {
-        if (!shm[i]) {
-            ALOGE("evshim: slot %d has no shared memory", i);
-            return JNI_FALSE;
-        }
-    }
-    return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL
