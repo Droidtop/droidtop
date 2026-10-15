@@ -1,49 +1,60 @@
 package dev.droidtop.library.consoles
 
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import dev.droidtop.pluginhost.DownloadJobs
-import dev.droidtop.pluginhost.PluginResult
+import android.content.pm.PackageManager
+import android.os.Environment
+import android.provider.MediaStore
+import dev.droidtop.pluginhost.PluginCapability
+import dev.droidtop.pluginhost.PluginJobsCenter
+import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.runtime.tasks.PrivilegedShell
 import dev.droidtop.runtime.tasks.RiskyActions
 import dev.droidtop.runtime.tasks.RiskyClass
-import dev.droidtop.runtime.tasks.RiskyPrompts
 import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.zip.ZipInputStream
 
 /**
- * Getting the libretro core a RetroArch launch needs into RetroArch, without the person opening
- * RetroArch (docs/SPEC.md 7e2c, Droidtop/tracker#271).
+ * Getting the libretro core a RetroArch launch needs into RetroArch (docs/SPEC.md 7e2c, Droidtop/tracker#271).
  *
- * What RetroArch offers another app, checked against its 1.22.2 source: no intent, content provider
- * or network command downloads or installs a core (command.h lists every network command; none
- * does), and its core loader `dlopen`s the LIBRETRO path verbatim (runloop.c load_dynamic_core), so
- * a core must sit somewhere RetroArch can map executable. Shared storage is mounted noexec
- * (/proc/mounts on the console: `/storage/emulated fuse ... noexec`), and the cores folder,
- * `/data/user/0/<package>/cores`, is RetroArch's private data, which the shell user (Shizuku) cannot
- * reach either. So the one touchless path is: droidtop downloads the official core from the libretro
- * buildbot over https, checks it, and a privileged helper running as root (Sui, through the
- * `priv.shell` provider; never `su` in droidtop's own process) copies it into the cores folder, owned
- * by RetroArch with the folder's own SELinux label. Without root, droidtop cannot see or place cores,
- * so it opens RetroArch for the person (its Core Downloader is one menu away). An existing core
- * is never overwritten.
+ * One source of truth (coordinator, 2026-10-15): the RetroArch package is the one droidtop's preset launches, and
+ * the core is fetched by the RetroArch manager plugin (`droidtop.retroarch`), whose `download_core` job droidtop
+ * runs with that package. droidtop's own buildbot downloader, which placed cores as root, is gone. The manager
+ * downloads the official core into its own data and, where a root-level helper is allowed, places it in RetroArch's
+ * cores folder itself.
  *
- * Placing a core is a risky action (docs/SPEC.md "Risky actions"): root-level commands, in another app's private
- * folder. It happens only with Settings > Risky actions > Root-level commands on, and only for a person who has just
- * confirmed it for this core ([ensure]'s `confirmed`); a launch never places one by itself.
+ * Without root (the console: Shizuku runs as the shell user, which cannot write `/data/user/0/<package>/cores`,
+ * RetroArch's private data), RetroArch installs the core itself: its exported `CoreSideloadActivity` (RetroArch
+ * 1.19.1 to 1.22.0, pkg/android/phoenix) copies the file its `LIBRETRO` extra names into its own cores folder, as
+ * RetroArch, then starts RetroArch with it. RetroArch has to be able to read that file: droidtop puts a copy in the
+ * shared Download folder, which the buildbot builds read (target SDK 28, legacy storage, once RetroArch has its
+ * storage permission) and the Play Store builds do not (target SDK 35, scoped storage). For those the person installs
+ * the core in RetroArch's own Core Downloader. The installed-cores broadcast on RetroArch's master branch is not in
+ * any release yet, so droidtop does not rely on it.
+ *
+ * Looking into RetroArch's cores folder ([state]) needs root and Settings > Risky actions > Root-level commands; the
+ * state is [State.UNKNOWN] otherwise. An existing core is never overwritten by droidtop.
  */
 object RetroArchCores {
-    const val DOWNLOAD_POST = "retroarch_core"
-    private const val BUILDBOT = "https://buildbot.libretro.com/nightly/android/latest"
     private const val SUFFIX = "_libretro_android.so"
-    private const val MAX_ZIP_BYTES = 200L * 1024 * 1024
 
-    private const val ARG_PACKAGE = "retroarchPackage"
-    private const val ARG_CORE = "core"
-    private const val ARG_ABI = "abi"
+    /** The RetroArch manager plugin, which fetches cores (and places them where it may run root-level commands). */
+    const val MANAGER_ID = "droidtop.retroarch"
+
+    /** Its job that fetches one core: args `core` and `playerPackage`, result `installedIntoRetroArch` and `file`. */
+    private const val JOB_DOWNLOAD_CORE = "download_core"
+
+    /** RetroArch's exported sideload screen (pkg/android/phoenix/AndroidManifest.xml, 1.19.1 to 1.22.0). */
+    const val SIDELOAD_ACTIVITY = "com.retroarch.browser.debug.CoreSideloadActivity"
+
+    /** The folder under the shared Download folder where droidtop leaves a core for RetroArch to sideload. */
+    const val SHARED_DIR = "droidtop-cores"
+
+    /** The highest target SDK at which an app still reads any file in shared storage with its storage permission. */
+    private const val LEGACY_STORAGE_MAX_TARGET_SDK = 29
 
     /**
      * What droidtop knows about one core. [PARTIAL]: the file is there but is not a whole ELF library (an interrupted
@@ -97,18 +108,21 @@ object RetroArchCores {
      * launch). [suspect] decides whether it applies. Pure.
      */
     fun troubleHint(need: Need): String =
-        "RetroArch shows a black screen when the core it is given is not installed or is incomplete: " +
-            "install ${need.core} in RetroArch (Online Updater > Core Downloader), or choose Get the core."
+        "RetroArch shows a black screen when the core it is given is not installed or is incomplete. " +
+            "This game needs ${checked(need)}: choose Get the core, or install it in RetroArch (Online Updater > Core Downloader)."
 
     /** The launch-failure sentence for a core droidtop saw is [State.MISSING] or [State.PARTIAL]. Pure. */
     fun missingMessage(need: Need, state: State): String =
         if (state == State.PARTIAL) {
-            "The ${need.core} core in RetroArch is incomplete, so RetroArch would show a black screen. " +
-                "Install it again in RetroArch (Online Updater > Core Downloader), or choose Get the core."
+            "The ${need.core} core in RetroArch is incomplete, so RetroArch would show a black screen (${checked(need)}). " +
+                "Install it again in RetroArch (Online Updater > Core Downloader)."
         } else {
-            "RetroArch does not have the ${need.core} core this game needs, so it would show a black screen. " +
+            "RetroArch does not have the core this game needs, so it would show a black screen (${checked(need)}). " +
                 "Choose Get the core, or install it in RetroArch (Online Updater > Core Downloader)."
         }
+
+    /** What droidtop looks for, named whole so a mismatch shows: the core, the RetroArch package and the file. Pure. */
+    fun checked(need: Need): String = "${need.core} in ${need.packageName}, ${need.corePath}"
 
     /**
      * Whether [header] (at least the first 64 bytes) and [size] make a whole ELF file: the magic, and a section header
@@ -139,91 +153,6 @@ object RetroArchCores {
 
     private val CORE_ID = Regex("[a-z0-9_]+")
 
-    /** The official buildbot zip for [core] on [abi], https only. */
-    fun buildbotUrl(abi: String, core: String): String {
-        require(abi in ABIS) { "unknown ABI $abi" }
-        require(core.matches(CORE_ID)) { "not a core id: $core" }
-        return "$BUILDBOT/$abi/$core$SUFFIX.zip"
-    }
-
-    private val ABIS = setOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
-
-    /**
-     * The ABI RetroArch runs as, from its native library folder's last segment (`.../lib/arm64`),
-     * which is what Android picked for it; [deviceAbis] in order when that says nothing.
-     */
-    fun abiFor(nativeLibraryDir: String?, deviceAbis: List<String>): String? {
-        val fromDir = when (nativeLibraryDir?.substringAfterLast('/')) {
-            "arm64" -> "arm64-v8a"
-            "arm" -> "armeabi-v7a"
-            "x86_64" -> "x86_64"
-            "x86" -> "x86"
-            else -> null
-        }
-        return fromDir ?: deviceAbis.firstOrNull { it in ABIS }
-    }
-
-    /** Whether [header] (the first 20 bytes of a file) is an ELF shared object built for [abi]. */
-    fun elfMatches(header: ByteArray, abi: String): Boolean {
-        if (header.size < 20) return false
-        if (header[0] != 0x7F.toByte() || header[1] != 'E'.code.toByte() || header[2] != 'L'.code.toByte() || header[3] != 'F'.code.toByte()) return false
-        val is64 = header[4].toInt() == 2
-        val machine = (header[18].toInt() and 0xFF) or ((header[19].toInt() and 0xFF) shl 8)
-        return when (abi) {
-            "arm64-v8a" -> is64 && machine == 183
-            "x86_64" -> is64 && machine == 62
-            "armeabi-v7a" -> !is64 && machine == 40
-            "x86" -> !is64 && machine == 3
-            else -> false
-        }
-    }
-
-    /**
-     * Unpacks the one `<core>_libretro_android.so` from a buildbot zip into [dest] and checks it is
-     * an ELF for [abi]. Refuses a zip holding anything else, so a wrong or tampered archive never
-     * reaches RetroArch.
-     */
-    fun extractCore(zip: File, core: String, abi: String, dest: File) {
-        val wanted = core + SUFFIX
-        var found = false
-        ZipInputStream(zip.inputStream().buffered()).use { input ->
-            while (true) {
-                val entry = input.nextEntry ?: break
-                if (entry.isDirectory) continue
-                require(entry.name == wanted && !found) { "the core archive holds an unexpected file" }
-                dest.parentFile?.mkdirs()
-                dest.outputStream().use { input.copyTo(it) }
-                found = true
-            }
-        }
-        require(found) { "the core archive is empty" }
-        val header = ByteArray(20)
-        val read = dest.inputStream().use { it.read(header) }
-        if (read < 20 || !elfMatches(header, abi)) {
-            dest.delete()
-            throw IllegalStateException("the core is not built for $abi")
-        }
-    }
-
-    /**
-     * The root commands that place [source] as [target] in RetroArch's cores folder: a copy beside
-     * it, RetroArch's owner and the folder's own SELinux label on it, then a no-clobber rename, so
-     * a core RetroArch already has is never replaced and a half-copied file is never loaded.
-     */
-    fun placeCommands(source: String, target: String, uid: Int, label: String): List<List<String>> {
-        val staged = "$target.droidtop-new"
-        return listOf(
-            listOf("cp", source, staged),
-            listOf("chown", "$uid:$uid", staged),
-            listOf("chmod", "600", staged),
-            listOf("chcon", label, staged),
-            listOf("mv", "-n", staged, target),
-            listOf("rm", "-f", staged),
-        )
-    }
-
-    // --- device parts ----------------------------------------------------------------------------
-
     /**
      * The helper when it runs as root (Sui) and Root-level commands is on in Settings > Risky actions; null otherwise,
      * and then nothing is asked of it, not even to look. Blocks on the provider: background only.
@@ -235,9 +164,6 @@ object RetroArchCores {
         val id = shell.exec(listOf("id", "-u")) ?: return null
         return shell.takeIf { id.exit == 0 && id.stdout.trim() == "0" }
     }
-
-    /** Whether the switch is on and the root helper is there: whether a confirmed press can place a core. Background only. */
-    fun canPlace(): Boolean = rootShell() != null
 
     /** Whether RetroArch has [need]'s core, and whole ([elfWhole]). Background only. */
     fun state(need: Need): State {
@@ -258,58 +184,125 @@ object RetroArchCores {
         return needFor(player.packageName, player.argumentsTemplate)
     }
 
+    /** Whether RetroArch [packageName] can read a file droidtop leaves in shared storage: a legacy-storage build with its storage permission. Pure. */
+    fun canSideload(targetSdk: Int, storageGranted: Boolean): Boolean =
+        targetSdk <= LEGACY_STORAGE_MAX_TARGET_SDK && storageGranted
+
+    /** The path RetroArch is handed for [need]'s core under [downloadsDir] (the shared Download folder). Pure. */
+    fun sharedCorePath(downloadsDir: String, need: Need): String = "$downloadsDir/$SHARED_DIR/${need.core}$SUFFIX"
+
+    /** The intent that has RetroArch [need] copy [path] into its own cores folder and start with it. Pure apart from Intent. */
+    fun sideloadIntent(need: Need, path: String): Intent =
+        Intent().setClassName(need.packageName, SIDELOAD_ACTIVITY)
+            .putExtra("LIBRETRO", path)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
     /**
-     * Makes sure RetroArch has [need]'s core: nothing when it has it, a download-and-place job in
-     * Downloads and installs when root can place it and the person has [confirmed] it with Root-level
-     * commands switched on, and otherwise opens RetroArch and says where its own Core Downloader is (or
-     * which switch lets droidtop place it). RetroArch is opened only when the person asked ([asked], or [confirmed]
-     * which implies it): a launch passes neither and must never put RetroArch in front. Returns the line the caller shows.
+     * Makes sure RetroArch has [need]'s core: nothing when droidtop sees it is there; otherwise the RetroArch manager's
+     * download_core job for it, in [need]'s package, which places it where it may; otherwise RetroArch's own sideload of
+     * the downloaded file, when RetroArch can read it; otherwise the line saying where RetroArch's Core Downloader is.
+     * RetroArch is opened only when the person asked ([asked]); a launch never puts it in front. Returns what to show.
      */
-    suspend fun ensure(
-        context: Context,
-        need: Need,
-        confirmed: Boolean = false,
-        asked: Boolean = confirmed,
-        onStatus: (String) -> Unit = {},
-    ): Outcome {
-        when (withContext(Dispatchers.IO) { state(need) }) {
-            State.INSTALLED -> return Outcome.Ready
-            State.PARTIAL -> {
-                // droidtop never replaces a core file RetroArch has; RetroArch's own downloader does.
-                if (asked) openRetroArch(context, need.packageName)
-                return Outcome.Manual("Install the ${need.core} core again in RetroArch: Online Updater > Core Downloader.")
-            }
-            State.MISSING -> {
-                if (!confirmed) {
-                    if (asked) openRetroArch(context, need.packageName)
-                    return Outcome.Manual(
-                        "Install the ${need.core} core in RetroArch: Online Updater > Core Downloader, or press Install core on the system's emulator screen in Settings.",
-                    )
-                }
-            }
-            State.UNKNOWN -> {
-                openRetroArch(context, need.packageName)
-                return Outcome.Manual(
-                    "Install the ${need.core} core in RetroArch: Online Updater > Core Downloader" +
-                        if (RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) "" else ". " + RiskyPrompts.turnOnHint(RiskyClass.ROOT_COMMANDS),
-                )
-            }
+    suspend fun ensure(context: Context, need: Need, asked: Boolean = false, onStatus: (String) -> Unit = {}): Outcome {
+        val state = withContext(Dispatchers.IO) { state(need) }
+        if (state == State.INSTALLED) return Outcome.Ready
+        if (state == State.PARTIAL) {
+            // droidtop never replaces a core file RetroArch has; RetroArch's own downloader does.
+            if (asked) openRetroArch(context, need.packageName)
+            return Outcome.Manual("Install the ${need.core} core again in RetroArch: Online Updater > Core Downloader.")
         }
-        val abi = withContext(Dispatchers.IO) {
+        val record = withContext(Dispatchers.IO) { PluginStore.installed(context).firstOrNull { it.manifest.id == MANAGER_ID } }
+            ?: return manual(context, need, asked, "Add the RetroArch manager in Plugins to get cores, or install ${need.core} in RetroArch")
+        val jobId = PluginJobsCenter.start(
+            context = context,
+            record = record,
+            capability = PluginCapability.APP_STATUS,
+            args = mapOf("job" to JOB_DOWNLOAD_CORE, "core" to need.core, "playerPackage" to need.packageName),
+            title = "$JOB_DOWNLOAD_CORE (${need.core})",
+            onProgress = { _, line -> onStatus(line) },
+            userInitiated = true,
+        ) ?: return manual(context, need, asked, "The RetroArch manager is not approved, so it cannot get cores: approve it in Plugins, or install ${need.core} in RetroArch")
+        val result = PluginJobsCenter.await(jobId) ?: return Outcome.Failed("The core download did not finish")
+        if (!result.ok) return Outcome.Failed(result.error ?: "The RetroArch manager could not get ${need.core}")
+        if (result.values["installedIntoRetroArch"] == "true") return Outcome.Ready
+        val downloaded = withContext(Dispatchers.IO) { result.values["file"]?.let { managerFile(PluginStore.dataDirFor(context, MANAGER_ID), it) } }
+            ?: return manual(context, need, asked, "The RetroArch manager downloaded ${need.core} but did not say where; install it in RetroArch")
+        return sideload(context, need, downloaded, asked)
+    }
+
+    /**
+     * The file the manager names by [name] in its own data folder [dataDir], when it is one there: a name that leads out
+     * of the folder (`..`, an absolute path, a link) is not followed. Background only.
+     */
+    internal fun managerFile(dataDir: File, name: String): File? {
+        val root = dataDir.canonicalFile
+        val file = File(root, name).canonicalFile
+        return file.takeIf { it.path.startsWith(root.path + File.separator) && it.isFile }
+    }
+
+    /**
+     * Hands [file] to RetroArch's sideload screen through a copy in the shared Download folder, when RetroArch can read
+     * it there ([canSideload]); the Core Downloader line otherwise.
+     */
+    private suspend fun sideload(context: Context, need: Need, file: File, asked: Boolean): Outcome {
+        val readable = withContext(Dispatchers.IO) {
             val info = runCatching { context.packageManager.getApplicationInfo(need.packageName, 0) }.getOrNull()
-            abiFor(info?.nativeLibraryDir, android.os.Build.SUPPORTED_ABIS.toList())
-        } ?: return Outcome.Failed("No core build for this device")
-        val result: PluginResult = DownloadJobs.run(
-            context,
-            title = "RetroArch core ${need.core}",
-            post = DOWNLOAD_POST,
-            url = buildbotUrl(abi, need.core),
-            name = "retroarch-${need.core}-$abi.zip",
-            maxBytes = MAX_ZIP_BYTES,
-            extra = mapOf(ARG_PACKAGE to need.packageName, ARG_CORE to need.core, ARG_ABI to abi),
-            onStatus = onStatus,
+            val granted = context.packageManager.checkPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE, need.packageName) ==
+                PackageManager.PERMISSION_GRANTED
+            info != null && canSideload(info.targetSdkVersion, granted)
+        }
+        // The copy goes in through MediaStore's Downloads collection, which is Android 10 and up.
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            return manual(context, need, asked, "droidtop can hand RetroArch a core from Android 10 on, so install ${need.core} in RetroArch")
+        }
+        if (!readable) {
+            return manual(
+                context,
+                need,
+                asked,
+                "This RetroArch cannot read a core droidtop downloads (a Play Store build, or it has no storage access), so install ${need.core} in RetroArch",
+            )
+        }
+        val path = withContext(Dispatchers.IO) { runCatching { shareCopy(context, need, file) }.getOrNull() }
+            ?: return Outcome.Failed("Could not put ${need.core} in the Download folder for RetroArch")
+        return runCatching { context.startActivity(sideloadIntent(need, path)) }.fold(
+            onSuccess = { Outcome.Manual("RetroArch is installing ${need.core} and opens with it. Start the game again from droidtop.") },
+            onFailure = { manual(context, need, asked, "This RetroArch has no sideload screen, so install ${need.core} in RetroArch") },
         )
-        return if (result.ok) Outcome.Ready else Outcome.Failed(result.error ?: "The core was not installed")
+    }
+
+    /**
+     * [file] copied to `Download/[SHARED_DIR]/<core>_libretro_android.so` through MediaStore (no storage permission for
+     * droidtop), an earlier copy of the same name replaced; the absolute path RetroArch reads. Background only.
+     */
+    private fun shareCopy(context: Context, need: Need, file: File): String {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) error("MediaStore's Downloads collection needs Android 10")
+        val name = "${need.core}$SUFFIX"
+        val relative = "${Environment.DIRECTORY_DOWNLOADS}/$SHARED_DIR/"
+        val resolver = context.contentResolver
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        resolver.delete(
+            collection,
+            "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND ${MediaStore.MediaColumns.RELATIVE_PATH} = ?",
+            arrayOf(name, relative),
+        )
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relative)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val uri = checkNotNull(resolver.insert(collection, values)) { "the Download folder refused the file" }
+        resolver.openOutputStream(uri).use { out -> file.inputStream().use { it.copyTo(checkNotNull(out)) } }
+        resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+        @Suppress("DEPRECATION")
+        val downloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).absolutePath
+        return sharedCorePath(downloads, need)
+    }
+
+    /** RetroArch's Core Downloader as the way on, after [why]; RetroArch opened when the person asked. */
+    private fun manual(context: Context, need: Need, asked: Boolean, why: String): Outcome {
+        if (asked) openRetroArch(context, need.packageName)
+        return Outcome.Manual("$why: Online Updater > Core Downloader.")
     }
 
     /**
@@ -325,66 +318,29 @@ object RetroArchCores {
     }
 
     /**
-     * The cores of every system in [systems] whose chosen emulator is RetroArch: each missing one
-     * installed as its own job, the person having confirmed the batch. Without root, or with Root-level commands
-     * off, opens RetroArch and names the cores. Returns the line shown.
+     * The cores of every system in [systems] whose chosen emulator is RetroArch. Where droidtop can see RetroArch's
+     * cores (root), each missing one is fetched through the manager in turn; otherwise RetroArch is opened and the cores
+     * are named, since one sideload screen at a time is a game's own Get the core. Returns the line shown.
      */
-    suspend fun ensureForLibrary(context: Context, systems: List<ConsoleSystemDef>, onStatus: (String) -> Unit = {}): String =
-        withContext(Dispatchers.IO) {
-            val needs = systems.mapNotNull { needForSystem(context, it) }.distinctBy { it.packageName to it.core }
-            if (needs.isEmpty()) return@withContext "No system uses RetroArch"
-            if (!canPlace()) {
-                openRetroArch(context, needs.first().packageName)
-                return@withContext "Install in RetroArch's Core Downloader: " + needs.joinToString(", ") { it.core } +
-                    if (RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) "" else ". " + RiskyPrompts.turnOnHint(RiskyClass.ROOT_COMMANDS)
-            }
-            val missing = needs.filter { state(it) == State.MISSING }
-            val failed = missing.filter { ensure(context, it, confirmed = true, onStatus = onStatus) !is Outcome.Ready }
-            when {
-                missing.isEmpty() -> "All ${needs.size} cores installed"
-                failed.isEmpty() -> "Installed ${missing.size} of ${missing.size}"
-                else -> "Not installed: " + failed.joinToString(", ") { it.core }
-            }
+    suspend fun ensureForLibrary(context: Context, systems: List<ConsoleSystemDef>, onStatus: (String) -> Unit = {}): String {
+        val needs = withContext(Dispatchers.IO) { systems.mapNotNull { needForSystem(context, it) }.distinctBy { it.packageName to it.core } }
+        if (needs.isEmpty()) return "No system uses RetroArch"
+        val states = withContext(Dispatchers.IO) { needs.associateWith { state(it) } }
+        if (states.values.any { it == State.UNKNOWN }) {
+            openRetroArch(context, needs.first().packageName)
+            return "Install in RetroArch's Core Downloader: " + needs.joinToString(", ") { it.core }
         }
+        val missing = needs.filter { states[it] == State.MISSING }
+        val failed = missing.filter { ensure(context, it, onStatus = onStatus) !is Outcome.Ready }
+        return when {
+            missing.isEmpty() -> "All ${needs.size} cores installed"
+            failed.isEmpty() -> "Installed ${missing.size} of ${missing.size}"
+            else -> "Not installed: " + failed.joinToString(", ") { it.core }
+        }
+    }
 
     private fun openRetroArch(context: Context, packageName: String) {
         val intent = context.packageManager.getLaunchIntentForPackage(packageName) ?: return
         runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-    }
-
-    /** The post step: unpack, check, place as root. Registered at process start so a finished download is placed after a restart. */
-    fun registerDownloadPost() {
-        DownloadJobs.registerPost(DOWNLOAD_POST) { context, file, args ->
-            val packageName = requireNotNull(args[ARG_PACKAGE]?.takeIf { isRetroArch(it) }) { "not a RetroArch package" }
-            val core = requireNotNull(args[ARG_CORE]?.takeIf { it.matches(CORE_ID) }) { "no core named" }
-            val abi = requireNotNull(args[ARG_ABI]) { "no ABI named" }
-            withContext(Dispatchers.IO) {
-                val so = File(context.filesDir, "retroarch-cores/$core$SUFFIX")
-                try {
-                    extractCore(file, core, abi, so)
-                    check(RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) { "Root-level commands are off in Settings > Risky actions" }
-                    val root = checkNotNull(rootShell()) { "root access is needed to place the core" }
-                    val dir = coresDir(packageName)
-                    val target = "$dir/$core$SUFFIX"
-                    val label = root.exec(listOf("stat", "-c", "%C", dir))?.takeIf { it.exit == 0 }?.stdout?.trim()
-                        ?: throw IllegalStateException("RetroArch's cores folder is not there; open RetroArch once")
-                    if (root.exec(listOf("test", "-e", target))?.exit == 0) {
-                        "$core is already installed"
-                    } else {
-                        val uid = context.packageManager.getApplicationInfo(packageName, 0).uid
-                        for (argv in placeCommands(so.absolutePath, target, uid, label)) {
-                            val out = root.exec(argv) ?: throw IllegalStateException("the root helper stopped")
-                            if (out.exit != 0 && argv.first() != "rm") {
-                                throw IllegalStateException("placing the core failed: ${out.stderr.trim().take(120)}")
-                            }
-                        }
-                        check(root.exec(listOf("test", "-e", target))?.exit == 0) { "the core is not in place" }
-                        "Installed $core"
-                    }
-                } finally {
-                    so.delete()
-                }
-            }
-        }
     }
 }

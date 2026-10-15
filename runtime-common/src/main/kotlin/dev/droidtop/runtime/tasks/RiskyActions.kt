@@ -40,7 +40,7 @@ enum class RiskyClass(val id: String, val title: String, val summary: String) {
     ROOT_COMMANDS(
         "root_commands",
         "Root-level commands",
-        "Let droidtop run commands as root through a provider that has it, such as placing a RetroArch core in RetroArch's own folder",
+        "Let droidtop run commands as root through a provider that has it, such as looking in RetroArch's own folder for a game's core",
     ),
 }
 
@@ -94,15 +94,6 @@ object RiskyPrompts {
         "Download this file with $plugin" + (source?.let { " from $it" } ?: "") + " and put it at $path? " +
             if (viaHelper) "droidtop will write it into $app's folder as the system's shell user, because Android keeps droidtop out of it."
             else "It goes into $app's BIOS folder."
-
-    fun placeCoresConfirm(targets: List<String>, app: String): String =
-        "Place " + (if (targets.size == 1) "this core" else "these ${targets.size} cores") + " in $app's private folder: " +
-            targets.take(4).joinToString(", ") + (if (targets.size > 4) " and ${targets.size - 4} more" else "") +
-            "? droidtop will copy " + (if (targets.size == 1) "it" else "them") + " there as root through your root provider."
-
-    fun placeCoreConfirm(core: String, app: String, target: String): String =
-        "Place the $core core at $target in $app's private folder? droidtop will copy it there as root " +
-            "through your root provider."
 
     /** Where the person turns a class on, for a row that is shown without it. */
     fun turnOnHint(risk: RiskyClass): String =
@@ -174,9 +165,9 @@ object RiskyNotices {
                 "Turning it on lets droidtop rewrite emulator settings files and put BIOS files in an emulator's folder, through the helper app. Each change asks first.",
             )
             RiskyClass.ROOT_COMMANDS -> Triple(
-                "Core installs are off for safety",
-                "It downloads emulator cores from the internet.",
-                "Turning it on lets droidtop place RetroArch cores in RetroArch's own folder as root, through your root provider. Each install asks first.",
+                "Core checks are off for safety",
+                "It runs root-level commands.",
+                "Turning it on lets droidtop look in RetroArch's own cores folder as root, through your root provider, so a game whose core is missing says so before it starts.",
             )
             RiskyClass.DISPLAY_SETTINGS -> Triple(
                 "Display controls are off for safety",

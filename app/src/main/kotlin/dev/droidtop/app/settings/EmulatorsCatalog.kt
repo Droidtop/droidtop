@@ -146,15 +146,12 @@ object EmulatorsCatalog {
             },
             value = when (state) {
                 RetroArchCores.State.INSTALLED -> "Installed"
-                RetroArchCores.State.MISSING -> "Install core"
+                // The RetroArch manager fetches it, and places it or has RetroArch install it (RetroArchCores.ensure).
+                RetroArchCores.State.MISSING, RetroArchCores.State.UNKNOWN -> "Get the core"
                 RetroArchCores.State.PARTIAL -> "Incomplete: reinstall in RetroArch"
-                RetroArchCores.State.UNKNOWN -> "Open RetroArch"
             },
-            // Placing the core is a root-level command in RetroArch's private folder: only with Risky actions >
-            // Root-level commands on (the state is UNKNOWN otherwise), and only after a yes naming the file.
-            confirmTitle = if (state == RetroArchCores.State.MISSING) RiskyPrompts.placeCoreConfirm(need.core, appLabel(context, need.packageName), need.corePath) else null,
             run = { ctx, onStatus ->
-                outcomeLine(RetroArchCores.ensure(ctx, need, confirmed = state == RetroArchCores.State.MISSING, asked = true, onStatus = onStatus), need)
+                outcomeLine(RetroArchCores.ensure(ctx, need, asked = true, onStatus = onStatus), need)
             },
         )
     }
@@ -277,17 +274,10 @@ object EmulatorsCatalog {
                 val needs = resolvedById.values.mapNotNull { resolved ->
                     resolved?.player?.let { RetroArchCores.needFor(it.packageName, it.argumentsTemplate) }
                 }.distinctBy { it.packageName to it.core }
-                // The cores a yes would place, named in the confirmation (a root-level command, Risky actions); none
-                // while the switch is off or no root provider is there, and then the row only opens RetroArch.
-                val toPlace = if (RetroArchCores.canPlace()) needs.filter { RetroArchCores.state(it) == RetroArchCores.State.MISSING } else emptyList()
                 val retroArchCores = AsyncActionItem(
                     id = "emulators_retroarch_cores",
                     title = "RetroArch cores",
                     subtitle = "Install the cores these systems use",
-                    confirmTitle = if (toPlace.isEmpty()) null else RiskyPrompts.placeCoresConfirm(
-                        toPlace.map { it.corePath },
-                        appLabel(context, toPlace.first().packageName),
-                    ),
                     run = { ctx, onStatus -> RetroArchCores.ensureForLibrary(ctx, withGames, onStatus) },
                 )
                 val usesRetroArch = needs.isNotEmpty()
