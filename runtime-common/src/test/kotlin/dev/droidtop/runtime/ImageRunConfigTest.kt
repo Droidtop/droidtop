@@ -48,4 +48,28 @@ class ImageRunConfigTest {
         assertEquals("/docker-entrypoint.sh nginx -g 'daemon off;'", ImageRunConfig.shellWords(listOf("/docker-entrypoint.sh", "nginx", "-g", "daemon off;")))
         assertEquals("echo 'it'\\''s'", ImageRunConfig.shellWords(listOf("echo", "it's")))
     }
+
+    @Test
+    fun `exposed ports are read, sorted, and kept`() {
+        val gitea = """{"config":{"ExposedPorts":{"3000/tcp":{},"22/tcp":{},"53/UDP":{},"80":{},"bad/tcp":{},"70000/tcp":{}}}}"""
+        val ports = ImageRunConfig.fromImageConfig(gitea).ports
+        assertEquals(listOf("22/tcp", "53/udp", "80/tcp", "3000/tcp"), ports.map { it.toString() })
+        assertEquals("http://localhost:3000", ports.last().url)
+        assertEquals(null, ports[1].url)
+        assertTrue(ports.first().needsRoot)
+        assertFalse(ports.last().needsRoot)
+        val config = ImageRunConfig(cmd = listOf("gitea"), ports = ports)
+        assertEquals(config, ImageRunConfig.fromImageConfig(ImageRunConfig.encode(config)))
+    }
+
+    @Test
+    fun `a port two programs share refuses with a sentence naming both`() {
+        val web = listOf(ExposedPort(8080))
+        assertEquals(
+            "code-server and gitea both use port 8080; stop gitea's program first",
+            ExposedPort.clash("code-server", web, mapOf("redis" to listOf(ExposedPort(6379)), "gitea" to listOf(ExposedPort(22), ExposedPort(8080)))),
+        )
+        assertEquals(null, ExposedPort.clash("code-server", web, mapOf("dns" to listOf(ExposedPort(8080, "udp")))))
+        assertEquals(null, ExposedPort.clash("code-server", web, mapOf("code-server" to web)))
+    }
 }

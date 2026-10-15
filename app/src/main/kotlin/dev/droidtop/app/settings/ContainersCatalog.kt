@@ -35,6 +35,7 @@ import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.runtime.BundledImageRepositories
 import dev.droidtop.runtime.CompositorProvisioning
+import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
@@ -50,6 +51,7 @@ import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ExportedApp
 import dev.droidtop.runtime.ExportedCommand
+import dev.droidtop.runtime.ExposedPort
 import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.ImageRunConfig
@@ -519,11 +521,36 @@ object ContainersCatalog {
         if (config.env.isNotEmpty()) {
             add(TextBlockItem(id = "container_program_env", title = "Environment", text = config.env.joinToString("\n")))
         }
+        config.ports.forEach { port -> add(portItem(container.id, port, info.container.backend)) }
         if (!config.runsAsRoot) {
             add(TextBlockItem(id = "container_program_user", title = "User", text = "The image asks for ${config.user}; containers here run everything as root"))
         }
         val log = withContext(Dispatchers.IO) { ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, container.id)) }
         add(TextBlockItem(id = "container_program_log", title = "Log", text = log.joinToString("\n").ifEmpty { "Nothing yet" }, last = true))
+    }
+
+    /**
+     * One port the image says its program listens on (docs/SPEC.md 3 "Ports"). There are no network namespaces, so it
+     * is the device's own port: a tcp one is a web address Open on Android reaches, anything else is a note.
+     */
+    private fun portItem(containerId: String, port: ExposedPort, backend: ContainerBackend): CatalogItem {
+        val note = when {
+            port.needsRoot && backend == ContainerBackend.PROOT -> "Below 1024: it can only listen there with root"
+            port.url == null -> "${port.protocol.uppercase()}, on the device's own port"
+            else -> "On the device's own port; open it while the program runs"
+        }
+        val url = port.url ?: return TextBlockItem(id = "container_port_${containerId}_$port", title = "Port ${port.number}", text = note)
+        return ActionItem(
+            id = "container_port_${containerId}_$port",
+            title = url,
+            subtitle = note,
+            value = "Open on Android",
+            run = { ctx ->
+                runCatching {
+                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            },
+        )
     }
 
     private fun programStateLabel(state: ContainerPrograms.State): String = when (state) {

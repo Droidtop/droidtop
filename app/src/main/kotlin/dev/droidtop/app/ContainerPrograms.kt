@@ -6,6 +6,8 @@ import android.util.Log
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.ExposedPort
+import dev.droidtop.runtime.nameOf
 import java.io.File
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
@@ -28,6 +30,9 @@ internal object ContainerPrograms {
     private const val TAG = "droidtop.Programs"
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, Job>()
+
+    /** The ports each started program's image says it listens on, by container id, with its name: what a start is checked against. */
+    private val listening = HashMap<String, Pair<String, List<ExposedPort>>>()
 
     /** What a container's program is doing, for its page. */
     sealed interface State {
@@ -60,6 +65,17 @@ internal object ContainerPrograms {
         val job = scope.launch {
             val config = runtime.imageRunConfig(container)?.takeIf { it.program().isNotEmpty() } ?: run {
                 set(container.id, State.Failed("Its image names no program to run"))
+                return@launch
+            }
+            // No network namespaces: every program listens on the device's own ports, so a second program on a port
+            // one already holds does not start (docs/SPEC.md 3 "Ports").
+            val name = runCatching { runtime.nameOf(container) }.getOrDefault(container.id)
+            val clash = synchronized(listening) {
+                val others = listening.filterKeys { it != container.id }.values.toMap()
+                ExposedPort.clash(name, config.ports, others).also { if (it == null) listening[container.id] = name to config.ports }
+            }
+            if (clash != null) {
+                set(container.id, State.Failed(clash))
                 return@launch
             }
             val log = ContainerProgram.hostLogFile(app.filesDir, container.id).apply { parentFile?.mkdirs() }
@@ -95,6 +111,7 @@ internal object ContainerPrograms {
                 }
             } finally {
                 trimmer.cancel()
+                synchronized(listening) { listening.remove(container.id) }
                 jobs.remove(container.id)
             }
         }

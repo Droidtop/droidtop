@@ -1590,9 +1590,22 @@ differ only in the `RootfsUnpacker` that writes the tree.
   The log is kept under 1 MB, trimmed every 30 s to its last 512 KB in
   place (`ContainerProgram.trim`; the running program's append lands at
   the new end). A program ends with droidtop's process. Not yet: an image
-  without `/bin/sh` (a distroless one), the user an image asks for, its
-  ports as links (the next D6 step), and app containers made from the
-  create screen with Private homes.
+  without `/bin/sh` (a distroless one), the user an image asks for, and
+  app containers made from the create screen with Private homes.
+  **Ports** (D6, 2026-10-15). The kept config carries the image's
+  `ExposedPorts` (`ExposedPort`: `8080/tcp`, no protocol meaning tcp, as
+  Docker reads it). There are no network namespaces here, so a port is the
+  device's own port where the program listens, not a mapping, and droidtop
+  never renames one. The section lists each: a tcp port as
+  `http://localhost:<port>` with **Open on Android** (`ACTION_VIEW`), any
+  other as a note, and under proot a port below 1024 says it can only
+  listen there with root. A start whose image shares a port with a program
+  droidtop already started does not run: it reads "couldn't start: <this>
+  and <that> both use port <n>; stop <that>'s program first"
+  (`ExposedPort.clash`, checked and recorded under one lock in
+  `ContainerPrograms.start`). Programs a person runs by hand in a terminal
+  are not known and not checked. A container pulled before this keeps a
+  config without ports until it is recreated.
 - *The flattener* reads the layers top first, so the first time a path is
   seen is its final version, and applies whiteouts (`.wh.<name>`, and
   `.wh..wh..opq` for an opaque directory) to the layers below theirs. What
