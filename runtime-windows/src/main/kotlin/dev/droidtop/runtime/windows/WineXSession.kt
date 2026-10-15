@@ -279,9 +279,15 @@ class WineXSession(
         this.environment = null
         val winHandler = xServer.winHandler
         teardown.execute {
+            // A game left with Back is paused (SIGSTOP). Continue it first: a stopped wineserver
+            // cannot answer `wineserver -k`, and the pause's own verifier must not stop anything
+            // again. Then whatever Wine is still listed is killed, the sweep the next launch does
+            // anyway, so a stopped session does not wait for one (Droidtop/tracker#249, rig on 1894).
+            runCatching { ProcessHelper.resumeAllWineProcesses() }
             runCatching { winHandler?.stop() }
             ProcessHelper.removeDebugCallback(outputCollector)
             runCatching { environment.stopEnvironmentComponents() }
+            runCatching { ProcessHelper.killAllWineProcesses() }
         }
     }
 
