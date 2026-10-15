@@ -12,7 +12,7 @@ import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerDiskUsage
 import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerSockets
-import dev.droidtop.runtime.ExtraMount
+import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.ContainerNames
@@ -147,8 +147,10 @@ class ProotRuntime(
         val imageRef = info.image ?: error("${container.id} has no recorded image reference to recreate from")
         val provisioning = if (container.role == ContainerRole.PRIMARY) readProvisioning(container.id) else null
         val displayName = info.displayName
+        // The home and shared folders are the person's choice, not the image's: they survive a recreate.
+        val mounts = withContext(Dispatchers.IO) { readMounts(container.id) }
         destroy(container)
-        val created = createContainer(container.id, container.role, RootfsImage(reference = imageRef), provisioning)
+        val created = createContainer(container.id, container.role, RootfsImage(reference = imageRef), provisioning, mounts)
         if (container.role == ContainerRole.SIBLING) {
             withContext(Dispatchers.IO) { names.set(created.id, displayName) }
         }
@@ -160,6 +162,7 @@ class ProotRuntime(
         role: ContainerRole,
         image: RootfsImage,
         provisioning: PrimaryProvisioning?,
+        mounts: EnvironmentMounts = EnvironmentMounts.NEW_CONTAINER,
     ): Container {
         stopProcess(name)
         val rootfs = rootfsOf(name)
@@ -171,6 +174,9 @@ class ProotRuntime(
             config[KEY_IMAGE] = image.reference
             image.digest?.let { config[KEY_DIGEST] = it }
             configOf(name).outputStream().use { config.store(it, "droidtop proot container") }
+            // A new container shares the home; a recreated one is handed
+            // the home and folders it had ([recreateFromImage]).
+            writeMounts(name, mounts)
         }
         provisioning?.let { recordProvisioning(name, it) }
         log.line("created $name")
@@ -352,12 +358,12 @@ class ProotRuntime(
     /** Where tar's own complaints go, read back into the error the person sees. */
     private fun backupLog(): File = File(context.cacheDir, "container-backup.log")
 
-    override suspend fun extraMounts(container: Container): List<ExtraMount> = withContext(Dispatchers.IO) {
-        readExtraMounts(container.id)
+    override suspend fun mounts(container: Container): EnvironmentMounts = withContext(Dispatchers.IO) {
+        readMounts(container.id)
     }
 
-    override suspend fun setExtraMounts(container: Container, mounts: List<ExtraMount>) = withContext(Dispatchers.IO) {
-        writeExtraMounts(container.id, mounts)
+    override suspend fun setMounts(container: Container, mounts: EnvironmentMounts) = withContext(Dispatchers.IO) {
+        writeMounts(container.id, mounts)
     }
 
     /**
@@ -547,13 +553,12 @@ class ProotRuntime(
             // Volumes mounted now, looked up per session: a card or USB
             // drive mounted since the last one is there the next time.
             ContainerLayout.sharedStorageBinds(SharedVolume.mounted(context)).forEach { (host, guest) -> add("--bind=$host:$guest") }
-            // The person's own extra Mounts (docs/SPEC.md 3d), each at its
-            // own path under EXTRA_MOUNTS_DIR -- a host folder removed
-            // since it was added is skipped, the same "don't fail a start
-            // over one missing bind" policy sharedStorageBinds already
-            // gets from the platform for a card that's been unmounted.
-            readExtraMounts(containerId).filter { File(it.hostPath).isDirectory }
-                .forEach { add("--bind=${it.hostPath}:${it.containerPath}") }
+            // The container's home and the person's own extra folders
+            // (docs/SPEC.md 3d "Home and folders"), from the one
+            // description both backends read; a folder removed since it
+            // was added is skipped, not a failed start.
+            readMounts(containerId).binds(ContainerLayout.sharedHomeDir(appStorageDir))
+                .forEach { (host, guest) -> add("--bind=$host:$guest") }
             add("--bind=${File(etcDir, "resolv.conf").absolutePath}:/etc/resolv.conf")
             add("--bind=${File(etcDir, "hosts").absolutePath}:/etc/hosts")
             add("--bind=${File(etcDir, "bwrap").absolutePath}:$BWRAP_SHIM_PATH")
@@ -621,7 +626,7 @@ class ProotRuntime(
     private fun containerDir(name: String) = File(containersDir, name)
     private fun rootfsOf(name: String) = File(containerDir(name), "rootfs")
     private fun configOf(name: String) = File(containerDir(name), "container.properties")
-    private fun extraMountsFile(name: String) = File(containerDir(name), "mounts.list")
+    private fun mountsFile(name: String) = File(containerDir(name), "mounts.list")
 
     /** Synchronous read for [startSession], which already runs on Dispatchers.IO via its callers. */
     private fun readSocketsSync(name: String): ContainerSockets {
@@ -632,17 +637,12 @@ class ProotRuntime(
         )
     }
 
-    /** One "hostPath\tname" line per extra mount ([ExtraMount], docs/SPEC.md 3d). */
-    private fun readExtraMounts(name: String): List<ExtraMount> =
-        extraMountsFile(name).takeIf { it.isFile }?.readLines().orEmpty()
-            .mapNotNull { line ->
-                val parts = line.split("\t", limit = 2)
-                if (parts.size == 2 && parts[0].isNotBlank() && parts[1].isNotBlank()) ExtraMount(parts[0], parts[1]) else null
-            }
+    /** The container's home and extra folders ([EnvironmentMounts], docs/SPEC.md 3d "Home and folders"). */
+    private fun readMounts(name: String): EnvironmentMounts =
+        EnvironmentMounts.decode(mountsFile(name).takeIf { it.isFile }?.readText().orEmpty())
 
-    private fun writeExtraMounts(name: String, mounts: List<ExtraMount>) {
-        extraMountsFile(name).apply { parentFile?.mkdirs() }
-            .writeText(mounts.joinToString("") { "${it.hostPath}\t${it.name}\n" })
+    private fun writeMounts(name: String, mounts: EnvironmentMounts) {
+        mountsFile(name).apply { parentFile?.mkdirs() }.writeText(EnvironmentMounts.encode(mounts))
     }
 
     private fun readConfig(name: String): Properties =

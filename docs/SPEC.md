@@ -2255,6 +2255,33 @@ the `ContainerRuntime` interface that already exists (§3):
   most 200, the rest reachable as a Custom reference), Name (defaulting as
   below) and Create, which reports its progress on its own row. Text is
   edited in the navigator's dialog, where the keyboard's Done key saves.
+  **Home and folders (decided 2026-10-14, built 2026-10-15,
+  Droidtop/tracker#555 D3).** One description, `EnvironmentMounts`
+  (runtime-common), says what a container sees of the device: its home
+  and its extra folders. Both backends read it through
+  `EnvironmentMounts.binds`, so proot's `--bind` arguments and
+  droidspaces' `bind_mounts` come from one list. The home is what
+  programs see at `/root` (every container runs as root):
+  - **Your files (shared with the desktop)** (`HomeChoice.Shared`):
+    droidtop's one shared home folder, `files/desktop-home`
+    (`ContainerLayout.sharedHomeDir`), bound at `/root` in every
+    container that shares it, distrobox's default. A new container,
+    primary or sibling, starts here.
+  - **Its own files only** (`HomeChoice.Private`): the image's own
+    `/root`, like distrobox `--home`. Every container made before homes
+    existed reads as Private, so nothing already in its `/root` is hidden
+    behind the shared folder.
+  - **A folder you choose** (`HomeChoice.Chosen`): a folder on the device
+    bound at `/root`.
+  The choice and the folders are kept in the mounts file each backend
+  already had (proot `mounts.list`, droidspaces `<name>.mounts`): folder
+  lines are unchanged (`hostPath<TAB>name`) and one `@home` line names the
+  home. A missing folder or chosen home is left out at start, not a
+  failed start. Recreate from the image keeps the home and folders. The
+  container page shows the three choices as a Home section above Mounts;
+  a change applies from the next start. Next in D3: an app container
+  (D6) defaults to Private, and the Wine prefix's home and drive letters
+  come from the same description.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy
@@ -2264,9 +2291,10 @@ the `ContainerRuntime` interface that already exists (§3):
   real recursive walk of the rootfs tree, `ContainerDiskUsage`, shared by
   both backends as a default method), `sockets`/`setSockets`
   (`ContainerSockets(waylandShared, audioShared)`) and
-  `extraMounts`/`setExtraMounts` (`ExtraMount`, a host folder bound at its
-  own path under `ContainerLayout.EXTRA_MOUNTS_DIR`, picked with the
-  system folder picker like §4b's shared-storage flow). Sockets and
+  `mounts`/`setMounts` (`EnvironmentMounts`: the home, below, and the
+  `ExtraMount` folders, each a host folder bound at its own path under
+  `ContainerLayout.EXTRA_MOUNTS_DIR`, picked with the system folder
+  picker like §4b's shared-storage flow). Sockets and
   Mounts follow the same "one row unlocks a real backend feature" shape
   as Devices, except both backends can now bridge host audio in (fixed
   2026-09-28, Droidtop/tracker#95; `audioSharingUnavailableReason` is
