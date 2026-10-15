@@ -9,8 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
-import android.widget.Toast
 import dev.droidtop.library.LaunchDisplay
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notices
 import dev.droidtop.library.settings.PlayEnforcer
 import dev.droidtop.library.settings.PlayStep
 import dev.droidtop.library.settings.PlayTime
@@ -23,7 +24,6 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
  * Counts play and holds the play-time limits (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421): while
@@ -91,9 +91,12 @@ object PlayTimeLimiter {
         Log.i(TAG, "play time up, quit: $outcome")
     }
 
-    /** A toast, which shows over any app, and a notification where the person allowed them. */
-    private suspend fun tell(app: Context, title: String, text: String) {
-        withContext(Dispatchers.Main) { Toast.makeText(app, "$title. $text", Toast.LENGTH_LONG).show() }
+    /**
+     * A caution flash, which is a platform toast over a running game (no droidtop surface is started then), and a
+     * notification where the person allowed them.
+     */
+    private fun tell(app: Context, title: String, text: String) {
+        Notices.flash("$title. $text", tone = NoticeTone.Caution, context = app)
         runCatching { notify(app, title, text) }
     }
 
