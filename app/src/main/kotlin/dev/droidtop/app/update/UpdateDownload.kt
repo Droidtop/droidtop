@@ -77,6 +77,17 @@ internal object UpdateDownload {
         return Found.Missing
     }
 
+    /** What the update is doing right now, for the Updates screen: the running pass, or the APK's download job; null when idle. */
+    fun liveLine(): String? {
+        val pass = UpdateNow.pass.value
+        if (pass.running) return pass.line.ifBlank { "Checking..." }
+        val entry = PluginJobsCenter.entries().value.firstOrNull { entry ->
+            entry.nativeKind == DownloadJobs.KIND && !entry.done &&
+                PluginJobsCenter.argsOf(entry.jobId)?.get("name")?.let { UpdateFiles.buildOf(it) } != null
+        } ?: return null
+        return if (entry.percent in 0..99) "${entry.statusLine} (${entry.percent}%)" else entry.statusLine
+    }
+
     /** The id of the running download job for the file [name], or null. */
     fun jobFor(name: String): String? = PluginJobsCenter.entries().value.firstOrNull { entry ->
         entry.nativeKind == DownloadJobs.KIND && !entry.done && PluginJobsCenter.argsOf(entry.jobId)?.get("name") == name

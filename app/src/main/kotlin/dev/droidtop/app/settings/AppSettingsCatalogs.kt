@@ -1008,6 +1008,8 @@ object AppSettingsCatalogs {
     private suspend fun availableUpdatesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val selfUpdate = dev.droidtop.app.update.AppSelfUpdate
         val newerBuild = selfUpdate.newerSeenVersionName(context)
+        // While Check now is checking, downloading or waiting for Android's installer, say so instead of "Up to date".
+        val updating = dev.droidtop.app.update.UpdateDownload.liveLine()
         val installed = PluginStore.installed(context)
         val listings = PluginCatalog.listings(context)
         val pluginUpdates = PluginCatalog.offersFor(installed, listings, UserOriginKeys.load(UserOriginKeys.storeFile(context)))
@@ -1029,12 +1031,14 @@ object AppSettingsCatalogs {
                 ActionItem(
                     id = "updates_droidtop_status",
                     title = "droidtop",
-                    subtitle = if (newerBuild != null) {
+                    subtitle = if (updating != null) {
+                        "Installed ${selfUpdate.installedVersionName(context)}. Updating now; reopen this list to see the latest state"
+                    } else if (newerBuild != null) {
                         "Installed ${selfUpdate.installedVersionName(context)}. Check now, below, installs it"
                     } else {
                         "Installed ${selfUpdate.installedVersionName(context)}. No newer build seen by the last check"
                     },
-                    value = newerBuild?.let { "Update to $it" } ?: "Up to date",
+                    value = updating ?: newerBuild?.let { "Update to $it" } ?: "Up to date",
                     run = {},
                 ),
             )

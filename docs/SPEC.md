@@ -17081,6 +17081,10 @@ lasts three hours and is cleared when the update fails); an update that arrives 
 the screen from a game. Enginehost declares no Home filter (only `MAIN`/`LAUNCHER`, checked in its
 manifest on `origin/main`), so it is not a competing Home candidate.
 
+**Updates screen state (2026-10-14).** While "Check now" is checking, downloading or waiting for Android's
+installer, the droidtop row on the Available tab shows that state (`UpdateDownload.liveLine`: the pass's line, or the
+APK job's status and percent) instead of "Up to date".
+
 **Update files.** The APK lands as `droidtop-<versionCode>.apk` in the downloads folder (droidtop's
 external files directory), written by the download runner with `.apk.part`/`.part.meta` beside it while it
 is fetched. `UpdateFiles` deletes
