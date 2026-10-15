@@ -47,7 +47,6 @@ import dev.droidtop.library.settings.GameRunner
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.UiModeRefresh
 import dev.droidtop.runtime.systemstatus.PerformanceOverlay
-import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -99,7 +98,6 @@ internal fun runnerOf(entry: LibraryEntry?): GameRunner =
 @Composable
 internal fun CompanionGameTab() {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val running by LaunchDisplay.running.collectAsState()
     val entries by CompanionState.libraryEntries.collectAsState()
     val settings by CompanionPrefs.settings.collectAsState()
@@ -159,15 +157,7 @@ internal fun CompanionGameTab() {
                 GameRow.RESUME -> GameButton(label, primary = true) { CompanionState.onLaunchEntry?.invoke(entry) }
                 GameRow.QUIT -> GameButton(label) { act(row) { CompanionState.onQuitEntry?.invoke(entry) } }
                 GameRow.RESTART -> GameButton(label) { act(row) { CompanionState.onRestartEntry?.invoke(entry) } }
-                GameRow.KILL -> GameButton(label) {
-                    act(row) {
-                        val pkg = LaunchDisplay.runningPackageName
-                        scope.launch {
-                            if (pkg != null) TaskManager.close(context, pkg)
-                            LaunchDisplay.clearRunning()
-                        }
-                    }
-                }
+                GameRow.KILL -> GameButton(label) { act(row) { CompanionState.onKillEntry?.invoke(entry) } }
                 GameRow.EMULATOR -> CompanionEmulatorChoice(entry)
                 GameRow.OVERLAY -> GameButton("$label: ${overlay.label}") {
                     if (PerformanceOverlay.canDraw(context)) PerformanceOverlay.setLevel(context, overlay.next())

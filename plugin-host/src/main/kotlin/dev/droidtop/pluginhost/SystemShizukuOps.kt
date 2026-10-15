@@ -43,6 +43,8 @@ class SystemShizukuOps : ElevatedBackend {
         return if (allowed) BackendState.READY else BackendState.NEEDS_PERMISSION
     }
 
+    override fun installed(): Boolean = ShizukuTransport.shizukuAppInstalled() || state() != BackendState.ABSENT
+
     override fun capabilities(): TaskPrivileges =
         if (state() == BackendState.READY) {
             TaskPrivileges(forceStop = true, shell = true, grantPermission = true, appOps = true, files = true)

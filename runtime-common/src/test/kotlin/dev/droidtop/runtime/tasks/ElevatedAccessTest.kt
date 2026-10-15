@@ -154,7 +154,19 @@ class ElevatedAccessTest {
         assertTrue(notAllowed.contains("not allowed in Shizuku"))
         assertTrue(notAllowed.contains("Allow droidtop in Shizuku"))
         assertEquals(notAllowed, ElevatedAccess.unavailableReason(ElevatedChoice.SHIZUKU_APP, needs, ready))
-        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, absent)!!.startsWith("Shizuku is not running"))
+        // Nothing installed: say what would let droidtop close apps.
+        val nothing = ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, absent)!!
+        assertTrue(nothing.contains("Install Shizuku"))
+        assertTrue(nothing.contains("add the Shizuku plugin"))
+        // The Shizuku app is on the device but not running: start it, do not ask for it to be added.
+        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, absent, appInstalled = true)!!.startsWith("Shizuku is installed but not running"))
+        // The plugin is installed and waiting for approval (console, build 1773): approve it, never "add the plugin".
+        val waiting = ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, absent, needs, appInstalled = true)!!
+        assertTrue(waiting.contains("plugin is installed but not approved"))
+        assertTrue(!waiting.contains("add the Shizuku plugin"))
+        assertEquals(waiting, ElevatedAccess.unavailableReason(ElevatedChoice.SHIZUKU_PLUGIN, ready, needs))
+        // The app being usable-after-allowing wins the wording when both need the person.
+        assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.AUTO, needs, needs)!!.contains("not allowed in Shizuku"))
         assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.SHIZUKU_PLUGIN, ready, absent)!!.contains("Shizuku plugin"))
         assertTrue(ElevatedAccess.unavailableReason(ElevatedChoice.OFF, ready, ready)!!.startsWith("Elevated access is Off"))
     }

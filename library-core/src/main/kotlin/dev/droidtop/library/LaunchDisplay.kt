@@ -9,6 +9,7 @@ import android.view.Display
 import dev.droidtop.runtime.AudioHandOff
 import dev.droidtop.runtime.LaunchSoundExperiment
 import dev.droidtop.runtime.tasks.LaunchLedger
+import dev.droidtop.runtime.tasks.sessionOver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -325,7 +326,7 @@ object LaunchDisplay {
         if (packageName != null && LaunchReplace.replaces(replacing, packageName, runningGame?.gameId)) {
             LaunchWatchdog.cancel()
             val outcome = withContext(Dispatchers.IO) { dev.droidtop.runtime.tasks.TaskManager.close(context, packageName) }
-            val ended = outcome is dev.droidtop.runtime.tasks.CloseOutcome.Closed
+            val ended = outcome.sessionOver
             AudioHandOff.mark("replacing ${replacing?.gameId} in $packageName: ${if (ended) "ended" else "not ended"}")
             redeliver = LaunchReplace.redeliver(packageName, ended)
         }

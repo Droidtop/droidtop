@@ -33,9 +33,39 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
             files = caller.hasOp("priv.shell", 1, "read_file") && caller.hasOp("priv.shell", 1, "write_file"),
         )
 
-    /** Ready while a running provider plugin serves either interface; the plugin itself says why a call fails. */
-    override fun state(): BackendState =
-        if (available().let { it.forceStop || it.shell }) BackendState.READY else BackendState.ABSENT
+    /**
+     * Ready while a running provider plugin serves either interface; the plugin itself says why a call fails. A provider
+     * plugin that is installed but not running (not approved yet, turned off, disabled after a crash) needs the person:
+     * [BackendState.NEEDS_PERMISSION], so Kill says to approve it instead of to add it (console, build 1773).
+     */
+    override fun state(): BackendState = when {
+        available().let { it.forceStop || it.shell } -> BackendState.READY
+        providerInstalled() -> BackendState.NEEDS_PERMISSION
+        else -> BackendState.ABSENT
+    }
+
+    @Volatile
+    private var installedAt = 0L
+
+    @Volatile
+    private var installedAnswer = false
+
+    /**
+     * Whether an installed plugin exports `priv.packages` or `priv.shell`, running or not. Reads the plugins' records, so
+     * the answer is kept for [INSTALLED_CACHE_MS]: [state] is asked often and must not touch the disk each time.
+     */
+    private fun providerInstalled(): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - installedAt < INSTALLED_CACHE_MS) return installedAnswer
+        val answer = runCatching {
+            PluginStore.installed(context.applicationContext).any { record ->
+                record.manifest.v2.exports.any { it.api == "priv.packages" || it.api == "priv.shell" }
+            }
+        }.getOrDefault(false)
+        installedAnswer = answer
+        installedAt = now
+        return answer
+    }
 
     override fun forceStop(packageName: String): ForceStopResult =
         when (val result = ForceStop.request(caller, packageName)) {
@@ -108,5 +138,6 @@ class PluginPrivilegedOps(private val context: Context) : ElevatedBackend {
         /** Raw bytes per call: under a quarter of a binder transaction once base64-encoded. */
         const val FILE_CHUNK = 192 * 1024
         const val ROOT_LEVEL = "root"
+        const val INSTALLED_CACHE_MS = 5_000L
     }
 }

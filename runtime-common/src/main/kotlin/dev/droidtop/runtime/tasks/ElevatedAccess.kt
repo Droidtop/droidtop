@@ -7,7 +7,10 @@ enum class BackendState {
     /** Not there: no Shizuku binder, or no running provider plugin. */
     ABSENT,
 
-    /** There, but droidtop has not been allowed in it yet. */
+    /**
+     * There, but not usable until the person acts: droidtop has not been allowed in the Shizuku app yet, or the Shizuku
+     * provider plugin is installed and not yet approved and turned on.
+     */
     NEEDS_PERMISSION,
 
     READY,
@@ -39,6 +42,9 @@ enum class ElevatedChoice(val id: String, val label: String) {
 interface ElevatedBackend : PrivilegedShell {
     /** Cheap: a binder ping or a registry lookup, never a command. */
     fun state(): BackendState
+
+    /** Whether the source is installed even though it is not running, so a reason can say "start it" instead of "get it". */
+    fun installed(): Boolean = state() != BackendState.ABSENT
 }
 
 /** The pure choice between the two backends; everything that decides lives here so it can be tested. */
@@ -65,25 +71,33 @@ object ElevatedAccess {
 
     private const val NOT_ALLOWED = "droidtop is not allowed in Shizuku yet: $SETTINGS_PLACE > Allow droidtop in Shizuku"
 
+    private const val PLUGIN_NOT_APPROVED = "The Shizuku plugin is installed but not approved and turned on yet: open it in $SETTINGS_PLACE"
+
     /**
      * Why [choice] gives no elevated access with the backends in these states, or null when it does
-     * ([ElevatedShell.unavailableReason]). The Shizuku app running over ADB without having allowed droidtop is the
-     * likely console case (build 1649: Quick Menu Kill said only "Not confirmed" three times while Shizuku ran).
+     * ([ElevatedShell.unavailableReason]). Each sentence is the real state and the one step that changes it: Shizuku
+     * missing, installed but not running, running but not allowing droidtop (the console case behind build 1649), or the
+     * plugin installed and waiting for approval (console, build 1773, where Kill said to add a plugin that was added).
+     * [appInstalled] is whether the Shizuku app is on the device even though it is not running.
      */
-    fun unavailableReason(choice: ElevatedChoice, app: BackendState, plugin: BackendState): String? = when (choice) {
+    fun unavailableReason(choice: ElevatedChoice, app: BackendState, plugin: BackendState, appInstalled: Boolean = false): String? = when (choice) {
         ElevatedChoice.OFF -> "Elevated access is Off: $SETTINGS_PLACE > Elevated access"
         ElevatedChoice.SHIZUKU_APP -> when (app) {
             BackendState.READY -> null
             BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
             BackendState.ABSENT -> "The Shizuku app is not running: start it, or pick another source in $SETTINGS_PLACE > Elevated access"
         }
-        ElevatedChoice.SHIZUKU_PLUGIN ->
-            if (plugin == BackendState.READY) null
-            else "The Shizuku plugin picked in $SETTINGS_PLACE > Elevated access is not running"
+        ElevatedChoice.SHIZUKU_PLUGIN -> when (plugin) {
+            BackendState.READY -> null
+            BackendState.NEEDS_PERMISSION -> PLUGIN_NOT_APPROVED
+            BackendState.ABSENT -> "The Shizuku plugin picked in $SETTINGS_PLACE > Elevated access is not installed or not running"
+        }
         ElevatedChoice.AUTO -> when {
             app == BackendState.READY || plugin == BackendState.READY -> null
             app == BackendState.NEEDS_PERMISSION -> NOT_ALLOWED
-            else -> "Shizuku is not running: start the Shizuku app, or add the Shizuku plugin"
+            plugin == BackendState.NEEDS_PERMISSION -> PLUGIN_NOT_APPROVED
+            appInstalled -> "Shizuku is installed but not running: open the Shizuku app and start it"
+            else -> "droidtop can only ask Android to close apps. Install Shizuku, or add the Shizuku plugin in $SETTINGS_PLACE"
         }
     }
 
@@ -139,7 +153,7 @@ class ElevatedShell(
         }
     }
 
-    override fun unavailableReason(): String? = ElevatedAccess.unavailableReason(choice(), app.state(), plugin.state())
+    override fun unavailableReason(): String? = ElevatedAccess.unavailableReason(choice(), app.state(), plugin.state(), app.installed())
 
     override fun forceStop(packageName: String): ForceStopResult = target().forceStop(packageName)
 

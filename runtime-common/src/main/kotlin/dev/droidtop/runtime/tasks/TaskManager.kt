@@ -1,6 +1,7 @@
 package dev.droidtop.runtime.tasks
 
 import android.app.ActivityManager
+import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -46,7 +47,30 @@ object TaskManager {
                 Log.d(TAG, "Couldn't ask Android to end $pkg", t)
                 false
             }
-        }, endEnginehostGame = { EnginehostEndGame.request(context.applicationContext) })
+        }, endEnginehostGame = { EnginehostEndGame.request(context.applicationContext) }, sendToBackground = { pkg -> sendToBackground(context.applicationContext, pkg) })
+    }
+
+    /** How long the Home press is given to take the app off the screen before the background kill, which spares a visible app. */
+    private const val BACKGROUND_SETTLE_MS = 1_200L
+
+    /**
+     * Without a helper the only way to end an app is [ActivityManager.killBackgroundProcesses], which leaves an app that
+     * is on screen alone (console, build 1773: RetroArch kept running after Kill). So the app droidtop opened is first put
+     * in the background the way the person would, by a Home press on the screen it is on, and given a moment to stop.
+     * Does nothing for an app droidtop did not open (its screen is unknown) or for droidtop itself. Blocks: IO thread only.
+     */
+    private fun sendToBackground(context: Context, packageName: String) {
+        if (packageName == context.packageName) return
+        val display = LaunchLedger.entries().firstOrNull { it.packageName == packageName }?.displayId ?: return
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(home, ActivityOptions.makeBasic().setLaunchDisplayId(display).toBundle())
+            Thread.sleep(BACKGROUND_SETTLE_MS)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        } catch (t: Throwable) {
+            Log.d(TAG, "Couldn't put $packageName in the background", t)
+        }
     }
 
     private val snapshotFlow = MutableStateFlow<RunningSnapshot?>(null)
@@ -70,7 +94,7 @@ object TaskManager {
     suspend fun close(context: Context, packageName: String): CloseOutcome =
         withContext(Dispatchers.IO) {
             val outcome = closer(context).close(packageName)
-            if (outcome is CloseOutcome.Closed) refreshNow(context)
+            if (outcome.sessionOver) refreshNow(context)
             outcome
         }
 

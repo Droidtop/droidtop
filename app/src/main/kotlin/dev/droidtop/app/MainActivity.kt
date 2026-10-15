@@ -181,6 +181,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
     private var companionQuitSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
+    private var companionKillSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
 
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
@@ -325,6 +326,18 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             }
         }
         CompanionState.onQuitEntry = companionQuitSeam
+        // Kill from the Game tab: the same outcome on the same banner, so a kill that could not be confirmed says why
+        // (no helper, Shizuku not allowed, the plugin waiting for approval) instead of the tab just going away.
+        companionKillSeam = { entry ->
+            lifecycleScope.launch {
+                CompanionState.launchError.value = when (val outcome = library.killRunning(applicationContext, entry)) {
+                    dev.droidtop.library.QuitResult.Ended -> null
+                    is dev.droidtop.library.QuitResult.NotEnded -> outcome.message
+                    is dev.droidtop.library.QuitResult.Unresolvable -> outcome.message
+                }
+            }
+        }
+        CompanionState.onKillEntry = companionKillSeam
         CompanionState.onRestartEntry = { entry ->
             lifecycleScope.launch {
                 when (val outcome = library.quitRunning(applicationContext, entry)) {
@@ -891,6 +904,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         }
         if (CompanionState.onQuitEntry === companionQuitSeam) {
             CompanionState.onQuitEntry = null
+        }
+        if (CompanionState.onKillEntry === companionKillSeam) {
+            CompanionState.onKillEntry = null
         }
         clipboardBridge?.stop()
         clipboardBridge = null

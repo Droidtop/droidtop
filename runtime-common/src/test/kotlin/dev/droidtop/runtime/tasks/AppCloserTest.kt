@@ -35,11 +35,14 @@ class AppCloserTest {
     private var endGameAnswer: Boolean? = null
     private var endGameAsks = 0
 
+    private val order = mutableListOf<String>()
+
     private fun closer(ops: PrivilegedShell, killWorks: Boolean = true) =
         AppCloser(
             ops,
-            killBackground = { killed += it; killWorks },
+            killBackground = { order += "kill"; killed += it; killWorks },
             endEnginehostGame = { endGameAsks++; endGameAnswer },
+            sendToBackground = { order += "home" },
             onClosed = { closed += it },
         )
 
@@ -55,17 +58,54 @@ class AppCloserTest {
     }
 
     @Test
-    fun `when Enginehost had no game or could not be asked the close is only asked of Android`() {
-        for (answer in listOf(false, null)) {
-            endGameAnswer = answer
-            killed.clear()
+    fun `when Enginehost could not be asked the close is only asked of Android`() {
+        endGameAnswer = null
 
-            val outcome = closer(FakeOps(TaskPrivileges.NONE)).close(TaskPolicy.ENGINEHOST_PACKAGE)
+        val outcome = closer(FakeOps(TaskPrivileges.NONE)).close(TaskPolicy.ENGINEHOST_PACKAGE)
 
-            assertTrue(outcome is CloseOutcome.Requested)
-            assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), killed)
-        }
+        assertTrue(outcome is CloseOutcome.Requested)
+        assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), killed)
         assertTrue(closed.isEmpty())
+    }
+
+    @Test
+    fun `Enginehost saying no game is running ends droidtop's stale session, and Android is still asked`() {
+        endGameAnswer = false
+
+        val outcome = closer(FakeOps(TaskPrivileges.NONE)).close(TaskPolicy.ENGINEHOST_PACKAGE)
+
+        assertEquals(CloseOutcome.NotRunning("Enginehost has no game running"), outcome)
+        assertTrue(outcome.sessionOver)
+        assertEquals("Enginehost has no game running", outcome.text)
+        // Enginehost's own screens may still be open, so the ask of Android is not skipped.
+        assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), killed)
+        assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), closed)
+    }
+
+    @Test
+    fun `a request to Android is not the end of a session`() {
+        assertEquals(false, CloseOutcome.Requested("Not confirmed").sessionOver)
+        assertEquals(false, CloseOutcome.Failed("Helper failed").sessionOver)
+        assertEquals(true, CloseOutcome.Closed.sessionOver)
+    }
+
+    @Test
+    fun `the app is put in the background just before the background kill and never when a helper stops it`() {
+        closer(FakeOps(TaskPrivileges.NONE)).close("com.retroarch.aarch64")
+
+        assertEquals(listOf("home", "kill"), order)
+
+        order.clear()
+        closer(FakeOps(TaskPrivileges(forceStop = true, shell = true), ForceStopResult.Stopped)).close("com.retroarch.aarch64")
+
+        assertTrue(order.isEmpty())
+    }
+
+    @Test
+    fun `Clear all does not count an app that had nothing running`() {
+        val summary = ClearAllSummary.of(listOf(CloseOutcome.Closed, CloseOutcome.NotRunning(), CloseOutcome.Requested("Not confirmed")))
+
+        assertEquals(ClearAllSummary(closed = 1, requested = 1, failed = 0), summary)
     }
 
     @Test

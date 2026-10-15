@@ -9,6 +9,7 @@ import dev.droidtop.library.consoles.RetroArchCores
 import dev.droidtop.runtime.tasks.CloseOutcome
 import dev.droidtop.runtime.tasks.Fidelity
 import dev.droidtop.runtime.tasks.TaskManager
+import dev.droidtop.runtime.tasks.sessionOver
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -273,7 +274,7 @@ object LaunchWatchdog {
     /** The alert's "Close it": ends the app by the task manager's one close path, and clears the alert only when that really closed it. */
     suspend fun closeIt(context: Context, alert: LaunchAlert): CloseOutcome {
         val outcome = TaskManager.close(context.applicationContext, alert.packageName)
-        if (outcome is CloseOutcome.Closed) {
+        if (outcome.sessionOver) {
             LaunchDisplay.clearRunning()
             dismiss()
         }
@@ -290,7 +291,7 @@ object LaunchWatchdog {
     suspend fun getCore(context: Context, alert: LaunchAlert): String? {
         val need = alert.retroArchCore ?: return null
         val closed = TaskManager.close(context.applicationContext, alert.packageName)
-        if (closed is CloseOutcome.Closed) LaunchDisplay.clearRunning()
+        if (closed.sessionOver) LaunchDisplay.clearRunning()
         dismiss()
         return when (val outcome = RetroArchCores.ensure(context.applicationContext, need, asked = true)) {
             RetroArchCores.Outcome.Ready -> "${need.core} is installed. Start the game again."

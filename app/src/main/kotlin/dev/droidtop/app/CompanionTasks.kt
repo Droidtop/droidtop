@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.rememberScrollState
 import dev.droidtop.library.tasks.TaskActions
 import dev.droidtop.runtime.tasks.AppsInsights
-import dev.droidtop.runtime.tasks.CloseOutcome
+import dev.droidtop.runtime.tasks.sessionOver
 import dev.droidtop.runtime.tasks.ProtectedApps
 import dev.droidtop.runtime.tasks.RunningApp
 import dev.droidtop.runtime.tasks.TaskManager
@@ -104,7 +104,7 @@ internal fun CompanionTasks() {
         rowStates[app.packageName] = "Closing…"
         scope.launch {
             val outcome = TaskManager.close(context, app.packageName)
-            if (outcome is CloseOutcome.Closed) {
+            if (outcome.sessionOver) {
                 rowStates.remove(app.packageName)
             } else {
                 rowStates[app.packageName] = outcome.text
