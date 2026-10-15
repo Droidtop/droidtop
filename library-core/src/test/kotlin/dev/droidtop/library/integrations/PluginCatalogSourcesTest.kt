@@ -202,6 +202,17 @@ class PluginCatalogSourcesTest {
         val text = signedIndex(master)
         val files = mapOf(PluginCatalogSources.INDEX_SIGNATURE_FILE to indexSignature(master, text))
 
+        // Each stage on its own line, so a failure names the stage.
+        val parsed = PluginCatalogIndexParser.parse(text)
+        assertNotNull(parsed)
+        val declared = parsed!!.catalog!!.keyBase64!!
+        assertEquals(sha(b64(master.pair.public.encoded)), dev.droidtop.pluginhost.UserOriginKeys.keySha256(declared))
+        val anchor = dev.droidtop.pluginhost.PluginOriginKeys.anchorForKey(declared)
+        assertNotNull(anchor)
+        val leafOnly = ChainSignature.verify(files.getValue(PluginCatalogSources.INDEX_SIGNATURE_FILE), ChainSignature.Purpose.CATALOG, anchor!!, text.toByteArray(Charsets.UTF_8), now)
+        assertTrue(leafOnly.toString(), leafOnly is ChainSignature.Result.Verified)
+        assertTrue(dev.droidtop.runtime.util.CatalogSignature.verify(text.toByteArray(Charsets.UTF_8), files.getValue(PluginCatalogSources.INDEX_SIGNATURE_FILE), anchor, now, "someone/catalog") is dev.droidtop.runtime.util.CatalogSignature.Verdict.Verified)
+
         // Adding: the signature chains to the master the index names, which the person then accepts.
         val first = check(text, expected = null, files = files)
         assertTrue(first.signed)
