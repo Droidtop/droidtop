@@ -963,9 +963,16 @@ class ConsoleRomProvider(
         // The launch goes ahead as the preset says (SPEC 7e2, "File access is help in emulator setup, never a launch
         // step"); when it went out with the content link because the emulator lacks All files access, a launch alert
         // says so and names the setup row (Droidtop/tracker#270: NetherSX2 black, then not responding, on the link).
-        if (playerNeedsAllFilesAccess(context, player)) {
-            LaunchWatchdog.adviseNext(player.packageName, fileAccessAdvice(player.name, system.displayName, EmulatorAccess.canGrantAllFiles()))
-        }
+        // It also tells the watchdog this is an emulator playing a game, so one that sits idle is reported
+        // (Droidtop/tracker#270, #271).
+        LaunchWatchdog.expectNext(
+            player.packageName,
+            if (playerNeedsAllFilesAccess(context, player)) {
+                fileAccessAdvice(player.name, system.displayName, EmulatorAccess.canGrantAllFiles())
+            } else {
+                null
+            },
+        )
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         try {
             LaunchDisplay.start(context, intent)

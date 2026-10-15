@@ -7900,21 +7900,36 @@ change reaches it (console, build 1397: RetroArch's system dialog came 44 s afte
 - when a `priv.shell` provider runs, whether the app's task is in the system's task list
   (`TaskManager`, exact fidelity only); without one this is unknown and claims nothing.
 
-- for a RetroArch launch, when a `priv.shell` provider runs, the processor time its processes have used,
-  read once 15 s after the launch (`pidof`, then `/proc/<pid>/stat` utime plus stime, which the shell user
-  reads for every app as `ps` does; `LaunchWatchPolicy.cpuMsFromStat`).
+- for a launch through an emulator preset (`ConsoleRomProvider` announces it with `LaunchWatchdog.expectNext`) and
+  for any launch that carries RetroArch's `LIBRETRO` extra, when a `priv.shell` provider runs, the processor time
+  the app's main process has used, read 15 s after the launch (`pidof`, then `/proc/<pid>/stat` utime plus stime,
+  which the shell user reads for every app as `ps` does; `LaunchWatchPolicy.cpuMsFromStat`). A read that returns
+  nothing (the helper still starting) is tried again every 15 s until one returns; that one is judged.
 
 It reports four things, each in plain words naming the app: it is not responding; it closed straight
 after it started (the shell came back within 10 s and the app is not open); it is no longer running
-but its screen never handed back (task list says gone after 9 s); a RetroArch launch has stalled (under
+but its screen never handed back (task list says gone after 9 s); an emulator launch has stalled (under
 1 s of processor time 15 s after the launch, `STALLED`). A black window of a live, responsive
-app is indistinguishable from a game that is running and is never claimed, and a person returning to
+app is in general indistinguishable from a game that is running and is never claimed, and a person returning to
 the shell on purpose while the app is open or after 10 s is not a problem. The stall is the one black
-screen that is claimed, for RetroArch only, because its evidence is not a guess: a running game or
-RetroArch's own menu (which it shows when content fails to load) draws every frame and has used seconds
-by then, while the console's hung GBC and N64 launches (build 1649, Droidtop/tracker#271) showed 0.14 s
-of processor time after 90 s and answered nothing until Back raised Android's not-responding dialog.
-Before this, a hang that nobody touched was reported only once a key reached it, or never.
+screen that is claimed, for emulator launches only, because its evidence is not a guess: a running game or
+an emulator's own menu draws every frame and has used seconds by then, while the console's hung RetroArch
+GBC and N64 launches (build 1649, Droidtop/tracker#271) showed 0.14 s of processor time after 90 s and
+answered nothing until Back raised Android's not-responding dialog, and NetherSX2 on a PS2 game it could not
+boot (build 1335, Droidtop/tracker#270) showed 0.2 s after 60 s. The words claim only what was seen ("done
+almost nothing since, so its screen is probably black"), then say to close it and try again and to check the
+game file, any BIOS the system needs, and the emulator's file access; a RetroArch launch adds its core
+sentence and Get the core. Before this, a hang that nobody touched was reported only once a key reached it,
+or never.
+
+**Without a privileged helper the watchdog sees nothing, by design.** Every signal above except the shell
+coming back needs the `priv.shell` provider (Shizuku with droidtop's full access, Sui, or the root helper).
+Android gives an unprivileged app no view of another app's process: `/proc/<pid>` is hidden from other uids,
+`ActivityManager.getProcessesInErrorState` and `getHistoricalProcessExitReasons` answer only for the caller's
+own package, and the not-responding dialog itself appears only once a key reaches the app. The console builds
+1773 and 1790 (Droidtop/tracker#270, #271) had no provider (the Shizuku plugin installed, not given full
+access), so a black PS2 or N64 launch produced no alert; that is this limit, not a defect in the checks. The
+watchdog does not guess instead, for the reason in "Considered and not built".
 
 It watches other apps only. A game screen of droidtop's own, a Windows game's `WineGameActivity`, knows
 how its game ended and says so itself (Droidtop/tracker#302): the watchdog could only see droidtop's own
@@ -7926,11 +7941,9 @@ exit code, how long it ran and the last 12 lines Wine printed. A game that ran a
 returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit, however soon it
 ended, and the words say "program".
 
-Considered and not built (Droidtop/tracker#270): a "taking a long time" notice for an emulator that is open
-and responsive but never draws (NetherSX2 sat black and idle for 60 s with no report). Without root nothing
-tells that apart from a healthy long-running game, so a timed notice would fire on every game. A reliable
-signal would be the app's task having no visible window in the task list while a `priv.shell` provider
-runs; only that, and only with the provider present, would justify raising it. The verdict is published once
+Considered and not built (Droidtop/tracker#270): a timed "taking a long time" notice for an emulator that is open
+and responsive but never draws. Time alone does not tell it from a healthy long-running game, so it would fire on
+every game; the processor-time check above is the signal that does, and it needs the helper. The verdict is published once
 (`LaunchWatchdog.alert`) and written to the scan log (`logs/scan.log`, whose path is shown). The shell
 shows it as the launch-failure dialog with Close it (`TaskManager.close`, the one close path; the alert
 clears only on a confirmed close, anything else is shown as the task manager words it), Return to

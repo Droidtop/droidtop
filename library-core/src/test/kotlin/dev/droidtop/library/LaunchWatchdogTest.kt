@@ -75,14 +75,18 @@ class LaunchWatchdogTest {
     }
 
     @Test
-    fun aRetroArchThatHasUsedNoProcessorTimeIsStalled() {
+    fun anEmulatorThatHasUsedNoProcessorTimeIsStalled() {
         fun read(elapsedMs: Long, cpuMs: Long?, shellCameBack: Boolean = false) =
             LaunchWatchPolicy.judge(WatchObservation(elapsedMs, shellCameBack, notResponding = false, taskListed = null, cpuMs = cpuMs))
-        // Console, build 1649: GBC and N64 launches at 0:00.14 of processor time, black, until Back raised an ANR.
+        // Console, build 1649: GBC and N64 launches at 0:00.14 of processor time, black, until Back raised an ANR;
+        // build 1335: NetherSX2 on a PS2 game at 0.2 s after 60 s.
         assertEquals(WatchVerdict.Trouble(LaunchTrouble.STALLED), read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = 140))
         // A game that runs, or RetroArch's own menu, has used seconds by then.
         assertEquals(WatchVerdict.Keep, read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = 3_900))
-        // No reading (no helper, or not a RetroArch launch) claims nothing; nor does a person already back in droidtop.
+        // A reading that only came back at a retry is judged the same way.
+        assertEquals(WatchVerdict.Trouble(LaunchTrouble.STALLED), read(2 * LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = 200))
+        assertEquals(WatchVerdict.Keep, read(2 * LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = LaunchWatchPolicy.STALL_CPU_MS))
+        // No reading (no helper, or not an emulator launch) claims nothing; nor does a person already back in droidtop.
         assertEquals(WatchVerdict.Keep, read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = null))
         assertEquals(WatchVerdict.Stop, read(LaunchWatchPolicy.STALL_CHECK_MS, cpuMs = 140, shellCameBack = true))
     }
@@ -99,6 +103,13 @@ class LaunchWatchdogTest {
     @Test
     fun withoutAHelperTheWatchEndsAtTheLimitAndClaimsNothingAboutABlackScreen() {
         assertEquals(WatchVerdict.Stop, look(LaunchWatchPolicy.WATCH_MS, taskListed = null))
+    }
+
+    @Test
+    fun theStalledMessageDoesNotClaimWhyOnlyWhatWasSeenAndWhereToLook() {
+        val text = LaunchWatchPolicy.message("NetherSX2", LaunchTrouble.STALLED)
+        assertTrue(text, "almost nothing" in text)
+        assertTrue(text, "BIOS" in text && "file access" in text)
     }
 
     @Test

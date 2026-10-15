@@ -31,7 +31,10 @@ enum class LaunchTrouble {
     /** The app is no longer open, yet the screen it was sent to did not hand back. */
     GONE_WHILE_AWAY,
 
-    /** A RetroArch launch whose process has done almost nothing since it started: a core it could not load. */
+    /**
+     * An emulator launch whose process has done almost nothing since it started: RetroArch with a core it could not
+     * load, NetherSX2 on a game it cannot read or without a BIOS (it sat at 0.2 s of processor time for 60 s).
+     */
     STALLED,
 }
 
@@ -57,8 +60,9 @@ internal data class WatchObservation(
     /** Whether the system's task list holds the app; null when droidtop cannot read that list (no privileged helper). */
     val taskListed: Boolean?,
     /**
-     * Processor time the app's processes have used, read once at [LaunchWatchPolicy.STALL_CHECK_MS] for a RetroArch
-     * launch through the privileged helper; null at every other look, and without a helper.
+     * Processor time the app's processes have used, read through the privileged helper for an emulator launch at
+     * [LaunchWatchPolicy.STALL_CHECK_MS] and again every that long until a reading comes back; null at every other
+     * look, and without a helper.
      */
     val cpuMs: Long? = null,
 )
@@ -101,14 +105,17 @@ internal object LaunchWatchPolicy {
     /** The most the watchdog ever watches; after this a stuck app is the person's to notice. */
     const val WATCH_MS = 90_000L
 
-    /** When a RetroArch launch's processor time is read once. */
+    /**
+     * When an emulator launch's processor time is first read, and the gap between retries while the helper gives no
+     * reading (it may still be starting). The first reading that comes back is the only one judged.
+     */
     const val STALL_CHECK_MS = 15_000L
 
     /**
-     * Less processor time than this by [STALL_CHECK_MS] is a RetroArch that never got going. A running game or
-     * RetroArch's own menu (which it shows when content fails to load) draws every frame and uses seconds; the hung
-     * GBC and N64 launches had used 0.14 s after 90 s (console, build 1649, `ps` TIME 0:00.14) while a GBA game ran at
-     * 26% of a core.
+     * Less processor time than this by [STALL_CHECK_MS] is an emulator that never got going. A running game, or an
+     * emulator's own menu, draws every frame and uses seconds; the hung RetroArch GBC and N64 launches had used 0.14 s
+     * after 90 s (console, build 1649, `ps` TIME 0:00.14) while a GBA game ran at 26% of a core, and NetherSX2 on
+     * the PS2 game it could not boot used 0.2 s after 60 s (build 1335).
      */
     const val STALL_CPU_MS = 1_000L
 
@@ -160,7 +167,8 @@ internal object LaunchWatchPolicy {
         LaunchTrouble.GONE_WHILE_AWAY ->
             "$appName is no longer running, but its screen did not return to droidtop. Go back to droidtop and try again."
         LaunchTrouble.STALLED ->
-            "$appName started but has done nothing since, so its screen stays black. Close it and try again once the cause below is fixed."
+            "$appName started but has done almost nothing since, so its screen is probably black. Close it and try again. " +
+                "If it keeps happening, check the game file, any BIOS the system needs, and the emulator's file access."
     }
 }
 
@@ -187,18 +195,22 @@ object LaunchWatchdog {
         alertFlow.value = null
     }
 
-    /** A sentence for the next launch of one package, set by the provider that built it: see [adviseNext]. */
+    /** What the provider that built the next launch of one package told the watchdog: see [expectNext]. */
+    private data class Expectation(val packageName: String, val advice: String?)
+
     @Volatile
-    private var advice: Pair<String, String>? = null
+    private var expected: Expectation? = null
 
     /**
-     * Notes what the provider that built the next launch of [packageName] knows that would explain trouble with it,
-     * added to any alert that launch gets. The one user is a launch handed a content link because its emulator has no
+     * Tells the watchdog the next launch of [packageName] is an emulator playing a game, so a process that has done
+     * almost nothing since it started is reported ([LaunchTrouble.STALLED]); a plain app, an engine or a launcher is
+     * not read that way. [advice] is what the provider that built the launch knows that would explain trouble with it,
+     * added to any alert that launch gets; its one user is a launch handed a content link because its emulator has no
      * All files access (Droidtop/tracker#270): the alert says so and names the emulator setup row that gives it.
      * Taken by the next [start] for that package, and dropped by a start for any other.
      */
-    fun adviseNext(packageName: String, sentence: String) {
-        advice = packageName to sentence
+    fun expectNext(packageName: String, advice: String? = null) {
+        expected = Expectation(packageName, advice)
     }
 
     /** Stops watching: the launch ended on purpose (a quit), so its silence is not a problem. */
@@ -211,29 +223,36 @@ object LaunchWatchdog {
     /**
      * Watches [packageName], launched at [launchedAtMs]; replaces any launch still being watched.
      * [retroArchCorePath] is a RetroArch launch's LIBRETRO extra: a stuck RetroArch is most often a
-     * core that is not installed, which RetroArch never reports, so the alert then says so.
+     * core that is not installed, which RetroArch never reports, so the alert then says so. A RetroArch launch, and
+     * any launch the provider announced with [expectNext], has its processor time checked for a stall.
      */
     @Synchronized
     fun start(context: Context, packageName: String, launchedAtMs: Long, retroArchCorePath: String? = null) {
         val appContext = context.applicationContext
         job?.cancel()
         alertFlow.value = null
-        val note = advice?.takeIf { it.first == packageName }?.second
-        advice = null
+        val expectation = expected?.takeIf { it.packageName == packageName }
+        val note = expectation?.advice
+        expected = null
+        val checkStall = retroArchCorePath != null || expectation != null
         job = scope.launch {
             val appName = TaskManager.appLabel(appContext, packageName) ?: packageName
             val started = System.currentTimeMillis()
             var settled = false
-            // A RetroArch launch's processor time is read once (LaunchWatchPolicy.STALL_CHECK_MS): a missing or
-            // broken core leaves RetroArch black and idle, and RetroArch reports nothing (Droidtop/tracker#271).
-            var stallChecked = retroArchCorePath == null
+            // An emulator launch's processor time is read (LaunchWatchPolicy.STALL_CHECK_MS): a missing or broken
+            // core leaves RetroArch black and idle and it reports nothing (Droidtop/tracker#271), and NetherSX2 sits
+            // black and idle on a game it cannot boot (Droidtop/tracker#270). A reading that does not come back (the
+            // helper not ready) is tried again a check later.
+            var stallChecked = !checkStall
+            var nextStallCheckMs = LaunchWatchPolicy.STALL_CHECK_MS
             while (isActive) {
                 delay(LaunchWatchPolicy.POLL_MS)
                 val elapsed = System.currentTimeMillis() - started
                 val shellCameBack = LaunchDisplay.shellStartedMs >= launchedAtMs
-                val cpuMs = if (!stallChecked && elapsed >= LaunchWatchPolicy.STALL_CHECK_MS) {
-                    stallChecked = true
-                    cpuMs(packageName)
+                val cpuMs = if (!stallChecked && elapsed >= nextStallCheckMs) {
+                    val read = cpuMs(packageName)
+                    if (read != null) stallChecked = true else nextStallCheckMs += LaunchWatchPolicy.STALL_CHECK_MS
+                    read
                 } else {
                     null
                 }
@@ -325,7 +344,7 @@ object LaunchWatchdog {
     }
 
     /**
-     * The processor time [packageName]'s processes have used, read as the privileged helper's user (the shell user can
+     * The processor time [packageName]'s main process has used, read as the privileged helper's user (the shell user can
      * read every app's `/proc/<pid>/stat`, as `ps` does); null without a helper or a running process.
      */
     private fun cpuMs(packageName: String): Long? {
