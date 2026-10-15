@@ -175,7 +175,7 @@
           "description": "A condition the person should know about, drawn as droidtop's own notice card named after the plugin (docs/plugin-api.md 1.6, Notices). Lengths and counts are in docs/view-limits/plugin-view-limits.json; over them the host cuts or drops and logs a plugin message.",
           "properties": {
             "type": { "const": "notice" },
-            "tone": { "enum": ["info", "caution"], "description": "A plugin has no danger tone; any other value is drawn as info." },
+            "tone": { "enum": ["info", "caution", "danger"], "description": "danger: something the person is about to lose or risk now (since 2026-10-15, Droidtop/tracker#521 item 1). Any other value is drawn as info." },
             "placement": { "enum": ["section", "banner"], "description": "banner: under the page header, at most one a page." },
             "details": { "type": ["string", "null"], "description": "What Info shows; exact terms are fine here." },
             "action": { "$ref": "#/$defs/action" }
