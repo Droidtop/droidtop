@@ -57,13 +57,19 @@ object PluginBundleInstaller {
         userKeys: Map<String, String> = emptyMap(),
         /** The permissions droidtop's own manifest requests ([AndroidPermissions.heldBy]); null skips that check (tests). */
         hostPermissions: Set<String>? = null,
+        /**
+         * Whether a key is the person's confirmed successor of another for an origin ([UserOriginKeys.succeeds]):
+         * (origin, approved key SHA-256, verified key SHA-256). An approved plugin signed by its old key's successor
+         * carries over like a same-key update (Droidtop/tracker#270). Never by default.
+         */
+        succeeds: (String, String, String) -> Boolean = { _, _, _ -> false },
     ): PluginInstallResult {
         // Entries are streamed to a staging folder on disk and hashed as they go: a bundle carrying both ABIs of an
         // engine is tens of MiB, and several installs run at once (Update all), so none of it is held in the heap
         // (Droidtop/tracker#545). Only the small trust files are read into memory, each under its cap.
         val staging = File(pluginsRoot.absoluteFile.parentFile ?: pluginsRoot, ".plugin-install-" + System.nanoTime()).also { it.mkdirs() }
         try {
-            return installStaged(bundleFile, pluginsRoot, staging, userKeys, hostPermissions)
+            return installStaged(bundleFile, pluginsRoot, staging, userKeys, hostPermissions, succeeds)
         } finally {
             staging.deleteRecursively()
         }
@@ -78,6 +84,7 @@ object PluginBundleInstaller {
         staging: File,
         userKeys: Map<String, String>,
         hostPermissions: Set<String>?,
+        succeeds: (String, String, String) -> Boolean,
     ): PluginInstallResult {
         val small = linkedMapOf<String, ByteArray>()
         val staged = linkedMapOf<String, Staged>()
@@ -241,13 +248,18 @@ object PluginBundleInstaller {
         // old plugin master it was approved under, [PluginOriginKeys.sameTrustAnchor]). Everything else
         // starts PENDING: a first install, an update of a plugin that was
         // only ever PENDING, an update signed by a different user key (a
-        // rotation is a new trust decision), and any update of a DENIED
+        // rotation is a new trust decision, made once: a key the person
+        // confirmed as the old one's successor, [UserOriginKeys.replace],
+        // carries over like the same key), and any update of a DENIED
         // plugin (the user said no; it re-enters at PENDING).
         val sameBytes = existingState?.archiveDigest == digest
         val carriedOver = sameBytes || (
             existingState?.trust == PluginTrustState.APPROVED &&
                 existingState.manifest.origin == manifest.origin &&
-                PluginOriginKeys.sameTrustAnchor(existingState.approvedKeySha256, keyFingerprint)
+                (
+                    PluginOriginKeys.sameTrustAnchor(existingState.approvedKeySha256, keyFingerprint) ||
+                        succeeds(manifest.origin, existingState.approvedKeySha256, keyFingerprint)
+                    )
             )
         val record = PluginRecord(
             manifest = manifest,

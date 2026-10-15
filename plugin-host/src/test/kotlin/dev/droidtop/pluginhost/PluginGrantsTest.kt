@@ -122,6 +122,24 @@ class PluginGrantsTest {
     }
 
     @Test
+    fun `approving again starts from the answers the plugin had, not the defaults`() {
+        val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "vibrate"), obj("id" to "net.any")) {
+            it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.settings")))
+        }
+        // No answers yet: the defaults, which leave the high-risk point and the dangerous permission unticked.
+        assertEquals(PluginGrants.defaultTicked(record), PluginGrants.approvalTicked(record, grants.read("acme.tool")))
+        assertFalse("provide:library.sources" in PluginGrants.defaultTicked(record))
+        grants.initialiseOnApproval(record, ticked = setOf("provide:library.sources", "net.state", "net.any"))
+        grants.set("acme.tool", "provide:ui.settings", GrantState.DENIED)
+        // Sent back to waiting (a key change) and approved again: what was allowed stays ticked, what was blocked unticked.
+        val ticks = PluginGrants.approvalTicked(record, grants.read("acme.tool"))
+        assertEquals(setOf("provide:library.sources", "net.state", "net.any"), ticks)
+        grants.initialiseOnApproval(record)
+        assertEquals(GrantState.GRANTED, PluginGrants.provideState(record, grants.read("acme.tool"), "library.sources"))
+        assertEquals(GrantState.DENIED, PluginGrants.provideState(record, grants.read("acme.tool"), "ui.settings"))
+    }
+
+    @Test
     fun `a contract 1 plugin's points can be unticked too`() {
         val v1 = TestPlugins.record(TestPlugins.manifest(contract = 1))
         assertEquals(setOf("provide:ui.status_tile"), PluginGrants.defaultTicked(v1))

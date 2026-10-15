@@ -19342,6 +19342,23 @@ what the index says is display data, never a trust decision.
   and a first install (nothing to carry). Records written by builds
   before this rule have no key fingerprint and get no carry-over on their
   first update — one re-approval, the safe direction.
+  A rotation is decided ONCE, for the publisher, not once per plugin
+  (Droidtop/tracker#270, RP5 2026-10-15: seven sources sent back to waiting
+  and re-approved with their high-risk points blocked). When the person
+  confirms a publisher's new key in place of the old one, seeing both
+  fingerprints (Keys you trust's changed-key warning, or an added catalog's
+  "has a new key" row), `UserOriginKeys.replace` keeps the old key's SHA-256
+  as the new one's predecessor (`UserOriginKey.previous`). A plugin approved
+  under that old key and now signed by its confirmed successor
+  (`UserOriginKeys.succeeds`) carries over like a same-key update: approval,
+  the enabled bit and its grants, with new items waiting at Ask first.
+  Plugins an update had already sent back to waiting for that reason are
+  approved again at the confirmation (`PluginStore.keyReplaced`; root, which
+  needs its own yes, is not). Removing a key and adding another records no
+  succession: that stays a new trust decision. Approving a plugin that has
+  answers stored (sent back by a key change, or denied before) starts the
+  approval list from those answers, not the defaults
+  (`PluginGrants.approvalTicked`); the person still sees every tick.
 - **The flow — REDESIGNED (2026-09-28, agent pluginsui).** Settings →
   Library → Accounts and sources → Plugins (moved under uisources's
   Accounts and sources consolidation, above; still the one tidy settings

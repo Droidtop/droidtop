@@ -1819,7 +1819,7 @@ object AppSettingsCatalogs {
         val m = record.manifest
         val wantsNewAccess = grants.wantsNewAccess
         val enabledPoints = when (record.trust) {
-            PluginTrustState.PENDING -> PluginGrants.defaultTicked(record)
+            PluginTrustState.PENDING -> PluginGrants.approvalTicked(record, grants)
                 .filterTo(HashSet()) { it.startsWith(PluginPermissions.PROVIDE_PREFIX) }
             PluginTrustState.APPROVED -> m.v2.provides.mapNotNullTo(HashSet()) { entry ->
                 (PluginPermissions.PROVIDE_PREFIX + entry.point).takeIf { PluginGrants.provideState(record, grants, entry.point) == GrantState.GRANTED }
@@ -2089,7 +2089,7 @@ object AppSettingsCatalogs {
         }
 
         // Approval is a list (docs/plugin-api.md 4.3): every item is a tick box, the actions come after it, and the plugin runs with exactly what is ticked.
-        val approvalTicks = if (record.trust == PluginTrustState.PENDING) tickBuffer(m.id, PluginGrants.defaultTicked(record)) else null
+        val approvalTicks = if (record.trust == PluginTrustState.PENDING) tickBuffer(m.id, PluginGrants.approvalTicked(record, grantSnapshot)) else null
         val approveItems: List<CatalogItem> = if (approvalTicks == null) {
             emptyList()
         } else {
@@ -3178,7 +3178,9 @@ object AppSettingsCatalogs {
                 if (proposal.existing == null) {
                     "Origin \"${proposal.origin}\" is now trusted -- plugins it signs will verify against this key"
                 } else {
-                    "Replaced the key for \"${proposal.origin}\" -- plugins signed by the OLD key no longer verify"
+                    val restored = PluginStore.keyReplaced(context, proposal.origin)
+                    "Replaced the key for \"${proposal.origin}\". Its plugins update under the new key and keep their approval" +
+                        if (restored > 0) ". $restored waiting for approval because of the change were approved again" else ""
                 }
             AddKeyOutcome.AlreadyTrustedSameKey -> "Origin \"${proposal.origin}\" is already trusted with this same key"
             is AddKeyOutcome.KeyChanged ->
