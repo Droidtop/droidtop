@@ -12,7 +12,7 @@ import org.junit.Test
 /**
  * The source-key fetch (docs/SPEC.md 12a "The primary path"):
  * URL derivation for the well-known key file, the two-field published
- * format, and that nothing untrustworthy (a non-P-256 key, an origin
+ * format, and that nothing untrustworthy (an unusable key, an origin
  * claiming the official id) ever survives a fetch to reach a prompt.
  * The network leg is injected, so these tests run the real derivation
  * and parsing chain with no network.
@@ -104,12 +104,12 @@ class PluginSourceKeysTest {
     }
 
     @Test
-    fun `fetchKey refuses a published key that is not a P-256 SPKI`() {
+    fun `fetchKey refuses a published key droidtop cannot use`() {
         val fetched = PluginSourceKeys.fetchKey("https://example.com/plugins") {
             keyJson("acme", "not a real spki key").toByteArray()
         }
         assertTrue(fetched is PluginSourceKeys.FetchResult.Failed)
-        assertTrue((fetched as PluginSourceKeys.FetchResult.Failed).reason.contains("P-256"))
+        assertTrue((fetched as PluginSourceKeys.FetchResult.Failed).reason.contains("can use"))
     }
 
     @Test
@@ -119,5 +119,16 @@ class PluginSourceKeysTest {
         val reason = (fetched as PluginSourceKeys.FetchResult.Failed).reason
         assertTrue(reason.contains("Couldn't fetch"))
         assertTrue(reason.contains(PluginSourceKeys.KEY_FILE_NAME))
+    }
+
+    @Test
+    fun `a published certificate gives the anchor key`() {
+        val pair = freshKeyPair()
+        val cert = dev.droidtop.testpki.TestPki.cert("acme", pair.public).eku(dev.droidtop.testpki.TestPki.PLUGIN)
+            .uri(dev.droidtop.runtime.util.ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
+        val text = JSONObject().put("origin", "acme").put("certificate", dev.droidtop.testpki.TestPki.pem(cert)).toString()
+        assertEquals(Base64.getEncoder().encodeToString(pair.public.encoded), PluginSourceKeys.parsePublishedKey(text)?.keyBase64)
+        val fetched = PluginSourceKeys.fetchKey("https://example.com/plugins") { text.toByteArray() }
+        assertTrue(fetched is PluginSourceKeys.FetchResult.Fetched)
     }
 }

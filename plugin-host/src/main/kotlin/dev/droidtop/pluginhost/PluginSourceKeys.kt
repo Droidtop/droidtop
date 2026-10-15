@@ -18,7 +18,7 @@ object PluginSourceKeys {
     /** The well-known file a plugin source publishes its key in (docs/SPEC.md 12a's key file format). */
     const val KEY_FILE_NAME = "droidtop-plugin-key.json"
 
-    /** A source's published key: the origin id it claims and its P-256 SPKI, base64. */
+    /** A source's published key: the origin id it claims and the anchor key to trust for it ([UserOriginKeys.anchorKey]), SPKI base64. */
     data class PublishedKey(val origin: String, val keyBase64: String)
 
     sealed interface FetchResult {
@@ -66,23 +66,27 @@ object PluginSourceKeys {
 
     /**
      * Parses a published key file / catalog index: a JSON object with
-     * `origin` and `key` string fields -- the entire documented
-     * contract, so anything else is "doesn't publish a key", not a
-     * versioned format to guess at.
+     * `origin` and `certificate` (the origin's certificate, PEM or base64
+     * DER) string fields, or `key` (a bare SubjectPublicKeyInfo) instead of
+     * `certificate` -- the entire documented contract, so anything else is
+     * "doesn't publish a key", not a versioned format to guess at. The anchor
+     * key returned is [UserOriginKeys.anchorKey]'s, so a certificate Droidtop
+     * Core issued for the origin anchors it at Core; what cannot be read is
+     * passed through for [fetchKey] to refuse.
      */
     fun parsePublishedKey(text: String): PublishedKey? {
         val json = runCatching { org.json.JSONObject(text) }.getOrNull() ?: return null
         val origin = json.optString("origin").trim().takeIf { it.isNotBlank() } ?: return null
         // "publicKey" is accepted as a spelling of "key"; either names the same SPKI.
-        val key = (json.optString("key").takeIf { it.isNotBlank() } ?: json.optString("publicKey")).trim().takeIf { it.isNotBlank() } ?: return null
-        return PublishedKey(origin, key)
+        val given = listOf("certificate", "key", "publicKey").firstNotNullOfOrNull { json.optString(it).trim().takeIf(String::isNotBlank) } ?: return null
+        return PublishedKey(origin, UserOriginKeys.anchorKey(origin, given) ?: given)
     }
 
     /**
      * Fetches and validates the source's key; [httpGet] is injectable
      * so the unit tests exercise the real URL-derivation and parsing
      * chain with no network. Validation before returning: the key must
-     * be a P-256 SPKI and the origin id must be one a user-trusted
+     * be a usable anchor key and the origin id must be one a user-trusted
      * origin may hold ([UserOriginKeys.originProblem]) -- a source
      * publishing origin "droidtop" is the "may not claim the official
      * id" attack and is refused before it ever reaches a prompt.
@@ -108,11 +112,11 @@ object PluginSourceKeys {
             }
             val published = parsePublishedKey(bytes.toString(Charsets.UTF_8))
             if (published == null) {
-                lastProblem = "$url has no \"origin\" and \"key\" fields"
+                lastProblem = "$url has no \"origin\" and \"certificate\" fields"
                 continue
             }
             if (PluginOriginKeys.parseSpki(published.keyBase64) == null) {
-                lastProblem = "the key $url publishes is not a valid P-256 public key"
+                lastProblem = "the certificate $url publishes is not one droidtop can use for that origin"
                 continue
             }
             UserOriginKeys.originProblem(published.origin)?.let {
@@ -122,8 +126,8 @@ object PluginSourceKeys {
         }
         return FetchResult.Failed(
             "Couldn't fetch a usable key from $sourceUrl ($lastProblem). " +
-                "A plugin source publishes $KEY_FILE_NAME with \"origin\" and \"key\" at its root; " +
-                "a catalog index carries the same two fields.",
+                "A plugin source publishes $KEY_FILE_NAME with \"origin\" and \"certificate\" at its root; " +
+                "a catalog index carries the same fields.",
         )
     }
 

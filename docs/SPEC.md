@@ -16709,30 +16709,24 @@ redistributables downloaded to read their terms):
   every entry of the group) and push: the next run removes the copy and
   points the catalog at the maker. README.md of droidtop-components says
   the same.
-- **The catalog's signature.** The same model as plugin certificates
-  (12a): droidtop's one master key (`MasterKey`, `:runtime-common`, moved
-  there from `PluginOriginKeys` so plugins and the catalog share one pin)
-  certifies a catalog key in `catalog.cert` (the plugin certificate's JSON
-  with `catalogs` for `pluginIds`, over its own bytes
-  `droidtop-catalog-cert-v1\nid:..\ncatalogs:..\nkey:..\nnotBefore:..\nnotAfter:..\n`,
-  so neither kind of certificate can stand in for the other), and the
-  catalog key signs the exact bytes of `catalog.json` as `catalog.json.sig`.
-  The workflow signs when the `CATALOG_SIGNING_KEY` and
-  `CATALOG_SIGNING_CERT` secrets exist and names the files in the catalog's
-  `signature` field. `ComponentCatalog.refresh` (`CatalogSignature.verify`)
-  accepts an unsigned catalog while no master is pinned; once one is, it
-  requires both files whatever the catalog says, refuses a catalog that
-  fails, and does not trust a copy kept from before the pin.
-  `CatalogSignature` lives in `:runtime-common` (2026-10-08) because a
-  plugin catalog the person added (12a "Added catalogs") is checked by the
-  same `verify`, with that catalog's own master and id in place of
-  droidtop's: one certificate format and one decision for every signed
-  catalog. Owner steps:
-  derive the catalog key from the master seed (HKDF as in 12a, info
-  `droidtop/catalog-signing/v1\0droidtop/droidtop-components[\0generation=N]`),
-  issue `catalog.cert` with certId `Droidtop/droidtop-components#<N>`, set
-  the two secrets; pin the master in `MasterKey.PINNED` (the same value
-  12a's plugin step pins).
+- **The catalog's signature** (redecided 2026-10-15, Droidtop/tracker#550;
+  12a "Signatures: certificate chains to Droidtop Core"). The catalog key
+  signs the exact bytes of `catalog.json` as `catalog.json.jws`: a detached
+  JWS whose `x5c` carries the catalog key's certificate, a catalog-signing
+  leaf (EKU `...2`) naming `urn:droidtop:catalog:Droidtop/droidtop-components`,
+  issued by Droidtop Core. The workflow signs when the `CATALOG_SIGNING_KEY`
+  and `CATALOG_SIGNING_CERT` secrets exist. `ComponentCatalog.refresh`
+  (`CatalogSignature.verify`) accepts an unsigned catalog while no Core is
+  pinned; once one is, it requires the signature whatever the catalog says,
+  refuses a catalog that fails, and does not trust a copy kept from before
+  the pin. `CatalogSignature` lives in `:runtime-common` because a plugin
+  catalog the person added (12a "Added catalogs") is checked by the same
+  `verify`, with that catalog's own anchor and id in place of Core and
+  droidtop-components': one format and one decision for every signed
+  catalog. The old `catalog.cert`/`catalog.json.sig` pair under the old
+  P-256 master is gone (its seed was lost). Owner steps: derive the catalog
+  key in the provisioning tool, issue its leaf from the Core key, set the
+  two secrets; commit the Core certificate at the pinned path (12a).
 
 ## 10. Build order
 
@@ -18543,13 +18537,12 @@ path FETCHES the key from the source the user adds; manual paste/file is
 the secondary path for sources that publish no key.
 
 - **Three tiers, one resolution order.** An origin is OFFICIAL
-  ("droidtop": its bundles verify through the plugin master's
-  certificates, or during the transition the legacy origin key, both
-  pinned in the app binary; "Per-plugin keys and the plugin master"
-  below), USER-TRUSTED (an origin the user chose to
+  ("droidtop": its bundles' certificate chains end at the Droidtop Core
+  certificate pinned in the app binary; "Signatures: certificate chains to
+  Droidtop Core" below), USER-TRUSTED (an origin the user chose to
   trust, stored in droidtop's own private storage, never in the pinned
   set), or unknown (refused outright, as always). `PluginOriginKeys.
-  resolve` checks the official pinned key FIRST, then user-trusted
+  anchorFor` answers the official origin with Core FIRST, then user-trusted
   keys, so a user-trusted entry can never shadow the official origin
   even if the store file were edited by hand — and `UserOriginKeys.add`
   refuses the origin id "droidtop" outright: an origin may not claim
@@ -18606,13 +18599,17 @@ the secondary path for sources that publish no key.
   and per-hop authorization. The ES-DE theme repository itself remains a JGit
   clone; installer files continue through `DownloadJobs`, which uses it.
 - **The key file format plugin authors publish** — the whole contract,
-  deliberately two fields:
-  `{ "origin": "acme", "key": "<base64 of a P-256 public key as X.509 SubjectPublicKeyInfo — the same SPKI shape the official pinned key uses>" }`
+  deliberately two fields (since 2026-10-15, Droidtop/tracker#550):
+  `{ "origin": "acme", "certificate": "<the origin's X.509 certificate, PEM or base64 DER>" }`
   as `droidtop-plugin-key.json` at the source's root; a catalog index
-  carries the same two fields at its top level. `publicKey` is read as
-  a spelling of `key`. The key is validated
-  before it is ever shown: base64 → X.509 SPKI → EC → exactly P-256
-  (`PluginOriginKeys.parseSpki`); anything else is refused.
+  carries the same fields at its top level. A bare `key` (or `publicKey`)
+  SubjectPublicKeyInfo in place of `certificate` is still read. What is
+  stored is the anchor key `UserOriginKeys.anchorKey` derives (a
+  certificate Droidtop Core issued for the origin gives Core's key; any
+  other gives its own), validated before it is ever shown: EC P-256 or
+  RSA of 2048 bits or more (`PluginOriginKeys.parseSpki`), and a
+  certificate that names origins must name this one; anything else is
+  refused (12a "Signatures: certificate chains to Droidtop Core").
 - **A changed key is never silently accepted.** Trusting a source
   stores origin → key plus the source URL it was fetched from, so the
   row shows provenance. A later fetch of a source that publishes a
@@ -18637,12 +18634,13 @@ the secondary path for sources that publish no key.
   `docs/plugin-api.md`, not from a droidtop-hosted sample.
 - **Plugin bundles are signed by CI (owner, 2026-10-07).** Official plugin
   repos sign in their GitHub Actions jobs, not by
-  hand: the repo secret `PLUGIN_SIGNING_KEY` (that plugin's origin EC private
-  key PEM) is written to a 600 temp file inside the job, `sign.sh` produces
-  the `.droidplugin.tar.xz`, and an `always()` step deletes the file. Every
-  plugin repo has its own key derived from the master; the optional second
-  secret `PLUGIN_SIGNING_CERT` (that key's certificate from the plugin
-  master) is packaged as `origin.cert` next to `manifest.sig` when present.
+  hand: the repo secret `PLUGIN_SIGNING_KEY` (that repository's derived EC
+  private key PEM) is written to a 600 temp file inside the job, `sign.sh`
+  produces the `.droidplugin.tar.xz`, and an `always()` step deletes the
+  file. Every plugin repo has its own key; the second secret
+  `PLUGIN_SIGNING_CERT` (that key's certificate, issued by Droidtop Core)
+  goes into `manifest.jws` as its `x5c` (since 2026-10-15; 12a "Signatures:
+  certificate chains to Droidtop Core").
   Pull requests and forks have no secret (signing is also skipped on
   `pull_request` events), so they upload the unsigned payload and say so in
   the job summary; the job never fails for that. A `plugin-v*` tag attaches
@@ -18797,102 +18795,147 @@ the secondary path for sources that publish no key.
   (the last two only when they apply). The official origin has no entry
   there and never can.
 
-**Per-plugin keys and the plugin master (owner, 2026-10-08).** "Every
-plugin repo gets a different key derived from the master." Official
-plugin bundles are signed in each repository's CI (decided earlier) with
-that repository's OWN key, never one shared key, so no repository needs
-access to another's secrets or write access to the organisation.
+**Signatures: certificate chains to Droidtop Core (owner, 2026-10-15,
+Droidtop/tracker#550; replaces "Per-plugin keys and the plugin master" of
+2026-10-08).** The master seeds behind the old P-256 plugin master were
+lost in the 2026-10-15 droidtop-dev wipe. The owner, verbatim: "Feel free
+to rewrite the signing and signature code if needed to use tls certs";
+"We do NOT want to chain the signature past this key"; "Go ahead and get
+the signing code rewritten. I feel like this might be more secure anyway."
+So every signature droidtop checks (plugin bundles, catalog indexes,
+revocation lists) is an X.509 certificate chain anchored at ONE pinned
+certificate, Droidtop Core, and nothing above it. Enginehost implements
+the same format; the format as posted for it is the #550 comment of
+2026-10-15.
 
-- **The chain.** droidtop pins one plugin MASTER public key in the binary
-  (`MasterKey.PINNED` in `:runtime-common`, P-256; the same master
-  certifies the component catalog's key, §9). The master signs only
-  certificates and revocation lists, never a bundle. A certificate
-  (`PluginCertificates`) binds one repository's public key to the plugin
-  ids it may sign (exact ids, or a namespace written `droidtop.<name>.*`),
-  with a `certId` (`<owner>/<repo>#<generation>`) and a validity window
-  (`notBefore`/`notAfter`, epoch seconds). It ships inside the bundle as
-  `origin.cert`, beside `manifest.json` and `manifest.sig`; the CI writes
-  it from the repository's `PLUGIN_SIGNING_CERT` secret and signs with
-  `PLUGIN_SIGNING_KEY`. `BundleSignature.verifyBundle` is the one
-  decision, for install, for the re-verification before every activation,
-  and for the repository update pass: manifest signature, then the
-  certified key, then the certificate, then the pinned master, and the
-  certificate must name the manifest's id. What the master signs is a
-  line-per-field text (`PluginCertificates.signedBytes`,
-  `PluginRevocations.signedBytes`), not the JSON, so the signature never
-  depends on a JSON writer's ordering.
-- **Derivation.** Keys are derived from the owner's offline master seed
-  with HKDF-SHA256, the same construction Enginehost's
-  `derive-official-key.py` uses but with droidtop's own salt
-  (`droidtop-plugin-master-v1`), so the same seed yields unrelated keys for
-  the two apps: the master from `droidtop/plugin-master-signing/v1`, a
-  repository key from `droidtop/plugin-bundle-signing/v1`, the lowercased
-  `owner/repo` and, for a replacement, `generation=N`. A derived key is
-  reproducible from the seed, so nothing private is kept anywhere but the
-  repository's secret. The owner provisions a repository with the
-  coordination tree's `bin/plugin-key-provision official` (derive, certify,
-  `gh secret set` both secrets from files, shred); `master-public` prints
-  the value to pin. The master is pinned (2026-10-08): `MasterKey.PINNED`
-  holds its public key, sha256 fingerprint
-  `c29e030ddd8615bb22ac706e0dcd3cfc58a248fb1adbd8e31a6fb7bf8159452f`; a
-  build that carries no pin refuses every certified bundle with a reason
-  that says so.
-- **Expiry and revocation.** Validity is checked when a bundle is installed
-  or updated; an installed plugin is not stopped by its certificate
-  expiring (a device with a wrong clock must not lose its plugins), only
-  by revocation. The master-signed revocation list
-  (`PluginRevocations`: a `sequence`, `certIds`, key `keySha256`s) is
-  published beside the catalog index as `droidtop-plugins/revocations.json`
-  and fetched with it; droidtop keeps it in the plugins root only when the
-  master signed it and its sequence is higher than the one on file (an old
-  list cannot be replayed to un-revoke), and verifies it again every time
-  it is read. A revoked certificate or key refuses new installs and stops
-  installed plugins at their next activation ("signature no longer
-  verifies: ..."). A rotation is a new generation with a new `certId`; the
-  old one is then revoked. This list applies to the official origin only;
-  an added catalog's origin has its own ("Added catalogs").
-- **Approval across keys.** Approval binds to the trust anchor
-  (`PluginRecord.approvedKeySha256`): the master's fingerprint for a
-  certified bundle, the legacy official key's, or the user-trusted key's.
-  The two official anchors count as one (`PluginOriginKeys.
-  sameTrustAnchor`), so moving a plugin from the legacy key to its own
-  certified key, or rotating its certified key, keeps its approval; the
-  certificate's id binding is what stops one plugin's key from speaking
-  for another.
-- **Transition from the single origin key.** The legacy "droidtop" origin
-  key stays pinned and verifies official bundles that carry NO
-  certificate, so plugins installed from it keep running and updating
-  meanwhile; a plugin key cannot sign an official bundle without its
-  certificate. The transition ends when every official repository has
-  published a certified release in the catalog: the owner then publishes a
-  revocation list naming the legacy key's fingerprint (from then on only
-  certified bundles install or run), and the next droidtop release deletes
-  the legacy pin.
-- **Private plugins.** A private plugin is signed by the same CI process
-  with a key that is NOT derived from the master (`plugin-key-provision
-  independent`: `PLUGIN_SIGNING_KEY` only, no certificate) under its own
-  origin id, and reaches a device through "Keys you trust" exactly like
-  any third-party origin, using the same bundle format. droidtop's plugin
-  master never gives standing outside the official origin.
-- **Organisation masters (coordinator decision for the owner's
-  Droidtop/tracker#382, 2026-10-08).** An added catalog's organisation
-  has ONE key for its origin: its own plugin master, from a separate
-  master seed, never droidtop's (for gamegrab-sources the origin is
-  `gamegrab`). Each of its plugin repositories signs with its own key,
-  certified by that master (`plugin-key-provision official` run with the
-  organisation's seed), and the bundle carries `origin.cert`.
-  `BundleSignature.verifyBundle` checks such a bundle exactly as an
-  official one, bundle -> repository key -> certificate -> master, but
-  against the key the person trusts for that origin instead of
-  `MasterKey.PINNED`: when a non-official bundle carries a certificate,
-  the user-trusted key is its origin's master; the certificate must be
-  signed by it, cover the plugin id, not be revoked by that origin's own
-  list, be valid at install, and certify the key the manifest is signed
-  with. Approval binds to the master's fingerprint, so a repository key
-  rotation under the same master keeps it. Only the pinned master ever
-  yields "Official". An origin whose trusted key signs its bundles
-  directly (an independent key with no certificate, romgi's shape today)
-  keeps working the Keys-you-trust way.
+- **The anchor.** The Droidtop Core certificate (the owner's RSA "Droidtop
+  Core" key, issued by their UCM CA) is pinned in the binary as the
+  resource `runtime-common/src/main/resources/dev/droidtop/runtime/util/droidtop-core.pem`
+  (`DroidtopCore`, `:runtime-common`). It is public material; the
+  committed file is a PLACEHOLDER until the owner or coordinator replaces
+  it with the real certificate, and while it holds no certificate the
+  build pins no Core: no certificate-format official bundle installs (the
+  refusal says so) and the component catalog is accepted unsigned.
+  Verification walks from the signing certificate up to Core and STOPS:
+  the chain's last certificate must name Core as issuer and verify under
+  Core's key; the chain may not carry Core itself; the UCM root above Core
+  is never trusted, needed or read, so a chain that reaches only the
+  owner's wider CA is refused. Core signs certificates only, never a
+  bundle, a catalog or a list.
+- **The format: a JWS (RFC 7515) with `x5c`, not CMS** (`ChainSignature`,
+  `:runtime-common`). It verifies with the platform's X.509 parser and
+  `java.security.Signature` alone, with no native code: Android has no
+  public CMS parser and its bundled BouncyCastle is hidden. Compact
+  serialization; the protected header carries `alg` (`ES256` with a raw
+  R||S signature, or `RS256`, matching the leaf key), `typ`
+  (`droidtop-plugin+jws`, `droidtop-catalog+jws` or
+  `droidtop-revocations+jws`) and `x5c` (standard base64 DER, leaf first,
+  at most three, Core excluded); a `crit` refuses it. Bundles and indexes
+  are detached signatures (RFC 7515 Appendix F: `header..signature`, the
+  signing input being `BASE64URL(header) "." BASE64URL(exact bytes)`):
+  `manifest.jws` beside `manifest.json` in a bundle, `catalog.json.jws`
+  beside the component catalog, `index.json.jws` beside an added
+  catalog's index. A revocation list carries its payload.
+- **The certificate profile.** Leaf: X.509 v3, SHA-2 RSA or ECDSA
+  signature, an EC P-256 or RSA (2048 bits or more) key, CA:FALSE,
+  keyUsage with digitalSignature and without keyCertSign, and an
+  extendedKeyUsage naming the purpose under droidtop's UUID OID arc
+  `2.25.230248497294207031301727532441854392946` (`.1` plugin bundle
+  signing, `.2` catalog index signing, `.3` revocation list signing).
+  Identity is in subjectAltName URIs: a bundle-signing leaf must carry
+  `urn:droidtop:origin:<origin>` matching the manifest's origin and may
+  narrow itself with `urn:droidtop:plugin:<id>` or `<prefix>.*` entries
+  (the old certificate's per-repository plugin binding); catalog- and
+  revocation-signing leaves carry `urn:droidtop:catalog:<id>`
+  (`Droidtop/droidtop-components`, an added catalog's `owner/name`, and
+  `droidtop` for droidtop's own plugin catalog). Intermediates, when a
+  publisher's own CA uses them, are CA certificates with keyCertSign within
+  their path length. Validity is checked at install, update and fetch; an
+  installed plugin is not stopped by its certificate expiring (a device
+  with a wrong clock must not lose its plugins), only by revocation.
+- **Per-origin keys stay derived; their certificates come from Core.**
+  Every official plugin repository, droidtop-components' catalog, droidtop's
+  revocation signer, and the gamegrab and romgi origins sign with their own
+  key, HKDF-derived from master seeds that are themselves derived from the
+  Core key (HKDF-SHA256 over the key's private value, salt
+  `droidtop-ca-root-v1`, info `<name>-master-seed`), so everything is
+  reproducible by re-downloading the Core key from the CA. That derivation
+  lives in the owner's provisioning tool, never in this repository. Each
+  derived key gets a leaf certificate signed by the Core key with the
+  profile above; a repository's CI holds it as `PLUGIN_SIGNING_CERT` beside
+  `PLUGIN_SIGNING_KEY` and puts the chain in `manifest.jws`.
+- **Trust levels are unchanged for people** (the owner's rule: users must
+  not have to know the machinery). Official is a chain to Core whose leaf
+  names the official origin `droidtop`; nothing else yields it. A
+  user-trusted origin's anchor is the key the person confirmed for it in
+  "Keys you trust" (by adding a source, a repository or a catalog, or by
+  pasting): the store holds that anchor's SubjectPublicKeyInfo as before,
+  and a source now publishes a certificate (`droidtop-plugin-key.json`:
+  `{ "origin": ..., "certificate": "<PEM or base64 DER>" }`; a bare `key`
+  SPKI is still read). A certificate Droidtop Core issued that names the
+  origin stores Core's own key as that origin's anchor
+  (`UserOriginKeys.anchorKey`), so gamegrab and romgi verify to Core while
+  remaining origins the person chose (Unofficial or Added by you, exactly as
+  before); any other certificate stores its own key, which then anchors
+  that publisher's chains (a self-signed signing certificate, or a CA of
+  their own). A publisher who wraps the key people already trust in a
+  certificate keeps every approval: the anchor fingerprint is unchanged.
+  Full access is the permission tier and is untouched.
+- **Revocation: a signed list carried with the catalog, no CRL or OCSP**
+  (decided 2026-10-15). The device may be offline, and the catalog fetch is
+  the one network moment droidtop already has. droidtop's list is
+  `droidtop-plugins/revocations.jws` beside the plugin index (`RevocationList`,
+  `:runtime-common`: `type`, `version`, `catalog`, a monotonic `sequence`,
+  `certSha256` and `keySha256` lists), signed by a revocation-signing leaf
+  under Core naming `urn:droidtop:catalog:droidtop`; it applies to every
+  chain that ends at Core. An added catalog's `revocations.jws` chains to
+  that catalog's anchor, names the catalog, and applies only to the origins
+  trusted through it. A list is kept only when its sequence is higher than
+  the stored one (`PluginRevocations`: `.plugin-revocations.jws`, re-verified
+  on every read; `.origin-revocations-v2.json`), and a revoked certificate
+  or key anywhere in a chain refuses installs and stops installed plugins at
+  their next activation. CRL distribution points and OCSP in certificates
+  are ignored. A rotation is a new certificate; the old one is then listed.
+- **Migration from raw keys (bounded).** Installing or updating needs
+  `manifest.jws`; a bundle with only the old `manifest.sig` is refused with
+  "signed the old way ... its publisher has to sign it again with a
+  certificate". A publisher may keep `manifest.sig`/`origin.cert` in the
+  bundle beside `manifest.jws` so older droidtop builds still install it;
+  this build ignores them. A plugin ALREADY installed the old way keeps
+  verifying before each activation through `LegacyBundleSignature` (the old
+  pinned P-256 master and legacy official key, the old JSON certificate,
+  the old stored lists) until it updates; droidtop's Core-signed list can
+  stop one by naming the legacy key's SPKI SHA-256. Approval carries across
+  the move: Core and the two legacy official anchors count as one
+  (`PluginOriginKeys.sameTrustAnchor`). That legacy file, its test and the
+  two old stored list files are deleted in the first droidtop release after
+  every official plugin repository has published a certificate-format
+  release in the catalog. Third-party origins whose people trust an
+  organisation master that is being replaced by Core (gamegrab) see the
+  changed-key warning once in Keys you trust; their legacy plugins stop when
+  the person replaces the key, and their updates then install under Core.
+- **The component catalog and added catalogs** use the same check
+  (`CatalogSignature.verify`, catalog-signing leaf naming the catalog): §9's
+  `catalog.json.jws` chains to Core; an added catalog's `index.json.jws`
+  chains to the master the person accepted (Core's key for a catalog Core
+  certified). A catalog index's key blocks read `algorithm`
+  `droidtop-chain-v1` (an anchor key, P-256 or RSA) or the older
+  `SHA256withECDSA`.
+- **What the owner's provisioning tool must produce.** For each origin,
+  repository or catalog: the derived private key (only ever into that
+  repository's secret), and a leaf certificate signed by the Core key with
+  the profile above (CA:FALSE, digitalSignature, the purpose EKU, the URNs).
+  The Core certificate itself should be CA:TRUE, pathlen:0, keyUsage
+  keyCertSign and cRLSign (droidtop does not enforce the anchor's own
+  extensions; a strict PKIX library on the Enginehost side would).
+- **Plugins that are separate Android apps are unaffected.** Their trust is
+  Android's own APK signature (§12, "PLUGIN integrations ... a real APK");
+  this change needed no touchpoint there.
+- **Private plugins** are a publisher's own origin with its own key in a
+  certificate (self-signed, or Core-issued when the owner certifies it), and
+  reach a device through "Keys you trust" exactly like any third-party
+  origin, in the same bundle format. Only the official origin's leaf under
+  Core ever yields "Official".
 
 Unit-tested in `net-core` (`GitHubDeviceFlowTest`: interval, `slow_down`, denial,
 expiry, cancel, offline; `GitHubAccountTest`: the credential store seam), in
@@ -18969,13 +19012,13 @@ what the index says is display data, never a trust decision.
   the same "the index can make the catalog fast or stale, not lying"
   posture Enginehost's own index lives by. The `key` block is
   cross-checked, not trusted: an origin is offered at all only when this
-  build of droidtop pins a key for it (`PluginOriginKeys`) AND the
-  index's `keySha256` matches one of its official anchors (the legacy
-  origin key or the plugin master), so a tampered index cannot rebind a
-  pinned origin to a new key; an origin whose key this build does not pin
-  is listed but not installable. New official plugins need no app change:
-  each repository's key is certified by the master ("Per-plugin keys and
-  the plugin master" above). An index with
+  build of droidtop pins an anchor for it AND the index's `keySha256`
+  matches one of its official anchors (Droidtop Core's key, or a legacy
+  anchor, `PluginOriginKeys.officialAnchorFingerprints`), so a tampered
+  index cannot rebind a pinned origin to a new key; an origin whose key
+  this build does not pin is listed but not installable. New official
+  plugins need no app change: each repository's key is certified by Core
+  ("Signatures: certificate chains to Droidtop Core" above). An index with
   an unknown `schemaVersion` is refused whole (a newer format is not
   guessed at), the same validate-before-replace posture as the platform
   databases.
@@ -19212,22 +19255,22 @@ what the index says is display data, never a trust decision.
     or none is refused and the cached copy kept; trusting another master
     means removing the catalog and adding it again. The index itself may
     be signed the way droidtop-components' catalog is ("The catalog's
-    signature", 9): `index.json.sig` (base64 DER ECDSA over the exact
-    index bytes) and `index.cert` (a `droidtop-catalog-cert-v1`
-    certificate from the catalog's master naming the catalog's id),
+    signature", 9): `index.json.jws`, a detached JWS over the exact index
+    bytes whose catalog-signing leaf names the catalog's id and chains to
+    the catalog's master (Core's key for a catalog Core certified),
     checked by the same `CatalogSignature.verify` with that master. Once a
     signature has verified, an unsigned copy is refused. A master or a
     signature that appears after Accept is recorded, since that only makes
     later fetches stricter. A catalog with neither can be added, and its
     review says the index is not signed.
-  - **Revocation, per catalog.** `revocations.json` beside the index, in
-    the plugin master's own format and signed bytes (`PluginRevocations`:
-    `sequence`, `certIds`, `keySha256`, `signature`), signed by the
-    catalog's master. It is fetched with the index and kept, per origin
-    the person trusts through that catalog, only when the master signed it
-    and its sequence is higher than the one on file
-    (`PluginRevocations.acceptForOrigin`, `.origin-revocations.json` in the
-    plugins root). `verifyBundle` checks an origin's own list for that
+  - **Revocation, per catalog.** `revocations.jws` beside the index, in
+    droidtop's own list format (`RevocationList`: `sequence`,
+    `certSha256`, `keySha256`), with a revocation-signing leaf that names
+    the catalog and chains to the catalog's master. It is fetched with the
+    index and kept, per origin the person trusts through that catalog,
+    only when it verifies and its sequence is higher than the one on file
+    (`PluginRevocations.acceptForOrigin`, `.origin-revocations-v2.json` in
+    the plugins root). `verifyBundle` checks an origin's own list for that
     origin alone (`PluginRevocationList.forOrigin`): a revoked certificate
     or key refuses installs and stops installed plugins at their next
     activation. droidtop's list never reaches an added catalog's origin,
@@ -19266,8 +19309,9 @@ what the index says is display data, never a trust decision.
   Unit-tested in `library-core` (`PluginCatalogSourcesTest`: addresses,
   the store, the blocks, the disclaimer gate, the offer rule, the
   master's origin) and `plugin-host` (`UserOriginKeysTest`: the catalog
-  field; `PluginCertificatesTest`: an organisation master's chain, its
-  own revocation list, and droidtop's master giving no standing there).
+  field; `BundleSignatureTest` and `PluginRevocationsTest`: an origin
+  anchored at its own key or at Core, its own revocation list, and
+  droidtop's list giving no standing there).
 - **The official index is generated (built 2026-10-10,
   Droidtop/tracker#458).** `generator/droidtop_plugins_index.py` in
   droidtop-platforms writes `droidtop-plugins/index.json`; the existing
@@ -19289,6 +19333,13 @@ what the index says is display data, never a trust decision.
   HTTP status, and that state remains for a device that cannot reach it.
   The gamegrab-sources catalog builds its index with the same script adapted to
   its organisation (a separate repository, so a copy with the same rules).
+  **Open since the certificate format (2026-10-15, Droidtop/tracker#550):**
+  both generators still check `origin.cert`/`manifest.sig` under the old
+  master. They must instead verify each bundle's `manifest.jws` to Droidtop
+  Core (gamegrab's: to Core, its leaves naming `gamegrab`), write Core's key
+  in the `key` block with `algorithm` `droidtop-chain-v1`, and publish
+  `revocations.jws`; until a repository ships a certificate-format release
+  its plugins are not offered for new installs.
 - **The web catalog (owner, 2026-10-10, Droidtop/tracker#458: "the catalog can
   also be browsable over the web, making tap-to-add repos simpler").** A catalog
   is also a web page, generated from its own `index.json`; one generator,
@@ -19479,12 +19530,13 @@ what the index says is display data, never a trust decision.
    contract version, both ABIs when native libraries ship. A plugin that
    fails any step never has its code loaded, not even to ask it to
    describe itself.
-4. Signing is real, not a placeholder gesture: ECDSA P-256/SHA-256 over
-   the exact manifest bytes (`BundleSignature.verifyBundle`): an official
-   bundle against its own repository key, certified for its id by the
-   pinned plugin master ("Per-plugin keys and the plugin master" above;
-   the legacy origin key for uncertified bundles during the transition),
-   any other origin against the user-trusted key "Keys you trust" stores. Approval is bound to the
+4. Signing is real, not a placeholder gesture: a JWS over the exact
+   manifest bytes, signed by a certificate whose chain ends at the
+   origin's anchor (`BundleSignature.verifyBundle`): an official bundle's
+   at the pinned Droidtop Core certificate, its leaf naming the official
+   origin ("Signatures: certificate chains to Droidtop Core" above; plugins
+   installed before the change verify on the bounded legacy path until
+   they update), any other origin's at the key "Keys you trust" stores. Approval is bound to the
    plugin's identity under a key, not to one byte-string: the record
    stores the digest it was verified against
    (`PluginRecord.archiveDigest`, a SHA-256 over the signed manifest)
@@ -19492,8 +19544,8 @@ what the index says is display data, never a trust decision.
    (`PluginRecord.approvedKeySha256`). A re-install of the exact same
    bytes keeps its state; an update with different bytes keeps it too
    when the new bundle verifies under the SAME trust anchor (the same
-   user-trusted key, or for the official origin the legacy key or the
-   plugin master, which count as one; the catalog's whole job, "The
+   user-trusted key, or for the official origin Droidtop Core or a legacy
+   anchor, which count as one; the catalog's whole job, "The
    catalog" above), and starts back at PENDING when the key differs, when the origin differs, or when the
    plugin was never APPROVED in the first place. A DENIED state never
    carries over under any digest.

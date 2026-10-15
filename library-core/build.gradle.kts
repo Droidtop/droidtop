@@ -170,6 +170,8 @@ dependencies {
     implementation(libs.xz)
 
     testImplementation(libs.junit)
+    // Throwaway certificates for the signature tests (docs/SPEC.md 12a); test-only, never shipped.
+    testImplementation(project(":test-pki"))
     // RomDatabaseMigrationTest walks the game_metadata migration chain over
     // a real SQLite file and opens the migrated file with Room itself; a
     // plain JVM test cannot do either (android.jar's SQLiteDatabase is a

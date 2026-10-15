@@ -2870,6 +2870,8 @@ object AppSettingsCatalogs {
             "any other is one YOU chose to trust: third-party, not official, and droidtop has not vetted it",
         groups = { context ->
             val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
+            // The pinned certificate is read from the APK's resources on first use: off the main thread.
+            val coreFingerprint = withContext(Dispatchers.IO) { dev.droidtop.runtime.util.DroidtopCore.keySha256() }
             val proposal = pendingKeyProposal
             listOf(
                 CatalogGroup(
@@ -2880,9 +2882,8 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "plugin_keys_official",
                                 title = PluginOriginKeys.OFFICIAL_ORIGIN,
-                                subtitle = "Official: certified inside droidtop itself. Plugin master key " +
-                                    (PluginOriginKeys.masterKeyBase64()?.let(UserOriginKeys::fingerprint) ?: "not pinned in this build") +
-                                    "; legacy key " + (UserOriginKeys.fingerprint(PluginOriginKeys.officialKeyBase64()) ?: "unavailable"),
+                                subtitle = "Official: certified inside droidtop itself. Droidtop Core certificate " +
+                                    (coreFingerprint?.take(16)?.chunked(4)?.joinToString(" ") ?: "not pinned in this build"),
                                 run = {},
                             ),
                         )
@@ -2967,8 +2968,8 @@ object AppSettingsCatalogs {
                         ),
                         TextInputItem(
                             id = "plugin_keys_manual_key",
-                            title = "Public key",
-                            subtitle = "The origin's public key, pasted exactly as its author publishes it",
+                            title = "Certificate or public key",
+                            subtitle = "The origin's certificate (or its public key), pasted exactly as its author publishes it",
                             // The value column beside a row's title is narrow:
                             // the whole ~124-char base64 squeezed this row's
                             // title and description out of the row once one

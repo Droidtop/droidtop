@@ -2,8 +2,7 @@ package dev.droidtop.runtime.windows.utils
 
 import android.content.Context
 import dev.droidtop.runtime.util.CatalogSignature
-import dev.droidtop.runtime.util.MasterKey
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.runtime.util.DroidtopCore
 import dev.droidtop.runtime.windows.PrefManager
 import dev.droidtop.runtime.windows.RuntimeDownloads
 import kotlinx.coroutines.Dispatchers
@@ -30,9 +29,9 @@ import timber.log.Timber
  *
  * Every item and file lists its download locations in order (`urls`: our
  * copy, then its makers' copies of the same bytes); [RuntimeDownloads] tries
- * them in turn against the one SHA-256. Once this build pins a master key the
- * catalog must carry a valid signature ([CatalogSignature]); until then it is
- * accepted unsigned.
+ * them in turn against the one SHA-256. Once this build pins Droidtop Core the
+ * catalog must carry a valid signature chained to it ([CatalogSignature]);
+ * until then it is accepted unsigned.
  */
 object ComponentCatalog {
     const val SOURCE_MIRROR = "mirror"
@@ -41,14 +40,13 @@ object ComponentCatalog {
     private const val RELEASES = "https://github.com/Droidtop/droidtop-components/releases/download/"
     const val CATALOG_URL = RELEASES + "catalog/catalog.json"
     private const val SIGNATURE_URL = RELEASES + "catalog/" + CatalogSignature.SIGNATURE_FILE
-    private const val CERTIFICATE_URL = RELEASES + "catalog/" + CatalogSignature.CERTIFICATE_FILE
 
     private const val ONE_DAY_MS = 24 * 60 * 60 * 1000L
     private const val PREFS = "droidtop_component_catalog"
     private const val KEY_JSON = "catalog_json"
     private const val KEY_FETCHED_AT = "fetched_at"
 
-    /** The master fingerprint the kept copy was verified under, "" when it was taken unsigned. */
+    /** The Droidtop Core key fingerprint the kept copy was verified under, "" when it was taken unsigned. */
     private const val KEY_VERIFIED_WITH = "verified_with"
     private const val KEY_MIGRATED = "gamenative_list_dropped"
     private val json = Json { ignoreUnknownKeys = true }
@@ -57,8 +55,8 @@ object ComponentCatalog {
     suspend fun load(context: Context): ManifestData = withContext(Dispatchers.IO) {
         migrate(context)
         val prefs = prefs(context)
-        // A copy taken before this build pinned its master (or under another one) is not trusted.
-        val trusted = MasterKey.key()?.let { prefs.getString(KEY_VERIFIED_WITH, "") == Sha256.hex(it.encoded) } ?: true
+        // A copy taken before this build pinned Droidtop Core (or under another anchor) is not trusted.
+        val trusted = DroidtopCore.keySha256()?.let { prefs.getString(KEY_VERIFIED_WITH, "") == it } ?: true
         val cached = if (trusted) parse(prefs.getString(KEY_JSON, null)) else null
         if (cached != null && System.currentTimeMillis() - prefs.getLong(KEY_FETCHED_AT, 0) < ONE_DAY_MS) {
             return@withContext cached
@@ -68,15 +66,14 @@ object ComponentCatalog {
             .getOrNull() ?: cached ?: ManifestData.empty()
     }
 
-    /** Fetches the catalog now, checks its signature when a master is pinned, and keeps it; throws when it cannot. Network. */
+    /** Fetches the catalog now, checks its signature when Droidtop Core is pinned, and keeps it; throws when it cannot. Network. */
     suspend fun refresh(context: Context): ManifestData = withContext(Dispatchers.IO) {
         val bytes = RuntimeDownloads.bytes(CATALOG_URL)
-        val master = MasterKey.key()
+        val anchor = DroidtopCore.anchor()
         val verdict = CatalogSignature.verify(
             catalogBytes = bytes,
-            signatureBase64 = master?.let { runCatching { RuntimeDownloads.bytes(SIGNATURE_URL).toString(Charsets.UTF_8) }.getOrNull() },
-            certificateText = master?.let { runCatching { RuntimeDownloads.bytes(CERTIFICATE_URL).toString(Charsets.UTF_8) }.getOrNull() },
-            master = master,
+            jws = anchor?.let { runCatching { RuntimeDownloads.bytes(SIGNATURE_URL).toString(Charsets.UTF_8) }.getOrNull() },
+            anchor = anchor,
             nowEpochSeconds = System.currentTimeMillis() / 1000,
         )
         if (verdict is CatalogSignature.Verdict.Refused) error("the component catalog was refused: ${verdict.reason}")
@@ -85,7 +82,7 @@ object ComponentCatalog {
         prefs(context).edit()
             .putString(KEY_JSON, text)
             .putLong(KEY_FETCHED_AT, System.currentTimeMillis())
-            .putString(KEY_VERIFIED_WITH, (verdict as? CatalogSignature.Verdict.Verified)?.masterSha256 ?: "")
+            .putString(KEY_VERIFIED_WITH, (verdict as? CatalogSignature.Verdict.Verified)?.anchorSha256 ?: "")
             .apply()
         parsed
     }
