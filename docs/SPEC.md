@@ -429,6 +429,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   width for the window list on a 768 dp console. The bar's buttons stay for touch and a mouse. The Start
   button only opens now: the menu is modal, so the "Close" label it wore while the menu floated over the
   bar is gone.
+- **Desktop is immersive, one layout** (Droidtop/tracker#555 D4, 2026-10-15). Android's status and
+  navigation bars are hidden while Desktop shows (`MainActivity.applySystemBars`, as Gaming), and every
+  hosted sheet hides them in its own window (`HostedListSheet` calls `HideSystemBarsInThisDialog`, as the
+  Quick Menu's frame already did). Before, the activity showed them, the Quick Menu hid them, the Start
+  menu, windows list and search left them, and focus coming back showed them again, so the desktop
+  resized under the person as sheets opened and closed. A swipe from the edge shows them for a moment.
+  Standard keeps the system bars.
 - **One listener feeds the container's window list.** The bridge has room for one change listener, so the
   taskbar and the windows sheet read the same list.
 - **Android apps and games started from Desktop are in the bar** (Droidtop/tracker#352). A game or an app
