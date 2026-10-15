@@ -140,7 +140,8 @@ object UnifiedSearch {
     /**
      * The search for [query]. [local] answers for the device (called off the
      * main thread, must not touch the disk); [platform] scopes the sources
-     * to one system when the surface has one. [carry] is the previous
+     * to one system when the surface has one: only the sources whose manifest declares that system (or
+     * none) are asked, "pc" being the PC library (Droidtop/tracker#543). [carry] is the previous
      * query's source rows: they stay in the list (while they still show the
      * query) until their source answers again, so the list does not blink
      * with every keystroke. [keep] drops a source result the surface has no
@@ -160,7 +161,7 @@ object UnifiedSearch {
         carry = carry,
         keep = keep,
         loadSources = {
-            withContext(Dispatchers.IO) { GameSources.plugins(context) to AcquireContentSources.unavailablePlugins(context) }
+            withContext(Dispatchers.IO) { GameSources.plugins(context, platform) to AcquireContentSources.unavailablePlugins(context, platform) }
         },
         fetch = { source -> source.search(context, query.trim(), platform) },
         needOf = { source -> PluginSearchAggregator.runtimeNeedOf(context, source) },

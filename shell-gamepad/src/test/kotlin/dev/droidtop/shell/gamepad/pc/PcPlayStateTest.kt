@@ -30,8 +30,10 @@ class PcPlayStateTest {
 
     @Test
     fun `a holding changes nothing about installing a game that is not on the device`() {
-        StoreHolding.entries.forEach { holding ->
+        // A wishlist game is the one holding that is not installed from here: it is found on the store.
+        StoreHolding.entries.filter { it != StoreHolding.WISHLIST }.forEach { holding ->
             assertEquals(holding.name, StoreStage.INSTALL, storeStageOf(row(holding, installed = false), null))
         }
+        assertEquals(StoreStage.WISHLIST, storeStageOf(row(StoreHolding.WISHLIST, installed = false), null))
     }
 }

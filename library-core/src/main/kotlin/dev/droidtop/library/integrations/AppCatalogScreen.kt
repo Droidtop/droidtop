@@ -1,5 +1,9 @@
 package dev.droidtop.library.integrations
 
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
 import android.content.Context
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -81,23 +85,33 @@ object AppCatalogScreen {
     private suspend fun rootGroups(context: Context): List<CatalogGroup> {
         val providers = AppCatalogs.providers(context)
         if (providers.isEmpty()) {
-            val waiting = PluginStore.installed(context).any { record -> record.manifest.v2.provides.any { it.point == AppCatalogs.POINT } }
+            val waiting = PluginStore.installed(context).filter { record -> record.manifest.v2.provides.any { it.point == AppCatalogs.POINT } }
             return listOf(
                 CatalogGroup(
                     "apps_none",
                     null,
-                    listOf(
-                        ActionItem(
-                            "apps_none_row",
-                            if (waiting) "An app catalog plugin is installed but not allowed yet" else "No app catalog is added",
-                            subtitle = if (waiting) {
-                                "Open it on the Plugins screen and allow \"Android apps from a catalog\""
-                            } else {
-                                "Apps come from catalog plugins, such as one that reads F-Droid repositories. Plugins > Add lists them"
-                            },
-                            run = {},
-                        ),
-                    ),
+                    if (waiting.isNotEmpty()) {
+                        // The row is the way there: it opens the plugin's own page (the list when several wait), where "Android apps
+                        // from a catalog" is allowed.
+                        listOf(
+                            AcquireContentSources.pluginsLink(
+                                "apps_none_row",
+                                if (waiting.size == 1) "${waiting.first().manifest.label} is installed but not allowed yet" else "${waiting.size} app catalogs are installed but not allowed yet",
+                                "Open it to allow \"Android apps from a catalog\"",
+                                waiting.singleOrNull()?.manifest?.id,
+                            ),
+                        )
+                    } else {
+                        listOf(
+                            ActionItem("apps_none_row", "No app catalog is added", subtitle = "Apps come from catalog plugins, such as one that reads F-Droid repositories", run = {}),
+                            NestedScreenItem(
+                                "apps_none_plugins",
+                                "Plugins",
+                                subtitle = "Add a plugin that offers an app catalog",
+                                registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
+                            ),
+                        )
+                    },
                 ),
             )
         }
@@ -270,12 +284,18 @@ object AppCatalogScreen {
         title = "Review before adding",
         chips = listOf(CatalogChip("From ${record.manifest.label}")),
         items = buildList<CatalogItem> {
+            // U2 (docs/SPEC.md 7k, "Notices"): the caution banner; the address and key are the rows below.
             add(
-                TextBlockItem(
+                NoticeItem(
                     id = "apps_review_who",
-                    title = review.name,
-                    text = "This source is not part of droidtop and droidtop has not checked its apps. Add it only if you trust " +
-                        "the people who run it. Each app is still checked against the key this source names before Android installs it.",
+                    notice = Notice(
+                        tone = NoticeTone.Caution,
+                        title = "Unofficial list",
+                        body = "Add from it only if someone you trust pointed you to it.",
+                        details = "${review.name} is not part of droidtop and droidtop has not checked its apps. Each app is still " +
+                            "checked against the key this source names before Android installs it.\nAddress: ${review.address}",
+                    ),
+                    placement = NoticePlacement.Page,
                 ),
             )
             review.description?.let { add(TextBlockItem(id = "apps_review_description", title = "", text = it)) }
@@ -508,5 +528,5 @@ object AppCatalogScreen {
     internal fun grouped(hex: String): String = hex.lowercase().chunked(4).joinToString(" ").take(80)
 
     private fun relative(time: Long): String =
-        android.text.format.DateUtils.getRelativeTimeSpanString(time, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS).toString()
+        dev.droidtop.library.format.ValueFormat.ago(System.currentTimeMillis(), time).replaceFirstChar { it.lowercase() }
 }

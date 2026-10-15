@@ -1,5 +1,8 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.ui.shared.LocalNoticePalette
 import android.content.Intent
 import android.media.AudioManager
 import android.net.Uri
@@ -361,7 +364,7 @@ internal fun CompanionLowBatteryLine(reading: dev.droidtop.runtime.systemstatus.
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
     ) {
-        Text(note ?: "Battery ${r.percent}%", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.weight(1f))
+        Text(note ?: "Battery ${r.percent}%", style = MaterialTheme.typography.bodyMedium, color = LocalNoticePalette.current.ink(NoticeTone.Caution), modifier = Modifier.weight(1f))
         CompanionPill("Battery saver") {
             dev.droidtop.runtime.systemstatus.SettingsLaunch.start(context, dev.droidtop.runtime.systemstatus.SystemControls.batterySaverSettingsIntent())
         }

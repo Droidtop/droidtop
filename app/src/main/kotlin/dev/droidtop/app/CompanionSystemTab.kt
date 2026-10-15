@@ -120,7 +120,7 @@ internal fun StorageLine() {
     val list = volumes ?: run { CompanionNote("Reading…"); return }
     list.forEach { volume ->
         Text(volume.name, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        Text(storageText(volume.free, volume.total), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(dev.droidtop.library.format.ValueFormat.freeOf(volume.free, volume.total), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         CompanionBar(if (volume.total > 0) (volume.total - volume.free).toFloat() / volume.total else 0f)
     }
 }
@@ -159,8 +159,4 @@ internal fun CompanionBar(fraction: Float) {
     }
 }
 
-/** "12.3 GB free of 128.0 GB"; pure so it is testable. */
-internal fun storageText(freeBytes: Long, totalBytes: Long): String =
-    "%.1f GB free of %.1f GB".format(freeBytes / GB, totalBytes / GB)
 
-private const val GB = 1_000_000_000.0

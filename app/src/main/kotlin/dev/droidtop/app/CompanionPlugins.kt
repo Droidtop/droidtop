@@ -1,5 +1,8 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.ui.shared.LocalNoticePalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -264,7 +267,7 @@ internal fun CompanionRecordingIndicator() {
     Text(
         PluginRecording.timer(recording.sinceMs, now),
         style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error,
+        color = LocalNoticePalette.current.ink(NoticeTone.Danger),
         modifier = Modifier.semantics { contentDescription = "Recording, by ${recording.label}" },
     )
 }

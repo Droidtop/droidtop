@@ -43,6 +43,13 @@ data class PluginRecord(
      * ([afterHostUpdate]); without that a plugin stopped by a bug in an old droidtop stays stopped for ever.
      */
     val disabledBuild: Int = 0,
+    /**
+     * When this pending version replaced an approved one whose maker was someone else (a different trust anchor):
+     * that version's anchor fingerprint and origin, so approving it asks in red first (docs/SPEC.md 12a, "Full access
+     * asks in red", D3) and its page says so. Cleared by the approval decision.
+     */
+    val replacedKeySha256: String? = null,
+    val replacedOrigin: String? = null,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", manifest.id)
@@ -87,6 +94,8 @@ data class PluginRecord(
         put("disabledReason", disabledReason ?: JSONObject.NULL)
         put("disabledDetail", disabledDetail ?: JSONObject.NULL)
         put("disabledBuild", disabledBuild)
+        put("replacedKeySha256", replacedKeySha256 ?: JSONObject.NULL)
+        put("replacedOrigin", replacedOrigin ?: JSONObject.NULL)
     }
 
     companion object {
@@ -157,6 +166,8 @@ data class PluginRecord(
                 disabledReason = optNullableString(json, "disabledReason"),
                 disabledDetail = optNullableString(json, "disabledDetail"),
                 disabledBuild = json.optInt("disabledBuild", 0),
+                replacedKeySha256 = optNullableString(json, "replacedKeySha256"),
+                replacedOrigin = optNullableString(json, "replacedOrigin"),
             )
         }
     }

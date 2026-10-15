@@ -61,14 +61,6 @@ class StoreContentTest {
     }
 
     @Test
-    fun `sizes read as megabytes below a gigabyte and gigabytes above, blank for nothing`() {
-        assertEquals("", StoreContent.sizeLabel(0))
-        assertEquals("1 MB", StoreContent.sizeLabel(10))
-        assertEquals("300 MB", StoreContent.sizeLabel(300_000_000L))
-        assertEquals("2.5 GB", StoreContent.sizeLabel(2_500_000_000L))
-    }
-
-    @Test
     fun `a store with one branch and no extras has nothing to choose`() {
         assertTrue(StoreContentOptions(emptyList(), listOf(branch("public", selected = true)), installed = false).isEmpty)
         assertFalse(options.isEmpty)

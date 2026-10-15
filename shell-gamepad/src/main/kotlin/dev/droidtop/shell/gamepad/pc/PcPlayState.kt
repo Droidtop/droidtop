@@ -21,7 +21,9 @@ import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.WindowsSetup
 import dev.droidtop.library.GameNaming
+import dev.droidtop.library.stores.StoreHolding
 import dev.droidtop.library.stores.StoreInstallJob
+import dev.droidtop.library.stores.StoreWeb
 import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.stores.StoreLibrary
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +59,7 @@ internal data class PcPlayState(
 )
 
 /** Where a store game is in its life on this device, when that is the thing to do next. */
-internal enum class StoreStage { INSTALL, UPDATE, DOWNLOADING, PAUSED }
+internal enum class StoreStage { INSTALL, UPDATE, DOWNLOADING, PAUSED, WISHLIST }
 
 /**
  * The store stage of [entry], or null when there is none (a folder game, an
@@ -70,6 +72,8 @@ internal enum class StoreStage { INSTALL, UPDATE, DOWNLOADING, PAUSED }
 internal fun storeStageOf(entry: LibraryEntry, download: StoreDownloads.Progress?): StoreStage? {
     val pc = entry.pcInfo?.takeIf { entry.isStoreRow() } ?: return null
     return when {
+        // On a wishlist and not owned: there is nothing to install, only the store's page to find it on.
+        pc.holding == StoreHolding.WISHLIST -> StoreStage.WISHLIST
         download != null -> if (download.paused) StoreStage.PAUSED else StoreStage.DOWNLOADING
         !pc.installed -> StoreStage.INSTALL
         pc.update == StoreUpdate.AVAILABLE -> StoreStage.UPDATE
@@ -100,7 +104,7 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: St
     val own = entry.ownStore() != null
     return when (stage) {
         StoreStage.INSTALL -> {
-            val size = (entry.pcInfo?.sizeBytes ?: 0L).takeIf { it > 0 }?.let { "Downloads ${downloadSizeLabel(it)}" }
+            val size = (entry.pcInfo?.sizeBytes ?: 0L).takeIf { it > 0 }?.let { "Downloads ${dev.droidtop.library.format.ValueFormat.size(it)}" }
             PcPlayState(
                 "Install",
                 when {
@@ -127,12 +131,22 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: St
             "Stopped at ${download?.percent ?: 0}%",
             pressable = true, ready = false, store = stage, progress = download?.fraction,
         )
+        StoreStage.WISHLIST -> PcPlayState(
+            "Find on ${entry.storeLabel() ?: "the store"}",
+            "On your wishlist. You do not own it",
+            pressable = true, ready = false, store = stage,
+        )
     }
 }
 
-/** A download size as a person reads it: whole megabytes below a gigabyte, one decimal above. Pure. */
-internal fun downloadSizeLabel(bytes: Long): String =
-    if (bytes >= 1_000_000_000L) String.format("%.1f GB", bytes / 1_000_000_000.0) else "${(bytes / 1_000_000L).coerceAtLeast(1)} MB"
+/**
+ * What A does on a wishlist game: the store's own pages, searched for its title, in the store's view. Returns the
+ * line to show when it could not, else null.
+ */
+internal fun openOnStore(context: Context, entry: LibraryEntry): String? {
+    val store = entry.ownStore() ?: return NO_STORE_LINE
+    return if (StoreWeb.search(context, store, GameNaming.displayName(entry.title))) null else "${store.label} has no pages to open"
+}
 
 /** The state before the runner has been worked out: nothing to press yet. */
 internal val PcPlayStateLoading = PcPlayState("…", "", pressable = false, ready = false)

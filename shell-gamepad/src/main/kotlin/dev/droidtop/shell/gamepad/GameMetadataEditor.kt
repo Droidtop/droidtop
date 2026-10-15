@@ -256,7 +256,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
 @Composable
 private fun SectionLabel(text: String) {
     Text(
-        text.uppercase(),
+        text.labelCase(),
         color = MenuTokens.OnSurfaceMuted,
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),

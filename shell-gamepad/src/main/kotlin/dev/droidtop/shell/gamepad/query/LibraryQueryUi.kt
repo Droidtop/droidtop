@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad.query
 
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.getGamesScreen
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -60,6 +64,7 @@ import dev.droidtop.library.integrations.LocalSearchRow
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.SourceDestinations
 import dev.droidtop.library.integrations.SourceHit
+import dev.droidtop.library.integrations.UnavailableSource
 import dev.droidtop.library.integrations.UnifiedSearch
 import dev.droidtop.library.integrations.UnifiedState
 import dev.droidtop.library.settings.CatalogScreen
@@ -67,7 +72,6 @@ import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.shell.gamepad.CatalogNavigator
-import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
@@ -291,7 +295,7 @@ internal fun LibraryFilterSheet(
             entries.forEach { entry ->
                 when (entry) {
                     is FilterEntry.Header -> MenuSectionLabel(entry.text)
-                    is FilterEntry.Note -> MenuHint(entry.text)
+                    is FilterEntry.Note -> NoticeCard(Notice(NoticeTone.Info, entry.text), NoticePlacement.Group)
                     is FilterEntry.Row -> MenuRow(
                         title = entry.title,
                         value = entry.value,
@@ -484,6 +488,12 @@ internal fun LibrarySearchDialog(
     switches: List<SearchSwitch> = emptyList(),
     // Drops a source's result this surface has no use for, before it is ranked.
     sourceFilter: ((dev.droidtop.library.integrations.AcquireContentResult) -> Boolean)? = null,
+    // What the sources are asked for when it is not a console system (the PC library asks for PC games), so they can
+    // narrow their own answer. A console list leaves it null and asks for its [systemId].
+    sourcePlatform: String? = null,
+    // The settings of this surface: matching ones follow the rows as a section called Settings, and a press opens the
+    // screen the setting lives on. Null where the surface has no settings of its own to search.
+    settingsRoot: CatalogScreen? = null,
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
     // (Droidtop/tracker#376: a plain String field put the caret at the start).
@@ -494,11 +504,20 @@ internal fun LibrarySearchDialog(
     val fieldFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val view = LocalView.current
-    LaunchedEffect(Unit) {
+    // A page a result opens (Get games, a source's detail, a plugin's settings) takes the window over: the
+    // search panel is not drawn under it, because two translucent windows put text on text (Droidtop/tracker#542).
+    // What was typed and where the cursor was stay in this composition and are there when the page closes.
+    var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
+    var firstShow by remember { mutableStateOf(true) }
+    LaunchedEffect(activeCatalog == null) {
+        if (activeCatalog != null) return@LaunchedEffect
         // The field lives in the dialog's own composition, which attaches a frame or more after this
         // effect starts: one early request failed silently on a reopen and left the field unfocused
         // until A (Droidtop/tracker#376). Ask until it is attached.
         dev.droidtop.shell.gamepad.requestFocusWhenAttached(fieldFocus, "Search field")
+        // Back from a page the soft keyboard stays away: the pad is on a row, not typing.
+        if (!firstShow) return@LaunchedEffect
+        firstShow = false
         // Explicit, not implicit: Compose's own request on focus is dropped while a pad or keyboard is attached.
         delay(120)
         keyboard?.show()
@@ -515,24 +534,37 @@ internal fun LibrarySearchDialog(
     var statusLine by remember { mutableStateOf<String?>(null) }
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
-    var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
     // What a failed source reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167), by source id.
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     // The row under the pad's cursor, by key so a source answering above it does not move it; null is the field.
     var focusKey by remember { mutableStateOf<String?>(null) }
     val currentLocal by rememberUpdatedState(local)
     val currentFilter by rememberUpdatedState(sourceFilter)
+    // The settings index is built once, off the main thread, the first time the text is long enough to match one
+    // (SettingsSearchIndex.search wants two letters); typing afterwards only filters it in memory.
+    val settingsIndex by produceState<List<dev.droidtop.library.settings.SettingsSearchResult>?>(null, settingsRoot, text.length >= 2) {
+        if (settingsRoot != null && text.length >= 2 && value == null) {
+            value = try {
+                withContext(Dispatchers.IO) { dev.droidtop.library.settings.SettingsSearchIndex.build(context, settingsRoot) }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w("droidtop.search", "settings index failed: ${e.message}")
+                emptyList()
+            }
+        }
+    }
 
     // Typing puts the cursor back in the field.
     LaunchedEffect(text) { focusKey = null }
 
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
-    LaunchedEffect(text, systemId, searchTick, localKey) {
+    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey) {
         UnifiedSearch.search(
             context = context,
             query = text,
-            platform = systemId,
+            platform = sourcePlatform ?: systemId,
             local = { q -> currentLocal?.invoke(q).orEmpty() },
             carry = state.sourceHits,
             keep = { result -> currentFilter?.invoke(result) ?: true },
@@ -596,9 +628,18 @@ internal fun LibrarySearchDialog(
                     },
                 )
             }
+            // Settings are a different thing being searched (docs/SPEC.md 7k), so they are a section of their own after the
+            // rows, a few at most; the full list is the Settings page's own search.
+            val settingsHits = settingsIndex?.let { dev.droidtop.library.settings.SettingsSearchIndex.search(it, text).take(MAX_SETTINGS_ROWS) }.orEmpty()
+            if (settingsHits.isNotEmpty()) {
+                add(SearchLine.Header("Settings"))
+                settingsHits.forEach { hit ->
+                    add(SearchLine.Entry("setting:${hit.itemId}", hit.itemTitle, subtitle = hit.screenTitle) { activeCatalog = hit.target })
+                }
+            }
             when {
                 !state.settled -> add(SearchLine.Note("Searching"))
-                state.rows.isEmpty() -> add(SearchLine.Note("No match"))
+                state.rows.isEmpty() && settingsHits.isEmpty() -> add(SearchLine.Note("No match"))
             }
             if (state.settled) {
                 // Sources that wait for the person: one row that opens the approval, not a line per plugin.
@@ -607,8 +648,8 @@ internal fun LibrarySearchDialog(
                     add(
                         SearchLine.Entry(
                             "waiting",
-                            if (waiting.size == 1) "${waiting.first().label} is waiting for your approval" else "${waiting.size} sources are waiting for your approval",
-                            subtitle = if (waiting.size == 1) "Open it to approve" else "Open to approve them",
+                            UnavailableSource.waitingTitle(waiting),
+                            subtitle = UnavailableSource.waitingSubtitle(waiting),
                         ) { openPlugin(waiting.singleOrNull()?.pluginId) },
                     )
                 }
@@ -668,7 +709,7 @@ internal fun LibrarySearchDialog(
     }
     val entries = lines.filterIsInstance<SearchLine.Entry>()
 
-    Dialog(
+    if (activeCatalog == null) Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
@@ -789,6 +830,9 @@ internal fun LibrarySearchDialog(
         }
     }
 }
+
+/** The most settings the search lists; a person who wants more opens Settings. */
+private const val MAX_SETTINGS_ROWS = 5
 
 /** A switch under the search field: its label, whether it is on, and what pressing it does. */
 internal data class SearchSwitch(val label: String, val on: Boolean, val toggle: () -> Unit)

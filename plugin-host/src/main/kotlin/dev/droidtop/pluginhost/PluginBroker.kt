@@ -62,6 +62,12 @@ interface BrokerEnvironment {
     fun toast(pluginLabel: String, text: String): Boolean
 
     /**
+     * Asks the person [notice] on droidtop's confirm card (docs/SPEC.md 7k, "Asking before a change"), the safe
+     * button first; true only for a press of [proceed]. Blocks the calling binder thread until answered.
+     */
+    fun confirm(notice: dev.droidtop.library.settings.Notice, proceed: String, cancel: String): Boolean = false
+
+    /**
      * The systems the library holds games for, with each one's chosen emulator, for `library.read` `systems`
      * (docs/plugin-api.md 3 A1): `{ready, systems: [...]}`, read from the in-memory index. May block briefly; never walks a folder.
      */
@@ -383,6 +389,27 @@ object HostApis {
             val extras = buildMap { extrasJson.keys().forEach { put(it, extrasJson.optString(it)) } }
             val action = args.optString("action").takeIf { it.isNotBlank() }
             JSONObject().put("launched", env.launchAppWithExtras(pkg, extras, action))
+        },
+        // docs/plugin-api.md 3 C6b: a yes-or-no question on droidtop's own confirm card, during a call the person started.
+        // A plugin has no danger tone and cannot use droidtop's own notice titles; the card names the plugin.
+        HostOp("ui.prompt", "confirm", userOnly = true) { env, record, args ->
+            val title = args.optString("title").trim().takeIf { it.isNotEmpty() } ?: invalid("title is required")
+            val proceed = args.optString("proceed").trim().takeIf { it.isNotEmpty() } ?: invalid("proceed is required")
+            if (title.lowercase() in PluginViewLimits.reservedTitles) invalid("\"$title\" is one of droidtop's own titles")
+            val tone = when (args.optString("tone", "info")) {
+                "caution" -> dev.droidtop.library.settings.NoticeTone.Caution
+                else -> dev.droidtop.library.settings.NoticeTone.Info
+            }
+            fun text(key: String, limit: Int) = args.optString(key).trim().takeIf { it.isNotEmpty() }?.take(limit)
+            val notice = dev.droidtop.library.settings.Notice(
+                tone = tone,
+                title = title.take(PluginViewLimits.length("noticeTitle")),
+                body = text("subtitle", PluginViewLimits.length("noticeSubtitle")),
+                details = text("details", PluginViewLimits.length("noticeDetails")),
+                source = record.manifest.label,
+            )
+            val actionLabel = PluginViewLimits.length("actionLabel")
+            JSONObject().put("confirmed", env.confirm(notice, proceed.take(actionLabel), text("cancel", actionLabel) ?: "Cancel"))
         },
         // docs/plugin-api.md 3 C6a: the Decky toaster's job, drawn by droidtop and always named after the plugin.
         HostOp(

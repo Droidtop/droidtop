@@ -877,6 +877,8 @@ class Library(
     private val links: GameLinksStore = NoOpGameLinksStore,
     /** Where a linked record's newest version is asked: the `library.updates` plugins (docs/SPEC.md 7g, "Where an update comes from"). */
     private val updateSources: UpdateSources = NoUpdateSources,
+    /** The ids a game is known by and the save rule it was matched to; they follow a game when it is folded into another (docs/SPEC.md 7o "Saves"). */
+    private val saveRecords: dev.droidtop.library.saves.SaveRecordStore = dev.droidtop.library.saves.NoOpSaveRecordStore,
 ) {
     private val updates = SourceUpdateCheck(links, updateSources)
 
@@ -1814,6 +1816,7 @@ class Library(
         playHistory.moveTo(missing.id, replacement.id)
         favorites.moveTo(missing.id, replacement.id)
         links.moveTo(missing.id, replacement.id)
+        saveRecords.moveTo(missing.id, replacement.id)
         changedFactIds += listOf(missing.id, replacement.id)
         providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(missing.id, replacement.id, keepSource = false) }
         for (provider in providers.filter { it.indexed }) {
@@ -1883,6 +1886,7 @@ class Library(
         for (source in setOf(game.displayEntry.id, other.displayEntry.id) - target) {
             playHistory.moveTo(source, target)
             favorites.moveTo(source, target)
+            saveRecords.moveTo(source, target)
             providers.filterIsInstance<EntryFactsOwner>().forEach { it.moveEntryFacts(source, target, keepSource = true) }
         }
         changedFactIds += keep + fold
@@ -1967,38 +1971,39 @@ class Library(
      * confirmed end clears droidtop's running-game state (Droidtop/tracker#82): a quit that left the
      * emulator alive must not make anything read "the game ended".
      */
-    suspend fun quitRunning(context: android.content.Context, entry: LibraryEntry): QuitResult = endRunning(context, entry, kill = false)
+    suspend fun quitRunning(context: android.content.Context, entry: LibraryEntry): QuitResult =
+        // The close must finish even if the surface that asked goes away meanwhile: a helper's sheet, or the Home press
+        // that moves the game off the screen, can recreate the activity that launched this (rig, build 1809: the banner
+        // read "Quit failed: Job was cancelled" while the close went on unseen).
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            val outcome = try {
+                val running = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName
+                if (running == context.packageName) {
+                    // A game screen of droidtop's own (a Windows game): the task manager never closes
+                    // droidtop's own tasks, so the screen itself ends it (OwnGameScreens).
+                    OwnGameScreens.stop()
+                    QuitResult.Ended
+                } else if (running != null) {
+                    dev.droidtop.runtime.tasks.TaskManager.close(context, running).toQuitResult()
+                } else {
+                    quit(entry)
+                }
+            } catch (e: Exception) {
+                QuitResult.NotEnded("Couldn't end it: ${e.message ?: e.javaClass.simpleName}")
+            }
+            if (outcome is QuitResult.Ended) LaunchDisplay.clearRunning()
+            outcome
+        }
 
     /**
-     * Kill for the running game (the companion's Game tab): [quitRunning] for a person who said "stop it at once". A close
-     * that only reached "asked Android, cannot confirm" has done everything droidtop can, and leaving the session standing
-     * is how a dead launch stayed "Playing" for ever (Droidtop/tracker#289), so that also ends droidtop's session; the
-     * result is still [QuitResult.NotEnded] with the plain reason, so the surface says what could not be confirmed and why.
-     * A helper that tried and failed leaves the session: the game may well still be running.
+     * [quitRunning] for the game droidtop believes is running, for a caller that holds no entry (the play-time
+     * limit, Droidtop/tracker#421): the entry is looked up by the running session's game id. Null when nothing is running.
      */
-    suspend fun killRunning(context: android.content.Context, entry: LibraryEntry): QuitResult = endRunning(context, entry, kill = true)
-
-    private suspend fun endRunning(context: android.content.Context, entry: LibraryEntry, kill: Boolean): QuitResult {
-        var asked = false
-        val outcome = runCatching {
-            val running = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName
-            if (running == context.packageName) {
-                // A game screen of droidtop's own (a Windows game): the task manager never closes
-                // droidtop's own tasks, so the screen itself ends it (OwnGameScreens).
-                OwnGameScreens.stop()
-                QuitResult.Ended
-            } else if (running != null) {
-                val closed = dev.droidtop.runtime.tasks.TaskManager.close(context, running)
-                asked = closed is dev.droidtop.runtime.tasks.CloseOutcome.Requested
-                closed.toQuitResult()
-            } else {
-                quit(entry)
-            }
-        }.getOrElse {
-            QuitResult.NotEnded("Quit failed: ${it.message ?: it.javaClass.simpleName}")
-        }
-        if (outcome is QuitResult.Ended || (kill && asked)) LaunchDisplay.clearRunning()
-        return outcome
+    suspend fun quitRunningGame(context: android.content.Context): QuitResult? {
+        val id = LaunchDisplay.running.value?.context?.gameId ?: return null
+        val entry = withContext(Dispatchers.IO) { find(id) }
+            ?: return QuitResult.NotEnded("The running game is not in the library")
+        return quitRunning(context, entry)
     }
 
     /**

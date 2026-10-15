@@ -42,7 +42,8 @@ class LauncherSearchApp(
  * one the PC library and the console lists use) with the launcher's own
  * rows in the one list: the installed apps and the library's games that
  * match, ranked together with whatever the download sources answer
- * (docs/SPEC.md 12a "One search"). While the field is empty droidtop's
+ * (docs/SPEC.md 12a "One search"); the surface's settings follow as a section of
+ * their own ([settingsRoot]). While the field is empty droidtop's
  * Recommendations show.
  *
  * [games] is the library's already-scanned list, null while it has not been
@@ -62,6 +63,8 @@ fun LauncherSearchScreen(
     findApps: suspend (String) -> List<LauncherSearchApp>,
     onPlay: (LibraryEntry) -> Unit,
     onDismiss: () -> Unit,
+    // The settings of this surface, searched with the rest (null: this surface has none to search).
+    settingsRoot: dev.droidtop.library.settings.CatalogScreen? = null,
 ) {
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         val context = LocalContext.current
@@ -88,6 +91,7 @@ fun LauncherSearchScreen(
             onTextChange = {},
             onDismiss = onDismiss,
             suggestions = suggestions,
+            settingsRoot = settingsRoot,
             localKey = playable to systemNames,
             switches = listOf(
                 SearchSwitch("Include hidden games", includeHidden) { includeHidden = !includeHidden },

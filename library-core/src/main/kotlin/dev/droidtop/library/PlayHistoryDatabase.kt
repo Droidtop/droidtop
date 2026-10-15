@@ -220,14 +220,18 @@ data class LinkedKey(
 )
 
 @Database(
-    entities = [PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, SourceLinkEntity::class, SourceAnswerEntity::class],
-    version = 4,
+    entities = [
+        PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, SourceLinkEntity::class, SourceAnswerEntity::class,
+        dev.droidtop.library.saves.GameIdEntity::class, dev.droidtop.library.saves.SaveRuleEntity::class,
+    ],
+    version = 5,
     exportSchema = false,
 )
 abstract class PlayHistoryDatabase : RoomDatabase() {
     abstract fun playHistoryDao(): PlayHistoryDao
     abstract fun favoritesDao(): FavoritesDao
     abstract fun gameLinksDao(): GameLinksDao
+    abstract fun saveRecordsDao(): dev.droidtop.library.saves.SaveRecordsDao
 
     companion object {
         @Volatile private var instance: PlayHistoryDatabase? = null
@@ -292,13 +296,28 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
+        // The ids a game is known by outside droidtop and the save rule it was matched to (docs/SPEC.md 7o "Saves"):
+        // two new tables, nothing existing touched, for the same reason as MIGRATION_1_2.
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `game_ids` (`game_id` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                        "`value` TEXT NOT NULL, PRIMARY KEY(`game_id`, `kind`))",
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `save_rules` (`game_id` TEXT NOT NULL, `kind` TEXT NOT NULL, " +
+                        "`name` TEXT NOT NULL, `how` TEXT NOT NULL, `checked_at` INTEGER NOT NULL, PRIMARY KEY(`game_id`))",
+                )
+            }
+        }
+
         fun get(context: Context): PlayHistoryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     PlayHistoryDatabase::class.java,
                     "droidtop-play-history.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
             }
     }
 }

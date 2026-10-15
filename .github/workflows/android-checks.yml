@@ -61,6 +61,16 @@ jobs:
       # ES-DE formulas -- exactly the kind of code a unit test can verify
       # without a screen, which is otherwise the only way this project
       # checks theme rendering at all.
+      # The UI rules (docs/SPEC.md 7k, "Notices"): each rule is switched on in
+      # scripts/check-ui-rules.sh in the commit that clears its last site, so
+      # this fails only on a site a switched-on rule forbids; the fixture test
+      # proves every rule, on or off, catches what it names.
+      - name: UI rules
+        if: ${{ !cancelled() }}
+        run: |
+          scripts/test-check-ui-rules.sh
+          scripts/check-ui-rules.sh --check
+
       - name: Lint (minSdk API gate)
         # NewApi/InlinedApi only, across :app and everything it depends on
         # -- see the lint block in app/build.gradle.kts for why this
@@ -104,7 +114,7 @@ jobs:
         # never once run in CI. Add the module here the moment it grows its
         # first test; a test nothing runs is not a test.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest --stacktrace
 
       - name: Upload test reports
         if: always()
@@ -122,4 +132,5 @@ jobs:
             host-bridge/build/reports/tests/
             plugin-host/build/reports/tests/
             display/build/reports/tests/
+            ui-shared/build/reports/tests/
           if-no-files-found: ignore

@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
@@ -159,7 +163,7 @@ internal fun ManualMatchPicker(
                     )
                 }
             }
-            status?.let { MenuHint(it) }
+            status?.let { NoticeCard(Notice(NoticeTone.Info, it), NoticePlacement.Group) }
         }
     }
 

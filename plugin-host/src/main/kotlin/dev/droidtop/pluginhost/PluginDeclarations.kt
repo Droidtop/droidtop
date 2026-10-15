@@ -206,7 +206,7 @@ data class ExportedApi(
 
     /**
      * The plain line the provider's approval list shows for this export: what other plugins may then do, from the
-     * registry label of the permission its ops are gated by ("Other plugins may: Run commands as root").
+     * registry label of the permission its ops are gated by ("Other plugins may: Full control of the device").
      */
     fun offerLabel(): String =
         ops.firstNotNullOfOrNull { PluginPermissions.labelFor(it.permission) }?.let { "Other plugins may: $it" }

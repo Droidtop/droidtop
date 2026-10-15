@@ -420,7 +420,7 @@ enum class ListPlace {
 }
 
 /** Why [listExclusion] keeps an entry out. */
-enum class Exclusion { HIDDEN, SHARED, FREE }
+enum class Exclusion { HIDDEN, SHARED, FREE, WISHLIST }
 
 /**
  * THE rule for which games a list shows (docs/SPEC.md 7j, "Hidden is one
@@ -434,6 +434,8 @@ enum class Exclusion { HIDDEN, SHARED, FREE }
  *    is off, FREE only with [OwnershipOptions.showFree].
  * 5. A FREE row is in the library while installed or ever played ([freeInLibrary]):
  *    derived, never stored. To keep a tried free game out, the person hides it.
+ * 6. A WISHLIST row (a game on a store's wishlist, not owned) is out of every ordinary list; the Wishlist
+ *    shelf of PC Games and the Ownership facet show it.
  * [options] null means the list has no ownership rule (a console list).
  * Pure; one look at fields the entry already carries.
  */
@@ -451,6 +453,8 @@ fun listExclusion(
         null, StoreHolding.OWNED, StoreHolding.NOT_OWNED -> null
         StoreHolding.FAMILY -> if (options.showShared) null else Exclusion.SHARED
         StoreHolding.FREE -> if (options.showFree || entry.freeInLibrary()) null else Exclusion.FREE
+        // Not owned: only the Wishlist shelf and the Ownership facet show it (Droidtop/tracker#134).
+        StoreHolding.WISHLIST -> Exclusion.WISHLIST
     }
 }
 

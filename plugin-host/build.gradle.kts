@@ -27,6 +27,14 @@ android {
         }
     }
 
+    // The plugin view limits (docs/view-limits/plugin-view-limits.json) are the one source PluginViewLimits reads, the
+    // same file plugin-common-py's gg.lint_view reads: packaged as a resource, never restated in code.
+    sourceSets {
+        getByName("main") {
+            resources.srcDir("../docs/view-limits")
+        }
+    }
+
     // The IPluginRuntime binder contract (docs/SPEC.md 12a): :app talks to
     // the isolated plugin process only through this AIDL interface, never
     // by holding a reference to plugin code directly.

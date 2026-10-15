@@ -157,13 +157,6 @@ class PcCapsuleStateTest {
         )
     }
 
-    @Test
-    fun `download sizes read as megabytes or gigabytes`() {
-        assertEquals("1.5 GB", downloadSizeLabel(1_500_000_000L))
-        assertEquals("420 MB", downloadSizeLabel(420_000_000L))
-        assertEquals("1 MB", downloadSizeLabel(10L))
-    }
-
     private val scope = LibraryQueryScope(
         id = "pc",
         facets = listOf(LibraryFacet.INSTALLED, LibraryFacet.FAVOURITES, LibraryFacet.UPDATE, LibraryFacet.RECENTLY_PLAYED),
@@ -249,5 +242,25 @@ class PcCapsuleStateTest {
         assertEquals("Mine", read.id)
         assertTrue(read.pinned)
         assertEquals(listOf(hidden), LibraryViewPrefs.decodeViews(LibraryViewPrefs.encodeViews(listOf(hidden))))
+    }
+
+
+    @Test
+    fun `a game on a wishlist is found on the store, not installed`() {
+        val wished = LibraryEntry(
+            id = "gog:1207658691",
+            title = "Wished Game",
+            kind = LibraryEntryKind.WINE_PROFILE,
+            pcInfo = PcInfo(storeId = "gog:1207658691", installed = false, holding = dev.droidtop.library.stores.StoreHolding.WISHLIST),
+        )
+        assertEquals(StoreStage.WISHLIST, storeStageOf(wished, null))
+        // a download cannot be running for a game that is not owned, but the wishlist wins over it anyway
+        assertEquals(StoreStage.WISHLIST, storeStageOf(wished, StoreDownloads.Progress(0.4f, paused = false)))
+        assertEquals(CapsuleStatus.WISHLIST, capsuleStatusOf(wished, null))
+        val state = playStateOf(null, wished)
+        assertTrue(state.verb.startsWith("Find on"))
+        assertTrue(state.pressable)
+        assertFalse(state.ready)
+        assertEquals(StoreStage.WISHLIST, state.store)
     }
 }

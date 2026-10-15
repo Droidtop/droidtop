@@ -4,7 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.widget.Toast
 import dev.droidtop.library.LaunchResult
 import dev.droidtop.library.LibraryEntry
 
@@ -83,7 +82,7 @@ class GameLaunchActivity : Activity() {
 
         private fun report(context: Context, message: String) {
             android.util.Log.w(TAG, message)
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            dev.droidtop.library.settings.Notices.flash(message, context = context)
         }
     }
 }

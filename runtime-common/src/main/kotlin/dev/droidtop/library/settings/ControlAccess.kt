@@ -8,8 +8,8 @@ package dev.droidtop.library.settings
  * Kid or Kiosk: [UiMode.hidesSettings] and [UiMode.kidGamesOnly] read from here too.
  *
  * Pure: no Android, no Compose, so every rule is stated and checked in ControlAccessTest. Each mode's
- * rules are written out in [rules]; the `when` there is exhaustive, so a mode added to [UiMode] (Guest
- * is reserved) does not compile until its rules are written, and the test names every mode's sets.
+ * rules are written out in [rules]; the `when` there is exhaustive, so a mode added to [UiMode] does not
+ * compile until its rules are written, and the test names every mode's sets.
  */
 enum class ControlSurface { COMPANION, QUICK_MENU }
 
@@ -34,6 +34,8 @@ enum class ControlRow {
     GAME_PLUGIN_ROWS, GAME_SCREENSHOT,
     // Performance
     STATS, PERFORMANCE_CONTROLS, LOGS,
+    // Home: today's and this week's play against the play-time limits (Kid and Full)
+    PLAY_TIME,
 }
 
 /** Everything one UI mode allows, written out per mode in [ControlAccess.rules]. */
@@ -65,7 +67,7 @@ object ControlAccess {
     /** Kid's optional maximum volume, applied in the one volume write path. */
     const val ID_KID_VOLUME_CAP = "pref_kid_volume_cap"
 
-    /** The optional passkey for leaving Kid and Kiosk. */
+    /** The optional passkey for leaving Kid, Kiosk and Guest. */
     const val ID_UI_MODE_PASSKEY = "pref_ui_mode_passkey"
 
     private val FULL = ControlRules(
@@ -106,14 +108,33 @@ object ControlAccess {
         alwaysAsk = true,
         hiddenItemIds = setOf(
             GamingSettingsCatalog.ID_UI_MODE, GamingSettingsCatalog.ID_DISPLAY_COMPANION, ID_KID_VOLUME_CAP, ID_UI_MODE_PASSKEY,
+            PlayTimeSettings.ID_LINK,
         ),
         hiddenGroupIds = setOf(GROUP_COMPANION),
+    )
+
+    /** Kid: the restricted set over kid-friendly games, with the play-time line on Home (Droidtop/tracker#421). */
+    private val KID = RESTRICTED.copy(kidGamesOnly = true, rows = RESTRICTED.rows + ControlRow.PLAY_TIME)
+
+    /**
+     * Guest (Droidtop/tracker#420): the handheld handed to somebody who is not the owner, with the owner's
+     * library to play. Kid's limits (no Settings, stores, downloads, accounts or plugin installs, nothing
+     * that stops or overwrites without asking) but all of the library rather than the kid-friendly part,
+     * and none of Kid's own parts: no volume cap, no play-time limit. The owner's private panels go too: the
+     * Quick Menu drops Notifications (the owner's messages), Social, Plugins and Downloads, and the
+     * companion keeps the restricted tabs. The passkey that leaves Guest is the one that leaves Kid and
+     * Kiosk, when set.
+     */
+    private val GUEST = RESTRICTED.copy(
+        quickMenuPanels = ControlPanel.entries.toSet() -
+            setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS),
     )
 
     fun rules(mode: UiMode): ControlRules = when (mode) {
         UiMode.FULL -> FULL
         UiMode.KIOSK -> RESTRICTED
-        UiMode.KID -> RESTRICTED.copy(kidGamesOnly = true)
+        UiMode.KID -> KID
+        UiMode.GUEST -> GUEST
     }
 
     fun panels(mode: UiMode, surface: ControlSurface): Set<ControlPanel> = when (surface) {

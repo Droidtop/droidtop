@@ -60,6 +60,79 @@ object ContextActionFilter {
     }
 }
 
+/**
+ * The systems a `library.sources` entry serves (docs/plugin-api.md 1.6, Droidtop/tracker#543): the entry's static
+ * `systems`, a list of droidtop system ids or `"*"` for every system. Decided from the manifest alone, so a Get games
+ * page never loads a plugin to learn whether to list it. An entry without a usable `systems` is [UNDECLARED]: it keeps
+ * the behaviour every source had before the field existed (listed under every system, asked by every search).
+ */
+class SourceSystems private constructor(private val ids: Set<String>?, private val declared: Boolean) {
+    val isDeclared: Boolean get() = declared
+
+    /** True when the entry names every system (`"*"`) or says nothing. */
+    val isAll: Boolean get() = !declared || ids == null
+
+    /** The system ids the entry names, empty for "every system" and for an undeclared entry. */
+    val named: Set<String> get() = ids.orEmpty()
+
+    /**
+     * Whether the entry serves [systemId]. A blank or null id is a search with no system of its own (the launcher's
+     * search): every source is asked. [PC] is the PC library, which spans several system ids ([PC_FAMILY]): an entry
+     * serves it when it names any of them. An entry naming `pc` serves every PC system.
+     */
+    fun serves(systemId: String?): Boolean {
+        if (isAll) return true
+        val id = systemId?.trim()?.lowercase().orEmpty()
+        if (id.isEmpty()) return true
+        val named = ids.orEmpty()
+        if (id in named) return true
+        if (id == PC) return named.any { it in PC_FAMILY }
+        return PC in named && id in PC_FAMILY
+    }
+
+    /** True when the entry serves the PC library and no console system: its page can open straight on the PC search. */
+    fun servesOnlyPc(): Boolean = !isAll && ids.orEmpty().all { it in PC_FAMILY }
+
+    companion object {
+        /** The PC library's pseudo system id (the PC Games list). */
+        const val PC = "pc"
+
+        /** The system ids that are the PC library's games: a source naming one of them serves PC searches. */
+        val PC_FAMILY: Set<String> = setOf("pc", "windows", "windows3x", "windows9x", "dos", "linux", "mac", "macos")
+
+        val UNDECLARED = SourceSystems(null, declared = false)
+        val ALL = SourceSystems(null, declared = true)
+
+        /** Reads a `systems` value: `"*"`, or a list of ids (a `"*"` in it means all). Anything else, or an empty list, is undeclared. */
+        fun parse(value: Any?): SourceSystems {
+            val list: List<String> = when (value) {
+                is String -> listOf(value)
+                is org.json.JSONArray -> List(value.length()) { value.optString(it) }
+                else -> return UNDECLARED
+            }.map { it.trim().lowercase() }.filter { it.isNotEmpty() }
+            if (list.isEmpty()) return UNDECLARED
+            if ("*" in list) return ALL
+            return SourceSystems(list.toSet(), declared = true)
+        }
+
+        fun of(vararg ids: String) = SourceSystems(ids.map { it.trim().lowercase() }.toSet(), declared = true)
+
+        /** The `systems` of one `library.sources` entry. */
+        fun of(entry: ProvidedPoint): SourceSystems =
+            runCatching { parse(JSONObject(entry.extra).opt("systems")) }.getOrDefault(UNDECLARED)
+
+        /** The systems a plugin's manifest says its sources serve: the union of its `library.sources` entries, undeclared when any entry (or the contract 1 capability) says nothing. */
+        fun of(manifest: PluginManifest): SourceSystems {
+            val entries = manifest.v2.provides.filter { it.point == "library.sources" }
+            if (entries.isEmpty()) return UNDECLARED
+            val each = entries.map { of(it) }
+            if (each.any { !it.isDeclared }) return UNDECLARED
+            if (each.any { it.isAll }) return ALL
+            return SourceSystems(each.flatMap { it.named }.toSet(), declared = true)
+        }
+    }
+}
+
 /** What a metadata source (A3) found for one game, every field optional. [source] names where it came from. */
 data class MetadataFields(
     val source: String,

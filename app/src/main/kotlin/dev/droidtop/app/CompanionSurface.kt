@@ -1,5 +1,10 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.settings.NoticeAction
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.ui.shared.NoticeCard
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import androidx.compose.foundation.background
@@ -76,6 +81,8 @@ fun CompanionSurface(
             // Status line, always the first row (the controls live in the System section and tab).
             CompanionSystemBar()
             LaunchErrorLine()
+            if (shows(dev.droidtop.library.settings.ControlRow.LIBRARY)) CompanionSearchPill()
+            if (shows(dev.droidtop.library.settings.ControlRow.PLAY_TIME)) CompanionPlayTimeLine()
             if (shows(dev.droidtop.library.settings.ControlRow.PINS)) CompanionPinsSection()
             if (shows(dev.droidtop.library.settings.ControlRow.NOW_PLAYING)) CompanionNowPlayingCard()
             val library = shows(dev.droidtop.library.settings.ControlRow.LIBRARY)
@@ -105,6 +112,51 @@ fun CompanionSurface(
 }
 
 /**
+ * The companion's way into the one search (docs/SPEC.md 12a "One search", Droidtop/tracker#12): the same
+ * search window Standard's drawer opens, started on the screen the tap was on, so its rows, its sources
+ * and its settings are the same ones. The companion draws no search of its own.
+ */
+@Composable
+private fun CompanionSearchPill() {
+    val context = LocalContext.current
+    androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+        CompanionPill("Search games, apps and sources") {
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(context, LauncherSearchActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    android.app.ActivityOptions.makeBasic().setLaunchDisplayId(displayIdOf(context)).toBundle(),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * "Today 45 min of 2 h · This week 3 h 10 min of 10 h" (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421),
+ * under the status line, while a play-time limit is set. Read off the main thread, again every half minute.
+ */
+@Composable
+private fun CompanionPlayTimeLine() {
+    val context = LocalContext.current
+    val summary by androidx.compose.runtime.produceState<String?>(null) {
+        while (true) {
+            value = withContext(Dispatchers.IO) {
+                val (limits, today, week) = dev.droidtop.library.settings.PlayTimePrefs.snapshot(context.applicationContext)
+                if (limits.any) dev.droidtop.library.settings.PlayTime.summary(limits, today, week) else null
+            }
+            kotlinx.coroutines.delay(30_000)
+        }
+    }
+    val line = summary ?: return
+    Text(
+        line,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 8.dp),
+    )
+}
+
+/**
  * Why the last launch or quit made from the companion failed. The shell's own error line is on the other
  * screen, and a log line alone left a tap here looking like it did nothing. Tap to dismiss; the next launch
  * clears it too.
@@ -113,14 +165,18 @@ fun CompanionSurface(
 private fun LaunchErrorLine() {
     val launchError by CompanionState.launchError.collectAsState()
     val message = launchError ?: return
-    Text(
-        message,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error,
+    NoticeCard(
+        Notice(
+            NoticeTone.Caution,
+            "Didn't open",
+            body = message.take(Notice.BODY_MAX),
+            details = message,
+            action = NoticeAction("Dismiss") { CompanionState.launchError.value = null },
+        ),
+        NoticePlacement.Row,
+        onAction = { CompanionState.launchError.value = null },
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = 48.dp)
-            .clickable { CompanionState.launchError.value = null }
             .padding(top = 8.dp),
     )
 }

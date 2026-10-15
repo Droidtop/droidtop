@@ -189,10 +189,22 @@ the same envelope in both directions:
 
 Error codes are a closed set: `INVALID_ARGS`, `UNSUPPORTED`,
 `NOT_FOUND`, `PERMISSION_DENIED`, `RATE_LIMITED`, `TIMEOUT`,
-`PROVIDER_UNAVAILABLE`, `PROVIDER_CRASHED`, `CANCELLED`, `FAILED`. A
-plugin's own ordinary failure ("no network", "nothing found") is an
-error reply, not a crash. This keeps today's distinction in
-`PluginCrashPolicy`.
+`PROVIDER_UNAVAILABLE`, `PROVIDER_CRASHED`, `CANCELLED`, `FAILED`,
+`SIGN_IN_REQUIRED`. A plugin's own ordinary failure ("no network",
+"nothing found") is an error reply, not a crash. This keeps today's
+distinction in `PluginCrashPolicy`.
+
+**What the person reads of an error (2026-10-14, Droidtop/tracker#485).**
+An error may also carry `title` and `subtitle` (plain words, at most 60
+and 140 characters), `permission` and `action`:
+`{"code": "PERMISSION_DENIED", "message": "...", "title": "Not allowed",
+"permission": "net.any"}`. droidtop draws an error as a caution notice
+(§1.6, Notices) with the code and message in Info. `PERMISSION_DENIED`
+naming a permission the plugin **declared** opens that plugin's
+Permissions; naming one it did not declare is drawn as a plain notice and
+logged as a plugin message. `SIGN_IN_REQUIRED` offers its `action` (a view
+action) as "Sign in". The helpers write it (`gg.error(code, title, ...)`,
+`PluginReply.error(code, title, subtitle, permission, action)`).
 
 **Plugin → host (the broker):**
 
@@ -312,6 +324,41 @@ one host mechanism (`PluginViews`, `library-core`), so a plugin screen is a
 catalog screen: no second renderer per mode, and every improvement to the
 catalog renderers reaches plugin screens for free.
 
+**Notices (2026-10-14, Droidtop/tracker#485).** A `notice` node is a
+condition the person should know about, drawn as droidtop's own notice
+card (docs/SPEC.md 7k, "Notices") and named "from <plugin>":
+
+```json
+{ "type": "notice", "id": "signin", "tone": "caution", "placement": "section",
+  "title": "Sign in to download", "subtitle": "Downloads are for members.",
+  "details": "The site lists its download links only to signed-in members.",
+  "action": { "kind": "view", "op": "signin", "title": "Sign in" } }
+```
+
+- `tone` is `info` or `caution`; a plugin has no danger. Any other value
+  is drawn as info and logged.
+- `placement` is `section` (the default) or `banner`, at most one banner
+  a page; a second becomes a section notice and is logged.
+- Lengths (title 60, subtitle 140, details 500, the action's label 20) and
+  counts (two a section and only of different tones, three a view) are in
+  `docs/view-limits/plugin-view-limits.json`, the one file the host,
+  `gg.lint_view` and the Kotlin `PluginViewLint` read. Over a length the
+  host cuts; over a count it drops; a notice is moved first in its section.
+- A plugin notice may not use one of droidtop's own notice titles (the
+  `reservedTitles` of the limits file, exact, ignoring case); such a node
+  is drawn as a plain row and logged.
+- A reply's `data.notice` (the same object, `type` optional) is drawn
+  instead of `data.message` until the page's next action; a refetch never
+  clears it. Send both, so an older droidtop shows the message.
+- Every call envelope carries `host.viewFeatures` (`["notice",
+  "confirm"]` today): a plugin in any language tests it and keeps the old
+  `info` row for a droidtop without notices.
+- What the host changed (a cut, a drop, a move, an unknown tone, a reserved
+  title, an undeclared permission) is a **plugin message**: logged once per
+  plugin and view under the logcat tag `PluginMessages`, and the last 50
+  per plugin are kept for the plugin's page and the Plugin messages page in
+  developer options.
+
 **The document** (`docs/plugin-view.schema.json` is normative):
 
 ```json
@@ -424,6 +471,35 @@ page for a plugin.
 | `ui.quick_tile@1` (C2) | `action` may reply `{view}` | the view opens over the Quick Menu |
 | `ui.panel@1` (C17) | `panel {context:{surface, game?}}` | the plugin's Quick Menu panel, under its tiles (1.8) |
 | `ui.game_section@1` (C18) | `section {context:{target, sectionId}}` | rows on a game's page; the whole section opens as a page for its inputs (1.8) |
+
+**Which systems a source serves (`systems`, Droidtop/tracker#543).** A
+`library.sources` entry in `provides` may declare the systems it can give
+games for, next to `point` and `id`:
+
+```json
+{ "point": "library.sources", "version": 1, "id": "f95",
+  "label": "F95zone", "systems": ["windows", "linux"] }
+```
+
+`systems` is a list of droidtop system ids (the ES-DE short names, as in
+`system.id` below), or `"*"` (alone or in the list) for every system. droidtop
+decides from the manifest alone, without loading the plugin:
+
+- a system's Get games page lists the source only if it names that system;
+- the PC library (PC Games, search scoped to `pc`) asks only the sources that
+  name a PC system (`pc`, `windows`, `windows3x`, `windows9x`, `dos`, `linux`,
+  `mac`, `macos`); a source naming `pc` serves all of them, and a source that
+  names only consoles is not asked by a PC search;
+- a search with no system of its own (the launcher's) asks every source;
+- Game sources opens a source that serves only PC systems straight on the PC
+  search, and asks which system for any other.
+
+An entry **without** `systems`, or with an empty or malformed one, keeps the
+behaviour every source had before the field: listed under every system and
+asked by every search. Adding `systems` is not a breaking change and needs no
+contract bump; a build that does not know the field ignores it. Several
+`library.sources` entries in one plugin serve the union of their `systems`
+(one entry without it makes the plugin undeclared).
 
 **`library.sources` with views (the Get games flow).** Every call on this
 point carries `context: {system: {id, name}, destination}`; `system.id` is
@@ -991,8 +1067,8 @@ never disables its callers.
    - **Levels (built 2026-10-09, plugin-enforce-5).** A provider may export
      the same API at two levels, `{"level":"adb"}` and `{"level":"root"}`.
      Each export is its own grant on the provider's approval list, in plain
-     words from the op's permission ("Other plugins may: Run commands as
-     the system (adb)", "Other plugins may: Run commands as root"); the
+     words from the op's permission ("Other plugins may: Run system
+     commands", "Other plugins may: Full control of the device"); the
      root one is kept under the key `priv.shell@root`, the adb one under the
      API's plain name. Callers declare `priv.shell.adb` or `priv.shell.root`,
      each its own critical grant.
@@ -1015,7 +1091,7 @@ never disables its callers.
      that cannot run a plugin's call at its granted level refuses it
      rather than run it higher: Shizuku running as root cannot drop to the
      shell user without `su`, so it refuses an adb-level plugin call then
-     and says to allow "Run commands as root".
+     and says to allow "Full control of the device".
    - **Stream sessions (`exec_stream`, built 2026-10-09,
      plugin-enforce-5).** A command that outlives one call or takes input
      (droidtop's `PrivilegedShell.spawn`, the rooted desktop stack,
@@ -1203,6 +1279,8 @@ Names elsewhere in this document that predate 2.1 mean the op in this table.
   configured library folder. This is **`pluginsearch`'s Sources API**
   (`GameSourceProvider`, `library-core`). It is folded in here unchanged:
   a plugin source is one implementation, and built-in stores are others.
+- **Manifest:** `systems` on the `provides` entry (1.6, "Which systems a
+  source serves"): which systems it is listed under and which searches ask it.
 - **Ops:**
   - `search {query, platform}`;
   - `lookup {title, platform, ids}` (defaults to `search`);
@@ -1743,11 +1821,27 @@ Risk low.
 - **For:** a short message in the moment, Decky's `toaster.toast`: "Synced",
   "Tunnel up".
 - **Ops:** `show {text}` returns `{shown}`. Text is cut to 200 characters.
-- **Surfaces:** a toast over whatever is in front, in every mode, always
-  led by the plugin's name, so it is never mistaken for droidtop's own.
+- **Surfaces:** droidtop's corner flash (docs/SPEC.md 7k), always led by
+  the plugin's name so it is never mistaken for droidtop's own; about 80
+  characters are drawn and the whole text is kept in Recent (the Quick
+  Menu's Notifications tab). While no droidtop surface is on screen (a
+  game) it is a platform toast, still led by the name.
 - **Permission:** `overlay.toast` (normal), rate-limited like every
   broker call (§8).
 - **Status:** built (2026-10-07).
+
+**C6b Confirm.** API `ui.prompt@1`, op `confirm`. Risk low.
+- **For:** a yes-or-no question before a plugin does something the person
+  should agree to.
+- **Ops:** `confirm {title, subtitle?, details?, tone: info|caution,
+  proceed, cancel?}` returns `{confirmed}`. Drawn on droidtop's confirm
+  card (the danger dialog's shape with no danger: Cancel first and
+  focused), named after the plugin, with no second press to arm.
+- **Rules:** only during a call the person started; a title that is one of
+  droidtop's own notice titles is refused (`INVALID_ARGS`); limits as the
+  notice node's. The `text` op and its `REFUSED`/`BUSY` answers come with
+  the text-entry work (Droidtop/tracker#485, slice 9).
+- **Status:** built (2026-10-14).
 
 **C7 Themes and theme assets.** EP `theme.pack@1`. Risk medium.
 - **For:** ES-DE themes, icon packs, sound packs, wallpapers,
@@ -2267,27 +2361,27 @@ wording the host uses, so it is identical in every mode.
 | `apps.list` | dangerous | See all apps installed on this device | F4, C12 |
 | `apps.launch` | normal | Open other apps | F2 |
 | `apps.view` | normal | Open links in other apps | F2 |
-| `apps.intents.out` | normal (declared packages) / dangerous (any) | Send information to *listed apps* / to any app | F2, B1 |
+| `apps.intents.out` | normal (declared packages) / dangerous (any) | Send information to other apps | F2, B1 |
 | `intents.in` | dangerous | Be opened by other apps and links | F3 |
-| `apps.install` | dangerous | Install and update apps (Android asks you each time) | F5 |
-| `apps.bind` | dangerous | Stay connected to *listed apps* in the background | F6, F1 |
-| `vault.own` | normal | Store its own passwords and keys securely | G1 |
+| `apps.install` | dangerous | Install and update apps (Android asks each time) | F5 |
+| `apps.bind` | dangerous | Stay connected to other apps | F6, F1 |
+| `vault.own` | normal | Keep its own saved passwords | G1 |
 | `context.sync` | dangerous | Keep its data in step with apps on your paired computers | F8 |
 | `auth.oauth` | normal | Ask you to sign in to a service | G2 |
-| `web.session` | dangerous | Use your signed-in session on *listed sites* | G3 |
-| `github.api` | normal | Use your GitHub token for GitHub requests (the token stays in droidtop) | G4 |
-| `github.token.read` | dangerous | Read your GitHub token | G4 |
-| `diagnostics.read` † | dangerous | Read droidtop's own logs | H5 |
-| `telemetry.send` | dangerous (opt-in) | Send usage data to *listed address* | H6 |
+| `web.session` | dangerous | Use your sign-in on its sites | G3 |
+| `github.api` | normal | Use your GitHub account for GitHub requests | G4 |
+| `github.token.read` | dangerous | See your GitHub sign-in | G4 |
+| `diagnostics.read` † | dangerous | Read droidtop's logs | H5 |
+| `telemetry.send` | dangerous (opt-in) | Send usage data | H6 |
 | `plugins.export` | normal | Offer features to other plugins | §2.8 |
-| `plugins.export_privileged` | critical | Give other plugins root or system-level access | §2.7 |
-| `host.full_trust` | critical | Run with droidtop's full access | §5.3 |
-| `priv.shell.adb` | critical | Run commands as the system (adb) | F7, §2 |
-| `priv.shell.root` | critical | Run commands as root | F7, §2 |
-| `priv.packages` | critical | Install, remove and change permissions of apps without asking (through *provider*) | F7 |
-| `priv.settings` | critical | Change protected system settings (through *provider*) | F7 |
-| `root.modules` | critical | Install and remove root modules (through *provider*) | F7 |
-| `input.remap.apply` | dangerous | Change your controller mapping (through *provider*) | B5 |
+| `plugins.export_privileged` | critical | Give other plugins full control of the device | §2.7 |
+| `host.full_trust` | critical | Full access | §5.3 |
+| `priv.shell.adb` | critical | Run system commands | F7, §2 |
+| `priv.shell.root` | critical | Full control of the device | F7, §2 |
+| `priv.packages` | critical | Install and remove apps without asking | F7 |
+| `priv.settings` | critical | Change protected settings | F7 |
+| `root.modules` | critical | Install system add-ons | F7 |
+| `input.remap.apply` | dangerous | Change your controller mapping | B5 |
 
 That is 66 permissions. Those marked † are restricted to official
 origins.
@@ -3249,6 +3343,16 @@ version was bumped.
 - A `provides` entry for a major the host no longer serves is listed as
   "Not supported by this version" and never called, but the rest of the
   plugin still works.
+
+**Changelog (additive changes; no version moved).**
+
+- 2026-10-14 (Droidtop/tracker#485): the `notice` view node and a reply's
+  `data.notice`; `host.viewFeatures` in every call envelope; error replies
+  may carry `title`, `subtitle`, `permission` and `action`, and the new code
+  `SIGN_IN_REQUIRED`; `ui.prompt@1 confirm`; `ui.toast` is drawn as
+  droidtop's flash; the view limits moved into
+  `docs/view-limits/plugin-view-limits.json`; permission titles reworded in
+  plain words (§4.1).
 
 **Where the version facts live.** The host's registry of points, APIs,
 events and permissions is **code** in `plugin-host` (one Kotlin table:

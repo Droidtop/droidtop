@@ -100,8 +100,8 @@ object Motion {
     /**
      * The focus ring (FocusGlide.kt). Landing: when it appears it starts
      * [RingLandFromDp] outside its control and closes onto it over
-     * [RingLandMs]. Breathing: once landed it fades between full and the
-     * breath floor every [RingBreathMs], [RingBreathCycles] times, then rests.
+     * [RingLandMs], and then stays at full strength (two opaque edges,
+     * FocusRingInks: a ring that fades is a ring a low-vision eye loses).
      * Gliding: after a move it keeps re-measuring where its control is for
      * [GlideSettleMs] (layer animations move a control without a relayout);
      * two moves closer together than [GlideRepeatMs] are a held direction
@@ -110,8 +110,6 @@ object Motion {
      */
     const val RingLandMs = 400
     const val RingLandFromDp = 12f
-    const val RingBreathMs = 1200
-    const val RingBreathCycles = 20
     const val RingFadeMs = 140
     const val GlideSettleMs = 450
     const val GlideRepeatMs = 180
@@ -221,9 +219,6 @@ object FocusLook {
     const val RingWidthDp = 2f
     const val RingOffsetDp = 2f
 
-    /** The ring's strength over the accent's own: at rest, and at the bottom of a breath. */
-    const val RingAlpha = 0.6f
-    const val RingBreathAlpha = 0.24f
 
     fun scale(progress: Float, wide: Boolean = false): Float =
         1f + ((if (wide) LiftScaleWide else LiftScale) - 1f) * progress.coerceIn(0f, 1f)
@@ -233,7 +228,4 @@ object FocusLook {
 
     /** The ring while landing, [landed] 0 to 1: how far outside its place it still is, in dp. */
     fun ringLandOutsetDp(landed: Float): Float = Motion.RingLandFromDp * (1f - landed.coerceIn(0f, 1f))
-
-    /** The ring's alpha at [breath] 0 (full) to 1 (the floor of a breath). */
-    fun ringAlpha(breath: Float): Float = RingAlpha + (RingBreathAlpha - RingAlpha) * breath.coerceIn(0f, 1f)
 }

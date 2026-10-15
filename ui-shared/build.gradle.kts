@@ -1,0 +1,61 @@
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+}
+
+// The Compose pieces every droidtop surface draws alike (docs/SPEC.md 7k,
+// "Notices"; Droidtop/tracker#485): the notice card and its palette. Gaming,
+// Desktop, the companion and Standard (whose forked Launcher3 settings are
+// Preference rows, through a ComposeView this module builds) all draw these,
+// so none of them depends on another shell for them.
+android {
+    namespace = "dev.droidtop.ui.shared"
+    compileSdk = 36
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    buildFeatures {
+        compose = true
+    }
+
+    // The semantics tests run under Robolectric, as :display's do.
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+dependencies {
+    // The Notice model and NoticeColors live there, next to the theme mapping they derive from.
+    api(project(":runtime-common"))
+    implementation(libs.androidx.core.ktx)
+    implementation(platform(libs.androidx.compose.bom))
+    api(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.material3)
+    // The three tone glyphs (circle i, triangle !, octagon !): Material Symbols, as the settings glyphs are.
+    implementation(libs.androidx.compose.material.icons.extended)
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
+    testImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+// A failing check over the bundled themes names the theme and scheme in its message; print it in the CI log,
+// where the HTML report is out of reach.
+tasks.withType<Test>().configureEach {
+    testLogging {
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+    }
+}

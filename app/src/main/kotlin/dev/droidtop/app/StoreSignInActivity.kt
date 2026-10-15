@@ -1,5 +1,10 @@
 package dev.droidtop.app
 
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
@@ -142,7 +147,7 @@ class StoreSignInActivity : AppCompatActivity() {
                             Text(
                                 line,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = if (failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = if (failed) LocalNoticePalette.current.ink(NoticeTone.Caution) else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                         if (failed) TextButton(onClick = { retry(signIn) }) { Text("Try again") }
@@ -328,7 +333,7 @@ private fun Choices(label: String, failure: String?, session: StoreAccountSignIn
     val first = remember { FocusRequester() }
     // The primary action is selected on open, so a pad starts there.
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
-    failure?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium) }
+    failure?.let { NoticeCard(Notice(NoticeTone.Caution, "Not signed in", body = it.take(Notice.BODY_MAX), details = it), NoticePlacement.Row) }
     Text("With a QR code", style = MaterialTheme.typography.titleMedium)
     Text(
         "Scan it with the $label app on your phone and approve. Nothing is typed here.",
@@ -391,7 +396,7 @@ private fun CodeStep(label: String, step: AccountSignInStep.Code, session: Store
         if (step.sentByEmail) "Enter the code $label sent to your e-mail" else "Enter the code from the $label app on your phone",
         style = MaterialTheme.typography.titleMedium,
     )
-    if (step.wrongBefore) Text("That code was not right. Try again.", color = MaterialTheme.colorScheme.error)
+    if (step.wrongBefore) NoticeCard(Notice(NoticeTone.Caution, "That code wasn't right", body = "Type the code exactly as it is shown."), NoticePlacement.Row)
     OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text("Code") }, singleLine = true)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Button(enabled = code.isNotBlank(), onClick = { session.submitCode(code) }) { Text("Submit") }

@@ -78,10 +78,13 @@ enum class StoreHolding(
 
     /** Installed on the device but no longer held by the account (a licence ended, or signed out). */
     NOT_OWNED("No longer in your library"),
+
+    /** On the account's wishlist at the store and not owned (Droidtop/tracker#134): never installed, shown only on its own shelf and under the Ownership facet. */
+    WISHLIST("On your wishlist (not owned)"),
     ;
 
     companion object {
-        /** The strongest of [holdings]: OWNED, then FAMILY, then FREE, then NOT_OWNED. */
+        /** The strongest of [holdings]: OWNED, then FAMILY, then FREE, then NOT_OWNED, then WISHLIST. */
         fun strongest(holdings: Collection<StoreHolding>): StoreHolding = holdings.minByOrNull { it.ordinal } ?: OWNED
     }
 }
@@ -276,6 +279,12 @@ interface StoreLibrary {
      * nothing. Mirrored into droidtop's Hidden by [StoreHidden].
      */
     suspend fun hiddenGames(context: Context): Set<String>? = null
+
+    /**
+     * The games on the account's wishlist at the store, as rows held as [StoreHolding.WISHLIST], from droidtop's own
+     * copy of the last [sync] ([Wishlist]); no network. Empty for a store with no wishlist to read (the default).
+     */
+    suspend fun wishlist(context: Context): List<StoreGame> = emptyList()
 
     /** How many DLC the account holds for its own games, for the store page; null when the store does not say. No network. */
     suspend fun dlcCount(context: Context): Int? = null

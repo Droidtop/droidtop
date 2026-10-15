@@ -45,6 +45,12 @@ data class StoreMarker(
  *  - **Epic**: a `.egstore` folder in the install root holding a
  *    `<install id>.mancpn` JSON file whose `CatalogItemId` is the id Epic's
  *    library lists the game by (what droidtop's Epic rows are keyed by).
+ *  - **Battle.net**: `.build.info` in the install root, the plain-text table
+ *    Blizzard's installer (TACT) leaves: a header row of `Name!TYPE:size`
+ *    columns and one row per branch. The active row's `Product` is the game's
+ *    product code (`wow`, `pro`, `d3`) and its `Version` the build. Battle.net
+ *    has no store droidtop signs in to, so the id is read as the store's and
+ *    nothing is asked of it.
  *
  * Which names are markers is decided from a folder listing the walk already
  * read ([isMarkerName]); only a folder that has one is read further.
@@ -52,19 +58,25 @@ data class StoreMarker(
 object StoreMarkers {
     const val GOG = "gog"
     const val EPIC = "epic"
+
+    /** Battle.net's marker id; the name a person reads is this with its first letter capitalised, which is what it is. */
+    const val BATTLE_NET = "battle.net"
+    private const val BUILD_INFO = ".build.info"
     private const val EGSTORE = ".egstore"
     private const val MANCPN = ".mancpn"
     private val GOG_INFO = Regex("""goggame-(\d+)\.info""", RegexOption.IGNORE_CASE)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     /** Whether an entry named [name] in a game folder is a store's marker. */
-    fun isMarkerName(name: String): Boolean = GOG_INFO.matches(name) || name.equals(EGSTORE, ignoreCase = true)
+    fun isMarkerName(name: String): Boolean =
+        GOG_INFO.matches(name) || name.equals(EGSTORE, ignoreCase = true) || name.equals(BUILD_INFO, ignoreCase = true)
 
     /**
      * The marker in [folder], given the marker names its listing holds
      * ([isMarkerName]); null when there are none or none can be read. Reads
      * the marker files only: GOG's `.info` files, or one listing of
-     * `.egstore` and its `.mancpn`. A GOG marker wins over an Epic one.
+     * `.egstore` and its `.mancpn`, or `.build.info`. A GOG marker wins over an
+     * Epic one, and an Epic one over a Battle.net one.
      */
     fun read(folder: File, names: List<String>): StoreMarker? {
         if (names.isEmpty()) return null
@@ -72,12 +84,32 @@ object StoreMarkers {
             runCatching { File(folder, name).readText() }.getOrNull()
         }
         gogOf(infos)?.let { return it }
-        val egstore = names.firstOrNull { it.equals(EGSTORE, ignoreCase = true) } ?: return null
-        val manifests = File(folder, egstore).listFiles()
-            ?.filter { it.isFile && it.name.endsWith(MANCPN, ignoreCase = true) }
-            ?.sortedBy { it.name }
-            .orEmpty()
-        return manifests.firstNotNullOfOrNull { file -> runCatching { epicOf(file.readText()) }.getOrNull() }
+        names.firstOrNull { it.equals(EGSTORE, ignoreCase = true) }?.let { egstore ->
+            val manifests = File(folder, egstore).listFiles()
+                ?.filter { it.isFile && it.name.endsWith(MANCPN, ignoreCase = true) }
+                ?.sortedBy { it.name }
+                .orEmpty()
+            manifests.firstNotNullOfOrNull { file -> runCatching { epicOf(file.readText()) }.getOrNull() }?.let { return it }
+        }
+        val buildInfo = names.firstOrNull { it.equals(BUILD_INFO, ignoreCase = true) } ?: return null
+        return runCatching { File(folder, buildInfo).readText() }.getOrNull()?.let(::battleNetOf)
+    }
+
+    /**
+     * Battle.net's marker from the text of a `.build.info`: the header row names the columns (`Product!STRING:0`),
+     * the rows after it hold the values, separated by `|`. The row marked `Active` is the build in use, else the
+     * first; its `Product` is the game and its `Version` the build. Null when there is no product. Pure, for the tests.
+     */
+    fun battleNetOf(text: String): StoreMarker? {
+        val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+        val header = lines.firstOrNull()?.split('|')?.map { it.substringBefore('!').trim() } ?: return null
+        val product = header.indexOf("Product").takeIf { it >= 0 } ?: return null
+        val version = header.indexOf("Version")
+        val active = header.indexOf("Active")
+        val rows = lines.drop(1).map { it.split('|') }.filter { it.size > product }
+        val row = rows.firstOrNull { active >= 0 && it.getOrNull(active)?.trim() == "1" } ?: rows.firstOrNull() ?: return null
+        val code = row[product].trim().takeIf { it.isNotEmpty() } ?: return null
+        return StoreMarker(BATTLE_NET, code, buildId = row.getOrNull(version)?.trim()?.takeIf { version >= 0 && it.isNotEmpty() })
     }
 
     /**

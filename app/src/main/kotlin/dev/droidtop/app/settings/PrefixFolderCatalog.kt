@@ -1,6 +1,5 @@
 package dev.droidtop.app.settings
 
-import android.text.format.Formatter
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
@@ -61,7 +60,7 @@ object PrefixFolderCatalog {
                 when {
                     entry.link -> ActionItem(id = id, title = entry.name, subtitle = "Link to ${entry.target ?: "somewhere"}; not opened here", value = "Link", run = {})
                     entry.directory -> NestedScreenItem(id = id, title = entry.name, inline = screenOf(root, File(folder, entry.name)))
-                    else -> ActionItem(id = id, title = entry.name, value = Formatter.formatShortFileSize(context, entry.size), run = {})
+                    else -> ActionItem(id = id, title = entry.name, value = dev.droidtop.library.format.ValueFormat.size(entry.size), run = {})
                 }
             } + if (listing.more > 0) {
                 listOf(ActionItem(id = "wine_prefix_folder_more", title = "${listing.more} more not shown", run = {}))

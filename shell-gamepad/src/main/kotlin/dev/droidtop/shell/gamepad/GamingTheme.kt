@@ -9,6 +9,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,8 +38,10 @@ import androidx.lifecycle.LifecycleOwner
 import dev.droidtop.library.theme.GamingThemeColors
 import dev.droidtop.library.theme.GamingThemeMapping
 import dev.droidtop.library.theme.ThemeAssets
-import dev.droidtop.library.theme.ThemeColorMath
+import dev.droidtop.notices.ColorMath
 import dev.droidtop.library.theme.ThemeSafeMode
+import dev.droidtop.ui.shared.LocalNoticePalette
+import dev.droidtop.ui.shared.NoticePalette
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -80,6 +83,13 @@ class GamingPalette internal constructor(
     internal val bodyFamilyCapsOnly: Boolean = false,
     /** The theme draws its own clock or system status, so the shell's floating cluster yields (docs/SPEC.md 7k2). */
     internal val drawsOwnStatus: Boolean = false,
+    /**
+     * High contrast is on (droidtop's own Accessibility setting, or Android's high-contrast text): text and the
+     * notice colours hold 7:1, the ring is 4dp, there is no texture or art behind text (docs/SPEC.md 7k).
+     */
+    internal val highContrast: Boolean = false,
+    /** Labels drawn in a theme's capitals are drawn as written ([labelCase]); always so under [highContrast]. */
+    internal val sentenceCase: Boolean = false,
 ) {
     val ground = Color(colors.ground)
     val overlaySurface = Color(colors.overlaySurface)
@@ -112,17 +122,36 @@ class GamingPalette internal constructor(
     val onLaunchMuted = Color(colors.onLaunchMuted)
 
     /**
+     * The notice colours for this palette (docs/SPEC.md 7k, "Notices"), derived from the same theme
+     * colours. Built on the palette's background thread ([GamingTheme.refresh]) before the palette is
+     * published, so no composition pays for it.
+     */
+    val notice: NoticePalette by lazy {
+        if (!colors.declared && !highContrast) NoticePalette.Default else NoticePalette.of(colors, highContrast)
+    }
+
+    /**
      * The Material scheme for code that reads [MaterialTheme]: droidtop's
      * own pair when no theme declares anything, otherwise the palette's
      * roles in a light or dark scheme to match the theme's ground.
      */
     val colorScheme: ColorScheme by lazy {
+        // Material's error roles are the notice palette's danger, so a stock component that reads them
+        // draws what the notice card draws.
+        val n = notice.colors
+        val errorRoles = { scheme: ColorScheme ->
+            scheme.copy(
+                error = Color(n.dangerInk),
+                onError = Color(ColorMath.pickOn(n.dangerInk)),
+                errorContainer = Color(n.dangerPlate),
+                onErrorContainer = Color(n.onDanger),
+            )
+        }
         if (!colors.declared) {
-            ChromeColors.Dark
-        } else {
-            val outline = Color(ThemeColorMath.over(colors.cardOutline, colors.ground))
-            val onFavourite = Color(ThemeColorMath.pickOn(colors.favourite))
-            val onDanger = Color(ThemeColorMath.pickOn(colors.danger))
+            errorRoles(ChromeColors.Dark)
+        } else errorRoles(run {
+            val outline = Color(ColorMath.over(colors.cardOutline, colors.ground))
+            val onFavourite = Color(ColorMath.pickOn(colors.favourite))
             if (colors.isLight) {
                 lightColorScheme(
                     background = ground, onBackground = onSurface,
@@ -130,7 +159,6 @@ class GamingPalette internal constructor(
                     surfaceVariant = cardFocused, onSurfaceVariant = onSurfaceMuted,
                     primary = accent, onPrimary = onAccent,
                     tertiary = favourite, onTertiary = onFavourite,
-                    error = danger, onError = onDanger,
                     outline = outline,
                 )
             } else {
@@ -140,11 +168,10 @@ class GamingPalette internal constructor(
                     surfaceVariant = cardFocused, onSurfaceVariant = onSurfaceMuted,
                     primary = accent, onPrimary = onAccent,
                     tertiary = favourite, onTertiary = onFavourite,
-                    error = danger, onError = onDanger,
                     outline = outline,
                 )
             }
-        }
+        })
     }
 
     /** droidtop's type scale in the theme's own typefaces; the scale itself is unchanged. */
@@ -214,6 +241,8 @@ object GamingTheme {
         val aspectRatio: String?,
         val screenRatio: Float,
         val safeMode: Boolean,
+        val highContrast: Boolean,
+        val sentenceCase: Boolean,
     )
 
     private val cache = ConcurrentHashMap<PaletteKey, GamingPalette>()
@@ -228,7 +257,11 @@ object GamingTheme {
     /** Recomputes the palette off the main thread and publishes it. Cheap when the key is cached. */
     internal suspend fun refresh(context: Context) {
         val app = context.applicationContext
-        val next = withContext(Dispatchers.Default) { paletteFor(app) }
+        val next = withContext(Dispatchers.Default) {
+            // droidtop's own palette's notices and scheme too: Default is drawn whenever no theme is held.
+            GamingPalette.Default.colorScheme
+            paletteFor(app)
+        }
         if (next !== current) current = next
     }
 
@@ -242,35 +275,51 @@ object GamingTheme {
             aspectRatio = name?.let { LibraryThemePrefs.aspectRatio(context, it) },
             screenRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat(),
             safeMode = ThemeSafeMode.active,
+            highContrast = highTextContrast(context) || dev.droidtop.library.settings.ReadingPrefs.highContrast(context),
+            sentenceCase = dev.droidtop.library.settings.ReadingPrefs.sentenceCase(context),
         )
         cache[key]?.let { return it }
         val theme = if (name == null) null else ThemeAssets.loadActiveTheme(context)
         // A failed parse is not remembered: it would stand for the whole
         // process the way ThemeAssets itself refuses to cache one.
         if (name != null && theme == null) return GamingPalette.Default
-        val colors = GamingThemeMapping.map(theme)
+        val highContrast = key.highContrast
+        val sentenceCase = key.sentenceCase || highContrast
+        val mapped = GamingThemeMapping.map(theme)
+        val colors = if (highContrast) GamingThemeMapping.highContrast(mapped) else mapped
         val drawsOwnStatus = GamingThemeMapping.drawsOwnStatus(theme)
         val palette = when {
-            !colors.declared && !drawsOwnStatus -> GamingPalette.Default
-            !colors.declared -> GamingPalette(GamingThemeColors.DEFAULT, null, null, null, drawsOwnStatus = true)
+            !colors.declared && !drawsOwnStatus && !highContrast && !sentenceCase -> GamingPalette.Default
+            !colors.declared -> GamingPalette(colors, null, null, null, drawsOwnStatus = drawsOwnStatus, highContrast = highContrast, sentenceCase = sentenceCase)
             else -> {
                 val bodyFace = loadTypeface(colors.bodyFontPath)
                 GamingPalette(
                     colors = colors,
                     bodyFamily = bodyFace?.let { FontFamily(it) },
                     displayFamily = loadTypeface(colors.displayFontPath)?.let { FontFamily(it) },
-                    textureBrush = loadTexture(colors.textureImagePath),
+                    // No texture behind text under High contrast: a plain ground.
+                    textureBrush = if (highContrast) null else loadTexture(colors.textureImagePath),
                     bodyFamilyCapsOnly = bodyFace?.let { face ->
                         val paint = android.graphics.Paint().apply { typeface = face }
                         isCapsOnlyFont { paint.measureText(it.toString()) }
                     } == true,
                     drawsOwnStatus = drawsOwnStatus,
+                    highContrast = highContrast,
+                    sentenceCase = sentenceCase,
                 )
             }
         }
+        // Derived here, off the main thread, so the first composition that draws a notice reads a finished value.
+        palette.notice
+        palette.colorScheme
         cache[key] = palette
         return palette
     }
+
+    /** Android's "High contrast text" accessibility switch; a Settings.Secure value with no public getter. */
+    private fun highTextContrast(context: Context): Boolean =
+        runCatching { android.provider.Settings.Secure.getInt(context.contentResolver, "high_text_contrast_enabled", 0) == 1 }
+            .getOrDefault(false)
 
     private fun loadTypeface(path: String?): android.graphics.Typeface? {
         if (path == null) return null
@@ -342,11 +391,23 @@ fun GamingTheme(content: @Composable () -> Unit) {
         }
     }
     val configuration = LocalConfiguration.current
+    // High contrast and Sentence case (Settings > Accessibility) re-read the palette as soon as they change. The
+    // listener is held here, in the composition, because SharedPreferences holds its listeners weakly.
+    DisposableEffect(context) {
+        val prefs = dev.droidtop.library.settings.CatalogPrefs.prefs(context)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key in dev.droidtop.library.settings.ReadingPrefs.PALETTE_KEYS) ShellThemePrefs.bump()
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     LaunchedEffect(ShellThemePrefs.version, configuration.screenWidthDp, configuration.screenHeightDp) {
         GamingTheme.refresh(context)
     }
     val palette = GamingTheme.palette
-    MaterialTheme(colorScheme = palette.colorScheme, typography = palette.typography, content = content)
+    CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
+        MaterialTheme(colorScheme = palette.colorScheme, typography = palette.typography, content = content)
+    }
 }
 
 private fun Context.findLifecycleOwner(): LifecycleOwner? {
@@ -380,3 +441,10 @@ fun Modifier.groundBackground(): Modifier = drawBehind {
 }
 
 private const val TEXTURE_STRENGTH = 0.6f
+
+/**
+ * A label a theme draws in capitals (a section label, a tab, a chip, an eyebrow), as the palette says: in
+ * capitals, or as written when Sentence case or High contrast is on (docs/SPEC.md 7k, "High contrast").
+ * Never for data a person typed or a game's own name (tracker#532: theme transforms never apply to data).
+ */
+internal fun String.labelCase(): String = dev.droidtop.library.settings.ReadingPrefs.caps(this, GamingTheme.palette.sentenceCase)

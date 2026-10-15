@@ -9,7 +9,6 @@ import android.content.pm.ActivityInfo
 import android.os.Build
 import android.provider.Settings
 import android.text.TextUtils
-import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.Preference
@@ -54,7 +53,7 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                     putExtra("android.intent.extra.COMPONENT_NAME", componentName)
                 }
                 context.startActivity(intent)
-                Toast.makeText(context, context.resources.getString(R.string.pref_accessibility_request_toast), Toast.LENGTH_LONG).show()
+                dev.droidtop.library.settings.Notices.flash(context.resources.getString(R.string.pref_accessibility_request_toast), context = context)
                 return false
             }
             return true;

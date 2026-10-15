@@ -100,4 +100,40 @@ class StoreMarkerScanTest {
         )
         assertEquals(PcSource.Store("gog"), PcSource.of(entry, listOf("/sdcard/Games")))
     }
+
+
+    private val buildInfo = "Branch!STRING:0|Active!DEC:1|Build Key!HEX:16|Version!STRING:0|Product!STRING:0\n" +
+        "us|1|a1b2|1.14.3.44171|wow_classic_era\n" +
+        "eu|0|c3d4|1.14.2.40000|wow_classic_era\n"
+
+    @Test
+    fun `a Battle_net install reads as Battle_net with its product and the active build`() {
+        file("games/WoW/Wow.exe", "MZ")
+        file("games/WoW/.build.info", buildInfo)
+        val marker = PcFolderScan.storeMarkerOf(File(temp.root, "games/WoW"))
+        assertEquals(StoreMarker("battle.net", "wow_classic_era", buildId = "1.14.3.44171"), marker)
+        assertEquals("battle.net:wow_classic_era", marker?.key)
+        assertEquals("Battle.net", PcSource.Store("battle.net").label())
+    }
+
+    @Test
+    fun `a build info with no active row takes the first, and one without a product is no marker`() {
+        assertEquals(
+            StoreMarker("battle.net", "pro", buildId = "2.0"),
+            StoreMarkers.battleNetOf("Active!DEC:1|Product!STRING:0|Version!STRING:0\n0|pro|2.0\n"),
+        )
+        assertNull(StoreMarkers.battleNetOf("Branch!STRING:0|Version!STRING:0\nus|1.0\n"))
+        assertNull(StoreMarkers.battleNetOf(""))
+        assertNull(StoreMarkers.battleNetOf("Product!STRING:0\n"))
+        // a product with no version column keeps no build
+        assertEquals(StoreMarker("battle.net", "d3"), StoreMarkers.battleNetOf("Product!STRING:0\nd3\n"))
+    }
+
+    @Test
+    fun `GOG and Epic markers still win over a build info in the same folder`() {
+        file("games/Mixed/game.exe", "MZ")
+        file("games/Mixed/.build.info", buildInfo)
+        file("games/Mixed/goggame-5.info", """{"gameId":"5","buildId":"9"}""")
+        assertEquals("gog", PcFolderScan.storeMarkerOf(File(temp.root, "games/Mixed"))?.storeId)
+    }
 }

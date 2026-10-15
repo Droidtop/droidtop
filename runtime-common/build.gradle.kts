@@ -16,6 +16,11 @@ android {
     // classpath (getResourceAsStream) instead of duplicating its contents as
     // a test fixture, or needing Robolectric just to reach AssetManager.
     sourceSets {
+        // The notice colours and the colour arithmetic are the shared library droidtop and Enginehost both
+        // compile (vendor/notices, Droidtop/notices, pinned as a submodule; docs/SPEC.md 7k "Notices").
+        getByName("main") {
+            java.srcDir("../vendor/notices/src/main/kotlin")
+        }
         getByName("test") {
             resources.srcDirs("src/main/assets")
         }

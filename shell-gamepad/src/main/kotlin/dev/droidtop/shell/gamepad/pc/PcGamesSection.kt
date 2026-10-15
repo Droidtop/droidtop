@@ -3,6 +3,8 @@ package dev.droidtop.shell.gamepad.pc
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -100,6 +102,7 @@ import dev.droidtop.library.GameNaming
 import dev.droidtop.library.integrations.LocalSearchRow
 import dev.droidtop.library.integrations.SearchRowKind
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
+import dev.droidtop.shell.gamepad.query.SearchEntry
 import dev.droidtop.shell.gamepad.requestFocusWhenAttached
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
@@ -155,6 +158,17 @@ internal class PcGamesState {
     var destFocused by mutableStateOf(false)
     var destIndex by mutableIntStateOf(0)
 
+    /**
+     * The cursor is on Home's strip (What's new, Friends, Downloads; docs/SPEC.md 7i, "Home"), under the
+     * games row: which tab is showing and which card. The tab is stepped with L1/R1 wherever the cursor is.
+     */
+    var homeStrip by mutableStateOf(false)
+    var homeTab by mutableIntStateOf(0)
+    var homeCard by mutableIntStateOf(0)
+
+    /** The Needs attention page is open over Home. */
+    var attentionOpen by mutableStateOf(false)
+
     var pageId by mutableStateOf<String?>(null)
     var menuId by mutableStateOf<String?>(null)
     /** The open menu starts on the Engine picker (the page's "Choose a runner"). */
@@ -179,6 +193,8 @@ internal class PcGamesState {
         stripIndex = 0
         destFocused = false
         destIndex = 0
+        homeStrip = false
+        homeCard = 0
         shelfIndex = 0
         itemIndex = 0
         shelfItems.clear()
@@ -315,6 +331,8 @@ internal fun PcGamesSection(
     onOpenSection: (GamingSection) -> Unit,
     /** The folded PC games plus [retro] and game apps that Home's shelves are built from, for the companion's Home. */
     onHomeActivityChanged: (List<LibraryEntry>) -> Unit = {},
+    /** Opens the Quick Menu: Home's band (its status facts and the bell). */
+    onOpenQuickMenu: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val window = LocalShellWindow.current
@@ -455,6 +473,14 @@ internal fun PcGamesSection(
         others = loaded.second
     }
     fun badgeOf(entry: LibraryEntry): KindBadge? = kindBadgeOf(entry, systemNames, origins, badgeStyle, pcRoots.orEmpty())
+    // Home's strip and band (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a), built off the main thread from what
+    // the shell already holds. Only while Home is showing.
+    val homeAll = remember(games, others) { games.orEmpty() + others }
+    val homeStrip = if (state.home) rememberHomeStrip(homeAll, systemNames, keep = null) else HomeStripData()
+    val homeTabs = homeStrip.tabs
+    LaunchedEffect(homeTabs.size) { state.homeTab = state.homeTab.coerceIn(0, (homeTabs.size - 1).coerceAtLeast(0)) }
+    val homeTab = homeTabs.getOrNull(state.homeTab)
+    LaunchedEffect(homeTab?.cards?.size) { state.homeCard = state.homeCard.coerceIn(0, ((homeTab?.cards?.size ?: 1) - 1).coerceAtLeast(0)) }
     // Home's shelves (recent activity across every library) and PC Games'
     // Overview (the PC library's own), from the one shelf builder.
     var homeShelfList by remember { mutableStateOf(emptyList<PcShelf>()) }
@@ -621,8 +647,9 @@ internal fun PcGamesSection(
     }
     // Home's destination row is the list's last stop, and the only one when
     // nothing is on the shelves yet.
-    val onDest = state.home && (state.destFocused || shelves.isEmpty())
-    val focusedEntry = if (state.stripFocused || onDest) null else currentList.getOrNull(state.itemIndex)
+    val onDest = state.home && (state.destFocused || (shelves.isEmpty() && !state.homeStrip))
+    val onHomeStrip = state.home && state.homeStrip && !onDest
+    val focusedEntry = if (state.stripFocused || onDest || onHomeStrip) null else currentList.getOrNull(state.itemIndex)
     LaunchedEffect(focusedEntry?.id) { onFocusedEntryChanged(focusedEntry) }
     // Only a PC game has a runner to resolve; a Retro game or app just plays.
     val focusedPlay = focusedEntry?.takeIf { it.inPcFold }?.let { rememberPcPlayState(it) }
@@ -659,6 +686,27 @@ internal fun PcGamesSection(
     }
     fun openPage(entry: LibraryEntry) {
         if (entry.inPcFold) state.pageId = entry.id else otherMenu = entry
+    }
+
+    // A strip card's one verb (docs/SPEC.md 7i, "Home"): a game update opens the game's page, an addition the
+    // place it went to, plugin updates Plugins, the attention card its page, a friend the chat, a download
+    // the job.
+    fun openCard(card: HomeCard) {
+        EsDeNavigationSounds.play(UiSound.CONFIRM)
+        when (card) {
+            is HomeCard.GameUpdate -> openPage(card.entry)
+            is HomeCard.Added -> when {
+                card.single != null -> openPage(card.single)
+                card.systemId != null -> onOpenSection(GamingSection.GAMES)
+                card.place == "Apps" -> onOpenSection(GamingSection.APPS)
+                else -> onOpenSection(GamingSection.PC_GAMES)
+            }
+            is HomeCard.PluginUpdates -> onOpenSection(GamingSection.PLUGINS)
+            is HomeCard.More -> onOpenSection(GamingSection.UPDATES)
+            is HomeCard.Attention -> state.attentionOpen = true
+            is HomeCard.Friend -> onOpenSection(GamingSection.SOCIAL)
+            is HomeCard.Download -> onOpenSection(GamingSection.DOWNLOADS)
+        }
     }
     // The backdrop follows the game under the cursor (docs/SPEC.md 7i, "Home
     // art"); while the cursor is on the strip it keeps the last game's, and
@@ -747,7 +795,17 @@ internal fun PcGamesSection(
     // controls"). The cursor stays where it is: stepping a view from the
     // grid does not pull the cursor up onto the strip.
     OwnShoulders { step ->
-        if (state.home) return@OwnShoulders
+        if (state.home) {
+            val next = menuStep(state.homeTab, homeTabs.size, step)
+            if (next != state.homeTab) {
+                EsDeNavigationSounds.play(UiSound.TAB)
+                state.homeTab = next
+                state.homeCard = 0
+            } else {
+                EsDeNavigationSounds.play(UiSound.BUMP)
+            }
+            return@OwnShoulders
+        }
         val active = activeChip.takeIf { it >= 0 } ?: state.stripIndex.coerceIn(0, stripCount - 1)
         val next = menuStep(active, stripCount, step)
         if (next != active) {
@@ -763,11 +821,21 @@ internal fun PcGamesSection(
     // Sort By (docs/SPEC.md 7j), Select the focused game's menu: only what
     // dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
-    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile, state.headingFocused) {
+    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile, state.headingFocused, onHomeStrip, homeTab?.cards?.size) {
         // Steam's order: the list's own actions, then A and B. Start (Menu)
         // is the shell's, drawn at the row's left; L1/R1 are the glyphs at
         // the strip's ends, not hints.
-        listOf(
+        if (state.home) {
+            // Home is not a list: no Filter or Sort By (docs/SPEC.md 7i, "Home"). Y is Search; L1/R1 step the strip.
+            listOf(
+                HintBinding(GamepadAction.L, "Switch tab"),
+                HintBinding(GamepadAction.Y, "Search"),
+                HintBinding(GamepadAction.SELECT, "Options") { focusedEntry != null },
+                HintBinding(GamepadAction.A, if (onDest || onHomeStrip) "Open" else verb ?: "Play") {
+                    onDest || focusedEntry != null || (onHomeStrip && homeTab?.cards?.isNotEmpty() == true)
+                },
+            )
+        } else listOf(
             HintBinding(GamepadAction.X, "Filter"),
             HintBinding(GamepadAction.Y, "Sort By"),
             HintBinding(GamepadAction.SELECT, "Options"),
@@ -793,10 +861,19 @@ internal fun PcGamesSection(
     // page of shelves moves by as little as it takes (docs/SPEC.md 6e and
     // "Gaming motion and focus").
     val tilesState = rememberLazyGridState()
+    val homeCardsState = rememberLazyListState()
+    LaunchedEffect(onHomeStrip, state.homeCard, state.homeTab) {
+        if (onHomeStrip) {
+            // The strip is drawn inside the games row's item (or alone, first, on an empty Home).
+            columnState.keepInView(0, animate = !heldStep)
+            if (homeTab?.cards?.isNotEmpty() == true) homeCardsState.keepCentred(state.homeCard, chained = heldStep)
+        }
+    }
     LaunchedEffect(state.view, state.stripFocused, state.stripIndex, state.shelfIndex, state.itemIndex, shelves, grid, onDest, tiles) {
         when {
+            onHomeStrip -> Unit
             state.stripFocused -> stripState.keepCentred(state.stripIndex, chained = heldStep)
-            onDest -> columnState.keepInView(shelves.size, animate = !heldStep)
+            onDest -> columnState.keepInView(shelves.size + (if (state.home && shelves.isEmpty()) 1 else 0), animate = !heldStep)
             onTiles -> if (tiles.isNotEmpty()) tilesState.keepCentred(gridIndexOfTile(collectionGroupList, state.itemIndex), chained = heldStep)
             state.onShelves -> {
                 val shelf = shelves.getOrNull(state.shelfIndex) ?: return@LaunchedEffect
@@ -836,8 +913,24 @@ internal fun PcGamesSection(
                     if (press.action == GamepadAction.UP || press.action == GamepadAction.DOWN) state.headingFocused = false
                     when (press.action) {
                         GamepadAction.UP -> when {
-                            // Back from Home's destination row to the last shelf.
-                            onDest -> if (shelves.isNotEmpty()) state.destFocused = false
+                            // Back from Home's destination row to the last shelf (or the strip, when no shelf follows it).
+                            onDest -> if (shelves.size > 1) state.destFocused = false else {
+                                state.destFocused = false
+                                state.homeStrip = true
+                            }
+                            // From the strip up to the games row; Up from the games row does nothing (the band is touch only).
+                            onHomeStrip -> if (shelves.isNotEmpty()) {
+                                EsDeNavigationSounds.play(UiSound.MOVE)
+                                state.homeStrip = false
+                                state.shelfIndex = 0
+                                state.itemIndex = state.shelfItems[shelves[0].id] ?: 0
+                            }
+                            // Home's shelf under the strip goes up to the strip.
+                            state.home && state.onShelves && state.shelfIndex == 1 -> {
+                                EsDeNavigationSounds.play(UiSound.MOVE)
+                                currentShelf?.let { state.shelfItems[it.id] = state.itemIndex }
+                                state.homeStrip = true
+                            }
                             // Never the tab bar (owner, 2026-09-27): the top
                             // of this tab is its strip, and Up there stays.
                             state.stripFocused -> Unit
@@ -860,6 +953,23 @@ internal fun PcGamesSection(
                         }
                         GamepadAction.DOWN -> when {
                             onDest -> Unit
+                            // From the strip to the shelves under it, else to Your library.
+                            onHomeStrip -> {
+                                EsDeNavigationSounds.play(UiSound.MOVE)
+                                state.homeStrip = false
+                                if (shelves.size > 1) {
+                                    state.shelfIndex = 1
+                                    state.itemIndex = state.shelfItems[shelves[1].id] ?: 0
+                                } else {
+                                    state.destFocused = true
+                                }
+                            }
+                            // Down from Home's games row goes to the active tab's first card.
+                            state.home && state.onShelves && state.shelfIndex == 0 -> {
+                                EsDeNavigationSounds.play(UiSound.MOVE)
+                                currentShelf?.let { state.shelfItems[it.id] = state.itemIndex }
+                                state.homeStrip = true
+                            }
                             state.stripFocused -> if (currentList.isNotEmpty() || hasFreeRow || (onTiles && tiles.isNotEmpty())) state.stripFocused = false
                             state.onShelves -> if (state.shelfIndex < shelves.lastIndex) {
                                 val next = state.shelfIndex + 1
@@ -878,6 +988,12 @@ internal fun PcGamesSection(
                         GamepadAction.LEFT, GamepadAction.RIGHT -> {
                             val step = if (press.action == GamepadAction.LEFT) -1 else 1
                             when {
+                                onHomeStrip -> {
+                                    val size = homeTab?.cards?.size ?: 0
+                                    val next = menuStep(state.homeCard, size, step)
+                                    if (next != state.homeCard) EsDeNavigationSounds.play(UiSound.MOVE) else EsDeNavigationSounds.play(UiSound.BUMP)
+                                    state.homeCard = next
+                                }
                                 onDest -> {
                                     val next = menuStep(state.destIndex, HOME_DESTINATIONS.size, step)
                                     if (next != state.destIndex) EsDeNavigationSounds.play(UiSound.MOVE)
@@ -908,15 +1024,17 @@ internal fun PcGamesSection(
                             }
                         }
                         GamepadAction.A -> {
-                            if (state.onShelves && state.headingFocused) currentShelf?.let(::openShelf)
+                            if (onHomeStrip) homeTab?.cards?.getOrNull(state.homeCard)?.let(::openCard)
+                            else if (state.onShelves && state.headingFocused) currentShelf?.let(::openShelf)
                             else if (onDest) HOME_DESTINATIONS.getOrNull(state.destIndex)?.let { onOpenSection(it.section) }
                             else if (state.stripFocused) activateChip(state.stripIndex)
                             else if (onFreeRow) toggleFree()
                             else if (focusedTile != null) state.showGrid(focusedTile.query)
                             else focusedEntry?.let(activate)
                         }
-                        GamepadAction.X -> state.filterOpen = true
-                        GamepadAction.Y -> state.sortOpen = true
+                        // Home is not a list: X does nothing there and Y is Search (docs/SPEC.md 7i, "Home").
+                        GamepadAction.X -> if (!state.home) state.filterOpen = true
+                        GamepadAction.Y -> if (state.home) state.searchOpen = true else state.sortOpen = true
                         // Options is the focused game's menu (L2 stays its
                         // alias); with no game under the cursor it is the
                         // list's own options.
@@ -973,6 +1091,33 @@ internal fun PcGamesSection(
                     shelves = shelves,
                     state = state,
                     onDest = onDest,
+                    home = if (state.home) {
+                        HomeParts(
+                            strip = homeStrip,
+                            onStrip = onHomeStrip,
+                            cardsState = homeCardsState,
+                            onTab = { index ->
+                                state.homeTab = index
+                                state.homeCard = 0
+                            },
+                            onTapCard = { index ->
+                                state.destFocused = false
+                                if (onHomeStrip && state.homeCard == index) {
+                                    homeTab?.cards?.getOrNull(index)?.let(::openCard)
+                                } else {
+                                    state.homeStrip = true
+                                    state.homeCard = index
+                                }
+                            },
+                            onDownloads = { onOpenSection(GamingSection.DOWNLOADS) },
+                            onSearch = { state.searchOpen = true },
+                            onBell = onOpenQuickMenu,
+                            onFriends = { onOpenSection(GamingSection.SOCIAL) },
+                            onQuickMenu = onOpenQuickMenu,
+                        )
+                    } else {
+                        null
+                    },
                     onOpenSection = { index ->
                         state.destIndex = index
                         onOpenSection(HOME_DESTINATIONS[index].section)
@@ -1044,7 +1189,7 @@ internal fun PcGamesSection(
         }
         // The focused game's name and facts, said once (docs/SPEC.md 7i)
         // instead of on every capsule.
-        focusedEntry?.let { entry ->
+        focusedEntry?.takeIf { !state.home }?.let { entry ->
             Text(
                 focusLine(entry, focusedPlay?.first, partsOf(entry), pcRoots.orEmpty(), viaByEntry[entry.id]),
                 color = MenuTokens.OnSurfaceMuted,
@@ -1100,6 +1245,10 @@ internal fun PcGamesSection(
             ),
         )
     }
+    if (state.attentionOpen) {
+        val screen = remember(homeStrip.attention) { needsAttentionScreen(homeStrip.attention) }
+        dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { state.attentionOpen = false })
+    }
     if (state.sortOpen) {
         LibrarySortSheet(
             scope = scope,
@@ -1123,7 +1272,33 @@ internal fun PcGamesSection(
                 dev.droidtop.library.integrations.SourceDestinations.consoleNamesOf(ConsoleSystemsRepository.allSystems(context))
             }
         }
-        LibrarySearchDialog(
+        if (state.home) {
+            // Home's search is the global one (docs/SPEC.md 12a, "One search: where it opens"): every library and the
+            // launcher's game apps, the system names ("snes" finds the system), and every source, with no system scope.
+            var text by remember { mutableStateOf("") }
+            LibrarySearchDialog(
+                query = LibraryQuery(text = text),
+                matchCount = 0,
+                totalCount = homeAll.size,
+                onTextChange = { text = it },
+                onDismiss = { state.searchOpen = false },
+                suggestions = suggestions,
+                localKey = homeAll to systemNames,
+                local = { q ->
+                    SearchEntry.matchingSystems(q, systemNames).map { (_, name) ->
+                        LocalSearchRow("system:$name", SearchRowKind.GAME, name, "System") {
+                            state.searchOpen = false
+                            onOpenSection(GamingSection.GAMES)
+                        }
+                    } + homeAll.filter { matchesSearchText(it, q) }.take(SEARCH_GAME_ROWS).map { game ->
+                        LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), badgeOf(game)?.text ?: "Game") {
+                            state.searchOpen = false
+                            openPage(game)
+                        }
+                    }
+                },
+            )
+        } else LibrarySearchDialog(
             query = state.query,
             matchCount = grid.size,
             totalCount = all.size,
@@ -1139,8 +1314,10 @@ internal fun PcGamesSection(
                 }
             },
             sourceFilter = { result ->
-                consoleNames?.let { dev.droidtop.library.integrations.SourceDestinations.isPcResult(result.platform, it) } ?: true
+                consoleNames?.let { dev.droidtop.library.integrations.SourceDestinations.isPcResult(result, it) } ?: true
             },
+            // PC games are what the sources are asked for, so a source narrows its own answer before the filter does.
+            sourcePlatform = dev.droidtop.library.integrations.SourceDestinations.PC_PLATFORM,
         )
     }
     if (state.optionsOpen) {
@@ -1407,9 +1584,11 @@ private fun PcShelvesHome(
     mixed: Boolean,
     // A tap on a shelf's heading (Update available's opens the Updates tab).
     onOpenShelf: (PcShelf) -> Unit = {},
+    // Home's band and strip (docs/SPEC.md 7i, "Home"); null on PC Games' Overview.
+    home: HomeParts? = null,
 ) {
     val window = LocalShellWindow.current
-    if (shelves.isEmpty()) {
+    if (shelves.isEmpty() && home == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Lg)) {
                 Text("Nothing on the shelves yet", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
@@ -1429,27 +1608,43 @@ private fun PcShelvesHome(
         kotlinx.coroutines.delay(Motion.ms(Motion.RiseMs + Motion.riseDelay(Motion.RiseMaxSteps)))
         entered = true
     }
+    Column(Modifier.fillMaxSize()) {
+    // Home's band: touch only, never a stop of the pad; the list scrolls under nothing.
+    if (home != null) {
+        HomeTopBand(
+            data = home.strip,
+            onDownloads = home.onDownloads,
+            onSearch = home.onSearch,
+            onBell = home.onBell,
+            bellCount = home.strip.unreadMessages,
+            onFriends = home.onFriends,
+            onQuickMenu = home.onQuickMenu,
+        )
+    }
     LazyColumn(
         state = columnState,
         modifier = Modifier.fillMaxSize(),
-        // Home has no strip: its first row starts under the floating status
-        // cluster, the band Steam's top bar takes, never beneath it.
         contentPadding = PaddingValues(
-            top = if (mixed) maxOf(Space.Sm, StatusClusterRoom.size.height) else Space.Sm,
+            top = Space.Sm,
             bottom = Space.Lg,
         ),
         // Steam's home spacing: 24dp between shelves, 12dp between capsules.
         verticalArrangement = Arrangement.spacedBy(Space.Xl),
     ) {
+        // Home with nothing played or added yet: the strip and Your library still hold the cursor.
+        if (home != null && shelves.isEmpty()) {
+            item(key = "home-strip") { HomeStripItem(home, state) }
+        }
         itemsIndexed(shelves, key = { _, shelf -> shelf.id }) { shelfIndex, shelf ->
-            val onThisShelf = !state.stripFocused && !onDest && state.shelfIndex == shelfIndex
+            val onThisShelf = !state.stripFocused && !onDest && !(home?.onStrip ?: false) && state.shelfIndex == shelfIndex
             Column(if (entered) Modifier else Modifier.rise(shelfIndex)) {
                 // The hero row of what was being played carries no heading,
                 // as the Deck's recent row has none: the hero card's own
                 // caption ("Played today · 2 h") says what the row is.
                 // Steam's shelf heading: the heading weight, quieter until
                 // the cursor is on the shelf.
-                if (!(shelfIndex == 0 && shelf.id == SHELF_CONTINUE)) Text(
+                // Home's games row is headed "Recent games" (the final design on tracker#485, B.2).
+                if (home != null || !(shelfIndex == 0 && shelf.id == SHELF_CONTINUE)) Text(
                     shelf.heading,
                     color = if (onThisShelf) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     style = TypeRole.screenTitle,
@@ -1488,6 +1683,11 @@ private fun PcShelvesHome(
                         )
                     }
                 }
+                // Home's strip sits under the games row (docs/SPEC.md 7i, "Home").
+                if (home != null && shelfIndex == 0) {
+                    Spacer(Modifier.height(Space.Xl))
+                    HomeStripItem(home, state)
+                }
             }
         }
         // Home's way to the libraries: the Retro and PC menus, the last stop of
@@ -1500,7 +1700,78 @@ private fun PcShelvesHome(
             )
         }
     }
+    }
 }
+
+/** What Home adds to the shelves page: the band's data and taps, and the strip's cursor and taps. */
+internal class HomeParts(
+    val strip: HomeStripData,
+    val onStrip: Boolean,
+    val cardsState: LazyListState,
+    val onTab: (Int) -> Unit,
+    val onTapCard: (Int) -> Unit,
+    val onDownloads: () -> Unit,
+    val onSearch: () -> Unit,
+    val onBell: () -> Unit,
+    val onFriends: () -> Unit,
+    val onQuickMenu: () -> Unit,
+)
+
+@Composable
+private fun HomeStripItem(home: HomeParts, state: PcGamesState) {
+    HomeStripRow(
+        tabs = home.strip.tabs,
+        active = state.homeTab.coerceIn(0, (home.strip.tabs.size - 1).coerceAtLeast(0)),
+        selected = state.homeCard.takeIf { home.onStrip },
+        state = home.cardsState,
+        onTab = home.onTab,
+        onTapCard = home.onTapCard,
+    )
+}
+
+/**
+ * The Needs attention page (docs/SPEC.md 7i, "Home"): one row per item, each with its one verb as the row's
+ * value. A BIOS item opens that system's settings (its BIOS files are there); missing artwork starts the
+ * scrape job, followed under Downloads.
+ */
+internal fun needsAttentionScreen(items: List<AttentionItem>): dev.droidtop.library.settings.CatalogScreen =
+    dev.droidtop.library.settings.CatalogScreen(
+        id = "home_needs_attention",
+        title = "Needs attention",
+        groups = { _ ->
+            listOf(
+                dev.droidtop.library.settings.CatalogGroup(
+                    id = "needs_attention",
+                    title = null,
+                    items = items.map { item ->
+                        when (val target = item.target) {
+                            is AttentionTarget.Bios -> {
+                                val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get("console_systems", target.systemId)
+                                if (screen != null) {
+                                    dev.droidtop.library.settings.NestedScreenItem(
+                                        id = item.id,
+                                        title = item.title,
+                                        subtitle = item.body,
+                                        inline = screen,
+                                        valueLabel = { item.verb },
+                                    )
+                                } else {
+                                    dev.droidtop.library.settings.ActionItem(id = item.id, title = item.title, subtitle = item.body, run = {})
+                                }
+                            }
+                            AttentionTarget.Artwork -> dev.droidtop.library.settings.ActionItem(
+                                id = item.id,
+                                title = item.title,
+                                subtitle = item.body,
+                                value = item.verb,
+                                run = { context -> dev.droidtop.library.scraper.LibraryScrapeJob.start(context, item.verb, null) {} },
+                            )
+                        }
+                    },
+                ),
+            )
+        },
+    )
 
 /** A tile on Home's destination row: where it goes and what it is called. */
 internal class HomeDestination(val section: GamingSection, val label: String)

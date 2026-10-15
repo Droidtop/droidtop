@@ -32,4 +32,30 @@ class DesktopScaleTest {
         assertEquals("2x", DesktopScale.label(2.0))
         assertEquals("1.25x", DesktopScale.label(1.25))
     }
+
+    @Test
+    fun `resolution falls back to full for anything that is not a fraction`() {
+        assertEquals(1.0, DesktopScale.resolutionFactor(null), 0.0)
+        assertEquals(1.0, DesktopScale.resolutionFactor(DesktopScale.FULL_RESOLUTION), 0.0)
+        assertEquals(1.0, DesktopScale.resolutionFactor("banana"), 0.0)
+        assertEquals(1.0, DesktopScale.resolutionFactor("2"), 0.0)
+        assertEquals(1.0, DesktopScale.resolutionFactor("0.1"), 0.0)
+        assertEquals(0.75, DesktopScale.resolutionFactor("0.75"), 0.0)
+        assertEquals(0.5, DesktopScale.resolutionFactor("0.5"), 0.0)
+    }
+
+    @Test
+    fun `lower resolution gives an even smaller output and keeps the logical size`() {
+        assertEquals(1920 to 1080, DesktopScale.outputSize(1920, 1080, 1.0))
+        assertEquals(1440 to 810, DesktopScale.outputSize(1920, 1080, 0.75))
+        assertEquals(960 to 540, DesktopScale.outputSize(1920, 1080, 0.5))
+        // odd sides round down to even, and a tiny view never reaches zero
+        assertEquals(722 to 402, DesktopScale.outputSize(963, 537, 0.75))
+        assertEquals(2 to 2, DesktopScale.outputSize(1, 1, 0.5))
+        // 2x scale on 1920 wide is 960 logical; 1x on 960 pixels is 960 logical too
+        assertEquals(1.0, DesktopScale.outputScale(2.0, 0.5), 0.0)
+        assertEquals(0.5, DesktopScale.outputScale(1.0, 0.5), 0.0)
+        assertEquals(960.0, 1920 / 2.0, 0.0)
+        assertEquals(960.0, DesktopScale.outputSize(1920, 1080, 0.5).first / DesktopScale.outputScale(2.0, 0.5), 0.0)
+    }
 }

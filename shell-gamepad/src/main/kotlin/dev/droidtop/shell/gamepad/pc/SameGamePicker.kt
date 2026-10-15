@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.menuStep
 import androidx.activity.compose.BackHandler
@@ -18,7 +22,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.shell.gamepad.LocalShellWindow
-import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
@@ -126,7 +129,7 @@ internal fun SameGamePicker(
                     )
                 }
             }
-            if (working) MenuHint(workingLine)
+            if (working) NoticeCard(Notice(NoticeTone.Info, workingLine), NoticePlacement.Group)
         }
     }
 }

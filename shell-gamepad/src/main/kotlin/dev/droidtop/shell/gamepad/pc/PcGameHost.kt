@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -81,6 +80,7 @@ fun rememberPcLaunch(onLaunch: (LibraryEntry) -> Unit, onOpenDownloads: () -> Un
             launch = { entry ->
                 when (val stage = storeStageOf(entry, entry.downloadKey()?.let { downloads[it] })) {
                     StoreStage.INSTALL, StoreStage.UPDATE -> offer.value = StoreInstallOffer(entry, stage)
+                    StoreStage.WISHLIST -> say(context, openOnStore(context, entry))
                     null -> currentLaunch(entry)
                     else -> say(context, continueStoreDownload(context, entry, stage) { currentOpenDownloads() })
                 }
@@ -115,7 +115,7 @@ fun PcLaunchOfferSheet(launch: PcLaunch) {
 }
 
 private fun say(context: Context, line: String?) {
-    line?.let { dev.droidtop.shell.gamepad.theme.shellToast(context, it, long = true) }
+    line?.let { dev.droidtop.library.settings.Notices.flash(it, context = context) }
 }
 
 /**

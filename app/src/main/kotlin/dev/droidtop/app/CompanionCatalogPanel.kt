@@ -39,6 +39,7 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.NoticeItem
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
@@ -48,6 +49,7 @@ import dev.droidtop.shell.gamepad.QuickTiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.NoticeCard
 
 /**
  * One card of the companion's System tab (docs/SPEC.md "The companion's tabs", Droidtop/tracker#414): a titled
@@ -117,6 +119,10 @@ internal fun CompanionCatalogItems(
                     if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
                 }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
+                is NoticeItem -> CompanionNotice(item, onChanged, onOpen = { nested = it })
+                // A page's header and bar (docs/SPEC.md 7k, "Page anatomy"): the shared pieces, touch only.
+                is dev.droidtop.library.settings.PageHeaderItem -> dev.droidtop.ui.shared.PageHeaderView(item.header)
+                is dev.droidtop.library.settings.ButtonBarItem -> CompanionButtonBar(item, onChanged)
                 is TextBlockItem -> Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
                     if (item.title.isNotBlank()) Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
                     Text(item.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -275,8 +281,11 @@ private fun CatalogChoiceRow(item: ChoiceItem, onChanged: () -> Unit) {
 private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst: Boolean) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var status by remember(item) { mutableStateOf<String?>(null) }
-    var asking by remember(item) { mutableStateOf(false) }
+    // Keyed by the row's id, not the item: finishing an action re-reads the screen (onChanged), which builds new item
+    // objects, and a status kept per object vanished the moment the result arrived, so a tap on Check now showed
+    // nothing at all (rig, build 1809). The gamepad's Settings keeps statusById the same way.
+    var status by remember(item.id) { mutableStateOf<String?>(null) }
+    var asking by remember(item.id) { mutableStateOf(false) }
     val state = (item as? ActionItem)?.state
     val value = status ?: item.value ?: state?.let { if (it) "On" else "Off" }
     fun run() {
@@ -298,6 +307,77 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
             Row(horizontalArrangement = Arrangement.spacedBy(32.dp), modifier = Modifier.padding(top = 6.dp)) {
                 CompanionPill("Cancel", selected = true) { asking = false }
                 CompanionPill(item.title) { run() }
+            }
+        }
+    }
+}
+
+/**
+ * A notice on the companion (docs/SPEC.md 7k, "Notices"): the shared card, its action a tap, and its Info
+ * opened in place under it (the details, which a long press of the text can copy) rather than in a sheet,
+ * as the companion's rows open in place.
+ */
+@Composable
+private fun CompanionNotice(item: NoticeItem, onChanged: () -> Unit, onOpen: (CatalogScreen) -> Unit) {
+    val context = LocalContext.current
+    var info by remember(item.id) { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        NoticeCard(
+            notice = item.notice,
+            placement = item.placement,
+            onAction = item.notice.action?.let { action ->
+                { item.opens?.let(onOpen) ?: scope.launch { action.run(context); onChanged() } }
+            },
+            onInfo = { info = !info },
+        )
+        val details = item.notice.details
+        if (info && !details.isNullOrBlank()) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 8.dp))
+            }
+        }
+    }
+}
+
+/** A page's button bar on the companion: a tap presses; a button that asks first asks in place; More lists the rest. */
+@Composable
+private fun CompanionButtonBar(bar: dev.droidtop.library.settings.ButtonBarItem, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    var asking by remember { mutableStateOf<dev.droidtop.library.settings.PageButton?>(null) }
+    var moreOpen by remember { mutableStateOf(false) }
+    fun press(button: dev.droidtop.library.settings.PageButton) {
+        if (!button.enabled) return
+        if (button.confirmTitle != null) {
+            asking = button
+            return
+        }
+        button.run(context)
+        onChanged()
+    }
+    dev.droidtop.ui.shared.ButtonBarView(bar, selected = null, onPress = { slot ->
+        val button = bar.slots.getOrNull(slot)
+        if (button != null) press(button) else moreOpen = !moreOpen
+    })
+    if (moreOpen) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            bar.more.forEach { button ->
+                CatalogRow(button.shownLabel, null, null) {
+                    moreOpen = false
+                    press(button)
+                }
+            }
+        }
+    }
+    asking?.let { button ->
+        // The safe answer first (docs/SPEC.md 7k, copy rule 9).
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(button.confirmTitle.orEmpty(), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            CatalogRow("Cancel", null, null) { asking = null }
+            CatalogRow(button.label, null, null) {
+                asking = null
+                button.run(context)
+                onChanged()
             }
         }
     }

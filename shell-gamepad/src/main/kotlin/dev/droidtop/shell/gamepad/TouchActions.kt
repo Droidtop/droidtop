@@ -37,6 +37,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
+import dev.droidtop.shell.gamepad.input.HintFit
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import kotlin.math.abs
 
 /**
@@ -80,10 +87,13 @@ fun rememberGamepadTouch(): (GamepadAction) -> Unit {
  * screen the same list is the CONTROLS, since there are no face buttons
  * to press. One list, one meaning, two ways in.
  *
- * A sheet's bar (narrower than [TIGHT_HINT_BAR_WIDTH], or any bar on a
- * compact window) wraps its hints onto a second line; a full-width bar
- * scrolls sideways. Neither drops a hint to make the rest fit: that would
- * drop actions a touch user has no other route to.
+ * When the hints do not fit on one line at the current text size, the bar
+ * gives up room in the fit rule's order ([HintFit]: Start and R2 become
+ * glyphs, then L1/R1 drop, then Select; A and B never drop). Whatever
+ * still does not fit wraps onto a second line in a sheet's bar (narrower
+ * than [TIGHT_HINT_BAR_WIDTH], or any bar on a compact window) and
+ * scrolls sideways in a full-width bar. A screen reader hears the whole
+ * set however much was folded, and the bar offers "Read controls".
  */
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -97,11 +107,43 @@ internal fun TouchHintBar(
     if (hints.isEmpty()) return
     val window = LocalShellWindow.current
     val press = rememberGamepadTouch()
-    BoxWithConstraints(modifier.then(if (fill) Modifier.fillMaxWidth() else Modifier)) {
+    val view = LocalView.current
+    val measurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.labelMedium.copy(fontSize = MenuTokens.HintLabelTextSize)
+    val glyphStyle = MaterialTheme.typography.labelMedium.copy(fontSize = MenuTokens.HintGlyphTextSize, fontWeight = FontWeight.Bold)
+    val density = LocalDensity.current
+    val spoken = HintFit.spoken(hints) { GamepadKeyMap.labelFor(it) }
+    BoxWithConstraints(
+        modifier
+            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+            .semantics {
+                contentDescription = spoken
+                customActions = listOf(CustomAccessibilityAction("Read controls") { view.announceForAccessibility(spoken); true })
+            },
+    ) {
         // A bar narrower than the window (the Quick Menu's sheet) spaces its pills like a compact
         // window does: at the full window's spacing the sheet's four hints ran off its right edge,
         // "B Close" cut in half (console, build 1386). It still scrolls if even that does not fit.
         val tight = window.compact || maxWidth < TIGHT_HINT_BAR_WIDTH
+        val gap = if (tight) 10.dp else 24.dp
+        val sidePadding = if (tight) minOf(window.barPadding, 12.dp) else window.barPadding
+        // The fit rule, measured at the live text size: each hint is its keycap, 4dp, its label, and the gap.
+        val shown = remember(hints, maxWidth, tight, density.fontScale, labelStyle, glyphStyle) {
+            with(density) {
+                val available = (maxWidth - sidePadding * 2).toPx()
+                HintFit.fit(hints, available) { list ->
+                    list.sumOf { hint ->
+                        val glyph = GamepadKeyMap.labelFor(hint.action).ifBlank { hint.label.orEmpty() }
+                        val cap = maxOf(
+                            measurer.measure(glyph, glyphStyle, maxLines = 1).size.width + (MenuTokens.HintGlyphPaddingHorizontal * 2).toPx(),
+                            MenuTokens.KeycapHeight.toPx(),
+                        )
+                        val label = hint.label?.let { measurer.measure(it, labelStyle, maxLines = 1).size.width + 4.dp.toPx() } ?: 0f
+                        (cap + label).toDouble()
+                    }.toFloat() + gap.toPx() * (list.size - 1).coerceAtLeast(0)
+                }
+            }
+        }
         val plate = Modifier
             .then(if (fill) Modifier.fillMaxWidth() else Modifier)
             .background(background)
@@ -115,12 +157,12 @@ internal fun TouchHintBar(
             FlowRow(
                 modifier = plate
                     .heightIn(min = window.frameBarHeight)
-                    .padding(horizontal = minOf(window.barPadding, 12.dp), vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(horizontal = sidePadding, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                hints.forEach { (action, label) ->
-                    TouchHint(action = action, label = label, onPress = { press(action) })
+                shown.forEach { hint ->
+                    TouchHint(action = hint.action, label = hint.label, onPress = { press(hint.action) })
                 }
             }
         } else {
@@ -128,12 +170,12 @@ internal fun TouchHintBar(
                 modifier = plate
                     .horizontalScroll(rememberScrollState())
                     .heightIn(min = window.frameBarHeight)
-                    .padding(horizontal = window.barPadding),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    .padding(horizontal = sidePadding),
+                horizontalArrangement = Arrangement.spacedBy(gap),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                hints.forEach { (action, label) ->
-                    TouchHint(action = action, label = label, onPress = { press(action) })
+                shown.forEach { hint ->
+                    TouchHint(action = hint.action, label = hint.label, onPress = { press(hint.action) })
                 }
             }
         }
@@ -144,7 +186,7 @@ internal fun TouchHintBar(
 private val TIGHT_HINT_BAR_WIDTH = 600.dp
 
 @Composable
-private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit) {
+private fun TouchHint(action: GamepadAction, label: String?, onPress: () -> Unit) {
     val window = LocalShellWindow.current
     // The tap target and the drawn chip are two different sizes (owner,
     // on the RP5 console, 2026-09-25: "the pills are also too big"): the
@@ -182,15 +224,18 @@ private fun TouchHint(action: GamepadAction, label: String, onPress: () -> Unit)
                 )
                 .padding(horizontal = if (window.touchFirst) 8.dp else 0.dp, vertical = 2.dp),
         ) {
-            Keycap(GamepadKeyMap.labelFor(action).takeIf { it.isNotBlank() } ?: label)
-            Text(
-                label,
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.labelMedium.copy(fontSize = MenuTokens.HintLabelTextSize),
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Keycap(GamepadKeyMap.labelFor(action).takeIf { it.isNotBlank() } ?: label.orEmpty())
+            // Null: the fit rule folded this hint to its glyph (HintFit).
+            if (label != null) {
+                Text(
+                    label,
+                    color = MenuTokens.OnSurfaceMuted,
+                    style = MaterialTheme.typography.labelMedium.copy(fontSize = MenuTokens.HintLabelTextSize),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

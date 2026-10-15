@@ -21,6 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -181,7 +186,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     // can identity-check before clearing the process-wide hook.
     private var companionLaunchSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
     private var companionQuitSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
-    private var companionKillSeam: ((dev.droidtop.library.LibraryEntry) -> Unit)? = null
 
     /**
      * Re-runs orchestration from scratch: drops the parked display and the
@@ -318,7 +322,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Quit from the companion's Now card: the one quit path (Library.quitRunning), and a quit that could
         // not end the game says why where the tap was made.
         companionQuitSeam = { entry ->
-            lifecycleScope.launch {
+            // The process scope, not this activity's: ending a game opens a sheet or moves the game off the screen, either
+            // of which can recreate the activity, and a cancelled scope lost the answer (rig, build 1809).
+            CompanionState.scope.launch {
                 CompanionState.launchError.value = when (val outcome = library.quitRunning(applicationContext, entry)) {
                     dev.droidtop.library.QuitResult.Ended -> null
                     is dev.droidtop.library.QuitResult.NotEnded -> outcome.message
@@ -327,20 +333,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             }
         }
         CompanionState.onQuitEntry = companionQuitSeam
-        // Kill from the Game tab: the same outcome on the same banner, so a kill that could not be confirmed says why
-        // (no helper, Shizuku not allowed, the plugin waiting for approval) instead of the tab just going away.
-        companionKillSeam = { entry ->
-            lifecycleScope.launch {
-                CompanionState.launchError.value = when (val outcome = library.killRunning(applicationContext, entry)) {
-                    dev.droidtop.library.QuitResult.Ended -> null
-                    is dev.droidtop.library.QuitResult.NotEnded -> outcome.message
-                    is dev.droidtop.library.QuitResult.Unresolvable -> outcome.message
-                }
-            }
-        }
-        CompanionState.onKillEntry = companionKillSeam
         CompanionState.onRestartEntry = { entry ->
-            lifecycleScope.launch {
+            CompanionState.scope.launch {
                 when (val outcome = library.quitRunning(applicationContext, entry)) {
                     dev.droidtop.library.QuitResult.Ended -> CompanionState.onLaunchEntry?.invoke(entry)
                     is dev.droidtop.library.QuitResult.NotEnded -> CompanionState.launchError.value = outcome.message
@@ -475,10 +469,40 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
             val safeMode by dev.droidtop.library.theme.ThemeSafeMode.activeFlow.collectAsState()
             val bannerFocus = remember { FocusRequester() }
             if (mode == Mode.GAMING && safeMode) {
-                SafeModeBanner(
-                    onRetry = { dev.droidtop.library.diagnostics.CrashRecovery.retryTheme(this@MainActivity) },
-                    modifier = Modifier.align(Alignment.TopCenter),
-                    focusRequester = bannerFocus,
+                // U5 (docs/SPEC.md 7k, "Notices"; 10c): the caution banner, a pad stop of its own above the shell's lists
+                // (the tab bar never takes focus, so Up from the top row reaches it), A, Enter or a tap use the theme again.
+                val retry = { dev.droidtop.library.diagnostics.CrashRecovery.retryTheme(this@MainActivity) }
+                var bannerFocused by remember { mutableStateOf(false) }
+                dev.droidtop.ui.shared.NoticeCard(
+                    notice = dev.droidtop.library.settings.Notice(
+                        tone = dev.droidtop.library.settings.NoticeTone.Caution,
+                        title = "Safe mode",
+                        body = "The theme is off after two failed starts.",
+                        details = "droidtop crashed twice while starting, so the Gaming shell is drawn without the theme. " +
+                            "Your theme choice is kept; Use theme draws it again.",
+                        action = dev.droidtop.library.settings.NoticeAction("Use theme") { retry() },
+                    ),
+                    placement = dev.droidtop.library.settings.NoticePlacement.Page,
+                    onAction = retry,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .then(
+                            if (bannerFocused) {
+                                Modifier.border(3.dp, androidx.compose.material3.MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(6.dp))
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .onFocusChanged { bannerFocused = it.isFocused }
+                        .focusRequester(bannerFocus)
+                        .onPreviewKeyEvent { event ->
+                            val press = event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
+                                event.nativeKeyEvent.keyCode in setOf(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER)
+                            if (press) retry()
+                            press
+                        }
+                        .focusable(),
                 )
                 LaunchedEffect(safeMode) {
                     if (safeMode) bannerFocus.requestFocus()
@@ -905,9 +929,6 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         }
         if (CompanionState.onQuitEntry === companionQuitSeam) {
             CompanionState.onQuitEntry = null
-        }
-        if (CompanionState.onKillEntry === companionKillSeam) {
-            CompanionState.onKillEntry = null
         }
         clipboardBridge?.stop()
         clipboardBridge = null

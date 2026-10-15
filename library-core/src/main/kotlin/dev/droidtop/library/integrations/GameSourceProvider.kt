@@ -139,6 +139,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
 
 /** Every installed+approved+enabled source-plugin, wrapped as [GameSourceProvider] -- the whole plugin half of the Sources API's implementation list until a store adapter exists. */
 object GameSources {
-    fun plugins(context: Context): List<GameSourceProvider> =
-        AcquireContentSources.availablePlugins(context).map { PluginGameSource(it) }
+    /** [systemId] scopes the list to the sources that serve it ("pc": the PC library); null asks them all. */
+    fun plugins(context: Context, systemId: String? = null): List<GameSourceProvider> =
+        AcquireContentSources.availablePlugins(context, systemId).map { PluginGameSource(it) }
 }

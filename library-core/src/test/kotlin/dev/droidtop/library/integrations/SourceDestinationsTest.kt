@@ -15,7 +15,8 @@ class SourceDestinationsTest {
     private val psp = system("psp", "Sony PlayStation Portable")
     private val snes = system("snes", "Super Nintendo")
     private val windows = system("windows", "Windows")
-    private val systems = listOf(psp, snes, windows)
+    private val vita = system("psvita", "Sony PlayStation Vita")
+    private val systems = listOf(psp, snes, windows, vita)
 
     private val pspFolder = File("/games/psp")
     private val winFolder = File("/games/windows")
@@ -70,5 +71,30 @@ class SourceDestinationsTest {
         assertFalse(SourceDestinations.isPcResult("Sony PlayStation Portable", names))
         assertFalse(SourceDestinations.isPcResult("snes", names))
         assertTrue(SourceDestinations.isPcResult("PSP / Windows", names))
+    }
+
+    @Test
+    fun `a source writing the system its own way is still not a PC result`() {
+        val names = SourceDestinations.consoleNamesOf(systems)
+        // The word of the name, not the ES-DE id or the whole name: how a torrent site writes it.
+        assertFalse(SourceDestinations.isPcResult("Vita", names))
+        assertFalse(SourceDestinations.isPcResult("PS Vita", names))
+        assertFalse(SourceDestinations.isPcResult("PlayStation Portable", names))
+        assertFalse(SourceDestinations.isPcResult("Games - PSP", names))
+        // Words that say nothing about the system do not turn a PC result into a console one.
+        assertTrue(SourceDestinations.isPcResult("Games", names))
+        assertTrue(SourceDestinations.isPcResult("Sony", names))
+        assertTrue(SourceDestinations.isPcResult("Windows 10 64-bit", names))
+    }
+
+    @Test
+    fun `a badge can name the console system when the platform field is empty`() {
+        val names = SourceDestinations.consoleNamesOf(systems)
+        fun result(platform: String?, vararg badges: String) =
+            AcquireContentResult("id", "title", null, null, platform, null, emptyList(), "{}", badges = badges.toList())
+        assertFalse(SourceDestinations.isPcResult(result(null, "PSP"), names))
+        assertFalse(SourceDestinations.isPcResult(result("", "Vita", "English"), names))
+        assertTrue(SourceDestinations.isPcResult(result(null, "English"), names))
+        assertTrue(SourceDestinations.isPcResult(result("Windows", "PSP"), names))
     }
 }

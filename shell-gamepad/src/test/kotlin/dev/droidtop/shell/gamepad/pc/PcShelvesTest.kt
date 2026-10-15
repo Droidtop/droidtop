@@ -221,13 +221,17 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `home keeps the recent shelves across libraries and leaves the rest to PC Games`() {
+    fun `home keeps one recent games row across libraries and leaves the rest to PC Games`() {
         val pc = game("/pc", lastPlayed = now - 30, firstSeen = now - 300, favorite = true, update = "2.0")
         val rom = game("/rom", kind = LibraryEntryKind.CONSOLE_ROM, lastPlayed = now - 10).copy(systemId = "snes")
 
         val home = homeShelves(listOf(pc, game("/other")), listOf(rom), now)
-        assertEquals(listOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED, SHELF_UPDATES), home.map { it.id })
+        assertEquals(listOf(SHELF_RECENT_GAMES), home.map { it.id })
+        assertEquals("Recent games", home.single().title)
         assertEquals(listOf("/rom", "/pc"), home.first().entries.map { it.id })
+        // Nothing played yet: the row is what was added most recently.
+        val fresh = homeShelves(listOf(game("/new", firstSeen = now - 5)), emptyList(), now)
+        assertEquals(listOf("/new"), fresh.single().entries.map { it.id })
 
         // PC Games' Overview is the PC fold's own, Retro games never on it.
         val overview = pcShelves(listOf(pc, game("/other")), now)
@@ -313,5 +317,26 @@ class PcShelvesTest {
         assertEquals("Short games, from Acme Picks", shelves.single().title)
         assertEquals(listOf("/c", "/a"), shelves.single().entries.map { it.id })
         assertTrue("no built-in shelf id starts like a plugin's", HOME_SHELF_IDS.none { it.startsWith("plugin:") })
+    }
+
+
+    @Test
+    fun `games on a wishlist have a shelf of their own, last, and are in no other shelf`() {
+        fun wished(id: String) = game(
+            id,
+            kind = LibraryEntryKind.WINE_PROFILE,
+            pcInfo = PcInfo(storeId = "gog:$id", installed = false, holding = dev.droidtop.library.stores.StoreHolding.WISHLIST),
+        )
+        val owned = game("/a", lastPlayed = now - 10, firstSeen = now - 100)
+        val shelves = pcShelves(listOf(owned, wished("1"), wished("2")), now)
+        assertEquals(SHELF_WISHLIST, shelves.last().id)
+        assertEquals("Wishlist (not owned)", shelves.last().title)
+        assertEquals(listOf("1", "2"), shelves.last().entries.map { it.id })
+        // Nowhere else: not in Recently added or any source or kind shelf.
+        assertTrue(shelves.dropLast(1).none { shelf -> shelf.entries.any { it.id == "1" || it.id == "2" } })
+        // No wishlist, no shelf.
+        assertTrue(pcShelves(listOf(owned), now).none { it.id == SHELF_WISHLIST })
+        // and Home never carries it
+        assertTrue(homeShelves(listOf(owned, wished("1")), emptyList(), now).none { it.id == SHELF_WISHLIST })
     }
 }

@@ -43,18 +43,9 @@ class PluginCrashPolicy(
         val refusal = PluginTiers.refusal(record, grants) ?: return@withContext PluginTiers.of(record, grants) to null
         val state = PluginGrants.stateOf(record, grants, PluginTiers.FULL_TRUST)
         if (state == GrantState.ASK && userInitiated) {
-            val declared = record.manifest.v2.permissions.first { it.id == PluginTiers.FULL_TRUST }
-            val answer = PluginGrantPrompts.ask(
-                GrantPromptRequest(
-                    record.manifest.id, record.manifest.label, PluginTiers.FULL_TRUST,
-                    PluginPermissions.labelFor(PluginTiers.FULL_TRUST) ?: PluginTiers.FULL_TRUST, declared.reason, PermissionTier.CRITICAL,
-                ),
-            )
-            when (answer) {
-                GrantAnswer.ALLOW -> store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED)
-                GrantAnswer.NEVER -> store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.DENIED)
-                GrantAnswer.NOT_NOW -> Unit
-            }
+            // The red dialog, not the first-use sheet (Droidtop/tracker#481): Cancel leaves it unanswered, to be asked again.
+            val update = PluginTiers.FULL_TRUST in grants.fresh
+            if (PluginDangers.askFullAccess(record, update)) store.set(record.manifest.id, PluginTiers.FULL_TRUST, GrantState.GRANTED)
             grants = store.read(record.manifest.id)
             PluginTiers.refusal(record, grants)?.let { return@withContext null to it }
             return@withContext PluginTiers.of(record, grants) to null
@@ -67,8 +58,24 @@ class PluginCrashPolicy(
     private suspend fun loadFor(record: PluginRecord, userInitiated: Boolean): String? {
         val (tier, refusal) = tierFor(record, userInitiated)
         if (tier == null) return refusal ?: "plugin failed to load"
-        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
-        return if (runner.load(record, dir.absolutePath, tier)) null else loadFailure(record)
+        val id = record.manifest.id
+        val dir = PluginStore.payloadDirFor(context, id)
+        if (runner.load(record, dir.absolutePath, tier)) {
+            PluginDangers.loaded(id)
+            return null
+        }
+        // Protection did not start (Droidtop/tracker#481): during a call the person started, ask in red whether to run it
+        // this time anyway; from the background it waits for the Plugins page, which asks for every such plugin at once.
+        val report = PluginDangers.protectionReport(runner.loadFailure(id)) ?: return loadFailure(record)
+        if (userInitiated && PluginDangers.askRunUnprotected(id, record.manifest.label, report)) {
+            if (runner.load(record, dir.absolutePath, tier)) {
+                PluginDangers.loaded(id)
+                return null
+            }
+            return loadFailure(record)
+        }
+        PluginDangers.recordFailure(PluginDangers.Failure(id, record.manifest.label, report))
+        return "${record.manifest.label} did not run: its protection did not start"
     }
 
     /**

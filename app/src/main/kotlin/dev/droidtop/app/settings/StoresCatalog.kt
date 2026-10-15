@@ -9,7 +9,11 @@ import dev.droidtop.app.LauncherGamesActivity
 import dev.droidtop.app.OpenWithSource
 import dev.droidtop.library.PcSource
 import dev.droidtop.library.StoreLinkPrefs
+import dev.droidtop.library.integrations.AcquireContentSource
+import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.PluginJobsScreen
+import dev.droidtop.library.integrations.SourceScreens
+import dev.droidtop.library.integrations.SourceState
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogChip
@@ -22,6 +26,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.stores.StoreHolding
@@ -237,6 +242,8 @@ internal object StoresCatalog {
         val storeGames = runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList())
         val folders = FoldersCatalog.counts(context)
         val imported = runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap())
+        val sources = runCatching { AcquireContentSources.listings(context) }.getOrDefault(emptyList())
+        val sourceEntry = if (sources.any { it.state == SourceState.READY }) runCatching { SourceScreens.entryContext(context) }.getOrNull() else null
         fun storeRow(store: PcStore): CatalogItem {
             val signedIn = signedInByStore[store] == true
             val games = storeCounts(storeGames, store.key).total
@@ -291,6 +298,23 @@ internal object StoresCatalog {
                             ),
                         )
                     }
+                },
+            ),
+            // Every installed source plugin, ready or not, so a newcomer with no folders and no library can still reach
+            // a search: opening one searches it for PC games or asks the system (Droidtop/tracker#540).
+            CatalogGroup(
+                id = "stores_sources_group",
+                title = "Get games",
+                items = sources.map { sourceRow(it, sourceEntry) }.ifEmpty {
+                    listOf(
+                        NestedScreenItem(
+                            id = "stores_no_sources",
+                            title = "Get games from a source",
+                            subtitle = "No source is installed yet. Plugins lists the ones you can add",
+                            registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
+                            icon = CatalogIcon.LIBRARY,
+                        ),
+                    )
                 },
             ),
             CatalogGroup(
@@ -359,6 +383,38 @@ internal object StoresCatalog {
                     ),
                 ),
             ).takeIf { anySignedIn },
+        )
+    }
+
+    /**
+     * A source plugin's row in Game sources: ready, it opens its search ([SourceScreens.entryScreen]); waiting for
+     * approval, turned off or disabled, it opens the plugin's own page in Plugins, where that is fixed. The state is
+     * the row's value, so a source is a detail of where games come from and not a screen of its own.
+     */
+    private fun sourceRow(listing: dev.droidtop.library.integrations.SourceListing, entry: SourceScreens.EntryContext?): CatalogItem {
+        val id = "source_${listing.pluginId}"
+        val ready = listing.state == SourceState.READY && entry != null
+        val value: (Context) -> String? = { listing.stateLabel }
+        if (ready) {
+            val source = AcquireContentSource.Plugin(listing.record)
+            return NestedScreenItem(
+                id = id,
+                title = listing.label,
+                subtitle = source.description ?: "Search ${listing.label} for games",
+                inline = SourceScreens.entryScreen(source, entry!!),
+                valueLabel = value,
+                icon = CatalogIcon.GLOBAL,
+            )
+        }
+        val page = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, listing.pluginId)
+        return NestedScreenItem(
+            id = id,
+            title = listing.label,
+            subtitle = "Open its page in Plugins to get it ready",
+            inline = page,
+            registryId = if (page == null) AcquireContentSources.PLUGINS_SCREEN_ID else null,
+            valueLabel = value,
+            icon = CatalogIcon.GLOBAL,
         )
     }
 

@@ -203,26 +203,7 @@ class PcPageAboutTest {
     }
 
     @Test
-    fun lastPlayedReadsAsAPersonSaysIt() {
-        val now = 100 * day
-        assertEquals("today", lastPlayedPhrase(now, now - 3_600_000))
-        assertEquals("yesterday", lastPlayedPhrase(now, now - day - 1000))
-        assertEquals("5 days ago", lastPlayedPhrase(now, now - 5 * day - 1000))
-        assertEquals("3 weeks ago", lastPlayedPhrase(now, now - 21 * day - 1000))
-        assertEquals("4 months ago", lastPlayedPhrase(now, now - 125 * day))
-        assertEquals("over a year ago", lastPlayedPhrase(now, now - 400 * day))
-        // A clock that ran backwards is today, never negative days.
-        assertEquals("today", lastPlayedPhrase(now, now + day))
-    }
-
-    @Test
-    fun playTimeIsShortInTheStripAndTheHeroCaption() {
-        assertEquals("Not played yet", playtimeShort(0))
-        assertEquals("Under a minute", playtimeShort(30))
-        assertEquals("45 min", playtimeShort(45 * 60))
-        assertEquals("2 h", playtimeShort(2 * 3600))
-        assertEquals("2 h 5 min", playtimeShort(2 * 3600 + 5 * 60))
-
+    fun playTimeIsShortInTheHeroCaption() {
         val now = 100 * day
         assertEquals("Played yesterday \u00B7 2 h 5 min", heroCaption(entry().copy(lastPlayedEpochMs = now - day - 1000, playtimeSeconds = 2 * 3600 + 5 * 60), now))
         assertEquals("Not played yet", heroCaption(entry(), now))
@@ -236,19 +217,19 @@ class PcPageAboutTest {
             playtimeSeconds = 3600,
             availableUpdate = "0.9.6",
         )
-        val strip = factsStrip(played, now, folderSizeBytes = 2048, installedVersion = "0.9.5", runsWith = "Wine", formatSize = { "$it B" })
+        val strip = factsStrip(played, now, folderSizeBytes = 2048, installedVersion = "0.9.5", runsWith = "Wine")
         assertEquals(
             listOf(
                 "Last played" to "2 days ago",
                 "Play time" to "1 h",
                 "Version" to "0.9.5, v0.9.6 is available",
-                "Size" to "2048 B",
+                "Size" to "2 KB",
                 "Runs with" to "Wine",
             ),
             strip,
         )
 
-        val bare = factsStrip(entry(), now, folderSizeBytes = null, installedVersion = null, runsWith = null, formatSize = { "$it B" })
+        val bare = factsStrip(entry(), now, folderSizeBytes = null, installedVersion = null, runsWith = null)
         assertEquals(listOf("Last played" to "Never", "Play time" to "Never played"), bare)
     }
 

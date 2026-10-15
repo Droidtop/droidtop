@@ -73,7 +73,6 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import android.widget.Toast
 import coil3.compose.AsyncImage
 import dev.droidtop.library.settings.CatalogPrefs
 import dev.droidtop.library.settings.GamingSettingsCatalog
@@ -270,6 +269,9 @@ private fun GamepadShellBody(
     triggerBrowseThemes: Boolean = false,
 ) {
     val context = LocalContext.current
+    // Where droidtop's danger and confirm dialogs and its corner flashes are drawn (docs/SPEC.md 7k, "Notices").
+    NoticeDialogHost()
+    NoticeFlashHost()
     // One layout system for both orientations: every screen below reads
     // LocalShellWindow instead of assuming the console's landscape
     // geometry. There is no portrait COPY of any screen.
@@ -484,6 +486,8 @@ private fun GamepadShellBody(
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
     var leftMenuOpen by remember { mutableStateOf(false) }
+    // The one search over the library, the apps, the download sources and the settings (the left menu's Search row).
+    var globalSearchOpen by remember { mutableStateOf(false) }
     // The game screen of a Windows game sends Back here with openQuickMenu set (OwnGameScreens): the
     // menu opens on its Game section, since the game is running.
     LaunchedEffect(deepLinkToken) {
@@ -830,7 +834,36 @@ private fun GamepadShellBody(
                 leftMenuOpen = false
                 quickMenuOpen = true
             },
+            // Kiosk and Kid keep the library and leave out what manages the device, downloads and settings with it.
+            onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
+                {
+                    leftMenuOpen = false
+                    globalSearchOpen = true
+                }
+            } else {
+                null
+            },
             onDismiss = { leftMenuOpen = false },
+        )
+    }
+    if (globalSearchOpen) {
+        dev.droidtop.shell.gamepad.query.LauncherSearchScreen(
+            initialText = "",
+            games = gameEntries,
+            // The apps are the shell's own list, matched in memory by the same text rule every list uses.
+            findApps = { text ->
+                appEntries.orEmpty().filter { !it.missing && dev.droidtop.shell.gamepad.query.matchesSearchText(it, text) }.take(20).map { app ->
+                    dev.droidtop.shell.gamepad.query.LauncherSearchApp(
+                        key = app.id,
+                        title = dev.droidtop.library.GameNaming.displayName(app.title),
+                        icon = null,
+                        open = { onLaunch(app) },
+                    )
+                }
+            },
+            onPlay = onLaunch,
+            settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
+            onDismiss = { globalSearchOpen = false },
         )
     }
     // A store's cloud-save sync asks here when a game's saves differ (docs/SPEC.md 7g, "Stores").
@@ -1405,6 +1438,7 @@ private fun GamepadShellBody(
                                     if (target == GamingSection.PC_GAMES) pcGames.open(home = false)
                                     selectSection(target)
                                 },
+                                onOpenQuickMenu = { quickMenuOpen = true },
                             )
                             GamingSection.APPS -> {
                                 canGoBack = false
@@ -1452,11 +1486,9 @@ private fun GamepadShellBody(
             // band; it is a readout and the tap route to the Quick Menu.
             // On Retro Games it yields to a theme that draws its own clock
             // or system status (docs/SPEC.md 7k2), so the two never overlap.
-            if (!screensaverOn && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
-                // Home's shelves scroll up under the cluster: a strip of their own for it (tracker#494).
-                if (section == GamingSection.PC_GAMES && pcGames.home && nav.place is ShellPlace.Section) {
-                    StatusScrim(Modifier.align(Alignment.TopStart))
-                }
+            // Home's top band draws the status facts itself (docs/SPEC.md 7i, "Home"; Droidtop/tracker#494, #485 F7a).
+            val homeBand = section == GamingSection.PC_GAMES && pcGames.home && nav.place is ShellPlace.Section
+            if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
                 FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
             }
             // A theme that draws its own help legend (a pad is attached, so
@@ -3500,10 +3532,7 @@ private fun AppsSection(
         hiddenNow = hiddenNow + (entry.id to nowHidden)
         coroutineScope.launch {
             withContext(Dispatchers.IO) { dev.droidtop.library.AppHiding.set(context, entry.id, nowHidden) }
-            dev.droidtop.shell.gamepad.theme.shellToast(
-                context,
-                if (nowHidden) "${entry.title} hidden" else "${entry.title} shown",
-            )
+            dev.droidtop.library.settings.Notices.flash(if (nowHidden) "${entry.title} hidden" else "${entry.title} shown", context = context)
         }
     }
 
@@ -3515,10 +3544,7 @@ private fun AppsSection(
             coroutineScope.launch {
                 withContext(Dispatchers.IO) { AppGameMarks.set(context, entry.id, nowGame) }
                 marksTick++
-                dev.droidtop.shell.gamepad.theme.shellToast(
-                    context,
-                    if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game",
-                )
+                dev.droidtop.library.settings.Notices.flash(if (nowGame) "${entry.title} marked as a game" else "${entry.title} is not a game", context = context)
             }
         }
     }

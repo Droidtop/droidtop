@@ -3,7 +3,6 @@ package app.murinelauncher.settings
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
@@ -75,7 +74,7 @@ class SettingsIconPackFragment : AbstractSettingsFragment() {
                                 appState.model.onAppIconChanged(pkg, android.os.Process.myUserHandle())
                             }
                             updateClearCustomIconsPref(preference)
-                            Toast.makeText(requireContext(), R.string.pref_clear_custom_icons_toast, Toast.LENGTH_SHORT).show()
+                            dev.droidtop.library.settings.Notices.flash(requireContext().getString(R.string.pref_clear_custom_icons_toast), context = requireContext())
                         }
                         .setNegativeButton(android.R.string.cancel, null)
                         .show()

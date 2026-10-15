@@ -2959,28 +2959,34 @@ the stack. One mechanism serves every surface: `TaskManager` in `:runtime-common
 a close path of its own. Every call works off the main thread.
 
 - **Ending an app: one path, strongest first** (`TaskPolicy.closeSteps`, `AppCloser`):
-  1. The active `PrivilegedShell` backend force-stops the package (the Shizuku app or Sui, or a
-     `priv.packages` provider plugin such as the official Shizuku plugin or a root provider: all are
-     reached through `PrivilegedShell`, never code in the task manager, and root is only ever an
-     enhancement behind the same interface).
-  2. Enginehost only: droidtop asks Enginehost to end its running game (`dev.enginehost.END_GAME`,
+  1. Enginehost only, asked first: droidtop asks Enginehost to end its running game (`dev.enginehost.END_GAME`,
      Enginehost's SPEC "Ending the running game"; answered to droidtop alone, by Android's record of the
      caller and droidtop's signing certificate). Android records the caller only for
      `startActivityForResult`, so an invisible activity of droidtop's (`EnginehostEndGame`, its own task,
      not in Recents) starts it and waits up to 4 s for the answer. "A game was running and has ended" is a
      confirmed close. "None was running" is `CloseOutcome.NotRunning`: droidtop's session for it is
-     stale (a launch cancelled on Enginehost's warning, or one that crashed), so the session ends, and the
-     next step is still asked because Enginehost's own screens may be open. An Enginehost without
+     stale (a launch cancelled on Enginehost's warning, or one that crashed), so the session ends and nothing
+     further is asked. An Enginehost without
      END_GAME and a blocked start fall through to the next step with nothing claimed. So Kill on an
      engine game is confirmed without Shizuku (Droidtop/tracker#289: it said "cannot confirm" after the
-     game had gone), and Quit on a stale one clears it.
+     game had gone), and Quit on a stale one clears it. It is asked before the helper because it needs none:
+     with the Shizuku plugin installed but not allowed full access, Quit on a cancelled launch used to open the
+     plugin's "run with droidtop's full access" sheet for a game that was not running (rig, build 1809).
+  2. The active `PrivilegedShell` backend force-stops the package (the Shizuku app or Sui, or a
+     `priv.packages` provider plugin such as the official Shizuku plugin or a root provider: all are
+     reached through `PrivilegedShell`, never code in the task manager, and root is only ever an
+     enhancement behind the same interface). A plugin that has not been allowed full access asks for it on
+     the first-use sheet because ending a game is the person's own action (Droidtop/tracker#378); Not now
+     fails this step with the plugin's own refusal and the next step is still tried.
   3. `ActivityManager.killBackgroundProcesses` (the `KILL_BACKGROUND_PROCESSES` normal permission),
      always tried last. It ends a process only while it is cached, and nothing confirms the result, so
      it is never reported as a close. It spares an app that is on screen, which is where a game is, so
      just before it droidtop presses Home on the display the app was opened on (`TaskManager.sendToBackground`,
      from `LaunchLedger`; an app droidtop did not open has no known display and is not moved) and gives
-     the app 1.2 s to stop (Droidtop/tracker#412: RetroArch kept running after Kill on the console). A
-     helper's force-stop needs none of this and is never preceded by it.
+     the app 1.2 s to stop. This is a best effort and it is not known to work: on the console (build 1809) RetroArch
+     was still in `ps` after it, hidden but alive (Droidtop/tracker#412), so the result stays "cannot confirm" and the
+     person is told that only a helper's force-stop ends an app for sure. A helper's force-stop needs none of
+     this and is never preceded by it.
   `ActivityManager.getAppTasks` / `AppTask.finishAndRemoveTask` is deliberately not a step: Android
   lists only tasks whose root activity is droidtop's own, so it can never find another package's task
   (this was the dead leg of the old `ConsoleRomProvider.quit`), and droidtop never closes its own tasks
@@ -3008,11 +3014,13 @@ a close path of its own. Every call works off the main thread.
   asks the provider again for a binder whose broadcast was missed. A
   surface never does nothing silently, and only a close that ended the session (`sessionOver`) is the Quick Menu's
   `QuitResult.Ended` (droidtop's running-game state clears on that alone, as the rule above already says).
-  The companion's Game tab Kill goes through `Library.killRunning`, the same path as Quit with one difference:
-  a close that could only reach `Requested` also ends the session, because the person said stop it at once and
-  droidtop has done all it can (a dead launch must not stay "Playing"), while the result still carries the plain
-  reason to the companion's banner. A helper that tried and `Failed` leaves the session standing. Before this the
-  Kill button discarded the outcome, cleared the session whatever happened, and the tab simply went away with no
+  Quit and the companion's Kill are one path, `Library.quitRunning`, run so that it finishes even when the
+  surface that asked is recreated (the helper's sheet or the Home press can do that; the banner read "Quit failed:
+  Job was cancelled" on build 1809): the companion's seams run in `CompanionState.scope`, not the activity's. A
+  close that only reached `Requested` or `Failed` leaves the session standing and puts the reason on the banner:
+  the game may well still be running (RetroArch was), so nothing may say it ended. A helper that was refused
+  reads "Couldn't end it: <its refusal>" and adds that Android was also asked and cannot say. Before this the Kill
+  button discarded the outcome, cleared the session whatever happened, and the tab simply went away with no
   word (Droidtop/tracker#412).
 - **The running game's session ends in one place** (`SessionMonitor`, `SessionLiveness`, Droidtop/tracker#289,
   #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
@@ -3023,10 +3031,12 @@ a close path of its own. Every call works off the main thread.
   on two looks in a row after the 9 s a launch is given to appear (the same data and grace as the launch
   watchdog; the list is shared within 2 s, `TaskManager.snapshotWithin`). A game screen of droidtop's own
   (Windows) is never judged by the task list and reports its own end. A launch whose dispatch throws never
-  becomes a session (`LaunchDisplay.startOn` clears it). Without a helper there is no evidence a process
-  died, so nothing is claimed: the session stands until Quit or Kill settles it, and Enginehost's END_GAME
-  "none running" answer settles it honestly. A non-destructive Enginehost state query would let the monitor
-  end an engine session by itself without a helper (open follow-up, tracked on Droidtop/tracker#289).
+  becomes a session (`LaunchDisplay.startOn` clears it). Enginehost's games need no helper: Enginehost
+  answers its `state` call (Enginehost SPEC "Reporting whether anything is open") with the number of tasks it
+  holds, and none on two looks ends the session, so Cancel on the no-sandbox warning, or Back on a startup
+  error screen, clears it within seconds (`EnginehostCapabilities.holdsTask`; an Enginehost without `state`
+  says nothing). For any other app without a helper there is no evidence a process died, so nothing is
+  claimed: the session stands until Quit settles it.
 - **The app in front is what droidtop last started.** `LaunchDisplay.dispatch`, the one point every
   droidtop launch passes, notes the package and display in `LaunchLedger` (process memory; a
   restart forgets it, which is the honest direction). The Quick Menu's Quit row closes
@@ -3754,6 +3764,8 @@ on touch, rest the pointer for a mouse, a short focus dwell for the pad. A tip i
 only inside the topmost layer on the hint bar (`FocusedHints.tipsAllowedFor`): the page's tip goes while the Quick Menu,
 the Start menu or a dialog is open over it. Sentences are for real errors only;
 there are no "Info" links. The rest of the app follows the same rule.
+explanation that still has to exist is on the focus line and in Info (Y) (7k, "Explanations: no tooltips";
+the tooltip bubble was deleted 2026-10-14). Sentences are for real errors only; there are no "Info" links. The rest of the app follows the same rule.
 
 ### iiSU uses Android's own secondary-display home
 
@@ -5993,6 +6005,17 @@ believable), rounded to a quarter and never below 1: 2x on the console, 1x
 on a desktop monitor. The viewport sends it with every size, so a change
 applies the next time the desktop is shown.
 
+**Desktop resolution (decided 2026-10-14, Droidtop/tracker#426).** Beside the
+scale, "Desktop resolution" (`DesktopScale.RESOLUTION_KEY`): Full (default),
+75% or 50% of each side of the surface. The output is asked for the smaller
+size (`DesktopScale.outputSize`, even sides) and the output scale is
+multiplied by the same fraction (`outputScale`), so the layout keeps its
+logical size and only gets blurrier; the present path already scales the
+buffer to fill the view, and the pointer transform takes the smaller output
+size, so input lands where it is drawn. Faster because the compositor draws,
+and screencopy delivers, fewer pixels. Applies the next time the desktop is
+shown.
+
 **The frame path's threading (rebuilt 2026-09-24).** `:host-bridge`'s native
 client has one dispatch thread, and it owns everything the compositor's
 events touch: the capture loop and the output configuration. It waits on
@@ -6031,6 +6054,29 @@ Shift's own events are exempt because they carry `META_SHIFT_ON` too. Caps
 lock is deliberately not read as shift: the Caps Lock key is forwarded like
 any other and toggles the container's own caps state, which a synthesized
 Shift on top of it would cancel.
+
+**Modifiers (decided 2026-10-14, Droidtop/tracker#147, #555 D1).** A key event
+alone never changed a modifier in the container. wlroots handles
+`zwp_virtual_keyboard_v1.key` with `update_state = false`
+(`types/wlr_virtual_keyboard_v1.c`, `virtual_keyboard_key`), so a Shift, Ctrl,
+Alt or Super press reached the focused client as a key while the keyboard's
+modifier state, which every other key is read through, stayed empty: on
+emulator-5560 (build 1771) `Abc_X|Y>Z*:1` arrived as `abc-x\y.z8;1`, Ctrl+C in
+foot typed `c`, and no sway binding with a modifier could fire. The synthesized
+Shift above was sent and had no effect for the same reason. The state changes
+only through `zwp_virtual_keyboard_v1.modifiers`, so `HostBridge` keeps it for
+each of its two virtual keyboards (`KeyboardModifiers`, `:host-bridge`): a held
+modifier key is depressed, a Caps Lock or Num Lock press toggles its modifier in
+the locked set, and after a key that changes them the new masks are sent, the
+order a physical keyboard's compositor uses. Which modifier a key sets is read
+from the keymap that keyboard was given (`XkbModifierMap`: its `modifier_map`
+lines, and a key whose first symbol is a mapped modifier symbol, such as a
+layout's right Alt that is `ISO_Level3_Shift`, sets what that symbol's key is
+mapped to), never assumed, so the German layout's AltGr is Mod5 where the US
+map's right Alt is Mod1. The US map is read from the same embedded text the
+compositor gets; a layout set later (Keyboard layout below) replaces the layout
+keyboard's map, and keys still held are re-read under it. A new connection
+starts with nothing held.
 
 **Gamepad.** The right stick drives the pointer and the two stick clicks are
 left/right button; the D-pad, face buttons, shoulders and left stick are left
@@ -7094,8 +7140,8 @@ owns it, found by the rig's new-user pass and fixed there.
 
 Use labels and short values across screens, dialogs, settings, launcher and desktop. No explanatory
 sentences on screens; row subtitles are values or 2–4 words. Remove "what this does" and "why"
-text. Put useful explanations in one shared tooltip: pointer hover, delayed pad focus or touch
-long-press. No Info links or parallel detail sheets. Hide Shizuku/Sui actions while unavailable.
+text. Put useful explanations on the focus line and in Info (Y); the tooltip this once named is gone
+(7k, "Explanations: no tooltips"). No Info links or parallel detail sheets. Hide Shizuku/Sui actions while unavailable.
 Errors and confirmations may use one short sentence; empty states use 2–3 words. Keep one-line
 warnings for deletion, trust and sign-in. Use sentence case, one name per concept, verb labels on
 buttons, no developer notation or backend errors. Keep ids, package names, URLs and paths out of
@@ -7385,6 +7431,12 @@ Two concrete references to build from rather than design blind:
     scanner was told about by hand outside the roots with the store part, which reads those folders). The
     folder stays where the installer put it. `addGame` is the function #407's flow calls to make a
     row; it takes a prefix made here.
+  - **Unpack first, Wine second (decided 2026-10-14, Droidtop/tracker#405).** Choosing an installer (picked or
+    typed) takes its files out without running it, as below, and only when that cannot be done does the screen run
+    it in a new prefix of its own: `WindowsInstalls.install` tries `InnoExtract` for a `.exe` and falls back to
+    `begin` (the new-prefix route above) when the installer is not an Inno Setup one or the unpacker cannot be had,
+    saying why in the row's line. A `.msi`, `.bat` or `.cmd` goes straight to Wine. There is one set of rows for
+    it, not one for unpacking and one for installing.
   - **Unpack an installer (2026-10-09, Droidtop/tracker#10).** The same screen takes the files out of
     an Inno Setup installer (GOG's offline installers are) without running it: `InnoExtract` runs
     innoextract 1.9 over the installer into a NEW folder (the installer's name, never an existing
@@ -9712,8 +9764,7 @@ System tab.
 
 **UI modes and ControlAccess (decided 2026-10-09, Droidtop/tracker#414).**
 `ControlAccess` (`:runtime-common`) is the one restriction model. It takes
-the UI mode as a value (Full, Kid, Kiosk; Guest is reserved and gets its
-rules when it is defined, Droidtop/tracker#420) and answers, for the
+the UI mode as a value (Full, Kid, Kiosk, Guest) and answers, for the
 companion and the Quick Menu alike: which panels show (`ControlPanel`, the
 companion's tabs and the Quick Menu's sections named once), which panels
 are read-only, which non-catalog rows show inside them (`ControlRow`),
@@ -9733,17 +9784,53 @@ sets, so an added mode fails until its sets are written.
   companion's own preferences (the Companion catalog group), Kid's volume
   cap, the passkey and the UI mode choice. The way out (Leave Kid, Leave
   Kiosk on the Quick Menu's System section) stays.
+- **Guest (decided 2026-10-14, Droidtop/tracker#420).** For somebody else's
+  hands on the owner's handheld. Kid's limits, but the whole library
+  (`kidGamesOnly` off) and none of Kid's own parts: no volume cap and no
+  play-time limit (7f "Play-time limits"), and no passkey of its own. Settings
+  and the places (Game sources, Social, Downloads and installs, Updates,
+  Plugins) are hidden as in Kid, so there are no stores, accounts or plugin
+  installs, and the companion shows Home, Game and Performance as in Kid.
+  Because the owner's private things are on the Quick Menu, Guest drops its
+  Notifications, Social, Plugins and Downloads sections (Kid and Kiosk keep
+  every section, as before). It is chosen from the UI mode choice like the
+  others, and leaving it is the same Leave row: with the Kid and Kiosk
+  passkey set it asks for it, with none it asks yes or no.
 - **Passkey (decided 2026-10-09, Droidtop/tracker#414 owner question 4,
   on its default).** ES-DE asks for a passkey to leave its Kid and Kiosk
   modes (`UIModeController`); droidtop had chosen no passcode. Now an
   optional one, none by default (`UiModePasskey`): Settings > "Passkey to
-  leave Kid and Kiosk" takes 4 to 8 digits, stored as a salted SHA-256,
+  leave Kid, Kiosk and Guest" takes 4 to 8 digits, stored as a salted SHA-256,
   never the digits, and its row says only whether one is set, with the
   recovery line "Forgot it? Android Settings > Apps > droidtop > Clear
   storage resets droidtop's settings." With none set, Leave asks yes or no
   as before. With one set, Leave opens a keypad (`UiModePasskeyActivity`)
   worked by touch or by pad (D-pad between keys, A presses, B cancels): a
   wrong passkey says "Wrong passkey" and stays, the right one leaves.
+
+**Play-time limits (decided 2026-10-14, Droidtop/tracker#421).** Settings >
+Play time (`PlayTimeSettings`, hidden in Kid, Kiosk and Guest like the other
+items that control the restriction) sets a limit per day and one per week, in
+minutes, none by default. They count all play together, not one game's, and
+they belong to Kid mode, the mode that is handed to a child: play is counted,
+and the limits hold, only while Kid is on (the owner said "for all play" and
+asked that Guest lack the play-time part). `PlayTimeLimiter` (`:app`, started
+in `DroidtopApplication`) watches `LaunchDisplay.running`: every 15 s while a
+game runs in Kid it adds the elapsed time to the ledger (`PlayTimePrefs`,
+seconds per local day, kept two weeks; the week starts on Monday) and asks
+`PlayEnforcer` for the step. Five minutes before the tighter limit it warns
+once, at the limit it says the game closes in 60 seconds, and then it quits the
+game through `Library.quitRunning`, the one quit path, so the player saves the
+way a Quit from the Quick Menu does; a quit that did not end the game is asked
+again every tick. A warning is a toast (it shows over any app) and, where
+notifications are allowed, a notification that returns to droidtop. A game
+started after the limit is told and closed after the same minute. The
+companion's Home shows "Today 45 min of 2 h · This week 3 h 10 min of 10 h"
+under the status line in Full and Kid while a limit is set
+(`ControlRow.PLAY_TIME`, Kid's alone among the restricted modes). Real play
+time is not stored per game (7g): this ledger is the only measure, and counts
+droidtop's own running-game state, so a game droidtop never saw start is not
+counted.
 
 **Screensaver.** ES-DE's four kinds — dim, black, slideshow and video —
 after Off/2/5/10/15/30 minutes (today: the slideshow only), with the
@@ -11665,7 +11752,7 @@ follows:
 ### Ownership is a fact (Droidtop/tracker#397 slice B)
 
 How the account holds a store row is `PcInfo.holding` (`StoreHolding`), the
-same four meanings for every store, never a name of its own (the old "Steam
+same five meanings for every store, never a name of its own (the old "Steam
 Family" and "Steam Free" groups, `PcStoreNames.groupOf`, and `PcInfo.source`
 are gone; where a game came from is `PcSource`, read from the store id):
 - **OWNED**: in the account's library on that store, however it got there. A
@@ -11674,6 +11761,7 @@ are gone; where a game came from is `PcSource`, read from the store id):
 - **FREE**: a free-to-play catalogue row the account holds a licence for but
   never added (today: Steam only). No store maps "free" or "claimed" to it.
 - **NOT_OWNED**: installed on the device but no longer held by the account.
+- **WISHLIST**: on the account's wishlist and not owned; see "Wishlist" below.
 - **One row per game per store.** When a store reports one game under more
   than one holding, its row carries the strongest: OWNED, then FAMILY, then
   FREE, then NOT_OWNED (`StoreHolding.strongest`; Steam's `SteamOwnership.statusOf`
@@ -11682,6 +11770,28 @@ Labels are one function (`StoreHolding.label`): "Owned", "Shared with you",
 "Free to play (not in your library)", "No longer in your library". Which
 lists show which holding is 7j's `listExclusion`. `STORE_LIST_RULES` 6 makes
 every store row read again with its holding.
+
+**Wishlist (decided 2026-10-14, Droidtop/tracker#134).** The games the person
+does not own come from the stores' wishlists, on a shelf of their own labelled
+not owned, never mixed into what they have. A fifth holding, **WISHLIST**
+("On your wishlist (not owned)", the weakest in `strongest`'s order), is a
+store row that is not installed and never will be from here. A store with a
+wishlist to read returns its rows from `StoreLibrary.wishlist`, from
+droidtop's own copy (`Wishlist`: a small file per store under `files/wishlist/`,
+written by the store's sync, so no network when the library is read);
+`PcLibrary.storeRead` adds them after every owned row and drops a wished game
+whose title is spelled the same way (`StoreIdentity.titleKey`) as one the person
+already has, in any store, so an owned game never folds into a wishlist card.
+`listExclusion` rule 6 keeps WISHLIST rows out of every ordinary list, count
+and search; the Ownership facet shows them, and PC Games' Overview ends with the
+shelf "Wishlist (not owned)" (`SHELF_WISHLIST`, not on Home). A wishlist card's
+corner says Wishlist and its primary button says "Find on <store>": A opens the
+store's own pages searched for the title (`StoreWeb.search`), where the person
+can buy it; nothing can be installed from here and nothing is added to or removed
+from the wishlist. GOG's wishlist is read (`GOGWishlist`: the ids at
+`embed.gog.com/user/wishlist.json` with the sign-in token, then a name and a
+cover for each id not already in the copy, at most 200). Steam's and Epic's
+are not read yet.
 
 **Recently added** means added since that source's first sync or scan
 (`SyncBaselines`, one record per `PcSource` id, stores and game folders
@@ -11713,7 +11823,15 @@ listing of a game folder says whether a marker is there
 folder reads nothing). GOG's is `goggame-<id>.info` (the file whose
 `rootGameId` is its own `gameId` is the game, every other one is DLC;
 `buildId` is the build); Epic's is `.egstore/<install id>.mancpn`, whose
-`CatalogItemId` is the id droidtop's Epic rows are keyed by. What it found is
+`CatalogItemId` is the id droidtop's Epic rows are keyed by; Battle.net's
+(decided 2026-10-14, Droidtop/tracker#404, low priority) is `.build.info`, the
+plain-text table Blizzard's installer leaves: a header of `Name!TYPE:size`
+columns and a row per branch, whose active row names the game's product code
+(`wow`, `pro`, `d3`) and its `Version`. Battle.net has no store droidtop signs
+in to, so it is a marker with the id `battle.net` and nothing more: the Source
+facet and the focus line say "Battle.net", the build is the installed version,
+and nothing asks it for updates. The game's name stays its folder's; droidtop
+keeps no table of product codes. What it found is
 written on the row (`PcInfo.marker`: store id, game id, build, DLC ids) and the
 build is the row's installed version, beating anything a folder name says.
 Consumers read the row; nothing else opens these files. A folder with a marker
@@ -12740,7 +12858,7 @@ it:
 
 | Steam Deck / Big Picture | Others | PC Games |
 | --- | --- | --- |
-| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps only recent activity across every library: Continue playing, Recently added and Update available (`homeShelves`, `HOME_SHELF_IDS`). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
+| Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (nonzero indexed first-seen time, newest first), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps one row of games, Recent games (Continue playing, else Recently added, `homeShelves`); updates and additions are its What's new cards ("Home" below). Every shelf is capped at 24; Recently added is hidden when no entry has a first-seen time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
 | Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (Select). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **Select on a pinned tab** opens its Options: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first. The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are one row of Overview, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) take this page's row when they exist. |
@@ -12947,6 +13065,22 @@ Install, Update and Downloading verbs of the primary action (#223), which
 land in `PcPlayState` and appear here without a change to the page. No
 version rollback (#231).
 
+### Home (decided 2026-10-14, Droidtop/tracker#485 F7a; the final design's section B)
+
+What I was playing, what changed, who is around, and the way into my library. Home is not a list, so it has no Filter and no Sort By: X does nothing there, **Y is Search**, L1/R1 step the strip, Select is the focused game's Options, A plays or opens. Top to bottom:
+
+- **The top band** (48 dp, `HomeTopBand`): touch only, in the accessibility tree, never a stop of the pad. Over a scrim from the ground at 60 percent to clear, right to left: the status facts (`StatusCluster` itself, on a solid plate in full ink; tapping them opens the Quick Menu), a divider, Friends (the avatar, with a ring while the person's own presence on a service is not Offline; shown while a social service is on), the bell (unread messages; opens the Quick Menu), Search, and Downloads with a progress ring while a job runs (`PluginJobsCenter.entries()`). Every target is 48 dp with a content description. The floating status cluster is not drawn on Home: the band carries the facts.
+- **Recent games**, headed: Continue playing, else Recently added, across every library (`homeShelves`, one row, id `recent-games`). Up from it does nothing.
+- **The strip** (`HomeStripRow`): What's new, Friends · n and Downloads · n, stepped with L1/R1 from anywhere on Home; the pills are not a stop, Down from Recent games goes to the active tab's first card, and Up goes back. What's new is always there ("You're up to date" when empty); Friends while a social service is on; Downloads while a job runs or is paused.
+  - **What's new** (`HomeModel.whatsNew`): at most 12 cards, newest first: a game update ("v0.9.6", opens the game's page), games one scan added to one place ("212 games added to SNES", counted as the library counts, hidden games left out; one game reads by its name, "Added 2 days ago"; opens that library), one card for plugin updates, "+N more" past the cap (opens Updates), and **last, at most one Needs attention card** ("3 things need attention"). Chores are never news.
+  - **Friends**: in game first, then unread, then online ("Playing Hades"); A opens Social.
+  - **Downloads**: name, progress and state ("45% · Paused"); A opens Downloads.
+- **Shelves** a plugin asks for (plugin-api C11), then **Your library** (the Retro Games and PC Games tiles) as the last stop.
+
+**Needs attention** (`needsAttentionScreen`): one row per item, each with one verb as its value. A system that has games in the library and is missing a BIOS file ("PlayStation needs a BIOS") or has one that matches no known good dump ("PlayStation BIOS doesn't match") are separate items with **Set up PlayStation**, which opens that system's settings (its BIOS files); the check reads every game folder's `bios` files against `BiosDatabase`, off the main thread, once per change in the set of systems with games. Games with no artwork are one item, **Find artwork**, which starts the scrape job. A seen item is meant to stay quiet until its state changes (`HomeModel.unseen`, keyed by the item's state).
+
+Not built yet (tracked on tracker#485): the unrecognised-files item (the scan does not keep its unmatched files), plugin update counts on the card, the hero following focus and the art order (F7b), Your library's systems and Random game (F7b), the Shelves page and the shelf cap (F7b), and sending the items to Notifications (needs S1's Recent list on main).
+
 ### Home art
 
 Droidtop/tracker#253, 2026-10-02. The PC Games home is led by the player's
@@ -12969,9 +13103,8 @@ own games, in droidtop's own treatment:
   which used to bring the shell back on the last view, the Retro games
   (Droidtop/tracker#361). Home has
   no strip and the shoulders do nothing there; B does nothing on Home (it is
-  the root). Home carries no chrome of its own: the shelves, a destination row
-  and the shell footer, its first row starting under the floating status
-  cluster (the band Steam's top bar takes).
+  the root). Home's chrome is its top band, which carries the status facts
+  ("Home" above), its strip and the shell footer.
 - **Home links to the libraries** (owner, 2026-10-03, Droidtop/tracker#273: Home
   is the hub and links to the Retro and PC menus): a row of two tiles, Retro
   Games and PC Games (`HOME_DESTINATIONS`), is the last stop of Home's one list,
@@ -12982,8 +13115,9 @@ own games, in droidtop's own treatment:
   from any other section whose own handlers have nothing left to close (Retro
   Games' system list, Apps, a place, Settings) to Home; on Home it does nothing.
 - **Home shows all recent activity, and only that** (Droidtop/tracker#273):
-  its shelves are Continue playing, Recently added and Update available; the
-  library's other shelves are PC Games' Overview. Continue playing
+  its games row is Continue playing, else Recently added, and updates and
+  additions are What's new cards ("Home" above); the library's other shelves
+  are PC Games' Overview. Continue playing
   and Recently added also take the Retro library and the launcher apps that
   are games (`AppCategoryRules`: Android's flag and the person's marks),
   merged with the PC games by last-played and by added time (`pcShelves(...,
@@ -13920,8 +14054,10 @@ view strip, the game page's tabs, the Quick Menu's rail). The D-pad never reache
 a header or status cluster. The hint row and the left menu are touch routes to
 their corresponding actions.
 
-The left menu's order is Home, PC Games, Retro Games, Apps, the places, then
-Settings. Home (the PC section's shelves, §7i "Home art") is the first row;
+The left menu's order is a Search row (not in Kiosk and Kid), Home, PC Games, Retro Games,
+Apps, the places, then Settings. Search opens the one search (12a "One search"), is
+not a destination, and carries no "you are here" mark; while a game runs, Resume leads
+and Search follows it. Home (the PC section's shelves, §7i "Home art") is the first row;
 the current-destination mark follows which of Home and PC Games is showing.
 
 The left menu is Steam's main menu, measured (Droidtop/tracker#273 slice 4;
@@ -14071,13 +14207,16 @@ so each view keeps its own filters and sort. Pure and unit-tested
   5. A FREE row is in the library while it is installed or has been played:
      derived from facts the row has, never stored. To keep a tried free game
      out, the person hides it.
+  6. A WISHLIST row (a game on a store's wishlist that is not owned, 7g
+     "Wishlist") is out of every list; the Ownership facet and the Wishlist shelf
+     show it.
   **No silent disappearance:** when rule 4 keeps free rows out of a grid view,
   its last item is a row, "1,506 free-to-play games not in your library are not
   shown. Show them"; A turns the option on and the row reads "Showing 1,506
   free-to-play games not in your library. Hide them". Down from the last row
   reaches it, nothing wraps onto it, and no row speaks of Hidden games.
   **Ownership** is a PC facet (Owned, Shared with you, Free to play (not in your
-  library), No longer in your library) counted over every row that is not
+  library), No longer in your library, On your wishlist (not owned)) counted over every row that is not
   hidden, so its counts add up to the store rows; other facets count what the
   list shows. The launcher's **search** has two switches under its field,
   "Include hidden games" and "Include free-to-play games not in your library",
@@ -14591,6 +14730,10 @@ setting (section 7b), which is what lets it use the shell's own menu row anatomy
 tokens are absolute against the menu overlay surface and legible over a dark ground and
 nothing else.
 
+
+### The hint bar fits (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+The bar names every button that acts, and Start and R2 always sit first, on the left. When the hints do not fit on one line at the current text size (measured, not estimated), the bar gives up room in a fixed order (`HintFit`): first Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2), then L1/R1 drop (the strip they step shows its own shoulder glyphs), then Select drops. **A and B never drop.** Whatever still does not fit wraps in a sheet's bar and scrolls in a full-width one, as before. A screen reader hears the whole set as the bar's description, however much was folded, and the bar offers the custom action **Read controls**. Long-press Select is not used for this: it is the Quick Menu fallback.
 ### Places: stores, friends, downloads, updates and plugins (directed 2026-10-01, Droidtop/tracker#258)
 
 The left menu is where things live. Beside the three tabs it lists five
@@ -14612,7 +14755,16 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
   "Not signed in", Folders "3 folders · 412 games". The column can be scanned by glyph: the
   stores keep the globe, Folders the folder, Add a game and Imported the game controller, Storage the
-  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. A store page's holding rows
+  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. Under the heading **Get games** the place lists every installed
+  source plugin (`AcquireContentSources.listings`), ready or not, with its state as the row's value
+  (Ready, Waiting for your approval, Denied, Turned off, Disabled), so a newcomer with no folders and an
+  empty library reaches a search from the first minute, which is the one route PC Games takes with no game
+  folder too (Droidtop/tracker#540). A ready source opens its search with no library system needed
+  (`SourceScreens.entryScreen`): a source that serves only PC systems opens straight on the PC search,
+  any other asks "PC games" or the system, listing only the systems it serves; a source that is not ready
+  opens its page in Plugins, where approving or turning it on is. With no source installed the group is
+  one row to Plugins, never a blank. The provider stays a detail: this is a row among where games come
+  from, with its state in the value column, not a screen of its own. A store page's holding rows
   ("Shared with you · 573", Free to play) are pressable like Open library:
   the shell opens PC Games filtered to that store and that holding
   (`PcSource.holdingItemId`), and the pill says so. **Folders**
@@ -14983,6 +15135,88 @@ provides `social.provider` sees its own service only, and no capability for
 other apps' conversations exists); the list is emptied when notification access
 is lost.
 
+### Notices: one component for every warning (decided 2026-10-14, Droidtop/tracker#485)
+
+A condition the person should know about (an unofficial plugin, a feature that is off for safety, a source that did not answer) is one **notice**, drawn the same way on every surface. It replaces grey paragraphs, "(high risk)" suffixes, red banners and per-screen hint lines. The design went through the society review on Droidtop/tracker#485 (final design, comment 6178078991).
+
+**Model** (`runtime-common`, `dev.droidtop.library.settings.Notice`): a tone (`Info`, `Caution`, `Danger`; Danger is droidtop's own and only appears in the danger dialog), a title (at most 40 characters, the condition, no period), a body (at most 90, the outcome), a recommendation (danger only), details (the exact terms, copyable, shown in Info), one action (a label of three words or fewer), and the plugin it is from (`source`, from the approval record; null for droidtop). `NoticeItem` puts a notice in a catalog screen as a row, a group notice (under the group's label) or the page banner (under the header, at most one per page). A notice cannot be dismissed: it is state from code and goes away with its condition.
+
+**Colours** (`NoticeColors`, in the shared library `vendor/notices` (Droidtop/notices, GPL-3.0, pinned as a submodule like the sandbox library; Enginehost adopts it too), derived once per palette from the theme's own `GamingThemeColors`, never in a composition): per tone an ink (glyph, title, edge bar), an opaque plate mixed from the ground toward the ink (0.14 info, 0.20 caution, 0.24 danger) and a body colour, plus the danger fill and its label for the risky button and the Full access chip. Info is the theme accent, unless the accent is within 20 L* and 30 degrees of hue of caution under normal vision or simulated deuteranopia, protanopia or tritanopia; then it is the neutral text colour and the glyph tells the tones apart. Caution is a fixed amber (`#FFC56B` on a dark ground, `#8A5A00` on a light one); danger is the palette's danger. Both keep their hue and move only in lightness: to reach 4.5:1 (7:1 while Android's high-contrast text is on) and, for danger, to stay 20 L* from caution under the three simulations; contrast wins when both cannot hold (on some grounds no readable pair of lightnesses is 20 L* apart, as on Slate's dark scheme; the glyphs then tell caution from danger). Material's error roles are set from these. `:ui-shared` (`NoticePalette`, `LocalNoticePalette`) turns them into Compose colours; the Gaming palette provides the active theme's, and a View surface derives its own from its theme's background, text and accent.
+
+**The card** (`:ui-shared`, `NoticeCard`): the plate with a 4 dp ink bar on the leading edge, a 20 dp glyph (circle i, triangle !, octagon !), the title at 16/20 semibold in the ink, "from <plugin>" at 14 sp muted after it, the body at 15/19, and trailing either the action as a chip (at least 32 dp, 14 sp) or a chevron when there is more in Info. Rows and group notices have 3 dp corners and are at least 48 dp tall (56 with a body); the banner has 6 dp corners and 12 dp below it. It fades in over 150 ms with a 4 dp rise, scaled by the system animator scale; nothing pulses or blinks. Gaming, the companion and Standard draw this one card; Standard's Preference rows host it through a ComposeView (`NoticeViews`), because the forked Launcher3 cannot depend on `:shell-gamepad` -- which is why `:ui-shared` is a module of its own.
+
+**Behaviour.** A notice is a stop of the pad only when something happens there (an action, details, or text cut on the row); otherwise the cursor passes over it. A runs the action, or opens Info when details are all it has (so a screen where Y is already bound, Games' Sort By, still reaches Info). Y is Info, the existing verb. The hint row names only what the notice answers. Info is a sheet with the title, body and details and a Copy chip on Select. A screen reader hears one node, tone first ("Caution, Unofficial plugin, ..."), as a polite live region for a group notice or a banner, with the custom actions Info and the action's label.
+
+**Plugin notices** (docs/plugin-api.md 1.3, 1.6; built 2026-10-14). A plugin's view has a `notice` node (info or caution, never danger; a section notice or the page banner) drawn as this same card with "from <plugin>". The limits (title 60, subtitle 140, details 500, the action's label 20; two notices a section and only of different tones, three a view, one banner a page) live in `docs/view-limits/plugin-view-limits.json`, the one file the host (`PluginViewLimits`, packaged as a resource), `gg.lint_view` and `PluginViewLint` read. A plugin notice may not reuse one of droidtop's own notice titles (the file's `reservedTitles`). A reply's `data.notice` is drawn instead of its message until the page's next action. An error reply is drawn as a caution notice with its code in Info; `PERMISSION_DENIED` naming a declared permission opens Permissions, `SIGN_IN_REQUIRED` offers "Sign in". What the host changed to draw a view is a plugin message (logcat tag `PluginMessages`, the last 50 per plugin kept on disk and listed on the plugin's page with Copy all). `ui.toast` is a flash named after the plugin (a platform toast while no droidtop surface is on screen), `ui.prompt@1 confirm` asks on the confirm card, and every call envelope carries `host.viewFeatures`. The unofficial plugin (U1) and unofficial list (U2) review pages open with a caution banner instead of a grey paragraph.
+
+**Copy rules** (every string a person reads in a notice, a dialog or a field; also in DESIGN-LANGUAGE "Copy"):
+
+1. Labels are three words or fewer: verbs for actions, nouns for settings.
+2. Notice titles are 40 characters or fewer and state the condition. Never "Warning:".
+3. Bodies are 90 characters or fewer and state the outcome, not the mechanism.
+4. The why goes in Info (Y). A hint that only restates its title is deleted.
+5. A field's label is its row title; placeholders are noun phrases; fields hold no instructions.
+6. No banned word in a title, body, recommendation or label: sandbox, root, Shizuku (except inside the Shizuku plugin, the integration the person chose), signing, key (cryptographic), fingerprint, helper, host, index, catalog, digest, IME, provider, tier, seccomp, adb. Details may be exact.
+7. A recommendation is one "We recommend <button>." sentence, on danger only, and names a button.
+8. An input error says what is allowed.
+9. In a modal the safe choice comes first (left) and has the focus.
+10. Never tell a person to do something they cannot do from where they are; give them the action.
+
+**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`; and byte, duration and relative-time formatting outside `ValueFormat` ("Values" below). Each rule is switched on in the commit that clears its last site.
+
+### Values: one formatter (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+Every value a person reads that is a size, a time or a state goes through one formatter, `ValueFormat` (`runtime-common`, `dev.droidtop.library.format`). It is in `runtime-common`, not `:ui-shared`, because `:library-core` formats too (store sizes, free space) and cannot depend on a Compose module. The rules:
+
+- **Sizes** are decimal, as storage is sold and as Android's Settings counts it: whole KB and MB (never "0 MB" for something that exists), one decimal for GB and TB ("12 KB", "420 MB", "1.5 GB"). Free space reads "12.3 GB free of 128.0 GB".
+- **Durations** leave out what is zero: "2 h 5 min", "2 h", "45 min", "Under a minute". The caller says what absence means ("Not played yet", or nothing); a duration never reads "0 min". A screen reader hears whole words ("2 hours 5 minutes").
+- **Time left** is never more exact than the rate behind it: whole minutes under an hour, quarter hours above ("About 8 min left").
+- **How long ago**: "today", "yesterday", "5 days ago", "3 weeks ago", "4 months ago", "over a year ago"; a recent check reads "Just now", "5 min ago", "2 h ago".
+- **Clock times** follow the device's 12 or 24 hour setting. **Percentages** are whole numbers. **Counts** are grouped ("1,234").
+- **States** have one word each: On, Off, Running, Stopped, Installed, Not installed, Connected, Disconnected, Waiting, Failed, Unknown. A plugin's typed `state` value maps onto these, and anything else reads Unknown.
+
+Digits use the root locale, so a decimal point never becomes a comma inside English copy. The per-screen copies this replaced (Containers' storage, the companion's sizes and play time, the PC game page's play time and "last played", the theme renderer's `playtime` text, the store content sheet's sizes, the download size on capsules, the companion's free space, and Android's `Formatter`/`DateUtils` calls) are deleted; `check-ui-rules.sh` rule `formatters` (on) fails a new one. The ported store code under `stores/` keeps its own.
+
+### Asking before a change, and the flash (decided 2026-10-14, Droidtop/tracker#485)
+
+**The danger dialog** (`NoticeDialogs.confirmDanger`, drawn by `:ui-shared`'s `ConfirmDialogCard`): Steam's shape. A centred dark card, min(480 dp, 90% of the window) wide, on a 0.6 scrim; the octagon and the title at 22/28 bold; the outcome; the recommendation ("We recommend Cancel.") in the danger ink; the plugins it is about; a Details row; and two 48 dp buttons side by side, **Cancel** on the left with the focus, the risky button on the right in the danger fill. There is no second-press arm and no delay: Cancel has the focus, so a mashed A cancels, and reaching the risky button is a deliberate move and a press. B, a tap on the scrim and Cancel all answer Cancel; Left/Right move between the buttons, Up reaches Details, Y opens Details. A danger dialog appears only when something changes (an install, an update, a different maker, protection failing to start); afterwards the page says it quietly. `NoticeDialogs.confirm` is the same card for an Info or Caution question with no fill on the proceed button. Code anywhere asks and suspends; the surface on top (the last to attach as a host) draws the question in its own window, one question at a time, and with no surface attached the answer is Cancel, so nothing risky happens unseen. Gaming draws the card; Standard's settings ask with a platform dialog whose default button is Cancel.
+
+**The flash** (`Notices.flash`): a corner card at the bottom right above the hint row, at most 320 dp wide, the tone's glyph and up to two lines (four at font scale 1.3 and above) of 14 sp text, led by the plugin's name for a plugin's flash. It is drawn in a window that never takes focus, so the page's focus and hints are untouched; it stays for the longer of 4 s and Android's recommended accessibility timeout and never less than 1.5 s, and is announced politely. Nothing in a flash needs action; acknowledgements are past tense with no period ("Saved", "Copied").
+
+**Recent**: every flash is also kept in memory (the last 50, with time, source and tone) unless it was marked private, and shown as a "droidtop" group at the top of the Quick Menu's Notifications tab, with an unread dot on the group and the tab, and Copy all on Select. It is a source of its own, so it shows without notification access.
+
+### Page anatomy (decided 2026-10-14, Droidtop/tracker#485 F2a)
+
+Every catalog page is built the same way, top to bottom (the final design on tracker#485, section C.1):
+
+1. **The header** (`PageHeader`): the thing's picture (64 dp, its own art or a glyph), its name, a byline ("Droidtop · v1.4.0") and its fact chips. Not a stop of the cursor; a screen reader hears it as one heading.
+2. **A search field**, when the page has one, above the bar, reached with Up.
+3. **The button bar** (`ButtonBarItem`): at most three buttons that do the page's job, then **More** for the rest. It is the first stop and has the cursor when the page opens (on the primary button). One primary at most, drawn in the launch fill; destructive buttons sit in More or after a rule and always confirm, Cancel first. A button that cannot act says why in its label ("Needs Wi-Fi"), in full ink; only its plate dims. Buttons are at least 48 dp tall and 120 dp wide (the primary 160 dp), and a label is never cut: it wraps and the bar grows.
+4. **One page banner** at most (a notice, "Notices" above).
+5. **Sections**: a label, then rows.
+6. **The focus line** (`FocusLine`): the focused row's sentence in 16 sp under the list, with room kept for three lines so the list never changes size as the cursor moves; past three lines it ends "Y Info", never a silent cut. Not a live region.
+7. **The hint bar**, with its fit rule (section 7j, "The hint bar fits").
+
+The model is `CatalogPage(header, buttons, more, groups)`, built once per refresh by `pageScreen(...)`. Every renderer reads it through the `groups` it always read: the header and the bar become the first group's two rows (`PageHeaderItem`, `ButtonBarItem`), so search, the companion and Standard's Preference rows need no second loading path, and the search index skips both. Gaming draws them with its own cursor (Left and Right move along the bar), the companion by touch, Standard through `PageViews` in a ComposeView. `CatalogScreen.layout` says whether a screen is one list, the two-pane category layout (three or more sections) or a strip of views of one list.
+
+**Empty, loading and error** are one `StateBlock`: a 48 dp glyph, a title of at most 32 characters, one body line and a next action (an empty state always has one); loading names what is slow after two seconds, never a bare title or an endless spinner; an error is a caution notice with one action and the raw text in Details.
+
+**The focus ring** (`FocusRingInks`) is two opaque edges: a 3 dp outer edge in the theme's accent (4 dp with high contrast) and a 1 dp inner edge in black or white, whichever is farther from the accent. Whatever the ring lands on, pure white, pure black or the accent's own colour, one of the two edges stands out by at least 3:1 (`GamingThemeMappingTest`). It no longer fades or breathes: a 60 percent ring that breathed to 24 percent vanished over light capsule art (low-vision review, R.4 #7).
+
+### Explanations: no tooltips (decided 2026-10-14, Droidtop/tracker#485 F2b)
+
+The tooltip bubble (`HintTip`) is deleted. A row's explanation is on the **focus line** under the list while the row is selected, and in **Info** (Y) with the rest; a row that has one shows a 20 dp info glyph, the hint row says `Y Info`, and a screen reader hears "More info available". **Accessibility > Info text** chooses where it shows: **Bottom line** (the default) or **Under each row** (`ReadingPrefs`; every renderer reads the one value). A screen's own explanation is the focus line's text when the selected row has none. The other bubbles moved to visible text: the PC game page's full paths and links are on its detail strip, the task manager's "not confirmed" reason shows under the selected row, the companion's heat card says "Battery temperature", and the key setup screens show their credit line and the current step's how-to. Every screen must make sense with every optional setting off and without pressing Y (rig check C11). The search index still reads the explanations. `check-ui-rules.sh` rule `hint-tip` (on) fails a new one.
+
+### High contrast, sentence case and the reading settings (decided 2026-10-14, Droidtop/tracker#485 F11)
+
+Settings > Appearance > Accessibility holds the reading settings (`ReadingPrefs`, read by every renderer):
+
+- **Info text**: Bottom line (default) or Under each row ("Explanations: no tooltips").
+- **High contrast** (off by default; Android's own high-contrast text turns it on too): every text role is moved the shortest way to 7:1 over every surface it is drawn on (`GamingThemeMapping.highContrast`), the notices hold 7:1, the focus ring's outer edge is 4 dp, the theme's texture is not drawn and the PC and Home backdrop is the plain ground (no art behind text), and labels are in sentence case. The separate "plain background" idea is this setting.
+- **Sentence case labels**: section labels, tabs, chips and eyebrows that a theme draws in capitals are drawn as written (`labelCase`; all caps is harder to read). Off by default, always on under High contrast; `ReadingPrefs.SENTENCE_CASE_DEFAULT` is the one constant to flip (owner question 4 on tracker#485). It never applies to data: a game's name and anything typed keep their own case.
+
+A change to either re-reads the palette at once (a preferences listener held by the Gaming theme's composition). **UI sounds** stay as decided in "Interface sounds": on by default (owner question 3, the coordinator's default), from the bundled Kenney Interface Sounds set (CC0, NOTICE.md), with the edge bump at list ends; a separate error tone is not bundled yet (it needs one more file from the same pack). The companion's own text size is the companion slice (F8).
+
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
 The owner could not read some settings items: rows were one line with
@@ -15207,10 +15441,10 @@ theme's roles (section 7k2).
   cursor moves, the edge on the side it heads springs ahead and the trailing edge follows 30 ms
   later, so the ring stretches and snaps onto the new control's shape; a held direction (moves
   under 180 ms apart) runs it as one piece; a single move further than 360dp carries it across as a
-  drop. Its look is Steam's: 2dp in the theme's accent at 60 percent, landing from 12dp outside the
-  control over 400 ms when it appears, then breathing to 24 percent and back every 1.2 s, twenty
-  times, before it rests; a capsule carries it 2dp outside its edge. It draws in an overlay of its
-  own, so a moving or breathing ring redraws nothing under it, and it re-measures its control every
+  drop. Its look is two opaque edges (7k, "Page anatomy": the accent outside, black or white
+  inside), landing from 12dp outside the control over 400 ms when it appears and then staying at full
+  strength (it breathed once; a fading ring is one a low-vision eye loses); a capsule carries it 2dp
+  outside its edge. It draws in an overlay of its own, so a moving ring redraws nothing under it, and it re-measures its control every
   frame only for 450 ms after a change. A window with no host (a one-off dialog) draws a still ring
   on the control. With motion off the ring jumps. The per-control landing outline it replaces is
   gone. Buttons follow Steam in the theme's colours: a quiet chip turns solid (`Selected`) under
@@ -15974,6 +16208,57 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   recorded on its row and is not shown at launch. It is shown when the
   person started the sync. After a game ends, with a cloud folder set, the
   saves are left there for it instead ("Transports" below).
+
+### Detected saves (Droidtop/tracker#546)
+
+Owner, 2026-10-14: "Gotta fix ALL of that. We also need to be able to index against the other games we detect,
+especially with metadata scrapers. some games (especially engine ones) are easier (for instance, renpy), and we need
+to be able to sync between handhelds." And the same day, for this part: "Let's also get all the saves detected."
+
+- **Every game page says where its saves are**, in the one "Saves" row of the game page and of a console game's
+  detail screen, with a page of details behind it. The row is worked out off the main thread when the page opens
+  (`SaveDetector`), never while a list draws, and it has four honest answers:
+  - **No rule known** ("No rule known"): nothing says where this game keeps saves, and the row says what would give
+    one.
+  - **A rule that cannot be applied yet** ("Not known yet"): the rule exists, but this game's own name for its folder
+    could not be read (a Ren'Py `config.save_directory` inside an archive, a Godot project inside a `.pck`, an AGS
+    game's folder name), or the emulator keeps its saves in a folder droidtop may not list. Never shown as "none".
+  - **None found**: the places searched are named.
+  - **Found**: how many files, in which folder, and how long ago the newest was written.
+- **Rules come from data, not code.** Engines carry a `saves` object in droidtop-platforms' engines database, and
+  emulators one on their players-database rows, in the form `docs/FORMAT.md` of that repository describes. A rule
+  names its source (the engine's or emulator's own code, or a shipped game) and the generator refuses one that does
+  not. The tokens are the agent core's (`crates/core/src/saves.rs`, Ludusavi's), plus `<engineData>`, `<emuSaves>`
+  and `<emuStates>`. A name the rule needs from the game (`facts`) is read from the game's own files by a reader
+  droidtop has; a name that cannot be read leaves that place unsearched and is said, never guessed.
+- **Where an engine game is searched** (all of them that apply, and the answer names the one it found them in): the
+  game's own folder (`beside`, which is where Enginehost also keeps the saves of KiriKiri, Buriko, CMVS, NScripter
+  and RPG Maker 2000/2003/XP/VX/VX Ace), Enginehost's save folder (`<volume>/Enginehost/saves`, with the game's own
+  directory inside it where the engine names one, the game's folder name where Enginehost names it: MV and MZ,
+  CatSystem2), and the Windows setup the game would run in. A rule does not say where an engine *should* save; it
+  says where the engine does, so droidtop changes no save logic ("we don't change save logic, we just make system
+  locations mean somewhere different"). Enginehost's per-family folders are Enginehost's own choice: droidtop uses the
+  default until the Enginehost adapter plugin tells it the real ones (`saves.roots@1`).
+- **Emulator saves are per emulator and per system**, following the `setup` convention: droidtop takes the first row
+  of the emulator's package that carries a rule, a `systems` entry replaces its patterns for one system, and the
+  emulator's own config file names its real folder (`folderKey`). **Memory cards shared by every game are a set of
+  their own** (`cards`), never part of a game's saves. **Save states are separate and not counted** as the game's
+  saves (`states`): a state only loads in the emulator version that wrote it, so syncing them is the person's choice
+  and belongs to the sync, not to detection.
+- **Matching a game to a rule** (`SaveMatcher`), strongest first, never fuzzy: a Steam id, a GOG id, an id a scraper
+  learned (`game_ids`), the install folder's name, the exact title key. Engine games match their engine's row and
+  console games the emulator that would launch them. A match is kept in `save_rules` (`kind`, `name`, `how`,
+  `checked_at`; the rule itself is read when used, never copied) so the page can say "This game is matched by its
+  Steam id". The scrapes now keep the ids they learned (`game_ids`, one row per kind); they were thrown away before.
+  The person's correction ("Don't look for this game's saves", and the row that takes it back) is stored with
+  `how=you` and is never replaced by an automatic match; both tables follow a game when it is folded into another.
+- **Where PC games get their rule today.** A paired computer's answer is the Ludusavi data droidtop has: the agent
+  core keeps the templates it answered with beside each game's baseline (`saves/<game>.spec.json`), and `ComputerSpecs`
+  reads them. It is a `SaveIndex`, the seam the agent core's own Ludusavi index will fill (Droidtop/tracker#546,
+  slice 1), so a game a computer has never been synced with reads "no rule known" until then. A rule in Windows
+  places is searched in the game's Wine prefix by the agent core's own layout (`prefix_roots`).
+- **Searching is bounded and read-only.** A walk never follows a link, goes at most 12 folders deep, and reports at
+  most 4096 files; a game with more says so. Nothing here writes, moves or deletes a save.
 
 ### Library
 
@@ -18207,7 +18492,7 @@ provider plugin). The Shizuku plugin is that provider (2026-10-09,
 plugin-enforce-5): while Shizuku's server runs as uid 0 (started as root,
 or Sui) it reports `root` through `plugins.report_level` and its
 `priv.shell` root export is offered, each level its own grant on the
-usual list ("Run commands as the system (adb)", "Run commands as root";
+usual list ("Run system commands", "Full control of the device";
 `docs/plugin-api.md` §2.7).
 
 **Root is an opt-in, per-plugin enhancement — never a requirement, never
@@ -19279,6 +19564,15 @@ what the index says is display data, never a trust decision.
    thing a real call site should iterate, so a disabled plugin's rows
    simply stop appearing rather than needing every caller to re-check.
 
+**Full access asks in red (owner 2026-10-10, Droidtop/tracker#481; built 2026-10-14 with the notice work, Droidtop/tracker#485).** Owner, verbatim: "Running plugins unsandboxed should be possible, but big red warnings and a recommendation that users not install unsandboxed plugins". Every moment a plugin would run without droidtop's protection is asked in the danger dialog (7k, "Asking before a change"), once, at the moment it changes, and running it stays possible:
+
+- **D1, allowing full access**: approving a plugin with "Full access" (`host.full_trust`) ticked or an older contract 1 plugin ("Install anyway"), saving an update's new items when they include full access ("Update anyway"), choosing Allowed for full access on its Permissions screen, the page's "Needs full access to work" notice (Allow), and the first call of a plugin whose full access is still unanswered. Cancel leaves it unanswered; it is never Never.
+- **D2, protection didn't start**: a contained plugin whose system-call filter (the sandbox library's lockdown) cannot be installed is no longer run silently. Its process refuses the load with `protection-failed: <report>`; during a call the person started droidtop asks ("Run anyway"), and the answer holds for this run of droidtop only, so protection is tried again next time. The mark that lets the load through is added by :app to the manifest it hands the process and stripped from the plugin's own file, so a plugin cannot set it.
+- **D4, several at once**: plugins held back in the background are listed on the Plugins page as a caution notice ("Protection didn't start", Review), which asks for all of them in one dialog ("Run all anyway", this run only).
+- **D3, a different maker**: an update verified under a different trust anchor than the approved version starts pending as before, and now remembers what it replaced (`PluginRecord.replacedKeySha256`/`replacedOrigin`); its page shows "Update made by someone else" with both fingerprints in groups of four in Info, and approving it asks "Update anyway" before anything else.
+
+After it is allowed, the plugin's page carries the Full access chip on its status row and the quiet caution notice "Has full access" with **Limit access**, which takes the grant away when the plugin can run with normal protection and otherwise turns the plugin off; there is no permanent red banner. The permission titles are plain words (`host.full_trust` is "Full access", `priv.shell.root` "Full control of the device", the full list in plugin-api.md 4.1), and the approval list's "(high risk)" suffix moved into the row's explanation. The Standard surface asks the same questions with a platform dialog (Cancel the default button); Gaming draws the Steam-shaped card.
+
 **What is built vs. open.** Built: the manifest format and validation,
 signing/hashing, install/uninstall/enable/approve, the approval screen,
 the plugin catalog (the droidtop-platforms index, install/update/Update
@@ -19934,6 +20228,12 @@ plugin had answered, then a row per plugin to open its own screen. The
 search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 (`shell-gamepad/query/LibraryQueryUi.kt`):
 
+**One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
+
+- **Everything**: **Y on Home** and the search target in Home's top band: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The left menu has one **Search** row, the one in its order above (under Resume, not in Kiosk and Kid), which opens the same runner through `LauncherSearchScreen` with the matching settings too; there is no second Search row under Home (two branches each added one; the merge of 2026-10-15 kept that one).
+- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). Home's system tiles and the Quick Menu's Game section get the same row with Your library's systems (F7b) and the Quick Menu work.
+- **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
+
 - **One list.** The device's rows (installed apps, library games; the caller
   matches them over lists it already holds in memory, no disk lookups per
   keystroke) and every `GameSourceProvider` (built-in or plugin) are rows of
@@ -19961,6 +20261,18 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   the plugin's page in Settings, Plugins (the whole list when there are
   several); one that is turned off or denied is a row that opens its page.
   None of them is a line of text that looks pressable and is not.
+  **Waiting means two things, and a source in either is not asked**
+  (`UnavailableSource.of`, Droidtop/tracker#485): the plugin is not approved yet,
+  or it is approved but the person has not allowed it the `library.sources`
+  point (Settings, Plugins, Permissions). The second used to be asked anyway and
+  came back as "X has not been allowed to get games from a source", one block
+  with a Technical details row per plugin. Now it counts in the one "N sources
+  are waiting for your approval" row. The "Get games" screens say the same thing
+  the same way (`UnavailableSource.waitingTitle`): when no source can answer, ONE
+  row names the waiting ones and opens Plugins (the plugin's own page when it is
+  one), never a block per plugin. "Get apps" with a catalog plugin installed but
+  not allowed is a row that opens that plugin's page, and with none installed
+  has a Plugins row, so neither is a dead end.
   **A failure is a sentence the person can act on** (`SourceFailures.plain`,
   Droidtop/tracker#375, #485): what a source reports (a site's own page text
   such as "JavaScript is disabled...", a platform exception, a socket error)
@@ -19983,18 +20295,42 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   passes the apps and games as `local`). The PC library passes its games as
   `local` too, so the one list holds them (a row opens the game's page) and
   the grid behind still narrows to the same text, which is the Filter sheet's
-  Search row; the PC search also drops a source's result that names a console
-  system (`SourceDestinations.isPcResult`, so a Nyaa PSP or Vita torrent is
-  not a PC result). A console gamelist has its list on screen under the dialog
+  Search row; the PC search asks the sources for PC games
+  (`SourceDestinations.PC_PLATFORM`, the plugin API's `windows`) and also drops
+  a source's result that names a console system (`SourceDestinations.isPcResult`,
+  so a Nyaa PSP or Vita torrent is not a PC result). The result is judged by
+  everything it says about its platform, its platform field and its badges, and
+  a system is named whole or by a distinctive word of its name ("Vita",
+  "PlayStation"; "Sony", "Games" and numbers name nothing), because a source
+  writes a system the way its own site does. A section searches its own
+  systems: a console list asks for its system, the PC library for PC games
+  (Droidtop/tracker#485, 2026-10-14: PC Games search showed Nyaa PSP and Vita
+  results). A console gamelist has its list on screen under the dialog
   and narrows it live through `matchesSearchText`, so it passes no `local` and
   shows the match count above the sources' rows (the Select row reads "Search:
   <text>" while a search is on, and the search lasts as long as the gamelist
   stays open; the PC Games tab keeps its own query, 7i); the launcher has no
   list under it, so the device's rows are in the one list; so are Desktop's
   (its Start menu and R1 open it, with the library and the container's apps as
-  the device's rows, 2b "Desktop chrome with a pad"). Settings has its own search over
-  settings rows (`SettingsSearchIndex`, 7k), which is a different thing being
-  searched, not a plugin mode.
+  the device's rows, 2b "Desktop chrome with a pad"). **Every mode has a normal way in**
+  (Droidtop/tracker#12, #315, #351): Gaming's left menu has a **Search** row right
+  under Resume (Start, then A; a tap works too), which opens the dialog with the
+  shell's games and apps as the device's rows (`LauncherSearchScreen`, so the
+  shell and Standard share the one wiring); Kiosk and Kid have no such row, as they
+  have no downloads or settings. Standard's drawer search field, Desktop's Start menu,
+  and the companion's Home (a **Search** pill under the status line, touch only, which
+  starts the same search window on the companion's screen) open the same dialog.
+  Settings has its own full search over settings rows (`SettingsSearchIndex`, 7k),
+  a different thing being searched, not a plugin mode; where a surface has settings
+  of its own (Gaming, Standard's Global settings, Desktop's) the one search also
+  shows the matching ones, at most five, as a **Settings** section after the
+  rows (`LibrarySearchDialog.settingsRoot`; the index is built once, off the main
+  thread, when the text first reaches two letters). A press opens the screen the
+  setting lives on, in the window a source's page uses. The rows of the library,
+  the apps and the sources stay one ranked list told apart by their detail line,
+  as decided on 2026-10-07; the one separate section is the one that searches
+  another kind of thing. The PC library and a console list do not offer Settings:
+  they search their own games.
 - **Picking.** A device row opens the app or plays the game (the PC library's
   opens the game's page). A source row always opens its detail
   (`GameSourceProvider.detailScreen`); the destination is worked out when it is
@@ -20003,6 +20339,13 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   soft keyboard goes away), Up from the first row returns to the field, A
   opens the row, and typing puts the cursor back in the field. The cursor
   follows a row by its key, so a source answering above it does not move it.
+- **A page a row opens replaces the search, it is not drawn over it**
+  (Droidtop/tracker#542). Get games, a source's detail and a plugin's settings
+  open in a window of their own while the search panel is not composed; what was
+  typed, the answers and the cursor stay in the dialog's state and are there
+  when the page closes (the search runs again then, so an approval or an
+  installed runtime shows). Two translucent windows had put the page's text on
+  the search's text. Back from the page leaves the soft keyboard away.
 - **The field and the keyboard.** The field asks for the soft keyboard
   explicitly when it opens (`SoftwareKeyboardController.show`; Compose's own
   request on focus is implicit, and Android drops an implicit request while a
@@ -20316,6 +20659,15 @@ without its runtime said "Running". Decisions:
   and the catalog screen says "No catalog is published yet" and points at
   Install plugin file; any other failure still shows its reason. The
   droidtop-platforms generator for the index is still not built (above).
+- **A source declares the systems it serves (Droidtop/tracker#543).** A `library.sources` entry's
+  `systems` (docs/plugin-api.md 1.6) is read from the manifest by `SourceSystems`
+  (`ExtensionProtocols.kt`, pure, unit-tested), and one rule uses it everywhere:
+  `AcquireContentSource.serves(systemId)`. A system's Get games page and the "Your/Other systems" choice list
+  only what some source serves, the one search asks `GameSources.plugins(context, platform)` (so PC Games, which
+  searches as `pc`, asks only sources naming a PC system and a console list asks the sources naming that
+  system), and a "not ready" note is shown only for a source that would have served. An entry with no
+  `systems` serves everything, as before. When sources exist but none serves a system, its page says so
+  ("No source gets <system> games") with the way to Plugins; it is never blank.
 - **"Get games" is offered everywhere, and it runs in search (owner,
   2026-10-01: "Get Games should be offered from EVERY menu, and it should
   also run in the global search bar").** One registered screen

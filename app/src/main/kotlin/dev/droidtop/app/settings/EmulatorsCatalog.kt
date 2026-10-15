@@ -46,6 +46,7 @@ import java.io.File
 import java.nio.file.Files
 import dev.droidtop.runtime.tasks.RiskyActions
 import dev.droidtop.runtime.tasks.RiskyClass
+import dev.droidtop.runtime.tasks.RiskyNotices
 import dev.droidtop.runtime.tasks.RiskyPrompts
 import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
@@ -99,12 +100,10 @@ object EmulatorsCatalog {
                 },
             )
         }
-        val canOffer = TaskManager.privileges().appOps && !RiskyActions.allows(RiskyClass.GRANT_ACCESS)
         return ActionItem(
             id = id,
             title = "$name needs All files access",
-            subtitle = "Opens Android's All files access screen for it." +
-                if (canOffer) " " + RiskyPrompts.turnOnHint(RiskyClass.GRANT_ACCESS) else "",
+            subtitle = "Opens Android's All files access screen for it.",
             value = "Open settings",
             run = { ctx -> openAllFilesAccessSettings(ctx, packageName) },
         )
@@ -141,8 +140,7 @@ object EmulatorsCatalog {
             // Without root droidtop cannot see RetroArch's cores, and RetroArch itself only shows
             // a black screen when one is missing (console, build 1386), so the row says what to check.
             subtitle = if (state == RetroArchCores.State.UNKNOWN) {
-                "${need.core}. If games stay black, it is not installed in RetroArch" +
-                    if (TaskManager.privileges().shell && !RiskyActions.allows(RiskyClass.ROOT_COMMANDS)) ". " + RiskyPrompts.turnOnHint(RiskyClass.ROOT_COMMANDS) else ""
+                "${need.core}. If games stay black, it is not installed in RetroArch"
             } else {
                 need.core
             },
@@ -332,6 +330,17 @@ object EmulatorsCatalog {
                                 value = resolved?.player?.name ?: "None",
                                 run = {},
                             ),
+                            // The switched-off risky actions this screen would offer, as one caution notice each (G1-G6).
+                            *listOfNotNull(
+                                RiskyNotices.item("emulator_risky_access_${system.id}", RiskyClass.GRANT_ACCESS).takeIf {
+                                    resolved?.player?.let { playerNeedsAllFilesAccess(context, it) } == true &&
+                                        TaskManager.privileges().appOps && !RiskyActions.allows(RiskyClass.GRANT_ACCESS)
+                                },
+                                RiskyNotices.item("emulator_risky_cores_${system.id}", RiskyClass.ROOT_COMMANDS).takeIf {
+                                    resolved?.player?.let { RetroArchCores.needFor(it.packageName, it.argumentsTemplate) } != null &&
+                                        TaskManager.privileges().shell && !RiskyActions.allows(RiskyClass.ROOT_COMMANDS)
+                                },
+                            ).toTypedArray(),
                             *listOfNotNull(
                                 resolved?.player?.takeIf { playerNeedsAllFilesAccess(context, it) }?.let {
                                     fileAccessRow("emulator_access_${system.id}", it.name, it.packageName)
@@ -514,7 +523,12 @@ object EmulatorsCatalog {
             }
         }
         if (items.isEmpty()) return null
-        return CatalogGroup(id = "emulator_setup_${system.id}", title = "Set up $name", items = items)
+        // One caution notice for the group while the files it would change are locked to droidtop (G1).
+        val biosFolder = EmulatorSetup.biosFolder(spec, configText)
+        val locked = (biosFolder != null && EmulatorSetup.writeReach("$biosFolder/x") == EmulatorSetup.Reach.LOCKED) ||
+            (configText != null && spec.config?.let { EmulatorSetup.writeReach(it.file) == EmulatorSetup.Reach.LOCKED } == true)
+        val notice = if (locked && !RiskyActions.allows(RiskyClass.OTHER_APP_FILES)) RiskyNotices.item("emulator_risky_files_${system.id}", RiskyClass.OTHER_APP_FILES) else null
+        return CatalogGroup(id = "emulator_setup_${system.id}", title = "Set up $name", items = listOfNotNull(notice) + items)
     }
 
     private fun biosItems(
@@ -552,8 +566,7 @@ object EmulatorsCatalog {
                 else -> "Missing ${missing.take(4).joinToString(", ")} in $folder"
             } + when {
                 writable -> ""
-                reach == EmulatorSetup.Reach.LOCKED -> ". Copy them there with a file manager, or from $name's own settings. " +
-                    RiskyPrompts.turnOnHint(RiskyClass.OTHER_APP_FILES)
+                reach == EmulatorSetup.Reach.LOCKED -> ". Copy them there with a file manager, or from $name's own settings"
                 else -> ". Copy them there with a file manager, or from $name's own settings"
             },
             value = when {
@@ -615,8 +628,7 @@ object EmulatorsCatalog {
             return openEmulatorRow(
                 id = "emulator_setting_${setting.id}",
                 title = setting.label,
-                subtitle = "${setting.about}. To change it: ${setting.manual}" +
-                    if (configText != null && reach == EmulatorSetup.Reach.LOCKED) ". " + RiskyPrompts.turnOnHint(RiskyClass.OTHER_APP_FILES) else "",
+                subtitle = "${setting.about}. To change it: ${setting.manual}",
                 name = name,
                 packageName = player.packageName,
             )

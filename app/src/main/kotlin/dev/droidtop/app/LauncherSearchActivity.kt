@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -58,6 +59,8 @@ class LauncherSearchActivity : ComponentActivity() {
                         }
                     },
                     onPlay = { GameLaunchActivity.dispatch(this@LauncherSearchActivity, it) },
+                    // Standard's own settings (the Global settings screen) are searched with the rest.
+                    settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(dev.droidtop.app.settings.DroidtopWideSettings.SCREEN_GLOBAL) },
                     onDismiss = { finish() },
                 )
             }

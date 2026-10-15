@@ -70,7 +70,7 @@ object PluginTiers {
         if (!declaresFullTrust(record.manifest)) {
             return "${record.manifest.label} needs full access ($blocker), and this version of it does not ask for it; it needs an update that does"
         }
-        return "${record.manifest.label} needs full access ($blocker). Allow \"Run with droidtop's full access\" on its Permissions screen"
+        return "${record.manifest.label} needs full access ($blocker). Allow \"Full access\" on its Permissions screen"
     }
 
     /**

@@ -3,6 +3,7 @@
 // just the JNI marshaling layer, deliberately kept thin.
 
 #include "wayland_client.h"
+#include "default_keymap.h"
 
 #include <jni.h>
 #include <android/log.h>
@@ -369,6 +370,27 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeInjectKey(
     if (auto* client = findClient(identityHash(env, thiz))) {
         client->injectKey(static_cast<uint32_t>(evdevKeyCode), pressed == JNI_TRUE, typed == JNI_TRUE);
     }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeInjectModifiers(
+    JNIEnv* env, jobject thiz, jint depressed, jint latched, jint locked, jint group, jboolean typed) {
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    if (auto* client = findClient(identityHash(env, thiz))) {
+        client->injectModifiers(static_cast<uint32_t>(depressed), static_cast<uint32_t>(latched),
+                                static_cast<uint32_t>(locked), static_cast<uint32_t>(group), typed == JNI_TRUE);
+    }
+}
+
+// The embedded US keymap both virtual keyboards start with, as UTF-8 text, so HostBridge.kt reads its modifier
+// map from the same text the compositor was given rather than a second copy.
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeDefaultKeymap(JNIEnv* env, jobject) {
+    jsize length = static_cast<jsize>(sizeof(hostbridge::kDefaultXkbKeymapUS) - 1); // without the trailing NUL
+    jbyteArray bytes = env->NewByteArray(length);
+    if (!bytes) return nullptr;
+    env->SetByteArrayRegion(bytes, 0, length, reinterpret_cast<const jbyte*>(hostbridge::kDefaultXkbKeymapUS));
+    return bytes;
 }
 
 extern "C" JNIEXPORT jboolean JNICALL

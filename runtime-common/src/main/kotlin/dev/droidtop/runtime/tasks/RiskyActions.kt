@@ -158,3 +158,57 @@ object RiskyActions : RiskyGate {
         edit.apply()
     }
 }
+
+/**
+ * The caution group notice a screen shows while a risky action it offers is switched off (docs/SPEC.md 7k, "Notices",
+ * G1-G6): the feature named, what it would change, and Turn on, which switches on Risky actions and that one class.
+ * Each use still asks its own explicit question first ([RiskyPrompts]). One notice per group, never a sentence
+ * appended to every row.
+ */
+object RiskyNotices {
+    fun notice(risk: RiskyClass): dev.droidtop.library.settings.Notice {
+        val (title, body, details) = when (risk) {
+            RiskyClass.OTHER_APP_FILES -> Triple(
+                "Emulator setup is off for safety",
+                "It changes emulator config files.",
+                "Turning it on lets droidtop rewrite emulator settings files and put BIOS files in an emulator's folder, through the helper app. Each change asks first.",
+            )
+            RiskyClass.ROOT_COMMANDS -> Triple(
+                "Core installs are off for safety",
+                "It downloads emulator cores from the internet.",
+                "Turning it on lets droidtop place RetroArch cores in RetroArch's own folder as root, through your root provider. Each install asks first.",
+            )
+            RiskyClass.DISPLAY_SETTINGS -> Triple(
+                "Display controls are off for safety",
+                "They change screen refresh and scaling.",
+                "Turning it on lets droidtop set a screen's refresh rate for every app, through the helper app.",
+            )
+            RiskyClass.ACCESSIBILITY_SETTINGS -> Triple(
+                "Quick actions are off for safety",
+                "Some change system settings.",
+                "Turning it on lets droidtop set font size, display size, magnification, contrast, inversion and TalkBack for every app, through the helper app.",
+            )
+            RiskyClass.GRANT_ACCESS -> Triple(
+                "Granting access is off for safety",
+                "It gives emulators access they ask for.",
+                "Turning it on lets droidtop give an emulator All files access or a permission it asks for, instead of you doing it in Android's own screens. Each grant asks first.",
+            )
+        }
+        return dev.droidtop.library.settings.Notice(
+            tone = dev.droidtop.library.settings.NoticeTone.Caution,
+            title = title,
+            body = body,
+            details = "$details Settings > Risky actions > ${risk.title}.",
+            action = dev.droidtop.library.settings.NoticeAction("Turn on") { context ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    RiskyActions.setMaster(context, true)
+                    RiskyActions.setClass(context, risk, true)
+                }
+            },
+        )
+    }
+
+    /** [notice] as a group notice row. */
+    fun item(id: String, risk: RiskyClass): dev.droidtop.library.settings.NoticeItem =
+        dev.droidtop.library.settings.NoticeItem(id, notice(risk), dev.droidtop.library.settings.NoticePlacement.Group)
+}

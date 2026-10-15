@@ -1594,6 +1594,14 @@ void WaylandClient::injectKey(uint32_t evdevKeyCode, bool pressed, bool typed) {
     wl_display_flush(display_);
 }
 
+void WaylandClient::injectModifiers(uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group, bool typed) {
+    if (!globals_) return;
+    zwp_virtual_keyboard_v1* keyboard = typed ? globals_->text_keyboard : globals_->virtual_keyboard;
+    if (!keyboard) return;
+    zwp_virtual_keyboard_v1_modifiers(keyboard, depressed, latched, locked, group);
+    wl_display_flush(display_);
+}
+
 bool WaylandClient::setKeymap(const char* keymap, size_t length) {
     if (!globals_ || !globals_->virtual_keyboard || !keymap || length == 0) return false;
     // The protocol wants the text NUL-terminated within the size it is given.

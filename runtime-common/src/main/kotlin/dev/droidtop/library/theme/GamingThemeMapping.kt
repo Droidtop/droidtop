@@ -1,117 +1,6 @@
 package dev.droidtop.library.theme
 
-/**
- * Colour arithmetic for the Gaming design tokens, on plain ARGB `Int`s so
- * the whole mapping ([GamingThemeMapping]) is a pure function a JVM unit
- * test can run. Lives in `:runtime-common` next to the theme parser it
- * reads; `:shell-gamepad` turns the result into Compose colours.
- */
-object ThemeColorMath {
-    fun alpha(argb: Int): Int = argb ushr 24 and 0xFF
-    fun red(argb: Int): Int = argb shr 16 and 0xFF
-    fun green(argb: Int): Int = argb shr 8 and 0xFF
-    fun blue(argb: Int): Int = argb and 0xFF
-
-    fun rgb(r: Int, g: Int, b: Int): Int =
-        (0xFF shl 24) or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
-
-    fun withAlpha(argb: Int, alpha: Int): Int = (alpha.coerceIn(0, 255) shl 24) or (argb and 0xFFFFFF)
-
-    private fun channel(v: Int): Double {
-        val c = v / 255.0
-        return if (c <= 0.03928) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4)
-    }
-
-    /** WCAG relative luminance of the colour's RGB (alpha ignored). */
-    fun luminance(argb: Int): Double =
-        0.2126 * channel(red(argb)) + 0.7152 * channel(green(argb)) + 0.0722 * channel(blue(argb))
-
-    /** [fg] composited onto the opaque [bg], as it is on screen; the result is opaque. */
-    fun over(fg: Int, bg: Int): Int {
-        val a = alpha(fg) / 255.0
-        fun mixc(f: Int, b: Int) = Math.round(f * a + b * (1 - a)).toInt()
-        return rgb(mixc(red(fg), red(bg)), mixc(green(fg), green(bg)), mixc(blue(fg), blue(bg)))
-    }
-
-    /** WCAG contrast ratio of [fg] (composited over [bg] first) against [bg]. */
-    fun ratio(fg: Int, bg: Int): Double {
-        val l1 = luminance(over(fg, bg))
-        val l2 = luminance(bg)
-        return (maxOf(l1, l2) + 0.05) / (minOf(l1, l2) + 0.05)
-    }
-
-    /** [a] moved [t] of the way to [b] (0 = a, 1 = b); the result is opaque. */
-    fun mix(a: Int, b: Int, t: Double): Int {
-        fun m(x: Int, y: Int) = Math.round(x + (y - x) * t).toInt()
-        return rgb(m(red(a), red(b)), m(green(a), green(b)), m(blue(a), blue(b)))
-    }
-
-    /** HSV saturation, 0 for a grey and 1 for a pure hue. */
-    fun saturation(argb: Int): Double {
-        val mx = maxOf(red(argb), green(argb), blue(argb))
-        val mn = minOf(red(argb), green(argb), blue(argb))
-        return if (mx == 0) 0.0 else (mx - mn).toDouble() / mx
-    }
-
-    const val WHITE: Int = 0xFFFFFFFF.toInt()
-    const val BLACK: Int = 0xFF000000.toInt()
-
-    /** The smallest worst-case ratio of [fg] over every one of [backgrounds]. */
-    fun worstRatio(fg: Int, backgrounds: List<Int>): Double =
-        backgrounds.minOf { ratio(fg, it) }
-
-    /**
-     * [fg], unchanged if it already clears [floor] over every background,
-     * otherwise moved toward white or toward black, whichever reaches the
-     * floor with the smaller change to the colour, so a theme's amber stays
-     * an amber and only gets as light or dark as it must. If neither end
-     * can reach the floor (backgrounds on both sides of the text), the end
-     * that gets closest. The result is opaque.
-     */
-    fun ensure(fg: Int, backgrounds: List<Int>, floor: Double): Int {
-        val flat = over(fg, backgrounds.first())
-        if (worstRatio(flat, backgrounds) >= floor) return flat
-        var best: Int? = null
-        var bestStep = Int.MAX_VALUE
-        var closest = flat
-        var closestWorst = worstRatio(flat, backgrounds)
-        for (target in intArrayOf(WHITE, BLACK)) {
-            for (step in 1..50) {
-                val candidate = mix(flat, target, step / 50.0)
-                val worst = worstRatio(candidate, backgrounds)
-                if (worst >= floor) {
-                    if (step < bestStep) {
-                        bestStep = step
-                        best = candidate
-                    }
-                    break
-                }
-                if (worst > closestWorst) {
-                    closestWorst = worst
-                    closest = candidate
-                }
-            }
-        }
-        return best ?: closest
-    }
-
-    /**
-     * [bg] moved toward [target] until [fg] reads on it at [floor]; for a
-     * fill that carries a label (the launch button), where the label is
-     * fixed and the fill is what gives way.
-     */
-    fun ensureFill(bg: Int, fg: Int, floor: Double, target: Int): Int {
-        if (ratio(fg, bg) >= floor) return bg
-        for (step in 1..50) {
-            val candidate = mix(bg, target, step / 50.0)
-            if (ratio(fg, candidate) >= floor) return candidate
-        }
-        return mix(bg, target, 1.0)
-    }
-
-    /** Black or white, whichever reads better on [bg]. */
-    fun pickOn(bg: Int): Int = if (ratio(WHITE, bg) >= ratio(BLACK, bg)) WHITE else BLACK
-}
+import dev.droidtop.notices.ColorMath
 
 /**
  * Every colour role the Gaming chrome draws, as ARGB ints, plus the theme's
@@ -161,7 +50,7 @@ data class GamingThemeColors(
     val declared: Boolean = true,
 ) {
     /** True when the ground is light, so text is dark and the Material scheme is a light one. */
-    val isLight: Boolean get() = ThemeColorMath.luminance(ground) > 0.4
+    val isLight: Boolean get() = ColorMath.luminance(ground) > 0.4
 
     companion object {
         val DEFAULT = GamingThemeColors(
@@ -230,13 +119,13 @@ data class GamingThemeColors(
  *
  * Every text role is then forced to WCAG AA (4.5:1) over every surface it
  * is drawn on, by the smallest move toward white or black that gets there
- * ([ThemeColorMath.ensure]); roles that are fills (launch) give way to
+ * ([ColorMath.ensure]); roles that are fills (launch) give way to
  * their label instead. A theme that declares nothing of the above is
  * [GamingThemeColors.DEFAULT], untouched.
  */
 object GamingThemeMapping {
     /** WCAG AA for body text. */
-    const val TEXT_FLOOR = 4.5
+    const val TEXT_FLOOR = ColorMath.TEXT_FLOOR
 
     /** Disabled labels are held to the large-text floor, as they always were. */
     const val DISABLED_FLOOR = 3.0
@@ -273,6 +162,27 @@ object GamingThemeMapping {
                 (it.type == "clock" || it.type == "systemstatus") && esDeScopeAllows(it, menuOpen = false)
             }
         }
+    }
+
+    /** Body text under High contrast (docs/SPEC.md 7k, "High contrast"): WCAG AAA. */
+    const val HIGH_CONTRAST_FLOOR = 7.0
+
+    /**
+     * [colors] under High contrast: every text role moved the shortest way to 7:1 over every surface it is drawn
+     * on (contrast wins over the theme's hue when both cannot hold). Pure.
+     */
+    fun highContrast(colors: GamingThemeColors): GamingThemeColors {
+        val m = ColorMath
+        val surfaces = listOf(colors.ground, colors.overlaySurface, colors.card, colors.cardFocused, colors.cardInset, colors.hintBar)
+        fun strong(fg: Int) = m.ensure(fg, surfaces, HIGH_CONTRAST_FLOOR)
+        return colors.copy(
+            onSurface = strong(colors.onSurface),
+            onSurfaceMuted = strong(colors.onSurfaceMuted),
+            value = strong(colors.value),
+            placeholder = strong(colors.placeholder),
+            sectionLabel = strong(colors.sectionLabel),
+            accent = strong(colors.accent),
+        )
     }
 
     fun map(theme: EsDeTheme?): GamingThemeColors {
@@ -324,7 +234,7 @@ object GamingThemeMapping {
             ofType("clock").map { it.colorArgb("color") } +
             ofType("text").map { it.colorArgb("color") } +
             ofType("image").map { it.colorArgb("color") }
-        d.accent = accentCandidates.firstOrNull { it != null && ThemeColorMath.saturation(it) >= CHROMA_FLOOR && ThemeColorMath.alpha(it) >= 0x80 }
+        d.accent = accentCandidates.firstOrNull { it != null && ColorMath.saturation(it) >= CHROMA_FLOOR && ColorMath.alpha(it) >= 0x80 }
 
         // Typefaces.
         d.bodyFont = (ofType("helpsystem") + systemOfType("clock") + systemOfType("systemstatus") + ofType("text") + ofType("carousel"))
@@ -340,11 +250,11 @@ object GamingThemeMapping {
     private fun EsDeThemeElement.colorArgb(name: String): Int? {
         val packed = (this as EsDeThemeElement?).colorOrNull(name) ?: return null
         val argb = rgbaToArgb(packed)
-        return if (ThemeColorMath.alpha(argb) == 0) null else argb
+        return if (ColorMath.alpha(argb) == 0) null else argb
     }
 
     private fun opaqueColor(element: EsDeThemeElement, name: String): Int? =
-        element.colorArgb(name)?.takeIf { ThemeColorMath.alpha(it) == 0xFF }
+        element.colorArgb(name)?.takeIf { ColorMath.alpha(it) == 0xFF }
 
     private fun firstColor(list: List<Int?>): Int? = list.firstOrNull { it != null }
 
@@ -373,7 +283,7 @@ object GamingThemeMapping {
 
     private fun build(d: Declared): GamingThemeColors {
         val base = GamingThemeColors.DEFAULT
-        val m = ThemeColorMath
+        val m = ColorMath
         val ground = d.ground ?: base.ground
         // Which end of the scale text sits at: whichever the ground can carry.
         val ink = if (m.ratio(m.WHITE, ground) >= m.ratio(m.BLACK, ground)) m.WHITE else m.BLACK

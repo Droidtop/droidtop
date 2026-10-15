@@ -59,33 +59,6 @@ internal object StatusClusterRoom {
 }
 
 /**
- * A page with shelves scrolls up under the floating status cluster, and the
- * clock then sat on the art of whatever passed beneath it (Droidtop/tracker#494).
- * This is the strip Steam's top bar is: the page fades into the top edge
- * through the cluster's own band, so what scrolls there is dimmed out
- * instead of fighting the readout. Drawn only where the page has no strip
- * of its own to end short of the cluster (Home), under the cluster and over
- * the page; never takes a press.
- */
-@Composable
-internal fun StatusScrim(modifier: Modifier = Modifier) {
-    val room = StatusClusterRoom.size.height
-    if (room <= 0.dp) return
-    Box(
-        modifier
-            .fillMaxWidth()
-            .height(room + 10.dp)
-            .background(
-                Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.92f),
-                    0.7f to Color.Black.copy(alpha = 0.92f),
-                    1f to Color.Transparent,
-                ),
-            ),
-    )
-}
-
-/**
  * The status cluster as Gaming draws it: floating at the top-right over the
  * page on a soft plate rather than in a header band (docs/SPEC.md 7j); a
  * readout and the tap route to the Quick Menu. Reports its footprint to

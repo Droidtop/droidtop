@@ -29,6 +29,8 @@ data class EngineDef(
     val detect: List<DetectRule>,
     val strategies: List<GameLaunchStrategy>,
     val enginehost: EnginehostTarget?,
+    /** The row's optional `saves` object: where the engine keeps a game's saves (docs/SPEC.md 7o "Saves"). */
+    val saves: dev.droidtop.library.saves.EngineSaves? = null,
 )
 
 data class DetectRule(val all: List<DetectCondition>) {
@@ -128,6 +130,7 @@ object EngineRegistryParser {
                 detect = parseDetect(row),
                 strategies = parseStrategies(row),
                 enginehost = parseEnginehost(row),
+                saves = dev.droidtop.library.saves.EngineSaves.parse(row.optJSONObject("saves")),
             )
         }
         return result

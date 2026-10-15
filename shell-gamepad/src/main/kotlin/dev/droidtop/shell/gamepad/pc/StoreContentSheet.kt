@@ -1,5 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.ui.shared.NoticeCard
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notice
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
@@ -28,7 +32,6 @@ import dev.droidtop.library.stores.StoreExtra
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.userFacingErrorMessage
 import dev.droidtop.shell.gamepad.LocalShellWindow
-import dev.droidtop.shell.gamepad.MenuHint
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
@@ -211,7 +214,7 @@ internal fun StoreContentSheet(
                 )
             }
             status?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MenuTokens.Value) }
-            if (working) MenuHint("Working")
+            if (working) NoticeCard(Notice(NoticeTone.Info, "Working"), NoticePlacement.Group)
         }
     }
 }
@@ -223,7 +226,7 @@ private fun SectionLabel(text: String) {
 
 /** A DLC's value: its size, and "On device" for one already installed. */
 internal fun extraValue(extra: StoreExtra): String =
-    listOf(StoreContent.sizeLabel(extra.bytes), "On device".takeIf { extra.installed }).filterNotNull().filter { it.isNotEmpty() }.joinToString(" · ")
+    listOf(dev.droidtop.library.format.ValueFormat.sizeOrBlank(extra.bytes), "On device".takeIf { extra.installed }).filterNotNull().filter { it.isNotEmpty() }.joinToString(" · ")
 
 /** A branch's value: the one in force, a locked one, or nothing. */
 internal fun branchValue(branch: StoreBranch, picked: StoreContentChoice): String = when {
@@ -236,7 +239,7 @@ internal fun branchValue(branch: StoreBranch, picked: StoreContentChoice): Strin
 internal fun applyValue(options: StoreContentOptions, picked: StoreContentChoice): String {
     if (!StoreContent.differs(options, picked)) return ""
     val parts = buildList {
-        StoreContent.downloadBytes(options, picked).takeIf { it > 0 }?.let { add("+" + StoreContent.sizeLabel(it)) }
+        StoreContent.downloadBytes(options, picked).takeIf { it > 0 }?.let { add("+" + dev.droidtop.library.format.ValueFormat.sizeOrBlank(it)) }
         StoreContent.removedExtras(options, picked).size.takeIf { it > 0 }?.let { add("-$it DLC") }
         if (picked.branchId != options.branches.firstOrNull { it.selected }?.id) add(picked.branchId.orEmpty())
     }

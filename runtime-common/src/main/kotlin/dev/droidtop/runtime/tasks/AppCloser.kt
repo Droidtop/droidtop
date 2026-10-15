@@ -32,7 +32,6 @@ class AppCloser(
     private fun closeConnected(packageName: String): CloseOutcome {
         var providerFailure: String? = null
         var asked = false
-        var engineNothingRunning = false
         for (step in TaskPolicy.closeSteps(ops.available(), packageName)) {
             when (step) {
                 CloseStep.FORCE_STOP -> when (val result = ops.forceStop(packageName)) {
@@ -44,14 +43,18 @@ class AppCloser(
                     ForceStopResult.NoProvider -> Unit
                 }
                 // An ended game is a close. "None running" is not one, but it is not a failure either: whatever droidtop
-                // believed was running there is not (a launch cancelled or crashed), and Enginehost's own screens may
-                // still be open, so the background kill below is still asked.
+                // believed was running there is not (a launch cancelled or crashed), so the session is over and no
+                // other step is needed, least of all one that asks the person for a helper's full access. Anything
+                // else (an old Enginehost, a blocked start) says nothing and the next step is tried.
                 CloseStep.ENGINEHOST_END_GAME -> when (endEnginehostGame()) {
                     true -> {
                         onClosed(packageName)
                         return CloseOutcome.Closed
                     }
-                    false -> engineNothingRunning = true
+                    false -> {
+                        onClosed(packageName)
+                        return CloseOutcome.NotRunning("Enginehost has no game running")
+                    }
                     null -> Unit
                 }
                 CloseStep.KILL_BACKGROUND -> {
@@ -60,13 +63,12 @@ class AppCloser(
                 }
             }
         }
-        if (engineNothingRunning && providerFailure == null) {
-            onClosed(packageName)
-            return CloseOutcome.NotRunning("Enginehost has no game running")
-        }
         return when {
             providerFailure != null ->
-                CloseOutcome.Failed("Helper failed: $providerFailure")
+                CloseOutcome.Failed(
+                    "Couldn't end it: $providerFailure" +
+                        if (asked) ". Android was asked to close it too, but cannot say whether it did" else "",
+                )
             asked -> CloseOutcome.Requested(TaskPolicy.notConfirmed(ops.unavailableReason()))
             else -> CloseOutcome.Failed("Android refused")
         }

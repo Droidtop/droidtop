@@ -102,11 +102,9 @@ class MotionTokensTest {
     }
 
     @Test
-    fun ringLandsFromOutsideAndBreathesToItsFloor() {
+    fun ringLandsFromOutside() {
         assertEquals(Motion.RingLandFromDp, FocusLook.ringLandOutsetDp(0f), 0.0001f)
         assertEquals(0f, FocusLook.ringLandOutsetDp(1f), 0.0001f)
-        assertEquals(FocusLook.RingAlpha, FocusLook.ringAlpha(0f), 0.0001f)
-        assertEquals(FocusLook.RingBreathAlpha, FocusLook.ringAlpha(1f), 0.0001f)
     }
 
     @Test
