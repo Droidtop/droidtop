@@ -382,7 +382,7 @@ class PluginBundleInstallerTest {
     // ----- The certificate format against Droidtop Core, and the bounded legacy path -----
 
     @Test
-    fun `an official bundle installs through a leaf Droidtop Core issued, and not without a pinned Core`() {
+    fun `an official bundle installs through a leaf the signing root issued, and not without a pinned root`() {
         val coreKey = TestPki.rsa()
         val core = TestPki.core(coreKey)
         val leafKey = freshKeyPair()
@@ -391,7 +391,7 @@ class PluginBundleInstallerTest {
         val bundle = buildBundle("droidtop", leafKey, chain = listOf(leaf))
         DroidtopSigningRoot.withPinned(null) {
             val refused = install(bundle, pluginsRoot)
-            assertTrue((refused as PluginInstallResult.Refused).error.reason.contains("Droidtop Core"))
+            assertTrue((refused as PluginInstallResult.Refused).error.reason.contains("signing root"))
         }
         DroidtopSigningRoot.withPinned(core.publicKey) {
             val record = (install(bundle, pluginsRoot) as PluginInstallResult.Installed).record
