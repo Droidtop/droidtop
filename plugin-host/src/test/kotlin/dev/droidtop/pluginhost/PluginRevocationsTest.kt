@@ -44,19 +44,19 @@ class PluginRevocationsTest {
     fun `droidtop's list is kept only under Core, newer, and re-verified on every read`() {
         val root = tmp.newFolder("plugins")
         DroidtopCore.withPinned(core.publicKey) {
-            assertTrue(PluginRevocations.accept(root, list(2, keys = listOf("a".repeat(64))), now))
+            assertTrue(PluginRevocations.accept(root, list(2, keys = listOf("a".repeat(64)))))
             assertTrue(PluginRevocations.load(root).revokesKey("a".repeat(64)))
             // Not newer, another catalog's signer, or a chain to another key: nothing changes.
-            assertFalse(PluginRevocations.accept(root, list(2, keys = listOf("b".repeat(64))), now))
-            assertFalse(PluginRevocations.accept(root, list(3, catalog = "someone/else"), now))
+            assertFalse(PluginRevocations.accept(root, list(2, keys = listOf("b".repeat(64)))))
+            assertFalse(PluginRevocations.accept(root, list(3, catalog = "someone/else")))
             val otherKey = TestPki.rsa()
             val other = TestPki.core(otherKey)
-            assertFalse(PluginRevocations.accept(root, list(4) { signer(it, "droidtop", other, otherKey.private) }, now))
+            assertFalse(PluginRevocations.accept(root, list(4) { signer(it, "droidtop", other, otherKey.private) }))
             assertEquals(2L, PluginRevocations.load(root).sequence)
         }
         // Under another pinned Core (or none) the stored list no longer verifies, so it counts as none.
         DroidtopCore.withPinned(TestPki.rsa().public) { assertEquals(0L, PluginRevocations.load(root).sequence) }
-        DroidtopCore.withPinned(null) { assertFalse(PluginRevocations.accept(root, list(5), now)) }
+        DroidtopCore.withPinned(null) { assertFalse(PluginRevocations.accept(root, list(5))) }
     }
 
     @Test
@@ -66,12 +66,12 @@ class PluginRevocationsTest {
         val org = TestPki.cert("org", orgKey.public).ca(0).selfSigned(orgKey.private).build()
         val anchor = ChainSignature.Anchor(orgKey.public)
         val byOrg = { pair: KeyPair -> signer(pair, "acme/catalog", org, orgKey.private) }
-        assertFalse(PluginRevocations.acceptForOrigin(root, "acme", list(2, catalog = "acme/catalog", keys = listOf("c".repeat(64))), anchor, "acme/catalog", now))
-        assertTrue(PluginRevocations.acceptForOrigin(root, "acme", list(2, catalog = "acme/catalog", keys = listOf("c".repeat(64)), signerCert = byOrg), anchor, "acme/catalog", now))
+        assertFalse(PluginRevocations.acceptForOrigin(root, "acme", list(2, catalog = "acme/catalog", keys = listOf("c".repeat(64))), anchor, "acme/catalog"))
+        assertTrue(PluginRevocations.acceptForOrigin(root, "acme", list(2, catalog = "acme/catalog", keys = listOf("c".repeat(64)), signerCert = byOrg), anchor, "acme/catalog"))
         assertTrue(PluginRevocations.load(root).forOrigin("acme").revokesKey("c".repeat(64)))
         assertFalse(PluginRevocations.load(root).revokesKey("c".repeat(64)))
         assertEquals(PluginRevocationList.NONE, PluginRevocations.load(root).forOrigin("other"))
-        assertFalse(PluginRevocations.acceptForOrigin(root, "acme", list(1, catalog = "acme/catalog", signerCert = byOrg), anchor, "acme/catalog", now))
+        assertFalse(PluginRevocations.acceptForOrigin(root, "acme", list(1, catalog = "acme/catalog", signerCert = byOrg), anchor, "acme/catalog"))
     }
 
     // ----- The legacy path: installed plugins only -----

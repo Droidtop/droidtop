@@ -73,9 +73,9 @@ object PluginRevocations {
      * stored one's. Returns whether it replaced the stored list. Written via a temp file and rename, so a failed
      * write leaves the previous list in force.
      */
-    fun accept(pluginsRoot: File, jws: String, nowEpochSeconds: Long): Boolean {
+    fun accept(pluginsRoot: File, jws: String): Boolean {
         val anchor = DroidtopCore.anchor() ?: return false
-        val offered = RevocationList.parse(jws, anchor, OFFICIAL_CATALOG_ID, nowEpochSeconds) ?: return false
+        val offered = RevocationList.parse(jws, anchor, OFFICIAL_CATALOG_ID) ?: return false
         if (offered.sequence <= official(pluginsRoot).sequence) return false
         pluginsRoot.mkdirs()
         val temp = File(pluginsRoot, "$FILE_NAME.tmp")
@@ -89,8 +89,8 @@ object PluginRevocations {
      * Returns whether it did. Kept as the parsed list in app-private storage, like the trusted key it was checked
      * against.
      */
-    fun acceptForOrigin(pluginsRoot: File, origin: String, jws: String, anchor: ChainSignature.Anchor, catalogId: String, nowEpochSeconds: Long): Boolean {
-        val offered = RevocationList.parse(jws, anchor, catalogId, nowEpochSeconds) ?: return false
+    fun acceptForOrigin(pluginsRoot: File, origin: String, jws: String, anchor: ChainSignature.Anchor, catalogId: String): Boolean {
+        val offered = RevocationList.parse(jws, anchor, catalogId) ?: return false
         val stored = originLists(pluginsRoot)
         if (offered.sequence <= (stored[origin]?.sequence ?: 0)) return false
         val json = JSONObject()
