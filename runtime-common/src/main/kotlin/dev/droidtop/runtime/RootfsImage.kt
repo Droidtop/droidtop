@@ -41,7 +41,10 @@ interface RootfsPuller {
 
     /**
      * Makes [destinationPath] a rootfs of [image], pulling it into the
-     * image store first unless it is already there.
+     * image store first unless it is already there. Returns how the image
+     * says its own program runs ([ImageRunConfig]) when it unpacked it, for
+     * the container to keep, since the store may evict the config with the
+     * image; null when [destinationPath] already held this image.
      */
-    suspend fun pullAndUnpack(image: RootfsImage, destinationPath: String, policy: ImageCachePolicy)
+    suspend fun pullAndUnpack(image: RootfsImage, destinationPath: String, policy: ImageCachePolicy): ImageRunConfig?
 }

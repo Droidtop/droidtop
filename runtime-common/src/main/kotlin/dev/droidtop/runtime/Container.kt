@@ -249,6 +249,13 @@ interface ContainerRuntime {
     suspend fun importData(container: Container, input: java.io.InputStream): Unit =
         error(dataBackupUnavailableReason ?: "not supported")
 
+    /**
+     * How [container]'s image says its own program runs (Entrypoint, Cmd, Env, WorkingDir, User), kept from
+     * when it was created (docs/SPEC.md 3, "The image's own program"); null for a container made before this
+     * was kept, or a backend that does not keep it.
+     */
+    suspend fun imageRunConfig(container: Container): ImageRunConfig? = null
+
     /** [container]'s home and the extra host folders bound into it beyond the standard set (docs/SPEC.md 3d "Home and folders"). */
     suspend fun mounts(container: Container): EnvironmentMounts
 
