@@ -157,7 +157,7 @@ internal fun CompanionGameTab() {
                 GameRow.RESUME -> GameButton(label, primary = true) { CompanionState.onLaunchEntry?.invoke(entry) }
                 GameRow.QUIT -> GameButton(label) { act(row) { CompanionState.onQuitEntry?.invoke(entry) } }
                 GameRow.RESTART -> GameButton(label) { act(row) { CompanionState.onRestartEntry?.invoke(entry) } }
-                GameRow.KILL -> GameButton(label) { act(row) { CompanionState.onKillEntry?.invoke(entry) } }
+                GameRow.KILL -> GameButton(label) { act(row) { CompanionState.onQuitEntry?.invoke(entry) } }
                 GameRow.EMULATOR -> CompanionEmulatorChoice(entry)
                 GameRow.OVERLAY -> GameButton("$label: ${overlay.label}") {
                     if (PerformanceOverlay.canDraw(context)) PerformanceOverlay.setLevel(context, overlay.next())

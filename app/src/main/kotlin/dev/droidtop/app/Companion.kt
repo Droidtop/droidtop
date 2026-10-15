@@ -89,9 +89,11 @@ object CompanionState {
     @Volatile
     var onQuitEntry: ((LibraryEntry) -> Unit)? = null
 
-    /** Kill for the running game (the Game tab), installed by MainActivity: `Library.killRunning`, which says on the banner what it could not confirm. */
-    @Volatile
-    var onKillEntry: ((LibraryEntry) -> Unit)? = null
+    /**
+     * Where the seams above run what outlives a screen: ending a game can open a sheet or move the game off the screen,
+     * which recreates the activity that asked, and its own scope was cancelled before the answer reached the banner.
+     */
+    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main.immediate)
 
     /** Restart for the running game (the Game tab): the same quit, then the one launch path once it has ended. */
     @Volatile

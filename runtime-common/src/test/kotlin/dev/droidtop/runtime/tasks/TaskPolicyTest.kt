@@ -85,13 +85,13 @@ class TaskPolicyTest {
     }
 
     @Test
-    fun `enginehost is asked to end its game before the background kill, after a force-stop`() {
+    fun `enginehost is asked to end its game first, before any helper and the background kill`() {
         assertEquals(
             listOf(CloseStep.ENGINEHOST_END_GAME, CloseStep.KILL_BACKGROUND),
             TaskPolicy.closeSteps(TaskPrivileges.NONE, TaskPolicy.ENGINEHOST_PACKAGE),
         )
         assertEquals(
-            listOf(CloseStep.FORCE_STOP, CloseStep.ENGINEHOST_END_GAME, CloseStep.KILL_BACKGROUND),
+            listOf(CloseStep.ENGINEHOST_END_GAME, CloseStep.FORCE_STOP, CloseStep.KILL_BACKGROUND),
             TaskPolicy.closeSteps(TaskPrivileges(forceStop = true, shell = false), TaskPolicy.ENGINEHOST_PACKAGE),
         )
         assertEquals(listOf(CloseStep.KILL_BACKGROUND), TaskPolicy.closeSteps(TaskPrivileges.NONE, "com.retroarch.aarch64"))

@@ -104,13 +104,15 @@ object TaskPolicy {
      * Which close paths exist for [privileges], in the order they are tried. The background kill is
      * always listed as the last, unconfirmable try: on the console's Android 13 it ends an app that
      * has really gone to the background and is documented to do nothing for other apps on later
-     * releases, so its result is never reported as "closed". Enginehost has a step of its own between the
-     * two: it ends its game when droidtop asks, and says whether it did.
+     * releases, so its result is never reported as "closed". Enginehost has a step of its own, asked first: it ends
+     * its game when droidtop asks, and says whether it did or whether none was running.
      */
     fun closeSteps(privileges: TaskPrivileges, packageName: String? = null): List<CloseStep> =
         buildList {
-            if (privileges.forceStop) add(CloseStep.FORCE_STOP)
+            // Enginehost's own answer first: it needs no helper, so it never opens the helper's full-access sheet, and
+            // "none running" settles a stale session without asking anything else (Droidtop/tracker#289).
             if (packageName == ENGINEHOST_PACKAGE) add(CloseStep.ENGINEHOST_END_GAME)
+            if (privileges.forceStop) add(CloseStep.FORCE_STOP)
             add(CloseStep.KILL_BACKGROUND)
         }
 

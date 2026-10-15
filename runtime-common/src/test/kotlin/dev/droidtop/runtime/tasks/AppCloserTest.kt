@@ -69,16 +69,18 @@ class AppCloserTest {
     }
 
     @Test
-    fun `Enginehost saying no game is running ends droidtop's stale session, and Android is still asked`() {
+    fun `Enginehost saying no game is running ends droidtop's stale session and asks nothing else`() {
         endGameAnswer = false
+        // A helper that would open a full-access sheet is never reached for a game that is not running.
+        val ops = FakeOps(TaskPrivileges(forceStop = true, shell = true), ForceStopResult.Stopped)
 
-        val outcome = closer(FakeOps(TaskPrivileges.NONE)).close(TaskPolicy.ENGINEHOST_PACKAGE)
+        val outcome = closer(ops).close(TaskPolicy.ENGINEHOST_PACKAGE)
 
         assertEquals(CloseOutcome.NotRunning("Enginehost has no game running"), outcome)
         assertTrue(outcome.sessionOver)
         assertEquals("Enginehost has no game running", outcome.text)
-        // Enginehost's own screens may still be open, so the ask of Android is not skipped.
-        assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), killed)
+        assertTrue(ops.forceStops.isEmpty())
+        assertTrue(killed.isEmpty())
         assertEquals(listOf(TaskPolicy.ENGINEHOST_PACKAGE), closed)
     }
 
@@ -109,14 +111,16 @@ class AppCloserTest {
     }
 
     @Test
-    fun `a helper's force-stop of Enginehost does not ask Enginehost, and other apps are never asked`() {
+    fun `Enginehost is asked before a helper and other apps are never asked`() {
         endGameAnswer = true
         val ops = FakeOps(TaskPrivileges(forceStop = true, shell = true), ForceStopResult.Stopped)
 
         assertEquals(CloseOutcome.Closed, closer(ops).close(TaskPolicy.ENGINEHOST_PACKAGE))
+        assertEquals(1, endGameAsks)
+        assertTrue(ops.forceStops.isEmpty())
         closer(FakeOps(TaskPrivileges.NONE)).close("com.retroarch.aarch64")
 
-        assertEquals(0, endGameAsks)
+        assertEquals(1, endGameAsks)
     }
 
     @Test
@@ -163,6 +167,7 @@ class AppCloserTest {
 
         assertTrue(outcome is CloseOutcome.Failed)
         assertTrue(outcome.text.contains("Shizuku is not running"))
+        assertTrue(outcome.text.contains("Android was asked to close it too"))
         assertEquals(listOf("com.android.calendar"), killed)
         assertTrue(closed.isEmpty())
     }

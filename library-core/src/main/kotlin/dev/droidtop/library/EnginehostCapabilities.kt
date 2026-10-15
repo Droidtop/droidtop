@@ -33,6 +33,23 @@ object EnginehostCapabilities {
     // ExceptionInInitializerError. Real round-13 CI failure.
     val PROVIDER_URI: Uri by lazy { Uri.parse("content://dev.enginehost.capabilities/installed") }
 
+    /**
+     * Whether Enginehost holds any task of its own right now (a launch's warning, a running game, an error screen), by its
+     * `state` call, answered to droidtop alone. False once a launch was cancelled or a game ended; null when it cannot say
+     * (Enginehost not installed, one without `state`, a failed call). Blocking IPC: not for the main thread.
+     */
+    fun holdsTask(context: Context): Boolean? = runCatching {
+        val authority = Uri.parse("content://dev.enginehost.capabilities")
+        val client = context.contentResolver.acquireContentProviderClient(authority) ?: return@runCatching null
+        try {
+            val reply = client.call("state", null, null)
+            if (reply != null && reply.containsKey("tasks")) reply.getInt("tasks") > 0 else null
+        } finally {
+            @Suppress("DEPRECATION")
+            client.release()
+        }
+    }.getOrNull()
+
     data class InstalledBundle(
         val bundleId: String,
         val engine: String,
