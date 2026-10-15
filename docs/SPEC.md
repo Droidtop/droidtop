@@ -19947,6 +19947,13 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   soft keyboard goes away), Up from the first row returns to the field, A
   opens the row, and typing puts the cursor back in the field. The cursor
   follows a row by its key, so a source answering above it does not move it.
+- **A page a row opens replaces the search, it is not drawn over it**
+  (Droidtop/tracker#542). Get games, a source's detail and a plugin's settings
+  open in a window of their own while the search panel is not composed; what was
+  typed, the answers and the cursor stay in the dialog's state and are there
+  when the page closes (the search runs again then, so an approval or an
+  installed runtime shows). Two translucent windows had put the page's text on
+  the search's text. Back from the page leaves the soft keyboard away.
 - **The field and the keyboard.** The field asks for the soft keyboard
   explicitly when it opens (`SoftwareKeyboardController.show`; Compose's own
   request on focus is implicit, and Android drops an implicit request while a

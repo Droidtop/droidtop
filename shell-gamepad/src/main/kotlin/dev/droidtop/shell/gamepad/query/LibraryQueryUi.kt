@@ -494,11 +494,20 @@ internal fun LibrarySearchDialog(
     val fieldFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val view = LocalView.current
-    LaunchedEffect(Unit) {
+    // A page a result opens (Get games, a source's detail, a plugin's settings) takes the window over: the
+    // search panel is not drawn under it, because two translucent windows put text on text (Droidtop/tracker#542).
+    // What was typed and where the cursor was stay in this composition and are there when the page closes.
+    var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
+    var firstShow by remember { mutableStateOf(true) }
+    LaunchedEffect(activeCatalog == null) {
+        if (activeCatalog != null) return@LaunchedEffect
         // The field lives in the dialog's own composition, which attaches a frame or more after this
         // effect starts: one early request failed silently on a reopen and left the field unfocused
         // until A (Droidtop/tracker#376). Ask until it is attached.
         dev.droidtop.shell.gamepad.requestFocusWhenAttached(fieldFocus, "Search field")
+        // Back from a page the soft keyboard stays away: the pad is on a row, not typing.
+        if (!firstShow) return@LaunchedEffect
+        firstShow = false
         // Explicit, not implicit: Compose's own request on focus is dropped while a pad or keyboard is attached.
         delay(120)
         keyboard?.show()
@@ -515,7 +524,6 @@ internal fun LibrarySearchDialog(
     var statusLine by remember { mutableStateOf<String?>(null) }
     // Bumped to search again after the person fixed something (installed a runtime, approved a plugin).
     var searchTick by remember { mutableIntStateOf(0) }
-    var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
     // What a failed source reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167), by source id.
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     // The row under the pad's cursor, by key so a source answering above it does not move it; null is the field.
@@ -668,7 +676,7 @@ internal fun LibrarySearchDialog(
     }
     val entries = lines.filterIsInstance<SearchLine.Entry>()
 
-    Dialog(
+    if (activeCatalog == null) Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
