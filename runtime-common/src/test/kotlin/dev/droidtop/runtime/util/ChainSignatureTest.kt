@@ -217,6 +217,28 @@ class ChainSignatureTest {
         assertNull(RevocationList.parse(list(), ChainSignature.Anchor(TestPki.rsa().public), "droidtop", now))
     }
 
+    /**
+     * Android's provider is Conscrypt (BoringSSL), whose getExtendedKeyUsage() throws on droidtop's UUID arc;
+     * found when :library-core's tests ran after a Robolectric test had installed it. Every check must hold under it.
+     */
+    @Test
+    fun `verification holds under Conscrypt, the provider a device uses`() {
+        val provider = org.conscrypt.Conscrypt.newProvider()
+        java.security.Security.insertProviderAt(provider, 1)
+        try {
+            val parsed = ChainSignature.parseCertificate(java.util.Base64.getEncoder().encodeToString(leaf.encoded))!!
+            assertTrue(parsed.javaClass.name, parsed.javaClass.name.startsWith("org.conscrypt"))
+            assertTrue(verify(TestPki.detached(pluginTyp, listOf(leaf), leafKey.private, manifest)) is ChainSignature.Result.Verified)
+            val catalogTyp = TestPki.detached(ChainSignature.Purpose.CATALOG.typ, listOf(leaf), leafKey.private, manifest)
+            assertTrue(ChainSignature.verify(catalogTyp, ChainSignature.Purpose.CATALOG, anchor, manifest, now) is ChainSignature.Result.Refused)
+            val rsa = TestPki.rsa()
+            val rsaLeaf = TestPki.pluginLeaf(rsa, "droidtop", core, coreKey.private)
+            assertTrue(verify(TestPki.detached(pluginTyp, listOf(rsaLeaf), rsa.private, manifest)) is ChainSignature.Result.Verified)
+        } finally {
+            java.security.Security.removeProvider(provider.name)
+        }
+    }
+
     @Test
     fun `the pinned Core is a public key resource, and a placeholder pins none`() {
         // The repository ships a placeholder until the coordinator commits Core's public key.
