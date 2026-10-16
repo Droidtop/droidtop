@@ -3886,16 +3886,25 @@ droidtop 0.2.0-dev.1931).
   brightness write is gone. The main screen's brightness is Android's setting; the companion's is its own window's
   (`screenBrightness`, where the host is an Activity), never below 10%, so it never changes the main screen. **Off**:
   Android 13 gives the shell no command to power one panel of several off (`cmd display` has brightness, modes and
-  dock, not power), so Off is the companion window black at the lowest window brightness, still taking touch to
-  wake. **Idle** (`CompanionIdle`, Companion group "Dim and turn off the companion", on by default): untouched, the
-  companion dims after 2 minutes and goes off after 5, both stretched to what `AccessibilityManager
-  .getRecommendedTimeoutMillis` asks; TalkBack hears "Companion screen will turn off soon. Touch to keep it on." ten
-  seconds before. It does not run while Social shows, a plugin panel that declares keep-on shows, a running job is on
+  dock, not power), so Off is the companion window at the lowest window brightness, still taking touch to wake.
+  **Dim and Off are the backlight only (decided 2026-10-16, owner: "We can't capture the companion if it's always
+  black").** The companion's UI stays drawn in every state, so a screenshot or a screen recording shows the real
+  companion; a black layer used to cover it (55% dimmed, solid when off) and every capture of the RP5's companion was
+  black (rig, droidtop 0.2.0-dev.1931). Off lays a clear layer over a tab that takes the wake taps without passing them
+  on; the first-time "how to wake" line sits on a small plate. A host that is not an Activity (a Presentation) has no
+  window brightness of its own, so it does not dim. **Idle** (`CompanionIdle`, Companion group "Dim the companion
+  screen"): with no input the companion dims after the chosen time (Never, 1, 2 (the default), 5 or 10 minutes) and
+  goes off 3 minutes later, both stretched to what `AccessibilityManager.getRecommendedTimeoutMillis` asks; TalkBack
+  hears "Companion screen will dim soon. Touch to keep it on." ten seconds before. The old on/off switch's Off reads
+  as Never. **What wakes it**: a touch on it, input in droidtop's own windows on the main screen (the shell and the
+  Windows game screen; `CompanionPrefs.inputSeen`, at most one wake a second), a game ending, a launch alert, a new
+  message (below), and the Quick Menu's Companion screen row. Input to another app's game is not seen: droidtop does
+  not filter the system's keys. It does not run while Social shows, a plugin panel that declares keep-on shows, a running job is on
   Home (Downloads and updates), the companion keyboard is open, or a stream runs. Every touch is seen before the tab (never consumed), so a tap on a dimmed screen
   brightens it and does what was tapped. A new message notification brings an off or dimmed screen back to dimmed,
   except in Kid and Kiosk. **Wake** (Companion group): a double tap (default), a single tap, or only the Quick Menu's
   "Companion screen" row (System, while a second screen holds the companion); the off screen is one TalkBack element,
-  "Companion screen off, activate to turn on", and the first time it says how to wake it. On Input it is a dark
+  "Companion screen off, activate to turn on", and the first time it says how to wake it. On Input it is a dimmed
   trackpad: touches still move the pointer, and the Show tabs handle or the Tabs button wakes it. **Which screen**:
   "Show the companion on" (Companion group) lists every screen but the main one in plain words; the choice is
   remembered per set of screens (`CompanionScreens`, keyed by each screen's name, native size and built-in or

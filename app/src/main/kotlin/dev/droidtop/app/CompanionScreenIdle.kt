@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -58,10 +57,13 @@ internal fun newestMessage(items: List<NotificationsStore.Item>): Long = items.f
 /**
  * The companion screen's idle and off (docs/SPEC.md "The companion's tabs", Companion screen off and idle; slice C14):
  * every touch is noticed before the tab sees it (never consumed, so a tap on a dimmed screen brightens it and does what
- * was tapped); with no touch the screen dims, then goes off ([CompanionIdle]); [exempt] holds it on. The window's own
- * brightness follows ([DisplayControls.windowLevel]) where the host is an Activity, and a black layer does the rest.
- * Off is one large element for TalkBack; it wakes by the chosen tap, and a new message brings it back to dimmed. On
- * Input it stays a dark trackpad that touches still reach ([input]); the Tabs handle or button wakes it there.
+ * was tapped); with no input the screen dims, then goes off ([CompanionIdle]); [exempt] holds it on. Dim and off are
+ * the window's own brightness only ([DisplayControls.windowLevel], where the host is an Activity): what the companion
+ * shows is never covered, so a screenshot or a recording shows the real companion. A black layer used to cover it and
+ * every capture of the RP5's companion came out black (rig, droidtop 0.2.0-dev.1931). Off takes the first touches as
+ * the wake (the chosen tap) without passing them on, and is one large element for TalkBack. Input on droidtop's main
+ * screen, a game ending, a launch alert and a new message wake it ([CompanionPrefs.wakeRequests]); on Input it stays a
+ * trackpad that touches still reach ([input]), and the Tabs handle or button wakes it there.
  */
 @Composable
 internal fun CompanionIdleLayer(exempt: Boolean, input: Boolean, wakeRequest: Boolean, content: @Composable BoxScope.() -> Unit) {
@@ -80,14 +82,14 @@ internal fun CompanionIdleLayer(exempt: Boolean, input: Boolean, wakeRequest: Bo
         if (state != CompanionIdle.State.ON) state = CompanionIdle.State.ON
     }
     // The timer: wakes up only when the state is due to change, never polls.
-    LaunchedEffect(lastTouch, keepOn, settings.idleTimeout) {
+    LaunchedEffect(lastTouch, keepOn, settings.idleDimMs) {
         while (true) {
             val since = SystemClock.uptimeMillis() - lastTouch
-            if (CompanionIdle.warnNow(since, settings.idleTimeout, keepOn, recommended)) {
-                view.announceForAccessibility("Companion screen will turn off soon. Touch to keep it on.")
+            if (CompanionIdle.warnNow(since, settings.idleDimMs, keepOn, recommended)) {
+                view.announceForAccessibility("Companion screen will dim soon. Touch to keep it on.")
             }
-            state = CompanionIdle.state(since, settings.idleTimeout, keepOn, recommended)
-            val next = CompanionIdle.nextChangeInMs(since, settings.idleTimeout, keepOn, recommended) ?: break
+            state = CompanionIdle.state(since, settings.idleDimMs, keepOn, recommended)
+            val next = CompanionIdle.nextChangeInMs(since, settings.idleDimMs, keepOn, recommended) ?: break
             delay(next.coerceAtLeast(250L))
         }
     }
@@ -97,7 +99,7 @@ internal fun CompanionIdleLayer(exempt: Boolean, input: Boolean, wakeRequest: Bo
     var seenMessage by remember { mutableLongStateOf(newest) }
     LaunchedEffect(newest) {
         if (newest > seenMessage) {
-            CompanionIdle.afterMessage(state, ControlAccess.rules(uiMode).alwaysAsk, recommended)?.let { since ->
+            CompanionIdle.afterMessage(state, ControlAccess.rules(uiMode).alwaysAsk, settings.idleDimMs, recommended)?.let { since ->
                 lastTouch = SystemClock.uptimeMillis() - since
                 state = CompanionIdle.State.DIM
             }
@@ -109,7 +111,7 @@ internal fun CompanionIdleLayer(exempt: Boolean, input: Boolean, wakeRequest: Bo
     var seenOffs by remember { mutableStateOf(offs) }
     LaunchedEffect(offs) {
         if (offs != seenOffs) {
-            lastTouch = SystemClock.uptimeMillis() - CompanionIdle.timeouts(recommended).second
+            lastTouch = SystemClock.uptimeMillis() - CompanionIdle.timeouts(settings.idleDimMs.coerceAtLeast(1L), recommended).second
             state = CompanionIdle.State.OFF
         }
         seenOffs = offs
@@ -122,6 +124,15 @@ internal fun CompanionIdleLayer(exempt: Boolean, input: Boolean, wakeRequest: Bo
         if (wakes != seenWakes) touched()
         seenWakes = wakes
     }
+    // A game ending and a launch alert wake it: the companion is where the next thing happens.
+    val running by dev.droidtop.library.LaunchDisplay.running.collectAsState()
+    var wasRunning by remember { mutableStateOf(running != null) }
+    LaunchedEffect(running) {
+        if (wasRunning && running == null) touched()
+        wasRunning = running != null
+    }
+    val alert by dev.droidtop.library.LaunchWatchdog.alert.collectAsState()
+    LaunchedEffect(alert) { if (alert != null) touched() }
     // The window's own brightness, where the host is an Activity (a Presentation's window is not ours to set).
     val window = remember(view) { findActivity(view.context)?.window }
     DisposableEffect(window, state, level) {
@@ -145,30 +156,28 @@ internal fun CompanionIdleLayer(exempt: Boolean, input: Boolean, wakeRequest: Bo
             },
     ) {
         content()
-        when (state) {
-            CompanionIdle.State.ON -> Unit
-            CompanionIdle.State.DIM -> Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
-            CompanionIdle.State.OFF -> if (input) {
-                // A dark trackpad: the touches still reach it, and only the Tabs handle or button wakes it.
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.9f)))
-            } else {
-                OffScreen(
-                    wake = CompanionIdle.Wake.of(settings.wake),
-                    showHint = !offHintSeen,
-                    onWake = {
-                        touched()
-                        if (!offHintSeen) {
-                            offHintSeen = true
-                            CompanionPrefs.setOffHintSeen(context.applicationContext)
-                        }
-                    },
-                )
-            }
+        // Dim is the backlight alone. Off is the backlight too, and over a tab (not Input, a trackpad that touches
+        // still reach and only the Tabs handle or button wakes) a clear layer takes the wake taps.
+        if (state == CompanionIdle.State.OFF && !input) {
+            OffScreen(
+                wake = CompanionIdle.Wake.of(settings.wake),
+                showHint = !offHintSeen,
+                onWake = {
+                    touched()
+                    if (!offHintSeen) {
+                        offHintSeen = true
+                        CompanionPrefs.setOffHintSeen(context.applicationContext)
+                    }
+                },
+            )
         }
     }
 }
 
-/** The off screen: black, one element for TalkBack, woken by the chosen tap; the first time, a line says how. */
+/**
+ * The off screen's touch layer: clear, so the companion stays drawn under it, one element for TalkBack, woken by the
+ * chosen tap; the first time, a line on a plate says how.
+ */
 @Composable
 private fun OffScreen(wake: CompanionIdle.Wake, showHint: Boolean, onWake: () -> Unit) {
     var taps by remember { mutableStateOf(0) }
@@ -177,7 +186,6 @@ private fun OffScreen(wake: CompanionIdle.Wake, showHint: Boolean, onWake: () ->
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black)
             .pointerInput(wake) {
                 awaitPointerEventScope {
                     while (true) {
@@ -201,7 +209,14 @@ private fun OffScreen(wake: CompanionIdle.Wake, showHint: Boolean, onWake: () ->
             },
     ) {
         if (showHint) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(24.dp)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            ) {
                 Text(
                     when (wake) {
                         CompanionIdle.Wake.DOUBLE_TAP -> "Double tap to turn this screen on"
@@ -209,7 +224,7 @@ private fun OffScreen(wake: CompanionIdle.Wake, showHint: Boolean, onWake: () ->
                         CompanionIdle.Wake.NONE -> "Turn this screen on from the Quick Menu: Companion screen"
                     },
                     style = MaterialTheme.typography.bodyLarge,
-                    color = Color.White.copy(alpha = 0.6f),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
         }

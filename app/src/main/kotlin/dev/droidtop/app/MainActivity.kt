@@ -112,16 +112,23 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     private fun deliverKey(event: KeyEvent): Boolean = super.dispatchKeyEvent(event)
 
-    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean =
-        padGate.dispatchMotion(event) || super.dispatchGenericMotionEvent(event)
+    // Input on the main screen wakes a dimmed companion (docs/SPEC.md "The companion's tabs", Companion screen off and
+    // idle); CompanionPrefs.inputSeen asks at most once a second.
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        dev.droidtop.library.settings.CompanionPrefs.inputSeen(android.os.SystemClock.uptimeMillis())
+        return padGate.dispatchMotion(event) || super.dispatchGenericMotionEvent(event)
+    }
 
     // Desktop hands the pad to the container, but Start, Select, R2 and L1 are droidtop's chrome there
     // (docs/SPEC.md 2b "Desktop chrome with a pad"): the Start menu, the Quick Menu and the windows list.
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
-        (mode == Mode.DESKTOP && DesktopPadRoutes.claim(event, DesktopSessionService.state.value is DesktopSessionState.Connected)) ||
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        dev.droidtop.library.settings.CompanionPrefs.inputSeen(android.os.SystemClock.uptimeMillis())
+        return (mode == Mode.DESKTOP && DesktopPadRoutes.claim(event, DesktopSessionService.state.value is DesktopSessionState.Connected)) ||
             padGate.dispatchKey(event)
+    }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        dev.droidtop.library.settings.CompanionPrefs.inputSeen(android.os.SystemClock.uptimeMillis())
         padGate.noteTouch(event)
         return super.dispatchTouchEvent(event)
     }
