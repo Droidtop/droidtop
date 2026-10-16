@@ -51,6 +51,8 @@ import com.android.launcher3.views.ActivityContext;
 import java.io.PrintWriter;
 
 import java.util.ArrayList;
+import com.android.launcher3.LauncherPrefs;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -125,6 +127,8 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     private final SpannableString mPrivateProfileDividerBadge;
     private BaseAllAppsAdapter<T> mAdapter;
     private AppInfoComparator mAppNameComparator;
+    /** Whether [mApps] was last sorted Most used first (droidtop patch). */
+    private boolean mSortedByUse;
     private int mNumAppsPerRowAllApps;
     private int mNumAppRowsInAdapter;
     private Predicate<ItemInfo> mItemFilter;
@@ -274,13 +278,25 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                         .filter(mPrivateProviderManager.getItemInfoMatcher());
             }
         }
-        appSteam = appSteam.sorted(mAppNameComparator);
+        // droidtop patch (Droidtop/tracker#564): Most used first, by launches from the launcher, then by name.
+        mSortedByUse = sortByUse();
+        Comparator<AppInfo> order = mAppNameComparator;
+        if (mSortedByUse) {
+            Map<String, Integer> counts = RecentAppsStore.launchCounts(mActivityContext);
+            Map<AppInfo, Integer> launches = new HashMap<>();
+            for (AppInfo info : mAllAppsStore.getApps()) {
+                launches.put(info, counts.getOrDefault(info.componentName.flattenToString(), 0));
+            }
+            order = Comparator.<AppInfo>comparingInt(info -> -launches.getOrDefault(info, 0))
+                    .thenComparing(mAppNameComparator);
+        }
+        appSteam = appSteam.sorted(order);
         privateAppStream = privateAppStream.sorted(mAppNameComparator);
 
         // As a special case for some languages (currently only Simplified Chinese), we may need to
         // coalesce sections
         Locale curLocale = mActivityContext.getResources().getConfiguration().locale;
-        boolean localeRequiresSectionSorting = curLocale.equals(Locale.SIMPLIFIED_CHINESE);
+        boolean localeRequiresSectionSorting = curLocale.equals(Locale.SIMPLIFIED_CHINESE) && !mSortedByUse;
         if (localeRequiresSectionSorting) {
             // Compute the section headers. We use a TreeMap with the section name comparator to
             // ensure that the sections are ordered when we iterate over it later
@@ -512,6 +528,25 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
      *
      * @return the number of adapter items added.
      */
+    /** Whether the drawer's order setting is Most used (droidtop patch, Droidtop/tracker#564). */
+    private boolean sortByUse() {
+        return LauncherPrefs.DRAWER_SORT.get(mActivityContext)
+                == app.murinelauncher.settings.prefs.DrawerSort.MOST_USED;
+    }
+
+    /**
+     * droidtop patch: what the drawer does each time it opens (ActivityAllAppsContainerView.refreshRecentApps). The
+     * Recent row is derived again; in Most used order, or when the order setting changed since the list was built,
+     * the whole list is sorted again, launches having moved it.
+     */
+    public void refreshOnOpen() {
+        if (mSortedByUse || sortByUse()) {
+            onAppsUpdated();
+        } else {
+            updateAdapterItems();
+        }
+    }
+
     private int addRecentAppItems() {
         List<ComponentName> recent = RecentAppsStore.current(mActivityContext);
         if (recent.isEmpty()) return 0;
@@ -556,7 +591,9 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 mAdapterItems.add(AdapterItem.asApp(info));
             }
 
-            String sectionName = info.sectionName;
+            // droidtop patch: in Most used order the letters are not in order, so the list is one section and the fast
+            // scroller shows no letter.
+            String sectionName = mSortedByUse ? "" : info.sectionName;
             // Create a new section if the section names do not match
             if (!sectionName.equals(lastSectionName)) {
                 Log.d(TAG, "addAppsWithSections: adding sectionName: " + sectionName

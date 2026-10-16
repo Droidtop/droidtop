@@ -316,6 +316,9 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         val DOCK_ICONS = backedUpItem(SettingsHomeFragment.DOCK_ICONS, 0)
         @JvmField
         val DRAWER_PADDING = backedUpItem(SettingsDrawerFragment.DRAWER_PADDING, 100)
+        // droidtop patch (Droidtop/tracker#564): the drawer's order.
+        @JvmField
+        val DRAWER_SORT = backedUpItem(SettingsDrawerFragment.DRAWER_SORT, app.murinelauncher.settings.prefs.DrawerSort.ALPHABETICAL)
         @JvmField
         val ICON_SIZE = backedUpItem(SettingsIconsFragment.ICON_SIZE_KEY, 100)
         @JvmField

@@ -83,6 +83,9 @@
     <string name="pref_dock_icons_override_title">Dock size of its own</string>
     <string name="pref_dock_icons_override_summary">How many icons the dock holds, apart from the grid\'s width</string>
     <string name="pref_label_dock_icons">Dock icons</string>
+    <string name="pref_drawer_sort_title">Order</string>
+    <string name="drawer_sort_alphabetical">Alphabetical</string>
+    <string name="drawer_sort_most_used">Most used first</string>
 
     <string name="pref_blur_preview_title">Blur preview mode</string>
     <string name="pref_blur_preview_desc">Blur wallpaper while dragging icons and widgets</string>
