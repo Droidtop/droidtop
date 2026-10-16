@@ -181,6 +181,8 @@ public class DeviceProfile {
     public int iconTextSizePx;
 
     private final LabelVisibility mLabelVisibility;
+    // droidtop patch: the home screen's labels for mLabelVisibility (LauncherLabels).
+    private final dev.droidtop.runtime.LauncherLabels.Home mHomeLabels;
     private final float mDrawerPaddingScale;
     private final boolean mHideWorkspaceLabels; // True when labels must be hidden
     public int iconDrawablePaddingPx;
@@ -393,6 +395,7 @@ public class DeviceProfile {
         startAlignTaskbar = false;
         isTransientTaskbar = false;
         mLabelVisibility = LabelVisibility.AUTO;
+        mHomeLabels = dev.droidtop.runtime.LauncherLabels.Home.IF_ROOM;
         mDrawerPaddingScale = 1f;
         mHideWorkspaceLabels = false;
     }
@@ -429,8 +432,9 @@ public class DeviceProfile {
 
         mLabelVisibility = LauncherPrefs.get(context).get(LauncherPrefs.LABEL_VISIBILITY);
         mDrawerPaddingScale = LauncherPrefs.get(context).get(LauncherPrefs.DRAWER_PADDING) / 100f;
-        mHideWorkspaceLabels = mLabelVisibility == LabelVisibility.NEVER
-                || mLabelVisibility == LabelVisibility.NEVER_FULL;
+        // droidtop patch (Droidtop/tracker#564): LauncherLabels is the one rule for what the setting means.
+        mHomeLabels = dev.droidtop.runtime.LauncherLabels.INSTANCE.home(mLabelVisibility.name());
+        mHideWorkspaceLabels = mHomeLabels == dev.droidtop.runtime.LauncherLabels.Home.HIDDEN;
         // Determine device posture.
         mInfo = info;
         isTablet = info.isTablet(windowBounds);
@@ -1294,7 +1298,7 @@ public class DeviceProfile {
             }
 
             if (mHideWorkspaceLabels
-                    || (isVerticalLayout && mLabelVisibility != LabelVisibility.ALWAYS)) {
+                    || (isVerticalLayout && mHomeLabels == dev.droidtop.runtime.LauncherLabels.Home.IF_ROOM)) {
                 iconDrawablePaddingPx = 0;
                 iconTextSizePx = 0;
             } else {
@@ -1405,11 +1409,11 @@ public class DeviceProfile {
                 iconTextSizePx = 0;
                 iconDrawablePaddingPx = 0;
                 cellHeightPx = getIconSizeWithOverlap(iconSizePx);
-            } else if (isVerticalLayout && mLabelVisibility != LabelVisibility.ALWAYS) {
+            } else if (isVerticalLayout && mHomeLabels == dev.droidtop.runtime.LauncherLabels.Home.IF_ROOM) {
                 hideWorkspaceLabelsIfNotEnoughSpace();
             }
         }
-        if (mLabelVisibility == LabelVisibility.NEVER_FULL || mLabelVisibility == LabelVisibility.NEVER_DRAWER) {
+        if (!dev.droidtop.runtime.LauncherLabels.INSTANCE.drawer(mLabelVisibility.name())) {
             allAppsCellHeightPx = (int) (((float) allAppsCellHeightPx) - allAppsIconTextSizePx - allAppsIconDrawablePaddingPx);
             allAppsIconTextSizePx = 0;
             allAppsIconDrawablePaddingPx = 0;
