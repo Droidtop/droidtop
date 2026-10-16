@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -18,6 +19,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -157,11 +160,21 @@ internal fun CompanionNestedScreen(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (onBack != null) CompanionPill("Back", onClick = onBack)
-            Text(screen.title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            // The one panel frame (tracker#515): a plugin panel's icon, then its name at the shell's title size.
+            screen.iconFile?.let {
+                AsyncImage(model = java.io.File(it), contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.size(28.dp))
+            }
+            Text(
+                screen.title,
+                style = if (screen.panel) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         }
         lead?.let { CompanionNote(it) }
         val list = items
-        if (list == null) CompanionNote("Reading…") else CompanionCatalogItems(list, onChanged = { version++; onChanged() }, asks = asks)
+        CompositionLocalProvider(LocalOneLineSubtitles provides screen.panel) {
+            if (list == null) CompanionNote("Reading…") else CompanionCatalogItems(list, onChanged = { version++; onChanged() }, asks = asks)
+        }
     }
 }
 
@@ -197,7 +210,7 @@ private fun CatalogRow(
         }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+            if (!subtitle.isNullOrBlank()) RowSubtitle(subtitle)
         }
         if (!value.isNullOrBlank()) {
             if (valueChip) {
@@ -212,10 +225,32 @@ private fun CatalogRow(
                         .padding(horizontal = 10.dp, vertical = 2.dp),
                 )
             } else {
-                Text(value, style = MaterialTheme.typography.labelLarge, color = colors.primary, modifier = Modifier.padding(start = 12.dp))
+                // One value colour with the shell's rows (tracker#515): muted, not the accent, which is for what acts.
+                Text(value, style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
             }
         }
     }
+}
+
+/** True inside a plugin's panel ([CatalogScreen.panel]): each row's subtitle is one line until it is tapped. */
+private val LocalOneLineSubtitles = staticCompositionLocalOf { false }
+
+/**
+ * A row's explanation. In a plugin's panel it is one line, as on the shell (tracker#515), and a tap shows it whole,
+ * the companion's Info; elsewhere it is shown whole.
+ */
+@Composable
+private fun RowSubtitle(text: String) {
+    val oneLine = LocalOneLineSubtitles.current
+    var whole by remember(text) { mutableStateOf(false) }
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = if (oneLine && !whole) 1 else Int.MAX_VALUE,
+        overflow = TextOverflow.Ellipsis,
+        modifier = if (oneLine) Modifier.clickable(onClickLabel = "Read all") { whole = !whole } else Modifier,
+    )
 }
 
 /** A slider with a step button on each side: the step is the Quick Menu's own ([QuickTiles.sliderStep]). */
@@ -232,7 +267,7 @@ private fun CatalogSliderRow(item: SliderItem, onChanged: () -> Unit) {
     val percent = if (item.max > item.min) ((value - item.min) * 100 / (item.max - item.min)).toInt() else 0
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
         Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-        if (!item.subtitle.isNullOrBlank()) CompanionNote(item.subtitle!!)
+        if (!item.subtitle.isNullOrBlank()) RowSubtitle(item.subtitle!!)
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 56.dp)) {
             StepButton("−", "Lower ${item.title.lowercase()}") { set(value.toInt() - step); onChanged() }
             Slider(
@@ -284,7 +319,7 @@ private fun CatalogToggleRow(item: ToggleItem, onChanged: () -> Unit) {
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(item.title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-            if (!item.subtitle.isNullOrBlank()) CompanionNote(item.subtitle!!)
+            if (!item.subtitle.isNullOrBlank()) RowSubtitle(item.subtitle!!)
         }
         Switch(checked = on, onCheckedChange = null)
     }

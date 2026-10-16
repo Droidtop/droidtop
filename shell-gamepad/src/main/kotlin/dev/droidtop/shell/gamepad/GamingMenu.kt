@@ -326,16 +326,22 @@ private fun Modifier.primaryLift(selected: Boolean, shape: Shape): Modifier = co
 
 /** A screen-level menu header: name first, explanation second, both quiet. */
 @Composable
-internal fun MenuHeader(title: String, subtitle: String? = null, modifier: Modifier = Modifier) {
+internal fun MenuHeader(title: String, subtitle: String? = null, modifier: Modifier = Modifier, iconFile: String? = null) {
     // The same gutter the list below it uses. A fixed 48dp here put the
     // header a third of a phone's width in from rows indented 16dp.
     Column(modifier.padding(horizontal = LocalShellWindow.current.edgePadding).padding(top = 18.dp, bottom = 2.dp)) {
-        Text(
-            title,
-            color = MenuTokens.OnSurface,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.SemiBold,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // A plugin panel's own icon before its name (tracker#515).
+            if (iconFile != null) {
+                CatalogGlyph(null, iconFile, MenuTokens.OnSurface, Modifier.padding(end = Space.Sm).size(28.dp))
+            }
+            Text(
+                title,
+                color = MenuTokens.OnSurface,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
         subtitle?.let {
             Text(
                 it,
