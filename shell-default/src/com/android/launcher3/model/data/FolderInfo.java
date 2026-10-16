@@ -59,6 +59,15 @@ public class FolderInfo extends CollectionInfo {
     public static final int FLAG_MANUAL_FOLDER_NAME = 0x00000008;
 
     /**
+     * A tap starts the folder's first app and a swipe up on it opens the folder
+     * (droidtop, docs/SPEC.md "Standard", Droidtop/tracker#564).
+     */
+    public static final int FLAG_SWIPE_TO_OPEN = 0x00000100;
+
+    /** The folder shows its first app's icon in place of its preview: a cover icon. */
+    public static final int FLAG_COVER = 0x00000200;
+
+    /**
      * Different states of folder label.
      */
     public enum LabelState {
@@ -135,6 +144,18 @@ public class FolderInfo extends CollectionInfo {
     public void onAddToDatabase(@NonNull ContentWriter writer) {
         super.onAddToDatabase(writer);
         writer.put(LauncherSettings.Favorites.OPTIONS, options);
+    }
+
+    /** The app a swipe-to-open folder starts and a cover shows: the first in the folder's order, or null. */
+    @Nullable
+    public WorkspaceItemInfo firstApp() {
+        WorkspaceItemInfo first = null;
+        for (ItemInfo item : getContents()) {
+            if (item instanceof WorkspaceItemInfo app && (first == null || app.rank < first.rank)) {
+                first = app;
+            }
+        }
+        return first;
     }
 
     public boolean hasOption(int optionFlag) {

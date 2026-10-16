@@ -146,6 +146,13 @@ public class ItemClickHandler {
      * @param v The view that was clicked. Must be an instance of {@link FolderIcon}.
      */
     private static void onClickFolderIcon(View v) {
+        FolderInfo info = ((FolderIcon) v).mInfo;
+        WorkspaceItemInfo first = info.hasOption(FolderInfo.FLAG_SWIPE_TO_OPEN) ? info.firstApp() : null;
+        if (first != null) {
+            // Swipe to open (Droidtop/tracker#564): a tap starts the first app; FolderIcon opens it on a swipe up.
+            onClickAppShortcut(v, first, Launcher.getLauncher(v.getContext()));
+            return;
+        }
         Folder folder = ((FolderIcon) v).getFolder();
         if (!folder.isOpen() && !folder.isDestroyed()) {
             // Open the requested folder
