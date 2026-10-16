@@ -75,6 +75,8 @@ object ItemCustomize {
             setText(HomeItemExtras.title(info) ?: info.title ?: "")
             setSingleLine()
             selectAll()
+            // No full-screen input method over the dialog (as every droidtop field, NoFullscreenTextInput).
+            imeOptions = dev.droidtop.ui.shared.noFullscreen(imeOptions)
         }
         AlertDialog.Builder(context, R.style.DroidtopDialog)
             .setTitle(R.string.item_customize_title_ask)
