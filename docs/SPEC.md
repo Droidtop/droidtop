@@ -17925,6 +17925,15 @@ from that repository alone, so no other repository (jitpack's timeouts
 failed CI, Droidtop/tracker#283) is asked for its snapshot metadata. The pin moves onto a fixed artifact when
 the fork cuts a real tag; no guessing a version meanwhile.
 
+**One Compose across modules** (2026-10-16, Droidtop/tracker#566). Every module compiles against the Compose the
+app ships, or a call into a newer Compose method dies at runtime: on the emulator rig (0.2.0-dev.2070) a plugin page
+crashed with `NoSuchMethodError` on `FlowRow` (Page.kt:128), because shell-default's material3 1.4.0 brings
+foundation and ui 1.9 into the app while the BOM (2024.09.00) compiled every other module against 1.7. The BOM is
+the one that matches (`composeBom` 2025.10.00), and `checkComposeVersions` (root `build.gradle.kts`, a step in
+android-checks) fails the build when any module's Compose versions differ from the app's release runtime; each
+module writes its own list (`writeComposeVersions`), as Gradle 9 refuses to resolve another project's
+configuration from a root task.
+
 ## 10b. Releases and updates (directed 2026-09-02)
 
 Distribution is three different problems wearing one word, and each gets the
