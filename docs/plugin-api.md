@@ -2467,7 +2467,7 @@ database on the PC follows.
 | I1 | Debug surface | plugin authors and bug reports | Accounts and sources → Plugins → <plugin> → Developer (shown when developer options are on): the manifest as parsed; its grants; the last 50 calls with durations and error codes; the last 50 broker calls; the log (H5); "Call op…" with a JSON argument box (replaces today's status-tile "Call …" debug row); "Force crash" (today's `force-crash` query) | the debug row exists, status_tile only |
 | I2 | Fake host / test harness | test a plugin without a device | a JVM library `plugin-host-testing` (and a Python `droidtop_fake_host.py`) that loads a plugin, serves the host API from in-memory fakes with configurable grants, and runs the **conformance script** (§1.3) that a test fixture of every kind must pass in CI | built 2026-10-16 (Droidtop/tracker#71): `:plugin-host-testing` holds `FakeEnv` (droidtop in memory), `FakeHost` (a `native_bundle` plugin's class in the JVM, its `host.call` through the real `BrokerCore`) and `Conformance`; the cases are one file, `conformance.json` in that module, which `plugin-host-testing/python/droidtop_fake_host.py` reads too. CI runs the native fixture (`ConformanceTest`) and the python fixture (android-checks.yml). The cases: a declared point answers, a granted host call succeeds, a turned-off permission is `PERMISSION_DENIED`, a failure is one plain sentence, a job reports and completes. Not covered: `flutter_embed` (its Dart code needs the engine; a rig check) |
 | I3 | Manifest schema | validation for authors and CI | `docs/plugin-manifest.schema.json` (JSON Schema for contract 2, with v1 accepted), used by `PluginManifest` tests | not built |
-| I4 | Test fixtures | a provider/caller pair per kind for the conformance script | droidtop ships no sample plugins (owner, 2026-10-14); fixtures live under the test directories and are never packaged | built for the JVM (2026-10-16): one conformance fixture each for `native_bundle` and `python` (Droidtop/tracker#71), and a `native_bundle` provider/caller pair through the real broker (`ProviderCallerTest`, Droidtop/tracker#129: the answer, `PROVIDER_UNAVAILABLE` while the provider is off or gone, the answer again when it is back; `FakeHost.provide`). The same steps on a device run with real plugins: Shizuku's `priv.shell` and the RetroArch manager calling it |
+| I4 | Test fixtures | a provider/caller pair per kind for the conformance script | droidtop ships no sample plugins (owner, 2026-10-14); fixtures live under the test directories and are never packaged | built for the JVM (2026-10-16): one conformance fixture each for `native_bundle` and `python` (Droidtop/tracker#71), and a `native_bundle` provider/caller pair through the real broker (`ProviderCallerTest`, Droidtop/tracker#129: the answer, `PROVIDER_UNAVAILABLE` while the provider is off or gone, the answer again when it is back; `FakeHost.provide`). The same steps on a device run with real plugins: Shizuku's `priv.shell` and the RetroArch manager calling it (coordinator, 2026-10-16: "Keep the rig part, run with real plugins ... Use disable where possible, since the console is production.") |
 
 ### J. Plugin platform (cross-cutting)
 
@@ -3493,7 +3493,10 @@ arrays under the manifest's own keys (`V2Declarations`).
   reads the result back from Android rather than trusting the reply. It offers
   the rows only while the running provider exports the op (`HostApiCaller.hasOp`).
   Three more (2026-10-16, Droidtop/tracker#130; Shizuku plugin 1.5.0), also
-  under `priv.packages`:
+  under `priv.packages`. Decided by the coordinator, 2026-10-16: "build a, b
+  and c as you proposed" (clear_data, uninstall, revoke_permission); "uninstall
+  refuses droidtop itself and Shizuku's own package. Also refuse any package
+  that the active mode currently uses as the home launcher."
   - `revoke_permission {package, permission} -> {}`: `pm revoke`, the pair to
     `grant_permission`, with the same checks.
   - `clear_data {package} -> {cleared: true}`: `pm clear <package>`.
@@ -3510,7 +3513,13 @@ arrays under the manifest's own keys (`V2Declarations`).
   argument of the command, never shell text. No droidtop screen calls these
   three yet; they are for plugins that manage apps.
   And install (2026-10-16, Droidtop/tracker#130), a **job** under
-  `priv.packages`:
+  `priv.packages`. Decided by the coordinator, 2026-10-16: "The spec lists
+  install, and the apps are meant to be feature-complete, so don't defer it
+  indefinitely"; the design on the issue was accepted with "Streaming the APK
+  from droidtop's private cache into `pm install -S` over stdin: accepted.
+  It's better than my outline. Record why in §2.7. Providers without full
+  access get UNSUPPORTED." and "A confirm sheet naming the app on every
+  install, run as a job: yes."
   - The caller asks `install {name}`, `name` being an APK in its own `data`
     folder (H1); a plugin holding the APK elsewhere copies it there first.
   - droidtop's broker acts after the caller's grant and before the provider
@@ -3539,6 +3548,19 @@ arrays under the manifest's own keys (`V2Declarations`).
     It also means the provider must run in droidtop's process to read that
     cache: install is served only by a provider with full access, and the
     broker answers `UNSUPPORTED` for any other.
+  - **The rig check is an instrumentation test** (coordinator, 2026-10-16:
+    "don't build a test plugin or a test origin. That would add a trust
+    anchor to the production console ... Instead, write an androidTest
+    (instrumentation) in droidtop that drives the broker's priv.packages calls
+    against the installed Shizuku plugin, on a throwaway test package that the
+    test installs and cleans up itself"; and "these actions are destructive on
+    a production console, so the rig uses only a throwaway test package that
+    it installs itself, never one of the owner's apps"). It is
+    `PrivPackagesRigTest` in `app/src/androidTest`, on
+    `dev.droidtop.rigtest.throwaway` (`:rigtest-throwaway`), run by hand with
+    `am instrument` from CI's `droidtop-android-test` artifact. "When a real
+    droidtop screen or plugin first uses these calls, that screen gets the
+    user-way rig check too."
 - **Ops for the emulator setup helper** (specified 2026-10-08,
   Droidtop/tracker#130, #248; droidtop's side is built, the Shizuku provider
   plugin is to add them). Both are `priv.shell@1` ops, permission
