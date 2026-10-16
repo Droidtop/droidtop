@@ -7,12 +7,14 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 
@@ -42,9 +44,24 @@ internal fun AppOptionsMenu(
 ) {
     class Option(val title: String, val subtitle: String?, val onClick: () -> Unit)
 
-    val options = remember(entry, isGame, hidden, detailsLabel) {
+    // What plugins offer on this app (C4, Droidtop/tracker#67): the same page as Standard's long-press menu.
+    var pluginScreen by remember(entry) { mutableStateOf<CatalogScreen?>(null) }
+    val hasPluginActions = rememberHasPluginActions(entry)
+    pluginScreen?.let { screen ->
+        CatalogSheet(root = screen, onExit = { pluginScreen = null })
+        return
+    }
+
+    val options = remember(entry, isGame, hidden, detailsLabel, hasPluginActions) {
         buildList<Option> {
             add(Option(detailsLabel, null, onDetails))
+            if (hasPluginActions) {
+                add(
+                    Option(PLUGIN_ACTIONS_LABEL, "What your plugins can do with this app") {
+                        pluginScreen = pluginActionsScreen(entry, dev.droidtop.pluginhost.PluginModes.Surfaces.GAMING_APP_MENU) { reply -> pluginScreen = reply }
+                    },
+                )
+            }
             add(Option(if (entry.favorite) "Remove from favourites" else "Add to favourites", null, onToggleFavorite))
             // Only an installed app has a category to mark; the other kinds of this tab have none.
             if (entry.appFacts != null && onMarkGame != null) {
