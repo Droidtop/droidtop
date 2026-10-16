@@ -3089,24 +3089,45 @@ the broker can answer it." The folder above is the mechanism; what it serves:
   other path still goes to the kernel.
 - **The quota.** The folder is inside the plugin's data store, so the
   store's limit (`PluginDataStore.LIMIT_BYTES`, 512 MiB) covers both. The
-  broker's decider in :app checks every create, open for writing, `mkdir`
-  and rename into the folder: at or over the limit it answers `ENOSPC`
-  ("No space left on device": Dart's `FileSystemException`, SQLite's
-  `SQLITE_FULL`), never a crash. Usage is the folder's size, measured at
+  broker's decider in :app (its rules on the folder carry `SBX_DECIDE`)
+  checks every new file (an open with `O_CREAT` of a name not there yet)
+  and every `mkdir` in the folder: at or over the limit it answers
+  `ENOSPC` ("No space left on device": Dart's `FileSystemException`,
+  SQLite's `SQLITE_FULL`), never a crash. Opening a file that exists, for
+  reading or writing, and renames stay allowed, so a full plugin can still
+  open its database and free space. Usage is the folder's size, measured at
   most once a second and kept between. A write on a file already open never
-  reaches the broker (a descriptor's writes stay in the process), so the
-  process also runs with `RLIMIT_FSIZE` at the limit and `SIGXFSZ` ignored:
-  one file can never pass the whole quota (that write gets `EFBIG`), and the
-  next create after the folder passes it gets `ENOSPC`.
+  reaches the broker (a descriptor's writes stay in the process), so a
+  contained process also runs with `RLIMIT_FSIZE` at the limit and
+  `SIGXFSZ` ignored: one file can never pass the whole quota (that write
+  gets `EFBIG`), and the next new file after the folder passes it gets
+  `ENOSPC`. An open process gets no such cap: it may write shared storage
+  it was granted, where a sync engine's files can be larger.
 - **`open` over Flutter's `hostCall`** (kind parity with
   `PluginContext.openFile` and `droidtop.host.open`). The channel method
   `hostOpen` takes the same `{api, version, op, args}`; droidtop makes the
-  call through `openFile`, gives the descriptor a path of its own under
-  `/droidtop-sandbox/open/` as a local file of the sandbox library (read and
-  write when the op opened it for writing), and answers the broker's reply
-  with that `path` added. Dart opens it with `dart:io` like any file; every
-  open of that path is the same descriptor, so they share one position.
-  `hostClose {path}` lets it go, and a process keeps at most 64.
+  call through `openFile`, gives the descriptor a path of its own,
+  `/droidtop-sandbox/open/<n>`, as a local file of the sandbox library
+  (`sbx_local_add_mode`: read, and written when the descriptor was opened
+  for writing), and answers the broker's reply with that `path` added to
+  its `data` (`FlutterOpenFiles`). Dart opens it with `dart:io` like any
+  file; every open of that path is the same descriptor, so they share one
+  position, and `O_TRUNC` empties it. `hostClose {path}` lets it go (the
+  path then names an empty file), and a plugin keeps at most 64 at a time
+  (`RATE_LIMITED` past that). A plugin with full access, where nothing
+  stands between it and the kernel, gets `/proc/self/fd/<n>` of the
+  descriptor itself.
+- **How it is checked.** The library's own tests (sandbox 45e476d) cover
+  each trap with a broker in one process. The SELinux refusal and the
+  isolated UID exist only on a device, so the rig check is an
+  instrumentation test that loads a probe plugin contained, with droidtop's
+  own runner, and does each item above the way Android's own classes do
+  (`ContainedFilesRigTest`, run by hand: `adb shell am instrument -w -e
+  class dev.droidtop.app.ContainedFilesRigTest
+  dev.droidtop.app.test/androidx.test.runner.AndroidJUnitRunner`). It
+  reports each check by name, so a refusal (the WAL's `-shm` mapping
+  above, say) names itself.
+
 **Open processes: one hole per permission (2026-10-15,
 Droidtop/tracker#553).** The graphics tier below became the first of a
 family. The owner's decision for Syncthing (a plugin that dials peers and

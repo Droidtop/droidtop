@@ -33,6 +33,22 @@ internal object SandboxFiles {
 
     @JvmStatic private external fun nativeHook(suffixes: Array<String>): String
 
+    @JvmStatic private external fun nativeShare(path: String, fd: Int, writable: Boolean): Int
+
+    @JvmStatic private external fun nativeUnshare(path: String): Int
+
+    /** Where files a plugin opened through the broker appear ([share]). */
+    const val OPENED = ROOT + "open/"
+
+    /**
+     * Gives a file droidtop opened for the plugin ([PluginContext.openFile]) the path [path], so code that opens files
+     * by name only (Dart's `dart:io`) can: read, and written when [writable]. Takes [fd]. 0 or a negative errno.
+     */
+    fun share(path: String, fd: ParcelFileDescriptor, writable: Boolean): Int = nativeShare(path, fd.detachFd(), writable)
+
+    /** Lets a [share]d file go: its path names an empty, read-only file from now on. */
+    fun unshare(path: String): Int = nativeUnshare(path)
+
     @JvmStatic private external fun nativeHideSymbols(suffix: String, names: Array<String>): String
 
     @JvmStatic private external fun nativeBridgeScreen(suffix: String): String

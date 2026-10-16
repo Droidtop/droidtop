@@ -221,7 +221,7 @@ internal object PluginSyscallFilter {
         System.loadLibrary("droidtoppy")
     }
 
-    @JvmStatic private external fun nativeInstall(brokerFd: Int, ownOpens: Array<String>, claims: Array<String>?, network: Boolean): String
+    @JvmStatic private external fun nativeInstall(brokerFd: Int, ownOpens: Array<String>, claims: Array<String>?, network: Boolean, fileLimit: Long): String
 
     /**
      * Device files a process with the `gpu.render` hole opens itself before the lockdown: the kernel ties binder and some GPU drivers'
@@ -235,11 +235,14 @@ internal object PluginSyscallFilter {
      * process's end of its broker's socket (taken). [claims] are the folders the broker answers for in the isolated
      * sandbox ([SandboxBroker.claims]), whose other paths stay the kernel's; null in an open process, whose every path
      * goes to the broker. [gpu] and [network] are an open process's granted holes: the graphics devices opened first,
-     * and internet sockets.
+     * and internet sockets. A contained process's files are also capped at the data store's quota each.
      */
     @Synchronized
     fun install(brokerFd: Int, claims: Array<String>?, gpu: Boolean = false, network: Boolean = false): String =
-        nativeInstall(brokerFd, if (claims == null && gpu) OWN_OPENS else emptyArray(), claims, claims == null && network)
+        nativeInstall(
+            brokerFd, if (claims == null && gpu) OWN_OPENS else emptyArray(), claims, claims == null && network,
+            PluginDataStore.LIMIT_BYTES,
+        )
 
     fun isOn(report: String): Boolean = report.startsWith("on:")
 }

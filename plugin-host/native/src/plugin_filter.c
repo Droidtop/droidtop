@@ -46,9 +46,11 @@
  */
 #include <jni.h>
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 #include "sbx.h"
@@ -78,7 +80,7 @@ static void release_strings(JNIEnv *env, const char **strings, jstring *refs, un
 JNIEXPORT jstring JNICALL
 Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jclass clazz, jint broker_fd,
                                                                jobjectArray own_opens, jobjectArray claims,
-                                                               jboolean network) {
+                                                               jboolean network, jlong file_limit) {
     (void) clazz;
     if (installed) {
         /* A second plugin in a process already locked down: the first one's broker serves it. */
@@ -106,6 +108,16 @@ Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jcla
         .claim_count = claim_count,
     };
     if (!contained) prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
+    if (contained && file_limit > 0) {
+        /*
+         * A contained plugin's writes on a file it holds never reach the broker, so no one file may pass its whole
+         * quota (docs/plugin-api.md 5.3): such a write gets EFBIG, with SIGXFSZ ignored rather than killing the process.
+         * An open process keeps no limit: it may write shared storage it was granted (a sync engine's large files).
+         */
+        signal(SIGXFSZ, SIG_IGN);
+        struct rlimit limit = {(rlim_t) file_limit, (rlim_t) file_limit};
+        setrlimit(RLIMIT_FSIZE, &limit);
+    }
     int result = sbx_lockdown(broker_fd, &options);
     release_strings(env, opens, open_refs, open_count);
     release_strings(env, claimed, claim_refs, claim_count);

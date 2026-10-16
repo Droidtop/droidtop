@@ -78,6 +78,10 @@ class FlutterDroidtopPlugin internal constructor(
     private var channel: MethodChannel? = null
     @Volatile private var pluginContext: PluginContext? = null
     private val hostCallExecutor = Executors.newSingleThreadExecutor()
+
+    /** Files the plugin opened through the broker (`hostOpen`), by path; in a full-access process the descriptors too. */
+    private val openFiles = FlutterOpenFiles()
+    private val openDescriptors = ConcurrentHashMap<String, android.os.ParcelFileDescriptor>()
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
 
     // Job callbacks the host is waiting on, keyed by the SAME jobId
@@ -200,6 +204,8 @@ class FlutterDroidtopPlugin internal constructor(
         activeJobs.clear()
         pluginContext = null
         hostCallExecutor.shutdownNow()
+        openDescriptors.values.forEach { runCatching { it.close() } }
+        openDescriptors.clear()
     }
 
     /**
@@ -214,6 +220,11 @@ class FlutterDroidtopPlugin internal constructor(
     private fun handleIncomingCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "hostCall" -> handleHostCall(call.arguments, result)
+            "hostOpen" -> handleHostOpen(call.arguments, result)
+            "hostClose" -> {
+                val path = (call.arguments as? String)?.let { runCatching { JSONObject(it).optString("path") }.getOrNull() ?: it }.orEmpty()
+                result.success(closeOpened(path))
+            }
             "ready" -> {
                 // The readiness handshake's other half -- see [readyLatch]'s
                 // own doc comment. Counting down more than once (a plugin
@@ -266,6 +277,67 @@ class FlutterDroidtopPlugin internal constructor(
         } catch (_: java.util.concurrent.RejectedExecutionException) {
             result.success(errorReply("FAILED", "plugin is unloading"))
         }
+    }
+
+    /**
+     * `hostOpen` (docs/plugin-api.md 5.3): the same `{api, version, op, args}` as `hostCall`, made through
+     * [PluginContext.openFile]; a file handed over gets a path Dart's `dart:io` can open, in the reply's `data.path`.
+     * In a process loaded from descriptors that is a local file of the sandbox library, read and written when the
+     * descriptor was opened for writing; with full access, where nothing stands between the plugin and the kernel,
+     * `/proc/self/fd/<n>` of the descriptor itself.
+     */
+    private fun handleHostOpen(arguments: Any?, result: MethodChannel.Result) {
+        val request = try {
+            HostCallRequest.parse(arguments)
+        } catch (e: Exception) {
+            result.success(errorReply("INVALID_ARGS", e.message ?: "malformed hostOpen argument"))
+            return
+        }
+        val context = pluginContext ?: return result.success(errorReply("FAILED", "plugin is not loaded"))
+        try {
+            hostCallExecutor.execute {
+                val reply = runCatching { opened(context.openFile(request.api, request.version, request.op, request.argsJson)) }
+                    .getOrElse { errorReply("FAILED", it.message ?: "broker call failed") }
+                mainHandler.post { result.success(reply) }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            result.success(errorReply("FAILED", "plugin is unloading"))
+        }
+    }
+
+    private fun opened(file: PluginFileReply): String {
+        val fd = file.fd ?: return file.reply
+        val slot = openFiles.take() ?: run {
+            fd.close()
+            return errorReply("RATE_LIMITED", "this plugin has ${FlutterOpenFiles.MAX} files open; close one with hostClose")
+        }
+        val writable = runCatching {
+            val flags = android.system.Os.fcntlInt(fd.fileDescriptor, android.system.OsConstants.F_GETFL, 0)
+            (flags and android.system.OsConstants.O_ACCMODE) != android.system.OsConstants.O_RDONLY
+        }.getOrDefault(false)
+        val path = FlutterOpenFiles.pathOf(slot)
+        if (source.contained) {
+            val shared = SandboxFiles.share(path, fd, writable)
+            if (shared != 0) {
+                openFiles.free(path)
+                return errorReply("FAILED", "the opened file could not be given a path (errno ${-shared})")
+            }
+            return FlutterOpenFiles.withPath(file.reply, path)
+        }
+        openDescriptors[path] = fd
+        return FlutterOpenFiles.withPath(file.reply, "/proc/self/fd/${fd.fd}")
+    }
+
+    /** `hostClose {path}`: lets a file [handleHostOpen] gave a path go. True when it was one. */
+    private fun closeOpened(path: String): Boolean {
+        if (path.startsWith("/proc/self/fd/")) {
+            val entry = openDescriptors.entries.firstOrNull { "/proc/self/fd/${it.value.fd}" == path } ?: return false
+            openDescriptors.remove(entry.key)?.close()
+            return openFiles.free(entry.key)
+        }
+        if (!openFiles.free(path)) return false
+        if (source.contained) SandboxFiles.unshare(path)
+        return true
     }
 
     private fun errorReply(code: String, message: String): String = JSONObject()
