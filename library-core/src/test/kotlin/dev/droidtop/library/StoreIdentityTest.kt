@@ -209,4 +209,27 @@ class StoreIdentityTest {
 
         assertEquals(20_000, StoreIdentity.group(rows).size)
     }
+
+    @Test
+    fun `a search finds a title written with and where the query has an ampersand, and the other way round`() {
+        // Owner, 2026-10-16: "Love & Sex: Second Base ... can't be found using search".
+        assertTrue(StoreIdentity.matchesSearch("Love and Sex: Second Base", "Love & Sex"))
+        assertTrue(StoreIdentity.matchesSearch("Love & Sex: Second Base", "love and sex"))
+        assertTrue(StoreIdentity.matchesSearch("Love & Sex: Second Base", "second base"))
+    }
+
+    @Test
+    fun `search words match in any order, partly typed, through punctuation and accents`() {
+        assertTrue(StoreIdentity.matchesSearch("Love & Sex: Second Base", "base love"))
+        assertTrue(StoreIdentity.matchesSearch("Love & Sex: Second Base", "seco"))
+        assertTrue(StoreIdentity.matchesSearch("Pokémon: Let's Go", "pokemon lets"))
+        assertFalse(StoreIdentity.matchesSearch("Love & Sex: Second Base", "third base"))
+        assertTrue(StoreIdentity.matchesSearch("Anything", "  "))
+    }
+
+    @Test
+    fun `the shared fold keeps titleKey as it was`() {
+        assertEquals("loveandsexsecondbase", StoreIdentity.titleKey("Love & Sex: Second Base"))
+        assertEquals("love and sex second base", StoreIdentity.fold("Love  &  Sex:   Second Base"))
+    }
 }

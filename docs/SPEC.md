@@ -1302,7 +1302,10 @@ activity that draws the shared `LibrarySearchDialog` (`shell-gamepad`
 open, see 12a "Search surfaces wired") through `LauncherSearchScreen`. Its
 local results are the installed apps that match, then the library's games
 (`matchesSearchText`, the one text rule of every list, over the library's
-already-scanned in-RAM list: no per-game disk lookups while typing), all ranked
+already-scanned in-RAM list: no per-game disk lookups while typing; every word typed must be in the stored title, the
+shown name, the genre or the developer, folded as titles are compared, `StoreIdentity.fold`, so "&" is "and" and
+punctuation and accents do not count; owner, 2026-10-16: "Love & Sex: Second Base ... can't be found using
+search"), all ranked
 together with the source plugins' answers in the one list (12a "One search")
 and, while the field is empty, droidtop's Recommendations. A tap on an app opens
 it, a tap on a game plays it through `GameLaunchActivity.dispatch`, a tap on a
