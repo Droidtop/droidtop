@@ -1,7 +1,10 @@
 package dev.droidtop.shell.gamepad
 
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
+import dev.droidtop.library.settings.CatalogIcon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -15,8 +18,18 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
 
-/** One row of the mode switcher: what it says and what choosing it does. */
-class ModeSwitcherChoice(val label: String, val choose: () -> Unit)
+/**
+ * One row of the mode switcher: what it says and what choosing it does. [icon] is a mode's glyph; [current] marks the
+ * mode in use; [apart] is a row that is not a mode (a maintenance action), drawn below the modes under its own heading
+ * (Droidtop/tracker#530).
+ */
+class ModeSwitcherChoice(
+    val label: String,
+    val icon: CatalogIcon? = null,
+    val current: Boolean = false,
+    val apart: Boolean = false,
+    val choose: () -> Unit,
+)
 
 /**
  * The mode switcher (docs/SPEC.md 2c, "Switching modes is named on every surface") as the shell's own
@@ -63,8 +76,20 @@ fun ModeSwitcherSheet(choices: List<ModeSwitcherChoice>, onDismiss: () -> Unit, 
                 },
             ) {
                 choices.forEachIndexed { index, choice ->
+                    // The rows that are not modes come after the modes, under their own quiet heading, so a press
+                    // meant for a mode does not land on "Close all apps".
+                    if (choice.apart && choices.getOrNull(index - 1)?.apart == false) {
+                        Text(
+                            "Also here".labelCase(),
+                            color = MenuTokens.OnSurfaceMuted,
+                            style = TypeRole.eyebrow,
+                            modifier = Modifier.padding(start = Space.Lg, top = Space.Md, bottom = Space.Xs),
+                        )
+                    }
                     MenuRow(
                         title = choice.label,
+                        value = if (choice.current) "Current" else null,
+                        icon = choice.icon,
                         selected = index == focus,
                         onClick = {
                             focus = index

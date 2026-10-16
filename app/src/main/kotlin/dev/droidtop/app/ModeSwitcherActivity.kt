@@ -25,6 +25,13 @@ import dev.droidtop.shell.standard.HomeRolePrefs
  * your Home app to use Android mode", and Set requests the Home role (Droidtop/tracker#522). Another launcher
  * would take a screen of a dual-screen device and leave droidtop's surfaces behind.
  */
+/** A mode's glyph in the switcher: the same marks Global settings' mode rows use. */
+private fun modeIcon(mode: dev.droidtop.library.settings.Mode): dev.droidtop.library.settings.CatalogIcon = when (mode) {
+    dev.droidtop.library.settings.Mode.LAUNCHER -> dev.droidtop.library.settings.CatalogIcon.STANDARD
+    dev.droidtop.library.settings.Mode.GAMING -> dev.droidtop.library.settings.CatalogIcon.GAMING
+    dev.droidtop.library.settings.Mode.DESKTOP -> dev.droidtop.library.settings.CatalogIcon.DESKTOP
+}
+
 class ModeSwitcherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,8 +66,16 @@ class ModeSwitcherActivity : ComponentActivity() {
                     )
                 } else {
                     val choices = remember {
-                        BackButtonMenu.choices(this@ModeSwitcherActivity, askForHome = { asking = true })
-                            .map { (label, choose) -> ModeSwitcherChoice(label, choose) }
+                        val current = dev.droidtop.library.settings.Modes.lastMode(this@ModeSwitcherActivity)
+                        BackButtonMenu.choices(this@ModeSwitcherActivity, askForHome = { asking = true }).map { choice ->
+                            ModeSwitcherChoice(
+                                label = choice.label,
+                                icon = choice.mode?.let(::modeIcon),
+                                current = choice.mode?.id == current,
+                                apart = choice.mode == null,
+                                choose = choice.choose,
+                            )
+                        }
                     }
                     ModeSwitcherSheet(choices = choices, onDismiss = { if (!asking) finish() })
                 }
