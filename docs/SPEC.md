@@ -6585,6 +6585,14 @@ lock is deliberately not read as shift: the Caps Lock key is forwarded like
 any other and toggles the container's own caps state, which a synthesized
 Shift on top of it would cancel.
 
+Ctrl, Alt and Meta are read from the meta state the same way (2026-10-16, the
+rig's first container run): `adb shell input keycombination CTRL_LEFT MINUS`
+and many IMEs send Ctrl only as `META_CTRL_ON` on the key, so foot's
+Control+minus saw a bare minus. Each modifier the meta state carries and the
+container does not already see held is pressed before the key (Shift, Ctrl,
+Alt, Meta, in that order, each by its left key) and released once every key it
+was pressed for is up (`DesktopInputRouter.synthesizeModifiersDown`).
+
 **Modifiers (decided 2026-10-14, Droidtop/tracker#147, #555 D1).** A key event
 alone never changed a modifier in the container. wlroots handles
 `zwp_virtual_keyboard_v1.key` with `update_state = false`
