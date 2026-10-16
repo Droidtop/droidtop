@@ -38,6 +38,8 @@ sealed interface EngineRequest {
         val env: List<String> = emptyList(),
         /** Folders the person already mapped (docs/SPEC.md 3d "Home and folders"), by name; never a host path. */
         val volumes: List<String> = emptyList(),
+        /** `--restart`; the tools' own default, `no`, when not given (docs/SPEC.md 3d, "Restart policies"). */
+        val restart: ContainerProgram.RestartPolicy = ContainerProgram.RestartPolicy.No,
     ) : EngineRequest
 
     /** `rm`: deletes each container; [force] stops a running program first, as Docker's `-f` does. */

@@ -2472,7 +2472,7 @@ the `ContainerRuntime` interface that already exists (§3):
   too). A host path, another target or an unknown name is refused, so a path still never comes from the container.
   The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
   `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
-  "Its own program", and the start with the desktop. `-p`, `-w`, `--entrypoint`, `--restart`, `--rm` and `-u` answer
+  "Its own program", and the start with the desktop. `-p`, `-w`, `--entrypoint`, `--rm` and `-u` answer
   "not built in droidtop yet". Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
   `--tmpfs`, `--read-only`, ...) answer from the one table in "Kernel features, detected at runtime" (section 3);
   `--network host` and `--pid host` are taken, being what the containers already are. `docker info` (D10) says the
@@ -2483,6 +2483,16 @@ the `ContainerRuntime` interface that already exists (§3):
   containers do not have it. Docker words stay in the command; droidtop's
   screens keep "app" and "program". Nothing the container wrote reaches
   Android as a command, a path or an argv.
+  **Restart policies (built 2026-10-16, Droidtop/tracker#555 D12).** One setting per container's program
+  (`ContainerProgram.RestartPolicy`), in Docker's and Podman's words: `no`, `on-failure[:N]`, `always`,
+  `unless-stopped`. `docker run` and `podman run` take `--restart` (`no` when not given, both tools' own default:
+  the D12 "each path its own defaults"); a container made on its page keeps droidtop's default, restart when it
+  fails, and its page's "Restart when it fails" switch is the same setting (on is `on-failure`, off is `no`; the
+  stored true and false of before read that way). `on-failure` restarts after a failing exit; `always` and
+  `unless-stopped` after any exit, and turn on "Start with the desktop", as Docker's daemon starts them with itself;
+  `unless-stopped` turns it off again when the person stops the program (its page's Stop it, `docker stop`) and on
+  when they start it. Every policy waits longer after each quick exit and gives up after five in a row (or the N of
+  `on-failure:N`), a clean exit counting for `always`: a program that exits at once would otherwise restart for ever.
   **The podman command (built 2026-10-16, Droidtop/tracker#555 D11).** Every container also has `podman` on its
   `PATH`: a second command front over the same engine, not a second runtime (the owner's decision on #555: one
   engine, docker and podman fronts). Both fronts are `EngineCli` (`EngineCli.DOCKER`, `EngineCli.PODMAN`), each

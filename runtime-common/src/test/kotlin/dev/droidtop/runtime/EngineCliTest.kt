@@ -165,6 +165,16 @@ class EngineCliTest {
     }
 
     @Test
+    fun `run takes a restart policy on either front, no by default`() {
+        val p = ContainerProgram.RestartPolicy
+        assertEquals(p.No, (EngineCli.DOCKER.parse(listOf("run", "nginx")) as EngineRequest.Run).restart)
+        assertEquals(p.UnlessStopped, (EngineCli.DOCKER.parse(listOf("run", "--restart", "unless-stopped", "nginx")) as EngineRequest.Run).restart)
+        assertEquals(p.OnFailure(3), (EngineCli.PODMAN.parse(listOf("run", "--restart=on-failure:3", "nginx")) as EngineRequest.Run).restart)
+        assertTrue(answer(listOf("run", "--restart", "sometimes", "nginx")).text.contains("--restart takes no, on-failure[:N], always or unless-stopped"))
+        assertEquals(1, answer(listOf("run", "--restart")).code)
+    }
+
+    @Test
     fun `podman is a second front over the same requests, with its own name, token and wrapper`() {
         val podman = EngineCli.PODMAN
         assertEquals("podman", podman.name)
