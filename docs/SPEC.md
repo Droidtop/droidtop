@@ -4968,6 +4968,12 @@ rig check in the commit message.
   (the draft itself; its own keyboard composable is gone), droidtop's own fields and windows
   (`WindowKeySink`) and the keyboard over another app (`ImeConnectionSink`, or the accessibility
   service's `AccessibilityTyping.FieldSink`). `KeyMeta` is the one meta-state rule.
+- **No full-screen input method over droidtop's fields (rig on the console, 2026-10-16, Droidtop/tracker#485 comment
+  6224857113).** On a landscape screen Gboard replaced the whole window with its own editor, covering the search's
+  results, and its Search and Enter did not close it. Every droidtop Compose field asks for no full screen and no
+  extract editor (`IME_FLAG_NO_FULLSCREEN | IME_FLAG_NO_EXTRACT_UI`): the themes' roots (`DroidtopTheme`,
+  `GamingTheme`) wrap their content in `NoFullscreenTextInput` (`:ui-shared`), so it reaches every field below them,
+  dialogs and `TextEntry` included; a View field sets the same flags (`noFullscreen`).
 - **droidtop's own text fields always type.** On a display Android draws no keyboard on
   (`AddonKeyboardRules.ownFieldNeedsKeyboard`), the shell's text fields (library search, the text
   dialog, the metadata editor, a new collection's name) draw `OwnFieldKeyboard` under the field. Its

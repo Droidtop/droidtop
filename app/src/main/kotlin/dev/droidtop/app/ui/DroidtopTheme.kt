@@ -52,7 +52,10 @@ fun DroidtopTheme(
     // when no theme is held. Every root used to force dark, the companion among them (rig 1931, Droidtop/tracker#559).
     val palette = GamingPalette.defaultFor(rememberLightAppearance())
     CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
-        MaterialTheme(colorScheme = palette.colorScheme, typography = DroidtopTypography, content = content)
+        MaterialTheme(colorScheme = palette.colorScheme, typography = DroidtopTypography) {
+            // No full-screen input method over droidtop's own fields (Droidtop/tracker#485 comment 6224857113).
+            dev.droidtop.ui.shared.NoFullscreenTextInput(content)
+        }
     }
 }
 
