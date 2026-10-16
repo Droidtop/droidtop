@@ -753,6 +753,10 @@ Gaming. No code change from this: recorded here so the same false read isn't
 repeated. The switch-mode dialog's own, separately confirmed break is
 recorded below.
 
+Confirmed again 2026-10-16 (follow-up rig on v0.2.0-dev.2011): after a force-stop the console came back in Gaming
+though Standard was the mode in use, and its Default mode is Gaming. The owner: the console's Default mode "SHOULD
+be gaming". So Gaming after a force-stop is this rule working, not a fault, and nothing changes.
+
 Revisited 2026-09-26 (launcher2, p1-dt-home-redirect-before-model-load).
 The held task's original ask was to decide the target with `ModeGate`/prefs
 alone, as early as possible, so Standard never draws when the target is
