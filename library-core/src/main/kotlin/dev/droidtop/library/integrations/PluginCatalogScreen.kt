@@ -62,6 +62,12 @@ object PluginCatalogScreen {
     private val searches = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /**
+     * What the last Install all or Update all of a catalog did (Droidtop/tracker#517), by catalog id: its row goes once
+     * nothing is left to do, so the result is a notice in its place, where the cursor already is, until dismissed.
+     */
+    private val lastBulk = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /**
      * Whether [plugin], listed under [origin], answers a search: every word of [query] is somewhere in its name, id,
      * description or origin, in any case. Pure, over the index already in memory: a search never asks the network.
      */
@@ -362,7 +368,9 @@ object PluginCatalogScreen {
                             title = "Install all",
                             subtitle = "$toInstall plugin${if (toInstall == 1) "" else "s"} from ${current.name}. Each one waits for your approval before it runs",
                             value = toInstall.toString(),
-                            run = { ctx, onStatus -> PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus) },
+                            run = { ctx, onStatus ->
+                                PluginCatalog.installAll(ctx, PluginCatalogSources.byId(ctx, sourceId) ?: current, onStatus).also { lastBulk[sourceId] = it }
+                            },
                         ),
                     )
                 }
@@ -373,7 +381,22 @@ object PluginCatalogScreen {
                             title = "Update all",
                             subtitle = "$toUpdate plugin${if (toUpdate == 1) "" else "s"} installed from ${current.name} ${if (toUpdate == 1) "has" else "have"} a newer version",
                             value = toUpdate.toString(),
-                            run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus, only = PluginCatalogSources.byId(ctx, sourceId) ?: current) },
+                            run = { ctx, onStatus ->
+                                PluginCatalog.updateAll(ctx, onStatus, only = PluginCatalogSources.byId(ctx, sourceId) ?: current).also { lastBulk[sourceId] = it }
+                            },
+                        ),
+                    )
+                }
+                lastBulk[sourceId]?.let { said ->
+                    add(
+                        NoticeItem(
+                            id = "plugins_catalog_bulk_result",
+                            notice = Notice(
+                                tone = if (said.contains("Not installed") || said.contains("Couldn't")) NoticeTone.Caution else NoticeTone.Info,
+                                title = if (said.startsWith("Installed") || said.startsWith("Updated")) "Done" else "Finished",
+                                body = said,
+                                action = dev.droidtop.library.settings.NoticeAction("OK") { lastBulk.remove(sourceId) },
+                            ),
                         ),
                     )
                 }
