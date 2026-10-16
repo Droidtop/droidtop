@@ -318,6 +318,8 @@ class QuickTilesTest {
                 GamingSettingsCatalog.GROUP_SYSTEM, "System",
                 ids.map { ActionItem(id = it, title = it, run = {}) },
             ),
+            // Gaming's own Screen orientation row (Settings) is not the Display tab's: that one follows the mode
+            // droidtop is in (ID_ORIENTATION_HERE, a System row; Droidtop/tracker#571 row 34).
             CatalogGroup(
                 GamingSettingsCatalog.GROUP_SCREENS, "Screens",
                 listOf(ActionItem(id = GamingSettingsCatalog.ID_ORIENTATION, title = "Screen orientation", run = {})),
@@ -333,7 +335,7 @@ class QuickTilesTest {
             listOf(
                 GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
                 GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
-                GamingSettingsCatalog.ID_ORIENTATION,
+                GamingSettingsCatalog.ID_ORIENTATION_HERE,
                 GamingSettingsCatalog.ID_DISPLAY_SWAP,
             ),
             idsOf(QuickSection.DISPLAY),
