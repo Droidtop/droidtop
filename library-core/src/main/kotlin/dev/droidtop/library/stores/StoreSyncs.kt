@@ -32,6 +32,8 @@ object StoreSyncs {
             runCatching { StoreHidden.mirror(context, store) }
             // A freshly read library is the moment to look for updates of the games set to keep themselves current.
             StoreAutoUpdates.request(context)
+            // ...and to get details for games it brought that have none (docs/SPEC.md 7h, Droidtop/tracker#568).
+            dev.droidtop.library.scraper.PcAutoScrape.request(context)
             SyncChange.between(count, before, rowKeys(context, store))
         }
     }

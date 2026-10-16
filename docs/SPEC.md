@@ -13336,9 +13336,21 @@ The ROM scrapers index console dumps by platform id and file hash; none of
 them covers a Ren'Py build in a folder or a Steam install, so PC and
 engine games (`isPcOrEngineGame`: Wine/store entries and every detected
 engine kind) have their own pass, `PcScraper` (`scraper/PcScrape.kt`),
-built on the same model: user-initiated, one selected title source, ES-DE's
+built on the same model: one selected title source, ES-DE's
 `downloaded_media` layout, the same `game_metadata` rows and the same
 never-clobber-a-user's-edits write.
+
+**PC and engine games get their details by themselves (decided 2026-10-16, Droidtop/tracker#568; the owner: "can we
+add an automatic scraping system? We have LOTS of games with no metadata", then "make sure pc game scraping and stuff
+is enabled").** On by default (Settings, Scraper, "Get details for PC games automatically"; `PcAutoScrape`): about two
+minutes after droidtop starts and after a store's library is read, the one library scrape job runs over the PC and
+engine games (`LibraryScrapeJob.start(pcOnly = true)`), at most every twelve hours. It uses the PC sources below that
+need no account (Lutris, the Steam store's appdetails for a Steam game) and any the person set up, and the scrape's own
+filter skips games that already have their art and details, so a finished library asks nothing. It is a job in
+Downloads like any scrape (paused or cancelled there; the next run resumes a paused one). Consoles keep the one-time
+question ("After the first library scan", below): an automatic console scrape is #568's next part, with the rest of
+its scope (a review list, honest states). Built-in sources are droidtop's own code, not the plugin API's
+`library.metadata` point (the owner: "our built-in scrapers don't talk over the API"); plugins fill gaps after them.
 
 - **Title sources, one selected at a time.** Lutris (keyless; the default,
   because it works on a fresh install) returns covers and a year; IGDB
