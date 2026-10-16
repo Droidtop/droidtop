@@ -1071,7 +1071,10 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     The maker also chooses the grid's art (covers first, or square icons first) and the names' text size (small,
     normal, large), for the grid and the list alike.
   - **Desktop**: start or go back to the Desktop, saying whether its session runs (following
-    `DesktopSessionService.state`), and open Containers. Container apps on it come later.
+    `DesktopSessionService.state`), open Containers, and run up to two apps containers exported to the desktop.
+    Those go through the one export launch (`ExportLaunch`), which the desktop's own menus use too over the launch
+    request channel: in the running session at once; otherwise Desktop is shown, which starts the session where
+    Desktop is set up, and the app runs once it has connected (up to three minutes; nothing runs if it does not).
   - **Companion and screens**: with one screen, open the companion as its pull-down sheet; with a second screen
     holding it, turn that screen back on (a broadcast to the provider, `CompanionPrefs.requestWake`); and Reinitialize
     displays. Drawn again when a screen is added or removed.

@@ -313,6 +313,14 @@
                 <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
             </intent-filter>
         </activity>
+        <!-- Runs an exported container app from outside the shell (ExportLaunch; the Desktop widget). -->
+        <activity
+            android:name="dev.droidtop.app.ExportLaunchActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
         <activity
             android:name="dev.droidtop.app.QuickLaunchConfigureActivity"
             android:exported="true"
