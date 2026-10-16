@@ -42,8 +42,11 @@ data class CompanionSettings(
     val inputPin: String? = null,
     /** The one-screen sheet's first-run tip was dismissed (slice C13). */
     val sheetTipSeen: Boolean = false,
-    /** Dim and turn the companion screen off when untouched (slice C14); on by default. */
-    val idleTimeout: Boolean = true,
+    /**
+     * How long the companion screen waits with no input before it dims (slice C14), 0 for never; it goes off
+     * `CompanionIdle.OFF_GAP_MS` later. Two minutes by default.
+     */
+    val idleDimMs: Long = dev.droidtop.runtime.CompanionIdle.DIM_AFTER_MS,
     /** How an off companion wakes: `dev.droidtop.runtime.CompanionIdle.Wake` key, double tap by default. */
     val wake: String = "double",
     /** The off screen's "how to wake" line was seen through to a wake. */
@@ -91,16 +94,36 @@ object CompanionPrefs {
     private const val KEY_HANDLE = "input_handle_edge"
     private const val KEY_INPUT_PIN = "input_pin"
     private const val KEY_SHEET_TIP = "sheet_tip_seen"
+    /** The old on/off switch: off reads as Never until a time is chosen. */
     private const val KEY_IDLE = "idle_timeout"
+    private const val KEY_IDLE_DIM = "idle_dim_ms"
     private const val KEY_WAKE = "wake"
     private const val KEY_OFF_HINT = "off_hint_seen"
 
-    /** The Quick Menu's "Companion screen" row asks an off companion to wake; each request bumps this. */
+    /**
+     * Asks a dimmed or off companion to wake, and an awake one to start its idle time again; each request bumps this.
+     * The Quick Menu's "Companion screen" row, input on droidtop's main screen, a game ending and a launch alert ask.
+     */
     val wakeRequests = MutableStateFlow(0)
 
     fun requestWake() {
         wakeRequests.value++
     }
+
+    @Volatile
+    private var lastInputWakeMs = 0L
+
+    /**
+     * Input seen on droidtop's main screen: a wake request at most once a second, so a held stick or a stream of touch
+     * moves costs one bump a second, not one per event. [nowMs] is the uptime clock.
+     */
+    fun inputSeen(nowMs: Long) {
+        if (nowMs - lastInputWakeMs < INPUT_WAKE_GAP_MS) return
+        lastInputWakeMs = nowMs
+        requestWake()
+    }
+
+    private const val INPUT_WAKE_GAP_MS = 1_000L
     private const val TP = "trackpad_"
 
     const val HANDLE_BOTTOM = "bottom"
@@ -189,14 +212,15 @@ object CompanionPrefs {
         handleEdge = (all[KEY_HANDLE] as? String)?.takeIf { it == HANDLE_TOP } ?: HANDLE_BOTTOM,
         inputPin = (all[KEY_INPUT_PIN] as? String)?.takeIf { it.isNotBlank() },
         sheetTipSeen = all[KEY_SHEET_TIP] as? Boolean ?: false,
-        idleTimeout = all[KEY_IDLE] as? Boolean ?: true,
+        idleDimMs = (all[KEY_IDLE_DIM] as? Long)?.takeIf { it in dev.droidtop.runtime.CompanionIdle.DIM_CHOICES_MS }
+            ?: if (all[KEY_IDLE] == false) 0L else dev.droidtop.runtime.CompanionIdle.DIM_AFTER_MS,
         wake = all[KEY_WAKE] as? String ?: "double",
         offHintSeen = all[KEY_OFF_HINT] as? Boolean ?: false,
     )
 
-    fun setIdleTimeout(context: Context, on: Boolean) {
-        update { it.copy(idleTimeout = on) }
-        prefs(context).edit().putBoolean(KEY_IDLE, on).apply()
+    fun setIdleDim(context: Context, ms: Long) {
+        update { it.copy(idleDimMs = ms) }
+        prefs(context).edit().putLong(KEY_IDLE_DIM, ms).remove(KEY_IDLE).apply()
     }
 
     fun setWake(context: Context, key: String) {

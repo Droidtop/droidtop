@@ -331,6 +331,8 @@ class WineGameActivity : Activity() {
     // XInput state; anything left is a keyboard key for the X server.
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // A key in droidtop's own game screen wakes a dimmed companion, as input on the shell does (docs/SPEC.md).
+        dev.droidtop.library.settings.CompanionPrefs.inputSeen(android.os.SystemClock.uptimeMillis())
         if (failed) {
             if (event.action == KeyEvent.ACTION_UP && WinePresentation.dismissesFailure(event.keyCode)) leaveFailure()
             return true

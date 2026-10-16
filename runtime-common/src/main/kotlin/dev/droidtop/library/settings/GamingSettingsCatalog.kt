@@ -1227,12 +1227,16 @@ object GamingSettingsCatalog {
                     subtitle = "How the companion's Input trackpad moves, clicks and scrolls",
                     inline = trackpadScreen(),
                 ),
-                ToggleItem(
+                ChoiceItem(
                     id = "companion_idle",
-                    title = "Dim and turn off the companion",
-                    subtitle = "Untouched, the companion screen dims after 2 minutes and turns off after 5. Social, a chat and the keyboard keep it on",
-                    current = settings.idleTimeout,
-                    onToggle = { c, on -> CompanionPrefs.setIdleTimeout(c, on) },
+                    title = "Dim the companion screen",
+                    subtitle = "With no input, the companion screen dims after this and turns its backlight down 3 minutes later; " +
+                        "what it shows stays drawn. Social, a chat and the keyboard keep it on",
+                    options = dev.droidtop.runtime.CompanionIdle.DIM_CHOICES_MS.map {
+                        ChoiceOption(it.toString(), dev.droidtop.runtime.CompanionIdle.dimLabel(it))
+                    },
+                    current = settings.idleDimMs.toString(),
+                    onSelect = { c, value -> value.toLongOrNull()?.let { CompanionPrefs.setIdleDim(c, it) } },
                 ),
                 ChoiceItem(
                     id = "companion_wake",

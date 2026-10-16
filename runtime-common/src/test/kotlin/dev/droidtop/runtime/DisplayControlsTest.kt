@@ -53,27 +53,37 @@ class DisplayControlsTest {
     }
 
     @Test fun `idle dims after two minutes and goes off after five, unless exempt or switched off`() {
-        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(60_000, enabled = true, exempt = false))
-        assertEquals(CompanionIdle.State.DIM, CompanionIdle.state(120_000, enabled = true, exempt = false))
-        assertEquals(CompanionIdle.State.OFF, CompanionIdle.state(300_000, enabled = true, exempt = false))
-        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(600_000, enabled = true, exempt = true))
-        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(600_000, enabled = false, exempt = false))
-        assertNull(CompanionIdle.nextChangeInMs(0, enabled = true, exempt = true))
-        assertEquals(110_000L, CompanionIdle.nextChangeInMs(0, enabled = true, exempt = false))
-        assertTrue(CompanionIdle.warnNow(115_000, enabled = true, exempt = false))
-        assertFalse(CompanionIdle.warnNow(60_000, enabled = true, exempt = false))
+        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(60_000, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false))
+        assertEquals(CompanionIdle.State.DIM, CompanionIdle.state(120_000, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false))
+        assertEquals(CompanionIdle.State.OFF, CompanionIdle.state(300_000, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false))
+        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(600_000, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = true))
+        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(600_000, dimAfterMs = 0L, exempt = false))
+        assertNull(CompanionIdle.nextChangeInMs(0, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = true))
+        assertEquals(110_000L, CompanionIdle.nextChangeInMs(0, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false))
+        assertTrue(CompanionIdle.warnNow(115_000, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false))
+        assertFalse(CompanionIdle.warnNow(60_000, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false))
+    }
+
+    @Test fun `the chosen dim time sets when it dims and goes off, and Never keeps it on`() {
+        assertEquals(CompanionIdle.State.DIM, CompanionIdle.state(60_000, dimAfterMs = 60_000, exempt = false))
+        assertEquals(CompanionIdle.State.OFF, CompanionIdle.state(60_000 + CompanionIdle.OFF_GAP_MS, dimAfterMs = 60_000, exempt = false))
+        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(3_600_000, dimAfterMs = 0L, exempt = false))
+        assertEquals("Never", CompanionIdle.dimLabel(0))
+        assertEquals("After 1 minute", CompanionIdle.dimLabel(60_000))
+        assertEquals("After 10 minutes", CompanionIdle.dimLabel(600_000))
+        assertTrue(CompanionIdle.DIM_AFTER_MS in CompanionIdle.DIM_CHOICES_MS)
     }
 
     @Test fun `Android's recommended timeout stretches the idle times`() {
-        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(150_000, enabled = true, exempt = false, recommendedMs = 180_000))
-        assertEquals(180_000L to 360_000L, CompanionIdle.timeouts(180_000))
+        assertEquals(CompanionIdle.State.ON, CompanionIdle.state(150_000, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false, recommendedMs = 180_000))
+        assertEquals(180_000L to 360_000L, CompanionIdle.timeouts(CompanionIdle.DIM_AFTER_MS, 180_000))
     }
 
     @Test fun `a message brings an off or dimmed screen back to dimmed, except in Kid and Kiosk`() {
-        val since = CompanionIdle.afterMessage(CompanionIdle.State.OFF, restricted = false)!!
-        assertEquals(CompanionIdle.State.DIM, CompanionIdle.state(since, enabled = true, exempt = false))
-        assertNull(CompanionIdle.afterMessage(CompanionIdle.State.OFF, restricted = true))
-        assertNull(CompanionIdle.afterMessage(CompanionIdle.State.ON, restricted = false))
+        val since = CompanionIdle.afterMessage(CompanionIdle.State.OFF, restricted = false, dimAfterMs = CompanionIdle.DIM_AFTER_MS)!!
+        assertEquals(CompanionIdle.State.DIM, CompanionIdle.state(since, dimAfterMs = CompanionIdle.DIM_AFTER_MS, exempt = false))
+        assertNull(CompanionIdle.afterMessage(CompanionIdle.State.OFF, restricted = true, dimAfterMs = CompanionIdle.DIM_AFTER_MS))
+        assertNull(CompanionIdle.afterMessage(CompanionIdle.State.ON, restricted = false, dimAfterMs = CompanionIdle.DIM_AFTER_MS))
     }
 
     @Test fun `waking follows the chosen tap`() {
