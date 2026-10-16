@@ -224,6 +224,7 @@ class EngineCli private constructor(val front: Front) {
         val volumes = mutableListOf<String>()
         var restart: ContainerProgram.RestartPolicy = ContainerProgram.RestartPolicy.No
         var pod: String? = null
+        val labels = linkedMapOf<String, String>()
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
@@ -237,6 +238,10 @@ class EngineCli private constructor(val front: Front) {
                 "-v", "--volume" -> {
                     val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs a folder\n", 1)
                     volumes += volume(spec) ?: return volumeRefused(spec, sub)
+                }
+                "-l", "--label" -> {
+                    val kv = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs KEY=VALUE\n", 1)
+                    labels[kv.substringBefore('=')] = kv.substringAfter('=', "")
                 }
                 "-p", "--publish" -> {
                     val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs a port\n", 1)
@@ -271,6 +276,7 @@ class EngineCli private constructor(val front: Front) {
                         }
                     }
                     a.startsWith("--name=") -> name = a.substringAfter('=')
+                    a.startsWith("--label=") -> a.substringAfter('=').let { kv -> labels[kv.substringBefore('=')] = kv.substringAfter('=', "") }
                     a.startsWith("--env=") -> {
                         val kv = a.substringAfter('=')
                         env(kv) ?: return EngineRequest.Answer("${front.command} $sub: not NAME=VALUE: $kv\n", 1)
@@ -299,7 +305,8 @@ class EngineCli private constructor(val front: Front) {
         val newPod = pod?.startsWith("new:") == true
         val podName = if (newPod) pod!!.removePrefix("new:") else pod
         if (podName != null && !ContainerPods.validName(podName)) return EngineRequest.Answer("podman $sub: not a pod name: $podName\n", 1)
-        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish, start = sub == "run")
+        if (labels.keys.any { it.isBlank() }) return EngineRequest.Answer("${front.command} $sub: a label needs a key\n", 1)
+        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish, start = sub == "run", labels = labels)
     }
 
     /** Podman's `pod` subcommands droidtop answers; the rest say they are not built yet. */

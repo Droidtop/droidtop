@@ -98,13 +98,19 @@ object ContainerProgram {
      * its entrypoint, as Docker does) and [env] (`NAME=VALUE`) is added after the image's own, so it wins. Kept beside
      * the container's log, so the page's Start it and the start with the desktop run the same program as the command.
      */
-    data class RunOverrides(val args: List<String>? = null, val env: List<String> = emptyList()) {
+    data class RunOverrides(
+        val args: List<String>? = null,
+        val env: List<String> = emptyList(),
+        /** The labels it was made with (`--label`, the Engine API's `Labels`): what `docker compose` finds it by. */
+        val labels: Map<String, String> = emptyMap(),
+    ) {
         /** [config] as this container runs it. Pure. */
         fun applyTo(config: ImageRunConfig): ImageRunConfig = config.copy(cmd = args ?: config.cmd, env = config.env + env)
 
         fun encode(): String = kotlinx.serialization.json.buildJsonObject {
             args?.let { a -> put("args", kotlinx.serialization.json.JsonArray(a.map { kotlinx.serialization.json.JsonPrimitive(it) })) }
             put("env", kotlinx.serialization.json.JsonArray(env.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            if (labels.isNotEmpty()) put("labels", kotlinx.serialization.json.JsonObject(labels.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
         }.toString()
 
         companion object {
@@ -112,7 +118,9 @@ object ContainerProgram {
                 val o = kotlinx.serialization.json.Json.parseToJsonElement(text) as kotlinx.serialization.json.JsonObject
                 fun list(key: String) = (o[key] as? kotlinx.serialization.json.JsonArray)
                     ?.map { (it as kotlinx.serialization.json.JsonPrimitive).content }
-                RunOverrides(list("args"), list("env").orEmpty())
+                val labels = (o["labels"] as? kotlinx.serialization.json.JsonObject)
+                    ?.mapValues { (it.value as kotlinx.serialization.json.JsonPrimitive).content }.orEmpty()
+                RunOverrides(list("args"), list("env").orEmpty(), labels)
             }.getOrNull()
         }
     }

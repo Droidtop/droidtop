@@ -47,6 +47,8 @@ sealed interface EngineRequest {
         val publish: List<ExposedPort> = emptyList(),
         /** False for `create`: the container is made and its program is not started. */
         val start: Boolean = true,
+        /** `--label KEY=VALUE`, the Engine API's `Labels`: kept with the container and reported back. */
+        val labels: Map<String, String> = emptyMap(),
     ) : EngineRequest
 
     /** `restart`: stops each container's own program, then starts it. */

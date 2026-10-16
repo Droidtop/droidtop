@@ -6,20 +6,16 @@ import android.util.Log
 import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLauncher
-import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerPods
 import dev.droidtop.runtime.ContainerProgram
-import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.EngineCli
 import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineFeatures
 import dev.droidtop.runtime.EngineInspect
 import dev.droidtop.runtime.EngineOptions
-import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.Pod
-import dev.droidtop.runtime.RootfsImage
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -185,8 +181,7 @@ internal object ContainerEnterRequests {
             }
             is EngineRequest.Logs -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
-                val lines = ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, info.container.id), command.tail)
-                answer(dir, lines.joinToString("") { it + "\n" }, "", 0)
+                answer(dir, EngineActions.logs(app, info, command.tail).joinToString("") { it + "\n" }, "", 0)
             }
             is EngineRequest.Start, is EngineRequest.Stop -> {
                 val names = if (command is EngineRequest.Start) command.containers else (command as EngineRequest.Stop).containers
@@ -197,15 +192,12 @@ internal object ContainerEnterRequests {
                     when {
                         info == null -> err.append("Error: No such container: $name\n")
                         command is EngineRequest.Stop -> {
-                            ContainerPrograms.stoppedByPerson(app, info.container.id)
+                            EngineActions.stop(app, info)
                             out.append(name).append('\n')
                         }
-                        runCatching { runtime.imageRunConfig(info.container) }.getOrNull()?.program().isNullOrEmpty() ->
+                        !EngineActions.start(app, runtime, info) ->
                             err.append("Error: $name has no program of its own to start (its image names none)\n")
-                        else -> {
-                            ContainerPrograms.startedByPerson(app, runtime, info.container)
-                            out.append(name).append('\n')
-                        }
+                        else -> out.append(name).append('\n')
                     }
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
@@ -215,92 +207,33 @@ internal object ContainerEnterRequests {
                 enter(app, dir, Target(info.container.id, info.displayName, "${cli.name} exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
             }
             is EngineRequest.Pull -> {
-                val pulled = runCatching { OciImageStore.of(app).pull(RootfsImage(reference = command.image)) }
-                pulled.fold(
-                    onSuccess = { answer(dir, "${command.image}\nDigest: ${it.digest}\n", "", 0) },
+                EngineActions.pull(app, command.image).fold(
+                    onSuccess = { answer(dir, "${command.image}\nDigest: $it\n", "", 0) },
                     onFailure = { refuse(dir, "${cli.name} pull: ${it.message ?: it.javaClass.simpleName}", 1) },
                 )
             }
             is EngineRequest.Run -> {
                 val verb = if (command.start) "run" else "create"
-                val names = containers.map { it.displayName }
-                val name = command.name ?: ContainerNames.defaultName(ContainerRole.SIBLING, command.image, names)
-                ContainerNames.problemWith(name, names)?.let { return refuse(dir, "${cli.name} $verb: $it", 1) }
-                // A volume is a folder the person already mapped in some container (D3), found by its name: never a
-                // path the container chose (the review's bound for the docker request kind).
-                val mapped = containers.flatMap { runCatching { runtime.mounts(it.container).folders }.getOrDefault(emptyList()) }
-                val folders = command.volumes.map { wanted ->
-                    mapped.firstOrNull { it.name == wanted }
-                        ?: return refuse(dir, "${cli.name} $verb: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
+                val made = EngineActions.make(app, runtime, containers, command).getOrElse {
+                    return refuse(dir, "${cli.name} $verb: ${it.message}", 1)
                 }
-                // Podman's --pod: an existing pod, or a new one for --pod new:NAME (docs/SPEC.md 3d, "Pods").
-                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
-                val pod = command.pod?.let { wanted ->
-                    if (command.newPod) {
-                        ContainerPods.problemWith(pods, wanted)?.let { return refuse(dir, "${cli.name} $verb: $it", 1) }
-                        Pod(ContainerPods.newId(), wanted, System.currentTimeMillis())
-                    } else {
-                        ContainerPods.find(pods, wanted) ?: return refuse(dir, "${cli.name} $verb: no pod is called $wanted", 1)
-                    }
-                }
-                val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
-                    return refuse(dir, "${cli.name} $verb: ${it.message ?: it.javaClass.simpleName}", 1)
-                }
-                ContainerPrograms.recordCreated(app, created.id)
-                if (pod != null) {
-                    withContext(Dispatchers.IO) {
-                        val current = ContainerPods.read(app.filesDir).let { if (command.newPod) ContainerPods.with(it, pod) else it }
-                        ContainerPods.save(app.filesDir, ContainerPods.withMember(current, pod.id, created.id))
-                    }
-                }
-                // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
-                runCatching {
-                    val current = runtime.mounts(created)
-                    runtime.setMounts(created, current.copy(home = HomeChoice.Private, folders = (current.folders + folders).distinctBy { it.name }))
-                }
-                // The tools' own default, no restart, unless --restart said otherwise (docs/SPEC.md 3d, "Restart policies").
-                withContext(Dispatchers.IO) { ContainerPrograms.setRestartPolicy(app, created.id, command.restart) }
-                if (command.args != null || command.env.isNotEmpty()) {
-                    withContext(Dispatchers.IO) {
-                        ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(command.args, command.env))
-                    }
-                }
-                val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()
-                    ?.let { ContainerProgram.effectiveConfig(app.filesDir, created.id, it) }?.program().orEmpty()
                 // Both tools print the new container's id (D13); -p on a port's own number is what happens anyway.
-                val notes = StringBuilder()
-                command.publish.forEach { notes.append("$name listens on the device's own port $it; -p $it is what happens anyway\n") }
-                when {
-                    !command.start -> answer(dir, "${created.id}\n", notes.toString(), 0)
-                    program.isEmpty() -> answer(
-                        dir,
-                        "${created.id}\n",
-                        notes.append("$name's image names no program to run, so nothing was started; use ${cli.name} exec $name sh\n").toString(),
-                        0,
-                    )
-                    else -> {
-                        ContainerPrograms.start(app, runtime, created)
-                        answer(dir, "${created.id}\n", notes.toString(), 0)
-                    }
+                val notes = made.notes.toMutableList()
+                if (command.start && !made.hasProgram) {
+                    notes += "${made.name}'s image names no program to run, so nothing was started; use ${cli.name} exec ${made.name} sh"
                 }
+                answer(dir, "${made.container.id}\n", notes.joinToString("") { it + "\n" }, 0)
             }
             is EngineRequest.Remove -> {
                 val out = StringBuilder()
                 val err = StringBuilder()
                 for (target in command.containers) {
-                    val info = find(target)
-                    val running = info != null && (ContainerPrograms.isRunning(info.container.id) || (info.running && runtime.siblingsNeedStart))
-                    when {
-                        info == null -> err.append("Error: No such container: $target\n")
-                        info.container.role == ContainerRole.PRIMARY -> err.append("Error: $target is the desktop's own container; droidtop does not remove it\n")
-                        running && !command.force -> err.append("Error: $target is running; stop it first or use ${cli.name} rm -f\n")
-                        else -> runCatching {
-                            if (info.running && runtime.siblingsNeedStart) runtime.stop(info.container)
-                            ContainerRemoval.remove(app, runtime, info)
-                        }.fold(
-                            onSuccess = { out.append(target).append('\n') },
-                            onFailure = { err.append("Error: $target: ${it.message ?: it.javaClass.simpleName}\n") },
-                        )
+                    val info = find(target) ?: run { err.append("Error: No such container: $target\n"); null } ?: continue
+                    when (val removal = EngineActions.remove(app, runtime, info, command.force)) {
+                        EngineActions.Removal.Removed -> out.append(target).append('\n')
+                        EngineActions.Removal.Primary -> err.append("Error: $target is the desktop's own container; droidtop does not remove it\n")
+                        EngineActions.Removal.Running -> err.append("Error: $target is running; stop it first or use ${cli.name} rm -f\n")
+                        is EngineActions.Removal.Failed -> err.append("Error: $target: ${removal.message}\n")
                     }
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
@@ -312,13 +245,9 @@ internal object ContainerEnterRequests {
                     val info = find(name)
                     when {
                         info == null -> err.append("Error: No such container: $name\n")
-                        runCatching { runtime.imageRunConfig(info.container) }.getOrNull()?.program().isNullOrEmpty() ->
+                        !EngineActions.restart(app, runtime, info) ->
                             err.append("Error: $name has no program of its own to restart (its image names none)\n")
-                        else -> {
-                            ContainerPrograms.stop(info.container.id)
-                            ContainerPrograms.startedByPerson(app, runtime, info.container)
-                            out.append(name).append('\n')
-                        }
+                        else -> out.append(name).append('\n')
                     }
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)

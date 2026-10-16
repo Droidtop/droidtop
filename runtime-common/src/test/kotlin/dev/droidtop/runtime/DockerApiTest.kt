@@ -115,4 +115,91 @@ class DockerApiTest {
         assertEquals("unix:///run/droidtop-app-storage/docker.sock", DockerApi.DOCKER_HOST)
         assertEquals(DockerApi.DOCKER_HOST, ContainerLayout.clientEnvironment(null)["DOCKER_HOST"])
     }
+
+    @Test
+    fun `the write routes are read into calls, and what droidtop will not do is said`() {
+        assertEquals(DockerApi.Call.Create("web"), DockerApi.route("POST", "/v1.43/containers/create", mapOf("name" to "web")))
+        assertEquals(DockerApi.Call.Start("web"), DockerApi.route("POST", "/containers/web/start", emptyMap()))
+        assertEquals(DockerApi.Call.Stop("web"), DockerApi.route("POST", "/containers/web/stop", mapOf("t" to "10")))
+        assertEquals(DockerApi.Call.Kill("web", "SIGTERM"), DockerApi.route("POST", "/containers/web/kill", mapOf("signal" to "SIGTERM")))
+        assertTrue(DockerApi.route("POST", "/containers/web/kill", mapOf("signal" to "SIGHUP")) is DockerApi.Call.NotBuilt)
+        assertEquals(DockerApi.Call.Remove("web", force = true), DockerApi.route("DELETE", "/v1.43/containers/web", mapOf("force" to "1", "v" to "1")))
+        assertEquals(DockerApi.Call.Pull("nginx:1.27"), DockerApi.route("POST", "/images/create", mapOf("fromImage" to "nginx", "tag" to "1.27")))
+        assertEquals(DockerApi.Call.Pull("ghcr.io/x/y:2"), DockerApi.route("POST", "/images/create", mapOf("fromImage" to "ghcr.io/x/y:2", "tag" to "latest")))
+        assertTrue(DockerApi.route("POST", "/images/create", mapOf("fromImage" to "a;b")) is DockerApi.Call.Refused)
+        assertEquals(DockerApi.Call.Logs("web", 20, stdout = true, stderr = true), DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "stderr" to "1", "tail" to "20")))
+        assertTrue(DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "follow" to "1")) is DockerApi.Call.NotBuilt)
+        assertEquals(DockerApi.Call.Refused(400, "You must choose at least one stream"), DockerApi.route("GET", "/containers/web/logs", emptyMap()))
+        assertEquals(DockerApi.Call.Wait("web", "not-running"), DockerApi.route("POST", "/containers/web/wait", emptyMap()))
+        assertTrue(DockerApi.route("POST", "/containers/web/wait", mapOf("condition" to "removed")) is DockerApi.Call.NotBuilt)
+        assertEquals(
+            DockerApi.Call.Containers(all = true, filters = mapOf("label" to listOf("com.docker.compose.project=demo"))),
+            DockerApi.route("GET", "/containers/json", mapOf("all" to "1", "filters" to "{\"label\":[\"com.docker.compose.project=demo\"]}")),
+        )
+        assertTrue(DockerApi.route("GET", "/containers/json", mapOf("filters" to "nope")) is DockerApi.Call.Refused)
+    }
+
+    private val none = EngineFeatures("b", EngineFeature.entries.associateWith { FeatureState(kernel = false) })
+
+    private fun create(body: String) = DockerApi.createRequest(body, "web", none)
+
+    @Test
+    fun `a create body becomes the one run request, start left to start`() {
+        val (run, refused) = create(
+            """{"Image":"nginx:1.27","Cmd":["nginx","-g","daemon off;"],"Env":["A=1"],"Labels":{"com.docker.compose.project":"demo"},
+               "HostConfig":{"Binds":["Music:/run/droidtop-mounts/Music:ro"],"RestartPolicy":{"Name":"on-failure","MaximumRetryCount":3},
+               "PortBindings":{"8080/tcp":[{"HostIp":"","HostPort":"8080"}]},"NetworkMode":"default","Memory":0},
+               "NetworkingConfig":{"EndpointsConfig":{"bridge":{}}},"Tty":false,"OpenStdin":false}""",
+        )
+        assertNull(refused)
+        assertEquals(
+            EngineRequest.Run(
+                image = "nginx:1.27", name = "web", args = listOf("nginx", "-g", "daemon off;"), env = listOf("A=1"),
+                volumes = listOf("Music"), restart = ContainerProgram.RestartPolicy.OnFailure(3), publish = listOf(ExposedPort(8080)),
+                start = false, labels = mapOf("com.docker.compose.project" to "demo"),
+            ),
+            run,
+        )
+    }
+
+    @Test
+    fun `a create body asking for what droidtop does not do is refused, never trimmed`() {
+        fun answer(body: String): Pair<Int, String> = create(body).second!!.let { it.status to String(it.body) }
+        assertEquals(400, answer("""{"Cmd":["sh"]}""").first)
+        assertEquals(400, answer("""{"Image":"alpine","HostConfig":{"Privileged":true}}""").first)
+        assertTrue(answer("""{"Image":"alpine","HostConfig":{"Memory":536870912}}""").second.contains("--memory needs cgroups"))
+        assertTrue(answer("""{"Image":"alpine","HostConfig":{"PortBindings":{"80/tcp":[{"HostPort":"8080"}]}}}""").second.contains("network namespaces"))
+        assertTrue(answer("""{"Image":"alpine","HostConfig":{"Binds":["/etc:/host-etc"]}}""").second.contains("a folder you mapped"))
+        assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"NetworkMode":"demo_default"}}""").first)
+        assertEquals(501, answer("""{"Image":"alpine","NetworkingConfig":{"EndpointsConfig":{"demo_default":{}}}}""").first)
+        assertEquals(501, answer("""{"Image":"alpine","Entrypoint":["/bin/sh"]}""").first)
+        assertEquals(501, answer("""{"Image":"alpine","User":"1000"}""").first)
+        assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"volume","Source":"data","Target":"/data"}]}}""").first)
+        assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"CapAdd":["NET_ADMIN"]}}""").first)
+        assertNull(create("""{"Image":"alpine","User":"root"}""").second)
+    }
+
+    @Test
+    fun `filters pick by label, name, id and status; logs are Docker's frames`() {
+        val base = EngineInspect.Facts(
+            id = "droidtop-sibling-1a2b", name = "demo-web-1", image = "nginx", imageDigest = null, createdMs = null,
+            status = "running", exitCode = null, error = null, config = null, restart = ContainerProgram.RestartPolicy.No,
+            folders = emptyList(), podId = null, labels = mapOf("com.docker.compose.project" to "demo"),
+        )
+        val row = DockerApi.Summary(base, "Up")
+        assertTrue(DockerApi.matches(row, mapOf("label" to listOf("com.docker.compose.project=demo"))))
+        assertTrue(DockerApi.matches(row, mapOf("label" to listOf("com.docker.compose.project"))))
+        assertTrue(!DockerApi.matches(row, mapOf("label" to listOf("com.docker.compose.project=other"))))
+        assertTrue(DockerApi.matches(row, mapOf("name" to listOf("web"), "status" to listOf("running"))))
+        assertTrue(!DockerApi.matches(row, mapOf("status" to listOf("exited"))))
+        assertEquals(setOf("ancestor"), DockerApi.unknownFilters(mapOf("ancestor" to listOf("nginx"), "id" to listOf("droidtop"))))
+        assertTrue(DockerApi.summary(row).toString().contains("\"Labels\":{\"com.docker.compose.project\":\"demo\"}"))
+
+        val frames = DockerApi.logFrames(listOf("hi"))
+        assertEquals(listOf<Byte>(1, 0, 0, 0, 0, 0, 0, 3), frames.take(8))
+        assertEquals("hi\n", String(frames, 8, 3))
+        assertTrue(DockerApi.created("droidtop-sibling-1a2b", listOf("note")).contains("\"Warnings\":[\"note\"]"))
+        assertTrue(DockerApi.waited(3).contains("\"StatusCode\":3"))
+        assertTrue(DockerApi.pulled("nginx", "sha256:abc").lines().first().contains("Pulling from nginx"))
+    }
 }

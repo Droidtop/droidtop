@@ -2534,8 +2534,31 @@ the `ContainerRuntime` interface that already exists (§3):
   JSON as the docker front's `inspect`) and `images/json`. They are answered from the same facts as the command
   fronts (`EngineFacts`), so a client never sees two answers for one container. Every other route Docker has
   answers 501 with "not built in droidtop's engine yet"; an unknown one 404. Containers report NetworkMode `host`
-  and no published ports, which is what they have. Writes (create, start, stop, kill, remove, pull, logs, wait)
-  are the next slice; exec and attach, which take over the connection, the one after.
+  and no published ports, which is what they have. **Writes (built 2026-10-16, D14 second slice):**
+  `containers/create` (201 with the id and the notes), `start` (304 when running), `stop` (304 when stopped),
+  `restart`, `kill` (TERM, KILL or INT: a program is ended, not signalled; another signal is not built),
+  `DELETE /containers/{id}` (409 for a running one without `force`, and for the desktop's own), `images/create`
+  (a pull; its progress lines all at once after it), `containers/{id}/logs` (Docker's multiplexed frames, the
+  program's log as stdout; `follow`, `timestamps`, `since` and `until` not built) and `containers/{id}/wait`
+  (until the program is over; its exit code, 125 when it could not start). `containers/json` takes Docker's
+  `filters` for label, name, id and status; any other filter is answered as not built, never ignored. Every action
+  is `EngineActions`, the same code the command fronts run, so `docker run` and `POST /containers/create` make
+  the same container. A create body (`DockerApi.createRequest`) becomes the one request model, and nothing in it is
+  dropped:
+  - Taken: `Image`, `Cmd`, `Env`, `Labels`, `HostConfig.Binds` (a folder the person mapped, as `-v` takes it),
+    `RestartPolicy`, `NetworkMode` default, bridge or host (every container is on the device's network), and
+    `PortBindings` on a port's own number.
+  - Answered from the D10 feature table: resource limits (`Memory`, `NanoCpus`, `CpuShares`, `PidsLimit`, ...),
+    `Hostname`, and port bindings on another number.
+  - Answered 501, not built: `Entrypoint`, `WorkingDir`, a `User` other than root, `Volumes`, `Mounts`, a network
+    of the container's own (`docker compose`'s project network among them; networks are the next slice), `CapAdd`,
+    `Devices`, `SecurityOpt`.
+  - Refused 400: `Privileged`, which droidtop's containers never are.
+  Labels (`--label` on both command fronts too) are kept with the container's run settings
+  (`ContainerProgram.RunOverrides.labels`) and reported in `inspect`, `containers/json` and its filters, which is
+  how `docker compose` finds its containers. `docker pull` and `podman pull` resolve the tag to its digest
+  (`crane digest`) before the store pulls, as a container's creation does; they passed the bare reference, which
+  the store refused. Exec and attach, which take over the connection, and networks are the next slice.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept

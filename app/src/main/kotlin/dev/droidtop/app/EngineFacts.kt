@@ -34,6 +34,7 @@ internal object EngineFacts {
             restart = withContext(Dispatchers.IO) { ContainerPrograms.restartPolicy(app, id) },
             folders = runCatching { runtime.mounts(info.container).folders.map { it.name } }.getOrDefault(emptyList()),
             podId = pods.firstOrNull { id in it.members }?.id,
+            labels = withContext(Dispatchers.IO) { ContainerProgram.overrides(app.filesDir, id)?.labels.orEmpty() },
         )
     }
 
