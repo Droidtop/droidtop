@@ -52,6 +52,12 @@
             app:showIncrementButtons="false"
             app:showTicks="true" />
 
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_drawer_sort"
+            android:title="@string/pref_drawer_sort_title"
+            android:persistent="true"
+            app:showPreviewIcon="false" />
+
         <app.murinelauncher.widget.CustomSeekBarPreference
             android:key="pref_drawer_padding"
             android:title="@string/pref_drawer_padding_title"
