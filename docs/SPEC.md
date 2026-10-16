@@ -21862,9 +21862,15 @@ without its runtime said "Running". Decisions:
   chooseSystemScreen`, `systemScreen`, `GET_GAMES_SCREEN_ID`, its registration and deep link), `GetGamesEntry`
   and `GetMoreState`, `getGamesScreen`, `GetGamesSheet` and `GetGamesChip`, the search dialog's last "Get games"
   row, a system folder's "Get games" settings row, and the owner's 2026-10-01 "offered from EVERY menu ... run in
-  the global search bar" as a separate screen (the entries stay; they open search). JSON `acquire_content`
-  integrations (§12), which only that screen listed, have no surface: they fire an `am start` and never answer, so
-  they cannot answer a search. That is an open point for the coordinator, not a decision.
+  the global search bar" as a separate screen (the entries stay; they open search).
+  **JSON `acquire_content` integrations hand the query to their app (coordinator decision, 2026-10-16, under the
+  owner's Get games direction above; the owner may override).** A JSON integration (§12) fires an `am start` and
+  never answers, so it cannot answer a search; it gets one hand-off row in the one search instead, "Search <app>"
+  with `for "<query>"` as its detail ("Open <app>" when its template takes no `{query}`), which launches its
+  template with the query filled in. It ranks after every source's row: the query is its detail and never its title,
+  as the web row's is (`SearchRowKind.WEB`). It shows only in a search scoped to a place the integration covers: a
+  template that names the system (`{system.id}`, `{system.name}`, `{system.folder}`) only in a search scoped to one
+  console system, where those have values; one that does not, in every search (`IntegrationHandoff`).
   **Results stay in the one ranked list, not a heading per plugin.** The coordinator's relay asked for "their own
   rows or section"; rows are what "One search" (owner, 2026-10-07: "We don't want to separate plugin searches
   from regular searches, that's kinda broken") already decided, with no heading per source and no "Get more"
