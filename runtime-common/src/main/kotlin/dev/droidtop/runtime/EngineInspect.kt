@@ -40,6 +40,10 @@ object EngineInspect {
         val podId: String?,
         /** The labels it was made with. */
         val labels: Map<String, String> = emptyMap(),
+        /** When its program last started and last ended, as far as this run of droidtop saw. */
+        val startedMs: Long? = null,
+        val endedMs: Long? = null,
+        val podName: String? = null,
     )
 
     private val JSON = Json { prettyPrint = true }
@@ -50,7 +54,7 @@ object EngineInspect {
     fun container(f: Facts, front: EngineCli.Front): JsonObject = buildJsonObject {
         val program = f.config?.program().orEmpty()
         put("Id", f.id)
-        put("Created", f.createdMs?.let { Instant.ofEpochMilli(it).toString() } ?: "0001-01-01T00:00:00Z")
+        put("Created", time(f.createdMs))
         put("Path", program.firstOrNull() ?: "")
         putJsonArray("Args") { program.drop(1).forEach { add(JsonPrimitive(it)) } }
         putJsonObject("State") {
@@ -59,6 +63,8 @@ object EngineInspect {
             put("Restarting", f.status == "restarting")
             put("ExitCode", f.exitCode ?: 0)
             put("Error", f.error ?: "")
+            put("StartedAt", time(f.startedMs))
+            put("FinishedAt", time(f.endedMs))
         }
         put("Image", f.imageDigest ?: "")
         put("Name", if (front == EngineCli.Front.DOCKER) "/${f.name}" else f.name)
@@ -98,6 +104,11 @@ object EngineInspect {
             putJsonObject("ExposedPorts") { f.config?.ports?.forEach { put(it.toString(), JsonObject(emptyMap())) } }
         }
     }
+
+    /** [ms] as both tools write a time, Docker's zero time when droidtop does not know it. */
+    fun time(ms: Long?): String = ms?.let { Instant.ofEpochMilli(it).toString() } ?: ZERO_TIME
+
+    const val ZERO_TIME = "0001-01-01T00:00:00Z"
 
     /** A JSON list of [values], or null when nothing is known, as Docker writes an absent list. */
     private fun strings(values: List<String>?): JsonElement =

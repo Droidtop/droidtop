@@ -2523,7 +2523,7 @@ the `ContainerRuntime` interface that already exists (§3):
   storage, which every container sees as `/run/droidtop-app-storage/docker.sock`; `DOCKER_HOST` names it in every
   container's environment (`ContainerLayout.clientEnvironment`). A distro's own docker binary comes before
   droidtop's wrapper on the `PATH`, so installing one is all it takes. It is on demand: droidtop holds only the
-  listening socket while the desktop runs (`DockerApiServer`, started and stopped with the desktop session) and
+  listening socket while the desktop runs (`EngineApiServer`, started and stopped with the desktop session) and
   serves each connection off the main thread; nothing runs inside a container for it, and with the desktop down
   nothing listens, which to a client is the same as no daemon. The HTTP is `EngineHttp`: one request at a time on a
   kept-alive connection, bodies by Content-Length or chunks, at most 64 KB of headers and 1 MB of body (413
@@ -2585,7 +2585,7 @@ the `ContainerRuntime` interface that already exists (§3):
   non-root `User` is not built and `Privileged` is refused. The execs a session made are kept in memory, at most 256.
   **Attach and --rm (built 2026-10-16, D14 fifth slice).** `POST /containers/{id}/attach` is how `docker run` and
   `docker compose up` without `-d` show a program's output: a program's output goes to its log, so attach follows
-  that file (`DockerApiServer.followLog`) and sends what is added as stdout frames, from where it ends now, or from
+  that file (`EngineApiServer.followLog`) and sends what is added as stdout frames, from where it ends now, or from
   the top with `logs=1`, taking the connection over with a 101 when asked. With `stream=1` it goes on until the
   program has run and ended; attach comes before start, so it waits for the start (five minutes at most), and a
   program that starts and ends between two looks is seen by its state turning to over since the attach. A log
@@ -2596,6 +2596,31 @@ the `ContainerRuntime` interface that already exists (§3):
   started within ten minutes leaves the container be); with a restart policy it is refused, as Docker refuses it.
   `wait?condition=removed`, which Docker's CLI uses for `--rm`, answers the exit code once the container is gone, or
   after half a minute.
+  **The libpod API (built 2026-10-16, Droidtop/tracker#555 D15, first slice: reads).** Podman's clients talk to
+  Podman's own API, libpod, so droidtop serves it too: on `podman.sock` beside `docker.sock`, which every container
+  sees as `/run/droidtop-app-storage/podman.sock` and `CONTAINER_HOST` names in its environment. A podman a container
+  installed is remote whenever CONTAINER_HOST is set (Podman's own rule), and comes before droidtop's wrapper on the
+  `PATH`, so installing one is all it takes, as with docker. One server listens on both sockets
+  (`EngineApiServer`), under the same bounds (at most 16 connections across both); both sockets answer both APIs,
+  as Podman's service does: a path under `/v{X.Y.Z}/libpod/` is libpod's (`LibpodApi.route`), any other Docker's.
+  A libpod request is read into the same calls as a Docker one and answered from the same facts and actions; only
+  the JSON is Podman's. A client names its version in every path and reads the answers in that version's shapes, so
+  droidtop answers in the version asked, from 4.0 (the oldest Podman's clients take) to 5.0: Podman 5 made an
+  inspect's `Config.Entrypoint` a list, Podman 4 reads one string. The answers carry `Libpod-Api-Version`, which
+  Podman's client requires on its first ping. Routes: `_ping`, `version` (a Podman Engine component, whose
+  APIVersion `podman version` prints), `info` (the host, the counts, and each kernel feature from D10 as a line
+  under the host's runtime info, the one place Podman's info carries free text), `containers/json` (the same
+  filters as Docker's), `containers/{id}/json`, `images/json`, `images/{name}/json` (a name may hold slashes),
+  `pods/json` (filters name and id; others not built), `pods/{id}/json`, `networks/json`, `networks/{id}/json`,
+  and `exists` for each of containers, images, pods and networks (204, or 404). Podman's `ps` writes STATUS itself
+  from State, StartedAt, ExitedAt and ExitCode, so droidtop now records when each program last started and ended
+  (`ContainerPrograms.times`, for this run of droidtop); inspect gives them as State.StartedAt and FinishedAt on
+  every front. Image ids are the digest's hex without `sha256:`, as Podman writes them. Checked against Podman's own
+  remote clients, 5.2.5 and 4.9.5 built from source, over these shapes: `version`, `info`, `ps` (`-a`, `--pod`,
+  `--filter label=`), `inspect`, `images`, `image inspect`, `pod ps`, `pod inspect`, `network ls`, `network
+  inspect` and each `exists`. Every write route answers not built until the next slice; containers' short ids are
+  droidtop's own (`droidtop-sibling-...`), which both tools' `ps` cut to the same twelve characters, so NAMES is
+  what tells them apart.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept

@@ -507,13 +507,7 @@ class EngineCli private constructor(val front: Front) {
         return table(
             listOf("POD ID", "NAME", "STATUS", "CREATED", "# OF CONTAINERS"),
             rows.map { row ->
-                val status = when {
-                    row.containers == 0 -> "Created"
-                    row.running == row.containers -> "Running"
-                    row.running > 0 -> "Degraded"
-                    else -> "Exited"
-                }
-                listOf(row.pod.id.take(12), row.pod.name, status, ago(nowMs - row.pod.createdMs), row.containers.toString())
+                listOf(row.pod.id.take(12), row.pod.name, ContainerPods.status(row.containers, row.running), ago(nowMs - row.pod.createdMs), row.containers.toString())
             },
         )
     }

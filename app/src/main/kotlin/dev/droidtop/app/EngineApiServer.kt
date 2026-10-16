@@ -8,9 +8,12 @@ import android.net.LocalSocketAddress
 import android.util.Log
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerNetworks
+import dev.droidtop.runtime.ContainerPods
+import dev.droidtop.runtime.Pod
 import dev.droidtop.runtime.DockerApi
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineHttp
+import dev.droidtop.runtime.LibpodApi
 import dev.droidtop.runtime.OciImageStore
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
@@ -18,6 +21,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -26,20 +30,24 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * The Docker Engine API socket (docs/SPEC.md 3d, "The Docker Engine API"; Droidtop/tracker#555 D14). While the
- * desktop runs, droidtop listens on `docker.sock` in its app storage, which every container sees as
- * [DockerApi.DOCKER_HOST]; nothing runs inside a container for it. Each connection is served off the main thread,
- * one request at a time as Docker's clients send them, and answered from the same facts the docker command answers
- * from ([EngineFacts]). What a request may make droidtop read is bounded ([EngineHttp]), a connection idle for a
- * minute is closed, and at most [MAX_CONNECTIONS] are served at once.
+ * The engine's API sockets (docs/SPEC.md 3d, "The Docker Engine API" and "The libpod API"; Droidtop/tracker#555 D14,
+ * D15). While the desktop runs, droidtop listens on `docker.sock` and `podman.sock` in its app storage, which every
+ * container sees as [DockerApi.DOCKER_HOST] and [LibpodApi.CONTAINER_HOST]; nothing runs inside a container for them.
+ * Both sockets answer both APIs, as Podman's own service does: a `/libpod/` path is [LibpodApi]'s, any other
+ * [DockerApi]'s, read into the same calls. Each connection is served off the main thread, one request at a time as
+ * the clients send them, and answered from the same facts the command fronts answer from ([EngineFacts]). What a
+ * request may make droidtop read is bounded ([EngineHttp]), a connection idle for a minute is closed, and at most
+ * [MAX_CONNECTIONS] are served at once across both sockets.
  */
-internal object DockerApiServer {
-    private const val TAG = "droidtop.DockerApi"
+internal object EngineApiServer {
+    private const val TAG = "droidtop.EngineApi"
     private const val MAX_CONNECTIONS = 16
     private const val IDLE_MS = 60_000
     private const val WAIT_LOOK_MS = 250L
 
-    @Volatile private var server: LocalServerSocket? = null
+    private val SOCKETS = listOf(DockerApi.SOCKET_NAME, LibpodApi.SOCKET_NAME)
+
+    @Volatile private var servers: List<LocalServerSocket> = emptyList()
     @Volatile private var stopping = false
     private var job: Job? = null
     private val open = AtomicInteger(0)
@@ -48,64 +56,70 @@ internal object DockerApiServer {
     fun start(context: Context, scope: CoroutineScope) {
         if (job?.isActive == true) return
         val app = context.applicationContext
-        val file = socketFile(app)
         stopping = false
+        servers = emptyList()
         job = scope.launch(Dispatchers.IO) {
-            val listening = runCatching {
-                // A socket file left by an earlier session is stale: one file, removed before binding.
-                file.delete()
-                val bound = LocalSocket(LocalSocket.SOCKET_STREAM)
-                bound.bind(LocalSocketAddress(file.absolutePath, LocalSocketAddress.Namespace.FILESYSTEM))
-                LocalServerSocket(bound.fileDescriptor)
-            }.onFailure { Log.w(TAG, "Could not listen on ${file.path}", it) }.getOrNull() ?: return@launch
-            server = listening
-            Log.i(TAG, "Listening on ${file.path}")
-            while (isActive && !stopping) {
-                val connection = runCatching { listening.accept() }.getOrNull() ?: break
-                if (stopping) {
-                    runCatching { connection.close() }
-                    break
-                }
-                if (open.incrementAndGet() > MAX_CONNECTIONS) {
-                    open.decrementAndGet()
-                    runCatching { connection.close() }
-                    continue
-                }
-                launch {
-                    try {
-                        serve(app, connection)
-                    } finally {
-                        open.decrementAndGet()
-                    }
-                }
-            }
+            SOCKETS.forEach { name -> launch { listen(app, File(app.filesDir, name)) } }
         }
     }
 
+    private suspend fun listen(app: Context, file: File): Unit = coroutineScope {
+        val listening = runCatching {
+            // A socket file left by an earlier session is stale: one file, removed before binding.
+            file.delete()
+            val bound = LocalSocket(LocalSocket.SOCKET_STREAM)
+            bound.bind(LocalSocketAddress(file.absolutePath, LocalSocketAddress.Namespace.FILESYSTEM))
+            LocalServerSocket(bound.fileDescriptor)
+        }.onFailure { Log.w(TAG, "Could not listen on ${file.path}", it) }.getOrNull() ?: return@coroutineScope
+        synchronized(this@EngineApiServer) { servers = servers + listening }
+        Log.i(TAG, "Listening on ${file.path}")
+        while (isActive && !stopping) {
+            val connection = runCatching { listening.accept() }.getOrNull() ?: break
+            if (stopping) {
+                runCatching { connection.close() }
+                break
+            }
+            if (open.incrementAndGet() > MAX_CONNECTIONS) {
+                open.decrementAndGet()
+                runCatching { connection.close() }
+                continue
+            }
+            launch {
+                try {
+                    serve(app, connection)
+                } finally {
+                    open.decrementAndGet()
+                }
+            }
+        }
+        // Closed here too: a stop that came before this socket was listed only woke it.
+        runCatching { listening.close() }
+    }
+
     /**
-     * Stops listening and removes the socket file, off the main thread (the session ends from the service's
-     * teardown). The blocked accept is woken by one connection of droidtop's own.
+     * Stops listening and removes the socket files, off the main thread (the session ends from the service's
+     * teardown). Each blocked accept is woken by one connection of droidtop's own.
      */
     @Synchronized
     fun stop(context: Context) {
         stopping = true
-        val file = socketFile(context.applicationContext)
-        val listening = server
-        server = null
+        val app = context.applicationContext
+        val listening = servers
+        servers = emptyList()
         job?.cancel()
         job = null
         cleanup.launch {
-            runCatching {
-                LocalSocket(LocalSocket.SOCKET_STREAM).use { it.connect(LocalSocketAddress(file.absolutePath, LocalSocketAddress.Namespace.FILESYSTEM)) }
+            SOCKETS.map { File(app.filesDir, it) }.forEach { file ->
+                runCatching {
+                    LocalSocket(LocalSocket.SOCKET_STREAM).use { it.connect(LocalSocketAddress(file.absolutePath, LocalSocketAddress.Namespace.FILESYSTEM)) }
+                }
             }
-            runCatching { listening?.close() }
-            file.delete()
+            listening.forEach { runCatching { it.close() } }
+            SOCKETS.forEach { File(app.filesDir, it).delete() }
         }
     }
 
     private val cleanup = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    private fun socketFile(app: Context) = File(app.filesDir, DockerApi.SOCKET_NAME)
 
     private suspend fun serve(app: Context, connection: LocalSocket) {
         connection.use { socket ->
@@ -126,8 +140,9 @@ internal object DockerApiServer {
                     DockerApi.error(500, it.message ?: it.javaClass.simpleName)
                 }
                 val head = request.method == "HEAD"
+                val headers = DockerApi.headers + (LibpodApi.version(request.path)?.let { LibpodApi.headers(it) } ?: emptyMap())
                 runCatching {
-                    EngineHttp.write(output, if (head) response.copy(body = ByteArray(0)) else response, DockerApi.headers)
+                    EngineHttp.write(output, if (head) response.copy(body = ByteArray(0)) else response, headers)
                 }.onFailure { return }
                 // A streamed body (attach) is written as it comes, until it ends or the client goes.
                 response.stream?.let { stream ->
@@ -142,33 +157,31 @@ internal object DockerApiServer {
 
     /** What [request] asks, answered from droidtop's own state. */
     private suspend fun answer(app: Context, request: EngineHttp.Request): EngineHttp.Response {
-        val call = DockerApi.route(request.method, request.path, request.query)
+        // A libpod path is read by LibpodApi into the same calls, and answered in its version's shapes.
+        val libpod = LibpodApi.version(request.path)
+        val call = if (libpod != null) LibpodApi.route(request.method, request.path, request.query) else DockerApi.route(request.method, request.path, request.query)
         val runtime = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime
         return when (call) {
             DockerApi.Call.Ping -> EngineHttp.Response.text(200, "OK")
-            DockerApi.Call.Version -> EngineHttp.Response.json(200, DockerApi.version(arch(), kernel()))
+            DockerApi.Call.Version -> EngineHttp.Response.json(200, libpod?.let { LibpodApi.version(it, arch(), kernel()) } ?: DockerApi.version(arch(), kernel()))
             DockerApi.Call.Info -> {
                 val containers = runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty()
                 val memory = ActivityManager.MemoryInfo().also { app.getSystemService(ActivityManager::class.java)?.getMemoryInfo(it) }
-                EngineHttp.Response.json(
-                    200,
-                    DockerApi.info(
-                        DockerApi.InfoFacts(
-                            containers = containers.size,
-                            running = containers.count { ContainerPrograms.isRunning(it.container.id) },
-                            images = runCatching { OciImageStore.of(app).entries().size }.getOrDefault(0),
-                            arch = arch(),
-                            kernel = kernel(),
-                            cpus = Runtime.getRuntime().availableProcessors(),
-                            memoryBytes = memory.totalMem,
-                            features = runCatching { EngineFeatureProbe.current(app) }.getOrNull(),
-                        ),
-                    ),
+                val facts = DockerApi.InfoFacts(
+                    containers = containers.size,
+                    running = containers.count { ContainerPrograms.isRunning(it.container.id) },
+                    images = runCatching { OciImageStore.of(app).entries().size }.getOrDefault(0),
+                    arch = arch(),
+                    kernel = kernel(),
+                    cpus = Runtime.getRuntime().availableProcessors(),
+                    memoryBytes = memory.totalMem,
+                    features = runCatching { EngineFeatureProbe.current(app) }.getOrNull(),
                 )
+                EngineHttp.Response.json(200, libpod?.let { LibpodApi.info(facts, it) } ?: DockerApi.info(facts))
             }
             is DockerApi.Call.Containers -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
-                DockerApi.unknownFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return DockerApi.notBuilt("filters ${it.joinToString(", ")}") }
+                DockerApi.unknownFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return notBuilt(libpod, "filters ${it.joinToString(", ")}") }
                 val pods = EngineFacts.pods(app)
                 val rows = runtime.listContainers().map { info ->
                     val id = info.container.id
@@ -177,14 +190,17 @@ internal object DockerApiServer {
                         EngineFacts.statusText(ContainerPrograms.state(id), ContainerPrograms.isRunning(id), info.running),
                     )
                 }
-                EngineHttp.Response.json(200, DockerApi.containers(rows, call.all, call.filters))
+                EngineHttp.Response.json(200, if (libpod != null) LibpodApi.containers(rows, call.all, call.filters) else DockerApi.containers(rows, call.all, call.filters))
             }
             is DockerApi.Call.Container -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
                 val info = find(runtime.listContainers(), call.id) ?: return DockerApi.error(404, "No such container: ${call.id}")
-                EngineHttp.Response.json(200, DockerApi.container(EngineFacts.of(app, runtime, info, EngineFacts.pods(app))))
+                val facts = EngineFacts.of(app, runtime, info, EngineFacts.pods(app))
+                EngineHttp.Response.json(200, libpod?.let { LibpodApi.inspect(facts, it) } ?: DockerApi.container(facts))
             }
-            DockerApi.Call.Images -> EngineHttp.Response.json(200, DockerApi.images(OciImageStore.of(app).entries()))
+            DockerApi.Call.Images -> OciImageStore.of(app).entries().let {
+                EngineHttp.Response.json(200, if (libpod != null) LibpodApi.images(it) else DockerApi.images(it))
+            }
             is DockerApi.Call.Create -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
                 val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
@@ -278,17 +294,20 @@ internal object DockerApiServer {
             is DockerApi.Call.ImageGet -> {
                 val store = OciImageStore.of(app)
                 val entry = DockerApi.findImage(store.entries(), call.name) ?: return DockerApi.error(404, "No such image: ${call.name}")
-                EngineHttp.Response.json(200, DockerApi.image(entry, store.runConfig(entry.digest), arch()))
+                val config = store.runConfig(entry.digest)
+                EngineHttp.Response.json(200, if (libpod != null) LibpodApi.image(entry, config, arch()) else DockerApi.image(entry, config, arch()))
             }
             is DockerApi.Call.Networks -> {
-                DockerApi.unknownNetworkFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return DockerApi.notBuilt("network filters ${it.joinToString(", ")}") }
+                DockerApi.unknownNetworkFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return notBuilt(libpod, "network filters ${it.joinToString(", ")}") }
                 val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
-                EngineHttp.Response.json(200, DockerApi.networks(all, containerNames(runtime), call.filters))
+                val names = containerNames(runtime)
+                EngineHttp.Response.json(200, if (libpod != null) LibpodApi.networks(all, names, call.filters) else DockerApi.networks(all, names, call.filters))
             }
             is DockerApi.Call.NetworkGet -> {
                 val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
                 val network = ContainerNetworks.find(all, call.id) ?: return DockerApi.error(404, "network ${call.id} not found")
-                EngineHttp.Response.json(200, DockerApi.networkJson(network, containerNames(runtime)))
+                val names = containerNames(runtime)
+                EngineHttp.Response.json(200, if (libpod != null) LibpodApi.networkJson(network, names) else DockerApi.networkJson(network, names))
             }
             DockerApi.Call.NetworkCreate -> networksLock.withLock {
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
@@ -381,9 +400,40 @@ internal object DockerApiServer {
                 val exec = execs[call.execId] ?: return DockerApi.error(404, "No such exec instance: ${call.execId}")
                 EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, exec.containerId, exec.spec, exec.running, exec.exitCode))
             }
+            is DockerApi.Call.Exists -> if (exists(app, runtime, call)) EngineHttp.Response(204, "text/plain", ByteArray(0)) else DockerApi.error(404, "no such ${call.kind.name.lowercase()}: ${call.id}")
+            is DockerApi.Call.Pods -> {
+                runtime ?: return DockerApi.error(500, "the desktop is not running")
+                LibpodApi.unknownPodFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return LibpodApi.notBuilt("pod filters ${it.joinToString(", ")}") }
+                EngineHttp.Response.json(200, LibpodApi.pods(podFacts(app, runtime, EngineFacts.pods(app)), call.filters))
+            }
+            is DockerApi.Call.PodGet -> {
+                runtime ?: return DockerApi.error(500, "the desktop is not running")
+                val pod = ContainerPods.find(EngineFacts.pods(app), call.id) ?: return DockerApi.error(404, "no such pod: ${call.id}")
+                EngineHttp.Response.json(200, LibpodApi.pod(podFacts(app, runtime, listOf(pod)).single()))
+            }
             is DockerApi.Call.Refused -> DockerApi.error(call.status, call.message)
-            is DockerApi.Call.NotBuilt -> DockerApi.notBuilt(call.what)
+            is DockerApi.Call.NotBuilt -> notBuilt(libpod, call.what)
             DockerApi.Call.NotFound -> DockerApi.error(404, "page not found")
+        }
+    }
+
+    /** 501 for [what], naming the API's own section of docs/SPEC.md. */
+    private fun notBuilt(libpod: LibpodApi.Version?, what: String) = if (libpod != null) LibpodApi.notBuilt(what) else DockerApi.notBuilt(what)
+
+    /** Whether what [call] names is there: a container, a stored image, a pod or a network. */
+    private suspend fun exists(app: Context, runtime: dev.droidtop.runtime.ContainerRuntime?, call: DockerApi.Call.Exists): Boolean = when (call.kind) {
+        DockerApi.Kind.CONTAINER -> runtime?.let { find(it.listContainers(), call.id) } != null
+        DockerApi.Kind.IMAGE -> DockerApi.findImage(OciImageStore.of(app).entries(), call.id) != null
+        DockerApi.Kind.POD -> ContainerPods.find(EngineFacts.pods(app), call.id) != null
+        DockerApi.Kind.NETWORK -> ContainerNetworks.find(ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }, call.id) != null
+    }
+
+    /** [pods] with the facts of their members that still exist. */
+    private suspend fun podFacts(app: Context, runtime: dev.droidtop.runtime.ContainerRuntime, pods: List<Pod>): List<LibpodApi.PodFacts> {
+        val all = EngineFacts.pods(app)
+        val containers = runtime.listContainers()
+        return pods.map { pod ->
+            LibpodApi.PodFacts(pod, pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id }?.let { EngineFacts.of(app, runtime, it, all) } })
         }
     }
 

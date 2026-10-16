@@ -33,6 +33,14 @@ object ContainerPods {
         f.writeText(JSON.encodeToString(SERIALIZER, pods))
     }
 
+    /** A pod's status in Podman's words: Created with no containers, Running with every program up, some Degraded, none Exited. */
+    fun status(containers: Int, running: Int): String = when {
+        containers == 0 -> "Created"
+        running == containers -> "Running"
+        running > 0 -> "Degraded"
+        else -> "Exited"
+    }
+
     fun validName(name: String): Boolean = NAME.matches(name)
 
     /** The pod named or numbered [nameOrId]: its name, its id, or a unique start of its id, as Podman takes them. */
