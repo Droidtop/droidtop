@@ -70,4 +70,19 @@ class SourceFailuresTest {
         assertTrue(outcome.technical!!.startsWith("JavaScript is disabled"))
         assertFalse(outcome.failure!!.contains("JavaScript"))
     }
+
+    @Test
+    fun `droidtop's own refusal names the permission and is not a site failure`() {
+        // Rig 2026-10-15 (#485 step 5): LewdCorner's search line was the broker's own refusal, passed through.
+        assertEquals(
+            "It needs \u201cUse your sign-in on its sites\u201d, which is not allowed for it",
+            SourceFailures.permissionOff("\"Use your sign-in on its sites\" is turned off for LewdCorner."),
+        )
+        assertEquals(
+            "It needs \u201cUse your sign-in on its sites\u201d, which is not allowed for it",
+            SourceFailures.permissionOff("LewdCorner needs you to allow \"Use your sign-in on its sites\"."),
+        )
+        assertEquals(SourceFailures.PERMISSION_OFF, SourceFailures.permissionOff("no", dev.droidtop.pluginhost.PluginErrorCode.PERMISSION_DENIED))
+        assertNull(SourceFailures.permissionOff(lewdCorner))
+    }
 }

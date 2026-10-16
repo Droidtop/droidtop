@@ -718,6 +718,11 @@ internal fun LibrarySearchDialog(
                             },
                         )
                     }
+                    // Refused by droidtop's own permission check: the plugin's page is where it is allowed (#485 rig step 5).
+                    val pluginId = (source as? PluginGameSource)?.source?.record?.manifest?.id
+                    if (status.outcome?.permissionOff == true && pluginId != null) {
+                        add(SearchLine.Entry("permission:${source.id}", "Open ${source.label}'s page", subtitle = "Allow it there, then search again") { openPlugin(pluginId) })
+                    }
                     val shown = technicalDetails[source.id]
                     if (shown != null) {
                         add(SearchLine.Note(shown))
