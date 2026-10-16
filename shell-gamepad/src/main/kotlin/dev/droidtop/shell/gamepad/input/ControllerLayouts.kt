@@ -52,7 +52,15 @@ object ControllerLayouts {
     private const val KEY_SNAPSHOT = "droidtop_pad_property_snapshot"
     private const val HEAVY_MIN_INTERVAL_MS = 1500L
 
-    private var layoutState by mutableStateOf(FaceLayout.DEFAULT)
+    private var layoutStateValue by mutableStateOf(FaceLayout.DEFAULT)
+
+    /** The layout, and the swap every screen outside the shell reads ([FaceKeys.swapped]) kept in step with it. */
+    private var layoutState: FaceLayout
+        get() = layoutStateValue
+        set(value) {
+            layoutStateValue = value
+            org.pocketworkstation.pckeyboard.FaceKeys.swapped = value.swapped
+        }
     private var recaptureState by mutableStateOf(false)
     private var activeNameState by mutableStateOf<String?>(null)
     private var readyState by mutableStateOf(false)

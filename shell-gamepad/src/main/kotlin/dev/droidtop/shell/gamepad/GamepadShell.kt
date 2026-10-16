@@ -1325,10 +1325,11 @@ private fun GamepadShellBody(
                     modifier = Modifier
                         .fillMaxSize()
                         // While the launch screen covers the content, the screen under it
-                        // keeps its place but takes no presses; only Back gets through,
+                        // keeps its place but takes no presses; only what means Back gets through (the
+                        // pad's cancel button with the face-button swap applied, Escape, Back: FaceKeys),
                         // to leave a launch that never produces a window.
                         .onPreviewKeyEvent { event ->
-                            launching != null && event.nativeKeyEvent.keyCode !in LAUNCH_COVER_PASS_KEYS
+                            launching != null && !org.pocketworkstation.pckeyboard.FaceKeys.isCancel(event.nativeKeyEvent.keyCode)
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -3847,13 +3848,6 @@ private fun AppIconGrid(
 }
 
 private val APP_TILE_HEIGHT = 136.dp
-
-/** The keys the shell lets through while the launch screen covers it: the ones that mean Back. */
-private val LAUNCH_COVER_PASS_KEYS = setOf(
-    android.view.KeyEvent.KEYCODE_BACK,
-    android.view.KeyEvent.KEYCODE_BUTTON_B,
-    android.view.KeyEvent.KEYCODE_ESCAPE,
-)
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
