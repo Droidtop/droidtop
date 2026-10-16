@@ -7,6 +7,7 @@ import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLauncher
 import dev.droidtop.runtime.ContainerNames
+import dev.droidtop.runtime.ContainerPods
 import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.EngineCli
@@ -16,6 +17,7 @@ import dev.droidtop.runtime.EngineFeatures
 import dev.droidtop.runtime.EngineOptions
 import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.OciImageStore
+import dev.droidtop.runtime.Pod
 import dev.droidtop.runtime.RootfsImage
 import java.io.File
 import java.io.FileOutputStream
@@ -229,10 +231,26 @@ internal object ContainerEnterRequests {
                     mapped.firstOrNull { it.name == wanted }
                         ?: return refuse(dir, "${cli.name} run: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
                 }
+                // Podman's --pod: an existing pod, or a new one for --pod new:NAME (docs/SPEC.md 3d, "Pods").
+                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                val pod = command.pod?.let { wanted ->
+                    if (command.newPod) {
+                        ContainerPods.problemWith(pods, wanted)?.let { return refuse(dir, "${cli.name} run: $it", 1) }
+                        Pod(ContainerPods.newId(), wanted, System.currentTimeMillis())
+                    } else {
+                        ContainerPods.find(pods, wanted) ?: return refuse(dir, "${cli.name} run: no pod is called $wanted", 1)
+                    }
+                }
                 val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
                     return refuse(dir, "${cli.name} run: ${it.message ?: it.javaClass.simpleName}", 1)
                 }
                 ContainerPrograms.recordCreated(app, created.id)
+                if (pod != null) {
+                    withContext(Dispatchers.IO) {
+                        val current = ContainerPods.read(app.filesDir).let { if (command.newPod) ContainerPods.with(it, pod) else it }
+                        ContainerPods.save(app.filesDir, ContainerPods.withMember(current, pod.id, created.id))
+                    }
+                }
                 // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
                 runCatching {
                     val current = runtime.mounts(created)
@@ -274,6 +292,73 @@ internal object ContainerEnterRequests {
                     }
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
+            }
+            is EngineRequest.PodCreate -> {
+                val made = withContext(Dispatchers.IO) {
+                    val current = ContainerPods.read(app.filesDir)
+                    val id = ContainerPods.newId()
+                    val podName = command.name ?: ContainerPods.defaultName(id)
+                    ContainerPods.problemWith(current, podName)?.let { return@withContext Result.failure<Pod>(IllegalStateException(it)) }
+                    val pod = Pod(id, podName, System.currentTimeMillis())
+                    ContainerPods.save(app.filesDir, ContainerPods.with(current, pod))
+                    Result.success(pod)
+                }
+                made.fold(
+                    onSuccess = { answer(dir, it.id + "\n", "", 0) },
+                    onFailure = { refuse(dir, "${cli.name} pod create: ${it.message}", 1) },
+                )
+            }
+            is EngineRequest.PodList -> {
+                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                val rows = pods.map { pod ->
+                    val members = pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }
+                    val up = members.count { ContainerPrograms.isRunning(it.container.id) }
+                    EngineCli.PodRow(pod, members.size, up)
+                }
+                answer(dir, cli.formatPods(rows, command.quiet), "", 0)
+            }
+            is EngineRequest.PodStart, is EngineRequest.PodStop -> {
+                val starting = command is EngineRequest.PodStart
+                val names = if (command is EngineRequest.PodStart) command.pods else (command as EngineRequest.PodStop).pods
+                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (wanted in names) {
+                    val pod = ContainerPods.find(pods, wanted) ?: run { err.append("Error: no pod with name or ID $wanted found\n"); null } ?: continue
+                    for (member in pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }) {
+                        if (starting) ContainerPrograms.startedByPerson(app, runtime, member.container) else ContainerPrograms.stoppedByPerson(app, member.container.id)
+                    }
+                    out.append(pod.id).append('\n')
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 125)
+            }
+            is EngineRequest.PodRemove -> {
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (wanted in command.pods) {
+                    val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                    val pod = ContainerPods.find(pods, wanted) ?: run { err.append("Error: no pod with name or ID $wanted found\n"); null } ?: continue
+                    val members = pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }
+                    val running = members.filter { ContainerPrograms.isRunning(it.container.id) || (it.running && runtime.siblingsNeedStart) }
+                    if (running.isNotEmpty() && !command.force) {
+                        err.append("Error: pod ${pod.name} has running containers (${running.joinToString(", ") { it.displayName }}); stop it first or use podman pod rm -f\n")
+                        continue
+                    }
+                    // Its containers go with it, as Podman's pod rm removes them.
+                    val failed = members.mapNotNull { member ->
+                        runCatching {
+                            if (member.running && runtime.siblingsNeedStart) runtime.stop(member.container)
+                            ContainerRemoval.remove(app, runtime, member)
+                        }.exceptionOrNull()?.let { "${member.displayName}: ${it.message ?: it.javaClass.simpleName}" }
+                    }
+                    if (failed.isNotEmpty()) {
+                        err.append("Error: pod ${pod.name}: ${failed.joinToString("; ")}\n")
+                        continue
+                    }
+                    withContext(Dispatchers.IO) { ContainerPods.save(app.filesDir, ContainerPods.without(ContainerPods.read(app.filesDir), pod.id)) }
+                    out.append(pod.id).append('\n')
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 125)
             }
             is EngineRequest.Answer, EngineRequest.Info -> Unit
         }

@@ -40,6 +40,9 @@ sealed interface EngineRequest {
         val volumes: List<String> = emptyList(),
         /** `--restart`; the tools' own default, `no`, when not given (docs/SPEC.md 3d, "Restart policies"). */
         val restart: ContainerProgram.RestartPolicy = ContainerProgram.RestartPolicy.No,
+        /** Podman's `--pod`: the pod the container joins, or a new one to make when [newPod] (`--pod new:NAME`). */
+        val pod: String? = null,
+        val newPod: Boolean = false,
     ) : EngineRequest
 
     /** `rm`: deletes each container; [force] stops a running program first, as Docker's `-f` does. */
@@ -53,4 +56,19 @@ sealed interface EngineRequest {
 
     /** `info`: what droidtop's engine is and which kernel features this device gives it (D10). */
     data object Info : EngineRequest
+
+    /** Podman's `pod create`: a new pod named [name] (a name of droidtop's when null). Pods: docs/SPEC.md 3d, D12. */
+    data class PodCreate(val name: String?) : EngineRequest
+
+    /** Podman's `pod ps`: every pod; [quiet] prints only ids. */
+    data class PodList(val quiet: Boolean) : EngineRequest
+
+    /** Podman's `pod rm`: removes each pod and its stopped containers; [force] stops and removes running ones too. */
+    data class PodRemove(val pods: List<String>, val force: Boolean) : EngineRequest
+
+    /** Podman's `pod start`: starts the program of every container in each pod. */
+    data class PodStart(val pods: List<String>) : EngineRequest
+
+    /** Podman's `pod stop`: stops the program of every container in each pod. */
+    data class PodStop(val pods: List<String>) : EngineRequest
 }

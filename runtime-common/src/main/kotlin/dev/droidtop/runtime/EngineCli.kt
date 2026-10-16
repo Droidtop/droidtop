@@ -25,30 +25,32 @@ class EngineCli private constructor(val front: Front) {
     val token: String = ContainerLauncher.token("droidtop:${front.command}")
 
     /** This front's subcommands droidtop does not answer yet, said as such rather than as unknown. */
-    private val later: Set<String> = LATER + if (front == Front.PODMAN) setOf("pod", "generate", "play", "kube") else emptySet()
+    private val later: Set<String> = LATER + if (front == Front.PODMAN) setOf("generate", "play", "kube") else emptySet()
 
-    val usage: String = """
-        Usage: ${front.command} COMMAND
-
-        droidtop's containers, through droidtop's own engine (${front.daemon}):
-          ps [-a] [-q]                 List containers (running ones without -a)
-          images [-q]                  List the images droidtop holds
-          logs [-n N] CONTAINER        Show the last lines of a container's program
-          start CONTAINER...           Start a container's own program
-          stop CONTAINER...            Stop a container's own program
-          exec [-e K=V] [-w DIR] CONTAINER COMMAND [ARG...]
-                                       Run a command in another container (pipes, no terminal)
-          pull IMAGE                   Download an image into droidtop's store
-          run [-d] [--name NAME] IMAGE Make a container from an image and start its program
-          rm [-f] CONTAINER...         Delete a container (-f stops its program first)
-          info                         The engine, and the kernel features this device gives it
-
-        run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.
-        run takes --restart no|on-failure[:N]|always|unless-stopped (no by default). Not yet: -p, -w, --entrypoint,
-        --rm, -u. Options that need a kernel feature (--memory, --cpus, --network, --hostname, --tmpfs, ...) say
-        which one and whether this device has it; see ${front.command} info.
-        Containers here share the device's network and processes: a port is the device's own.
-    """.trimIndent() + "\n"
+    val usage: String = buildList {
+        add("Usage: ${front.command} COMMAND")
+        add("")
+        add("droidtop's containers, through droidtop's own engine (${front.daemon}):")
+        add("  ps [-a] [-q]                 List containers (running ones without -a)")
+        add("  images [-q]                  List the images droidtop holds")
+        add("  logs [-n N] CONTAINER        Show the last lines of a container's program")
+        add("  start CONTAINER...           Start a container's own program")
+        add("  stop CONTAINER...            Stop a container's own program")
+        add("  exec [-e K=V] [-w DIR] CONTAINER COMMAND [ARG...]")
+        add("                               Run a command in another container (pipes, no terminal)")
+        add("  pull IMAGE                   Download an image into droidtop's store")
+        add("  run [-d] [--name NAME] IMAGE Make a container from an image and start its program")
+        add("  rm [-f] CONTAINER...         Delete a container (-f stops its program first)")
+        add("  info                         The engine, and the kernel features this device gives it")
+        if (front == Front.PODMAN) add("  pod create|ps|rm|start|stop  Pods: a named group of containers started and stopped together")
+        add("")
+        add("run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.")
+        add("run takes --restart no|on-failure[:N]|always|unless-stopped (no by default).")
+        if (front == Front.PODMAN) add("run takes --pod POD to join a pod, or --pod new:NAME to make one.")
+        add("Not yet: -p, -w, --entrypoint, --rm, -u. Options that need a kernel feature (--memory, --cpus, --network,")
+        add("--hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.")
+        add("Containers here share the device's network and processes: a port is the device's own.")
+    }.joinToString("\n") + "\n"
 
     /**
      * [args] as a request. [features] is this device's (D10), read only when a `run` names an option from
@@ -72,6 +74,7 @@ class EngineCli private constructor(val front: Front) {
             "exec" -> exec(rest)
             "pull" -> pull(rest)
             "run" -> run(rest, features)
+            "pod" -> if (front == Front.PODMAN) pod(rest) else EngineRequest.Answer("docker: 'pod' is not a docker command. See 'docker --help'\n", 1)
             "info" -> flags(rest, emptySet())?.let { bad -> error("info", bad) } ?: EngineRequest.Info
             "rm" -> remove(rest)
             in later -> EngineRequest.Answer("${front.command} $sub: not built in droidtop yet\n", 1)
@@ -154,6 +157,7 @@ class EngineCli private constructor(val front: Front) {
         val envs = mutableListOf<String>()
         val volumes = mutableListOf<String>()
         var restart: ContainerProgram.RestartPolicy = ContainerProgram.RestartPolicy.No
+        var pod: String? = null
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
@@ -167,6 +171,10 @@ class EngineCli private constructor(val front: Front) {
                 "-v", "--volume" -> {
                     val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: $a needs a folder\n", 1)
                     volumes += volume(spec) ?: return volumeRefused(spec)
+                }
+                "--pod" -> {
+                    if (front != Front.PODMAN) return error("run", a)
+                    pod = args.getOrNull(++i) ?: return EngineRequest.Answer("podman run: --pod needs a pod\n", 1)
                 }
                 "--restart" -> {
                     val words = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: --restart needs a policy\n", 1)
@@ -191,6 +199,7 @@ class EngineCli private constructor(val front: Front) {
                         env(kv) ?: return EngineRequest.Answer("${front.command} run: not NAME=VALUE: $kv\n", 1)
                         envs += kv
                     }
+                    a.startsWith("--pod=") && front == Front.PODMAN -> pod = a.substringAfter('=')
                     a.startsWith("--restart=") -> {
                         val words = a.substringAfter('=')
                         restart = ContainerProgram.RestartPolicy.parse(words) ?: return restartRefused(words)
@@ -210,7 +219,49 @@ class EngineCli private constructor(val front: Front) {
         if (!validReference(image)) return EngineRequest.Answer("${front.command} run: not an image reference: $image\n", 1)
         if (name != null && name.isBlank()) return EngineRequest.Answer("${front.command} run: --name needs a name\n", 1)
         val command = args.drop(i + 1).takeIf { it.isNotEmpty() }
-        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart)
+        val newPod = pod?.startsWith("new:") == true
+        val podName = if (newPod) pod!!.removePrefix("new:") else pod
+        if (podName != null && !ContainerPods.validName(podName)) return EngineRequest.Answer("podman run: not a pod name: $podName\n", 1)
+        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart, podName, newPod)
+    }
+
+    /** Podman's `pod` subcommands droidtop answers; the rest say they are not built yet. */
+    private fun pod(args: List<String>): EngineRequest {
+        val sub = args.firstOrNull() ?: return EngineRequest.Answer("podman pod: name a subcommand: create, ps, rm, start, stop\n", 1)
+        val rest = args.drop(1)
+        return when (sub) {
+            "create" -> {
+                var name: String? = null
+                var i = 0
+                while (i < rest.size) {
+                    val a = rest[i]
+                    when {
+                        a == "--name" || a == "-n" -> name = rest.getOrNull(++i) ?: return EngineRequest.Answer("podman pod create: $a needs a name\n", 1)
+                        a.startsWith("--name=") -> name = a.substringAfter('=')
+                        a == "-p" || a == "--publish" || a.startsWith("--publish=") ->
+                            return EngineRequest.Answer("podman pod create: $a is not built in droidtop yet\n", 1)
+                        else -> return error("pod create", a)
+                    }
+                    i++
+                }
+                if (name != null && !ContainerPods.validName(name)) return EngineRequest.Answer("podman pod create: not a pod name: $name\n", 1)
+                EngineRequest.PodCreate(name)
+            }
+            "ps", "ls", "list" -> flags(rest, setOf("-q", "--quiet"))?.let { bad -> error("pod ps", bad) }
+                ?: EngineRequest.PodList(quiet = rest.isNotEmpty())
+            "rm" -> {
+                val force = rest.any { it == "-f" || it == "--force" }
+                rest.firstOrNull { it.startsWith("-") && it != "-f" && it != "--force" }?.let { return error("pod rm", it) }
+                val names = rest.filterNot { it.startsWith("-") }
+                if (names.isEmpty()) EngineRequest.Answer("podman pod rm: name at least one pod\n", 1) else EngineRequest.PodRemove(names, force)
+            }
+            "start", "stop" -> {
+                rest.firstOrNull { it.startsWith("-") }?.let { return error("pod $sub", it) }
+                if (rest.isEmpty()) return EngineRequest.Answer("podman pod $sub: name at least one pod\n", 1)
+                if (sub == "start") EngineRequest.PodStart(rest) else EngineRequest.PodStop(rest)
+            }
+            else -> EngineRequest.Answer("podman pod $sub: not built in droidtop yet\n", 1)
+        }
     }
 
     /** `run` flags droidtop knows of and has not built: said as such, not as unknown. */
@@ -349,6 +400,29 @@ class EngineCli private constructor(val front: Front) {
             first.contains('.') || first.contains(':') || first == "localhost" -> name
             else -> "docker.io/$name"
         }
+    }
+
+    /** One pod as `pod ps` lists it: its containers that still exist, and how many of their programs run. */
+    data class PodRow(val pod: Pod, val containers: Int, val running: Int)
+
+    /**
+     * `pod ps` as Podman prints it: POD ID (the first 12 of the id), NAME, STATUS, CREATED, # OF CONTAINERS. A pod with
+     * no containers is Created, one with every program up Running, some Degraded, none Exited. `-q` prints ids.
+     */
+    fun formatPods(rows: List<PodRow>, quiet: Boolean, nowMs: Long = System.currentTimeMillis()): String {
+        if (quiet) return rows.joinToString("") { it.pod.id.take(12) + "\n" }
+        return table(
+            listOf("POD ID", "NAME", "STATUS", "CREATED", "# OF CONTAINERS"),
+            rows.map { row ->
+                val status = when {
+                    row.containers == 0 -> "Created"
+                    row.running == row.containers -> "Running"
+                    row.running > 0 -> "Degraded"
+                    else -> "Exited"
+                }
+                listOf(row.pod.id.take(12), row.pod.name, status, ago(nowMs - row.pod.createdMs), row.containers.toString())
+            },
+        )
     }
 
     /** An image as Podman's `ps` shows it: the full repository, then the tag or the digest. */

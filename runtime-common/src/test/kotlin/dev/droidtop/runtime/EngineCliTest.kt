@@ -217,7 +217,7 @@ class EngineCliTest {
         assertEquals(EngineRequest.Ps(all = true, quiet = false), podman.parse(listOf("ps", "-a")))
         // Its words are its own.
         assertTrue((podman.parse(listOf("frobnicate")) as EngineRequest.Answer).text.contains("'frobnicate' is not a podman command"))
-        assertTrue((podman.parse(listOf("pod", "create")) as EngineRequest.Answer).text.contains("podman pod: not built in droidtop yet"))
+        assertTrue((podman.parse(listOf("generate", "kube", "web")) as EngineRequest.Answer).text.contains("podman generate: not built in droidtop yet"))
         assertTrue((EngineCli.DOCKER.parse(listOf("pod")) as EngineRequest.Answer).text.contains("not a docker command"))
         assertTrue((podman.parse(listOf("run", "--memory", "1g", "alpine")) as EngineRequest.Answer).text.startsWith("podman run: --memory"))
         assertTrue(podman.usage.startsWith("Usage: podman COMMAND"))
@@ -227,5 +227,59 @@ class EngineCliTest {
         val files = tmp.newFolder("both")
         ContainerEnter.writeWrappers(files, emptyList())
         assertEquals(podman.wrapperScript(), File(ContainerEnter.hostCommandsDir(files), "podman").readText())
+    }
+
+    @Test
+    fun `podman reads pods, docker has none`() {
+        val podman = EngineCli.PODMAN
+        assertEquals(EngineRequest.PodCreate("web"), podman.parse(listOf("pod", "create", "--name", "web")))
+        assertEquals(EngineRequest.PodCreate(null), podman.parse(listOf("pod", "create")))
+        assertTrue((podman.parse(listOf("pod", "create", "-p", "8080:80")) as EngineRequest.Answer).text.contains("-p is not built in droidtop yet"))
+        assertEquals(EngineRequest.PodList(quiet = true), podman.parse(listOf("pod", "ps", "-q")))
+        assertEquals(EngineRequest.PodRemove(listOf("web"), force = true), podman.parse(listOf("pod", "rm", "-f", "web")))
+        assertEquals(EngineRequest.PodStart(listOf("web")), podman.parse(listOf("pod", "start", "web")))
+        assertEquals(EngineRequest.PodStop(listOf("web", "db")), podman.parse(listOf("pod", "stop", "web", "db")))
+        assertTrue((podman.parse(listOf("pod", "top", "web")) as EngineRequest.Answer).text.contains("podman pod top: not built in droidtop yet"))
+        val joined = podman.parse(listOf("run", "--pod", "web", "nginx")) as EngineRequest.Run
+        assertEquals("web" to false, joined.pod to joined.newPod)
+        val made = podman.parse(listOf("run", "--pod=new:api", "nginx")) as EngineRequest.Run
+        assertEquals("api" to true, made.pod to made.newPod)
+        // Docker has no pods.
+        assertEquals(1, answer(listOf("run", "--pod", "web", "nginx")).code)
+        assertTrue(answer(listOf("pod", "ps")).text.contains("'pod' is not a docker command"))
+        assertTrue(podman.usage.contains("pod create|ps|rm|start|stop"))
+        assertFalse(EngineCli.DOCKER.usage.contains("pod create"))
+
+        val now = 10_000_000L
+        val rows = listOf(
+            EngineCli.PodRow(Pod("0123456789abcdef", "web", now - 120_000, listOf("a", "b")), containers = 2, running = 1),
+            EngineCli.PodRow(Pod("fedcba9876543210", "empty", now - 5_000), containers = 0, running = 0),
+        )
+        val table = podman.formatPods(rows, quiet = false, nowMs = now)
+        assertTrue(table.startsWith("POD ID         NAME    STATUS     CREATED         # OF CONTAINERS\n"))
+        assertTrue(table.contains("0123456789ab   web     Degraded   2 minutes ago   2"))
+        assertTrue(table.contains("fedcba987654   empty   Created    5 seconds ago   0"))
+        assertEquals("0123456789ab\nfedcba987654\n", podman.formatPods(rows, quiet = true, nowMs = now))
+    }
+
+    @Test
+    fun `pods keep their members by container id and lose them when a container goes`() {
+        val web = Pod("aaaa1111bbbb2222", "web", 0)
+        var pods = ContainerPods.with(emptyList(), web)
+        assertEquals("a pod is already called web", ContainerPods.problemWith(pods, "web"))
+        assertTrue(ContainerPods.problemWith(pods, "-bad")!!.contains("not a pod name"))
+        pods = ContainerPods.withMember(pods, web.id, "droidtop-sibling-1")
+        pods = ContainerPods.withMember(pods, web.id, "droidtop-sibling-1")
+        assertEquals(listOf("droidtop-sibling-1"), pods.single().members)
+        assertEquals(web.id, ContainerPods.find(pods, "web")?.id)
+        assertEquals(web.id, ContainerPods.find(pods, "aaaa11")?.id)
+        assertNull(ContainerPods.find(pods, "aa"))
+        pods = ContainerPods.withoutMember(pods, "droidtop-sibling-1")
+        assertEquals(emptyList<String>(), pods.single().members)
+        assertEquals(emptyList<Pod>(), ContainerPods.without(pods, web.id))
+        val dir = tmp.newFolder("pods")
+        ContainerPods.save(dir, pods)
+        assertEquals(pods, ContainerPods.read(dir))
+        assertEquals(64, ContainerPods.newId().length)
     }
 }
