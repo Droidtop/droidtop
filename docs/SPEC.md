@@ -8079,7 +8079,13 @@ the capture, and the resulting layout, so a console check reads the whole chain 
 face button, the Nintendo convention) and `keysSwapped` (the system reports the pad's face keys swapped
 against their position; Android's key codes are positional, `BUTTON_A` bottom, `BUTTON_B` right,
 `BUTTON_X` left, `BUTTON_Y` top). The key map swaps A with B and X with Y (the diamond turns as a whole)
-exactly when the two differ; a keyboard's Enter and Escape and the system back key are never swapped. A pill draws the glyph PRINTED on the button that does the job: Xbox A/B/X/Y, PlayStation cross, circle,
+exactly when the two differ; a keyboard's Enter and Escape and the system back key are never swapped.
+**Every screen reads a face key through the swap** (review, 2026-10-16): the shell through `GamepadKeyMap`, and
+every screen outside it (the text-entry slab, `TextEntry`, the safe-mode banner, the UI-mode passkey, the launch
+alert overlay, store sign-in, pairing a computer, the launch cover's Back pass-through) through
+`org.pocketworkstation.pckeyboard.FaceKeys`, whose `swapped` `ControllerLayouts` keeps in step with the layout.
+No screen tests `KEYCODE_BUTTON_A` or `KEYCODE_BUTTON_B` itself; such handlers confirmed with the cancel button on a
+Nintendo-layout or toggled pad. A pill draws the glyph PRINTED on the button that does the job: Xbox A/B/X/Y, PlayStation cross, circle,
 square, triangle, Nintendo with A on the right. So on an Xbox-printed handheld toggled to the Nintendo
 layout the confirm pill says B, because that is what the plastic says on the right button; pills always
 point at a real button. Resolution order, strongest first:

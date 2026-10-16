@@ -221,24 +221,29 @@ class SlabView(
      * Backspace through the event's own repeats.
      */
     fun handleKey(event: KeyEvent): Boolean {
-        val button = when (event.keyCode) {
-            KeyEvent.KEYCODE_DPAD_UP -> return move(Slab.Move.UP, event)
-            KeyEvent.KEYCODE_DPAD_DOWN -> return move(Slab.Move.DOWN, event)
-            KeyEvent.KEYCODE_DPAD_LEFT -> return move(Slab.Move.LEFT, event)
-            KeyEvent.KEYCODE_DPAD_RIGHT -> return move(Slab.Move.RIGHT, event)
-            KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_DPAD_CENTER -> {
+        // The face keys by what they mean on the pad in hand, the swap applied ([FaceKeys]); Enter and Escape are
+        // left to a hardware keyboard's own typing here, as before.
+        val face = if (event.keyCode == KeyEvent.KEYCODE_ENTER || event.keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER ||
+            event.keyCode == KeyEvent.KEYCODE_ESCAPE
+        ) null else FaceKeys.roleOf(event.keyCode)
+        val button = when {
+            event.keyCode == KeyEvent.KEYCODE_DPAD_UP -> return move(Slab.Move.UP, event)
+            event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN -> return move(Slab.Move.DOWN, event)
+            event.keyCode == KeyEvent.KEYCODE_DPAD_LEFT -> return move(Slab.Move.LEFT, event)
+            event.keyCode == KeyEvent.KEYCODE_DPAD_RIGHT -> return move(Slab.Move.RIGHT, event)
+            face == FaceKeys.Role.CONFIRM -> {
                 if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
                     state.focused?.let { key -> apply(Slab.press(state, key.action, event.eventTime), key) }
                 }
                 return true
             }
-            KeyEvent.KEYCODE_BUTTON_X -> Slab.Button.X
-            KeyEvent.KEYCODE_BUTTON_Y -> Slab.Button.Y
-            KeyEvent.KEYCODE_BUTTON_L1 -> Slab.Button.L1
-            KeyEvent.KEYCODE_BUTTON_R1 -> Slab.Button.R1
-            KeyEvent.KEYCODE_BUTTON_R2, KeyEvent.KEYCODE_BUTTON_START -> Slab.Button.R2
-            KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BACK -> Slab.Button.B
-            KeyEvent.KEYCODE_BUTTON_SELECT -> Slab.Button.SELECT
+            face == FaceKeys.Role.X -> Slab.Button.X
+            face == FaceKeys.Role.Y -> Slab.Button.Y
+            face == FaceKeys.Role.CANCEL || event.keyCode == KeyEvent.KEYCODE_BACK -> Slab.Button.B
+            event.keyCode == KeyEvent.KEYCODE_BUTTON_L1 -> Slab.Button.L1
+            event.keyCode == KeyEvent.KEYCODE_BUTTON_R1 -> Slab.Button.R1
+            event.keyCode == KeyEvent.KEYCODE_BUTTON_R2 || event.keyCode == KeyEvent.KEYCODE_BUTTON_START -> Slab.Button.R2
+            event.keyCode == KeyEvent.KEYCODE_BUTTON_SELECT -> Slab.Button.SELECT
             else -> return false
         }
         if (event.action != KeyEvent.ACTION_DOWN) return true

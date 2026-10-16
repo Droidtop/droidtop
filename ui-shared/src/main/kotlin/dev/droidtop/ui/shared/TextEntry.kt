@@ -287,7 +287,8 @@ private class SystemKeyboardHandOff(private val show: () -> Unit, private val hi
     /** B while the system keyboard types: back to the slab, and the key is taken. */
     fun leave(event: android.view.KeyEvent): Boolean {
         if (!active) return false
-        val back = event.keyCode == android.view.KeyEvent.KEYCODE_BUTTON_B || event.keyCode == android.view.KeyEvent.KEYCODE_BACK
+        // The pad's cancel button, the swap applied (FaceKeys), or back; not a hardware keyboard's Escape, which types.
+        val back = event.keyCode != android.view.KeyEvent.KEYCODE_ESCAPE && org.pocketworkstation.pckeyboard.FaceKeys.isCancel(event.keyCode)
         if (!back) return false
         if (event.action == android.view.KeyEvent.ACTION_UP) {
             active = false

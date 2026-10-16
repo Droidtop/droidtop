@@ -501,7 +501,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         .focusRequester(bannerFocus)
                         .onPreviewKeyEvent { event ->
                             val press = event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown &&
-                                event.nativeKeyEvent.keyCode in setOf(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_DPAD_CENTER)
+                                org.pocketworkstation.pckeyboard.FaceKeys.isConfirm(event.nativeKeyEvent.keyCode)
                             if (press) retry()
                             press
                         }

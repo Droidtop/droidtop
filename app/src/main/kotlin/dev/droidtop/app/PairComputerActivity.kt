@@ -100,7 +100,8 @@ class PairComputerActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.action == KeyEvent.ACTION_UP && (event.keyCode == KeyEvent.KEYCODE_BUTTON_B || event.keyCode == KeyEvent.KEYCODE_ESCAPE)) {
+        // The pad's cancel button (the face-button swap applied, FaceKeys), Escape or Back.
+        if (event.action == KeyEvent.ACTION_UP && org.pocketworkstation.pckeyboard.FaceKeys.isCancel(event.keyCode)) {
             finish()
             return true
         }

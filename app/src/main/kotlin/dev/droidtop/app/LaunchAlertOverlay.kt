@@ -95,11 +95,14 @@ internal object LaunchAlertOverlay {
                 },
             )
             isFocusable = true
+            // The pad's confirm and cancel buttons, the face-button swap applied (FaceKeys), and Back.
             setOnKeyListener { _, keyCode, event ->
-                if (event.action != KeyEvent.ACTION_UP) return@setOnKeyListener keyCode in KEYS
-                when (keyCode) {
-                    KeyEvent.KEYCODE_BUTTON_A -> back.performClick()
-                    KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BACK -> dismiss.performClick()
+                val confirm = org.pocketworkstation.pckeyboard.FaceKeys.isConfirm(keyCode)
+                val cancel = org.pocketworkstation.pckeyboard.FaceKeys.isCancel(keyCode)
+                if (event.action != KeyEvent.ACTION_UP) return@setOnKeyListener confirm || cancel
+                when {
+                    confirm -> back.performClick()
+                    cancel -> dismiss.performClick()
                     else -> return@setOnKeyListener false
                 }
                 true
@@ -130,6 +133,4 @@ internal object LaunchAlertOverlay {
         view = null
         windowManager = null
     }
-
-    private val KEYS = setOf(KeyEvent.KEYCODE_BUTTON_A, KeyEvent.KEYCODE_BUTTON_B, KeyEvent.KEYCODE_BACK)
 }
