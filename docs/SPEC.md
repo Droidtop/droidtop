@@ -8181,7 +8181,10 @@ person is not asked: RetroArch itself replaces the game on a new launch, and dro
 
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
-and ends early when the launch ends (`clearRunning`, a quit, the shell coming back). A listed and live app
+and ends early when the launch ends (`clearRunning`, a quit, the shell coming back). The session watch ending a
+session does not end it (`clearRunning(stopWatching = false)`): a game gone that young failed to start, and the
+watchdog is what says so (rig, droidtop 0.2.0-dev.1931: Vita3K and Eden exited within a second on the second display,
+the session ended and nothing was shown, because the shell never left the front there). A listed and live app
 after 30 s is settled: the task list is no longer read, but the not-responding check goes on to 90 s,
 because an app that hangs with nobody touching it is only declared not responding once a key or focus
 change reaches it (console, build 1397: RetroArch's system dialog came 44 s after the launch). It uses:
@@ -8204,9 +8207,12 @@ change reaches it (console, build 1397: RetroArch's system dialog came 44 s afte
   nothing (the helper still starting) is tried again every 15 s until one returns; that one is judged.
 
 It reports four things, each in plain words naming the app: it is not responding; it closed straight
-after it started (the shell came back within 10 s and the app is not open); it is no longer running
-but its screen never handed back (the task list misses it after 9 s on two looks in a row, 3 s apart, and no
-process of the app that started after the launch is alive: `pidof`, then each process's start time, field 22 of
+after it started (the shell came back within 10 s and the app is not open, or the app was never seen in the task
+list and went missing as below, the only sign on two displays); it is no longer running
+but its screen never handed back (seen in the task list once, then missing after 9 s on two looks in a row, 3 s
+apart, with no process of the app that started after the launch alive, or on four looks in a row whatever process is
+alive, since a process with no window for 12 s is left over, not starting; rig, 1931: Eden's process stayed in the
+background with nothing open: `pidof`, then each process's start time, field 22 of
 `/proc/<pid>/stat`, against the launch on the boot clock; `LaunchWatchPolicy.startedSince`); an emulator launch has
 stalled (under
 1 s of processor time 15 s after the launch, `STALLED`). A black window of a live, responsive
@@ -8221,6 +8227,10 @@ almost nothing since, so its screen is probably black"), then say to close it an
 game file, any BIOS the system needs, and the emulator's file access; a RetroArch launch adds its core
 sentence and Get the core. Before this, a hang that nobody touched was reported only once a key reached it,
 or never.
+
+When a launch closed or went missing with a process of it still alive, the watchdog ends that process by the task
+manager's one close path, the one Kill uses, so the next launch starts clean, and the alert says droidtop closed what
+it left running. Enginehost is exempt (a cancel there is not a failure; `leftBeforePlaying`, below).
 
 "No longer running" needs both looks and the process check because one look reads two harmless moments as gone
 (rig, droidtop 0.2.0-dev.1923, Droidtop/tracker#271): RetroArch restarts itself for a new core (its singleInstance
