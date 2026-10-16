@@ -169,6 +169,9 @@ internal fun PcGameMenu(
     var wineScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     // Which program the game runs (docs/SPEC.md 7i, "Which program runs"), in a sheet the same way.
     var programScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    // What plugins offer on this game (C4, Droidtop/tracker#67), in a sheet the same way.
+    var pluginScreen by remember(entry) { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    val hasPluginActions = dev.droidtop.shell.gamepad.rememberHasPluginActions(entry)
     // The free-space offer before a store install or update opens its own
     // window over the menu (Droidtop/tracker#227); null when it is closed.
     var storeOffer by remember(entry) { mutableStateOf<StoreInstallOffer?>(null) }
@@ -350,6 +353,10 @@ internal fun PcGameMenu(
                 reloadToken++
             },
         )
+        return
+    }
+    pluginScreen?.let { screen ->
+        dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = { pluginScreen = null })
         return
     }
     programScreen?.let { screen ->
@@ -1025,6 +1032,18 @@ internal fun PcGameMenu(
                             PcActionRow("Fix and advanced", "Replacements, merging, the engine, other versions and the runner's settings") {
                                 page = PcMenuPage.Advanced
                                 focusIndex = 0
+                            },
+                        ),
+                    )
+                }
+                if (hasPluginActions) {
+                    add(
+                        PcMenuEntry.Row(
+                            PcActionRow(dev.droidtop.shell.gamepad.PLUGIN_ACTIONS_LABEL, "What your plugins can do with this game") {
+                                pluginScreen = dev.droidtop.shell.gamepad.pluginActionsScreen(
+                                    entry,
+                                    dev.droidtop.pluginhost.PluginModes.Surfaces.GAMING_GAME_MENU,
+                                ) { reply -> pluginScreen = reply }
                             },
                         ),
                     )

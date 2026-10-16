@@ -1942,9 +1942,11 @@ Risk low.
   - the target's data needs its own grant: a file target hands a
     read-only fd scoped to that file, and a game target needs
     `library.read`.
-- **Status:** built on the game's or app's detail screen and the PC game
-  page in Gaming, Standard's long-press app menu and Desktop's Start menu
-  (section 6); the Select/Options menu and the PC game menu are not.
+- **Status:** built on the game's or app's detail screen, the PC game page,
+  the PC game menu (Y) and an app's Select menu in Gaming, Standard's
+  long-press app menu and Desktop's Start menu (section 6). The gamelist's
+  own options (Select on a list) act on the list, not one game, so they
+  carry none.
 
 **C5 Search providers.** EP `ui.search@1`. Risk medium.
 - **For:** results in droidtop's global and per-section search: games
@@ -3512,10 +3514,13 @@ arrays under the manifest's own keys (`V2Declarations`).
     opens one page of the actions (`PluginContextActions.screen`) in
     droidtop's plugin window, where `enabled` is asked and each action runs
     with its outcome on its row. The call's `surface.place` names where the
-    person is (`game.detail`, `standard.app_menu`, `desktop.start_menu`).
+    person is (`game.detail`, `gaming.game_menu`, `gaming.app_menu`, `standard.app_menu`, `desktop.start_menu`).
     Every host builds its target with `PluginContextActions.targetOf` (an
-    Android app is an `app` with its package, else a `game`). The PC game
-    menu and the Select/Options menu are not built.
+    Android app is an `app` with its package, else a `game`). In Gaming the
+    PC game menu (Y) and an app's Select menu have the same "Plugin actions"
+    row and page, in the menu's own sheet (`gaming.game_menu`,
+    `gaming.app_menu`; Droidtop/tracker#67, 2026-10-16). The gamelist's own
+    options act on the list and name no game, so they have none.
   - **Metadata sources (A3).** `PluginMetadataSources` opens one session per
     console scrape pass and, for each game, asks every running source
     `match` (facts: title, file name, system) then `fetch` (the ids of the
