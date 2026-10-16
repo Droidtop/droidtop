@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryGrouping
+import dev.droidtop.library.scraper.isPcOrEngineGame
 
 /**
  * The Quick launch widget's configure activity (Droidtop/tracker#563): picks the one game the widget plays. Opened by
