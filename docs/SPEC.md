@@ -4284,7 +4284,7 @@ droidtop 0.2.0-dev.1931).
   ways"). Above the letters: Esc, Tab, Ctrl, Alt and Super; above the symbols: F1 to F12; the bottom row is the layer
   key, space and the four arrows, with no Clipboard, globe or Done, as nothing on the tab closes. It lays out from its
   container's real size: the tab gives it three fifths of what is left under the header and the fact lines and never
-  less than `SlabView.minimumHeight` (every row at least 28 dp in the four-row form), so on a short screen the trackpad
+  less than `SlabView.minimumHeight` (every row of every layer at least 28 dp), so on a short screen the trackpad
   gets what is left, down to nothing, and the keys are never cut off; rows are sized for the tallest layer, so switching
   to the symbols never resizes a key; keys, gaps and labels scale together, labels never under 10 sp. The fact lines
   (the target, Pin, the status, the input method and accessibility buttons, the controllers) keep their place when

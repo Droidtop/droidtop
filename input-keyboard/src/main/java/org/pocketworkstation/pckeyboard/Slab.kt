@@ -90,8 +90,8 @@ object Slab {
     )
 
     /**
-     * The rows of [layer]. [large] is the Large keys form (automatic at font scale 1.3, or when the slab's container is
-     * too short for the number row): four letter rows, the digits on the symbols layer, as the S7 layout has it (5.2).
+     * The rows of [layer]. [large] is the Large keys form (automatic at font scale 1.3): four letter rows, the digits on
+     * the symbols layer, as the S7 layout has it (5.2).
      * [extras] adds a whole keyboard's keys for the companion's Input tab and Desktop (Droidtop/tracker#567): Esc, Tab,
      * Ctrl, Alt, Super and the up and down arrows above the letters, and F1 to F12 above the symbols.
      */

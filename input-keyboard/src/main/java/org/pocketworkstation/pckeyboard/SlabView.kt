@@ -25,8 +25,8 @@ import kotlin.math.min
  *
  * It lays out from its container's real size (Droidtop/tracker#567: the companion's keyboard "moves things around,
  * doesn't scale properly, and gets cut off"): the rows share the height it is given, between [MIN_ROW_DP] and
- * [MAX_ROW_DP]; a container too short for the number row drops to the four-row form (digits on the symbols layer);
- * the gaps, labels and keycaps scale with the key they sit on. Given no height, it asks for its design height (38 dp
+ * [MAX_ROW_DP], sized for the tallest layer so a layer switch never resizes a key; the gaps, labels and keycaps
+ * scale with the key they sit on. Given no height, it asks for its design height (38 dp
  * rows). Nothing is drawn outside its bounds at any size.
  */
 @SuppressLint("ViewConstructor")
@@ -99,15 +99,14 @@ class SlabView(
     /**
      * The rows fitted into [height]. A row is the height shared out over the tallest layer's rows (letters or symbols,
      * so switching layers never resizes a key) with a gap of a sixth of a row (3 to 6 dp) between and around them, at
-     * most [MAX_ROW_DP]. When that would put a row under [MIN_ROW_DP] the four-row form is used (digits on the symbols
-     * layer). A container shorter still gets rows under the minimum rather than rows past its edge: nothing is ever
-     * drawn outside the view, and a host that wants the minimum reserves [minimumHeight] (Droidtop/tracker#567).
+     * most [MAX_ROW_DP]. A container shorter than [minimumHeight] gets rows under [MIN_ROW_DP] rather than rows past
+     * its edge: nothing is ever drawn outside the view, and a host that wants the minimum reserves it
+     * (Droidtop/tracker#567). The four-row Large keys form follows the font scale only: the symbols layer keeps its
+     * digits row, so dropping the letters' number row would not make a row taller.
      */
     private fun relayout(height: Int) {
         if (height <= 0) return
-        val compact = largeByFont || fit(height, tallest(large = false)) < MIN_ROW_DP * density
-        if (compact != state.large) state = state.copy(large = compact)
-        rowHeight = min(fit(height, tallest(compact)), MAX_ROW_DP * density)
+        rowHeight = min(fit(height, tallest(state.large)), MAX_ROW_DP * density)
         gap = (rowHeight / 6f).coerceIn(min(3 * density, rowHeight / 6f), GAP_DP * density)
         val rows = state.keys.size
         state = state.copy(row = state.row.coerceIn(0, rows - 1), col = state.col.coerceIn(0, state.keys[state.row.coerceIn(0, rows - 1)].lastIndex))
@@ -325,11 +324,11 @@ class SlabView(
 
     companion object {
         /**
-         * The height that gives every row at least [MIN_ROW_DP] in the four-row form, in pixels: what a host reserves
-         * before sharing the rest out (the companion's Input tab gives its trackpad only what is left over).
+         * The height that gives every row of every layer at least [MIN_ROW_DP], in pixels: what a host reserves before
+         * sharing the rest out (the companion's Input tab gives its trackpad only what is left over).
          */
         fun minimumHeight(density: Float, form: Slab.Form = Slab.Form.FIELD, extras: Boolean = false): Int {
-            val rows = Slab.Layer.entries.maxOf { Slab.rows(it, true, form, extras).size }
+            val rows = Slab.Layer.entries.maxOf { layer -> listOf(true, false).maxOf { Slab.rows(layer, it, form, extras).size } }
             return kotlin.math.ceil(MIN_ROW_DP * density * (rows + (rows + 1) / 6f)).toInt()
         }
 
