@@ -182,16 +182,18 @@ fun TextEntryField(
 ) {
     val current by rememberUpdatedState(value)
     var slab by remember { mutableStateOf<SlabView?>(null) }
+    val system = rememberSystemKeyboard()
     fun deliver(output: Slab.Output) {
         when (output) {
             Slab.Output.Close -> onDone()
+            Slab.Output.UseSystemKeyboard -> system.use()
             is Slab.Output.Press -> if (output.keyCode == android.view.KeyEvent.KEYCODE_ENTER) onSubmit() else onValueChange(TextEntryEdits.apply(current, output, maxLength))
             else -> onValueChange(TextEntryEdits.apply(current, output, maxLength))
         }
     }
-    Column(modifier.onPreviewKeyEvent { event -> slab?.handleKey(event.nativeKeyEvent) == true }) {
-        Plate(value, onValueChange, placeholder, colors, focus, elsewhereCue.takeIf { !slabHere }, kind == Slab.Kind.SEARCH)
-        if (slabHere) SlabKeys(kind, Slab.Form.FIELD, enter, colors, capLabel, ::deliver) { slab = it }
+    Column(modifier.onPreviewKeyEvent { event -> system.leave(event.nativeKeyEvent) || slab?.handleKey(event.nativeKeyEvent) == true }) {
+        Plate(value, onValueChange, placeholder, colors, focus, system.cue ?: elsewhereCue.takeIf { !slabHere }, kind == Slab.Kind.SEARCH)
+        if (slabHere && !system.active) SlabKeys(kind, Slab.Form.FIELD, enter, colors, capLabel, ::deliver) { slab = it }
     }
 }
 
@@ -217,9 +219,11 @@ fun TextEntryPrompt(
     var value by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
     var slab by remember { mutableStateOf<SlabView?>(null) }
     val focus = remember { FocusRequester() }
+    val system = rememberSystemKeyboard()
     fun deliver(output: Slab.Output) {
         when (output) {
             Slab.Output.Close -> onCancel()
+            Slab.Output.UseSystemKeyboard -> system.use()
             is Slab.Output.Press -> if (output.keyCode == android.view.KeyEvent.KEYCODE_ENTER) onSave(value.text) else value = TextEntryEdits.apply(value, output, maxLength)
             else -> value = TextEntryEdits.apply(value, output, maxLength)
         }
@@ -228,7 +232,7 @@ fun TextEntryPrompt(
         Modifier
             .fillMaxSize()
             .background(colors.scrim)
-            .onPreviewKeyEvent { event -> slab?.handleKey(event.nativeKeyEvent) == true },
+            .onPreviewKeyEvent { event -> system.leave(event.nativeKeyEvent) || slab?.handleKey(event.nativeKeyEvent) == true },
         verticalArrangement = Arrangement.Bottom,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -242,13 +246,13 @@ fun TextEntryPrompt(
                 .padding(16.dp),
         ) {
             Text(title, color = colors.text, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold)
-            Plate(value, { value = it }, placeholder, colors, focus, elsewhereCue.takeIf { !slabHere }, search = false, modifier = Modifier.padding(top = 12.dp))
+            Plate(value, { value = it }, placeholder, colors, focus, system.cue ?: elsewhereCue.takeIf { !slabHere }, search = false, modifier = Modifier.padding(top = 12.dp))
             Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                 SmallButton("Cancel", colors, onCancel)
                 SmallButton(enter.label, colors) { onSave(value.text) }
             }
         }
-        if (slabHere) SlabKeys(kind, Slab.Form.PROMPT, enter, colors, capLabel, ::deliver) { slab = it }
+        if (slabHere && !system.active) SlabKeys(kind, Slab.Form.PROMPT, enter, colors, capLabel, ::deliver) { slab = it }
     }
 }
 
@@ -264,3 +268,38 @@ private fun SmallButton(text: String, colors: TextEntryColors, onClick: () -> Un
         contentAlignment = Alignment.Center,
     ) { Text(text, color = colors.text, fontSize = 15.sp) }
 }
+
+/**
+ * The globe key's hand-off (S7 5.6): this entry only is typed with the system keyboard, the plate says so, and B
+ * comes back to the slab. Android's keyboard follows the field's focus, which the entry keeps throughout.
+ */
+private class SystemKeyboardHandOff(private val show: () -> Unit, private val hide: () -> Unit) {
+    var active by mutableStateOf(false)
+        private set
+
+    val cue: String? get() = if (active) "System keyboard. B returns to droidtop's" else null
+
+    fun use() {
+        active = true
+        show()
+    }
+
+    /** B while the system keyboard types: back to the slab, and the key is taken. */
+    fun leave(event: android.view.KeyEvent): Boolean {
+        if (!active) return false
+        val back = event.keyCode == android.view.KeyEvent.KEYCODE_BUTTON_B || event.keyCode == android.view.KeyEvent.KEYCODE_BACK
+        if (!back) return false
+        if (event.action == android.view.KeyEvent.ACTION_UP) {
+            active = false
+            hide()
+        }
+        return true
+    }
+}
+
+@Composable
+private fun rememberSystemKeyboard(): SystemKeyboardHandOff {
+    val keyboard = LocalSoftwareKeyboardController.current
+    return remember(keyboard) { SystemKeyboardHandOff({ keyboard?.show() }, { keyboard?.hide() }) }
+}
+

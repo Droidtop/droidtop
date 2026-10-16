@@ -5000,8 +5000,17 @@ rig check in the commit message.
     (`TextEntryEdits`, tested: typing at the caret replacing a selection, Backspace, the caret's moves, the length
     limit). Where the keys are typed elsewhere (the companion, the internal screen), the host passes no slab and a cue
     under the plate.
-  - Moving the existing fields onto it is slice 8; where the slab shows (the placement matrix with its fallbacks) is
-    the host's, next in slice 6.
+  - Where the keys are typed (S7 5.6) is "Keyboard displays on" through `KeyboardTargets.placement`: the
+    companion's Input controller while a companion is started on another screen (one that is absent, asleep or
+    stopped is not, and the field's own screen types instead, silently), the internal screen, or this screen. With an
+    assistive service on (TalkBack or touch exploration, Switch Access, Select to Speak: `KeyboardTargets.assistiveOn`)
+    the system keyboard types instead, whatever the setting (`AddonKeyboardRules.keyboardPlacement(assistive)`),
+    since those services are built to drive it; a TalkBack pass on the RP5 decides whether the slab with its key
+    semantics replaces it. Every host asks the same rule: the field keyboard, the in-window keyboard and the
+    keyboard over other apps.
+  - The globe key (System keyboard, on the bottom row) hands only the current entry to the system keyboard: the slab
+    goes, the plate reads "System keyboard. B returns to droidtop's", and B brings the slab back.
+  - Moving the existing fields onto it is slice 8.
 - **Other apps on the add-on display: droidtop's input method, drawn where the app is.** droidtop's
   keyboard is already a selectable input method; its connection to the focused editor exists even
   where Android draws no keyboard window. When an editor asks it for the keyboard

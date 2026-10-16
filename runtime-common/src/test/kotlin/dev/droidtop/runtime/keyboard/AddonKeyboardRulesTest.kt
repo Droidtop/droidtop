@@ -64,6 +64,16 @@ class AddonKeyboardRulesTest {
     }
 
     @Test
+    fun `with an assistive service on, the system keyboard types whatever the setting`() {
+        KeyboardPlacement.entries.forEach { setting ->
+            assertEquals(
+                KeyboardPlacement.NOT_CONTROLLED,
+                AddonKeyboardRules.keyboardPlacement(setting, 15, setOf(0), true, true, assistive = true),
+            )
+        }
+    }
+
+    @Test
     fun `the other placements are the same screen, the internal screen when droidtop can draw there, and not controlled`() {
         assertEquals(KeyboardPlacement.SAME_SCREEN, place(KeyboardPlacement.SAME_SCREEN))
         assertEquals(KeyboardPlacement.INTERNAL_SCREEN, place(KeyboardPlacement.INTERNAL_SCREEN, companions = emptySet()))
