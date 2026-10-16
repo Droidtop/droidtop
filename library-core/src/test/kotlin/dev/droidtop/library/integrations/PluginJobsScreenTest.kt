@@ -56,7 +56,19 @@ class PluginJobsScreenTest {
         assertEquals("Paused\nDownloading… 12 MB of 300 MB", PluginJobsScreen.progressLine(job("a", 42, paused = true), null))
         assertEquals("Waiting for Wi-Fi", PluginJobsScreen.progressLine(job("a", status = "Waiting for Wi-Fi"), null))
         val held = job("h", 42, paused = true, status = "Waiting for Wi-Fi").copy(hold = "Waiting for Wi-Fi")
-        assertEquals("Waiting for Wi-Fi\nWaiting for Wi-Fi", PluginJobsScreen.progressLine(held, null))
+        // A status that repeats the first line is said once (tracker#85: "Paused Paused").
+        assertEquals("Waiting for Wi-Fi", PluginJobsScreen.progressLine(held, null))
+        assertEquals("Paused", PluginJobsScreen.progressLine(job("p", paused = true, status = "Paused"), null))
+    }
+
+    @Test
+    fun `a row leads with the job's own name, and who runs it is the second line`() {
+        val running = PluginJobsScreen.jobRow(job("a", 42).copy(title = "Love and Corruption"), nowMs = 0L)
+        assertEquals("Love and Corruption", running.title)
+        assertEquals("GOG", running.subtitle)
+        val done = PluginJobsScreen.jobRow(job("d", 100, done = true).copy(title = "Theme pack"), nowMs = 0L)
+        assertEquals("Theme pack", done.title)
+        assertEquals("GOG · Failed", done.subtitle)
     }
 
     @Test
