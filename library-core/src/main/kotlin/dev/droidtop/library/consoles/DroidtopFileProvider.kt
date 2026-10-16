@@ -24,6 +24,28 @@ import java.io.File
  * the way a documents provider does.
  */
 class DroidtopFileProvider : FileProvider() {
+    /**
+     * Its root is the whole file system, which is right for the apps droidtop grants a game to and wrong for a plugin:
+     * an open or full-access plugin runs as droidtop's UID and would reach every file of droidtop's past the file broker.
+     * A plugin reaches droidtop's files only through its API (docs/plugin-api.md 5.6), so a plugin process is refused.
+     */
+    private fun refusePlugins() {
+        val context = context ?: return
+        if (dev.droidtop.pluginhost.DroidtopCallers.callerIsPlugin(context)) {
+            throw SecurityException("a plugin reaches droidtop's files only through the plugin API")
+        }
+    }
+
+    override fun openFile(uri: Uri, mode: String): android.os.ParcelFileDescriptor? {
+        refusePlugins()
+        return super.openFile(uri, mode)
+    }
+
+    override fun getType(uri: Uri): String? {
+        refusePlugins()
+        return super.getType(uri)
+    }
+
     override fun query(
         uri: Uri,
         projection: Array<out String>?,
@@ -31,6 +53,7 @@ class DroidtopFileProvider : FileProvider() {
         selectionArgs: Array<out String>?,
         sortOrder: String?,
     ): Cursor {
+        refusePlugins()
         // The super call is the validation: it resolves the URI against
         // file_paths.xml and throws for one that is not droidtop's to serve.
         val columns = projection?.toList()?.toTypedArray() ?: FileDocumentColumns.ALL_COLUMNS

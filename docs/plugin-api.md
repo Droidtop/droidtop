@@ -3460,8 +3460,35 @@ asks for. Its scope, from the coordinator's package of 2026-10-16:
   allowed and is not listed as a finding.
 
 Each path is listed with its status, the commit that closed it and the
-test that proves it closed. The table is filled in as the audit lands; it
-is posted on Droidtop/tracker#53.
+test that proves it closed; the table is posted on Droidtop/tracker#53.
+Kinds: `native_bundle`, `python`, `flutter_embed` (there is no
+application-interface kind). Tiers: contained (an isolated process),
+open (`:plugin_open*`, droidtop's UID), full access (`:pluginhost*`,
+droidtop's UID).
+
+| Path | Tier | Status | Closed by | Test |
+| --- | --- | --- | --- | --- |
+| Driving another plugin process (`IPluginRuntime`: `loadPlugin` of a folder the plugin wrote, so unsigned code in a full-access slot; `invoke`/`handle` on another plugin) by binding droidtop's non-exported plugin services as droidtop's UID | open, full | closed: every call is refused unless it comes from droidtop's own main process, by the system's record of that process (`AppCaller`, `DroidtopCallers`); an isolated process keeps the pid of its first caller of droidtop's UID, which is droidtop binding it | the audit closings commit | `DroidtopCallersTest` |
+| Forged reports into droidtop (`IPluginRuntimeCallback`: a crash report that disables another plugin, frames into another plugin's screen) | all | closed: each process has its own callback, which believes a report only about a plugin loaded in that process | the audit closings commit | `DroidtopCallersTest` (ownership) |
+| droidtop's files through `DroidtopFileProvider` (its root is the whole file system; non-exported, but droidtop's UID passes) | open, full | closed: a plugin process (or an isolated UID) is refused | the audit closings commit | `DroidtopCallersTest` (process names) |
+| Shizuku's binder through its provider (OS rule) | open | closed: only droidtop and `:pluginhost*` get it; the Shizuku server still delivers it | the audit closings commit | `DroidtopCallersTest` (`mayUseShizuku`) |
+| A contained slot below API 29 reused for a second plugin (its filter and broker stay the first plugin's) | contained, API 26-28 | closed: a slot is one plugin's and its process ends with it | the audit closings commit | `PluginSlotsTest` |
+| Files outside the plugin's own folder | contained | closed: the isolated UID and SELinux; droidtop's private names are the plugin's own folder | 2026-10-14 to 10-16 | `ContainedFilesRigTest` (rig), sandbox `sbx_test` |
+| `/proc` of other processes | open | closed: the broker refuses another pid | sandbox library | `sbx_test` |
+| Environment and inherited descriptors | all | closed: only the python variables are set; the broker socket is close-on-exec, load descriptors are closed after the load, exec is refused | earlier | `sbx_test` (exec) |
+| droidtop's other non-exported components (services started by intent, receivers, activities, `LauncherProvider` and the shell's providers) as droidtop's UID | open, full | **open**: a start, a broadcast or an activity launch carries no caller Android lets droidtop check before API 34; the shell's providers are the UI lane's to guard | the separate-UID decision below | none |
+| droidtop's Android permissions through binder (the OS rule) | open | **open**: binder cannot be filtered by the system-call filter | the separate-UID decision below | none |
+| droidtop's classes, Application and files in-process | full | **open by design today** (droidtop's UID, the whole Application started, droidtop's class loader as parent) | the separate-UID decision below | none |
+| droidtop's classes in-process (no filtering class loader) | contained, open | partial: loadable, but droidtop's Application returns early there, so its state never starts | to do | none |
+| Several full-access plugins in one slot past eight | full | partial: they share droidtop's UID anyway | the separate-UID decision below | none |
+
+**The decision these rows wait on.** Against code running as droidtop's
+own UID, Android's only real boundary is the UID: such code reaches
+droidtop's components and uses droidtop's Android permissions whatever
+droidtop checks. So rule 1 for open and full access, and rule 2 for open,
+need those plugins to run under a UID that is not droidtop's (a companion
+plugin-host app of its own). That is put to the owner (2026-10-16); until
+it is answered the rows above stay open.
 
 ---
 

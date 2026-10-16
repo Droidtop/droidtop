@@ -139,7 +139,7 @@
           the Shizuku server (the shell or root) holds it.
         -->
         <provider
-            android:name="rikka.shizuku.ShizukuProvider"
+            android:name="dev.droidtop.pluginhost.DroidtopShizukuProvider"
             android:authorities="${applicationId}.shizuku"
             android:process=":pluginhost"
             android:multiprocess="false"
