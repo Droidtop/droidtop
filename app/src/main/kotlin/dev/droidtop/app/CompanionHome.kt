@@ -355,7 +355,10 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
     val jobs by PluginJobsCenter.entries().collectAsState()
     val active = remember(jobs) { jobs.filter { !it.done } }
     val entries by CompanionState.libraryEntries.collectAsState()
-    val updates = remember(entries) { entries.filter { it.availableUpdate != null }.distinctBy { it.id } }
+    // Grouped off the main thread: an update is on the game, not on a scanned entry (Droidtop/tracker#571 row 32).
+    val updates by produceState(emptyList<dev.droidtop.library.LibraryEntry>(), entries) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { dev.droidtop.library.GameUpdates.waiting(entries) }
+    }
     if (active.isEmpty() && updates.isEmpty()) return
     val summary = listOfNotNull(
         active.size.takeIf { it > 0 }?.let { "$it running" },

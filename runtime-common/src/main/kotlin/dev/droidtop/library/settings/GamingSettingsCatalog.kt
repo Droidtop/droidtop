@@ -853,7 +853,15 @@ object GamingSettingsCatalog {
                         ),
                     )
                 } else {
-                    add(ActionItem(id = ID_SYSTEM_SLEEP, title = "Sleep", value = "Power button", run = {}))
+                    // A press says what to do instead of nothing (Droidtop/tracker#571 row 20).
+                    add(
+                        AsyncActionItem(
+                            id = ID_SYSTEM_SLEEP,
+                            title = "Sleep",
+                            value = "Power button",
+                            run = { _, _ -> "Press the power button to sleep. With the helper app droidtop can do it from here" },
+                        ),
+                    )
                 }
                 // The power menu (shut down, restart) belongs to the system; a plain app has no call that
                 // opens it. With a privilege provider (Shizuku or Sui, the `priv.shell` capability) the
