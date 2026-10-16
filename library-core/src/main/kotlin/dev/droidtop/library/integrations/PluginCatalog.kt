@@ -224,15 +224,24 @@ object PluginCatalog {
      * wrong, and droidtop offers nothing for that plugin rather than guess
      * ([hasOrderConflict]).
      */
-    fun latestStable(plugin: PluginCatalogPlugin): PluginCatalogRelease? {
-        val stable = plugin.releases.filter { it.stream == STREAM_STABLE }
-        if (hasOrderConflict(stable)) return null
-        return stable.maxWithOrNull { a, b -> compareReleases(a, b) ?: 0 }
+    fun latestStable(plugin: PluginCatalogPlugin): PluginCatalogRelease? = latest(plugin, PluginChannel.STABLE)
+
+    /**
+     * The newest release of [plugin] that [channel] takes (its own line and every steadier one; SPEC 12a "Channels"),
+     * by the same rule as [latestStable], or null.
+     */
+    fun latest(plugin: PluginCatalogPlugin, channel: PluginChannel): PluginCatalogRelease? {
+        val taken = plugin.releases.filter { it.stream in channel.streams }
+        if (hasOrderConflict(taken)) return null
+        return taken.maxWithOrNull { a, b -> compareReleases(a, b) ?: 0 }
     }
 
+    /** The channel [plugin] is offered on from [source] (the person's choices; Stable when droidtop has not started them). */
+    fun channelFor(source: PluginCatalogSource?, pluginId: String): PluginChannel = PluginChannels.resolver(source?.id, pluginId)
+
     /** Whether [plugin]'s stable releases disagree between version order and publish order (see [latestStable]). */
-    fun hasOrderConflict(plugin: PluginCatalogPlugin): Boolean =
-        hasOrderConflict(plugin.releases.filter { it.stream == STREAM_STABLE })
+    fun hasOrderConflict(plugin: PluginCatalogPlugin, channel: PluginChannel = PluginChannel.STABLE): Boolean =
+        hasOrderConflict(plugin.releases.filter { it.stream in channel.streams })
 
     private fun hasOrderConflict(releases: List<PluginCatalogRelease>): Boolean =
         releases.indices.any { i -> (i + 1 until releases.size).any { j -> compareReleases(releases[i], releases[j]) == null } }
@@ -253,11 +262,24 @@ object PluginCatalog {
         }
     }
 
-    /** The update [record] has in [index]: the newest stable release of its id with a different manifest digest. Null when installed and current, or not listed. */
-    fun updateFor(index: PluginCatalogIndex, record: PluginRecord): PluginCatalogRelease? {
-        val plugin = index.pluginById(record.manifest.id) ?: return null
-        val latest = latestStable(plugin) ?: return null
-        return if (latest.manifestSha256.equals(record.archiveDigest, ignoreCase = true)) null else latest
+    /**
+     * The update [record] has in [index]: the newest release [channel] takes with a different manifest digest. Null when
+     * installed and current, or not listed. Never an older release: when the installed bytes are a release the index
+     * lists (a testing one, after moving to Stable), only a newer one is an update (SPEC 12a "Channels").
+     */
+    fun updateFor(
+        index: PluginCatalogIndex,
+        record: PluginRecord,
+        channel: PluginChannel = channelFor(null, record.manifest.id),
+    ): PluginCatalogRelease? = index.pluginById(record.manifest.id)?.let { updateFor(it, record, channel) }
+
+    /** [updateFor] for [plugin], the catalog's entry of [record]'s id. */
+    fun updateFor(plugin: PluginCatalogPlugin, record: PluginRecord, channel: PluginChannel): PluginCatalogRelease? {
+        val latest = latest(plugin, channel) ?: return null
+        if (latest.manifestSha256.equals(record.archiveDigest, ignoreCase = true)) return null
+        val installed = plugin.releases.firstOrNull { it.manifestSha256.equals(record.archiveDigest, ignoreCase = true) }
+        if (installed != null && (compareReleases(latest, installed) ?: 0) <= 0) return null
+        return latest
     }
 
     /** Every plugin in [installed] that has an update in [index], in the given order. */
@@ -271,7 +293,7 @@ object PluginCatalog {
                 ?: return@firstNotNullOfOrNull null
             if (!originOffered(listing.source, origin, userKeys)) return@firstNotNullOfOrNull null
             val plugin = origin.plugins.first { it.id == record.manifest.id }
-            updateFor(listing.index, record)?.let { Offer(listing.source, plugin, it) }
+            updateFor(listing.index, record, channelFor(listing.source, plugin.id))?.let { Offer(listing.source, plugin, it) }
         }
 
     /** Every plugin in [installed] with an update in [listings], in the given order. */
@@ -413,7 +435,7 @@ object PluginCatalog {
 
     /**
      * The plugins of [index] that "Install all" would install: not installed yet, under an origin [source] offers,
-     * with a newest stable release the catalog is consistent about. In the catalog's own order.
+     * with a newest release on its channel the catalog is consistent about. In the catalog's own order.
      */
     fun installable(
         source: PluginCatalogSource,
@@ -425,7 +447,7 @@ object PluginCatalog {
         val have = installed.map { it.manifest.id }.toSet()
         return index.origins.filter { originOffered(source, it, userKeys) }.flatMap { origin ->
             origin.plugins.mapNotNull { plugin ->
-                if (plugin.id in have) null else latestStable(plugin)?.let { plugin to it }
+                if (plugin.id in have) null else latest(plugin, channelFor(source, plugin.id))?.let { plugin to it }
             }
         }
     }

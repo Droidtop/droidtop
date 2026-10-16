@@ -1744,7 +1744,23 @@ object AppSettingsCatalogs {
                             onSelect = { _, value -> pluginFilter = PluginListFilter.entries.firstOrNull { it.name == value } ?: PluginListFilter.ALL },
                         ),
                     )
-                    val shown = cards.filter { (_, state, _) -> pluginFilter.keeps(state) }
+                    // Kinds (docs/plugin-api.md 1.2, "Categories", Droidtop/tracker#179): only the kinds installed plugins have.
+                    fun kindOf(record: dev.droidtop.pluginhost.PluginRecord) = dev.droidtop.pluginhost.PluginPresentation.category(record.manifest.presentation.category)
+                    val kinds = dev.droidtop.pluginhost.PluginPresentation.CATEGORIES.filter { kind -> installed.any { kindOf(it) == kind } }
+                    if (kinds.size > 1) {
+                        add(
+                            ChoiceItem(
+                                id = "plugins_kind",
+                                title = "Kind",
+                                options = listOf(ChoiceOption(ALL_KINDS, "All")) +
+                                    kinds.map { ChoiceOption(it, dev.droidtop.pluginhost.PluginPresentation.CATEGORY_LABELS.getValue(it)) },
+                                current = pluginKind.takeIf { it in kinds } ?: ALL_KINDS,
+                                onSelect = { _, value -> pluginKind = value },
+                            ),
+                        )
+                    }
+                    val kind = pluginKind.takeIf { it in kinds } ?: ALL_KINDS
+                    val shown = cards.filter { (record, state, _) -> pluginFilter.keeps(state) && (kind == ALL_KINDS || kindOf(record) == kind) }
                     if (shown.isEmpty()) {
                         add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}", run = {}))
                     }
@@ -1858,6 +1874,10 @@ object AppSettingsCatalogs {
     }
 
     @Volatile private var pluginFilter = PluginListFilter.ALL
+
+    /** The kind the installed list is narrowed to (docs/plugin-api.md 1.2, "Categories"), or [ALL_KINDS]. */
+    @Volatile private var pluginKind = ALL_KINDS
+    private const val ALL_KINDS = "all"
 
     /**
      * A plugin's trust badge, the same words in the list, on its page and on the approval screen
@@ -2396,11 +2416,30 @@ object AppSettingsCatalogs {
                     ActionItem(
                         id = "plugin_${m.id}_version",
                         title = "Version ${m.version}",
-                        subtitle = if (listings.isEmpty()) "Catalog not fetched yet: open Add > Catalogs to check" else "No newer stable release in your catalogs",
+                        subtitle = if (listings.isEmpty()) "Catalog not fetched yet: open Add > Catalogs to check" else "No newer version on its channel in your catalogs",
                         run = {},
                     )
                 },
             )
+            // Its own release line, or its catalog's (SPEC 12a "Channels", Droidtop/tracker#179).
+            if (listings.any { listing -> listing.index.pluginById(m.id) != null }) {
+                val channels = dev.droidtop.library.integrations.PluginChannels.forContext(context)
+                val listedIn = listings.firstOrNull { it.index.pluginById(m.id) != null }?.source
+                val catalogs = listedIn?.let { channels.catalog(it.id) } ?: dev.droidtop.library.integrations.PluginChannel.STABLE
+                add(
+                    ChoiceItem(
+                        id = "plugin_${m.id}_channel",
+                        title = "Channel",
+                        subtitle = "Testing and Unstable get new versions sooner and may not work as well",
+                        options = listOf(dev.droidtop.library.settings.ChoiceOption(CATALOG_CHANNEL, "As its catalog (${catalogs.label})")) +
+                            dev.droidtop.library.integrations.PluginChannel.entries.map { dev.droidtop.library.settings.ChoiceOption(it.id, it.label) },
+                        current = channels.plugin(m.id)?.id ?: CATALOG_CHANNEL,
+                        onSelect = { ctx, value ->
+                            dev.droidtop.library.integrations.PluginChannels.forContext(ctx).setPlugin(m.id, dev.droidtop.library.integrations.PluginChannel.of(value))
+                        },
+                    ),
+                )
+            }
         }
 
         // The plugin's own facts in droidtop's layout (docs/plugin-api.md 1.2 "Presentation", Droidtop/tracker#521 item 2),
@@ -2941,17 +2980,12 @@ object AppSettingsCatalogs {
         )
     }
 
+    /** The plugin page's "Channel" value for following its catalog's channel. */
+    private const val CATALOG_CHANNEL = "catalog"
+
     /** A manifest `category` in the person's words ([dev.droidtop.pluginhost.PluginPresentation.CATEGORIES]). */
-    private fun categoryLabel(category: String): String = when (category) {
-        "sources" -> "Game sources"
-        "emulators" -> "Emulators"
-        "games" -> "Games"
-        "tools" -> "Tools"
-        "system" -> "System"
-        "themes" -> "Themes"
-        "social" -> "Friends and chat"
-        else -> "Other"
-    }
+    private fun categoryLabel(category: String): String =
+        dev.droidtop.pluginhost.PluginPresentation.CATEGORY_LABELS.getValue(dev.droidtop.pluginhost.PluginPresentation.category(category))
 
     /** What a plugin adds, in plain words, for the installed-list row and the detail page's provides row. */
     private fun pluginSummary(m: dev.droidtop.pluginhost.PluginManifest, enabledPoints: Set<String>): String =

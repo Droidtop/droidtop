@@ -57,4 +57,17 @@ class PluginPresentationTest {
         val json = JSONObject().also { p.putInto(it) }
         assertEquals(p, PluginPresentation.fromJson(json, payload))
     }
+
+    @Test
+    fun `categories come from the fixed list, the first list's ids read as their successors`() {
+        assertEquals("sources", PluginPresentation.category("sources"))
+        assertEquals("sync", PluginPresentation.category(" Sync "))
+        assertEquals("system", PluginPresentation.category("tools"))
+        assertEquals("appearance", PluginPresentation.category("themes"))
+        assertEquals("integrations", PluginPresentation.category("social"))
+        assertEquals("sources", PluginPresentation.category("games"))
+        assertEquals("other", PluginPresentation.category(null))
+        assertEquals("other", PluginPresentation.category("crypto"))
+        PluginPresentation.CATEGORIES.forEach { assertTrue(it, PluginPresentation.CATEGORY_LABELS.containsKey(it)) }
+    }
 }

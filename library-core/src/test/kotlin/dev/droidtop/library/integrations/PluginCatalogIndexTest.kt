@@ -346,4 +346,77 @@ class PluginCatalogIndexTest {
         // An installed build the catalog does not list (same id, other digest) is offered the newest stable (SPEC 12a).
         assertEquals(newDigest, PluginCatalog.updateFor(index, record("f".repeat(64)))?.manifestSha256)
     }
+
+    private fun channelled(vararg releases: Triple<String, String, String>) = PluginCatalogPlugin(
+        id = "droidtop.sample",
+        label = "Sample",
+        description = null,
+        releases = releases.map { (stream, version, digest) ->
+            PluginCatalogRelease(version, stream, "2026-10-0${version.last()}T12:00:00Z", digest, PluginCatalogBundle("n", "https://x", 1, "b".repeat(64)))
+        },
+    )
+
+    @Test
+    fun `a channel takes its own line and every steadier one`() {
+        val plugin = channelled(
+            Triple("stable", "1.1", "1".repeat(64)),
+            Triple("testing", "1.2", "2".repeat(64)),
+            Triple("unstable", "1.3", "3".repeat(64)),
+        )
+        assertEquals("1.1", PluginCatalog.latest(plugin, PluginChannel.STABLE)?.version)
+        assertEquals("1.2", PluginCatalog.latest(plugin, PluginChannel.TESTING)?.version)
+        assertEquals("1.3", PluginCatalog.latest(plugin, PluginChannel.UNSTABLE)?.version)
+        // A testing release older than the newest stable one: Testing still gets the stable one.
+        val behind = channelled(Triple("stable", "1.5", "5".repeat(64)), Triple("testing", "1.4", "4".repeat(64)))
+        assertEquals("1.5", PluginCatalog.latest(behind, PluginChannel.TESTING)?.version)
+    }
+
+    @Test
+    fun `moving to a steadier channel never offers an older release`() {
+        val plugin = channelled(Triple("stable", "1.1", "1".repeat(64)), Triple("testing", "1.2", "2".repeat(64)))
+        val onTesting = sampleRecord("2".repeat(64))
+        assertNull("1.1 is older than the installed 1.2", PluginCatalog.updateFor(plugin, onTesting, PluginChannel.STABLE))
+        val newer = channelled(Triple("stable", "1.1", "1".repeat(64)), Triple("testing", "1.2", "2".repeat(64)), Triple("stable", "1.3", "3".repeat(64)))
+        assertEquals("1.3", PluginCatalog.updateFor(newer, onTesting, PluginChannel.STABLE)?.version)
+        assertEquals("1.2", PluginCatalog.updateFor(plugin, sampleRecord("1".repeat(64)), PluginChannel.TESTING)?.version)
+    }
+
+    @Test
+    fun `a plugin's own channel wins over its catalog's, and Stable is the default`() {
+        assertEquals(PluginChannel.STABLE, PluginChannels.resolve(null, null))
+        assertEquals(PluginChannel.TESTING, PluginChannels.resolve(null, PluginChannel.TESTING))
+        assertEquals(PluginChannel.STABLE, PluginChannels.resolve(PluginChannel.STABLE, PluginChannel.UNSTABLE))
+        assertEquals(PluginChannel.UNSTABLE, PluginChannel.of("unstable"))
+        assertNull(PluginChannel.of("nightly"))
+    }
+
+    @Test
+    fun `the index carries a plugin's category, read like the manifest's`() {
+        val index = PluginCatalogIndexParser.parse(indexWithPlugin { it.put("category", "themes") })!!
+        assertEquals("appearance", index.origins[0].plugins[0].category)
+        val none = PluginCatalogIndexParser.parse(indexWithPlugin { })!!
+        assertEquals("other", none.origins[0].plugins[0].category)
+    }
+
+    private fun sampleRecord(digest: String) = dev.droidtop.pluginhost.PluginRecord(
+        manifest = dev.droidtop.pluginhost.PluginManifest(
+            id = "droidtop.sample",
+            origin = "droidtop",
+            label = "Sample",
+            description = null,
+            version = "1.0",
+            kind = dev.droidtop.pluginhost.PluginKind.NATIVE_BUNDLE,
+            capabilities = setOf(dev.droidtop.pluginhost.PluginCapability.STATUS_TILE),
+            contractVersion = 1,
+            requestsRoot = false,
+            abis = emptySet(),
+            entryClass = "x",
+            payload = emptyList(),
+        ),
+        archiveDigest = digest,
+        trust = dev.droidtop.pluginhost.PluginTrustState.APPROVED,
+        enabled = true,
+        rootApproved = false,
+        disabledReason = null,
+    )
 }
