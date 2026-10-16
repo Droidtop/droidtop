@@ -61,3 +61,13 @@ upstream commits since the base that are not in this table, so a new upstream co
 Not yet decided: the rest of the list `scripts/murine-upstream.sh` prints. Of those, the website (`WEBSITE - ...`),
 version bumps and upstream's own build moves (AGP and Gradle upgrades, `4e670a4` moving every module under
 `modules/`) are not for this tree, whose build is droidtop's.
+
+## Deliberate local changes to Launcher3's model
+
+droidtop's features change Launcher3's UI freely (marked "droidtop patch" in the code). Changes to its **model**
+(the loader, the database, the cleanup) are listed here, because an upstream merge that touches those files has to
+keep them.
+
+| Where | What | Why |
+| --- | --- | --- |
+| `model/DatabaseHelper.removeGhostWidgets` | Spares the widget ids `WidgetStacks.sparedFromCleanup` returns: the hidden members of widget stacks still on the grid (Droidtop/tracker#564, 2026-10-16) | A widget stack's hidden widgets are bound to the launcher's host but in no database row. The loader only keeps widgets on the desktop or hotseat that overlap nothing (`WorkspaceItemProcessor.processWidget`, `checkAndAddItem`), so they cannot be model items; without this hook the cleanup would delete them at every load. A stack whose shown widget is gone is forgotten and its widgets freed. The coordinator asked that this stay the only model change for stacks |

@@ -100,6 +100,7 @@ import static com.android.launcher3.logging.StatsLogManager.StatsLatencyLogger.L
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_ACTIVITY_PAUSED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_DRAG_AND_DROP;
 import static com.android.launcher3.popup.SystemShortcut.APP_INFO;
+import static com.android.launcher3.popup.SystemShortcut.DRAWER_TABS;
 import static com.android.launcher3.popup.SystemShortcut.INSTALL;
 import static com.android.launcher3.popup.SystemShortcut.UNINSTALL_APP;
 import static com.android.launcher3.popup.SystemShortcut.WIDGETS;
@@ -1880,9 +1881,10 @@ public class Launcher extends StatefulActivity<LauncherState>
                     // droidtop patch (Droidtop/tracker#564): Home pressed while already on the
                     // first page runs the Home button's gesture slot, as in Nova and Apex; on any
                     // other page it still goes to the first page.
-                    if (mWorkspace.getNextPage() == Workspace.DEFAULT_PAGE
-                            && LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this)
-                                    != com.android.launcher3.touch.GestureAction.NONE) {
+                    if (dev.droidtop.runtime.StandardGestures.INSTANCE.homeRunsSlot(
+                            mWorkspace.getNextPage() == Workspace.DEFAULT_PAGE,
+                            LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this)
+                                    != com.android.launcher3.touch.GestureAction.NONE)) {
                         mWorkspace.post(() -> LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this).perform(this));
                     } else {
                         mWorkspace.post(mWorkspace::moveToDefaultScreen);
@@ -3305,7 +3307,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     public Stream<SystemShortcut.Factory> getSupportedShortcuts() {
-        return Stream.of(APP_INFO, WIDGETS, INSTALL, UNINSTALL_APP);
+        return Stream.of(APP_INFO, WIDGETS, INSTALL, UNINSTALL_APP, DRAWER_TABS);
     }
 
     /**

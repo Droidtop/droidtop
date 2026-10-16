@@ -40,6 +40,7 @@ import androidx.tracing.Trace;
 
 import com.android.launcher3.CheckLongPressHelper;
 import com.android.launcher3.Flags;
+import com.android.launcher3.Launcher;
 import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.model.data.ItemInfo;
@@ -242,16 +243,111 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
             }
             dragLayer.setTouchCompleteListener(this);
         }
+        if (stackSwipeIntercepts(ev)) return true;
         mLongPressHelper.onTouchEvent(ev);
         return mLongPressHelper.hasPerformedLongPress();
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
+        if (mStackSwiping) {
+            int action = ev.getActionMasked();
+            if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                mStackSwiping = false;
+                if (action == MotionEvent.ACTION_UP && mActivityContext instanceof Launcher launcher) {
+                    // Finger up is the next widget, down the one before. Posted: showing it replaces this view.
+                    int by = ev.getY() < mStackDownY ? 1 : -1;
+                    post(() -> WidgetStacks.swipe(launcher, this, by));
+                }
+            }
+            return true;
+        }
         mLongPressHelper.onTouchEvent(ev);
         // We want to keep receiving though events to be able to cancel long press on ACTION_UP
         return true;
     }
+
+    // droidtop (Droidtop/tracker#564): a vertical swipe on a stacked widget shows the stack's next widget
+    // (WidgetStacks). The swipe is claimed from the workspace at half a touch slop when it goes more up or
+    // down than sideways, and taken from the widget at one, unless what is under the finger can still scroll
+    // that way (a list widget scrolls first and changes widget at its end).
+    private float mStackDownX, mStackDownY;
+    private boolean mStackClaimed, mStackSwiping;
+
+    private boolean stackSwipeIntercepts(MotionEvent ev) {
+        switch (ev.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                mStackDownX = ev.getX();
+                mStackDownY = ev.getY();
+                mStackClaimed = false;
+                mStackSwiping = false;
+                return false;
+            case MotionEvent.ACTION_MOVE: {
+                if (mStackSwiping) return true;
+                float dy = ev.getY() - mStackDownY;
+                float dx = Math.abs(ev.getX() - mStackDownX);
+                int slop = android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                if (Math.abs(dy) <= dx || Math.abs(dy) <= slop / 2f) return false;
+                if (!(mActivityContext instanceof Launcher)
+                        || WidgetStacks.position(getContext(), getAppWidgetId()) == null) {
+                    return false;
+                }
+                // Finger moving up scrolls the content down: direction 1.
+                int direction = dy < 0 ? 1 : -1;
+                if (canScrollUnder(this, (int) mStackDownX, (int) mStackDownY, direction)) return false;
+                if (!mStackClaimed) {
+                    mStackClaimed = true;
+                    getParent().requestDisallowInterceptTouchEvent(true);
+                }
+                if (Math.abs(dy) > slop) {
+                    mStackSwiping = true;
+                    mLongPressHelper.cancelLongPress();
+                    return true;
+                }
+                return false;
+            }
+            default:
+                return mStackSwiping;
+        }
+    }
+
+    /** Whether a view under ([x], [y]) in [group]'s coordinates can still scroll vertically in [direction]. */
+    private static boolean canScrollUnder(ViewGroup group, int x, int y, int direction) {
+        for (int i = group.getChildCount() - 1; i >= 0; i--) {
+            View child = group.getChildAt(i);
+            if (child.getVisibility() != VISIBLE) continue;
+            int cx = x + group.getScrollX() - child.getLeft();
+            int cy = y + group.getScrollY() - child.getTop();
+            if (cx < 0 || cy < 0 || cx >= child.getWidth() || cy >= child.getHeight()) continue;
+            if (child.canScrollVertically(direction)) return true;
+            if (child instanceof ViewGroup childGroup && canScrollUnder(childGroup, cx, cy, direction)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    protected void dispatchDraw(@NonNull android.graphics.Canvas canvas) {
+        super.dispatchDraw(canvas);
+        // droidtop: a stacked widget shows where it is in its stack, as dots down its end edge.
+        int[] position = WidgetStacks.position(getContext(), getAppWidgetId());
+        if (position == null || position[0] < 0) return;
+        float density = getResources().getDisplayMetrics().density;
+        float radius = 3 * density;
+        float gap = 10 * density;
+        float x = getWidth() - 6 * density;
+        float top = (getHeight() - gap * (position[1] - 1)) / 2f;
+        if (mStackDotPaint == null) {
+            mStackDotPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        }
+        for (int i = 0; i < position[1]; i++) {
+            mStackDotPaint.setColor(i == position[0] ? 0xE6FFFFFF : 0x80FFFFFF);
+            canvas.drawCircle(x, top + i * gap, radius, mStackDotPaint);
+        }
+    }
+
+    private android.graphics.Paint mStackDotPaint;
 
     @Override
     protected void onAttachedToWindow() {

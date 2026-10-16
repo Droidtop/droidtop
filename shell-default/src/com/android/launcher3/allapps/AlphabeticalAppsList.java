@@ -51,6 +51,7 @@ import com.android.launcher3.views.ActivityContext;
 import java.io.PrintWriter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import com.android.launcher3.LauncherPrefs;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -59,6 +60,11 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
+import app.murinelauncher.settings.prefs.DrawerTabs;
+import com.android.launcher3.LauncherSettings;
+import com.android.launcher3.model.data.FolderInfo;
+import com.android.launcher3.model.data.WorkspaceItemInfo;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -132,6 +138,9 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     private int mNumAppsPerRowAllApps;
     private int mNumAppRowsInAdapter;
     private Predicate<ItemInfo> mItemFilter;
+    // droidtop patch (Droidtop/tracker#564): the drawer folders this list shows, made from DrawerTabs in
+    // onAppsUpdated; in no database.
+    private final List<FolderInfo> mDrawerFolders = new ArrayList<>();
 
     public AlphabeticalAppsList(Context context, @Nullable AllAppsStore<T> appsStore,
             WorkProfileManager workProfileManager, PrivateProfileManager privateProfileManager) {
@@ -158,6 +167,11 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
     /** Set the number of apps per row when device profile changes. */
     public void setNumAppsPerRowAllApps(int numAppsPerRow) {
         mNumAppsPerRowAllApps = numAppsPerRow;
+    }
+
+    /** droidtop patch: the drawer folders for BaseAllAppsAdapter.VIEW_TYPE_DRAWER_FOLDERS. */
+    public List<FolderInfo> getDrawerFolders() {
+        return mDrawerFolders;
     }
 
     public void updateItemFilter(Predicate<ItemInfo> itemFilter) {
@@ -271,6 +285,12 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             //privateAppStream = privateAppStream.filter(notHidden);
         }
 
+        // droidtop patch (Droidtop/tracker#564): the drawer tab chosen in DrawerTabsRow; All filters nothing.
+        Set<String> tabApps = hasSearchResults() ? null : DrawerTabs.selectedApps(mActivityContext);
+        if (tabApps != null) {
+            appSteam = appSteam.filter(info -> tabApps.contains(info.componentName.flattenToString()));
+        }
+
         if (!hasSearchResults() && mItemFilter != null) {
             appSteam = appSteam.filter(mItemFilter);
             if (mPrivateProviderManager != null) {
@@ -278,6 +298,36 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                         .filter(mPrivateProviderManager.getItemInfoMatcher());
             }
         }
+        // droidtop patch (Droidtop/tracker#564): drawer folders. In All, on the personal list, a tab marked
+        // "Show as a folder in All" becomes one folder of its apps there, and those apps leave the list.
+        mDrawerFolders.clear();
+        if (!hasSearchResults() && mWorkProviderManager == null && DrawerTabs.getSelected() == null) {
+            List<AppInfo> visible = appSteam.collect(Collectors.toList());
+            Set<String> inFolders = new HashSet<>();
+            for (DrawerTabs.Tab tab : DrawerTabs.tabs(mActivityContext)) {
+                if (!tab.getFolder()) continue;
+                List<AppInfo> members = new ArrayList<>();
+                for (AppInfo info : visible) {
+                    if (tab.getApps().contains(info.componentName.flattenToString())) members.add(info);
+                }
+                // A folder of one is just the app.
+                if (members.size() < 2) continue;
+                members.sort(mAppNameComparator);
+                FolderInfo folder = new FolderInfo();
+                folder.title = tab.getName();
+                folder.container = LauncherSettings.Favorites.CONTAINER_ALL_APPS;
+                for (int i = 0; i < members.size(); i++) {
+                    WorkspaceItemInfo item = members.get(i).makeWorkspaceItem(mActivityContext);
+                    item.container = folder.container;
+                    item.rank = i;
+                    folder.add(item);
+                    inFolders.add(members.get(i).componentName.flattenToString());
+                }
+                mDrawerFolders.add(folder);
+            }
+            appSteam = visible.stream().filter(info -> !inFolders.contains(info.componentName.flattenToString()));
+        }
+
         // droidtop patch (Droidtop/tracker#564): Most used first, by launches from the launcher, then by name.
         mSortedByUse = sortByUse();
         Comparator<AppInfo> order = mAppNameComparator;
@@ -351,10 +401,15 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 // droidtop patch (not upstream Launcher3): the "Recent"
                 // row goes before the alphabetical list, same shape as
                 // the work-profile items above it.
-                position += addRecentAppItems();
+                if (!mDrawerFolders.isEmpty()) {
+                    // droidtop patch: the drawer folders, one row above the Recent row.
+                    mAdapterItems.add(new AdapterItem(BaseAllAppsAdapter.VIEW_TYPE_DRAWER_FOLDERS));
+                    position += 1;
+                }
+                if (DrawerTabs.getSelected() == null) position += addRecentAppItems();
                 position = addAppsWithSections(mApps, position);
             }
-            if (Flags.enablePrivateSpace()) {
+            if (Flags.enablePrivateSpace() && DrawerTabs.getSelected() == null) {
                 position = addPrivateSpaceItems(position);
             }
             if (!mFastScrollerSections.isEmpty()) {

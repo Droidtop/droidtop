@@ -212,4 +212,21 @@
     <string name="droidtop_modes_option">droidtop modes</string>
     <string name="droidtop_games_option">droidtop games</string>
     <string name="pref_global_settings_desc">Modes, your home screen and setup</string>
+    <!-- droidtop: an open folder's options (Droidtop/tracker#564). -->
+    <string name="folder_options">Folder options</string>
+    <string name="folder_option_swipe_to_open">Tap opens the first app, swipe up opens the folder</string>
+    <string name="folder_option_cover">Show the first app\'s icon</string>
+    <!-- droidtop: the app drawer's tabs (Droidtop/tracker#564). -->
+    <string name="drawer_tabs_option">Drawer tabs</string>
+    <string name="drawer_tab_all">All</string>
+    <string name="drawer_tab_new">New tab</string>
+    <string name="drawer_tab_rename">Rename</string>
+    <string name="drawer_tab_move_left">Move left</string>
+    <string name="drawer_tab_move_right">Move right</string>
+    <string name="drawer_tab_delete">Delete tab</string>
+    <string name="drawer_tab_as_folder">Show as a folder in All</string>
+    <string name="drawer_tab_name_taken">A tab needs a name that no other tab has</string>
+    <!-- droidtop: widget stacks (Droidtop/tracker#564). -->
+    <string name="widget_stack_here">Stack a widget here</string>
+    <string name="widget_stack_none">This device has no widgets to stack</string>
 </resources>

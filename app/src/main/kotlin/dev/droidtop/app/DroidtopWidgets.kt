@@ -33,7 +33,7 @@ internal object DroidtopWidgets {
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** Every droidtop widget provider, for [refreshAll]. */
-    private val PROVIDERS = listOf(
+    internal val PROVIDERS = listOf(
         ContinuePlayingWidgetProvider::class.java,
         PluginStatusWidgetProvider::class.java,
         LibrarySearchWidgetProvider::class.java,
@@ -43,6 +43,7 @@ internal object DroidtopWidgets {
         ShelfWidgetProvider::class.java,
         CompanionWidgetProvider::class.java,
         FullPageWidgetProvider::class.java,
+        PluginWidgetProvider::class.java,
     )
 
     /** The four rows [rows] fills, in order. */

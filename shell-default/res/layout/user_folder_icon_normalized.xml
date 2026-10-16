@@ -61,6 +61,17 @@
             android:elevation="1dp"
             />
 
+        <!-- droidtop: the folder's own options, swipe to open and a cover (Droidtop/tracker#564). -->
+        <ImageButton
+            android:id="@+id/folder_options"
+            android:layout_width="48dp"
+            android:layout_height="match_parent"
+            android:layout_gravity="center_vertical"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/folder_options"
+            android:src="@drawable/ic_more_vert_dots"
+            android:tint="?attr/folderTextColor" />
+
     </LinearLayout>
 
 </com.android.launcher3.folder.Folder>

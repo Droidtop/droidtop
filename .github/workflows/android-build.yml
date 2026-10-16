@@ -53,16 +53,17 @@ permissions:
 # could email five failures for one problem. Keyed on the ref, so branches
 # and pull requests never cancel each other.
 #
-# This applies to main as well, where roughly two thirds of this repo's
-# runs happen. Each push publishes its own new, permanent release (tagged by
-# version, docs/SPEC.md 10b): a cancellation during the publish step leaves
-# no release for that commit rather than a half-built one, and the only
-# thing that can cancel a main run is a newer main run, which publishes its
-# own release when it finishes -- a cancelled commit's history entry is
-# simply missing, never wrong.
+# Main is the exception: a main build that has started is not cancelled. On
+# 2026-10-16 a run of quick landings cancelled every main build from
+# 83dd9acc to 939f7a3d (runs 38919863339, 38921783085, 38921955211), so the
+# rig had no release for the build it was asked to test. A main run now
+# finishes and publishes its own permanent release (docs/SPEC.md 10b). A
+# newer main push waits as the group's one pending run, and GitHub replaces
+# a pending run with a newer one. So a burst of landings costs at most the
+# build in progress plus one more, and the newest main always builds.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   build:
