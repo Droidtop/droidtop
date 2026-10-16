@@ -35,9 +35,6 @@
     <string name="backup_import_desc">Ripristina layout e impostazioni salvati</string>
     <string name="backup_import_confirm">Il launcher verrà riavviato e la configurazione ripristinata</string>
 
-    <string name="pref_label_ui_mode_system">Sistema</string>
-    <string name="pref_label_ui_mode_day">Chiaro</string>
-    <string name="pref_label_ui_mode_night">Scuro</string>
     <string name="pref_label_grid_width">Larghezza griglia</string>
     <string name="pref_label_grid_height">Altezza griglia</string>
     <string name="pref_label_icon_size">Dimensione icone (%)</string>

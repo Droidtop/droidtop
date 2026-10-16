@@ -46,6 +46,7 @@ public class LauncherApplication extends Application {
         mNightMode = getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
 
         app.murinelauncher.theme.ThemeOverride.syncNightMode(this);
+        app.murinelauncher.theme.ThemeOverride.watchAppearance(this);
         MainProcessInitializer.initialize(this);
         // droidtop patch: one-time carry-over from the old two-boolean
         // gesture prefs to the new per-slot GestureAction (see

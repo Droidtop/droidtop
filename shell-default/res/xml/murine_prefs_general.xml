@@ -20,11 +20,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <PreferenceCategory android:title="@string/pref_subcategory_day_night">
-        <com.android.settingslib.widget.SegmentedButtonPreference
-            android:key="pref_launcher_theme_day_night"
-            android:title="Screen Mode" />
-        <com.android.settingslib.widget.SpacePreference
-            android:layout_height="12dp" />
         <SwitchPreferenceCompat
             android:key="pref_blur_preview"
             android:title="@string/pref_blur_preview_title"
