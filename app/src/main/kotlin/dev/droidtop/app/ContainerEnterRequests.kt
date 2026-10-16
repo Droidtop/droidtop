@@ -158,12 +158,17 @@ internal object ContainerEnterRequests {
                 val rows = containers.map { info ->
                     val state = ContainerPrograms.state(info.container.id)
                     val programUp = ContainerPrograms.isRunning(info.container.id)
+                    val config = runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
+                        ?.let { ContainerProgram.effectiveConfig(app.filesDir, info.container.id, it) }
                     EngineCli.PsRow(
+                        id = info.container.id,
                         name = info.displayName,
                         image = info.image ?: "",
                         status = dockerStatus(state, programUp, info.running),
                         up = programUp || (info.running && runtime.siblingsNeedStart),
-                        ports = runCatching { runtime.imageRunConfig(info.container)?.ports }.getOrNull().orEmpty(),
+                        ports = config?.ports.orEmpty(),
+                        command = config?.program().orEmpty(),
+                        createdMs = withContext(Dispatchers.IO) { ContainerPrograms.created(app, info.container.id) },
                     )
                 }
                 answer(dir, cli.formatPs(rows, command), "", 0)
@@ -227,6 +232,7 @@ internal object ContainerEnterRequests {
                 val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
                     return refuse(dir, "${cli.name} run: ${it.message ?: it.javaClass.simpleName}", 1)
                 }
+                ContainerPrograms.recordCreated(app, created.id)
                 // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
                 runCatching {
                     val current = runtime.mounts(created)

@@ -1130,7 +1130,8 @@ object ContainersCatalog {
                                 run = { ctx, onStatus ->
                                     onStatus("Downloading ${repo.repository.substringAfterLast('/')}:$tag...")
                                     val image = CraneImageCatalogResolver(ctx).resolve(repo, tag).toRootfsImage()
-                                    runtime.createSibling(image, name)
+                                    val created = runtime.createSibling(image, name)
+                                    ContainerPrograms.recordCreated(ctx, created.id)
                                     "Created \"$name\". It is in Containers."
                                 },
                             ),
@@ -1178,9 +1179,10 @@ object ContainersCatalog {
                                 id = "create_go",
                                 title = "Create",
                                 subtitle = "Downloads $reference and makes \"$name\"",
-                                run = { _, onStatus ->
+                                run = { ctx, onStatus ->
                                     onStatus("Downloading $reference...")
-                                    runtime.createSibling(RootfsImage(reference = reference), name)
+                                    val created = runtime.createSibling(RootfsImage(reference = reference), name)
+                                    ContainerPrograms.recordCreated(ctx, created.id)
                                     "Created \"$name\". It is in Containers."
                                 },
                             ),

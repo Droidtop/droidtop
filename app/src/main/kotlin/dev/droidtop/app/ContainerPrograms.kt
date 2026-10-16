@@ -139,6 +139,7 @@ internal object ContainerPrograms {
 
     private const val KEY_RESTART = ".restart"
     private const val KEY_AUTOSTART = ".autostart"
+    private const val KEY_CREATED = ".created"
     private const val TRIM_EVERY_MS = 30_000L
 
     private fun settingsFile(context: Context) = File(File(context.filesDir, ContainerProgram.LOG_DIR_NAME), "programs.properties")
@@ -198,12 +199,26 @@ internal object ContainerPrograms {
 
     fun setAutostart(context: Context, containerId: String, on: Boolean) = saveSetting(context, containerId + KEY_AUTOSTART, on)
 
+    /**
+     * Notes that droidtop made [containerId] now, for `ps`'s CREATED (docs/SPEC.md 3d, "Each tool's output"): every
+     * place droidtop creates a container calls it. A container made before has none.
+     */
+    suspend fun recordCreated(context: Context, containerId: String) = withContext(Dispatchers.IO) {
+        val props = settings(context)
+        props[containerId + KEY_CREATED] = System.currentTimeMillis().toString()
+        store(context, props)
+    }
+
+    /** When droidtop made [containerId] (epoch ms), or null when it did not note it. */
+    fun created(context: Context, containerId: String): Long? = settings(context).getProperty(containerId + KEY_CREATED)?.toLongOrNull()
+
     /** Forgets [containerId]: its program stopped, its settings and its log gone (the container was deleted). */
     fun forget(context: Context, containerId: String) {
         stop(containerId)
         val props = settings(context)
         props.remove(containerId + KEY_RESTART)
         props.remove(containerId + KEY_AUTOSTART)
+        props.remove(containerId + KEY_CREATED)
         runCatching { settingsFile(context).outputStream().use { props.store(it, "droidtop app container programs") } }
         ContainerProgram.hostLogFile(context.filesDir, containerId).delete()
         ContainerProgram.overridesFile(context.filesDir, containerId).delete()

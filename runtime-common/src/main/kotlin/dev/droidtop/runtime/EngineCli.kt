@@ -275,21 +275,102 @@ class EngineCli private constructor(val front: Front) {
         EngineOptions.describe(features).forEach { append(it).append('\n') }
     }
 
-    /** One `ps` row as droidtop knows it. */
-    data class PsRow(val name: String, val image: String, val status: String, val up: Boolean, val ports: List<ExposedPort>)
+    /** One `ps` row as droidtop knows it: [createdMs] is null for a container made before droidtop kept the time. */
+    data class PsRow(
+        val id: String,
+        val name: String,
+        val image: String,
+        val status: String,
+        val up: Boolean,
+        val ports: List<ExposedPort>,
+        val command: List<String> = emptyList(),
+        val createdMs: Long? = null,
+    )
 
-    fun formatPs(rows: List<PsRow>, command: EngineRequest.Ps): String {
+    /**
+     * `ps` in this front's own columns (docs/SPEC.md 3d, "Each tool's output"; D12): CONTAINER ID, IMAGE, COMMAND,
+     * CREATED, STATUS, PORTS, NAMES, as both tools print them. Docker shortens Docker Hub's images and quotes the
+     * command; Podman keeps the full image name and leaves the command bare. `-q` prints ids, as both tools do.
+     */
+    fun formatPs(rows: List<PsRow>, command: EngineRequest.Ps, nowMs: Long = System.currentTimeMillis()): String {
         val shown = if (command.all) rows else rows.filter { it.up }
-        if (command.quiet) return shown.joinToString("") { it.name + "\n" }
-        return table(listOf("NAME", "IMAGE", "STATUS", "PORTS"), shown.map { listOf(it.name, it.image, it.status, it.ports.joinToString(", ")) })
+        if (command.quiet) return shown.joinToString("") { it.id + "\n" }
+        return table(
+            listOf("CONTAINER ID", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS", "NAMES"),
+            shown.map {
+                listOf(
+                    it.id,
+                    if (front == Front.DOCKER) shortImage(it.image) else fullImage(it.image),
+                    commandColumn(it.command),
+                    it.createdMs?.let { ms -> ago(nowMs - ms) } ?: "",
+                    it.status,
+                    it.ports.joinToString(", "),
+                    it.name,
+                )
+            },
+        )
     }
 
+    /** The COMMAND column: Docker's quoted and cut at 20 with an ellipsis, Podman's bare and cut with three dots. */
+    internal fun commandColumn(argv: List<String>): String {
+        val line = argv.joinToString(" ")
+        return if (front == Front.DOCKER) {
+            "\"" + (if (line.length > COMMAND_WIDTH) line.take(COMMAND_WIDTH - 1) + "\u2026" else line) + "\""
+        } else {
+            if (line.length > COMMAND_WIDTH) line.take(COMMAND_WIDTH - 3) + "..." else line
+        }
+    }
+
+    /**
+     * `images` in this front's own columns: REPOSITORY, TAG, IMAGE ID, SIZE. Docker shortens Docker Hub's names
+     * (`nginx`); Podman keeps them whole (`docker.io/library/nginx`) and spaces its sizes ("21.4 MB").
+     */
     fun formatImages(images: List<OciImageStore.Entry>, command: EngineRequest.Images): String {
         if (command.quiet) return images.joinToString("") { it.digest.substringAfter(':').take(12) + "\n" }
         return table(
             listOf("REPOSITORY", "TAG", "IMAGE ID", "SIZE"),
-            images.map { listOf(repository(it.reference), tag(it.reference), it.digest.substringAfter(':').take(12), size(it.sizeBytes)) },
+            images.map {
+                val repo = if (front == Front.DOCKER) repository(it.reference) else fullRepository(it.reference)
+                listOf(repo, tag(it.reference), it.digest.substringAfter(':').take(12), size(it.sizeBytes))
+            },
         )
+    }
+
+    /** An image as Docker's `ps` shows it: Docker Hub's prefix dropped, the tag kept. */
+    internal fun shortImage(reference: String): String =
+        reference.removePrefix("docker.io/").removePrefix("library/")
+
+    /** A repository as Podman names it: the registry kept, Docker Hub's official images under `library/`. */
+    internal fun fullRepository(reference: String): String {
+        val name = reference.substringBefore('@').let { r -> if (r.substringAfterLast('/').contains(':')) r.substringBeforeLast(':') else r }
+        val first = name.substringBefore('/')
+        return when {
+            !name.contains('/') -> "docker.io/library/$name"
+            first.contains('.') || first.contains(':') || first == "localhost" -> name
+            else -> "docker.io/$name"
+        }
+    }
+
+    /** An image as Podman's `ps` shows it: the full repository, then the tag or the digest. */
+    internal fun fullImage(reference: String): String {
+        if (reference.isEmpty()) return reference
+        val digest = reference.substringAfter('@', "")
+        return fullRepository(reference) + if (digest.isNotEmpty()) "@$digest" else ":" + tag(reference)
+    }
+
+    /** "2 minutes ago", as both tools word an age. */
+    internal fun ago(ms: Long): String {
+        val s = (ms / 1000).coerceAtLeast(0)
+        return when {
+            s < 2 -> "Less than a second ago"
+            s < 60 -> "$s seconds ago"
+            s < 120 -> "About a minute ago"
+            s < 3600 -> "${s / 60} minutes ago"
+            s < 7200 -> "About an hour ago"
+            s < 172_800 -> "${s / 3600} hours ago"
+            s < 1_209_600 -> "${s / 86_400} days ago"
+            else -> "${s / 604_800} weeks ago"
+        }
     }
 
     /** `docker.io/library/nginx:1.27` reads as `nginx`; another registry keeps its name. */
@@ -304,10 +385,17 @@ class EngineCli private constructor(val front: Front) {
         return if (last.contains(':')) last.substringAfter(':') else "latest"
     }
 
-    private fun size(bytes: Long): String = when {
-        bytes >= 1_000_000_000 -> String.format(java.util.Locale.ROOT, "%.1fGB", bytes / 1e9)
-        bytes >= 1_000_000 -> String.format(java.util.Locale.ROOT, "%.0fMB", bytes / 1e6)
-        else -> String.format(java.util.Locale.ROOT, "%.0fkB", bytes / 1e3)
+    private fun size(bytes: Long): String {
+        val gap = if (front == Front.PODMAN) " " else ""
+        return when {
+            bytes >= 1_000_000_000 -> String.format(java.util.Locale.ROOT, "%.1f%sGB", bytes / 1e9, gap)
+            bytes >= 1_000_000 -> if (front == Front.PODMAN) {
+                String.format(java.util.Locale.ROOT, "%.1f MB", bytes / 1e6)
+            } else {
+                String.format(java.util.Locale.ROOT, "%.0fMB", bytes / 1e6)
+            }
+            else -> String.format(java.util.Locale.ROOT, "%.0f%skB", bytes / 1e3, gap)
+        }
     }
 
     /** Columns padded to their widest cell plus three spaces, as Docker prints them. */
@@ -327,6 +415,9 @@ class EngineCli private constructor(val front: Front) {
     }
 
     companion object {
+        /** The COMMAND column's width, as Docker cuts it. */
+        private const val COMMAND_WIDTH = 20
+
         /** Lines `logs` gives without `--tail`, the most a page shows too. */
         const val DEFAULT_TAIL = 100
 
