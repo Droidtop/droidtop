@@ -60,6 +60,10 @@ class UpdateNowTest {
         assertFalse(scheduled(unmeteredOnly = true, metered = true))
         assertTrue(scheduled(unmeteredOnly = true, metered = false))
         assertTrue(scheduled(frequency = AppSelfUpdate.Frequency.WEEKLY, lastAttemptMs = 0L))
+        // The scheduled job runs in a window before its period ends: an hour early still counts, half a day does not.
+        val day = 24L * 60 * 60 * 1000
+        assertTrue(scheduled(lastAttemptMs = now - (day - 60 * 60 * 1000)))
+        assertFalse(scheduled(lastAttemptMs = now - day / 2))
     }
 
     @Test

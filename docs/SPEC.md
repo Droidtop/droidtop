@@ -15898,9 +15898,20 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
     privilege allows a silent install). Then **Get apps**.
-  It reads only what checks recorded and is built off the main thread. Not yet: checks on droidtop's own schedule for
-  every kind rather than at process start and on demand, and "Ask before installing" or "Install automatically" per
-  kind (#570, the next part); Enginehost's engines, which Enginehost updates itself.
+  It reads only what checks recorded and is built off the main thread.
+  **Checks run on their own schedule** (`UpdateChecks`): one job, at the "Check for updates" interval (every day by
+  default; Never cancels it) and on an unmetered network when that is set, runs the same check as Check now. It
+  replaced the check that ran only when droidtop's process started, which a launcher's seldom does; the process start
+  only makes sure the job is scheduled. `AppSelfUpdate.mayCheck` is its gate (a tenth early still counts, as Android
+  runs a periodic job in a window before its period ends).
+  **Each kind asks or installs** (`UpdateKinds`, in Update settings): "Ask before installing" lists the update and
+  posts one notification ("3 updates are ready", which opens Updates, replaced by the next check's); "Install
+  automatically" installs after the scheduled check. droidtop asks by default, and installing it always ends with
+  Android's own confirmation; Plugins installs automatically by default (it is the existing "Update plugins from
+  these repositories automatically", and covers catalog plugins too; an update asking for more access still waits for
+  approval); Android apps ask by default ("Update apps without asking" stays: it decides whether Android asks, where
+  Android allows it not to); Store games is the existing "Keep installed store games up to date" (off by default; it
+  follows Download rules). Not yet: Enginehost's engines, which Enginehost updates itself.
   **One Updates screen, one list of ways in** (2026-10-03, Droidtop/tracker#273):
   the plugin updates status and "Update all" that the Plugins screen also
   carried are gone (its "N updates" row opens Updates, 2026-10-16) (the Plugins screen lists plugins, approvals, repositories
