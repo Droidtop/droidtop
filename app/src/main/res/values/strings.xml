@@ -19,6 +19,11 @@
     <string name="widget_continue_playing_empty">No games played yet</string>
     <string name="widget_plugin_status_title">Plugin status</string>
     <string name="widget_plugin_status_empty">No status-tile plugins yet</string>
+    <string name="widget_search_title">Library search</string>
+    <string name="widget_search_hint">Search games and apps</string>
+    <string name="widget_quick_launch_title">Quick launch</string>
+    <string name="widget_quick_launch_pick">Pick a game</string>
+    <string name="widget_quick_launch_gone">This game left your library</string>
     <!-- TypingAccessibilityService (docs/SPEC.md 4c, "Typing on the add-on display"): its name and what it does,
          shown in Android's accessibility settings. -->
     <string name="typing_accessibility_label">droidtop keyboard and pointer</string>

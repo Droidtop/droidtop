@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A widget's plate in a dark appearance before Android 12; see widget_surface.xml. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#F01A1A1A" />
+    <corners android:radius="16dp" />
+</shape>

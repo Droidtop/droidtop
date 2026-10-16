@@ -5,9 +5,8 @@
     android:targetCellWidth="3"
     android:targetCellHeight="2"
     android:updatePeriodMillis="1800000"
-    android:initialLayout="@layout/widget_continue_playing"
+    android:initialLayout="@layout/widget_rows"
     android:previewImage="@mipmap/ic_launcher"
-    android:previewLayout="@layout/widget_continue_playing"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:description="@string/widget_continue_playing_title" />

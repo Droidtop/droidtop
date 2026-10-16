@@ -3,16 +3,12 @@ package dev.droidtop.app
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
-import android.view.View
 import android.widget.RemoteViews
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -46,52 +42,25 @@ class PluginStatusWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        private const val MAX_ROWS = 4
         private const val CALL_TIMEOUT_MS = 5_000L
-        private val ROW_IDS = intArrayOf(
-            R.id.widget_plugin_status_row1,
-            R.id.widget_plugin_status_row2,
-            R.id.widget_plugin_status_row3,
-            R.id.widget_plugin_status_row4,
-        )
-
-        // Off the process scope: an update must not die with whatever
-        // screen asked for it (a plugin being approved/disabled in
-        // Settings, or the periodic system tick).
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
         /** Called after a plugin's approval/enabled state changes, so the widget need not wait for the next 30-minute system tick. */
         fun requestUpdate(context: Context) {
-            val app = context.applicationContext
-            val manager = AppWidgetManager.getInstance(app)
-            val ids = manager.getAppWidgetIds(
-                android.content.ComponentName(app, PluginStatusWidgetProvider::class.java),
-            )
-            for (id in ids) updateOne(app, manager, id)
+            DroidtopWidgets.update(context, PluginStatusWidgetProvider::class.java, build = ::render)
         }
 
         private fun updateOne(context: Context, manager: AppWidgetManager, widgetId: Int) {
-            scope.launch {
-                val tiles = statusTiles(context)
-                val views = RemoteViews(context.packageName, R.layout.widget_plugin_status)
-                if (tiles.isEmpty()) {
-                    views.setViewVisibility(R.id.widget_plugin_status_empty, View.VISIBLE)
-                    for (rowId in ROW_IDS) views.setViewVisibility(rowId, View.GONE)
-                } else {
-                    views.setViewVisibility(R.id.widget_plugin_status_empty, View.GONE)
-                    for ((index, rowId) in ROW_IDS.withIndex()) {
-                        val tile = tiles.getOrNull(index)
-                        if (tile == null) {
-                            views.setViewVisibility(rowId, View.GONE)
-                            continue
-                        }
-                        views.setViewVisibility(rowId, View.VISIBLE)
-                        views.setTextViewText(rowId, "${tile.label}: ${tile.value}")
-                    }
-                }
-                manager.updateAppWidget(widgetId, views)
-            }
+            DroidtopWidgets.update(context, PluginStatusWidgetProvider::class.java, intArrayOf(widgetId), ::render)
         }
+
+        private suspend fun render(context: Context, widgetId: Int): RemoteViews =
+            DroidtopWidgets.rows(
+                context,
+                DroidtopWidgets.look(context),
+                context.getString(R.string.widget_plugin_status_title),
+                statusTiles(context).map { DroidtopWidgets.Row("${it.label}: ${it.value}", null) },
+                context.getString(R.string.widget_plugin_status_empty),
+            )
 
         /**
          * One real invoke() per candidate plugin ([PluginStore.runnableFor]
@@ -113,7 +82,7 @@ class PluginStatusWidgetProvider : AppWidgetProvider() {
             if (candidates.isEmpty()) return emptyList()
             val policy = PluginCrashPolicy(app)
             try {
-                return candidates.take(MAX_ROWS).mapNotNull { record -> tileFor(policy, record) }
+                return candidates.take(DroidtopWidgets.MAX_ROWS).mapNotNull { record -> tileFor(policy, record) }
             } finally {
                 policy.shutdown()
             }
