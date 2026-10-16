@@ -14,6 +14,7 @@ import dev.droidtop.runtime.EngineCli
 import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineFeatures
+import dev.droidtop.runtime.EngineInspect
 import dev.droidtop.runtime.EngineOptions
 import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.OciImageStore
@@ -221,28 +222,29 @@ internal object ContainerEnterRequests {
                 )
             }
             is EngineRequest.Run -> {
+                val verb = if (command.start) "run" else "create"
                 val names = containers.map { it.displayName }
                 val name = command.name ?: ContainerNames.defaultName(ContainerRole.SIBLING, command.image, names)
-                ContainerNames.problemWith(name, names)?.let { return refuse(dir, "${cli.name} run: $it", 1) }
+                ContainerNames.problemWith(name, names)?.let { return refuse(dir, "${cli.name} $verb: $it", 1) }
                 // A volume is a folder the person already mapped in some container (D3), found by its name: never a
                 // path the container chose (the review's bound for the docker request kind).
                 val mapped = containers.flatMap { runCatching { runtime.mounts(it.container).folders }.getOrDefault(emptyList()) }
                 val folders = command.volumes.map { wanted ->
                     mapped.firstOrNull { it.name == wanted }
-                        ?: return refuse(dir, "${cli.name} run: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
+                        ?: return refuse(dir, "${cli.name} $verb: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
                 }
                 // Podman's --pod: an existing pod, or a new one for --pod new:NAME (docs/SPEC.md 3d, "Pods").
                 val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
                 val pod = command.pod?.let { wanted ->
                     if (command.newPod) {
-                        ContainerPods.problemWith(pods, wanted)?.let { return refuse(dir, "${cli.name} run: $it", 1) }
+                        ContainerPods.problemWith(pods, wanted)?.let { return refuse(dir, "${cli.name} $verb: $it", 1) }
                         Pod(ContainerPods.newId(), wanted, System.currentTimeMillis())
                     } else {
-                        ContainerPods.find(pods, wanted) ?: return refuse(dir, "${cli.name} run: no pod is called $wanted", 1)
+                        ContainerPods.find(pods, wanted) ?: return refuse(dir, "${cli.name} $verb: no pod is called $wanted", 1)
                     }
                 }
                 val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
-                    return refuse(dir, "${cli.name} run: ${it.message ?: it.javaClass.simpleName}", 1)
+                    return refuse(dir, "${cli.name} $verb: ${it.message ?: it.javaClass.simpleName}", 1)
                 }
                 ContainerPrograms.recordCreated(app, created.id)
                 if (pod != null) {
@@ -265,11 +267,21 @@ internal object ContainerEnterRequests {
                 }
                 val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()
                     ?.let { ContainerProgram.effectiveConfig(app.filesDir, created.id, it) }?.program().orEmpty()
-                if (program.isEmpty()) {
-                    answer(dir, "$name\n", "$name's image names no program to run, so nothing was started; use ${cli.name} exec $name sh\n", 0)
-                } else {
-                    ContainerPrograms.start(app, runtime, created)
-                    answer(dir, "$name\n", "", 0)
+                // Both tools print the new container's id (D13); -p on a port's own number is what happens anyway.
+                val notes = StringBuilder()
+                command.publish.forEach { notes.append("$name listens on the device's own port $it; -p $it is what happens anyway\n") }
+                when {
+                    !command.start -> answer(dir, "${created.id}\n", notes.toString(), 0)
+                    program.isEmpty() -> answer(
+                        dir,
+                        "${created.id}\n",
+                        notes.append("$name's image names no program to run, so nothing was started; use ${cli.name} exec $name sh\n").toString(),
+                        0,
+                    )
+                    else -> {
+                        ContainerPrograms.start(app, runtime, created)
+                        answer(dir, "${created.id}\n", notes.toString(), 0)
+                    }
                 }
             }
             is EngineRequest.Remove -> {
@@ -292,6 +304,52 @@ internal object ContainerEnterRequests {
                     }
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
+            }
+            is EngineRequest.Restart -> {
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (name in command.containers) {
+                    val info = find(name)
+                    when {
+                        info == null -> err.append("Error: No such container: $name\n")
+                        runCatching { runtime.imageRunConfig(info.container) }.getOrNull()?.program().isNullOrEmpty() ->
+                            err.append("Error: $name has no program of its own to restart (its image names none)\n")
+                        else -> {
+                            ContainerPrograms.stop(info.container.id)
+                            ContainerPrograms.startedByPerson(app, runtime, info.container)
+                            out.append(name).append('\n')
+                        }
+                    }
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
+            }
+            is EngineRequest.Inspect -> {
+                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                val facts = mutableListOf<EngineInspect.Facts>()
+                val err = StringBuilder()
+                for (name in command.containers) {
+                    val info = find(name) ?: run { err.append("Error: No such object: $name\n"); null } ?: continue
+                    val id = info.container.id
+                    val config = runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
+                        ?.let { ContainerProgram.effectiveConfig(app.filesDir, id, it) }
+                    val state = ContainerPrograms.state(id)
+                    facts += EngineInspect.Facts(
+                        id = id,
+                        name = info.displayName,
+                        image = info.image ?: "",
+                        imageDigest = info.digest,
+                        createdMs = withContext(Dispatchers.IO) { ContainerPrograms.created(app, id) },
+                        status = inspectStatus(state, ContainerPrograms.isRunning(id)),
+                        exitCode = (state as? ContainerPrograms.State.Ended)?.exitCode,
+                        error = (state as? ContainerPrograms.State.Failed)?.message,
+                        config = config,
+                        restart = withContext(Dispatchers.IO) { ContainerPrograms.restartPolicy(app, id) },
+                        folders = runCatching { runtime.mounts(info.container).folders.map { it.name } }.getOrDefault(emptyList()),
+                        podId = pods.firstOrNull { id in it.members }?.id,
+                    )
+                }
+                // Docker prints what it found and the errors for the rest, failing if any was missing.
+                answer(dir, if (facts.isEmpty()) "[]\n" else EngineInspect.format(facts, cli.front), err.toString(), if (err.isEmpty()) 0 else 1)
             }
             is EngineRequest.PodCreate -> {
                 val made = withContext(Dispatchers.IO) {
@@ -362,6 +420,14 @@ internal object ContainerEnterRequests {
             }
             is EngineRequest.Answer, EngineRequest.Info -> Unit
         }
+    }
+
+    /** Docker's State.Status for `inspect`: created, running, restarting or exited. */
+    private fun inspectStatus(state: ContainerPrograms.State, programUp: Boolean): String = when {
+        programUp && state is ContainerPrograms.State.Waiting -> "restarting"
+        programUp -> "running"
+        state is ContainerPrograms.State.Ended || state is ContainerPrograms.State.Failed -> "exited"
+        else -> "created"
     }
 
     /** What `docker ps` says a container is doing, from its program first: that is what Docker's STATUS describes. */

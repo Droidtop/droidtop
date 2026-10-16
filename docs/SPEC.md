@@ -2472,7 +2472,7 @@ the `ContainerRuntime` interface that already exists (§3):
   too). A host path, another target or an unknown name is refused, so a path still never comes from the container.
   The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
   `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
-  "Its own program", and the start with the desktop. `-p`, `-w`, `--entrypoint`, `--rm` and `-u` answer
+  "Its own program", and the start with the desktop. `-w`, `--entrypoint`, `--rm` and `-u` answer
   "not built in droidtop yet". Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
   `--tmpfs`, `--read-only`, ...) answer from the one table in "Kernel features, detected at runtime" (section 3);
   `--network host` and `--pid host` are taken, being what the containers already are. `docker info` (D10) says the
@@ -2502,6 +2502,21 @@ the `ContainerRuntime` interface that already exists (§3):
   (`docker.io/library/nginx`, sizes as "21.4 MB") on the podman front. CREATED is the time droidtop made the
   container (`ContainerPrograms.recordCreated`, from every place droidtop creates one: `run` and the two Create rows
   in Containers); a container made before this has an empty CREATED rather than a guessed one.
+  **inspect, create, restart and -p (built 2026-10-16, Droidtop/tracker#555 D13), on both fronts.** `create` reads
+  what `run` reads and makes the container without starting its program. `run` and `create` print the new
+  container's id, as both tools do (`run` printed its name). `restart` stops a container's program and starts it
+  again (as a start by the person, so `unless-stopped` holds). `inspect` prints each container's details as JSON in
+  Docker's shape (`EngineInspect`): Id, Created (droidtop's record, else Docker's zero time), Path and Args (the
+  program with `run`'s command applied), State (Status created, running, restarting or exited, ExitCode, Error),
+  Image (the digest), Name (`/name` on the docker front), HostConfig (RestartPolicy, and NetworkMode and PidMode
+  `host`, which is what every container here has), Mounts (each folder the person mapped, by its name and where it
+  appears; never a host path) and Config (Image, Env, Cmd, Entrypoint, WorkingDir, ExposedPorts). The podman front
+  adds ImageName and Pod. Nothing droidtop does not know is given a value: no Pid, no network of the container's own.
+  `--format` (Go templates) and `--type image` answer "not built in droidtop yet". `-p` (`run`, `create`): a port
+  published on its own number (`-p 80:80`, `0.0.0.0:80:80`, `/udp`) is what happens anyway and is taken, with a note
+  saying so; another number, or a host port Docker would choose (`-p 80`), needs network namespaces to remap and is
+  answered from the feature table ("-p needs network namespaces, which this device's kernel does not have (here a
+  port is the device's own: -p 80:80 is what happens)"); one address other than all of them is not built yet.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept

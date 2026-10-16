@@ -40,6 +40,9 @@ class EngineCli private constructor(val front: Front) {
         add("                               Run a command in another container (pipes, no terminal)")
         add("  pull IMAGE                   Download an image into droidtop's store")
         add("  run [-d] [--name NAME] IMAGE Make a container from an image and start its program")
+        add("  create [--name NAME] IMAGE   Make a container from an image without starting its program")
+        add("  restart CONTAINER...         Stop a container's own program and start it again")
+        add("  inspect CONTAINER...         A container's details as JSON")
         add("  rm [-f] CONTAINER...         Delete a container (-f stops its program first)")
         add("  info                         The engine, and the kernel features this device gives it")
         if (front == Front.PODMAN) add("  pod create|ps|rm|start|stop  Pods: a named group of containers started and stopped together")
@@ -47,7 +50,8 @@ class EngineCli private constructor(val front: Front) {
         add("run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.")
         add("run takes --restart no|on-failure[:N]|always|unless-stopped (no by default).")
         if (front == Front.PODMAN) add("run takes --pod POD to join a pod, or --pod new:NAME to make one.")
-        add("Not yet: -p, -w, --entrypoint, --rm, -u. Options that need a kernel feature (--memory, --cpus, --network,")
+        add("-p takes a port on its own number (-p 80:80), which is what happens anyway: a port is the device's own.")
+        add("Not yet: -w, --entrypoint, --rm, -u. Options that need a kernel feature (-p 8080:80, --memory, --network,")
         add("--hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.")
         add("Containers here share the device's network and processes: a port is the device's own.")
     }.joinToString("\n") + "\n"
@@ -74,6 +78,13 @@ class EngineCli private constructor(val front: Front) {
             "exec" -> exec(rest)
             "pull" -> pull(rest)
             "run" -> run(rest, features)
+            "create" -> run(rest, features, sub = "create")
+            "restart" -> {
+                rest.firstOrNull { it.startsWith("-") }?.let { return error(sub, it) }
+                if (rest.isEmpty()) return EngineRequest.Answer("${front.command} restart: name at least one container\n", 1)
+                EngineRequest.Restart(rest)
+            }
+            "inspect" -> inspect(rest)
             "pod" -> if (front == Front.PODMAN) pod(rest) else EngineRequest.Answer("docker: 'pod' is not a docker command. See 'docker --help'\n", 1)
             "info" -> flags(rest, emptySet())?.let { bad -> error("info", bad) } ?: EngineRequest.Info
             "rm" -> remove(rest)
@@ -152,7 +163,62 @@ class EngineCli private constructor(val front: Front) {
         return EngineRequest.Pull(image)
     }
 
-    private fun run(args: List<String>, features: EngineFeatures?): EngineRequest {
+    /**
+     * `inspect`: containers by name or id. `--type container` is what it answers; `-f`/`--format` (Go templates) and
+     * images are not built yet.
+     */
+    private fun inspect(args: List<String>): EngineRequest {
+        val names = mutableListOf<String>()
+        var i = 0
+        while (i < args.size) {
+            val a = args[i]
+            when {
+                a == "--type" || a.startsWith("--type=") -> {
+                    val type = if (a == "--type") args.getOrNull(++i) else a.substringAfter('=')
+                    if (type != "container") return EngineRequest.Answer("${front.command} inspect: --type ${type ?: ""} is not built in droidtop yet; it inspects containers\n", 1)
+                }
+                a == "-f" || a == "--format" || a.startsWith("--format=") ->
+                    return EngineRequest.Answer("${front.command} inspect: --format is not built in droidtop yet; it prints the whole JSON\n", 1)
+                a.startsWith("-") -> return error("inspect", a)
+                else -> names += a
+            }
+            i++
+        }
+        if (names.isEmpty()) return EngineRequest.Answer("${front.command} inspect: name at least one container\n", 1)
+        return EngineRequest.Inspect(names)
+    }
+
+    /**
+     * `-p` as droidtop can honour it (docs/SPEC.md 3d, D13): every container listens on the device's own ports, so a
+     * port published on its own number (`80:80`, `0.0.0.0:80:80`, `/udp` too) is what happens anyway and is taken. A
+     * port published on another number, or on a number Docker would choose, needs network namespaces to remap; that is
+     * answered from [EngineOptions], so it says whether this device has them. One address other than all of them is
+     * not built. Pure.
+     */
+    internal fun publish(spec: String, features: EngineFeatures?, sub: String): Pair<ExposedPort?, EngineRequest.Answer?> {
+        val protocol = spec.substringAfter('/', ExposedPort.TCP)
+        val parts = spec.substringBefore('/').split(':')
+        val (address, host, container) = when (parts.size) {
+            1 -> Triple(null, null, parts[0])
+            2 -> Triple(null, parts[0], parts[1])
+            3 -> Triple(parts[0], parts[1], parts[2])
+            else -> return null to EngineRequest.Answer("${front.command} $sub: not a port: $spec\n", 1)
+        }
+        val number = container.toIntOrNull()?.takeIf { it in 1..65535 }
+        if (number == null || protocol !in setOf(ExposedPort.TCP, "udp") || (host != null && host.isNotEmpty() && host.toIntOrNull() == null)) {
+            return null to EngineRequest.Answer("${front.command} $sub: not a port: $spec\n", 1)
+        }
+        if (address != null && address.isNotEmpty() && address != "0.0.0.0" && address != "::") {
+            return null to EngineRequest.Answer("${front.command} $sub: -p on one address ($address) is not built in droidtop yet\n", 1)
+        }
+        if (host.isNullOrEmpty() || host.toInt() != number) {
+            return null to EngineRequest.Answer(EngineOptions.refusal("${front.command} $sub", "-p", features) + " (here a port is the device's own: -p $number:$number is what happens)\n", 1)
+        }
+        return ExposedPort(number, protocol) to null
+    }
+
+    private fun run(args: List<String>, features: EngineFeatures?, sub: String = "run"): EngineRequest {
+        val publish = mutableListOf<ExposedPort>()
         var name: String? = null
         val envs = mutableListOf<String>()
         val volumes = mutableListOf<String>()
@@ -162,25 +228,36 @@ class EngineCli private constructor(val front: Front) {
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
                 "-d", "--detach", "-i", "-t", "-it", "-ti", "-dit", "-itd" -> Unit
-                "--name" -> name = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: --name needs a name\n", 1)
+                "--name" -> name = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: --name needs a name\n", 1)
                 "-e", "--env" -> {
-                    val kv = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: $a needs NAME=VALUE\n", 1)
-                    env(kv) ?: return EngineRequest.Answer("${front.command} run: not NAME=VALUE: $kv\n", 1)
+                    val kv = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs NAME=VALUE\n", 1)
+                    env(kv) ?: return EngineRequest.Answer("${front.command} $sub: not NAME=VALUE: $kv\n", 1)
                     envs += kv
                 }
                 "-v", "--volume" -> {
-                    val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: $a needs a folder\n", 1)
-                    volumes += volume(spec) ?: return volumeRefused(spec)
+                    val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs a folder\n", 1)
+                    volumes += volume(spec) ?: return volumeRefused(spec, sub)
+                }
+                "-p", "--publish" -> {
+                    val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs a port\n", 1)
+                    val (port, refused) = publish(spec, features, sub)
+                    refused?.let { return it }
+                    publish += port!!
                 }
                 "--pod" -> {
-                    if (front != Front.PODMAN) return error("run", a)
-                    pod = args.getOrNull(++i) ?: return EngineRequest.Answer("podman run: --pod needs a pod\n", 1)
+                    if (front != Front.PODMAN) return error(sub, a)
+                    pod = args.getOrNull(++i) ?: return EngineRequest.Answer("podman $sub: --pod needs a pod\n", 1)
                 }
                 "--restart" -> {
-                    val words = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: --restart needs a policy\n", 1)
-                    restart = ContainerProgram.RestartPolicy.parse(words) ?: return restartRefused(words)
+                    val words = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: --restart needs a policy\n", 1)
+                    restart = ContainerProgram.RestartPolicy.parse(words) ?: return restartRefused(words, sub)
                 }
                 else -> when {
+                    a.startsWith("--publish=") -> {
+                        val (port, refused) = publish(a.substringAfter('='), features, sub)
+                        refused?.let { return it }
+                        publish += port!!
+                    }
                     EngineOptions.option(a) != null -> {
                         // One table for every option that needs a kernel feature (docs/SPEC.md 3, D10).
                         val option = EngineOptions.option(a)!!
@@ -190,39 +267,39 @@ class EngineCli private constructor(val front: Front) {
                             else -> null
                         }
                         if (!EngineOptions.asIs(option, value)) {
-                            return EngineRequest.Answer(EngineOptions.refusal("${front.command} run", option, features) + "\n", 1)
+                            return EngineRequest.Answer(EngineOptions.refusal("${front.command} $sub", option, features) + "\n", 1)
                         }
                     }
                     a.startsWith("--name=") -> name = a.substringAfter('=')
                     a.startsWith("--env=") -> {
                         val kv = a.substringAfter('=')
-                        env(kv) ?: return EngineRequest.Answer("${front.command} run: not NAME=VALUE: $kv\n", 1)
+                        env(kv) ?: return EngineRequest.Answer("${front.command} $sub: not NAME=VALUE: $kv\n", 1)
                         envs += kv
                     }
                     a.startsWith("--pod=") && front == Front.PODMAN -> pod = a.substringAfter('=')
                     a.startsWith("--restart=") -> {
                         val words = a.substringAfter('=')
-                        restart = ContainerProgram.RestartPolicy.parse(words) ?: return restartRefused(words)
+                        restart = ContainerProgram.RestartPolicy.parse(words) ?: return restartRefused(words, sub)
                     }
                     a.startsWith("--volume=") -> {
                         val spec = a.substringAfter('=')
-                        volumes += volume(spec) ?: return volumeRefused(spec)
+                        volumes += volume(spec) ?: return volumeRefused(spec, sub)
                     }
                     a in NOT_YET_RUN || NOT_YET_RUN.any { a.startsWith("$it=") } ->
-                        return EngineRequest.Answer("${front.command} run: $a is not built in droidtop yet\n", 1)
-                    else -> return error("run", a)
+                        return EngineRequest.Answer("${front.command} $sub: $a is not built in droidtop yet\n", 1)
+                    else -> return error(sub, a)
                 }
             }
             i++
         }
-        val image = args.getOrNull(i) ?: return EngineRequest.Answer("${front.command} run: name an image\n", 1)
-        if (!validReference(image)) return EngineRequest.Answer("${front.command} run: not an image reference: $image\n", 1)
-        if (name != null && name.isBlank()) return EngineRequest.Answer("${front.command} run: --name needs a name\n", 1)
+        val image = args.getOrNull(i) ?: return EngineRequest.Answer("${front.command} $sub: name an image\n", 1)
+        if (!validReference(image)) return EngineRequest.Answer("${front.command} $sub: not an image reference: $image\n", 1)
+        if (name != null && name.isBlank()) return EngineRequest.Answer("${front.command} $sub: --name needs a name\n", 1)
         val command = args.drop(i + 1).takeIf { it.isNotEmpty() }
         val newPod = pod?.startsWith("new:") == true
         val podName = if (newPod) pod!!.removePrefix("new:") else pod
-        if (podName != null && !ContainerPods.validName(podName)) return EngineRequest.Answer("podman run: not a pod name: $podName\n", 1)
-        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart, podName, newPod)
+        if (podName != null && !ContainerPods.validName(podName)) return EngineRequest.Answer("podman $sub: not a pod name: $podName\n", 1)
+        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish, start = sub == "run")
     }
 
     /** Podman's `pod` subcommands droidtop answers; the rest say they are not built yet. */
@@ -265,10 +342,10 @@ class EngineCli private constructor(val front: Front) {
     }
 
     /** `run` flags droidtop knows of and has not built: said as such, not as unknown. */
-    private val NOT_YET_RUN = setOf("-p", "--publish", "-w", "--workdir", "--entrypoint", "--rm", "-u", "--user")
+    private val NOT_YET_RUN = setOf("-w", "--workdir", "--entrypoint", "--rm", "-u", "--user")
 
-    private fun restartRefused(words: String) = EngineRequest.Answer(
-        "${front.command} run: --restart takes no, on-failure[:N], always or unless-stopped, not $words\n",
+    private fun restartRefused(words: String, sub: String) = EngineRequest.Answer(
+        "${front.command} $sub: --restart takes no, on-failure[:N], always or unless-stopped, not $words\n",
         1,
     )
 
@@ -290,8 +367,8 @@ class EngineCli private constructor(val front: Front) {
         }
     }
 
-    private fun volumeRefused(spec: String) = EngineRequest.Answer(
-        "${front.command} run: -v takes the name of a folder you mapped in Containers (it appears at " +
+    private fun volumeRefused(spec: String, sub: String) = EngineRequest.Answer(
+        "${front.command} $sub: -v takes the name of a folder you mapped in Containers (it appears at " +
             "${ContainerLayout.EXTRA_MOUNTS_DIR}/<name>); $spec is not one droidtop can mount\n",
         1,
     )
@@ -499,7 +576,7 @@ class EngineCli private constructor(val front: Front) {
         const val MAX_TAIL = 2000
 
         /** Subcommands droidtop does not answer yet on either front, said as such rather than as unknown. */
-        private val LATER = setOf("rmi", "create", "compose", "restart", "inspect")
+        private val LATER = setOf("rmi", "compose")
 
         /** Subcommands droidtop will not have: they need a daemon or image building it does not have. */
         private val NEVER = setOf("build", "buildx", "push", "login", "network", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "version", "search", "logout", "rename", "machine")

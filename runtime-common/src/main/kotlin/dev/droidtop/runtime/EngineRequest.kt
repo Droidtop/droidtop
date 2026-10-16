@@ -43,7 +43,17 @@ sealed interface EngineRequest {
         /** Podman's `--pod`: the pod the container joins, or a new one to make when [newPod] (`--pod new:NAME`). */
         val pod: String? = null,
         val newPod: Boolean = false,
+        /** `-p PORT:PORT`: ports published on the same number, which they are anyway (docs/SPEC.md 3d, D13). */
+        val publish: List<ExposedPort> = emptyList(),
+        /** False for `create`: the container is made and its program is not started. */
+        val start: Boolean = true,
     ) : EngineRequest
+
+    /** `restart`: stops each container's own program, then starts it. */
+    data class Restart(val containers: List<String>) : EngineRequest
+
+    /** `inspect`: each container's details as JSON, in the tool's own shape. */
+    data class Inspect(val containers: List<String>) : EngineRequest
 
     /** `rm`: deletes each container; [force] stops a running program first, as Docker's `-f` does. */
     data class Remove(val containers: List<String>, val force: Boolean) : EngineRequest
