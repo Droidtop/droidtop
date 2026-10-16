@@ -173,46 +173,46 @@ object PluginContextActions {
             policy.shutdown()
         }
     }
-}
 
-/**
- * The actions plugins offer on one game or app, as a page (Droidtop/tracker#67): what Standard's long-press app menu
- * and Desktop's Start menu open from their "Plugin actions" row, in [mode] at [place]. Which actions apply is read
- * from manifests and `enabled` asked when the page opens, off the main thread; each action is a row that runs it and
- * says what came of it, and a reply's view opens through [onReplyScreen].
- */
-fun PluginContextActions.screen(
-    target: ContextTarget,
-    mode: String,
-    place: String,
-    onReplyScreen: (CatalogScreen) -> Unit,
-): CatalogScreen = CatalogScreen(
-    id = "plugin_actions_${target.kind}_${target.id}",
-    title = target.title,
-    subtitle = "Plugin actions",
-    groups = { context ->
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            val actions = actionsFor(context, target, mode).filter { enabled(context, it, target, place) }
-            val items: List<dev.droidtop.library.settings.CatalogItem> = actions.map { action ->
-                dev.droidtop.library.settings.AsyncActionItem(
-                    id = "plugin_action_${action.record.manifest.id}_${action.id}",
-                    title = action.label,
-                    subtitle = "From ${action.record.manifest.label}",
-                    run = { ctx, _ ->
-                        val outcome = run(ctx, action, target, place)
-                        outcome.screen?.let(onReplyScreen)
-                        outcome.message ?: "${action.label} done"
-                    },
-                )
-            }.ifEmpty {
-                listOf(dev.droidtop.library.settings.TextBlockItem(id = "plugin_actions_none", text = "No plugin has anything for ${target.title} right now."))
+    /**
+     * The actions plugins offer on one game or app, as a page (Droidtop/tracker#67): what Standard's long-press app menu
+     * and Desktop's Start menu open from their "Plugin actions" row, in [mode] at [place]. Which actions apply is read
+     * from manifests and `enabled` asked when the page opens, off the main thread; each action is a row that runs it and
+     * says what came of it, and a reply's view opens through [onReplyScreen].
+     */
+    fun screen(
+        target: ContextTarget,
+        mode: String,
+        place: String,
+        onReplyScreen: (CatalogScreen) -> Unit,
+    ): CatalogScreen = CatalogScreen(
+        id = "plugin_actions_${target.kind}_${target.id}",
+        title = target.title,
+        subtitle = "Plugin actions",
+        groups = { context ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val actions = actionsFor(context, target, mode).filter { enabled(context, it, target, place) }
+                val items: List<dev.droidtop.library.settings.CatalogItem> = actions.map { action ->
+                    dev.droidtop.library.settings.AsyncActionItem(
+                        id = "plugin_action_${action.record.manifest.id}_${action.id}",
+                        title = action.label,
+                        subtitle = "From ${action.record.manifest.label}",
+                        run = { ctx, _ ->
+                            val outcome = run(ctx, action, target, place)
+                            outcome.screen?.let(onReplyScreen)
+                            outcome.message ?: "${action.label} done"
+                        },
+                    )
+                }.ifEmpty {
+                    listOf(dev.droidtop.library.settings.TextBlockItem(id = "plugin_actions_none", text = "No plugin has anything for ${target.title} right now."))
+                }
+                listOf(dev.droidtop.library.settings.CatalogGroup(id = "plugin_actions", title = null, items = items))
             }
-            listOf(dev.droidtop.library.settings.CatalogGroup(id = "plugin_actions", title = null, items = items))
-        }
-    },
-    // The settings search must never call a plugin.
-    indexGroups = { emptyList() },
-)
+        },
+        // The settings search must never call a plugin.
+        indexGroups = { emptyList() },
+    )
+}
 
 /**
  * Metadata sources (docs/plugin-api.md 3 A3), asked from inside the scrape
