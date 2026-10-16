@@ -52,7 +52,8 @@ object PluginHub {
  * main thread, and worked out again off it whenever plugins or their grants change ([PluginEpoch]) or a minute passed.
  */
 object PluginStandardHooks : PluginShellHooks.Provider {
-    private class Snapshot(val epoch: Int, val atMs: Long, val panels: Boolean)
+    /** [appActions]: the context actions that act on apps in Standard, matched to an app's package from memory. */
+    private class Snapshot(val epoch: Int, val atMs: Long, val panels: Boolean, val appActions: List<dev.droidtop.pluginhost.ProvidedPoint>)
 
     private const val MAX_AGE_MS = 60_000L
 
@@ -79,7 +80,14 @@ object PluginStandardHooks : PluginShellHooks.Provider {
         scope.launch {
             try {
                 val epoch = PluginEpoch.current()
-                snapshot = Snapshot(epoch, System.currentTimeMillis(), PluginPanels.panelsFor(context, PluginModes.STANDARD).isNotEmpty())
+                snapshot = Snapshot(
+                    epoch,
+                    System.currentTimeMillis(),
+                    PluginPanels.panelsFor(context, PluginModes.STANDARD).isNotEmpty(),
+                    providersOf(context, PluginContextActions.POINT, PluginModes.STANDARD)
+                        .map { it.second }
+                        .filter { "app" in dev.droidtop.pluginhost.ContextActionFilter.targets(it) },
+                )
             } finally {
                 refreshing.set(false)
             }
@@ -88,6 +96,20 @@ object PluginStandardHooks : PluginShellHooks.Provider {
 
     override fun companionTabs(context: Context, mode: String): List<Pair<String, String>> =
         PluginPanels.companionTabs(context, mode)
+
+    override fun appMenu(context: Context, packageName: String, label: String): PluginShellHooks.MenuEntry? {
+        val target = PluginContextActions.appTarget(packageName, label)
+        if (current()?.appActions?.any { dev.droidtop.pluginhost.ContextActionFilter.matches(it, target) } != true) return null
+        return PluginShellHooks.MenuEntry("Plugin actions") { ctx ->
+            val appContext = ctx.applicationContext
+            PluginHub.open(
+                ctx,
+                PluginContextActions.screen(target, PluginModes.STANDARD, PluginModes.Surfaces.STANDARD_APP_MENU) { screen ->
+                    PluginHub.open(appContext, screen)
+                },
+            )
+        }
+    }
 
     override fun homeMenu(context: Context): List<PluginShellHooks.MenuEntry> {
         if (current()?.panels != true) return emptyList()

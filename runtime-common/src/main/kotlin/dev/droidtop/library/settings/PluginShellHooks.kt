@@ -21,6 +21,12 @@ object PluginShellHooks {
          * (tab id, name) pairs for the Companion group's tab choices. Reads manifests: call it off the main thread.
          */
         fun companionTabs(context: Context, mode: String): List<Pair<String, String>> = emptyList()
+
+        /**
+         * "Plugin actions" on an app's long-press menu (Droidtop/tracker#67), when a plugin offers one for
+         * [packageName]; null otherwise. Answered from memory: the launcher builds that menu on the main thread.
+         */
+        fun appMenu(context: Context, packageName: String, label: String): MenuEntry? = null
     }
 
     @Volatile var provider: Provider? = null
@@ -29,6 +35,10 @@ object PluginShellHooks {
 
     /** See [Provider.companionTabs]; empty before `:app` installs the provider. Off the main thread. */
     fun companionTabs(context: Context, mode: String): List<Pair<String, String>> = provider?.companionTabs(context, mode).orEmpty()
+
+    /** See [Provider.appMenu]; null before `:app` installs the provider. From memory, so the main thread may ask. */
+    @JvmStatic fun appMenu(context: Context, packageName: String, label: String): MenuEntry? =
+        provider?.appMenu(context, packageName, label)
 
     /** Runs an entry from Java. */
     @JvmStatic fun run(entry: MenuEntry, context: Context) {

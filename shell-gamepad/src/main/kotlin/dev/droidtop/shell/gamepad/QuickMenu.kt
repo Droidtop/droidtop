@@ -804,15 +804,7 @@ private fun PluginsTab(
 ) {
     var replyScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
     val root = remember(runningEntry?.id) {
-        val game = runningEntry?.let { entry ->
-            dev.droidtop.pluginhost.ContextTarget(
-                kind = if (entry.kind == dev.droidtop.library.LibraryEntryKind.NATIVE_ANDROID_APP) "app" else "game",
-                id = entry.id,
-                title = dev.droidtop.library.GameNaming.displayName(entry.title),
-                systemId = entry.systemId,
-                packageName = if (entry.kind == dev.droidtop.library.LibraryEntryKind.NATIVE_ANDROID_APP) entry.id else null,
-            )
-        }
+        val game = runningEntry?.let { dev.droidtop.library.integrations.PluginContextActions.targetOf(it) }
         dev.droidtop.library.integrations.PluginPanels.quickMenuScreen(
             game = game,
             showManage = placeAvailable(PLACE_PLUGINS_SCREEN_ID),
