@@ -51,6 +51,9 @@ android {
         // Local builds without the env var stay at 1.
         versionCode = versionRevision.toIntOrNull()?.coerceAtLeast(1) ?: 1
         versionName = "0.2.0-dev.$versionRevision"
+        // On-device checks run by hand on a console with `am instrument` (app/src/androidTest; the first is the
+        // priv.packages rig check, Droidtop/tracker#130). CI builds the test APK; nothing runs it there.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The ABIs droidtop ships (arm64-v8a for real hardware, x86_64 for
         // x86 devices and emulators) are set by `splits` below and the
         // packaging excludes, not an ndk abiFilters block: AGP refuses the
@@ -234,6 +237,8 @@ configurations.all {
 }
 
 dependencies {
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.junit)
     implementation(project(":net-core"))
 
     implementation(project(":runtime-common"))
@@ -314,3 +319,15 @@ dependencies {
 tasks.matching { it.name == "packageDebug" }.configureEach {
     mustRunAfter("packageRelease")
 }
+
+// The throwaway app the priv.packages rig check installs (Droidtop/tracker#130): built by :rigtest-throwaway and
+// carried as an asset of the androidTest APK only, never of droidtop itself.
+val rigThrowawayAssets = layout.buildDirectory.dir("generated/rigThrowaway")
+val copyRigThrowaway by tasks.registering(Copy::class) {
+    dependsOn(":rigtest-throwaway:assembleDebug")
+    from(project(":rigtest-throwaway").layout.buildDirectory.file("outputs/apk/debug/rigtest-throwaway-debug.apk"))
+    into(rigThrowawayAssets)
+    rename { "throwaway.apk" }
+}
+android.sourceSets.getByName("androidTest").assets.srcDir(rigThrowawayAssets)
+tasks.matching { it.name == "mergeDebugAndroidTestAssets" }.configureEach { dependsOn(copyRigThrowaway) }

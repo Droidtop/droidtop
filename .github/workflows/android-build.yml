@@ -144,7 +144,9 @@ jobs:
         # debug APK exists to be inspectable (run-as, a debugger), never to
         # play on: it is not compiled ahead of time and Android runs it
         # without inlining, which is what made droidtop slow before 558.
-        run: ./gradlew :app:assembleRelease :app:assembleDebug --stacktrace
+        # The on-device check APK (app/src/androidTest) comes from the same run, so it matches these APKs; it is never
+        # published, only uploaded below for a rig to run with am instrument.
+        run: ./gradlew :app:assembleRelease :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Write release-info.json
         # Beside the APKs, in the same artifact, so that release-promote.yml
@@ -166,6 +168,15 @@ jobs:
             app/build/outputs/apk/release/app-x86_64-release.apk
             app/build/outputs/apk/debug/app-x86_64-debug.apk
             app/build/outputs/release-info.json
+          if-no-files-found: error
+
+      - name: Upload on-device check APK
+        # The rig checks run by hand with am instrument against an installed droidtop signed with the same key (the
+        # priv.packages check, Droidtop/tracker#130). Not part of droidtop-apk, so no channel ever carries it.
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: droidtop-android-test
+          path: app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
           if-no-files-found: error
 
       - name: Find droidtoppy native build outputs
