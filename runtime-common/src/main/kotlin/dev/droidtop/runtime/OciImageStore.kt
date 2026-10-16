@@ -124,6 +124,16 @@ class OciImageStore(
         }
     }
 
+    /** The run settings of the image pulled by [digest] (its config blob's `config`), or null when it is not here. */
+    suspend fun runConfig(digest: String): ImageRunConfig? = lock.withLock {
+        withContext(Dispatchers.IO) {
+            val index = readIndex() ?: return@withContext null
+            val entry = manifestsOf(index).firstOrNull { it.annotation(KEY_DIGEST) == digest } ?: return@withContext null
+            val stored = runCatching { imageOf(entry) }.getOrNull() ?: return@withContext null
+            runCatching { ImageRunConfig.fromImageConfig(blob(stored.config.digest).readText()) }.getOrNull()
+        }
+    }
+
     /** Forgets the image pulled by [digest] and deletes every blob no other image uses. */
     suspend fun remove(digest: String) = lock.withLock {
         withContext(Dispatchers.IO) {

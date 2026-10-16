@@ -49,7 +49,12 @@ sealed interface EngineRequest {
         val start: Boolean = true,
         /** `--label KEY=VALUE`, the Engine API's `Labels`: kept with the container and reported back. */
         val labels: Map<String, String> = emptyMap(),
+        /** Networks of droidtop's own the container joins (the Engine API's NetworkMode and EndpointsConfig). */
+        val networks: List<NetworkJoin> = emptyList(),
     ) : EngineRequest
+
+    /** A network a new container joins, by its id, and the aliases it was given there. */
+    data class NetworkJoin(val networkId: String, val aliases: List<String> = emptyList())
 
     /** `restart`: stops each container's own program, then starts it. */
     data class Restart(val containers: List<String>) : EngineRequest

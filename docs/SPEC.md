@@ -2551,14 +2551,29 @@ the `ContainerRuntime` interface that already exists (§3):
   - Answered from the D10 feature table: resource limits (`Memory`, `NanoCpus`, `CpuShares`, `PidsLimit`, ...),
     `Hostname`, and port bindings on another number.
   - Answered 501, not built: `Entrypoint`, `WorkingDir`, a `User` other than root, `Volumes`, `Mounts`, a network
-    of the container's own (`docker compose`'s project network among them; networks are the next slice), `CapAdd`,
+    of the container's own other than a network droidtop has (below), `CapAdd`,
     `Devices`, `SecurityOpt`.
   - Refused 400: `Privileged`, which droidtop's containers never are.
   Labels (`--label` on both command fronts too) are kept with the container's run settings
   (`ContainerProgram.RunOverrides.labels`) and reported in `inspect`, `containers/json` and its filters, which is
   how `docker compose` finds its containers. `docker pull` and `podman pull` resolve the tag to its digest
   (`crane digest`) before the store pulls, as a container's creation does; they passed the bare reference, which
-  the store refused. Exec and attach, which take over the connection, and networks are the next slice.
+  the store refused. **Networks and image inspect (built 2026-10-16, D14 third slice).** Every container is on the
+  device's network, so a network of droidtop's engine is a named group (`ContainerNetworks`, `networks.json` beside
+  the pods), which is what `docker compose` asks for: it lists networks by its project label, creates
+  `<project>_default` and creates each service's container on it. `GET /networks` (filters name, id and label;
+  others not built), `GET /networks/{id}`, `POST /networks/create` (409 for a name taken or Docker's own; an
+  internal network answers from the feature table, as it needs network namespaces; another driver, IPv6, subnets
+  of its own and Options answer not built), `DELETE /networks/{id}` (403 for bridge, host and none, and while a
+  container is on it) and `connect` and `disconnect`. bridge, host and none are always listed, with ids the same on
+  every device. A create joins a network named in NetworkMode or EndpointsConfig by its name or id; an unknown one
+  answers 404 "network ... not found", as Docker does, and none answers from the feature table. Aliases are kept,
+  but they do not resolve: the create's warnings say so and to reach another container by localhost, which works
+  because they share the device's network. Removing a container takes it off its networks. `GET /images/{name}/json`
+  finds a stored image by any of Docker's spellings (`nginx`, `nginx:latest`, `docker.io/library/nginx`), its digest
+  or a start of it, and describes it from its config blob (`OciImageStore.runConfig`): RepoTags, Size, Architecture
+  and Config (Env, Cmd, Entrypoint, WorkingDir, User, ExposedPorts); compose reads it to decide whether to pull.
+  Exec and attach, which take over the connection, are the next slice.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept
