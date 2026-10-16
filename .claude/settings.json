@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sanitize.py\" || python \"$CLAUDE_PROJECT_DIR/.claude/hooks/sanitize.py\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
