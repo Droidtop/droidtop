@@ -687,6 +687,21 @@ internal fun PcGamesSection(
     fun openPage(entry: LibraryEntry) {
         if (entry.inPcFold) state.pageId = entry.id else otherMenu = entry
     }
+    // Home's destination row: a library's menu, or Random game, which opens a game's page (a PC game) or its
+    // options (a Retro game or a game app), so Play is one press from there. The pick is from every game Home
+    // holds, PC, Retro and game apps, hidden ones left out (Droidtop/tracker#507).
+    fun openDestination(index: Int) {
+        state.destIndex = index
+        val destination = HOME_DESTINATIONS.getOrNull(index) ?: return
+        destination.section?.let { onOpenSection(it); return }
+        val pick = HomeModel.randomGame(games.orEmpty() + retro + others)
+        if (pick == null) {
+            EsDeNavigationSounds.play(UiSound.BUMP)
+        } else {
+            EsDeNavigationSounds.play(UiSound.CONFIRM)
+            openPage(pick)
+        }
+    }
 
     // A strip card's one verb (docs/SPEC.md 7i, "Home"): a game update opens the game's page, an addition the
     // place it went to, plugin updates Plugins, the attention card its page, a friend the chat, a download
@@ -1037,7 +1052,7 @@ internal fun PcGamesSection(
                         GamepadAction.A -> {
                             if (onHomeStrip) homeTab?.cards?.getOrNull(state.homeCard)?.let(::openCard)
                             else if (state.onShelves && state.headingFocused) currentShelf?.let(::openShelf)
-                            else if (onDest) HOME_DESTINATIONS.getOrNull(state.destIndex)?.let { onOpenSection(it.section) }
+                            else if (onDest) openDestination(state.destIndex)
                             else if (state.stripFocused) activateChip(state.stripIndex)
                             else if (onFreeRow) toggleFree()
                             else if (focusedTile != null) state.showGrid(focusedTile.query)
@@ -1129,10 +1144,7 @@ internal fun PcGamesSection(
                     } else {
                         null
                     },
-                    onOpenSection = { index ->
-                        state.destIndex = index
-                        onOpenSection(HOME_DESTINATIONS[index].section)
-                    },
+                    onOpenSection = ::openDestination,
                     columnState = columnState,
                     rowState = ::rowState,
                     onTapCapsule = { shelf, item, entry ->
@@ -1784,13 +1796,17 @@ internal fun needsAttentionScreen(items: List<AttentionItem>): dev.droidtop.libr
         },
     )
 
-/** A tile on Home's destination row: where it goes and what it is called. */
-internal class HomeDestination(val section: GamingSection, val label: String)
+/** A tile on Home's destination row: where it goes ([section]; null for Random game) and what it is called. */
+internal class HomeDestination(val section: GamingSection?, val label: String)
 
-/** Home's destination row: the Retro and PC game menus, in the left menu's order. */
+/**
+ * Home's destination row: the Retro and PC game menus, in the left menu's order, then Random game
+ * (Droidtop/tracker#507), which opens one game picked at random from everything Home holds.
+ */
 internal val HOME_DESTINATIONS = listOf(
     HomeDestination(GamingSection.GAMES, "Retro Games"),
     HomeDestination(GamingSection.PC_GAMES, "PC Games"),
+    HomeDestination(null, "Random game"),
 )
 
 /**
