@@ -2502,6 +2502,19 @@ the `ContainerRuntime` interface that already exists (§3):
   (`docker.io/library/nginx`, sizes as "21.4 MB") on the podman front. CREATED is the time droidtop made the
   container (`ContainerPrograms.recordCreated`, from every place droidtop creates one: `run` and the two Create rows
   in Containers); a container made before this has an empty CREATED rather than a guessed one.
+  **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
+  none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
+  device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept
+  in `pods.json` beside the containers' program settings; members by container id). `podman pod create [--name
+  NAME]` (`-p` answers "not built yet"; a pod made without a name is `pod_` and the start of its id) prints the pod's
+  id, 64 hex digits as Podman's are. `pod ps` prints POD ID (its first 12), NAME, STATUS (Created with no
+  containers, Running with every program up, Degraded with some, Exited with none), CREATED and # OF CONTAINERS.
+  `pod start` and `pod stop` start and stop every member's program as `podman start` and `podman stop` do (restart
+  policies included). `pod rm` removes the pod and its containers, through the one removal path; with any member
+  running it refuses unless `-f`, which stops them first. `podman run --pod POD` puts the new container in a pod and
+  `--pod new:NAME` makes the pod with it. A pod is named by its name, its id or a unique start of the id (three
+  characters or more). Removing a container, from anywhere, takes it out of its pod. The other `pod` subcommands,
+  `generate`, `play` and `kube` answer "not built in droidtop yet".
   **The podman command (built 2026-10-16, Droidtop/tracker#555 D11).** Every container also has `podman` on its
   `PATH`: a second command front over the same engine, not a second runtime (the owner's decision on #555: one
   engine, docker and podman fronts). Both fronts are `EngineCli` (`EngineCli.DOCKER`, `EngineCli.PODMAN`), each
@@ -2509,8 +2522,8 @@ the `ContainerRuntime` interface that already exists (§3):
   so a request says which front sent it. Each reads its tool's syntax into the one request model (`EngineRequest`:
   ps, images, logs, start, stop, exec, pull, run, rm, info), which droidtop answers one way
   (`ContainerEnterRequests`); a front's answers and refusals carry its own name ("podman run: --memory needs
-  cgroups, ..."). For this subset the two tools' syntax is the same. `podman pod`, `generate`, `play` and `kube`
-  answer "not built in droidtop yet" (pods come with D12). Their own defaults and output (Docker's daemon-style
+  cgroups, ..."). For this subset the two tools' syntax is the same. `podman generate`, `play` and `kube`
+  answer "not built in droidtop yet"; pods came with D12 (above). Their own defaults and output (Docker's daemon-style
   defaults and field names, Podman's rootless defaults and output) are D12. Neither name can be exported by a
   container.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
