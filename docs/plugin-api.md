@@ -3482,13 +3482,41 @@ droidtop's UID).
 | droidtop's classes in-process (no filtering class loader) | contained, open | partial: loadable, but droidtop's Application returns early there, so its state never starts | to do | none |
 | Several full-access plugins in one slot past eight | full | partial: they share droidtop's UID anyway | the separate-UID decision below | none |
 
-**The decision these rows wait on.** Against code running as droidtop's
-own UID, Android's only real boundary is the UID: such code reaches
-droidtop's components and uses droidtop's Android permissions whatever
-droidtop checks. So rule 1 for open and full access, and rule 2 for open,
-need those plugins to run under a UID that is not droidtop's (a companion
-plugin-host app of its own). That is put to the owner (2026-10-16); until
-it is answered the rows above stay open.
+**A UID of its own, as a sandbox feature (design, 2026-10-16).** The owner,
+on a companion app, verbatim: "companion app? This should be a sandbox
+functionality". So every plugin process runs under an isolated UID, and
+what an open or full-access plugin may do is granted by the sandbox
+library's broker, never by sharing droidtop's UID. What Android allows an
+isolated process, with AOSP sources, is in the sandbox's `docs/design.md`,
+"A UID of its own for every confined process". In short:
+
+- **Network (`net.sockets`): yes, through the broker.** An isolated process
+  can never create an internet socket, but from Android 11 (API 30) it may
+  use one droidtop created and handed over (no `ioctl`, no `listen` or
+  `accept`). The broker opens and connects sockets for the plugin, accepts
+  on a listening port the plugin was granted and hands each connection
+  over, and answers DNS. Below API 30 the plugin gets a Unix stream the
+  broker splices to the network socket. Its traffic is droidtop's on
+  Android's per-app network rules.
+- **The GPU (`gpu.render`): not inside an isolated process, on any Android
+  version** (sepolicy `neverallow` on `gpu_device` for `isolated_app_all`).
+  A plugin draws on the CPU into frames droidtop composites, as a contained
+  Flutter screen already does, unless a GPU process under droidtop's UID
+  runs its drawing (Chromium's model; not built).
+- **Direct OS use for full access: not under an identity of its own.** An
+  isolated UID holds no Android permission and can never be granted
+  Shizuku (Shizuku authorizes by the caller's package). What the sandbox
+  can give is a **binder relay**: the plugin's calls to an allowlisted
+  system service (and to Shizuku's binder, which droidtop holds) go through
+  a relay in droidtop's process that refuses any transaction naming one of
+  droidtop's own components and forwards the rest; the OS sees droidtop's
+  identity and permissions, and droidtop's internals stay out of reach.
+
+Two choices are the owner's before this is built (asked 2026-10-16): what
+`gpu.render` becomes (CPU frames only, a GPU process under droidtop's UID,
+or a named exception), and whether full access's direct OS use is the
+relay under droidtop's identity. Until then the rows above marked open
+stay open.
 
 ---
 
