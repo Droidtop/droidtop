@@ -37,6 +37,15 @@ class SourceDestinationsTest {
     }
 
     @Test
+    fun `a console system with no folder of its own gets one under the first games folder`() {
+        val root = File("/games")
+        val pick = SourceDestinations.pick("snes", null, null, systems, emptyList(), emptyList(), firstRoot = root)
+        assertEquals(File(root, "snes"), pick.folder)
+        // With no games folder at all there is still nowhere to put it.
+        assertEquals(null, SourceDestinations.pick("snes", null, null, systems, emptyList(), emptyList()).folder)
+    }
+
+    @Test
     fun `a result that names a console system goes to that system folder`() {
         val pick = SourceDestinations.pick(null, null, "PSP", systems, listOf(pspFolder to psp), listOf(root))
         assertEquals("psp", pick.systemId)

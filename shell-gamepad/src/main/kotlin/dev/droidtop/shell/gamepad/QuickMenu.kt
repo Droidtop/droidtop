@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad
 
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -142,6 +141,8 @@ internal fun QuickMenu(
     /** Whether [openPlace] would open this place in the current mode (Kiosk and Kid hide the device-management places). */
     placeAvailable: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
+    // The running console game's system searched (docs/SPEC.md 12a, "One search: where it opens"): its id and name.
+    onSearchSystem: (systemId: String, systemName: String) -> Unit = { _, _ -> },
 ) {
     val window = currentShellWindow()
     // The shared side-panel frame (SidePanel.kt): a right-edge panel, or a bottom sheet on a screen held upright.
@@ -246,7 +247,7 @@ internal fun QuickMenu(
                 key(section) {
                     when (section) {
                         QuickSection.GAME -> runningEntry?.let {
-                            GameTab(it, library, onResume, onQuit, quitOutcome, close)
+                            GameTab(it, library, onResume, onQuit, quitOutcome, close, onSearchSystem)
                         }
                         QuickSection.APPS -> AppsTab(close)
                         QuickSection.NOTIFICATIONS -> NotificationsTab(close)
@@ -818,10 +819,8 @@ private fun PluginsTab(
     )
     replyScreen?.let { screen ->
         val close = { replyScreen = null }
-        androidx.compose.ui.window.Dialog(onDismissRequest = close) {
-            GatePadInThisDialog()
-            CatalogNavigator(root = screen, onExit = close)
-        }
+        // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
+        CatalogSheet(root = screen, onExit = close)
     }
 }
 
@@ -859,6 +858,7 @@ private fun GameTab(
     onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
     quitOutcome: dev.droidtop.library.QuitResult?,
     onDismiss: () -> Unit,
+    onSearchSystem: (systemId: String, systemName: String) -> Unit,
 ) {
     var focusIndex by remember(entry.id) { mutableStateOf(0) }
     val focusRequester = remember { FocusRequester() }
@@ -927,6 +927,17 @@ private fun GameTab(
                                 if (dev.droidtop.library.consoles.GameEmulatorChoice.save(library, entry, next)) emulatorChoice = next
                             }
                         },
+                    ),
+                )
+            }
+            // A console game's system, searched (owner, 2026-10-14: "We also want per-console search items"): its games
+            // and the sources that serve it, a download landing in its folder, as Search SNES in its list does.
+            emulators?.system?.takeIf { entry.kind == dev.droidtop.library.LibraryEntryKind.CONSOLE_ROM }?.let { system ->
+                add(
+                    GameQuickTile(
+                        title = dev.droidtop.shell.gamepad.query.SearchEntry.systemLabel(system.displayName),
+                        subtitle = null,
+                        action = { onSearchSystem(system.id, system.displayName) },
                     ),
                 )
             }

@@ -155,8 +155,23 @@ object AddonKeyboardRules {
      * ([companionDisplays]); one that is off, hidden (Kiosk, Kid), covered by a full-screen app, or absent on a
      * single-display device is not. The internal screen hosts it when droidtop can draw there ([internalAvailable])
      * and the field is not already on it. Anything that cannot be honoured falls back to the field's own screen.
+     * With an assistive service on ([assistive]: TalkBack, Switch Access, Select to Speak), the system keyboard types
+     * instead, the one those services are built to drive (Droidtop/tracker#485 S7 5.6; a rig check with TalkBack on
+     * the RP5 decides whether droidtop's slab with its key semantics replaces it).
      */
     fun keyboardPlacement(
+        setting: KeyboardPlacement,
+        fieldDisplay: Int,
+        companionDisplays: Set<Int>,
+        companionHostsKeyboard: Boolean,
+        internalAvailable: Boolean,
+        assistive: Boolean = false,
+    ): KeyboardPlacement = when {
+        assistive -> KeyboardPlacement.NOT_CONTROLLED
+        else -> placementFor(setting, fieldDisplay, companionDisplays, companionHostsKeyboard, internalAvailable)
+    }
+
+    private fun placementFor(
         setting: KeyboardPlacement,
         fieldDisplay: Int,
         companionDisplays: Set<Int>,

@@ -38,6 +38,8 @@ android {
 dependencies {
     // The Notice model and NoticeColors live there, next to the theme mapping they derive from.
     api(project(":runtime-common"))
+    // The text-entry slab (Slab, SlabView) that TextEntry hosts (docs/SPEC.md 4c, Droidtop/tracker#485 S7).
+    api(project(":input-keyboard"))
     implementation(libs.androidx.core.ktx)
     implementation(platform(libs.androidx.compose.bom))
     api(libs.androidx.compose.ui)

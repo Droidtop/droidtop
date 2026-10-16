@@ -363,6 +363,10 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        // droidtop (Droidtop/tracker#564): a stacked widget sizes every member of its stack, hidden ones included.
+        if (getTag() instanceof com.android.launcher3.model.data.LauncherAppWidgetInfo stacked) {
+            WidgetStacks.onShown(getContext(), getAppWidgetId(), stacked.spanX, stacked.spanY);
+        }
         mIsAttachedToWindow = true;
         checkIfAutoAdvance();
     }

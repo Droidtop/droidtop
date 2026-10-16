@@ -121,7 +121,7 @@ object InWindowKeyboard {
         private fun show() {
             val sink = WindowKeySink { decor }
             val displayId = decor.display?.displayId ?: return
-            when (val opened = KeyboardTargets.open(displayId, sink) { elsewhere = null; dismissed = true }) {
+            when (val opened = KeyboardTargets.open(displayId, sink, onHide = { elsewhere = null; dismissed = true }, assistive = KeyboardTargets.assistiveOn(decor.context))) {
                 is KeyboardTargets.Opened.Elsewhere -> {
                     elsewhere = opened.request
                     return

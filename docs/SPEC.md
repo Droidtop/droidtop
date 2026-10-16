@@ -1067,8 +1067,9 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     id (`WidgetConfigs`) and forgotten when the widget is removed. A game that left the library says so, and a tap
     picks again.
   - **Downloads**: the downloads running or paused with their progress, then how many games have an update; a row
-    opens Downloads or Updates. Drawn again when the jobs change, at most every 2 s (`DownloadsWidgetProvider.watch`,
-    following `PluginJobsCenter` from :app's start).
+    opens Downloads or Updates. With nothing running and no update, a tap anywhere on it opens Downloads
+    (`DroidtopWidgets.rows(emptyTap)`; it did nothing, rig on 0.2.0-dev.2070). Drawn again when the jobs change, at
+    most every 2 s (`DownloadsWidgetProvider.watch`, following `PluginJobsCenter` from :app's start).
   - **Shelf**, with the first widget maker (`ShelfConfigureActivity`, opened on placement and to reconfigure):
     recently played, recently added, favourites, one of the person's collections or a system that has games, as a
     grid of art (a `RemoteViewsService` collection, `ShelfWidgetService`, each cell filling in its game's id) or a
@@ -1139,7 +1140,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Drawer folders: a drawer tab marked "Show as a folder in All" (the tab chip's long-press menu) is one folder in All, its apps leaving the list; it opens the same folder view as the home screen (built 2026-10-16, Droidtop/tracker#564) | HAVE | One model: the tab (`DrawerTabs.Tab.folder`). Coordinator, 2026-10-16: "Drawer folders: keep one data model... tapping the tile opens the same popup folder view the home screen uses (reuse that view, not a copy)". `AlphabeticalAppsList.onAppsUpdated` makes a `FolderInfo` per such tab on the personal list in All (two apps or more; a folder of one is just the app), in no database, and `BaseAllAppsAdapter.VIEW_TYPE_DRAWER_FOLDERS` is one row of them above the Recent row, each from `FolderIcon.inflateDrawerFolder`. That folder is read only (`Folder.setDrawerFolder`, `LauncherDelegate.DrawerFolderDelegate`): it opens and starts apps as any folder does, but nothing in it is dragged, renamed, saved or turned back into an icon. Its apps change from the tab ("Drawer tabs" in an app's menu, or the tab itself) |
 | Home screen lock (no moving, adding or removing icons and widgets), labels hidden everywhere or shown on Home only, drawer side padding (Murine upstream's, taken 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.LOCK_HOME_SCREEN` (`Launcher.isDraggingEnabled`), `LabelVisibility.NEVER_FULL`/`NEVER_DRAWER`, `LauncherPrefs.DRAWER_PADDING`; shell-default/UPSTREAM.md lists the commits. "Home only" shows labels on the home screen as Always does: it used to mean Auto there, which drops labels where the layout is short of room, so on a landscape handheld it showed none (rig, 2026-10-16; Always worked). The rule is `LauncherLabels` in `:runtime-common`, used by `DeviceProfile` and tested there |
 | Folder covers, per folder: swipe to open (a tap starts the folder's first app, a swipe up on the icon opens the folder) and a cover (the folder shows its first app's icon in place of its preview) (built 2026-10-16, Droidtop/tracker#564) | HAVE | The open folder's footer has a Folder options button (`Folder.showOptions`), two ticks saved with the folder as `FolderInfo.FLAG_SWIPE_TO_OPEN` and `FLAG_COVER` in its `options` column, read only while the home screen is locked. The first app is the lowest rank (`FolderInfo.firstApp`), so reordering the folder changes it. The tap goes through `ItemClickHandler.onClickAppShortcut`, the same path as an icon's tap. The swipe is `FolderIcon.handleSwipeToOpen`: claimed from the workspace at half a touch slop when it goes more up than sideways (before the drawer's own swipe up takes it at one), so a page swipe that starts on the folder still pages. The cover is drawn in `FolderIcon.drawCover` from the app's in-memory icon, with the notification dot kept. A folder's own picture, drawn in place of both the preview and a cover, is one of the per-icon options below (built 2026-10-16) |
-| Widget stacks: several widgets in one place on the home screen; a vertical swipe on it shows the next, and dots down its edge show which (built 2026-10-16, Droidtop/tracker#564) | HAVE | The shown widget is the model's item; the others are bound to the launcher's widget host and listed in a side table (`WidgetStackTable` in `:runtime-common`, pure and unit-tested; `WidgetStacks` keeps it in the launcher's preferences). A swipe swaps the item's widget id and provider for the next member's and binds it again (`WidgetStacks.swipe`, from `LauncherAppWidgetHostView`). It is claimed from the workspace at half a touch slop when vertical, and not taken while what is under the finger can still scroll that way, so a list widget scrolls first. Adding: the widget's resize frame (after a long press) has a "Stack a widget here" button. `WidgetStackActivity` lists the device's widgets, gives the chosen one an id on the launcher's host, binds it (asking when the system wants that), runs its setup, and shows it in the stack. The one model change is the ghost-widget cleanup sparing live stacks' hidden widgets (shell-default/UPSTREAM.md, "Deliberate local changes"; coordinator, 2026-10-16: "Widget stacks: go with your design... Keep the Launcher3 change to that single removeGhostWidgets hook"), because the loader keeps only widgets on the grid that overlap nothing. Removing the shown widget removes the stack, and its other widgets are freed at the next load. Taking one widget out of a stack is not built |
+| Widget stacks: several widgets in one place on the home screen; a vertical swipe on it shows the next, and dots down its edge show which (built 2026-10-16, Droidtop/tracker#564) | HAVE | The shown widget is the model's item; the others are bound to the launcher's widget host and listed in a side table (`WidgetStackTable` in `:runtime-common`, pure and unit-tested; `WidgetStacks` keeps it in the launcher's preferences). A swipe swaps the item's widget id and provider for the next member's and binds it again (`WidgetStacks.swipe`, from `LauncherAppWidgetHostView`). It is claimed from the workspace at half a touch slop when vertical, and not taken while what is under the finger can still scroll that way, so a list widget scrolls first. Adding: the widget's resize frame (after a long press) has a "Stack a widget here" button. `WidgetStackActivity` lists the device's widgets, gives the chosen one an id on the launcher's host, binds it (asking when the system wants that), runs its setup, and shows it in the stack. The one model change is the ghost-widget cleanup sparing live stacks' hidden widgets (shell-default/UPSTREAM.md, "Deliberate local changes"; coordinator, 2026-10-16: "Widget stacks: go with your design... Keep the Launcher3 change to that single removeGhostWidgets hook"), because the loader keeps only widgets on the grid that overlap nothing. Removing the shown widget removes the stack, and its other widgets are freed at the next load. Taking one widget out of a stack is not built. Every member, hidden ones included, is given the place's size as its widget options whenever the stack is made, a member is shown, or the stacked widget's view comes on screen (`WidgetStacks.sizeMembers`, by widget id, off the main thread): members are bound without size options, and a provider that lays out from them (the system Digital clock) otherwise drew for 0x0 (rig on 0.2.0-dev.2070) |
 | Per-icon options on the home screen, in the dock and in folders: a title of the icon's own, a picture in place of its icon, and what a swipe up or down on it does (an action of Standard's or an app); a folder's own picture in place of its preview (built 2026-10-16 for the Nova and Apex import, Droidtop/tracker#564: both launchers have them) | HAVE | An app icon's long-press menu has Customize (not while the home screen is locked): Title, Choose a picture / Remove the picture, Swipe up, Swipe down. A folder's options (its footer button) have Choose a picture / Remove the picture. All are kept per item id by `HomeItemExtras` (`dev.droidtop.shell.standard`): the title as Launcher3's own per-item label (`IconPreferences`' instance labels, which the loader had applied to pinned shortcuts only), the picture as a PNG in the app's files (`home_item_pictures/<id>.png`, fitted into a square of at most 384 pixels, read into memory as the workspace loads so no view reads a file), the swipes as `HomeAction`s in one JSON object in the launcher's preferences (`home_item_swipes`). They are drawn when a view applies its item (`BubbleTextView.applyLabel` and its icon, the folder preview, `FolderIcon`'s cover), so an icon refresh keeps them, and forgotten when the item is deleted (`ModelWriter`). A title equal to the app's own clears it; a picture is never themed. The picture is picked with the system's file picker (`ItemPictureActivity`, `ACTION_OPEN_DOCUMENT`, images only, at most 16 MB read). An icon's swipe is claimed from the workspace as a folder's swipe to open is, one shared rule (`IconSwipe`: half a touch slop to claim, more vertical than sideways, one slop to fire), and only in a direction the icon has an action for, so the workspace's own swipe up (the drawer) and swipe down (its gesture) still work from an icon with nothing set. Per-app titles from the drawer (App info's rename) stay as they were, for every icon of that app. Standard's own backup (Settings > Backup) carries the pictures, one flat entry each (`home_item_picture_<id>.png`), and a restore replaces them; titles and swipes are in the preferences it already carries |
 | Import from Nova or Apex: a `.novabackup` or `.apexbackup` (or Apex's older loose `apex_settings.bak` / `apex_data.bak`) as Standard's home screen (built 2026-10-16, Droidtop/tracker#564; the coordinator cleared it with the formats in the tracker's coordination/standard/launcher-import-formats.md, read from decompiled Apex 4.9.20 and Nova 8.0.18) | HAVE | The scope, relayed by the coordinator, 2026-10-16: "The owner wants Nova's and Apex's features in Standard, not only their layouts. So for the items the document lists as having no droidtop equivalent, build the equivalent where it's a real launcher feature: per-icon swipe actions, a custom icon and title per item, a custom folder image, and gestures that launch an app. Then import those too. Some things can't come across, like Nova's or Apex's own custom widgets. Show those in an import summary with plain reasons; never drop them silently." Settings > Misc > Backup > Import from Nova or Apex: the system's file picker (Apex's own folder under Android/data is not readable by other apps), then a summary, then Import. **Read** (`dev.droidtop.runtime.launcherimport`, pure, tested from the document's schemas): ZIP entries by base name only, each and in total capped (32 and 64 MB), a zipped `.novabackup` unwrapped once; preferences by a strict reader of the `<map>` format (no entity expanded); the database copied to the cache, opened read-only, its tables read as rows and the copy removed. Every column and key is read by presence, never by version, so older layouts read alike (Nova's `launcher.db` and legacy preferences, the pre-7.1 grid ints, `workspaceScreens` screen ids, `appgroup:` members, hidden apps at group 0). Intents are data: only a plain launch of an installed app's launcher activity is kept. **Mapping**: home and dock items, folders (with their name and multi-page flags; Nova's swipe-to-open folder becomes a cover folder with swipe to open), widgets as Launcher3's "tap to set up" placeholders (`appWidgetId` -1, restored `FLAG_ID_NOT_VALID`, `FLAG_PROVIDER_NOT_READY`, `FLAG_UI_NOT_READY`, as Nova's own restore does), grid and dock size, label switches (Apex), icon pack, gestures (to Standard's actions, or Open an app), hidden apps (added to droidtop's), drawer tabs and drawer folders (a Nova folder or Apex folder whose apps also stayed in the main list becomes a tab, said so in the summary), drawer renames (Nova), and each icon's own title, picture and swipes and a folder's own picture (the per-icon options above). Nova's half cells double the grid when it stays within 10, else round down; anything that then overlaps moves to the first free cell or a new page. Only the default dock page exists in droidtop. **Fitted to the device** (`ImportCheck`): apps not installed, widgets whose app is not, an icon pack that is not, and swipes or gestures to a missing app are left out; a folder left with one app becomes that app. **Never silent**: everything not brought across is a line of the summary with its reason (pinned shortcuts, which only their app can pin again; Nova's and Apex's own widgets; launcher actions droidtop has no equivalent of; other dock pages; gestures droidtop has no slot for; drawer-only custom icons), and so is everything changed on the way. **Apply** (`LauncherImport`, `LauncherImportActivity`): the grid and dock size first, on the main thread where the device profile follows them; then on the model thread the database for that grid (`tryMigrateDB`, as a grid change does) has every item replaced in one transaction; then the settings; then the launcher loads again. The import replaces the home screen and dock; drawer tabs, hidden apps and renames are added to. The file's entry list, its database's `user_version` and the Nova hidden-apps group's rows are logged (`droidtop.LauncherImport`) for the rig check the document asks for: there was no real backup file when this was built |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
@@ -4016,6 +4017,13 @@ intent filters and user-facing strings all survive.
 
 ### The companion's tabs (decided 2026-10-02, Droidtop/tracker#247, #273)
 
+**The keyboard is part of the companion (owner, 2026-10-16: "by default, it's PART of the companion,, especially if droidtop is set as the keyboard").**
+While a field on the other screen wants keys, droidtop's keyboard slab is docked at the bottom of the companion's own
+layout, under whatever tab is showing (`CompanionDockedSlab`), not a separate floating panel and not a switch to the
+Input tab. This is the default for droidtop's own text entry and always the case when droidtop is the system
+keyboard, whose requests come the same way (`KeyboardTargets.companion`). Changing tab keeps it; the Input tab, which
+types into the request already, shows no second one.
+
 The companion is a tabbed, touch-only second screen. One entry, `CompanionTabs` (`:app`), is drawn by
 every host that draws the companion (the registry's `Surface`, used by `SecondScreenPresentation` and
 `SecondaryDisplayActivity`, and `CompanionActivity`). Standard draws the same tabs (decided 2026-10-08, Droidtop/tracker#347): its own
@@ -4962,12 +4970,56 @@ rig check in the commit message.
   dialog, the metadata editor, a new collection's name) draw `OwnFieldKeyboard` under the field. Its
   keys are dispatched into the field's own window as keys of Android's virtual keyboard device, the
   path an attached keyboard takes: no input method, no window focus, no permission. The panel is
-  never a focus target, so a tap on a key leaves focus on the field.
+  never a focus target, so a tap on a key leaves focus on the field. It stands only while the person
+  types in the field: a page whose cursor moves from the field to its rows (the search) closes it,
+  wherever it is shown, the companion's Input controller included, and it comes back with the cursor
+  (`OwnFieldKeyboard(active)`; the companion's stayed up over the results, Droidtop/tracker#485 rig step 1).
 - **One keyboard at a time (Droidtop/tracker#523).** When a droidtop field's keys are served on another screen
   (`KeyboardTargets.open` answers `Elsewhere`: the companion's Input controller or the internal screen), Android's own
   keyboard is sent away from the field's window while the request stands (`KeyboardTargets.hideAndroidKeyboard`, from
   `OwnFieldKeyboard` and `InWindowKeyboard`): the field keeps its focus and its keys, and nothing covers it on the
   screen the person is looking at. The text-entry design itself is the UI quality pass's (Droidtop/tracker#485 S7).
+- **The text-entry slab (Droidtop/tracker#485 S7; owner, 2026-10-14: "our text popup appears a lot different than
+  steams, which is weird"; built from slice 6, 2026-10-16).** One pad-driven keyboard slab in every host, whose
+  model is `Slab` (`:input-keyboard`, pure, `SlabTest`):
+  - layers: letters (a number row, qwerty, Shift row, bottom row), symbols (every printable ASCII character, Tab,
+    Esc) and email (`@` and `.` on the Shift row); a number entry opens on symbols, an email entry on email; Large
+    keys (automatic at font scale 1.3) drop the number row to symbols;
+  - the cursor: left and right wrap within a row, up and down land on the key nearest the current one's centre (a
+    wide key is never skipped), Up from the top row is the host's (the plate's controls), and the slab opens on `g`;
+  - the pad: A presses the focused key, X Backspace, Y Space, L1 Shift (one capital; a second press within 400 ms
+    holds Caps; another lets go), R1 the symbols layer and back, R2 Enter labelled by purpose (Search, Save, Done,
+    Next, Go), B Done on a Field and Cancel on a Prompt, Select the clipboard; each such key shows its pad button.
+  The face-button map and the double press for Caps are the design's own and are to compare with a Deck: Valve
+  documents none for the Deck's keyboard (coordinator, 2026-10-16, from the public reference on #485, comment
+  6224222271). There is no emoji page (the Deck's emoji menu is a difference noted there, not adopted); the email
+  layer follows the Deck API's email mode.
+  - Drawn by `SlabView` (`:input-keyboard`): rows of 38 dp (Large keys 48 dp) with 6 dp gaps, so 226 dp (222 dp
+    Large); keys on the theme's card colour over its overlay surface; the focused key scaled 1.06 on the focused fill
+    with a 3 dp accent ring; labels 18 sp for a character and 15 sp for a named key, both capped at 60% of the row;
+    each pad key's printed button (from the host's controller layout, so a Nintendo pad's Backspace keycap reads Y)
+    in its lower right, at least 14 sp; every press, by pad or touch, an 80 ms flash and a keyboard haptic tick. It is
+    never a focus target: the host forwards the pad's keys to it and the field keeps focus.
+  - Hosted by `TextEntry` (`:ui-shared`) in two forms: `TextEntryField`, a plate in place with the slab under it (B
+    keeps the text and leaves; R2 submits), and `TextEntryPrompt`, Steam's rename dialog (a card at most 560 dp wide
+    above the slab, the page dimmed at 0.6, a 20 sp title, the plate, small Cancel and Save buttons; B cancels). The
+    plate is a real text field whose input method stays away (`showKeyboardOnFocus = false`), at least 64 dp (56 dp
+    for search) on 6 dp corners with a 2 dp accent underline. The slab's presses edit the value directly
+    (`TextEntryEdits`, tested: typing at the caret replacing a selection, Backspace, the caret's moves, the length
+    limit). Where the keys are typed elsewhere (the companion, the internal screen), the host passes no slab and a cue
+    under the plate.
+  - Where the keys are typed (S7 5.6) is "Keyboard displays on" through `KeyboardTargets.placement`, Companion by
+    default (owner, 2026-10-16: "by default, it's PART of the companion,, especially if droidtop is set as the keyboard"; this settles the design's open question on the default): the
+    slab docked in the companion's layout while a companion is started on another screen (one that is absent, asleep or
+    stopped is not, and the field's own screen types instead, silently), the internal screen, or this screen. With an
+    assistive service on (TalkBack or touch exploration, Switch Access, Select to Speak: `KeyboardTargets.assistiveOn`)
+    the system keyboard types instead, whatever the setting (`AddonKeyboardRules.keyboardPlacement(assistive)`),
+    since those services are built to drive it; a TalkBack pass on the RP5 decides whether the slab with its key
+    semantics replaces it. Every host asks the same rule: the field keyboard, the in-window keyboard and the
+    keyboard over other apps.
+  - The globe key (System keyboard, on the bottom row) hands only the current entry to the system keyboard: the slab
+    goes, the plate reads "System keyboard. B returns to droidtop's", and B brings the slab back.
+  - Moving the existing fields onto it is slice 8.
 - **Other apps on the add-on display: droidtop's input method, drawn where the app is.** droidtop's
   keyboard is already a selectable input method; its connection to the focused editor exists even
   where Android draws no keyboard window. When an editor asks it for the keyboard
@@ -5059,12 +5111,13 @@ companion trackpad's pointer, `canPerformGestures`, see "Input (slice C12)"), wh
     other apps) asks `KeyboardTargets.open`, which answers draw it here, elsewhere, or nowhere. The
     keys always go to the asker's own sink (the window's keys, the input method's connection, or
     `RoutedKeyboardSink`), so the field keeps its focus wherever the keyboard is drawn.
-  - Companion: the companion switches to its own input controller, the Input tab
-    (`SecondScreenInputView`, the same keyboard and trackpad Desktop mode uses), whose keys go to the
-    requesting field while the request lasts, and is on the tab it was on again when the field
-    loses focus, its Hide is pressed or the request ends any other way. The tab the person chose is
-    never overwritten: the Input tab is what the strip shows while a request stands (`shown` in
-    `CompanionTabs`), so there is no remembered tab to lose (Droidtop/tracker#369). A Hide holds only
+  - Companion (owner, 2026-10-16: "by default, it's PART of the companion,, especially if droidtop is set as the keyboard"): the keyboard is part of the companion's layout. The slab
+    (`CompanionDockedSlab`: `SlabView` with `SlabSink` delivering into the request's sink) docks under
+    the tab that is showing while the request lasts, and goes when the field loses focus, its Hide or
+    the slab's Done is pressed, or the request ends any other way. The tab the person chose is never
+    overwritten or switched (Droidtop/tracker#369); changing tab keeps the keyboard, and on the Input
+    tab, which types into the request itself, no second keyboard docks. It used to switch the strip to
+    the Input tab for the request (until 2026-10-16). A Hide holds only
     until the field is asked for again: another field taking focus, a tap on the focused field
     (`InWindowKeyboard`), or the app asking the input method for the keyboard again
     (`LatinIME.onShowInputRequested`, `ShowRequests.reasked`) brings the keyboard back. It hosts only while a companion host is started on another
@@ -7100,9 +7153,12 @@ same file): without it, Android's grey status bar paints over the top of
 every dialog-hosted menu (Quick Menu, L2 menu, game page, filter/search),
 leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
 
-- **Bounce.** A fresh press of a key less than 25 ms after that key's own
-  release is a worn or noisy switch: the press, its repeats and its
-  release are dropped.
+- **Bounce.** A fresh press of a pad's key less than 25 ms after that key's
+  own release is a worn or noisy switch: the press, its repeats and its
+  release are dropped. A keyboard's keys are never debounced: a doubled
+  letter typed quickly, or by `adb shell input text`, is two presses of one
+  key inside the window, and the second was dropped ("Goodbye" arrived as
+  "Godbye" in the search field on BlueStacks, Droidtop/tracker#569).
 - **The stick and the hat are a D-pad.** Past half travel a direction is
   pressed, back under 0.3 it is released (the band between is hysteresis,
   inside it is the deadzone); the hat wins over the stick. A held stick is
@@ -15181,7 +15237,9 @@ topmost layer's hints and nothing else (no Start Menu, none of the screen's).
 A panel passes its own hints (`MenuPanel(hints = ...)`, default A Select,
 B Back) and draws no hint row inside itself; two sets never show at once.
 A catalog sheet (`CatalogSheet`) is such a layer and paints the ground under itself
-(Droidtop/tracker#278). A failed source search says one plain sentence and
+(Droidtop/tracker#278). It is the one way a catalog page opens over another screen: a page a search result opens,
+the Plugins page reached from search, a plugin action's reply, a plugin page from a game page (a bare dialog around
+`CatalogNavigator` drew translucent, the screen behind showing through; rig on 0.2.0-dev.2070). A failed source search says one plain sentence and
 keeps what the source reported behind a "Technical details" row, never the
 raw exception text. A layer is also the shell's rule for sound: while one is
 open, nothing plays beneath it (docs/SPEC.md "Launch audio hand-off": the
@@ -17872,6 +17930,15 @@ for exactly that dependency, as exclusive content: the group resolves
 from that repository alone, so no other repository (jitpack's timeouts
 failed CI, Droidtop/tracker#283) is asked for its snapshot metadata. The pin moves onto a fixed artifact when
 the fork cuts a real tag; no guessing a version meanwhile.
+
+**One Compose across modules** (2026-10-16, Droidtop/tracker#566). Every module compiles against the Compose the
+app ships, or a call into a newer Compose method dies at runtime: on the emulator rig (0.2.0-dev.2070) a plugin page
+crashed with `NoSuchMethodError` on `FlowRow` (Page.kt:128), because shell-default's material3 1.4.0 brings
+foundation and ui 1.9 into the app while the BOM (2024.09.00) compiled every other module against 1.7. The BOM is
+the one that matches (`composeBom` 2025.10.00), and `checkComposeVersions` (root `build.gradle.kts`, a step in
+android-checks) fails the build when any module's Compose versions differ from the app's release runtime; each
+module writes its own list (`writeComposeVersions`), as Gradle 9 refuses to resolve another project's
+configuration from a root task.
 
 ## 10b. Releases and updates (directed 2026-09-02)
 
@@ -21439,7 +21506,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 **One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
 
 - **Everything**: **Y on Home** and the search target in Home's top band: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The left menu has one **Search** row, the one in its order above (under Resume, not in Kiosk and Kid), which opens the same runner through `LauncherSearchScreen` with the matching settings too; there is no second Search row under Home (two branches each added one; the merge of 2026-10-15 kept that one).
-- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). Home's system tiles and the Quick Menu's Game section get the same row with Your library's systems (F7b) and the Quick Menu work.
+- **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The Quick Menu's Game section has the same row for a running console game's system ("Search SNES", between Emulator and Restart; it opens the one search over that system's games and the sources that serve it, the Quick Menu closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
 
 - **One list.** The device's rows (installed apps, library games; the caller
@@ -21491,7 +21558,10 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   unreachable host "It could not reach the site", an exception or stack
   "This source is not ready to run here yet", markup or a long unknown text
   "The site answered in a way droidtop could not read". A short plain reason
-  is kept as the source wrote it. What the source said stays behind the
+  is kept as the source wrote it. A source refused by droidtop's own permission check (PERMISSION_DENIED, or the
+  broker's '"<label>" is turned off for <plugin>' passed through by the plugin) reads "It needs "<label>", which is not
+  allowed for it", with "Open <source>'s page" under it, where it is allowed (`SourceFailures.permissionOff`;
+  Droidtop/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission). What the source said stays behind the
   "Technical details" row, with markup removed and at most 400 characters
   (`SourceOutcome.technical`). There is no "Get games" row (2026-10-16, Droidtop/tracker#218, "There is no
   Get games sheet" in 13); a source's own filters live on its page under Game sources (`SourceScreens`). A plugin's own full screen (`ui.main`) is opened
@@ -21575,7 +21645,12 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   and goes to the PC folder, which is a `windows` or `pc` system folder when
   the person has one, else the first games folder they named under Settings,
   Game folders (the PC walk finds a game under any of them). The plugin's
-  context carries `system` `pc` there. When no folder exists the result
+  context carries `system` `pc` there. A console system with no folder of its
+  own yet goes to `<first games folder>/<system id>`, made when the first
+  download is placed (#536's rule; rig on 0.2.0-dev.2070: a DS game listed
+  under Nintendo DS by its own file name, in a folder that resolved as another
+  system, left DS without a folder and Get games said "No games folder for
+  Nintendo DS yet"). When no games folder exists at all the result
   still opens, on a page that says which games folder is missing and where to
   add it, so a row is never a dead end and nothing is sent to `startJob`
   with an invented path.

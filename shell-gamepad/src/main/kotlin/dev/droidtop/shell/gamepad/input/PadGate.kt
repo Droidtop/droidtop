@@ -45,9 +45,12 @@ internal data class PadSyntheticKey(
  * the shell does with a raw press before any screen sees it. Pure, so the
  * unit tests drive it with numbers and a fake clock.
  *
- * - **Bounce.** A fresh press of a key less than [DEBOUNCE_MS] after that
- *   key's own release is a worn or noisy switch, not a person: the press,
- *   its repeats and its release are dropped.
+ * - **Bounce.** A fresh press of a pad's key less than [DEBOUNCE_MS] after
+ *   that key's own release is a worn or noisy switch, not a person: the
+ *   press, its repeats and its release are dropped. A keyboard's keys are
+ *   never debounced: a doubled letter typed quickly (or typed by `adb shell
+ *   input text`) is two presses of one key well inside the window, and the
+ *   second was dropped ("Goodbye" arrived as "Godbye", Droidtop/tracker#569).
  * - **The stick and the hat are a D-pad.** Crossing [ENTER_THRESHOLD]
  *   presses the direction, falling back under [EXIT_THRESHOLD] releases it
  *   (a hysteresis band, so a stick resting near the edge cannot chatter);
@@ -100,8 +103,8 @@ internal class PadGateCore(
      * A key event from the device. Returns true to deliver it unchanged,
      * false to drop it ([emit] may have delivered something in its place).
      */
-    fun onKey(keyCode: Int, down: Boolean, repeatCount: Int, deviceId: Int, fallback: Boolean, now: Long): Boolean {
-        if (down && repeatCount == 0) {
+    fun onKey(keyCode: Int, down: Boolean, repeatCount: Int, deviceId: Int, fallback: Boolean, now: Long, fromPad: Boolean = true): Boolean {
+        if (fromPad && down && repeatCount == 0) {
             val released = lastUp[keyCode]
             if (released != null && now - released < DEBOUNCE_MS) {
                 bounced += keyCode
@@ -352,6 +355,7 @@ class PadGate(
             deviceId = event.deviceId,
             fallback = (event.flags and KeyEvent.FLAG_FALLBACK) != 0,
             now = event.eventTime,
+            fromPad = fromPad(event),
         )
         if (!pass) {
             log(event, "dropped")
@@ -364,6 +368,12 @@ class PadGate(
         log(event, if (handled) "handled" else "unhandled")
         return handled
     }
+
+    /** Whether a key came from a pad (its buttons, or a device that is a gamepad or joystick), not a keyboard. */
+    private fun fromPad(event: KeyEvent): Boolean =
+        KeyEvent.isGamepadButton(event.keyCode) ||
+            (event.source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
+            (event.source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
 
     /**
      * [deliver], unless an overlay covers this window or the press went to

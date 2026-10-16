@@ -37,6 +37,8 @@ data class SourceOutcome(
      * Sign in or Open the site under the source's name ([PluginWebAccount]), never the plugin (Droidtop/tracker#544).
      */
     val access: PluginWebAccount.Need? = null,
+    /** Set when droidtop's own permission check refused it: the search offers the plugin's page, where it is allowed. */
+    val permissionOff: Boolean = false,
 ) {
     val hits: List<SourceHit> get() = results.map { SourceHit(source, it) }
 }
@@ -129,12 +131,13 @@ object PluginSearchAggregator {
             PluginErrorCode.BROWSER_CHECK_REQUIRED -> PluginWebAccount.Need.BROWSER_CHECK
             else -> null
         }
+        val permission = if (access == null) SourceFailures.permissionOff(reply?.message ?: said, reply?.code) else null
         val sentence = when (access) {
             PluginWebAccount.Need.SIGN_IN -> SourceFailures.NEEDS_SIGN_IN
             PluginWebAccount.Need.BROWSER_CHECK -> SourceFailures.NEEDS_BROWSER_CHECK
-            null -> SourceFailures.plain(said)
+            null -> permission ?: SourceFailures.plain(said)
         }
-        return SourceOutcome(source, emptyList(), failure = sentence, technical = technical, access = access)
+        return SourceOutcome(source, emptyList(), failure = sentence, technical = technical, access = access, permissionOff = permission != null)
     }
 
     /** [fanOutOutcomes] for a fetcher that has no failure channel of its own (the lookup composition): a throw or timeout is simply no results. */

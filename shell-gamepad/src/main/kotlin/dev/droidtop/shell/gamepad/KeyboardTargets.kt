@@ -57,16 +57,32 @@ object KeyboardTargets {
     private fun companionDisplays(): Set<Int> = companions.value.values.mapNotNull { it() }.toSet()
 
     /** Where the keyboard for a field on [fieldDisplay] goes right now. */
-    fun placement(fieldDisplay: Int): KeyboardPlacement = AddonKeyboardRules.keyboardPlacement(
+    fun placement(fieldDisplay: Int, assistive: Boolean = false): KeyboardPlacement = AddonKeyboardRules.keyboardPlacement(
         AddonKeyboard.placement.value,
         fieldDisplay,
         companionDisplays(),
         AddonKeyboard.companionHostsKeyboard.value,
         internalSurface?.available() == true,
+        assistive,
     )
 
-    fun open(fieldDisplay: Int, sink: KeyboardSink, onHide: () -> Unit = {}): Opened =
-        when (val target = placement(fieldDisplay)) {
+    /**
+     * Whether an assistive service that drives the system keyboard is on (TalkBack or any touch exploration, Switch
+     * Access, Select to Speak): then the system keyboard types (AddonKeyboardRules.keyboardPlacement). droidtop's own
+     * accessibility service (the taskbar) is not one.
+     */
+    fun assistiveOn(context: android.content.Context): Boolean {
+        val manager = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java) ?: return false
+        if (!manager.isEnabled) return false
+        if (manager.isTouchExplorationEnabled) return true
+        return manager.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .any { info -> ASSISTIVE.any { it in info.id.lowercase() } }
+    }
+
+    private val ASSISTIVE = listOf("talkback", "switchaccess", "selecttospeak")
+
+    fun open(fieldDisplay: Int, sink: KeyboardSink, onHide: () -> Unit = {}, assistive: Boolean = false): Opened =
+        when (val target = placement(fieldDisplay, assistive)) {
             KeyboardPlacement.NOT_CONTROLLED -> Opened.Nowhere
             KeyboardPlacement.SAME_SCREEN -> Opened.Here
             KeyboardPlacement.COMPANION -> {

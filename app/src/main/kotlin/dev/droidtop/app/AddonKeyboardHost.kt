@@ -473,7 +473,7 @@ internal class PlacedKeyboard {
             shownOn = null
             onHide()
         }
-        when (val opened = KeyboardTargets.open(displayId, sink, hidden)) {
+        when (val opened = KeyboardTargets.open(displayId, sink, hidden, assistive = windowContext()?.let { KeyboardTargets.assistiveOn(it) } ?: false)) {
             is KeyboardTargets.Opened.Elsewhere -> {
                 elsewhere = opened.request
                 shownOn = displayId

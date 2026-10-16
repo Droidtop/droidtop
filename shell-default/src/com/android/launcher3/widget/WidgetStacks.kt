@@ -87,9 +87,31 @@ object WidgetStacks {
         info.providerName = provider
         launcher.modelWriter.updateItemInDatabase(info)
         launcher.bindAppWidget(info)
-        // A member is bound without size options and no add, drop or load path sizes it, so a provider that
-        // lays out from them (the system Digital clock) drew for 0x0: blank. Send the place's size on every
-        // show; this also repairs members stacked before. Off the main thread, and only when changed.
-        launcher.workspace.getWidgetForAppWidgetId(member.id)?.let { WidgetSizes.updateWidgetSizeRanges(it, launcher, info.spanX, info.spanY) }
+        stackOf(launcher, member.id)?.let { sizeMembers(launcher, it, info.spanX, info.spanY) }
+    }
+
+    /**
+     * Every member of [stack] gets the place's size ([spanX] by [spanY]) as its widget options. A member is bound
+     * without size options and no add, drop or load path sizes it, so a provider that lays out from them (the system
+     * Digital clock) drew for 0x0, blank (rig on dev.2070: "sized once with widgetSizePx=0x0"). Sizing by widget id
+     * rather than through the shown view reaches the hidden members too, before any is first shown, and does not
+     * depend on the view being attached yet. Off the main thread; WidgetSizes sends only what changed.
+     */
+    @JvmStatic
+    fun sizeMembers(context: Context, stack: WidgetStack, spanX: Int, spanY: Int) {
+        val app = context.applicationContext
+        com.android.launcher3.util.Executors.UI_HELPER_EXECUTOR.execute {
+            val manager = android.appwidget.AppWidgetManager.getInstance(app)
+            stack.members.forEach { member ->
+                val provider = manager.getAppWidgetInfo(member.id) ?: return@forEach
+                WidgetSizes.updateWidgetSizeRangesAsync(member.id, provider, app, spanX, spanY)
+            }
+        }
+    }
+
+    /** A stacked widget's view came on screen (the launcher's load, a page change): its stack's members are sized. */
+    @JvmStatic
+    fun onShown(context: Context, appWidgetId: Int, spanX: Int, spanY: Int) {
+        stackOf(context, appWidgetId)?.let { sizeMembers(context, it, spanX, spanY) }
     }
 }

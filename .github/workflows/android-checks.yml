@@ -92,6 +92,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: ./gradlew :app:lintDebug --stacktrace
 
+      - name: One Compose version across modules
+        # A module compiled against another Compose than the app ships dies at runtime with NoSuchMethodError
+        # (Droidtop/tracker#566: the plugin page's FlowRow). The root build's checkComposeVersions compares every
+        # module's compile classpath with the app's release runtime.
+        if: ${{ !cancelled() }}
+        run: ./gradlew checkComposeVersions --stacktrace
+
       - name: Upload lint report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

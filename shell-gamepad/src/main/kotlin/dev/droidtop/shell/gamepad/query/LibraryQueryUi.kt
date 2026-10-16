@@ -71,7 +71,6 @@ import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.PluginStore
-import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
@@ -722,6 +721,11 @@ internal fun LibrarySearchDialog(
                             },
                         )
                     }
+                    // Refused by droidtop's own permission check: the plugin's page is where it is allowed (#485 rig step 5).
+                    val pluginId = (source as? PluginGameSource)?.source?.record?.manifest?.id
+                    if (status.outcome?.permissionOff == true && pluginId != null) {
+                        add(SearchLine.Entry("permission:${source.id}", "Open ${source.label}'s page", subtitle = "Allow it there, then search again") { openPlugin(pluginId) })
+                    }
                     val shown = technicalDetails[source.id]
                     if (shown != null) {
                         add(SearchLine.Note(shown))
@@ -863,8 +867,9 @@ internal fun LibrarySearchDialog(
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
-            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
-            dev.droidtop.shell.gamepad.OwnFieldKeyboard()
+            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314), only
+            // while the cursor is in the field: on the rows it closes, the companion's included (#485 rig step 1).
+            dev.droidtop.shell.gamepad.OwnFieldKeyboard(active = focusKey == null)
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 lines.forEach { line ->
                     when (line) {
@@ -885,10 +890,8 @@ internal fun LibrarySearchDialog(
             activeCatalog = null
             searchTick += 1
         }
-        Dialog(onDismissRequest = close) {
-            GatePadInThisDialog()
-            CatalogNavigator(root = screen, onExit = close)
-        }
+        // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
+        dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = close)
     }
 }
 

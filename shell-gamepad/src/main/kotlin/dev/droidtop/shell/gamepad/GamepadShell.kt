@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad
 
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.util.Log
 import dev.droidtop.library.userFacingErrorMessage
@@ -488,6 +487,8 @@ private fun GamepadShellBody(
     var leftMenuOpen by remember { mutableStateOf(false) }
     // The one search over the library, the apps, the download sources and the settings (the left menu's Search row).
     var globalSearchOpen by remember { mutableStateOf(false) }
+    // One system's search, opened from the Quick Menu's Game section: its id and name.
+    var systemSearch by remember { mutableStateOf<Pair<String, String>?>(null) }
     // The game screen of a Windows game sends Back here with openQuickMenu set (OwnGameScreens): the
     // menu opens on its Game section, since the game is running.
     LaunchedEffect(deepLinkToken) {
@@ -783,6 +784,10 @@ private fun GamepadShellBody(
                 quickMenuOpen = false
                 onLaunch(entry)
             },
+            onSearchSystem = { id, name ->
+                quickMenuOpen = false
+                systemSearch = id to name
+            },
             onQuit = { entry, restart ->
                 // The sheet stays open until the game really ended, so a
                 // quit that could not end it shows its reason in the row.
@@ -864,6 +869,33 @@ private fun GamepadShellBody(
             onPlay = onLaunch,
             settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
             onDismiss = { globalSearchOpen = false },
+        )
+    }
+    systemSearch?.let { (systemId, systemName) ->
+        // One system's search (docs/SPEC.md 12a, "One search: where it opens"): its games, matched in memory over the
+        // list already loaded, and the sources that serve it.
+        val systemGames = remember(gameEntries, systemId) { gameEntries.orEmpty().filter { it.systemId == systemId && !it.missing } }
+        dev.droidtop.shell.gamepad.query.LibrarySearchDialog(
+            query = dev.droidtop.shell.gamepad.query.LibraryQuery(),
+            matchCount = 0,
+            totalCount = systemGames.size,
+            onTextChange = {},
+            onDismiss = { systemSearch = null },
+            systemId = systemId,
+            localKey = systemGames,
+            local = { text ->
+                systemGames.filter { dev.droidtop.shell.gamepad.query.matchesSearchText(it, text) }.take(20).map { game ->
+                    dev.droidtop.library.integrations.LocalSearchRow(
+                        game.id,
+                        dev.droidtop.library.integrations.SearchRowKind.GAME,
+                        dev.droidtop.library.GameNaming.displayName(game.title),
+                        systemName,
+                    ) {
+                        systemSearch = null
+                        onLaunch(game)
+                    }
+                }
+            },
         )
     }
     // A store's cloud-save sync asks here when a game's saves differ (docs/SPEC.md 7g, "Stores").
@@ -1968,10 +2000,8 @@ private fun EntryDetailScreen(
     }
     pluginActionScreen?.let { screen ->
         val close = { pluginActionScreen = null }
-        androidx.compose.ui.window.Dialog(onDismissRequest = close) {
-            GatePadInThisDialog()
-            dev.droidtop.shell.gamepad.CatalogNavigator(root = screen, onExit = close)
-        }
+        // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
+        CatalogSheet(root = screen, onExit = close)
     }
 }
 

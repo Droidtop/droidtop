@@ -60,7 +60,11 @@
 # Class.forName(name).getConstructor(Context.class) creates them, so R8 must
 # keep the constructor even though no code calls it (a console build logged
 # NoSuchMethodException on MurineClockWidgetPlugin.<init>(Context)).
--keep class * implements com.android.launcher3.widget.custom.CustomWidgetPlugin {
+# The interface is com.android.systemui.plugins.CustomWidgetPlugin (shell-default/src_plugins); this rule named
+# com.android.launcher3.widget.custom.CustomWidgetPlugin, which does not exist, so it kept nothing. Release builds
+# then failed to create the clock widget's plugin, and its placeholder (a copy of the first installed widget, with
+# no size) showed in the picker as "Chrome Shortcuts 0 x 0" under droidtop (rig on 0.2.0-dev.2070).
+-keep class * implements com.android.systemui.plugins.CustomWidgetPlugin {
     public <init>(...);
 }
 
