@@ -8,6 +8,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -461,6 +462,13 @@ object MenuTokens {
     val Danger: Color get() = GamingTheme.palette.danger
     /** "This is on / included" -- the one affirmative in the menus. */
     val Affirmative: Color get() = GamingTheme.palette.affirmative
+
+    /**
+     * Ink on an [Affirmative] fill (a switch's knob when on): black or white, whichever reads on it. The knob was
+     * [OnSurface], near black in a light appearance, on a dark green track (rig 2026-10-16, Droidtop/tracker#559).
+     * 0.179 is the relative luminance where black and white give the same contrast.
+     */
+    val OnAffirmative: Color get() = if (Affirmative.luminance() > 0.179f) Color.Black else Color.White
     val SectionLabel: Color get() = GamingTheme.palette.sectionLabel
 
     /** Behind every page the shell draws: the grid, a detail, the PC surface. */
@@ -478,6 +486,21 @@ object MenuTokens {
     val OnSelected: Color get() = GamingTheme.palette.onSelected
     /** Under text laid over artwork: the gradient's dark end. */
     val Scrim: Color get() = GamingTheme.palette.scrim
+
+    /**
+     * What a side panel lays over the page behind it (the left menu, the Quick Menu): the theme's [Scrim] in a dark
+     * appearance; in a light one, black at [LIGHT_VEIL_ALPHA]. The light scrim is the pale ground at 80 percent,
+     * which washed the page out rather than setting it back (rig 2026-10-16, Droidtop/tracker#559); a modal
+     * dialog's own dim was already black ([ModalScrim]).
+     */
+    val Veil: Color get() = GamingTheme.palette.let { if (it.colors.isLight) Color.Black.copy(alpha = LIGHT_VEIL_ALPHA) else it.scrim }
+
+    /** [Veil] behind the Quick Menu, lighter for the reason [QuickPanelScrimAlpha] gives. */
+    val PanelVeil: Color get() = GamingTheme.palette.let {
+        if (it.colors.isLight) Color.Black.copy(alpha = LIGHT_PANEL_VEIL_ALPHA) else it.scrim.copy(alpha = QuickPanelScrimAlpha)
+    }
+    private const val LIGHT_VEIL_ALPHA = 0.45f
+    private const val LIGHT_PANEL_VEIL_ALPHA = 0.32f
     /** The favourite mark. */
     val Favourite: Color get() = GamingTheme.palette.favourite
     /** The plate behind a [Danger] message that sits over the page. */

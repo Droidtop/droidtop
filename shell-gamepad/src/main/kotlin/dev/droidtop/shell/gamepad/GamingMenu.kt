@@ -648,7 +648,8 @@ private fun Modifier.valueShare(): Modifier = layout { measurable, constraints -
 /**
  * The shell's one on/off switch, in Settings' rows and on the Quick Menu's tiles alike (DroidDeck's
  * ToggleSwitch, ui/SettingsWidgets.kt at 9310d19, in the theme's roles): a 52 by 30 track that fills
- * with the affirmative colour when on, its knob sliding to that end. The colour answers at once; the
+ * with the affirmative colour when on, its knob sliding to that end in the ink that reads on that fill
+ * ([MenuTokens.OnAffirmative]). The colour answers at once; the
  * knob glides ([Motion.FocusMs]) and is moved in the layer phase, so a flip recomposes nothing.
  */
 @Composable
@@ -667,7 +668,7 @@ internal fun ShellSwitch(on: Boolean, modifier: Modifier = Modifier) {
                 .graphicsLayer { translationX = knob.value * (SwitchWidth - SwitchHeight).toPx() }
                 .size(SwitchHeight - SwitchInset * 2)
                 .clip(Corners.Pill)
-                .background(MenuTokens.OnSurface),
+                .background(if (on) MenuTokens.OnAffirmative else MenuTokens.OnSurface),
         )
     }
 }

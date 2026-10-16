@@ -28,11 +28,19 @@ object AppearancePrefs {
         else -> (uiMode and Configuration.UI_MODE_NIGHT_MASK) != Configuration.UI_MODE_NIGHT_YES
     }
 
-    /** The Settings row that chooses it. */
+    /**
+     * The Settings row that chooses it. Built where the settings catalog is built (it reads the active theme, as the
+     * theme rows beside it do). When the Gaming theme has a colour scheme of its own chosen, that scheme wins over this
+     * on every Gaming-themed screen, so the row says so and how to undo it (rig 2026-10-16, Droidtop/tracker#559: the
+     * settings page stayed dark on Light until the scheme was Automatic).
+     */
     fun item(context: Context): ChoiceItem = ChoiceItem(
         id = KEY_APPEARANCE,
         title = "Light or dark",
-        subtitle = "How droidtop draws its screens; the Gaming theme's matching colour scheme is used when it has one",
+        subtitle = chosenScheme(context)?.let { scheme ->
+            "The Gaming theme's colour scheme is set to $scheme, which droidtop's screens keep whatever this says; " +
+                "set Theme color scheme to Automatic to follow it"
+        } ?: "How droidtop draws its screens; the Gaming theme's matching colour scheme is used when it has one",
         options = listOf(
             ChoiceOption(FOLLOW_ANDROID, "Follow Android"),
             ChoiceOption(LIGHT, "Light"),
@@ -41,4 +49,10 @@ object AppearancePrefs {
         current = choice(context),
         onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_APPEARANCE, value).apply() },
     )
+
+    /** The colour scheme the person named for the active Gaming theme, or null when it is Automatic or there is no theme. */
+    private fun chosenScheme(context: Context): String? = runCatching {
+        val theme = dev.droidtop.library.theme.ThemeAssets.activeThemeName(context) ?: return null
+        dev.droidtop.library.theme.ThemePrefs.colorScheme(context, theme)
+    }.getOrNull()
 }
