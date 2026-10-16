@@ -2718,6 +2718,7 @@ wording the host uses, so it is identical in every mode.
 | `plugins.export` | normal | Offer features to other plugins | §2.8 |
 | `plugins.export_privileged` | critical | Give other plugins full control of the device | §2.7 |
 | `host.full_trust` | critical | Full access | §5.3 |
+| `os.shizuku` | critical | Use Shizuku through droidtop | §5.6 (full access only: the Shizuku relay) |
 | `priv.shell.adb` | critical | Run system commands | F7, §2 |
 | `priv.shell.root` | critical | Full control of the device | F7, §2 |
 | `priv.packages` | critical | Install and remove apps without asking | F7 |
@@ -3573,8 +3574,38 @@ Android 11 and later (`PluginTiers.runsIsolated`; the sandbox's
 `SBX_LOCK_NET_BROKERED`; droidtop's broker grants out, in and name lookups,
 and connects netd's `dnsproxyd` and `fwmarkd` for it). Below Android 11 it
 stays in an open process of droidtop's UID until the broker's byte relay.
-Full access on the relay, and the Shizuku plugin with it, are being built
-next; until then the full-access rows above stay open.
+Built (2026-10-16), behind a switch: full access isolated and the Shizuku
+relay.
+
+- **The switch.** `adb shell setprop debug.droidtop.isolate_full 1`
+  (`PluginTiers.fullAccessIsolated`), off by default. With it on, a
+  contract 2 plugin allowed full access on Android 11 or later loads like a
+  contained one, in an isolated process with the broker's network
+  (`net.sockets`) and a contained process's files; everything else is the
+  API's. A contract 1 plugin stays under droidtop's UID, an open row in
+  the table above. The default changes only after every official and
+  gamegrab plugin has passed on CI and on the rig, with the results on
+  #53, as the owner asked.
+- **The relay** (`BinderRelay`). A `Binder` in droidtop's process that a
+  plugin's process holds in place of a service's. A transaction code
+  outside the call range is refused whatever the allowlist says (a dump, a
+  shell command, an interface query answered by the relay itself). Every
+  other code goes to the service's policy, and every decision goes to the
+  plugin's activity log. A refusal reaches the plugin as a
+  `SecurityException` naming why, never a crash of droidtop.
+- **Shizuku.** The new full-access permission `os.shizuku` ("Use Shizuku
+  through droidtop", critical). droidtop hands it to the plugin with
+  `IPluginRuntime.attachRelay`, and again whenever Shizuku sends droidtop a
+  new binder. `ShizukuRelayPolicy` forwards the state reads, droidtop's
+  permission check and request, and attaching the client. It forwards
+  `newProcess` only for a plugin that exports a command point (`priv.shell`,
+  `priv.packages`, `priv.settings`), and never with an argument naming
+  droidtop's package. It never forwards the raw `transactRemote`, user
+  services, system properties, or stopping Shizuku.
+
+Needs a rig check: whether an isolated process may use the pipes of a
+process Shizuku started in the shell's domain. Until the per-plugin runs
+pass, the full-access rows above stay open.
 
 ---
 

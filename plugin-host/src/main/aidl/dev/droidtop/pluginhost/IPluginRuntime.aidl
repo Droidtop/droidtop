@@ -164,4 +164,12 @@ interface IPluginRuntime {
     boolean startJob(String pluginId, String capability, String argsJson, String jobId);
 
     void cancelJob(String pluginId, String jobId);
+
+    /**
+     * Hands this process a relay droidtop holds for a system service (docs/plugin-api.md 5.6, "Every plugin is
+     * isolated, full access included"): an isolated plugin has no package a service would authorize, so its calls go
+     * through {@code relay}, a binder in droidtop's process that forwards only what the plugin's declared full-access
+     * points prescribe. {@code name} says which service: "shizuku" installs it as this process's Shizuku binder.
+     */
+    void attachRelay(String pluginId, String name, IBinder relay);
 }

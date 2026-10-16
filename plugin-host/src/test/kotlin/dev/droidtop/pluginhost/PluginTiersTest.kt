@@ -7,6 +7,7 @@ import dev.droidtop.pluginhost.TestPlugins.record
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -26,6 +27,25 @@ class PluginTiersTest {
         assertNull(PluginTiers.containmentBlocker(r.manifest))
         assertNull(PluginTiers.refusal(r, grants()))
         assertNull(PluginTiers.badge(r, grants()))
+    }
+
+    @Test
+    fun `full access runs isolated only with its switch, from Android 11, for a contract 2 plugin`() {
+        val r = record(manifest { it.put("permissions", arr(fullTrust)) })
+        assertFalse("the switch is off by default", PluginTiers.fullAccessRunsIsolated(r, switchOn = false, sdk = 34))
+        assertTrue(PluginTiers.fullAccessRunsIsolated(r, switchOn = true, sdk = 30))
+        assertFalse("its sockets need API 30", PluginTiers.fullAccessRunsIsolated(r, switchOn = true, sdk = 29))
+        assertFalse("contract 1 predates the API", PluginTiers.fullAccessRunsIsolated(record(manifest(contract = 1)), switchOn = true, sdk = 34))
+        assertFalse("no device property in a unit test", PluginTiers.fullAccessIsolated())
+    }
+
+    @Test
+    fun `the Shizuku relay needs os shizuku declared and granted`() {
+        val shizuku = obj("id" to PluginTiers.OS_SHIZUKU, "reason" to "Runs commands through Shizuku")
+        val r = record(manifest { it.put("permissions", arr(fullTrust, shizuku)) })
+        assertTrue(ShizukuRelays.allowed(r, grants(PluginTiers.OS_SHIZUKU to GrantState.GRANTED)))
+        assertFalse(ShizukuRelays.allowed(r, grants()))
+        assertFalse("undeclared", ShizukuRelays.allowed(record(manifest { it.put("permissions", arr(fullTrust)) }), grants(PluginTiers.OS_SHIZUKU to GrantState.GRANTED)))
     }
 
     @Test

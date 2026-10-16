@@ -47,6 +47,29 @@ object PluginTiers {
      */
     internal const val HOLES_KEY = "_droidtopHoles"
 
+    /** Shizuku through droidtop's relay (docs/plugin-api.md 5.6): a full-access permission, granted to nothing else. */
+    const val OS_SHIZUKU = "os.shizuku"
+
+    /**
+     * The system property that runs full access isolated before it is the default (docs/plugin-api.md 5.6, "Every
+     * plugin is isolated, full access included"): `adb shell setprop debug.droidtop.isolate_full 1`, for the per-plugin
+     * runs on CI and the rig. The default switches only once every official and gamegrab plugin has passed.
+     */
+    const val ISOLATE_FULL_PROPERTY = "debug.droidtop.isolate_full"
+
+    /** Whether full access runs isolated on this device now: [ISOLATE_FULL_PROPERTY] set. Off by default. */
+    fun fullAccessIsolated(): Boolean = runCatching {
+        Class.forName("android.os.SystemProperties").getMethod("get", String::class.java).invoke(null, ISOLATE_FULL_PROPERTY) == "1"
+    }.getOrDefault(false)
+
+    /**
+     * True when [record], allowed full access, runs in an isolated process with [switchOn]: a contract 2 plugin on
+     * Android 11 (API 30) or later, where its sockets can be the broker's. A contract 1 plugin predates the API and
+     * stays in droidtop's UID, an open hole the 5.6 table lists.
+     */
+    fun fullAccessRunsIsolated(record: PluginRecord, switchOn: Boolean, sdk: Int = android.os.Build.VERSION.SDK_INT): Boolean =
+        switchOn && record.manifest.contractVersion >= 2 && sdk >= 30
+
     fun declaresFullTrust(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == FULL_TRUST }
 
     /**

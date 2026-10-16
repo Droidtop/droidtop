@@ -117,6 +117,7 @@ object PluginPermissions {
         PluginPermission("plugins.export", PermissionTier.NORMAL, "Offer features to other plugins"),
         PluginPermission("plugins.export_privileged", PermissionTier.CRITICAL, "Give other plugins full control of the device"),
         PluginPermission("host.full_trust", PermissionTier.CRITICAL, "Full access"),
+        PluginPermission("os.shizuku", PermissionTier.CRITICAL, "Use Shizuku through droidtop"),
         PluginPermission("priv.shell.adb", PermissionTier.CRITICAL, "Run system commands"),
         PluginPermission("priv.shell.root", PermissionTier.CRITICAL, "Full control of the device"),
         PluginPermission("priv.packages", PermissionTier.CRITICAL, "Install and remove apps without asking"),
