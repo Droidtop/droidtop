@@ -11,6 +11,8 @@ import dev.droidtop.library.settings.CatalogChip
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.ChoiceItem
+import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextBlockItem
@@ -60,6 +62,10 @@ object PluginCatalogScreen {
 
     // What was last searched for in each catalog's screen (by source id): kept while the app runs, like the address buffer above.
     private val searches = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    /** The kind each catalog's list is narrowed to (docs/plugin-api.md 1.2, "Categories"), or [ALL_KINDS]. */
+    private val kinds = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private const val ALL_KINDS = "all"
 
     /**
      * What the last Install all or Update all of a catalog did (Droidtop/tracker#517), by catalog id: its row goes once
@@ -412,6 +418,33 @@ object PluginCatalogScreen {
                     ),
                 )
             }
+            if (index != null && PluginCatalog.listable(current, index)) {
+                val present = index.origins.flatMap { it.plugins }.map { it.category }.toSet()
+                val categories = dev.droidtop.pluginhost.PluginPresentation.CATEGORIES.filter { it in present }
+                if (categories.size > 1) {
+                    add(
+                        ChoiceItem(
+                            id = "plugins_catalog_category",
+                            title = "Kind",
+                            options = listOf(ChoiceOption(ALL_KINDS, "All")) + categories.map {
+                                ChoiceOption(it, dev.droidtop.pluginhost.PluginPresentation.CATEGORY_LABELS.getValue(it))
+                            },
+                            current = kinds[sourceId] ?: ALL_KINDS,
+                            onSelect = { _, value -> kinds[sourceId] = value },
+                        ),
+                    )
+                }
+                add(
+                    ChoiceItem(
+                        id = "plugins_catalog_channel_$sourceId",
+                        title = "Channel",
+                        subtitle = "Which versions this catalog offers. Testing and Unstable get new versions sooner and may not work as well. A plugin's own page can choose differently",
+                        options = PluginChannel.entries.map { ChoiceOption(it.id, it.label) },
+                        current = PluginChannels.forContext(context).catalog(sourceId).id,
+                        onSelect = { ctx, value -> PluginChannel.of(value)?.let { PluginChannels.forContext(ctx).setCatalog(sourceId, it) } },
+                    ),
+                )
+            }
             add(
                 AsyncActionItem(
                     id = "plugins_catalog_refresh",
@@ -449,7 +482,8 @@ object PluginCatalogScreen {
             }
             val rows = index.origins.flatMap { origin ->
                 val state = PluginCatalog.originState(current, origin, userKeys)
-                origin.plugins.filter { matchesQuery(it, origin.origin, query) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id], installed[plugin.id]?.let { PluginStore.iconFile(context, it.manifest) }) }
+                val kind = kinds[sourceId] ?: ALL_KINDS
+                origin.plugins.filter { matchesQuery(it, origin.origin, query) && (kind == ALL_KINDS || it.category == kind) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id], installed[plugin.id]?.let { PluginStore.iconFile(context, it.manifest) }) }
             }
             groups += CatalogGroup(
                 id = "plugins_catalog_list",
@@ -630,9 +664,9 @@ object PluginCatalogScreen {
         installed: PluginRecord?,
     ): CatalogItem {
         val offered = state == PluginCatalog.OriginState.Offered
-        val latest = PluginCatalog.latestStable(plugin)
-        val isUpdate = offered && installed != null && latest != null &&
-            !latest.manifestSha256.equals(installed.archiveDigest, ignoreCase = true)
+        val channel = PluginCatalog.channelFor(source, plugin.id)
+        val latest = PluginCatalog.latest(plugin, channel)
+        val isUpdate = offered && installed != null && latest != null && PluginCatalog.updateFor(plugin, installed, channel) != null
         val id = "plugins_catalog_${plugin.id}_action"
         return when {
             isUpdate -> AsyncActionItem(

@@ -75,6 +75,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         ForegroundShell.installPadReturn(this)
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
+        // Which release line each catalog and plugin is offered on (SPEC 12a "Channels", Droidtop/tracker#179).
+        dev.droidtop.library.integrations.PluginChannels.install(this)
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).
         // One spelling for a mode wherever a plugin meets it (docs/plugin-api.md 1.9): `standard`, `gaming`, `desktop`.
         dev.droidtop.pluginhost.PluginBrokers.modeProvider = { dev.droidtop.library.settings.Modes.lastMode(this) }

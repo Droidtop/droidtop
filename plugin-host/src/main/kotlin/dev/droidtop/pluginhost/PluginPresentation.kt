@@ -39,7 +39,28 @@ data class PluginPresentation(
         const val SUMMARY_MAX = 80
         const val PUBLISHER_MAX = 60
         const val SCREENSHOTS_MAX = 6
-        val CATEGORIES = listOf("sources", "emulators", "games", "tools", "system", "themes", "social", "other")
+        /** The fixed category list (docs/plugin-api.md 1.2, "Categories", Droidtop/tracker#179), in the order droidtop shows it. */
+        val CATEGORIES = listOf("sources", "emulators", "system", "sync", "integrations", "appearance", "other")
+
+        /** Each category in the person's words. */
+        val CATEGORY_LABELS = mapOf(
+            "sources" to "Sources and fetchers",
+            "emulators" to "Emulators and runners",
+            "system" to "System tools",
+            "sync" to "Sync and backup",
+            "integrations" to "Integrations",
+            "appearance" to "Appearance",
+            "other" to "Other",
+        )
+
+        /** The first list's ids (2026-10-15), read as their successors. */
+        private val CATEGORY_SUCCESSORS = mapOf("tools" to "system", "themes" to "appearance", "social" to "integrations", "games" to "sources")
+
+        /** [raw] as one of [CATEGORIES]: a first-list id as its successor, anything else (or nothing) "other". */
+        fun category(raw: String?): String {
+            val id = raw?.trim()?.lowercase().orEmpty()
+            return CATEGORY_SUCCESSORS[id] ?: id.takeIf { it in CATEGORIES } ?: "other"
+        }
         private val IMAGE = Regex("(?i)\\.(png|webp)$")
 
         /** The presentation in [json] (a manifest or a record); images must be among [payloadPaths]. */
@@ -55,7 +76,7 @@ data class PluginPresentation(
                 summary = text("summary", SUMMARY_MAX),
                 publisher = text("publisher", PUBLISHER_MAX),
                 homepage = text("homepage", 2048)?.takeIf { it.startsWith("https://") && !it.contains(' ') },
-                category = text("category", 32)?.lowercase()?.let { if (it in CATEGORIES) it else "other" },
+                category = text("category", 32)?.let(::category),
                 icon = image(json.takeUnless { it.isNull("icon") }?.optString("icon")),
                 screenshots = shots,
             )
