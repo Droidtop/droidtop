@@ -250,6 +250,26 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_quick_launch_info" />
         </receiver>
+        <receiver
+            android:name="dev.droidtop.app.DownloadsWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_downloads_info" />
+        </receiver>
+        <receiver
+            android:name="dev.droidtop.app.DesktopWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_desktop_info" />
+        </receiver>
         <activity
             android:name="dev.droidtop.app.QuickLaunchConfigureActivity"
             android:exported="true"

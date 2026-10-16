@@ -38,6 +38,8 @@ internal object DroidtopWidgets {
         PluginStatusWidgetProvider::class.java,
         LibrarySearchWidgetProvider::class.java,
         QuickLaunchWidgetProvider::class.java,
+        DownloadsWidgetProvider::class.java,
+        DesktopWidgetProvider::class.java,
     )
 
     /** The four rows [rows] fills, in order. */
