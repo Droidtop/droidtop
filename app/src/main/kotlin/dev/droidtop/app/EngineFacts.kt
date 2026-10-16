@@ -21,6 +21,8 @@ internal object EngineFacts {
         val config = runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
             ?.let { ContainerProgram.effectiveConfig(app.filesDir, id, it) }
         val state = ContainerPrograms.state(id)
+        val times = ContainerPrograms.times(id)
+        val pod = pods.firstOrNull { id in it.members }
         return EngineInspect.Facts(
             id = id,
             name = info.displayName,
@@ -33,8 +35,11 @@ internal object EngineFacts {
             config = config,
             restart = withContext(Dispatchers.IO) { ContainerPrograms.restartPolicy(app, id) },
             folders = runCatching { runtime.mounts(info.container).folders.map { it.name } }.getOrDefault(emptyList()),
-            podId = pods.firstOrNull { id in it.members }?.id,
+            podId = pod?.id,
             labels = withContext(Dispatchers.IO) { ContainerProgram.overrides(app.filesDir, id)?.labels.orEmpty() },
+            startedMs = times.startedMs,
+            endedMs = times.endedMs,
+            podName = pod?.name,
         )
     }
 

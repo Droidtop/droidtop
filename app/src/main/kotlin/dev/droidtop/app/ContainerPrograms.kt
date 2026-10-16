@@ -49,6 +49,13 @@ internal object ContainerPrograms {
 
     fun state(containerId: String): State = states.value[containerId] ?: State.Stopped
 
+    /** When a program last started and last ended, in this run of droidtop: what the engine APIs give as its times. */
+    data class Times(val startedMs: Long?, val endedMs: Long?)
+
+    private val times = java.util.concurrent.ConcurrentHashMap<String, Times>()
+
+    fun times(containerId: String): Times = times[containerId] ?: Times(null, null)
+
     private fun set(containerId: String, state: State) {
         states.value = states.value + (containerId to state)
     }
@@ -92,7 +99,9 @@ internal object ContainerPrograms {
                 while (isActive) {
                     if (runtime.siblingsNeedStart) runCatching { runtime.start(container) }
                     val startedAt = SystemClock.elapsedRealtime()
-                    set(container.id, State.Running(System.currentTimeMillis()))
+                    val now = System.currentTimeMillis()
+                    times[container.id] = Times(now, null)
+                    set(container.id, State.Running(now))
                     Log.i(TAG, "${container.id}: starting ${config.program().joinToString(" ")}")
                     val result = runCatching {
                         runtime.exec(container, ContainerProgram.command(config, container.id), ContainerProgram.environment(config))
@@ -113,6 +122,7 @@ internal object ContainerPrograms {
                     delay(wait)
                 }
             } finally {
+                times[container.id]?.let { times[container.id] = it.copy(endedMs = System.currentTimeMillis()) }
                 trimmer.cancel()
                 synchronized(listening) { listening.remove(container.id) }
                 jobs.remove(container.id)

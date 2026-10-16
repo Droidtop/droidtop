@@ -33,7 +33,7 @@ object DockerApi {
     /** DOCKER_HOST as the desktop's environment gives it. */
     const val DOCKER_HOST = "unix://${ContainerLayout.APP_STORAGE_DIR}/$SOCKET_NAME"
 
-    /** What one request asks for. */
+    /** What one request asks for, on either API: the libpod API ([LibpodApi]) asks for these too, and a few of its own. */
     sealed interface Call {
         data object Ping : Call
         data object Version : Call
@@ -62,6 +62,11 @@ object DockerApi {
         data class ExecStart(val execId: String) : Call
         data class ExecGet(val execId: String) : Call
 
+        /** The libpod API's own: whether a container, image, pod or network exists (204, or 404). */
+        data class Exists(val kind: Kind, val id: String) : Call
+        data class Pods(val filters: Map<String, List<String>>) : Call
+        data class PodGet(val id: String) : Call
+
         /** A request Docker would take that droidtop refuses as asked: answered [status] with [message]. */
         data class Refused(val status: Int, val message: String) : Call
 
@@ -70,6 +75,8 @@ object DockerApi {
 
         data object NotFound : Call
     }
+
+    enum class Kind { CONTAINER, IMAGE, POD, NETWORK }
 
     private val VERSION_PREFIX = Regex("^/v[0-9]+\\.[0-9]+(?=/)")
 
@@ -310,7 +317,7 @@ object DockerApi {
     fun network(n: Network, names: Map<String, String>): JsonObject = buildJsonObject {
         put("Name", n.name)
         put("Id", n.id)
-        put("Created", if (n.createdMs > 0) java.time.Instant.ofEpochMilli(n.createdMs).toString() else "0001-01-01T00:00:00Z")
+        put("Created", EngineInspect.time(n.createdMs.takeIf { it > 0 }))
         put("Scope", "local")
         put("Driver", when (n.name) { "host" -> "host"; "none" -> "null"; else -> "bridge" })
         put("EnableIPv6", false)
@@ -351,21 +358,21 @@ object DockerApi {
     }.toString() + "\n"
 
     /** `GET /networks`: [all] that pass [filters] (name, id, label). */
-    fun networks(all: List<Network>, names: Map<String, String>, filters: Map<String, List<String>>): String = JsonArray(
-        all.filter { n ->
-            filters.all { (key, wanted) ->
-                when (key) {
-                    "name" -> wanted.any { n.name.contains(it) }
-                    "id" -> wanted.any { n.id.startsWith(it) }
-                    "label" -> wanted.any { w ->
-                        val k = w.substringBefore('=')
-                        if (w.contains('=')) n.labels[k] == w.substringAfter('=') else n.labels.containsKey(k)
-                    }
-                    else -> true
-                }
+    fun networks(all: List<Network>, names: Map<String, String>, filters: Map<String, List<String>>): String =
+        JsonArray(all.filter { networkMatches(it, filters) }.map { network(it, names) }).toString() + "\n"
+
+    /** Whether [n] passes [filters]: name, id and label, as both APIs take them. Pure. */
+    fun networkMatches(n: Network, filters: Map<String, List<String>>): Boolean = filters.all { (key, wanted) ->
+        when (key) {
+            "name" -> wanted.any { n.name.contains(it) }
+            "id" -> wanted.any { n.id.startsWith(it) }
+            "label" -> wanted.any { w ->
+                val k = w.substringBefore('=')
+                if (w.contains('=')) n.labels[k] == w.substringAfter('=') else n.labels.containsKey(k)
             }
-        }.map { network(it, names) },
-    ).toString() + "\n"
+            else -> true
+        }
+    }
 
     fun unknownNetworkFilters(filters: Map<String, List<String>>): Set<String> = filters.keys - setOf("name", "id", "label")
 
@@ -383,7 +390,7 @@ object DockerApi {
         putJsonArray("RepoTags") { add(JsonPrimitive(EngineCli.PODMAN.fullImage(e.reference).removePrefix("docker.io/library/").removePrefix("docker.io/"))) }
         putJsonArray("RepoDigests") { }
         put("Parent", "")
-        put("Created", "0001-01-01T00:00:00Z")
+        put("Created", EngineInspect.ZERO_TIME)
         put("Os", "linux")
         put("Architecture", arch)
         put("Size", e.sizeBytes)
