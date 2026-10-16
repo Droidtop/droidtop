@@ -530,7 +530,7 @@ object EmulatorsCatalog {
         configText: String?,
     ): List<CatalogItem> {
         val bios = BiosDatabase.forSystem(context, system.id) ?: return emptyList()
-        val needed = bios.files.map { EmulatorSetup.biosRelative(it.file) }
+        val needed = bios.files.map { EmulatorSetup.biosTarget(spec, it) }
         if (needed.isEmpty()) return emptyList()
         val shown = needed.take(4).joinToString(", ") + if (needed.size > 4) " and ${needed.size - 4} more" else ""
         val folder = EmulatorSetup.biosFolder(spec, configText)
@@ -544,7 +544,8 @@ object EmulatorsCatalog {
                 ),
             )
         val present = EmulatorSetup.listFolder(folder)
-        val missing = present?.let { have -> needed.filter { want -> have.none { it.equals(want, ignoreCase = true) } } }
+        val missingFiles = present?.let { EmulatorSetup.missingBios(spec, bios, it) }
+        val missing = missingFiles?.map { EmulatorSetup.biosTarget(spec, it) }
         val reach = EmulatorSetup.writeReach("$folder/x")
         val writable = reach == EmulatorSetup.Reach.DIRECT || reach == EmulatorSetup.Reach.HELPER
         val status = ActionItem(
@@ -567,10 +568,32 @@ object EmulatorsCatalog {
             run = {},
         )
         if (!writable) return listOf(status)
+        // droidtop's own copies of the missing files, in a games folder's bios folder: the one place droidtop keeps them.
+        val roots = dev.droidtop.library.GamesRoots.current(context)
+        val ours = missingFiles.orEmpty().mapNotNull { want -> EmulatorSetup.droidtopBios(roots, want)?.let { want to it } }
         return listOfNotNull(
             status,
+            ours.takeIf { it.isNotEmpty() }?.let { found ->
+                AsyncActionItem(
+                    id = "emulator_bios_copy_${system.id}",
+                    title = "Use droidtop's BIOS files",
+                    subtitle = "Copy " + found.joinToString(", ") { EmulatorSetup.biosTarget(spec, it.first) } +
+                        " from ${found.first().second.parent} into $name's BIOS folder",
+                    confirmTitle = if (reach == EmulatorSetup.Reach.HELPER) RiskyPrompts.addFileConfirm(name, folder) else null,
+                    run = { _, _ ->
+                        withContext(Dispatchers.IO) {
+                            val sync = EmulatorSetup.syncBios(spec, configText, bios, roots)
+                            when {
+                                sync == null -> "Not copied: droidtop cannot look in $folder"
+                                sync.missing.isEmpty() -> "Copied ${sync.copied.joinToString(", ")} into $name's BIOS folder"
+                                else -> "Copied ${sync.copied.size}; still missing ${sync.missing.joinToString(", ")} in ${sync.folder}"
+                            }
+                        }
+                    },
+                )
+            },
             // Only while a plugin that supplies BIOS files is installed and allowed (emulator.bios, Droidtop/tracker#415).
-            dev.droidtop.library.integrations.PluginBios.row(context, system.id, system.displayName, bios, folder, name, reach == EmulatorSetup.Reach.HELPER),
+            dev.droidtop.library.integrations.PluginBios.row(context, system.id, system.displayName, bios, spec, folder, name, reach == EmulatorSetup.Reach.HELPER),
             DocumentPickItem(
                 id = "emulator_bios_add_${system.id}",
                 title = "Add a BIOS file",
@@ -578,7 +601,7 @@ object EmulatorsCatalog {
                 mimeType = "*/*",
                 // Through the helper this writes into another app's folder (a risky action): say where, before the picker.
                 confirmTitle = if (reach == EmulatorSetup.Reach.HELPER) RiskyPrompts.addFileConfirm(name, folder) else null,
-                onPicked = { ctx, uri -> withContext(Dispatchers.IO) { placeBios(ctx, uri, bios, folder, name) } },
+                onPicked = { ctx, uri -> withContext(Dispatchers.IO) { placeBios(ctx, uri, bios, spec, folder, name) } },
             ),
         )
     }
@@ -588,6 +611,7 @@ object EmulatorsCatalog {
         context: Context,
         uri: android.net.Uri,
         bios: dev.droidtop.library.consoles.SystemBiosSpec,
+        spec: EmulatorSetupSpec,
         folder: String,
         name: String,
     ): String = runCatching {
@@ -608,6 +632,7 @@ object EmulatorsCatalog {
             out.toByteArray()
         } ?: error("the file could not be opened")
         val target = EmulatorSetup.biosTarget(bios, picked, EmulatorSetup.md5(bytes))
+            .let { if (spec.biosFlat) it.substringAfterLast('/') else it }
         if (EmulatorSetup.write("$folder/$target", bytes)) "Added $target to $name's BIOS folder" else "Not added: droidtop could not write to $folder"
     }.getOrElse { "Not added: ${it.message ?: it.javaClass.simpleName}" }
 

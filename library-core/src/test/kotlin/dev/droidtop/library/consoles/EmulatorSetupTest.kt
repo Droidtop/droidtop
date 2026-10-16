@@ -67,4 +67,38 @@ class EmulatorSetupTest {
         assertEquals("UI", spec.config!!.settings.single().section)
         assertNull(EmulatorSetup.parse(null, "x"))
     }
+
+    private val ps2 = SystemBiosSpec("ps2", "PS2", listOf(BiosFileSpec("bios/ps2/ps2-0230a-20080220.bin", listOf("21038400dc633070a78ad53090c53017"))))
+
+    @Test
+    fun `a flat BIOS folder takes the file at its top, under the database's base name`() {
+        val nether = EmulatorSetup.parse(JSONObject("""{"biosFolder": "/storage/emulated/0/Android/data/{pkg}/files/bios", "biosFlat": true}"""), "xyz.aethersx2.tturnip")!!
+        assertEquals("/storage/emulated/0/Android/data/xyz.aethersx2.tturnip/files/bios", EmulatorSetup.biosFolder(nether, null))
+        assertEquals("ps2-0230a-20080220.bin", EmulatorSetup.biosTarget(nether, ps2.files.single()))
+        // A folder that keeps the database's layout (RetroArch's system folder) keeps the subfolder.
+        assertEquals("ps2/ps2-0230a-20080220.bin", EmulatorSetup.biosTarget(EmulatorSetupSpec(biosFolder = "/x"), ps2.files.single()))
+        assertEquals(listOf(ps2.files.single()), EmulatorSetup.missingBios(nether, ps2, setOf("ps2/ps2-0230a-20080220.bin")))
+        assertEquals(emptyList<BiosFileSpec>(), EmulatorSetup.missingBios(nether, ps2, setOf("PS2-0230A-20080220.BIN")))
+    }
+
+    @Test
+    fun `droidtop's own BIOS is found in a games folder's bios folder, at the database's path or by name`() {
+        val root = java.nio.file.Files.createTempDirectory("games").toFile()
+        val bios = java.io.File(root, "bios").apply { mkdirs() }
+        assertNull(EmulatorSetup.droidtopBios(listOf(root), ps2.files.single()))
+        val flat = java.io.File(bios, "ps2-0230a-20080220.bin").apply { writeBytes(ByteArray(16)) }
+        assertEquals(flat, EmulatorSetup.droidtopBios(listOf(root), ps2.files.single()))
+        val nested = java.io.File(bios, "ps2/ps2-0230a-20080220.bin").apply { parentFile.mkdirs(); writeBytes(ByteArray(16)) }
+        assertEquals(nested, EmulatorSetup.droidtopBios(listOf(root), ps2.files.single()))
+        // One file at a time, one folder at a time.
+        nested.delete(); nested.parentFile.delete(); flat.delete(); bios.delete(); root.delete()
+    }
+
+    @Test
+    fun `a launch names the BIOS file still missing and the folder it belongs in`() {
+        val sync = EmulatorSetup.BiosSync("/storage/emulated/0/Android/data/xyz.aethersx2.tturnip/files/bios", emptyList(), listOf("ps2-0230a-20080220.bin"))
+        val line = biosMissingSentence("NetherSX2", "PlayStation 2", sync)!!
+        assertEquals(true, line.contains("ps2-0230a-20080220.bin is not in /storage/emulated/0/Android/data/xyz.aethersx2.tturnip/files/bios"))
+        assertNull(biosMissingSentence("NetherSX2", "PlayStation 2", sync.copy(missing = emptyList())))
+    }
 }
