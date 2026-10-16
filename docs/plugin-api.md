@@ -2396,6 +2396,7 @@ database on the PC follows.
 | G4 | GitHub token | higher API limits and private repositories for sources on GitHub (#16) | `github.request {path, headers?, as?, timeoutMs?}` → the `net.request` answer: a GET to `https://api.github.com<path>` made by the host with the person's token (set once in Accounts and sources; unauthenticated when there is none). The token never reaches the plugin; GitHubAuth decides on every redirect hop whether it may go there. The plugin's headers (a `Range`, `If-None-Match`) go on every hop. A download descriptor's `"auth": "github"` (A12) asks the same for a file. `github.token()` (the raw token) is not offered | Accounts and sources | `github.api` (normal, through the host request) / `github.token.read` (dangerous: the raw token, not built) | medium / high | `github.request` built 2026-10-10 (Droidtop/tracker#261) |
 | G5 | Accounts registry | a plugin's account shown as a row in Accounts and sources (signed in or not, sign out) | EP `accounts.provider@1`: `status → {signedIn, name}`; `sign_in` (runs G2/G3), `sign_out` | A/G/D: Accounts and sources | `provide:accounts.provider` | low | not built |
 | G6 | Identity of the device user | "who is this" | not offered: plugins get no Android account list, no email, no device ids. `host.info()` gives a **per-plugin random install id** only | — | — | — | by design |
+| G7 | Theme tokens | UI a plugin draws itself (a Flutter plugin's pages, its own screen) in droidtop's colours, light or dark (Droidtop/tracker#559) | `ui.get_theme()` → {theme: "light"\|"dark", tokens: {ground, surface, surfaceVariant, onSurface, onSurfaceMuted, primary, onPrimary, caution, danger, focus, focusInner}}, each `#RRGGBB`, read from the palette in use (docs/SPEC.md 7k "Light and dark": the Gaming theme's while Gaming shows one, droidtop's own light or dark otherwise); `host.get_info` carries `theme`; event `host.theme_changed` {theme} when Light or dark, Android's night mode or the Gaming theme changes the set. A plugin draws no colour of its own for these roles. A Flutter plugin reads the same op through its host calls | — | — (no permission: the colours say nothing about the person) | low | built (2026-10-16, `RoleTokens`) |
 
 ### H. Data
 
@@ -3552,6 +3553,10 @@ version was bumped.
   plugin still works.
 
 **Changelog (additive changes; no version moved).**
+
+- 2026-10-16 (Droidtop/tracker#559): theme tokens (G7): `ui.get_theme`,
+  `theme` in `host.get_info`, and the event `host.theme_changed`, for UI a
+  plugin draws itself.
 
 - 2026-10-16 (Droidtop/tracker#556, #553): paired devices (D21):
   `devices.list_paired`, `devices.announce` and the event

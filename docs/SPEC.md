@@ -14770,6 +14770,10 @@ UI through the one palette (`GamingPalette`) every token reads:
   .cautionInk`, `.dangerInk`, readable and told apart under every colour-vision simulation); `focus` is the focus
   ring's outer edge (`accent`) and `focusInner` its inner edge (`FocusRingInks.inner(accent)`). The plugin lane carries
   them to plugins (`host.info.theme`, `ui.theme`, `host.theme_changed`; docs/plugin-api.md).
+  `RoleTokens` (`:runtime-common`) is that set: the Gaming shell provides it from its palette while a theme is held,
+  droidtop's own for the appearance otherwise. Plugins read it with `ui.get_theme` (docs/plugin-api.md G7) and hear
+  `host.theme_changed`; droidtop's own screens built from plain Android views (the web sign-in screen,
+  `WebSessionActivity`) draw with it and take the system's light or dark widgets to match.
 
 **Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
 top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width

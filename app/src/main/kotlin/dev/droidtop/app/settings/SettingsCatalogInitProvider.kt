@@ -26,6 +26,9 @@ import kotlinx.coroutines.launch
  * Android offers an app module.
  */
 class SettingsCatalogInitProvider : ContentProvider() {
+    /** The Appearance preference's listener: SharedPreferences keeps listeners weakly, so this holds it. */
+    private var appearanceWatch: android.content.SharedPreferences.OnSharedPreferenceChangeListener? = null
+
     override fun onCreate(): Boolean {
         val appContext = context?.applicationContext ?: return true
         // First, because everything else asks it what to start. Also
@@ -53,6 +56,19 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // are served again while a plugin has announced something to them; a file read and a listener, off this thread.
         dev.droidtop.net.peer.PairedDevices.onChanged = { ctx -> dev.droidtop.library.integrations.notifyDevicesChanged(ctx) }
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.serve(appContext) } }, "devices-serve").start()
+        // The role tokens UI droidtop does not draw follows (docs/SPEC.md 7k, Droidtop/tracker#559): plugins hear when
+        // they change, looked at again on Light or dark, on Android's night mode, and by the Gaming shell on a theme.
+        dev.droidtop.library.theme.RoleTokens.onChanged = { ctx, set -> dev.droidtop.library.integrations.notifyThemeChanged(ctx, set.light) }
+        dev.droidtop.library.theme.RoleTokens.attach(appContext)
+        appearanceWatch = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == dev.droidtop.library.settings.AppearancePrefs.KEY_APPEARANCE) dev.droidtop.library.theme.RoleTokens.checkSoon()
+        }.also { dev.droidtop.library.settings.CatalogPrefs.prefs(appContext).registerOnSharedPreferenceChangeListener(it) }
+        appContext.registerComponentCallbacks(object : android.content.ComponentCallbacks {
+            override fun onConfigurationChanged(newConfig: android.content.res.Configuration) = dev.droidtop.library.theme.RoleTokens.checkSoon()
+
+            @Deprecated("Deprecated in Java")
+            override fun onLowMemory() = Unit
+        })
         // Every social provider's message notifications and the Quick Menu's unread count
         // (SPEC "Social"), then Steam, which stays connected while signed in for friends and
         // chat: its service, then the connection itself (7g, "Stores").

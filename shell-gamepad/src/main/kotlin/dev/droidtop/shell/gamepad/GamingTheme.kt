@@ -247,8 +247,23 @@ object GamingTheme {
         if (appearanceLight != light) appearanceLight = light
     }
 
-    internal fun acquire() { holders++ }
-    internal fun release() { if (holders > 0) holders-- }
+    internal fun acquire() {
+        holders++
+        dev.droidtop.library.theme.RoleTokens.checkSoon()
+    }
+
+    internal fun release() {
+        if (holders > 0) holders--
+        dev.droidtop.library.theme.RoleTokens.checkSoon()
+    }
+
+    init {
+        // The role tokens UI droidtop does not draw reads (docs/SPEC.md 7k, Droidtop/tracker#559): the theme's while a
+        // Gaming surface holds one; otherwise droidtop's own for the appearance, which RoleTokens works out itself.
+        dev.droidtop.library.theme.RoleTokens.provider = {
+            if (holders > 0) current.let { dev.droidtop.library.theme.RoleTokens.of(it.colors, it.highContrast) } else null
+        }
+    }
 
     private data class PaletteKey(
         val theme: String?,
@@ -281,6 +296,7 @@ object GamingTheme {
             paletteFor(app)
         }
         if (next !== current) current = next
+        dev.droidtop.library.theme.RoleTokens.checkSoon()
     }
 
     private fun paletteFor(context: Context): GamingPalette {

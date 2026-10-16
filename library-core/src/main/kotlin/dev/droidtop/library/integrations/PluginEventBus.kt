@@ -121,6 +121,24 @@ fun notifyDevicesChanged(context: Context) {
 }
 
 /**
+ * Fires [PluginEvent.THEME_CHANGED] (Droidtop/tracker#559) at every runnable plugin that subscribed to it: the role
+ * tokens changed. Set as [dev.droidtop.library.theme.RoleTokens.onChanged] at start.
+ */
+fun notifyThemeChanged(context: Context, light: Boolean) {
+    CoroutineScope(Dispatchers.IO).launch {
+        val candidates = PluginStore.installed(context).filter { it.runnable() && it.manifest.subscribesTo(PluginEvent.THEME_CHANGED) }
+        if (candidates.isEmpty()) return@launch
+        val policy = PluginCrashPolicy(context.applicationContext)
+        try {
+            val args = mapOf("theme" to if (light) "light" else "dark")
+            candidates.forEach { runCatching { policy.notifyEvent(it, PluginEvent.THEME_CHANGED, args) } }
+        } finally {
+            policy.shutdown()
+        }
+    }
+}
+
+/**
  * The exact args map [PluginEventBus.notifyDefaultPlayerChanged] delivers
  * as [PluginEvent.DEFAULT_PLAYER_CHANGED]'s payload -- pulled out of the
  * suspend dispatch (which needs a real [Context], the plugin store and a
