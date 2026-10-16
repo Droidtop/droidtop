@@ -70,7 +70,7 @@ class CompanionActivity : AppCompatActivity() {
                         // shell relocated to the addon, THIS activity is what the remaining panel
                         // shows, and in Desktop mode its default tab is the input surface
                         // (trackpad + keyboard), with Home, Tasks, Performance and System beside it.
-                        val mode = dev.droidtop.display.SecondaryDisplayContent.currentMode(this@CompanionActivity)
+                        val mode = dev.droidtop.display.SecondaryDisplayContent.followedMode(this@CompanionActivity)
                         CompanionTabs(mode) {
                             val entry = settledFocusedEntry()
                             CompanionSurface(entry = entry, widgetManager = widgetManager, widgetHost = widgetHost)

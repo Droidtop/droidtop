@@ -89,12 +89,11 @@ class SecondScreenPresentation(outerContext: Context, display: Display) : androi
         // class, which never branched on mode at all). Widget
         // hosting/listening is the registered content's own concern now
         // (CompanionSurfaceHost's DisposableEffect), not duplicated here.
-        val mode = SecondaryDisplayContent.currentMode(context)
-        val content = SecondaryDisplayContent.contentFor(mode)
         val composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
             setContent {
+                val content = SecondaryDisplayContent.contentFor(SecondaryDisplayContent.followedMode(context))
                 DisplayOrientationContent {
                     if (content != null) {
                         Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
