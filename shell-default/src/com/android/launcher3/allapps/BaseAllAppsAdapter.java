@@ -72,7 +72,10 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
     // ordinary VIEW_TYPE_ICON path already renders -- see
     // AlphabeticalAppsList.addRecentAppItems and RecentAppsStore.
     public static final int VIEW_TYPE_RECENT_APPS_HEADER = 1 << 10;
-    public static final int NEXT_ID = 11;
+    // droidtop patch (Droidtop/tracker#564): one row of drawer folders, the home screen's FolderIcon over
+    // each drawer tab marked "Show as a folder in All" (AlphabeticalAppsList.getDrawerFolders).
+    public static final int VIEW_TYPE_DRAWER_FOLDERS = 1 << 11;
+    public static final int NEXT_ID = 12;
 
     // Common view type masks
     public static final int VIEW_TYPE_MASK_DIVIDER = VIEW_TYPE_ALL_APPS_DIVIDER;
@@ -240,6 +243,17 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
             case VIEW_TYPE_RECENT_APPS_HEADER:
                 return new ViewHolder(mLayoutInflater.inflate(R.layout.all_apps_recent_header,
                         parent, false));
+            case VIEW_TYPE_DRAWER_FOLDERS: {
+                android.widget.HorizontalScrollView scroll =
+                        new android.widget.HorizontalScrollView(parent.getContext());
+                scroll.setHorizontalScrollBarEnabled(false);
+                scroll.setLayoutParams(new RecyclerView.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                android.widget.LinearLayout row = new android.widget.LinearLayout(parent.getContext());
+                row.setOrientation(android.widget.LinearLayout.HORIZONTAL);
+                scroll.addView(row);
+                return new ViewHolder(scroll);
+            }
             case VIEW_TYPE_ALL_APPS_DIVIDER, VIEW_TYPE_PRIVATE_SPACE_SYS_APPS_DIVIDER:
                 return new ViewHolder(mLayoutInflater.inflate(
                         R.layout.private_space_divider, parent, false));
@@ -333,6 +347,19 @@ public abstract class BaseAllAppsAdapter<T extends Context & ActivityContext> ex
                         == STATE_DISABLED ? null : new SectionDecorationInfo(mActivityContext,
                         ROUND_NOTHING, true /* decorateTogether */);
                 break;
+            case VIEW_TYPE_DRAWER_FOLDERS: {
+                // The home screen's own folder views, made read only (FolderIcon.inflateDrawerFolder).
+                ViewGroup row = (ViewGroup) ((ViewGroup) holder.itemView).getChildAt(0);
+                row.removeAllViews();
+                int width = mActivityContext.getDeviceProfile().allAppsCellWidthPx;
+                int height = mActivityContext.getDeviceProfile().allAppsCellHeightPx;
+                for (com.android.launcher3.model.data.FolderInfo folder : mApps.getDrawerFolders()) {
+                    View icon = com.android.launcher3.folder.FolderIcon.inflateDrawerFolder(
+                            mActivityContext, row, folder);
+                    row.addView(icon, new ViewGroup.LayoutParams(width, height));
+                }
+                break;
+            }
             case VIEW_TYPE_BOTTOM_VIEW_TO_SCROLL_TO:
             case VIEW_TYPE_ALL_APPS_DIVIDER:
             case VIEW_TYPE_WORK_DISABLED_CARD:

@@ -224,5 +224,6 @@
     <string name="drawer_tab_move_left">Move left</string>
     <string name="drawer_tab_move_right">Move right</string>
     <string name="drawer_tab_delete">Delete tab</string>
+    <string name="drawer_tab_as_folder">Show as a folder in All</string>
     <string name="drawer_tab_name_taken">A tab needs a name that no other tab has</string>
 </resources>

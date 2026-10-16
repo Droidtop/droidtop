@@ -95,6 +95,7 @@ import com.android.launcher3.logger.LauncherAtom.FromState;
 import com.android.launcher3.logger.LauncherAtom.ToState;
 import com.android.launcher3.logging.StatsLogManager;
 import com.android.launcher3.logging.StatsLogManager.StatsLogger;
+import com.android.launcher3.model.ModelWriter;
 import com.android.launcher3.model.data.FolderInfo;
 import com.android.launcher3.model.data.ItemInfo;
 import com.android.launcher3.model.data.WorkspaceItemFactory;
@@ -425,7 +426,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         if (DEBUG) {
             Log.d(TAG, "onBackKey newTitle=" + newTitle);
         }
-        mInfo.setTitle(newTitle, mLauncherDelegate.getModelWriter());
+        mInfo.setTitle(newTitle, modelWriter());
         mFolderIcon.onTitleChanged(newTitle);
 
         if (TextUtils.isEmpty(mInfo.title)) {
@@ -512,6 +513,24 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
     void setDragController(DragController dragController) {
         mDragController = dragController;
+    }
+
+    /**
+     * droidtop (Droidtop/tracker#564): makes this a drawer folder (LauncherDelegate.DrawerFolderDelegate),
+     * before it is given its icon: read only, no name editing, no options.
+     */
+    void setDrawerFolder() {
+        mLauncherDelegate = LauncherDelegate.forDrawerFolder(mActivityContext);
+        mFolderName.setEnabled(false);
+        mFolderName.setFocusable(false);
+        View options = findViewById(R.id.folder_options);
+        if (options != null) options.setVisibility(GONE);
+    }
+
+    /** The model writer, or null for a drawer folder, whose changes are not saved. */
+    @Nullable
+    private ModelWriter modelWriter() {
+        return mLauncherDelegate.writesModel() ? mLauncherDelegate.getModelWriter() : null;
     }
 
     public void setFolderIcon(FolderIcon icon) {
@@ -803,7 +822,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
 
                     if (updateAnimationFlag) {
                         mInfo.setOption(FolderInfo.FLAG_MULTI_PAGE_ANIMATION, true,
-                                mLauncherDelegate.getModelWriter());
+                                modelWriter());
                     }
                 }
             });
@@ -1185,7 +1204,7 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         if (getItemCount() <= mContent.itemsPerPage()) {
             // Show the animation, next time something is added to the folder.
             mInfo.setOption(FolderInfo.FLAG_MULTI_PAGE_ANIMATION, false,
-                    mLauncherDelegate.getModelWriter());
+                    modelWriter());
         }
     }
 
@@ -1202,8 +1221,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             }
         }
 
-        if (!items.isEmpty()) {
-            mLauncherDelegate.getModelWriter().moveItemsInDatabase(items, mInfo.id, 0);
+        if (!items.isEmpty() && modelWriter() != null) {
+            modelWriter().moveItemsInDatabase(items, mInfo.id, 0);
         }
         if (!isBind && total > 1 /* no need to update if there's one icon */) {
             Executors.MODEL_EXECUTOR.post(() -> {

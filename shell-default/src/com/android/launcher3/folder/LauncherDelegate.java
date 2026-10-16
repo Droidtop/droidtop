@@ -151,6 +151,47 @@ public class LauncherDelegate {
         return false;
     }
 
+    /**
+     * Whether the folder's changes are saved to the model. False for a drawer folder (DrawerFolderDelegate),
+     * whose FolderInfo is made by the drawer from a drawer tab and is in no database.
+     */
+    boolean writesModel() {
+        return true;
+    }
+
+    /**
+     * droidtop (Droidtop/tracker#564): a drawer folder, the home screen's folder view over a drawer tab
+     * marked "Show as a folder in All" (DrawerTabs). It opens and starts apps as any folder does, but nothing
+     * in it is dragged, renamed, saved or turned back into a single icon: the tab is the model.
+     */
+    private static class DrawerFolderDelegate extends LauncherDelegate {
+        DrawerFolderDelegate(Launcher launcher) {
+            super(launcher);
+        }
+
+        @Override
+        boolean isDraggingEnabled() {
+            return false;
+        }
+
+        @Override
+        void beginDragShared(View child, DragSource source, DragOptions options) { }
+
+        @Override
+        boolean writesModel() {
+            return false;
+        }
+
+        @Override
+        boolean replaceFolderWithFinalItem(Folder folder) {
+            return false;
+        }
+    }
+
+    static LauncherDelegate forDrawerFolder(ActivityContext context) {
+        return context instanceof Launcher launcher ? new DrawerFolderDelegate(launcher) : from(context);
+    }
+
     private static class FallbackDelegate extends LauncherDelegate {
 
         private final ActivityContext mContext;

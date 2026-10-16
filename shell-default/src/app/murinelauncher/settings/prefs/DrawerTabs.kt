@@ -11,13 +11,16 @@ import org.json.JSONObject
  * is not a tab of its own. An app may be in any number of tabs; a tab holds component names, so an app that
  * is uninstalled simply stops showing.
  *
+ * A tab can also be a drawer folder in All (Tab.folder): one mechanism for both, the tab being the model.
+ *
  * Kept as one JSON string in the launcher's preferences, beside the hidden apps, so it is backed up with them.
  * Read once and then held in memory: the drawer filters on every rebuild.
  */
 object DrawerTabs {
     private const val KEY = "drawer_tabs"
 
-    data class Tab(val name: String, val apps: Set<String>)
+    /** [folder]: shown in All as one drawer folder holding its apps, which then leave All's list. */
+    data class Tab(val name: String, val apps: Set<String>, val folder: Boolean = false)
 
     @Volatile
     private var cache: List<Tab>? = null
@@ -77,6 +80,11 @@ object DrawerTabs {
     }
 
     @JvmStatic
+    fun setFolder(context: Context, name: String, folder: Boolean) {
+        save(context, tabs(context).map { if (it.name == name) it.copy(folder = folder) else it })
+    }
+
+    @JvmStatic
     fun setMember(context: Context, tab: String, component: String, member: Boolean) {
         save(context, tabs(context).map { if (it.name == tab) it.copy(apps = if (member) it.apps + component else it.apps - component) else it })
     }
@@ -88,7 +96,7 @@ object DrawerTabs {
             (0 until array.length()).map { i ->
                 val o = array.getJSONObject(i)
                 val apps = o.optJSONArray("apps") ?: JSONArray()
-                Tab(o.getString("name"), (0 until apps.length()).map { apps.getString(it) }.toSet())
+                Tab(o.getString("name"), (0 until apps.length()).map { apps.getString(it) }.toSet(), o.optBoolean("folder"))
             }
         }.getOrDefault(emptyList())
     }
@@ -96,7 +104,7 @@ object DrawerTabs {
     private fun save(context: Context, tabs: List<Tab>) {
         cache = tabs
         val array = JSONArray()
-        tabs.forEach { tab -> array.put(JSONObject().put("name", tab.name).put("apps", JSONArray(tab.apps.sorted()))) }
+        tabs.forEach { tab -> array.put(JSONObject().put("name", tab.name).put("apps", JSONArray(tab.apps.sorted())).put("folder", tab.folder)) }
         prefs(context).edit().putString(KEY, array.toString()).apply()
     }
 }
