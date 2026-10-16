@@ -58,6 +58,9 @@ class PrivPackagesRigTest {
         "0".repeat(64),
         "",
         PluginTrustState.APPROVED,
+        enabled = true,
+        rootApproved = false,
+        disabledReason = null,
     )
 
     private val env = object : BrokerEnvironment by real {
