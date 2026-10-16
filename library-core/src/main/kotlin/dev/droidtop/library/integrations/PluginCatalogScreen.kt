@@ -561,6 +561,11 @@ object PluginCatalogScreen {
 
     private fun chipFor(source: PluginCatalogSource): String? = if (source.official) null else UNOFFICIAL
 
+    /**
+     * One plugin of a catalog (Droidtop/tracker#514): its name, its one-line summary and what pressing on would do, and
+     * a page of its own with the whole description, who makes it and which catalog lists it, then the action. Nothing is
+     * stitched onto the summary: the maker and the catalog are fields of the page, and the description is never a tooltip.
+     */
     private fun rowFor(
         source: PluginCatalogSource,
         origin: PluginCatalogOrigin,
@@ -568,52 +573,89 @@ object PluginCatalogScreen {
         plugin: PluginCatalogPlugin,
         installed: PluginRecord?,
     ): CatalogItem {
-        val subtitle = buildString {
-            append(plugin.summary ?: plugin.description ?: "No description")
-            if (source.official) append(" - ").append(plugin.publisher ?: origin.origin)
-            else append(" - ").append(plugin.publisher?.let { "$it, " }.orEmpty()).append("from ").append(source.name)
-            if (PluginCatalog.hasOrderConflict(plugin)) {
-                append(" - the catalog lists releases whose versions and dates disagree, so none is offered until it is fixed")
-            }
-        }
+        val action = actionFor(source, state, plugin, installed)
+        val id = "plugins_catalog_${plugin.id}"
+        val conflict = PluginCatalog.hasOrderConflict(plugin)
+        val page = CatalogScreen(
+            id = "${id}_page",
+            title = plugin.label,
+            subtitle = plugin.summary,
+            groups = {
+                listOf(
+                    CatalogGroup(
+                        id = "${id}_about",
+                        title = null,
+                        items = listOfNotNull(
+                            (plugin.description ?: plugin.summary)?.let { TextBlockItem(id = "${id}_description", text = it) },
+                            ActionItem(id = "${id}_maker", title = "Made by", value = plugin.publisher ?: origin.origin, run = {}),
+                            ActionItem(id = "${id}_from", title = "Listed in", value = if (source.official) "droidtop's catalog" else source.name, chip = chipFor(source), run = {}),
+                            if (conflict) {
+                                NoticeItem(
+                                    id = "${id}_conflict",
+                                    notice = Notice(
+                                        tone = NoticeTone.Caution,
+                                        title = "No release offered",
+                                        body = "The catalog lists releases whose versions and dates disagree, so none is offered until it is fixed.",
+                                    ),
+                                )
+                            } else {
+                                null
+                            },
+                        ),
+                    ),
+                    CatalogGroup(id = "${id}_action", title = null, items = listOf(action)),
+                )
+            },
+        )
+        return NestedScreenItem(
+            id = id,
+            title = plugin.label,
+            subtitle = plugin.summary ?: plugin.description?.substringBefore(". ")?.take(120) ?: "No description",
+            inline = page,
+            valueLabel = { action.value },
+            chip = chipFor(source),
+        )
+    }
+
+    /** The plugin page's one action: install, update, or why neither can happen. */
+    private fun actionFor(
+        source: PluginCatalogSource,
+        state: PluginCatalog.OriginState,
+        plugin: PluginCatalogPlugin,
+        installed: PluginRecord?,
+    ): CatalogItem {
         val offered = state == PluginCatalog.OriginState.Offered
         val latest = PluginCatalog.latestStable(plugin)
         val isUpdate = offered && installed != null && latest != null &&
             !latest.manifestSha256.equals(installed.archiveDigest, ignoreCase = true)
-        val id = "plugins_catalog_${plugin.id}"
+        val id = "plugins_catalog_${plugin.id}_action"
         return when {
             isUpdate -> AsyncActionItem(
                 id = id,
-                title = plugin.label,
-                subtitle = subtitle,
-                chip = chipFor(source),
+                title = "Update",
                 value = "Update to ${latest!!.version}",
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest!!, onStatus) },
             )
-            installed != null -> ActionItem(id = id, title = plugin.label, subtitle = subtitle, value = "Installed ${installed.manifest.version}", chip = chipFor(source), run = {})
+            installed != null -> ActionItem(id = id, title = "Installed", value = "Installed ${installed.manifest.version}", run = {})
             offered && latest != null -> AsyncActionItem(
                 id = id,
-                title = plugin.label,
-                subtitle = subtitle,
-                chip = chipFor(source),
+                title = "Install",
+                subtitle = "It waits for your approval before it runs",
                 value = "Install ${latest.version}",
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest, onStatus) },
             )
             !offered -> ActionItem(
                 id = id,
-                title = plugin.label,
-                subtitle = subtitle,
-                chip = chipFor(source),
+                title = "Not offered",
                 value = when (state) {
-                    PluginCatalog.OriginState.NotTrusted -> "Trust its origin above first"
-                    is PluginCatalog.OriginState.KeyChanged -> "Not offered: its key changed"
-
+                    PluginCatalog.OriginState.NotTrusted -> "Trust its origin first"
+                    is PluginCatalog.OriginState.KeyChanged -> "Its key changed"
                     is PluginCatalog.OriginState.Unusable -> "Not available (${state.reason})"
                     PluginCatalog.OriginState.Offered -> ""
                 },
                 run = {},
             )
-            else -> ActionItem(id = id, title = plugin.label, subtitle = subtitle, value = "No stable release yet", chip = chipFor(source), run = {})
+            else -> ActionItem(id = id, title = "Not offered", value = "No stable release yet", run = {})
         }
     }
 }

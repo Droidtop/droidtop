@@ -1948,11 +1948,11 @@ object AppSettingsCatalogs {
             else -> emptySet()
         }
         val state = pluginState(record, grants, runtimeNeed, updateAvailable, waiting)
-        val trustBadge = pluginTrustBadge(m.origin, userKeys, catalogNames)
         return NestedScreenItem(
             id = "plugin_${m.id}",
             title = m.label,
-            subtitle = listOfNotNull(m.presentation.summary ?: pluginSummary(m, enabledPoints), trustBadge, PluginTiers.badge(record, grants)).joinToString(" - "),
+            // What it is, in its own line; its trust and access are the chip and its page's header (#514), never stitched on.
+            subtitle = m.presentation.summary ?: pluginSummary(m, enabledPoints),
             inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
             valueLabel = { "$state · v${m.version}" },
             chip = if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
