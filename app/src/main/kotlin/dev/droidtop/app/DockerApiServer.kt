@@ -22,9 +22,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -276,7 +273,7 @@ internal object DockerApiServer {
             is DockerApi.Call.NetworkGet -> {
                 val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
                 val network = ContainerNetworks.find(all, call.id) ?: return DockerApi.error(404, "network ${call.id} not found")
-                EngineHttp.Response.json(200, DockerApi.network(network, containerNames(runtime)).toString() + "\n")
+                EngineHttp.Response.json(200, DockerApi.networkJson(network, containerNames(runtime)))
             }
             DockerApi.Call.NetworkCreate -> networksLock.withLock {
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
@@ -284,7 +281,7 @@ internal object DockerApiServer {
                 val (network, refused) = DockerApi.networkRequest(String(request.body, Charsets.UTF_8), existing, features)
                 refused?.let { return@withLock it }
                 withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.with(existing, network!!)) }
-                EngineHttp.Response.json(201, buildString { append("{\"Id\":\"").append(network!!.id).append("\",\"Warning\":\"\"}\n") })
+                EngineHttp.Response.json(201, DockerApi.networkCreated(network!!.id))
             }
             is DockerApi.Call.NetworkRemove -> networksLock.withLock {
                 if (ContainerNetworks.PREDEFINED.any { it == call.id || ContainerNetworks.predefinedId(it) == call.id }) {
@@ -301,8 +298,7 @@ internal object DockerApiServer {
             }
             is DockerApi.Call.NetworkConnect -> networksLock.withLock {
                 runtime ?: return@withLock DockerApi.error(500, "the desktop is not running")
-                val body = runCatching { Json.parseToJsonElement(String(request.body, Charsets.UTF_8)) as JsonObject }.getOrNull()
-                val ref = (body?.get("Container") as? JsonPrimitive)?.content ?: return@withLock DockerApi.error(400, "name a Container")
+                val ref = DockerApi.connectTarget(String(request.body, Charsets.UTF_8)) ?: return@withLock DockerApi.error(400, "name a Container")
                 val info = find(runtime.listContainers(), ref) ?: return@withLock DockerApi.error(404, "No such container: $ref")
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
                 if (call.id in ContainerNetworks.PREDEFINED) return@withLock EngineHttp.Response(200, "text/plain", ByteArray(0))
