@@ -1173,7 +1173,21 @@ neither of them specific to the new widget:
    appeared (droidtop's own `#custom-widget-scheme` smartspace clock still
    did, since that path skips `AppFilter` entirely) until
    `AppFilter.HIDE_SELF_EXEMPT_CLASSES` was extended to include both
-   widget providers.
+   widget providers. That list was the bug's real shape: every widget added later
+   (Search, Quick launch, Downloads, Desktop, Shelf, Companion and the
+   droidtop page) was filtered out of Standard's picker again (rig,
+   2026-10-16, build 0.2.0-dev.1994: only Continue playing and Plugin
+   status listed). The list is gone. `LauncherSelfFilter` (`:runtime-common`)
+   is the one rule: droidtop's package shows its one icon and every
+   component that is an app widget provider, which `AppFilter` reads from
+   the receiver's metadata, disabled ones included. `WidgetManifestTest`
+   ties the manifest's widget receivers to `DroidtopWidgets.PROVIDERS` and
+   to that rule, and checks each has its own `android:label` (pickers show
+   it; without one they show the app's name). Murine's own clock
+   (`MurineClockWidgetPlugin`) is hidden from the picker
+   (`WIDGET_FEATURE_HIDE_FROM_PICKER`): the Smartspace setting places it,
+   and in the picker it showed under droidtop as a nameless "Calendar
+   0 x 0".
 2. **A `native_bundle` plugin self-disables on its very first real call on
    Android 10+.** Android refuses `DexClassLoader` on a file that is still
    writable by the app ("Writable dex file ... is not allowed"); this
