@@ -25,6 +25,7 @@ import static com.android.launcher3.LauncherPrefs.GRID_HEIGHT;
 import static com.android.launcher3.LauncherPrefs.GRID_NAME;
 import static com.android.launcher3.LauncherPrefs.GRID_WIDTH;
 import static com.android.launcher3.LauncherPrefs.DRAWER_GRID_WIDTH_OVERRIDE;
+import static com.android.launcher3.LauncherPrefs.DOCK_ICONS;
 import static com.android.launcher3.LauncherPrefs.DRAWER_PADDING;
 import static com.android.launcher3.LauncherPrefs.ICON_LABEL_SIZE;
 import static com.android.launcher3.LauncherPrefs.LABEL_VISIBILITY;
@@ -309,6 +310,7 @@ public class InvariantDeviceProfile {
             } else if (GRID_WIDTH.getSharedPrefKey().equals(key) ||
                     GRID_HEIGHT.getSharedPrefKey().equals(key) ||
                     DRAWER_GRID_WIDTH_OVERRIDE.getSharedPrefKey().equals(key) ||
+                    DOCK_ICONS.getSharedPrefKey().equals(key) ||
                     DRAWER_PADDING.getSharedPrefKey().equals(key) ||
                     ICON_SIZE.getSharedPrefKey().equals(key) ||
                     ICON_LABEL_SIZE.getSharedPrefKey().equals(key) ||
@@ -319,11 +321,11 @@ public class InvariantDeviceProfile {
         };
         prefs.addListener(prefListener, FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
                 GRID_WIDTH, GRID_HEIGHT, DRAWER_GRID_WIDTH_OVERRIDE, ICON_SIZE, ICON_LABEL_SIZE,
-                LABEL_VISIBILITY, DRAWER_PADDING);
+                LABEL_VISIBILITY, DRAWER_PADDING, DOCK_ICONS);
         lifeCycle.addCloseable(() -> prefs.removeListener(prefListener,
                 FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE, GRID_WIDTH, GRID_HEIGHT,
                 DRAWER_GRID_WIDTH_OVERRIDE, ICON_SIZE, ICON_LABEL_SIZE, LABEL_VISIBILITY,
-                DRAWER_PADDING));
+                DRAWER_PADDING, DOCK_ICONS));
 
         SimpleBroadcastReceiver localeReceiver = new SimpleBroadcastReceiver(context,
                 MAIN_EXECUTOR, i -> onConfigChanged(context));
@@ -476,9 +478,12 @@ public class InvariantDeviceProfile {
         numColumns = mPrefs.get(GRID_WIDTH);
         numRows = mPrefs.get(GRID_HEIGHT);
 
-        // Dynamic hotseat and all apps columns based on width
-        numShownHotseatIcons = numColumns;
-        numDatabaseHotseatIcons = numColumns;
+        // Dynamic hotseat and all apps columns based on width; droidtop patch: or the dock's own count
+        // (LauncherPrefs.DOCK_ICONS, Droidtop/tracker#564). A change goes through the grid migration, as the
+        // database hotseat size is part of the model state.
+        int dockIcons = mPrefs.get(DOCK_ICONS);
+        numShownHotseatIcons = dockIcons != 0 ? dockIcons : numColumns;
+        numDatabaseHotseatIcons = numShownHotseatIcons;
         numAllAppsColumns = mPrefs.get(DRAWER_GRID_WIDTH_OVERRIDE);
         if (numAllAppsColumns == 0) numAllAppsColumns = numColumns;
         numDatabaseAllAppsColumns = numAllAppsColumns;
