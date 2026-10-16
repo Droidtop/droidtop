@@ -271,6 +271,26 @@
                 android:resource="@xml/widget_desktop_info" />
         </receiver>
         <receiver
+            android:name="dev.droidtop.app.CompanionWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_companion_info" />
+        </receiver>
+        <receiver
+            android:name="dev.droidtop.app.FullPageWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_page_info" />
+        </receiver>
+        <receiver
             android:name="dev.droidtop.app.ShelfWidgetProvider"
             android:exported="false">
             <intent-filter>

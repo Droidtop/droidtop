@@ -1071,6 +1071,13 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     Art style and text size in the maker come later.
   - **Desktop**: start or go back to the Desktop, saying whether its session runs (following
     `DesktopSessionService.state`), and open Containers. Container apps on it come later.
+  - **Companion and screens**: with one screen, open the companion as its pull-down sheet; with a second screen
+    holding it, turn that screen back on (a broadcast to the provider, `CompanionPrefs.requestWake`); and Reinitialize
+    displays. Drawn again when a screen is added or removed.
+  - **droidtop page** (`FullPageWidgetProvider`, 4x5): a whole launcher page of droidtop to swipe to from the person's
+    own home screen. The one search's bar, the last games played, then droidtop's places: Quick Menu, Downloads, and
+    Gaming or Desktop while that mode is on, then Switch mode, four at most. Drawn again after a launch and when a
+    mode is switched.
 - The library widgets are not gated by a mode: the library is never mode-gated (2c). The Desktop widget is: its
   provider is enabled only while Desktop is on (`ModeStartup`, `ModePiece.DESKTOP_SESSION`), which is how Android
   hides a widget from every launcher's picker. What a launcher does with one already placed is for the rig to see.

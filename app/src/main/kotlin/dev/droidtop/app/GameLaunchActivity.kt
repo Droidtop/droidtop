@@ -72,6 +72,7 @@ class GameLaunchActivity : Activity() {
                     // The recent games among droidtop's app shortcuts move too.
                     LaunchResult.Launched -> {
                         ContinuePlayingWidgetProvider.requestUpdate(app)
+                        FullPageWidgetProvider.requestUpdate(app)
                         DroidtopShortcuts.refresh(app)
                     }
                 }

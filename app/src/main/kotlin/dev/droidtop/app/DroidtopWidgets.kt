@@ -41,6 +41,8 @@ internal object DroidtopWidgets {
         DownloadsWidgetProvider::class.java,
         DesktopWidgetProvider::class.java,
         ShelfWidgetProvider::class.java,
+        CompanionWidgetProvider::class.java,
+        FullPageWidgetProvider::class.java,
     )
 
     /** The four rows [rows] fills, in order. */
@@ -58,11 +60,11 @@ internal object DroidtopWidgets {
     class Row(val text: String, val tap: PendingIntent?)
 
     /**
-     * A title and up to [MAX_ROWS] rows (layout `widget_rows`), or [empty] when there are none: an honest empty state,
-     * never placeholder data.
+     * A title and up to [MAX_ROWS] rows, or [empty] when there are none: an honest empty state, never placeholder
+     * data. [layout] is `widget_rows`, or a larger layout that holds the same ids (the full page, `widget_page`).
      */
-    fun rows(context: Context, look: Look, title: String, rows: List<Row>, empty: String): RemoteViews {
-        val views = RemoteViews(context.packageName, R.layout.widget_rows)
+    fun rows(context: Context, look: Look, title: String, rows: List<Row>, empty: String, layout: Int = R.layout.widget_rows): RemoteViews {
+        val views = RemoteViews(context.packageName, layout)
         plate(views, look)
         views.setTextViewText(R.id.widget_title, title)
         views.setTextColor(R.id.widget_title, look.ink)
