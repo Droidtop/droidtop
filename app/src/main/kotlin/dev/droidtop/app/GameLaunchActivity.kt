@@ -69,7 +69,11 @@ class GameLaunchActivity : Activity() {
                     // widget (docs/SPEC.md Launcher mode) shows this game
                     // as most-recent now rather than at its next 30-minute
                     // system tick.
-                    LaunchResult.Launched -> ContinuePlayingWidgetProvider.requestUpdate(app)
+                    // The recent games among droidtop's app shortcuts move too.
+                    LaunchResult.Launched -> {
+                        ContinuePlayingWidgetProvider.requestUpdate(app)
+                        DroidtopShortcuts.refresh(app)
+                    }
                 }
             }
         }
