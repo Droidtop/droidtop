@@ -51,6 +51,8 @@ sealed interface EngineRequest {
         val labels: Map<String, String> = emptyMap(),
         /** Networks of droidtop's own the container joins (the Engine API's NetworkMode and EndpointsConfig). */
         val networks: List<NetworkJoin> = emptyList(),
+        /** `--rm`, the Engine API's AutoRemove: the container is removed once its program has run and ended. */
+        val autoRemove: Boolean = false,
     ) : EngineRequest
 
     /** A network a new container joins, by its id, and the aliases it was given there. */

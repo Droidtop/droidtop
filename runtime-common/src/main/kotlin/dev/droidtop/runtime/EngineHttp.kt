@@ -36,7 +36,17 @@ object EngineHttp {
     /** A request that could not be read: [status] and why, answered before the connection closes. */
     class BadRequest(val status: Int, message: String) : Exception(message)
 
-    data class Response(val status: Int, val contentType: String, val body: ByteArray, val extraHeaders: Map<String, String> = emptyMap()) {
+    data class Response(
+        val status: Int,
+        val contentType: String,
+        val body: ByteArray,
+        val extraHeaders: Map<String, String> = emptyMap(),
+        /**
+         * A body written as it comes (attach): after the head, the server hands it the connection's output and closes
+         * the connection when it returns. Such a response has no length.
+         */
+        val stream: (suspend (OutputStream) -> Unit)? = null,
+    ) {
         override fun equals(other: Any?): Boolean =
             other is Response && status == other.status && contentType == other.contentType && body.contentEquals(other.body) &&
                 extraHeaders == other.extraHeaders
@@ -91,6 +101,8 @@ object EngineHttp {
             if (response.status == 101) {
                 append("Connection: Upgrade\r\n")
                 append("Upgrade: tcp\r\n")
+            } else if (response.stream != null) {
+                append("Connection: close\r\n")
             } else {
                 append("Content-Length: ").append(response.body.size).append("\r\n")
             }

@@ -2472,7 +2472,7 @@ the `ContainerRuntime` interface that already exists (§3):
   too). A host path, another target or an unknown name is refused, so a path still never comes from the container.
   The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
   `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
-  "Its own program", and the start with the desktop. `-w`, `--entrypoint`, `--rm` and `-u` answer
+  "Its own program", and the start with the desktop. `-w`, `--entrypoint` and `-u` answer
   "not built in droidtop yet". Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
   `--tmpfs`, `--read-only`, ...) answer from the one table in "Kernel features, detected at runtime" (section 3);
   `--network host` and `--pid host` are taken, being what the containers already are. `docker info` (D10) says the
@@ -2583,7 +2583,19 @@ the `ContainerRuntime` interface that already exists (§3):
   script), never shell text. It runs on pipes and its output comes back when it ends, so input and a terminal
   (`docker exec -i`, `-t`) answer not built: droidtop's own docker command, at the end of the PATH, streams them. A
   non-root `User` is not built and `Privileged` is refused. The execs a session made are kept in memory, at most 256.
-  Attach (`docker run` without `-d`, `docker compose up` without `-d`) is the next slice.
+  **Attach and --rm (built 2026-10-16, D14 fifth slice).** `POST /containers/{id}/attach` is how `docker run` and
+  `docker compose up` without `-d` show a program's output: a program's output goes to its log, so attach follows
+  that file (`DockerApiServer.followLog`) and sends what is added as stdout frames, from where it ends now, or from
+  the top with `logs=1`, taking the connection over with a 101 when asked. With `stream=1` it goes on until the
+  program has run and ended; attach comes before start, so it waits for the start (five minutes at most), and a
+  program that starts and ends between two looks is seen by its state turning to over since the attach. A log
+  trimmed under it is followed from its top. Input (`stdin=1`, `docker run -i`) answers not built, and a create
+  asking for a terminal or open input (`Tty`, `OpenStdin`, `docker run -t`, `-i`) answers not built at once rather
+  than at attach. `--rm` (the wrapper's `run`, the API's `AutoRemove`) removes the container through the one
+  removal path once its program has run and ended (`EngineActions`, watching from the creation; a program never
+  started within ten minutes leaves the container be); with a restart policy it is refused, as Docker refuses it.
+  `wait?condition=removed`, which Docker's CLI uses for `--rm`, answers the exit code once the container is gone, or
+  after half a minute.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept
