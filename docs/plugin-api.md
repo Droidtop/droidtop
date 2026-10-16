@@ -971,7 +971,8 @@ of surfaces of their own.
   call's `context.surface` names the place (`gaming.quick_menu`,
   `standard.home`, `desktop.taskbar`, `gaming.home`, `desktop.start_menu`,
   `gaming.companion` and `gaming.companion_game` with each mode's own prefix
-  (C15), `settings`).
+  (C15), `settings`, and `android.widget` for a droidtop widget on any
+  launcher's page, C10, which belongs to no mode).
 - **Where each point is drawn** (`PluginModes.HOMES`):
 
 | Point | Gaming | Standard | Desktop |
@@ -982,14 +983,15 @@ of surfaces of their own.
 | `social.provider` (C19) | Social place, Quick Menu tile, companion | Settings → Social | Settings → Social |
 | `ui.settings`, `ui.main` (C1, C16) | Settings | Settings | Settings |
 | `jobs.service`, `jobs.schedule` (E8, E9) | run in every mode, shown in Jobs | same | same |
+| `ui.widget` and tiles that allow it (C10, C2, C3) | droidtop's Android app widgets, on any launcher's pages, whatever mode droidtop is in (`android.widget`) | same | same |
 
 - **droidtop's plugin window** (`PluginHubActivity`, opened through
   `PluginHub`): where a panel opened from Standard or Desktop is drawn,
   with the same navigator, hint row and look as the Containers screen.
 - **Later, not built:** Desktop taskbar items with a menu (C8 `ui.tray`),
   Start menu and home-screen actions (C12 `launcher.actions`), context
-  actions on an app (long-press) or a window, file associations (E4), and
-  widget lines (C10). Each is a catalogue row already; they come after
+  actions on an app (long-press) or a window, and file associations (E4).
+  Each is a catalogue row already; they come after
   Gaming's surfaces are complete.
 
 ---
@@ -1888,9 +1890,17 @@ Risk low.
   is shown whatever runs. RetroArch's Save state and Fast-forward are the
   case: `{"point": "ui.quick_tile", "id": "save_state", "gamePackages":
   ["com.retroarch", "com.retroarch.aarch64"]}`.
+- **On a widget (2026-10-16, Droidtop/tracker#563).** A tile whose
+  `surfaces` is empty or names `android.widget` can be put on droidtop's
+  widgets (C10). Its state is asked with the same `state` op and budget,
+  at most once every 30 s, and a press on the widget is the same `toggle`
+  or `action`, with `context.surface` `android.widget`, the 15 s budget,
+  and no UI: the reply's `message` is shown as a short note naming the
+  plugin, and a reply view is not opened from a launcher. A tile with
+  `whileGame` or `gamePackages` is never offered for a widget.
 - **Status:** built in the Quick Menu; since 2026-10-07 its rows are in
   the plugin's panel. A `status_tile` counts as a read-only quick tile
-  (§6).
+  (§6). Widget calls built 2026-10-16 (`PluginWidgets`).
 
 **C3 Status tiles and home widgets.** EP `ui.status_tile@1`. Risk low.
 - **For:** ambient readings (network or VPN state, a sync status).
@@ -1900,7 +1910,8 @@ Risk low.
 - **Surfaces:**
   - G: the plugin's panel in the Quick Menu (C17), and its value on the
     plugin's row of the Plugins list; the companion screen;
-  - A: `PluginStatusWidgetProvider`, a home-screen widget;
+  - A: droidtop's widgets (C10); `PluginStatusWidgetProvider` until it
+    moves onto them;
   - D: the tray.
 - **Permission:** none.
 - **Status:** built (`status_tile`: the widget and the panel; the
@@ -2040,20 +2051,58 @@ Risk low.
 - **Rules:** never the game file itself (12a rule 1); nothing is ranked
   or auto-picked (rule 3).
 
-**C10 Desktop widgets.** EP `ui.widget@1`. Risk low.
-- **For:** a small live panel on the desktop surface or the companion
-  screen: a clock, a system monitor, now playing, a sync status.
-- **What the plugin supplies:** data only, from a fixed set of widget
-  templates (value, list, gauge, media, image) that droidtop draws.
-- **Ops:** `snapshot {size} → template data`, at most one refresh every
-  30 s.
+**C10 Widgets.** EP `ui.widget@1`. Risk low.
+- **For:** a small live panel on a launcher's page, the desktop surface
+  or the companion screen: a clock, a system monitor, now playing, a sync
+  status (Droidtop/tracker#563: a plugin's integration on Niagara's or any
+  launcher's pages).
+- **What the plugin supplies:** data only, in one of a closed set of
+  templates that droidtop draws. Every template maps to views an Android
+  app widget can hold, so no plugin code runs in a launcher's process and
+  there are no free-form views.
+- **Ops:**
+  - `snapshot {size: {widthDp, heightDp}}` → a template. droidtop asks at
+    most once every 30 s for one widget size (sooner only right after a
+    press on it), with a 5 s budget; a miss, a failure or a template
+    droidtop cannot draw keeps the last snapshot and is not a crash.
+    `context.surface` says where it is drawn (`android.widget` on a
+    launcher).
+  - `action {id}`: a tap. Only an id the last snapshot offered is sent;
+    15 s; the reply's `message` is shown as a short note naming the
+    plugin, and a reply view is not opened from a launcher. The widget
+    is drawn again afterwards.
+- **Templates** (`data.template`; text is cut at 60 characters for a
+  title, 140 for a subtitle or `empty`, 40 for a value or label):
+  - `value {title, value, subtitle?, severity?}`; `value` may be a typed
+    value (1.6, "Typed values").
+  - `list {title?, items[{id, title, subtitle?, value?, action?}], empty?}`:
+    at most 20 items, each `id` once; `empty` is the plugin's own line for
+    no items.
+  - `gauge {title, percent, label?}`: `percent` is 0 to 100, or -1 for
+    unknown.
+  - `media {title, subtitle?, image?, buttons?[{id, label}]}`: at most 3
+    buttons.
+  - `image {image, title?}`.
+  - Any template may carry `action {id}`, a tap on the whole widget; a
+    list item's `action` and a media button's `id` are the others. An id
+    is 1 to 64 of `A-Z a-z 0-9 . _ : -`.
+  - An `image` is `{data, type}`: base64 PNG, JPEG or WebP, at most
+    96 KiB. droidtop checks that the bytes are what `type` says and
+    decodes them once, at most 512 px on the longer side. A widget never
+    fetches a URL.
+- **Which entries can be on a widget:** a `ui.widget` entry, and C2 and
+  C3 tiles, whose `surfaces` is empty or names `android.widget` (the
+  filter every tile surface reads). The widget maker lists them from
+  manifests without loading a plugin.
 - **Surfaces:**
-  - G: companion screen panels (§4d);
-  - A: home widgets, through the same template renderer as
-    `PluginStatusWidgetProvider`;
-  - D: the desktop surface.
+  - A: droidtop's widgets on any launcher's pages (Droidtop/tracker#563),
+    through the one widget renderer;
+  - G: companion screen panels (§4d), not built;
+  - D: the desktop surface, not built.
 - **Permission:** none.
-- **Status:** not built.
+- **Status:** built for Android app widgets (2026-10-16,
+  `PluginWidgetProtocol`, `PluginWidgets`, `PluginWidgetActionReceiver`);
+  the widget renderer and maker are the UI lane's (#563).
 
 **C11 Gaming-shell sections and rows.** EP `gaming.rows@1`. Risk medium.
 - **For:** a row on Gaming's home or a section, such as "New on
@@ -3554,6 +3603,12 @@ version was bumped.
 
 **Changelog (additive changes; no version moved).**
 
+- 2026-10-16 (Droidtop/tracker#563): widgets (C10) are built for Android
+  app widgets: `ui.widget@1` `snapshot` and `action` with the value, list,
+  gauge, media and image templates, and C2 and C3 tiles on a widget.
+  `context.surface` `android.widget` is new; a tile's `surfaces` decides
+  whether it may be on one.
+
 - 2026-10-16 (Droidtop/tracker#559): theme tokens (G7): `ui.get_theme`,
   `theme` in `host.get_info`, and the event `host.theme_changed`, for UI a
   plugin draws itself.
@@ -3645,6 +3700,7 @@ does not duplicate it once built.
 | search `query` (C5) | 1.5 s | results omitted; not a crash |
 | `pre_launch` hook (B3) | 2 s | launch proceeds; not a crash |
 | status or quick tile `state` (C2, C3) | 5 s (the widget's existing value) | last value kept; not a crash |
+| widget `snapshot` (C10) | 5 s, at most once every 30 s | last snapshot kept; not a crash |
 | provider call (§2.4) | the caller's remaining time minus 1 s, at most 15 s | caller gets `TIMEOUT`; **provider** treated as crashed |
 | job | no per-call bound; progress at least every 60 s or the job shows "not responding" (not killed) | the user cancels |
 

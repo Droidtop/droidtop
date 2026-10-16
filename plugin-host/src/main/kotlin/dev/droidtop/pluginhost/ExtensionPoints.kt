@@ -56,7 +56,7 @@ object ExtensionPoints {
         ExtensionPoint("theme.pack", "Themes", PointRisk.MEDIUM, lets = "Lets it provide themes."),
         ExtensionPoint("ui.tray", "Taskbar and tray items", PointRisk.LOW, lets = "Lets it add items to the taskbar and tray."),
         ExtensionPoint("files.handler", "File actions and open with", PointRisk.HIGH, lets = "Lets it receive files you choose to open or send to it."),
-        ExtensionPoint("ui.widget", "Desktop widgets", PointRisk.LOW, lets = "Lets it add widgets to the desktop."),
+        ExtensionPoint("ui.widget", "Widgets", PointRisk.LOW, lets = "Lets it add widgets to your home screen, the desktop and the companion screen."),
         ExtensionPoint("gaming.rows", "Shelves on Home", PointRisk.MEDIUM, lets = "Lets it add shelves of your own games to Home."),
         ExtensionPoint("launcher.actions", "Launcher app drawer and home actions", PointRisk.MEDIUM, lets = "Lets it add actions to the app drawer and home screen."),
         ExtensionPoint("onboarding.step", "Setup steps", PointRisk.HIGH, officialOnly = true, lets = "Lets it add a step to droidtop's first-run setup."),
