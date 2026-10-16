@@ -342,6 +342,8 @@ object ThemeAssets {
         val systemFullName: String?,
         val collectionKind: EsDeCollectionKind,
         val screenAspectRatio: Float,
+        /** The appearance: it picks the colour scheme when the person chose none ([colorSchemeFor]). */
+        val light: Boolean,
     )
 
     private val systemThemeCache = java.util.concurrent.ConcurrentHashMap<ThemeCacheKey, EsDeTheme>()
@@ -357,7 +359,40 @@ object ThemeAssets {
             discoveredThemes = null
             systemThemeCache.clear()
             capabilitiesCache.clear()
+            matchingSchemeCache.clear()
         }
+    }
+
+    /** (theme name, light) to the colour scheme whose ground is that appearance's; "" when no scheme of it is. */
+    private val matchingSchemeCache = java.util.concurrent.ConcurrentHashMap<Pair<String, Boolean>, String>()
+
+    /**
+     * The colour scheme a load of [theme] uses (docs/SPEC.md 7k, "Light and dark"; decided 2026-10-16): the one the
+     * person chose for it in Settings, else the first declared scheme whose ground is the appearance's ([light]), found
+     * by parsing the theme once per scheme and caching the answer, else null, the theme's first-declared scheme, whose
+     * palette GamingThemeMapping then derives for the appearance. Parses, so it is asked off the main thread, as every
+     * load is.
+     */
+    private fun colorSchemeFor(context: Context, theme: ThemeDescriptor, themeDir: File, light: Boolean, screenAspectRatio: Float): String? {
+        ThemePrefs.colorScheme(context, theme.name)?.let { return it }
+        val found = matchingSchemeCache.getOrPut(theme.name to light) {
+            val schemes = EsDeThemeParser.parseCapabilities(File(themeDir, "capabilities.xml")).colorSchemes
+            if (schemes.size <= 1) return@getOrPut ""
+            schemes.firstOrNull { scheme ->
+                val parsed = runCatching {
+                    EsDeThemeParser.parseWithCapabilities(
+                        File(themeDir, "theme.xml"),
+                        screenAspectRatio = screenAspectRatio,
+                        themeRootDir = themeDir,
+                        colorSchemeOverride = scheme,
+                        variantOverride = ThemePrefs.variant(context, theme.name),
+                        aspectRatioOverride = ThemePrefs.aspectRatio(context, theme.name),
+                    )
+                }.getOrNull()
+                parsed != null && GamingThemeMapping.map(parsed).let { it.declared && it.isLight == light }
+            } ?: ""
+        }
+        return found.ifEmpty { null }
     }
 
     private fun cacheKey(
@@ -379,6 +414,7 @@ object ThemeAssets {
             systemFullName = systemFullName,
             collectionKind = collectionKind,
             screenAspectRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat(),
+            light = dev.droidtop.library.settings.AppearancePrefs.light(context),
         )
     }
 
@@ -523,7 +559,7 @@ object ThemeAssets {
                 // listeners a theme switch does, which clears
                 // systemThemeCache -- so stale-scheme parses can't be
                 // served after a selection change.
-                colorSchemeOverride = ThemePrefs.colorScheme(context, active.name),
+                colorSchemeOverride = colorSchemeFor(context, active, themeDir, cacheKey.light, screenAspectRatio),
                 variantOverride = ThemePrefs.variant(context, active.name),
                 aspectRatioOverride = ThemePrefs.aspectRatio(context, active.name),
             )

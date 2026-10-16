@@ -185,11 +185,26 @@ object GamingThemeMapping {
         )
     }
 
-    fun map(theme: EsDeTheme?, light: Boolean = false): GamingThemeColors {
-        if (theme == null) return defaultFor(light)
+    /**
+     * The palette for [theme] in the appearance asked for: null [light] is the theme as it is. A theme whose ground is
+     * the other appearance's (no colour scheme of it matched, ThemeAssets) keeps its accent and fonts over droidtop's
+     * own ground for [light], and its text colours, written for the other ground, are derived again; its texture is
+     * left out (docs/SPEC.md 7k, "Light and dark").
+     */
+    fun map(theme: EsDeTheme?, light: Boolean? = null): GamingThemeColors {
+        if (theme == null) return defaultFor(light == true)
         val declared = read(theme)
-        if (!declared.any) return defaultFor(light)
-        return build(declared)
+        if (!declared.any) return defaultFor(light == true)
+        val built = build(declared)
+        if (light == null || built.isLight == light) return built
+        return build(
+            Declared(
+                ground = defaultFor(light).ground,
+                accent = declared.accent,
+                bodyFont = declared.bodyFont,
+                displayFont = declared.displayFont,
+            ),
+        )
     }
 
     /**
