@@ -24,6 +24,8 @@
     <string name="widget_quick_launch_title">Quick launch</string>
     <string name="widget_downloads_title">Downloads</string>
     <string name="widget_desktop_title">Desktop</string>
+    <string name="widget_shelf_title">Shelf</string>
+    <string name="widget_shelf_empty">No games on this shelf yet</string>
     <string name="widget_downloads_empty">Nothing downloading, and no updates</string>
     <string name="widget_quick_launch_pick">Pick a game</string>
     <string name="widget_quick_launch_gone">This game left your library</string>

@@ -1064,6 +1064,11 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
   - **Downloads**: the downloads running or paused with their progress, then how many games have an update; a row
     opens Downloads or Updates. Drawn again when the jobs change, at most every 2 s (`DownloadsWidgetProvider.watch`,
     following `PluginJobsCenter` from :app's start).
+  - **Shelf**, with the first widget maker (`ShelfConfigureActivity`, opened on placement and to reconfigure):
+    recently played, recently added, favourites, one of the person's collections or a system that has games, as a
+    grid of art (a `RemoteViewsService` collection, `ShelfWidgetService`, each cell filling in its game's id) or a
+    list of names (the shared rows); 24 games at most. Its content is kept by the widget's id (`WidgetConfigs`).
+    Art style and text size in the maker come later.
   - **Desktop**: start or go back to the Desktop, saying whether its session runs (following
     `DesktopSessionService.state`), and open Containers. Container apps on it come later.
 - The library widgets are not gated by a mode: the library is never mode-gated (2c). The Desktop widget is: its

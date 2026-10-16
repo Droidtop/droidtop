@@ -40,6 +40,7 @@ internal object DroidtopWidgets {
         QuickLaunchWidgetProvider::class.java,
         DownloadsWidgetProvider::class.java,
         DesktopWidgetProvider::class.java,
+        ShelfWidgetProvider::class.java,
     )
 
     /** The four rows [rows] fills, in order. */

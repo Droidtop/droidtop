@@ -270,6 +270,29 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_desktop_info" />
         </receiver>
+        <receiver
+            android:name="dev.droidtop.app.ShelfWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_shelf_info" />
+        </receiver>
+        <service
+            android:name="dev.droidtop.app.ShelfWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <activity
+            android:name="dev.droidtop.app.ShelfConfigureActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
         <activity
             android:name="dev.droidtop.app.QuickLaunchConfigureActivity"
             android:exported="true"
