@@ -16674,7 +16674,12 @@ starts a word (`PrincessEvangileFull` is `Princess Evangile Full`,
 `BeingADik` is `Being A Dik`); a name with no lower-case letter (`GTA`) or
 with a space is left as written. A dotted version written straight onto the
 title with a capital V (`SomeGameV0.80`) is the version, not part of the
-title. The console's PC cards that read `REC` and `RTS` are not a parser
+title. So is a version written straight after punctuation or a letter of
+another script, which no English word goes on through
+(`新生活は妹ちゃんと!ver1.8` is `新生活は妹ちゃんと!`, version 1.8; `ver` or
+`version` with any number, a bare `v` with a dotted one;
+Droidtop/tracker#174, rig 2026-10-14); after a Latin letter `ver` may end a
+word (`Forever1.0`) and stays the title's. The console's PC cards that read `REC` and `RTS` are not a parser
 miss: their folders are `REC_v0.4.3.5` and `RTS_0.032_WIN2`, whose titles
 are `REC` and `RTS` (a build-stage folder under a titled game still takes
 the game's title, `isReleaseTagFolder`). The grid's name line under the
