@@ -10624,7 +10624,12 @@ reconciliation, a file read and the paths named, never a walk.
   placed, from the job. A restored job whose file the dead process had
   already placed (the entry is finished in Android's list, the file is gone
   from the downloads area and present in the folder) is finished and
-  reported again instead of failing with "its file is missing".
+  reported again instead of failing with "its file is missing". The step
+  moves the file with `DownloadJobs.moveFile`: a rename where it can, and a
+  copy under a hidden `.placing` name in the folder, synced and renamed into
+  place before the download is deleted where it cannot, since the downloads
+  area and an SD card game folder are two volumes (Droidtop/tracker#558: a
+  BIOS file to an exFAT card failed). Its failures name the target path.
 - `StoreInstallJob` reports the store's own answer for where the game is
   (the store's folder when the store cannot say) when the install ends. A
   store uninstall reports the folder removed. Sign-in, sign-out and sync
