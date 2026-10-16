@@ -58,7 +58,7 @@ class LibpodApiTest {
         assertEquals(DockerApi.Call.Networks(mapOf("name" to listOf("x"))), get("/networks/json", mapOf("filters" to """{"name":["x"]}""")))
         assertEquals(DockerApi.Call.Exists(DockerApi.Kind.NETWORK, "x"), get("/networks/x/exists"))
         assertTrue(get("/containers/json", mapOf("filters" to "[1]")) is DockerApi.Call.Refused)
-        assertEquals(DockerApi.Call.NotBuilt("POST /libpod/pods/create"), LibpodApi.route("POST", "/v5.2.5/libpod/pods/create", emptyMap()))
+        assertEquals(DockerApi.Call.NotBuilt("POST /libpod/volumes/create"), LibpodApi.route("POST", "/v5.2.5/libpod/volumes/create", emptyMap()))
         assertEquals(DockerApi.Call.NotFound, get("/nothing"))
         assertTrue(LibpodApi.notBuilt("x").body.toString(Charsets.UTF_8).contains("The libpod API"))
     }
@@ -115,7 +115,7 @@ class LibpodApiTest {
         assertEquals("Degraded", listed.str("Status"))
         assertEquals(listOf("web", "job"), listed.getValue("Containers").jsonArray.map { it.jsonObject.str("Names") })
         assertEquals(0, list(LibpodApi.pods(listOf(facts), mapOf("name" to listOf("other")))).size)
-        assertEquals(setOf("label"), LibpodApi.unknownPodFilters(mapOf("label" to listOf("a"), "name" to listOf("b"))))
+        assertEquals(setOf("status"), LibpodApi.unknownPodFilters(mapOf("label" to listOf("a"), "name" to listOf("b"), "status" to listOf("running"))))
         val inspected = obj(LibpodApi.pod(facts))
         assertEquals("Degraded", inspected.str("State"))
         assertEquals("2", inspected.str("NumContainers"))
@@ -221,5 +221,55 @@ class LibpodApiTest {
         assertEquals(404, missing.status)
         assertTrue(obj(missing.body.toString(Charsets.UTF_8)).str("message").contains("no such container"))
         assertTrue(obj(LibpodApi.missing(DockerApi.Kind.POD, "p").body.toString(Charsets.UTF_8)).str("message").contains("no such pod"))
+    }
+
+    @Test
+    fun `pods and networks are made, started, stopped and removed through libpod's routes`() {
+        fun post(path: String, query: Map<String, String> = emptyMap()) = LibpodApi.route("POST", "/v5.2.5/libpod$path", query)
+        assertEquals(DockerApi.Call.PodCreate, post("/pods/create"))
+        assertEquals(DockerApi.Call.PodAction("demo", "stop"), post("/pods/demo/stop", mapOf("timeout" to "-1")))
+        assertEquals(DockerApi.Call.PodAction("demo", "kill", "KILL"), post("/pods/demo/kill", mapOf("signal" to "KILL")))
+        assertTrue(post("/pods/demo/kill", mapOf("signal" to "HUP")) is DockerApi.Call.NotBuilt)
+        assertEquals(DockerApi.Call.PodRemove("demo", force = true), LibpodApi.route("DELETE", "/v5.2.5/libpod/pods/demo", mapOf("force" to "true")))
+        assertEquals(DockerApi.Call.NetworkCreate(ignoreIfExists = true), post("/networks/create", mapOf("ignoreIfExists" to "true")))
+        assertEquals(DockerApi.Call.NetworkRemove("n1"), LibpodApi.route("DELETE", "/v5.2.5/libpod/networks/n1", mapOf("force" to "false")))
+        assertEquals(DockerApi.Call.NetworkConnect("n1", connect = false), post("/networks/n1/disconnect"))
+
+        // What podman pod create --name p1 --label a=b sends (Podman 5.2.5), trimmed of what droidtop leaves alone.
+        val (name, labels, refused) = LibpodApi.podRequest(
+            """{"name":"p1","labels":{"a":"b"},"shared_namespaces":["ipc","net","uts"],"netns":{},"Networks":null,"resource_limits":{"cpu":{}}}""",
+            null,
+        )
+        assertEquals("p1", name)
+        assertEquals(mapOf("a" to "b"), labels)
+        assertNull(refused)
+        assertEquals(501, LibpodApi.podRequest("""{"resource_limits":{"memory":{"limit":1}}}""", null).third?.status)
+        assertEquals(501, LibpodApi.podRequest("""{"portmappings":[{"container_port":80,"host_port":8080}]}""", null).third?.status)
+        assertNull(LibpodApi.podRequest("""{"portmappings":[{"container_port":8080,"host_port":8080}]}""", null).third)
+        assertEquals("d".repeat(4), obj(LibpodApi.podCreated("d".repeat(4))).str("Id"))
+        assertEquals(0, obj(LibpodApi.podReport("p")).getValue("Errs").jsonArray.size)
+        assertTrue(LibpodApi.podRemoved("p", listOf("c1")).contains("\"c1\":null"))
+        val pod = Pod("c".repeat(64), "demo", 1L, labels = mapOf("io.podman.compose.project" to "demo"))
+        assertTrue(LibpodApi.podMatches(pod, mapOf("label" to listOf("io.podman.compose.project=demo"))))
+        assertTrue(!LibpodApi.podMatches(pod, mapOf("label" to listOf("io.podman.compose.project=other"))))
+
+        // What podman network create --label a=b n1 sends.
+        val (network, problem) = LibpodApi.networkRequest(
+            """{"name":"n1","id":"","driver":"bridge","created":"0001-01-01T00:00:00Z","ipv6_enabled":false,"internal":false,"dns_enabled":true,"labels":{"a":"b"}}""",
+            emptyList(),
+            null,
+        )
+        assertNull(problem)
+        assertEquals("n1", network!!.name)
+        assertEquals(mapOf("a" to "b"), network.labels)
+        assertEquals("n1", LibpodApi.networkName("""{"name":"n1"}"""))
+        assertEquals(409, LibpodApi.networkRequest("""{"name":"n1"}""", listOf(network), null).second?.status)
+        assertEquals(501, LibpodApi.networkRequest("""{"name":"n2","internal":true}""", emptyList(), null).second?.status)
+        assertEquals(501, LibpodApi.networkRequest("""{"name":"n3","subnets":[{"subnet":"10.9.0.0/24"}]}""", emptyList(), null).second?.status)
+        assertEquals("n1", list(LibpodApi.networkRemoved("n1")).single().jsonObject.str("Name"))
+        // Both APIs' connect bodies: Docker's Container and EndpointConfig.Aliases, libpod's container and aliases.
+        assertEquals("web", DockerApi.connectTarget("""{"container":"web","aliases":["w"]}"""))
+        assertEquals(listOf("w"), DockerApi.connectAliases("""{"container":"web","aliases":["w"]}"""))
+        assertEquals(listOf("db"), DockerApi.connectAliases("""{"Container":"web","EndpointConfig":{"Aliases":["db"]}}"""))
     }
 }

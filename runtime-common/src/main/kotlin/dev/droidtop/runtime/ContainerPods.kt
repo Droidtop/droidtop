@@ -12,7 +12,14 @@ import kotlinx.serialization.json.Json
  * container ids.
  */
 @Serializable
-data class Pod(val id: String, val name: String, val createdMs: Long, val members: List<String> = emptyList())
+data class Pod(
+    val id: String,
+    val name: String,
+    val createdMs: Long,
+    val members: List<String> = emptyList(),
+    /** `pod create --label`: kept and reported back, as Podman's are. */
+    val labels: Map<String, String> = emptyMap(),
+)
 
 /** The pods droidtop keeps, in one file beside the containers' program logs and settings. Pure but for [read] and [save]. */
 object ContainerPods {

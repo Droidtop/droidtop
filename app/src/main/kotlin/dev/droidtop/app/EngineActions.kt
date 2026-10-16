@@ -184,6 +184,60 @@ internal object EngineActions {
         digest
     }
 
+    /**
+     * Makes a pod named [name], or `pod_` and the start of its id (docs/SPEC.md 3d, "Pods"), with [labels]; the reason
+     * when the name is taken or is not one.
+     */
+    suspend fun makePod(app: Context, name: String?, labels: Map<String, String> = emptyMap()): Result<Pod> = withContext(Dispatchers.IO) {
+        val current = ContainerPods.read(app.filesDir)
+        val id = ContainerPods.newId()
+        val podName = name ?: ContainerPods.defaultName(id)
+        ContainerPods.problemWith(current, podName)?.let { return@withContext Result.failure(Refused(it)) }
+        val pod = Pod(id, podName, System.currentTimeMillis(), labels = labels)
+        ContainerPods.save(app.filesDir, ContainerPods.with(current, pod))
+        Result.success(pod)
+    }
+
+    /** [pod]'s containers that still exist, among [containers]. */
+    fun members(pod: Pod, containers: List<ContainerInfo>): List<ContainerInfo> =
+        pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }
+
+    /** Starts every member's program as the person's start, as `podman start` does (restart policies included). */
+    fun startPod(app: Context, runtime: ContainerRuntime, pod: Pod, containers: List<ContainerInfo>) =
+        members(pod, containers).forEach { ContainerPrograms.startedByPerson(app, runtime, it.container) }
+
+    /** Stops every member's program as the person's stop, as `podman stop` does. */
+    suspend fun stopPod(app: Context, pod: Pod, containers: List<ContainerInfo>) =
+        members(pod, containers).forEach { ContainerPrograms.stoppedByPerson(app, it.container.id) }
+
+    sealed interface PodRemoval {
+        /** Removed, with the ids of the containers that went with it. */
+        data class Removed(val containerIds: List<String>) : PodRemoval
+        data class Running(val names: List<String>) : PodRemoval
+        data class Failed(val messages: List<String>) : PodRemoval
+    }
+
+    /**
+     * Removes [pod] and its containers, as Podman's pod rm does, through the one removal path; one with a member
+     * running only with [force], which stops them first.
+     */
+    suspend fun removePod(app: Context, runtime: ContainerRuntime, pod: Pod, containers: List<ContainerInfo>, force: Boolean): PodRemoval {
+        val members = members(pod, containers)
+        val running = members.filter { isRunning(runtime, it) }
+        if (running.isNotEmpty() && !force) return PodRemoval.Running(running.map { it.displayName })
+        val failed = members.mapNotNull { member ->
+            when (val removal = remove(app, runtime, member, force = true)) {
+                Removal.Removed -> null
+                Removal.Primary -> "${member.displayName}: the desktop's own container is not removed"
+                Removal.Running -> "${member.displayName}: running"
+                is Removal.Failed -> "${member.displayName}: ${removal.message}"
+            }
+        }
+        if (failed.isNotEmpty()) return PodRemoval.Failed(failed)
+        withContext(Dispatchers.IO) { ContainerPods.save(app.filesDir, ContainerPods.without(ContainerPods.read(app.filesDir), pod.id)) }
+        return PodRemoval.Removed(members.map { it.container.id })
+    }
+
     /** The last [tail] lines of [info]'s program log. */
     suspend fun logs(app: Context, info: ContainerInfo, tail: Int): List<String> = withContext(Dispatchers.IO) {
         ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, info.container.id), tail)

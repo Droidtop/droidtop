@@ -304,13 +304,25 @@ internal object EngineApiServer {
                 val names = containerNames(runtime)
                 EngineHttp.Response.json(200, if (libpod != null) LibpodApi.networkJson(network, names) else DockerApi.networkJson(network, names))
             }
-            DockerApi.Call.NetworkCreate -> networksLock.withLock {
+            is DockerApi.Call.NetworkCreate -> networksLock.withLock {
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
                 val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
-                val (network, refused) = DockerApi.networkRequest(String(request.body, Charsets.UTF_8), existing, features)
-                refused?.let { return@withLock it }
+                val body = String(request.body, Charsets.UTF_8)
+                if (libpod == null) {
+                    val (network, refused) = DockerApi.networkRequest(body, existing, features)
+                    refused?.let { return@withLock it }
+                    withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.with(existing, network!!)) }
+                    return@withLock EngineHttp.Response.json(201, DockerApi.networkCreated(network!!.id))
+                }
+                // libpod answers the network itself; with ignoreIfExists one of that name already there is the answer.
+                val names = containerNames(runtime)
+                val (network, refused) = LibpodApi.networkRequest(body, existing, features)
+                if (refused != null) {
+                    val there = LibpodApi.networkName(body)?.let { name -> existing.firstOrNull { it.name == name } }
+                    return@withLock if (call.ignoreIfExists && there != null) EngineHttp.Response.json(200, LibpodApi.networkJson(there, names)) else refused
+                }
                 withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.with(existing, network!!)) }
-                EngineHttp.Response.json(201, DockerApi.networkCreated(network!!.id))
+                EngineHttp.Response.json(200, LibpodApi.networkJson(network!!, names))
             }
             is DockerApi.Call.NetworkRemove -> networksLock.withLock {
                 if (ContainerNetworks.PREDEFINED.any { it == call.id || ContainerNetworks.predefinedId(it) == call.id }) {
@@ -323,16 +335,18 @@ internal object EngineApiServer {
                     return@withLock DockerApi.error(403, "error while removing network: network ${network.name} has active endpoints")
                 }
                 withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.without(existing, network.id)) }
-                EngineHttp.Response(204, "text/plain", ByteArray(0))
+                if (libpod != null) EngineHttp.Response.json(200, LibpodApi.networkRemoved(network.name)) else EngineHttp.Response(204, "text/plain", ByteArray(0))
             }
             is DockerApi.Call.NetworkConnect -> networksLock.withLock {
                 runtime ?: return@withLock DockerApi.error(500, "the desktop is not running")
-                val ref = DockerApi.connectTarget(String(request.body, Charsets.UTF_8)) ?: return@withLock DockerApi.error(400, "name a Container")
+                val body = String(request.body, Charsets.UTF_8)
+                val ref = DockerApi.connectTarget(body) ?: return@withLock DockerApi.error(400, "name a Container")
                 val info = find(runtime.listContainers(), ref) ?: return@withLock missing(libpod, DockerApi.Kind.CONTAINER, ref)
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
-                if (call.id in ContainerNetworks.PREDEFINED) return@withLock EngineHttp.Response(200, "text/plain", ByteArray(0))
+                // The device's own network, by any API's name for it: every container is on it already.
+                if (call.id in ContainerNetworks.PREDEFINED || (libpod != null && call.id == "podman")) return@withLock EngineHttp.Response(200, "text/plain", ByteArray(0))
                 val network = ContainerNetworks.find(existing, call.id) ?: return@withLock missing(libpod, DockerApi.Kind.NETWORK, call.id)
-                val next = if (call.connect) ContainerNetworks.withMember(existing, network.id, info.container.id)
+                val next = if (call.connect) ContainerNetworks.withMember(existing, network.id, info.container.id, DockerApi.connectAliases(body))
                 else ContainerNetworks.withoutMember(existing, info.container.id, network.id)
                 withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, next) }
                 EngineHttp.Response(200, "text/plain", ByteArray(0))
@@ -404,6 +418,35 @@ internal object EngineApiServer {
             is DockerApi.Call.ExecGet -> {
                 val exec = execs[call.execId] ?: return noExec(libpod, call.execId)
                 EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, exec.containerId, exec.spec, exec.running, exec.exitCode))
+            }
+            DockerApi.Call.PodCreate -> {
+                val (name, labels, refused) = LibpodApi.podRequest(String(request.body, Charsets.UTF_8), runCatching { EngineFeatureProbe.current(app) }.getOrNull())
+                refused?.let { return it }
+                EngineActions.makePod(app, name, labels).fold(
+                    onSuccess = { EngineHttp.Response.json(201, LibpodApi.podCreated(it.id)) },
+                    onFailure = { DockerApi.error(409, it.message ?: "could not create the pod") },
+                )
+            }
+            is DockerApi.Call.PodAction -> {
+                runtime ?: return DockerApi.error(500, "the desktop is not running")
+                val pod = ContainerPods.find(EngineFacts.pods(app), call.id) ?: return missing(libpod, DockerApi.Kind.POD, call.id)
+                val containers = runtime.listContainers()
+                // kill ends the programs, as stop does: a program is ended, not signalled.
+                if (call.action != "start") EngineActions.stopPod(app, pod, containers)
+                if (call.action == "start" || call.action == "restart") EngineActions.startPod(app, runtime, pod, containers)
+                EngineHttp.Response.json(200, LibpodApi.podReport(pod.id))
+            }
+            is DockerApi.Call.PodRemove -> {
+                runtime ?: return DockerApi.error(500, "the desktop is not running")
+                val pod = ContainerPods.find(EngineFacts.pods(app), call.id) ?: return missing(libpod, DockerApi.Kind.POD, call.id)
+                when (val removal = EngineActions.removePod(app, runtime, pod, runtime.listContainers(), call.force)) {
+                    is EngineActions.PodRemoval.Removed -> EngineHttp.Response.json(200, LibpodApi.podRemoved(pod.id, removal.containerIds))
+                    is EngineActions.PodRemoval.Running -> DockerApi.error(
+                        409,
+                        "pod ${pod.name} has running containers (${removal.names.joinToString(", ")}); stop it first or use podman pod rm -f",
+                    )
+                    is EngineActions.PodRemoval.Failed -> DockerApi.error(500, "pod ${pod.name}: ${removal.messages.joinToString("; ")}")
+                }
             }
             is DockerApi.Call.ExecRemove -> {
                 val exec = execs[call.execId] ?: return noExec(libpod, call.execId)

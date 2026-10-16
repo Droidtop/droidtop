@@ -85,6 +85,19 @@ object LibpodApi {
             }
             p == "/images/pull" && method == "POST" -> pull(query)
             segments.size == 3 && segments[0] == "exec" && segments[2] == "remove" && method == "POST" -> DockerApi.Call.ExecRemove(segments[1])
+            p == "/pods/create" && method == "POST" -> DockerApi.Call.PodCreate
+            segments.size == 3 && segments[0] == "pods" && method == "POST" && segments[2] in setOf("start", "stop", "restart", "kill") -> when {
+                segments[2] == "kill" && !killable(query["signal"]) -> DockerApi.Call.NotBuilt("signal ${query["signal"]} (a container's program is ended, not signalled)")
+                else -> DockerApi.Call.PodAction(segments[1], segments[2], query["signal"])
+            }
+            segments.size == 2 && segments[0] == "pods" && method == "DELETE" -> DockerApi.Call.PodRemove(segments[1], flag(query["force"]))
+            p == "/networks/create" && method == "POST" -> DockerApi.Call.NetworkCreate(ignoreIfExists = flag(query["ignoreIfExists"]))
+            segments.size == 2 && segments[0] == "networks" && method == "DELETE" -> when {
+                flag(query["force"]) -> DockerApi.Call.NotBuilt("network rm --force (it takes the network's containers with it)")
+                else -> DockerApi.Call.NetworkRemove(segments[1])
+            }
+            segments.size == 3 && segments[0] == "networks" && method == "POST" && segments[2] in setOf("connect", "disconnect") ->
+                DockerApi.Call.NetworkConnect(segments[1], segments[2] == "connect")
             // Podman's client sends Go's zero time for no since or until, and -1 for every line.
             segments.size == 3 && segments[0] == "containers" && segments[2] == "logs" && read -> DockerApi.route(
                 method,
@@ -105,6 +118,10 @@ object LibpodApi {
 
     private fun flag(value: String?): Boolean = value == "1" || value == "true" || value == "True"
 
+    /** A signal that ends a program, which is all droidtop does to one; none given is Podman's KILL. */
+    private fun killable(signal: String?): Boolean =
+        signal.isNullOrEmpty() || signal.removePrefix("SIG") in setOf("KILL", "TERM", "INT") || signal in setOf("9", "15", "2")
+
     /** libpod's wait: until the program is over (its conditions stopped and exited), as Docker's not-running. */
     private fun wait(id: String, query: Map<String, String>): DockerApi.Call {
         val condition = query["condition"].orEmpty()
@@ -124,8 +141,8 @@ object LibpodApi {
         }
     }
 
-    /** Pod filters droidtop applies: name and id. Any other is said, never ignored. */
-    fun unknownPodFilters(filters: Map<String, List<String>>): Set<String> = filters.keys - setOf("name", "id")
+    /** Pod filters droidtop applies: name, id and label. Any other is said, never ignored. */
+    fun unknownPodFilters(filters: Map<String, List<String>>): Set<String> = filters.keys - setOf("name", "id", "label")
 
     /**
      * 404 for [ref] in Podman's words. Podman's client tells a missing container, pod or exec from another failure by
@@ -258,6 +275,83 @@ object LibpodApi {
             autoRemove = autoRemove,
         ) to null
     }
+
+    /**
+     * A pod-create body (`POST /libpod/pods/create`, Podman's PodSpecGenerator): its name and labels. A pod here is a
+     * named group whose containers already share the device's network (docs/SPEC.md 3d, "Pods"), so the namespaces it
+     * shares are what it has anyway; a port is taken on its own number, and what a pod would need namespaces or limits
+     * of its own for is answered from the feature table or as not built. Pure.
+     */
+    fun podRequest(body: String, features: EngineFeatures?): Triple<String?, Map<String, String>, EngineHttp.Response?> {
+        fun answer(response: EngineHttp.Response) = Triple(null, emptyMap<String, String>(), response)
+        val o = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(body.ifBlank { "{}" }) as JsonObject }.getOrNull()
+            ?: return answer(DockerApi.error(400, "the body is not a JSON object"))
+        fun string(obj: JsonObject?, key: String): String? = (obj?.get(key) as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "null" }
+        fun feature(option: String) = answer(DockerApi.error(501, EngineOptions.refusal("podman pod create", option, features)))
+        string(o, "hostname")?.let { return feature("--hostname") }
+        if (string(o["netns"] as? JsonObject, "nsmode") == "none") return feature("--network")
+        // Podman's client sends {"cpu":{}} with no limit set.
+        (o["resource_limits"] as? JsonObject)?.filterValues { (it as? JsonObject)?.isNotEmpty() ?: (it !is JsonNull) }?.keys?.firstOrNull()?.let { key ->
+            return feature(if (key == "memory") "--memory" else if (key == "pids") "--pids-limit" else "--cpus")
+        }
+        ((o["Networks"] as? JsonObject)?.takeIf { it.isNotEmpty() })?.let { return answer(notBuilt("a pod on a network of its own (each container joins one with --network)")) }
+        listOf("dns_server", "hostadd", "devices", "infra_image", "sysctl").forEach { key ->
+            if (((o[key] as? JsonArray)?.isNotEmpty() ?: (o[key] as? JsonObject)?.isNotEmpty() ?: (string(o, key) != null))) return answer(notBuilt(key))
+        }
+        (o["portmappings"] as? JsonArray).orEmpty().forEach { m ->
+            val mapping = m as? JsonObject
+            val container = string(mapping, "container_port") ?: return answer(DockerApi.error(400, "a port mapping needs a container_port"))
+            val host = string(mapping, "host_port")?.takeIf { it != "0" }
+            val spec = listOfNotNull(string(mapping, "host_ip"), host).joinToString(":").let { if (it.isEmpty()) container else "$it:$container" }
+            EngineCli.PODMAN.publish(spec, features, "pod create").second?.let { return answer(DockerApi.error(501, it.text.trim())) }
+        }
+        val labels = (o["labels"] as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.content ?: "" }.orEmpty()
+        return Triple(string(o, "name"), labels, null)
+    }
+
+    /** `POST /libpod/pods/create`'s answer. */
+    fun podCreated(id: String): String = JsonObject(mapOf("Id" to JsonPrimitive(id))).toString() + "\n"
+
+    /** A pod start, stop, restart or kill's answer: no errors. */
+    fun podReport(id: String): String = buildJsonObject {
+        putJsonArray("Errs") { }
+        put("Id", id)
+    }.toString() + "\n"
+
+    /** `DELETE /libpod/pods/{id}`'s answer: the pod and the containers that went with it. */
+    fun podRemoved(id: String, containerIds: List<String>): String = buildJsonObject {
+        putJsonObject("RemovedCtrs") { containerIds.forEach { put(it, JsonNull) } }
+        put("Id", id)
+    }.toString() + "\n"
+
+    /**
+     * A network-create body (`POST /libpod/networks/create`, netavark's shape) read; or the answer when it asks for
+     * what droidtop cannot give: the same rules as Docker's (`DockerApi.networkRequest`), in Podman's field names. Pure.
+     */
+    fun networkRequest(body: String, existing: List<Network>, features: EngineFeatures?): Pair<Network?, EngineHttp.Response?> {
+        val o = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(body.ifBlank { "{}" }) as JsonObject }.getOrNull()
+            ?: return null to DockerApi.error(400, "the body is not a JSON object")
+        fun string(key: String): String? = (o[key] as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "null" }
+        fun bool(key: String): Boolean = (o[key] as? JsonPrimitive)?.content == "true"
+        val name = string("name") ?: return null to DockerApi.error(400, "a network needs a name")
+        ContainerNetworks.problemWith(existing, name)?.let { return null to DockerApi.error(409, it) }
+        string("driver")?.takeIf { it != "bridge" }?.let { return null to notBuilt("the $it network driver") }
+        if (bool("internal")) return null to DockerApi.error(501, EngineOptions.refusal("podman network create", "--network", features) + " (an internal network)")
+        if (bool("ipv6_enabled")) return null to notBuilt("IPv6 networks")
+        (o["subnets"] as? JsonArray)?.takeIf { it.isNotEmpty() }?.let { return null to notBuilt("subnets of a network's own (--subnet)") }
+        (o["options"] as? JsonObject)?.takeIf { it.isNotEmpty() }?.let { return null to notBuilt("network options (--opt)") }
+        string("network_interface")?.let { return null to notBuilt("--interface-name") }
+        val labels = (o["labels"] as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.content ?: "" }.orEmpty()
+        return Network(ContainerNetworks.newId(), name, System.currentTimeMillis(), labels) to null
+    }
+
+    /** The name a network-create body asks for, or null. Pure. */
+    fun networkName(body: String): String? = runCatching {
+        ((kotlinx.serialization.json.Json.parseToJsonElement(body) as JsonObject)["name"] as? JsonPrimitive)?.content
+    }.getOrNull()
+
+    /** `DELETE /libpod/networks/{id}`'s answer: one report for the network removed. */
+    fun networkRemoved(name: String): String = JsonArray(listOf(JsonObject(mapOf("Name" to JsonPrimitive(name))))).toString() + "\n"
 
     /** `POST /libpod/images/pull`'s answer: a line of progress, then the image's id, as Podman's client reads them. */
     fun pulled(reference: String, digest: String): String =
@@ -487,7 +581,7 @@ object LibpodApi {
                 put("Namespace", "")
                 putJsonArray("Networks") { }
                 put("Status", p.status)
-                putJsonObject("Labels") { }
+                putJsonObject("Labels") { p.pod.labels.forEach { (k, v) -> put(k, v) } }
             }
         },
     ).toString() + "\n"
@@ -496,6 +590,10 @@ object LibpodApi {
         when (key) {
             "name" -> wanted.any { pod.name.contains(it) }
             "id" -> wanted.any { pod.id.startsWith(it) }
+            "label" -> wanted.any { w ->
+                val k = w.substringBefore('=')
+                if (w.contains('=')) pod.labels[k] == w.substringAfter('=') else pod.labels.containsKey(k)
+            }
             else -> true
         }
     }
@@ -521,6 +619,7 @@ object LibpodApi {
                 )
             }
         }
+        putJsonObject("Labels") { p.pod.labels.forEach { (k, v) -> put(k, v) } }
         put("LockNumber", 0)
     }.toString() + "\n"
 
