@@ -265,7 +265,7 @@ The reply uses the same `{ok, data|error}` shape.
 | --- | --- | --- | --- |
 | `native_bundle` | `DroidtopPlugin.handle(call: PluginCall): PluginReply` (v2); v1 `invoke(capability, args)` still served via the legacy translation | `PluginContext.call(api, version, op, args)` on the context handed to `onLoad`; `PluginContext.openFile(...)` for an op that hands over a file (built 2026-10-08) | `startJob(jobId, call, progress)` / `cancelJob` (as today) |
 | `python` | module-level `handle(call_json) -> reply_json` (JSON text both ways, like `invoke`; called for a contract 2 manifest, built 2026-10-01); v1 `invoke(payload_json)` still served | `droidtop.host.call(api, op, args=None, version=1) -> dict`: the modules `droidtop` and `droidtop.host`, which the bootstrap puts in `sys.modules` before `plugin.py` is imported (built 2026-10-07); the dict is the parsed broker reply, `{"ok": true, "data": ...}` or `{"ok": false, "error": {...}}`, and a call never raises for a refusal; `droidtop.host.open(api, op, args=None, version=1)` returns the same dict with the descriptor number under `fd` when a file was handed over (built 2026-10-08) | `start_job(job_id, call, progress)` / `cancel_job(job_id)`: the bridge registers the job, runs it on a Java thread droidtop starts (not a Python thread: a thread Python makes is attached to the JVM around every host call, and one died of the sandbox's own trap, Droidtop/tracker#558), forwards progress live, and calls `cancel_job(job_id)` cooperatively |
-| `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text; no `open` (a Flutter plugin always runs with full access, §5.3, and opens its own files) | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
+| `flutter_embed` | the plugin's `MethodChannel("dev.droidtop.pluginhost/<plugin id>")`, method `handle`, envelope and reply as JSON strings (called for a contract 2 manifest, built 2026-10-01) | the same channel's `hostCall`, with `{api, version, op, args}` as JSON text and the broker reply as JSON text; no `open` yet: a Flutter plugin runs contained like every kind (§5.3, built 2026-10-09), and keeps its files through `data` (`read`, `write`, ...) over `hostCall`; packages that need a files directory (`path_provider`, `shared_preferences`, `sqflite`) find none (Droidtop/tracker#375) | the same channel's `startJob`/`cancelJob` plus progress messages (the job support built 2026-09-26) |
 
 **What a `native_bundle` plugin links against.** Its dex is loaded with
 droidtop's own class loader as parent, so the plugin API
@@ -3661,9 +3661,9 @@ arrays under the manifest's own keys (`V2Declarations`).
   access; Activity lists the log; Advanced → Containment check loads the
   plugin as a call would and reports what its process can reach.
 - **Kind parity.** `openFile` is served to `native_bundle`
-  (`PluginContext.openFile`) and `python` (`droidtop.host.open`), not to
-  `flutter_embed`, which always runs with full access and opens its own
-  files.
+  (`PluginContext.openFile`) and `python` (`droidtop.host.open`), not yet to
+  `flutter_embed`, which runs contained too (§5.3) and reaches its files
+  only through `data` over `hostCall` (Droidtop/tracker#375).
 
 **Compatibility promises:**
 
