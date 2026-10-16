@@ -408,6 +408,40 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
         return new CustomizeShortcut(context, itemInfo, originalView);
     };
 
+    /**
+     * droidtop (Droidtop/tracker#67): "Plugin actions" on an app's long-press menu, on the home screen and in the
+     * drawer, when a plugin offers a context action for that app. Answered from memory (PluginShellHooks); the
+     * actions themselves are asked and run on the page it opens.
+     */
+    public static final Factory<ActivityContext> PLUGIN_ACTIONS = (context, itemInfo, originalView) -> {
+        if (itemInfo.itemType != LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
+                || itemInfo.getTargetComponent() == null || originalView == null) {
+            return null;
+        }
+        String label = itemInfo.title != null ? itemInfo.title.toString()
+                : itemInfo.getTargetComponent().getPackageName();
+        dev.droidtop.library.settings.PluginShellHooks.MenuEntry entry =
+                dev.droidtop.library.settings.PluginShellHooks.appMenu(originalView.getContext(),
+                        itemInfo.getTargetComponent().getPackageName(), label);
+        return entry == null ? null : new PluginActionsShortcut(context, itemInfo, originalView, entry);
+    };
+
+    private static class PluginActionsShortcut<T extends ActivityContext> extends SystemShortcut<T> {
+        private final dev.droidtop.library.settings.PluginShellHooks.MenuEntry mEntry;
+
+        PluginActionsShortcut(T target, ItemInfo itemInfo, View originalView,
+                dev.droidtop.library.settings.PluginShellHooks.MenuEntry entry) {
+            super(R.drawable.ic_plugin_action, R.string.plugin_actions_option, target, itemInfo, originalView);
+            mEntry = entry;
+        }
+
+        @Override
+        public void onClick(View view) {
+            dismissTaskMenuView();
+            dev.droidtop.library.settings.PluginShellHooks.run(mEntry, mOriginalView.getContext());
+        }
+    }
+
     private static class CustomizeShortcut<T extends ActivityContext> extends SystemShortcut<T> {
         CustomizeShortcut(T target, ItemInfo itemInfo, View originalView) {
             super(R.drawable.gm_edit_24, R.string.item_customize, target, itemInfo, originalView);

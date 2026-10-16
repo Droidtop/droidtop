@@ -34,10 +34,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import dev.droidtop.display.SecondaryDisplayContent
 import dev.droidtop.display.secondScreenScroll
-import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.integrations.PluginPanels
 import dev.droidtop.library.settings.AskFirst
 import dev.droidtop.library.settings.CatalogItem
@@ -77,17 +75,6 @@ internal fun pluginMode(mode: SecondaryDisplayContent.Mode): String = mode.name.
 internal fun pluginRowAsks(item: CatalogItem, mode: UiMode, ask: AskFirst): Boolean =
     GameControls.asksPluginRow(item.confirmText != null, mode, ask)
 
-/** The running entry as a plugin call's `context.game`, the way the Quick Menu's Plugins section hands it over. */
-internal fun gameTarget(entry: LibraryEntry): ContextTarget {
-    val app = entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP
-    return ContextTarget(
-        kind = if (app) "app" else "game",
-        id = entry.id,
-        title = GameNaming.displayName(entry.title),
-        systemId = entry.systemId,
-        packageName = if (app) entry.id else null,
-    )
-}
 
 /** The panels for [mode], read from manifests off the main thread; again when a plugin or grant changes. Null while reading. */
 @Composable
@@ -108,7 +95,7 @@ private fun rememberRunningTarget(): ContextTarget? {
     val running by LaunchDisplay.running.collectAsState()
     val entries by CompanionState.libraryEntries.collectAsState()
     val id = running?.context?.gameId
-    return remember(id, entries) { id?.let { gameId -> entries.firstOrNull { it.id == gameId } }?.let(::gameTarget) }
+    return remember(id, entries) { id?.let { gameId -> entries.firstOrNull { it.id == gameId } }?.let(dev.droidtop.library.integrations.PluginContextActions::targetOf) }
 }
 
 /**
@@ -213,7 +200,7 @@ internal fun CompanionGamePluginRows(entry: LibraryEntry) {
     if (!ControlAccess.shows(uiMode, ControlRow.GAME_PLUGIN_ROWS)) return
     val runningPackage = LaunchDisplay.runningPackageName
     val panels = rememberCompanionPanels(mode)?.filter { CompanionAbilities.gameRowsFor(it.entry, runningPackage) } ?: return
-    val game = remember(entry.id) { gameTarget(entry) }
+    val game = remember(entry.id) { dev.droidtop.library.integrations.PluginContextActions.targetOf(entry) }
     panels.forEach { panel ->
         key(panel.pluginId) {
             val screen by produceState<CatalogScreen?>(null, panel.pluginId, entry.id, mode) {

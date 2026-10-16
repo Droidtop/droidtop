@@ -1675,15 +1675,7 @@ private fun EntryDetailScreen(
 
     // Context actions plugins offer on this game or app (docs/plugin-api.md 3 C4). Which ones apply comes from
     // manifests alone, and `enabled` is asked once, when this screen opens, never while drawing.
-    val contextTarget = remember(entry) {
-        dev.droidtop.pluginhost.ContextTarget(
-            kind = if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) "app" else "game",
-            id = entry.id,
-            title = dev.droidtop.library.GameNaming.displayName(entry.title),
-            systemId = entry.systemId,
-            packageName = if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) entry.id else null,
-        )
-    }
+    val contextTarget = remember(entry) { dev.droidtop.library.integrations.PluginContextActions.targetOf(entry) }
     var pluginActions by remember(entry) { mutableStateOf<List<dev.droidtop.library.integrations.PluginContextActions.Action>>(emptyList()) }
     // Rows plugins add to a game's page (docs/plugin-api.md 3 C18): on this screen each section is a chip that opens
     // it as a page, where its rows, inputs and actions work; the PC game page draws them as its own rows instead.

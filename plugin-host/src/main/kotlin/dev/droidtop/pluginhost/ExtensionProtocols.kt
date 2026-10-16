@@ -31,14 +31,17 @@ object ContextActionFilter {
      */
     fun matches(entry: ProvidedPoint, target: ContextTarget): Boolean {
         val extra = runCatching { JSONObject(entry.extra) }.getOrDefault(JSONObject())
-        val targets = strings(extra, "targets").ifEmpty { listOf("game") }
-        if (target.kind !in targets) return false
+        if (target.kind !in targets(entry)) return false
         val systems = strings(extra, "systems")
         if (systems.isNotEmpty() && target.systemId !in systems) return false
         val packages = strings(extra, "packages")
         if (packages.isNotEmpty() && target.packageName !in packages) return false
         return true
     }
+
+    /** The kinds of thing the entry acts on (`targets`, default `game`). */
+    fun targets(entry: ProvidedPoint): List<String> =
+        strings(runCatching { JSONObject(entry.extra) }.getOrDefault(JSONObject()), "targets").ifEmpty { listOf("game") }
 
     /** True when the entry asks to run as a contract 1 job (`"job": true` in its own fields) instead of a quick call. */
     fun runsAsJob(entry: ProvidedPoint): Boolean =

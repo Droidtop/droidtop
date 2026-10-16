@@ -981,7 +981,8 @@ of surfaces of their own.
 | --- | --- | --- | --- |
 | `ui.panel` and tiles (C17, C2, C3) | Quick Menu Plugins section; the companion (C15) | home screen's long-press menu: "Plugins", the same list, in droidtop's plugin window; the companion | taskbar "Plugins", the same list; the companion |
 | `gaming.rows` (C11) | Home shelves | — (no shelf of games) | Start menu sections of the same entries |
-| `ui.game_section`, `ui.context_action` (C18, C4) | game pages | — (no game page) | — |
+| `ui.game_section` (C18) | game pages | — (no game page) | — |
+| `ui.context_action` (C4) | a game's or app's detail screen, the PC game page | an app's long-press menu: "Plugin actions", a page of the actions in droidtop's plugin window (`standard.app_menu`) | a Start menu row's menu (Y or a long press): "Plugin actions", the same page (`desktop.start_menu`) |
 | `social.provider` (C19) | Social place, Quick Menu tile, companion | Settings → Social | Settings → Social |
 | `ui.settings`, `ui.main` (C1, C16) | Settings | Settings | Settings |
 | `jobs.service`, `jobs.schedule` (E8, E9) | run in every mode, shown in Jobs | same | same |
@@ -992,7 +993,7 @@ of surfaces of their own.
   with the same navigator, hint row and look as the Containers screen.
 - **Later, not built:** Desktop taskbar items with a menu (C8 `ui.tray`),
   Start menu and home-screen actions (C12 `launcher.actions`), context
-  actions on an app (long-press) or a window, and file associations (E4).
+  actions on a window, and file associations (E4).
   Each is a catalogue row already; they come after
   Gaming's surfaces are complete.
 
@@ -1941,7 +1942,9 @@ Risk low.
   - the target's data needs its own grant: a file target hands a
     read-only fd scoped to that file, and a game target needs
     `library.read`.
-- **Status:** declared as `library_action` with **no caller**.
+- **Status:** built on the game's or app's detail screen and the PC game
+  page in Gaming, Standard's long-press app menu and Desktop's Start menu
+  (section 6); the Select/Options menu and the PC game menu are not.
 
 **C5 Search providers.** EP `ui.search@1`. Risk medium.
 - **For:** results in droidtop's global and per-section search: games
@@ -3442,9 +3445,18 @@ arrays under the manifest's own keys (`V2Declarations`).
     miss or failure keeps it offered. `run` is a quick call, or a job when
     the entry says `"job": true` (the contract 1 `startJob` path). A game
     target carries its id, title and system only when the plugin holds
-    `library.read`. Built on the detail screen of console ROMs and apps;
-    the PC game menu, the Select/Options menu, the launcher's long-press
-    menu and the desktop menus are not.
+    `library.read`. Built on the detail screen of console ROMs and apps and
+    the PC game page; on Standard's long-press app menu and Desktop's Start
+    menu row menu (Droidtop/tracker#67, 2026-10-16) as a "Plugin actions"
+    row, shown when a manifest's static filter matches (Standard answers
+    from the hook's memory, the menu being built on the main thread), that
+    opens one page of the actions (`PluginContextActions.screen`) in
+    droidtop's plugin window, where `enabled` is asked and each action runs
+    with its outcome on its row. The call's `surface.place` names where the
+    person is (`game.detail`, `standard.app_menu`, `desktop.start_menu`).
+    Every host builds its target with `PluginContextActions.targetOf` (an
+    Android app is an `app` with its package, else a `game`). The PC game
+    menu and the Select/Options menu are not built.
   - **Metadata sources (A3).** `PluginMetadataSources` opens one session per
     console scrape pass and, for each game, asks every running source
     `match` (facts: title, file name, system) then `fetch` (the ids of the

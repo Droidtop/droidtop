@@ -23,6 +23,13 @@ class ExtensionProtocolsTest {
     }
 
     @Test
+    fun `an entry's targets default to games, as the filter reads them`() {
+        assertEquals(listOf("game"), ContextActionFilter.targets(entry()))
+        assertEquals(listOf("game", "app"), ContextActionFilter.targets(entry("targets" to strings("game", "app"))))
+        assertEquals(listOf("game"), ContextActionFilter.targets(ProvidedPoint(point = "ui.context_action", extra = "not json")))
+    }
+
+    @Test
     fun `the static filter decides on kind, systems and packages`() {
         assertTrue(ContextActionFilter.matches(entry("targets" to strings("game", "app")), ContextTarget("app", "com.x", "X", packageName = "com.x")))
         assertTrue(ContextActionFilter.matches(entry("systems" to strings("snes", "nes")), game))
