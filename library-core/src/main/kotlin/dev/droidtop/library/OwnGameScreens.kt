@@ -28,6 +28,14 @@ object OwnGameScreens {
 
         /** Ends the game and closes the screen. Callable from any thread; the work is done off the main one. */
         fun stop()
+
+        /**
+         * Controller mouse mode (docs/SPEC.md 5b, Droidtop/tracker#565): on or off for this screen's game, or null
+         * where the screen has no pointer to drive. The Quick Menu's Game section shows and turns it.
+         */
+        val padMouse: Boolean? get() = null
+
+        fun setPadMouse(on: Boolean) {}
     }
 
     @Volatile
