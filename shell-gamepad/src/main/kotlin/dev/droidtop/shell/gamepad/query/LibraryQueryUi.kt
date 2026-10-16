@@ -59,6 +59,7 @@ import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.SourceGets
 import dev.droidtop.library.integrations.PluginGameSource
 import dev.droidtop.library.integrations.LocalSearchRow
+import dev.droidtop.library.integrations.SearchRowKind
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.SourceDestinations
 import dev.droidtop.library.integrations.SourceHit
@@ -557,14 +558,30 @@ internal fun LibrarySearchDialog(
     // Typing puts the cursor back in the field.
     LaunchedEffect(text) { focusKey = null }
 
+    // JSON acquire_content integrations, read once off the main thread: each is one hand-off row, after every source's
+    // (docs/SPEC.md 13, "There is no Get games sheet"; IntegrationHandoff), in the searches its template can fill.
+    val handoffs by produceState(emptyList<dev.droidtop.library.integrations.Integration>()) {
+        value = withContext(Dispatchers.IO) {
+            dev.droidtop.library.integrations.IntegrationStore.available(context, dev.droidtop.library.integrations.IntegrationCapability.ACQUIRE_CONTENT)
+        }
+    }
+    val scopedToSystem = GetGamesEntry.searchSystem(systemId) != null && sourcePlatform == null
+    fun handoffRows(q: String): List<LocalSearchRow> =
+        handoffs.filter { dev.droidtop.library.integrations.IntegrationHandoff.covers(it.argumentsTemplate, scopedToSystem) }.map { integration ->
+            val (title, detail) = dev.droidtop.library.integrations.IntegrationHandoff.text(integration.label, integration.argumentsTemplate, q)
+            LocalSearchRow("handoff:${integration.id}", SearchRowKind.WEB, title, detail ?: integration.description.orEmpty()) {
+                SourceGets.handOff(context, integration, systemId, systemFolder, q) { statusLine = it }
+            }
+        }
+
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
-    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey) {
+    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey, handoffs) {
         UnifiedSearch.search(
             context = context,
             query = text,
             platform = sourcePlatform ?: systemId,
-            local = { q -> currentLocal?.invoke(q).orEmpty() },
+            local = { q -> currentLocal?.invoke(q).orEmpty() + handoffRows(q) },
             carry = state.sourceHits,
             keep = { result -> currentFilter?.invoke(result) ?: true },
         ).collect { state = it }
