@@ -86,6 +86,14 @@
 # its crypto provider is registered by name.
 -keep class in.dragonbra.javasteam.** { *; }
 -keep class * extends in.dragonbra.javasteam.steam.handlers.steamunifiedmessages.UnifiedService { *; }
+# Bouncy Castle for JavaSteam (stores): its provider registers every algorithm by class name and creates them by
+# reflection, so R8 must keep the provider and the algorithm classes it names (Droidtop/tracker#313: Steam downloads
+# died with BouncyCastleProvider missing). Its LDAP store is never used.
+-keep class org.bouncycastle.jce.provider.** { *; }
+-keep class org.bouncycastle.jcajce.provider.** { *; }
+-dontwarn org.bouncycastle.jce.provider.X509LDAPCertStoreSpi
+-dontwarn org.bouncycastle.x509.util.LDAPStoreHelper
+-dontwarn javax.naming.**
 -keep class org.spongycastle.**
 -dontwarn org.spongycastle.jce.provider.X509LDAPCertStoreSpi
 -dontwarn org.spongycastle.x509.util.LDAPStoreHelper
