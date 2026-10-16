@@ -764,7 +764,7 @@ internal fun PcGamesSection(
     // Home is the root: B does nothing there (Overview goes back to it).
     val storesScreen = remember { SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
     val knownEmpty = games?.isEmpty() == true
-    val showingSetup = (state.setupOpen || knownEmpty) && storesScreen != null
+    val showingSetup = state.setupOpen && storesScreen != null
     val canGoBack = state.setupOpen || state.view != PcView.HOME
     LaunchedEffect(canGoBack) {
         // The shell's one footer draws this tab's hints too: the focused
@@ -786,6 +786,17 @@ internal fun PcGamesSection(
         // on instead of nothing (docs/SPEC.md 7i). CatalogNavigator owns
         // its own B; at its root that leaves the level.
         CatalogNavigator(root = storesScreen!!, onExit = { state.setupOpen = false })
+        return
+    }
+    // Home also shows the Retro library and the launcher apps: it is empty only when they are too.
+    if (knownEmpty && (!state.home || (retro.isEmpty() && apps.isEmpty()))) {
+        // An empty library is its own place's empty state, with PC setup ("Game sources") as its button, rather than
+        // opening on PC setup as if the person had chosen it (Droidtop/tracker#533).
+        dev.droidtop.shell.gamepad.EmptyLibrary(
+            line = if (state.home) "No games yet" else "No PC games yet",
+            actionLabel = "Game sources",
+            onAction = { state.setupOpen = true },
+        )
         return
     }
 

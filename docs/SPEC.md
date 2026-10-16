@@ -13970,11 +13970,17 @@ folder name when the name contains one under §7m's naming rules.
 
 ### Empty, and setup
 
-An empty PC library opens on **PC setup** (`pc_stores`, the one
-settings-catalog screen for game folders, the Windows system files and
-Downloads -- store sign-ins are under Accounts and sources, §7f), drawn
-in place, instead of empty shelves; the same screen is the options
-menu's "PC setup" row and B leaves it. Known empty, not merely unfolded:
+An empty library shows **one empty state** (`EmptyLibrary`, Droidtop/tracker#533), the same on
+Retro Games, PC Games and Home: a glyph, one line ("No games yet"; PC Games says "No PC games yet"), and
+two buttons side by side in the middle of the page, the place's own action first and **Get games**
+beside it. Retro Games' action is **Add a folder** (the Game folders page drawn in place); PC Games'
+and Home's is **Game sources**, which opens **PC setup** (`pc_stores`, the one settings-catalog screen
+for game folders, the Windows system files and Downloads -- store sign-ins are under Accounts and
+sources, §7f) in place; B leaves it, and the options menu's "PC setup" row opens the same screen.
+Neither button is drawn filled, so the focus ring is the only highlight (a filled first button beside
+a ringed second read as two chosen at once). PC Games and Home used to open on PC setup by
+themselves, which read as a redirect into Game sources. Home counts its Retro games and launcher apps
+too: it is empty only when all three are. Known empty, not merely unfolded:
 the fold runs off the main thread and the tab shows a spinner, never a
 false "you have nothing", while it runs.
 
