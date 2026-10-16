@@ -11,6 +11,9 @@ import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.DockerCli
 import dev.droidtop.runtime.DockerCommand
+import dev.droidtop.runtime.EngineFeatureProbe
+import dev.droidtop.runtime.EngineFeatures
+import dev.droidtop.runtime.EngineOptions
 import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.RootfsImage
@@ -56,7 +59,13 @@ internal object ContainerEnterRequests {
         }
         val cwd = runCatching { File(dir, "cwd").readText().trim() }.getOrNull()
         if (token == DockerCli.TOKEN) {
-            docker(app, dir, DockerCli.parse(args), cwd, seenAt, writtenAt)
+            // The device's kernel features (D10) only when the request needs them: probed once a boot, kept after.
+            val features = if (args.firstOrNull() == "info" || (args.firstOrNull() == "run" && EngineOptions.mentioned(args))) {
+                EngineFeatureProbe.current(app)
+            } else {
+                null
+            }
+            docker(app, dir, DockerCli.parse(args, features), cwd, seenAt, writtenAt, features)
             return
         }
         val command = ContainerEnter.forToken(ContainerEnter.read(app.filesDir), token)
@@ -116,9 +125,22 @@ internal object ContainerEnterRequests {
      * Answers a `docker` request (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c) from droidtop's own
      * state: the containers, their programs and the image store. Containers are named by their name or their id.
      */
-    private suspend fun docker(app: Context, dir: File, command: DockerCommand, cwd: String?, seenAt: Long, writtenAt: Long?) {
+    private suspend fun docker(
+        app: Context,
+        dir: File,
+        command: DockerCommand,
+        cwd: String?,
+        seenAt: Long,
+        writtenAt: Long?,
+        features: EngineFeatures?,
+    ) {
         if (command is DockerCommand.Answer) {
             if (command.code == 0) answer(dir, command.text, "", 0) else answer(dir, "", command.text, command.code)
+            return
+        }
+        if (command is DockerCommand.Info) {
+            val backend = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime?.backend
+            answer(dir, DockerCli.formatInfo(features ?: EngineFeatureProbe.current(app), backend), "", 0)
             return
         }
         val runtime = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime ?: run {
@@ -244,7 +266,7 @@ internal object ContainerEnterRequests {
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
             }
-            is DockerCommand.Answer -> Unit
+            is DockerCommand.Answer, DockerCommand.Info -> Unit
         }
     }
 
