@@ -88,7 +88,7 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
             opened = null
             return@DisposableEffect onDispose {}
         }
-        val now = KeyboardTargets.open(display, sink)
+        val now = KeyboardTargets.open(display, sink, assistive = KeyboardTargets.assistiveOn(view.context))
         opened = now
         onDispose { (now as? KeyboardTargets.Opened.Elsewhere)?.let { KeyboardTargets.close(it.request) } }
     }
