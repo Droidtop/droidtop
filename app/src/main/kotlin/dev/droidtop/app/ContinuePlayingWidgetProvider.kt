@@ -1,19 +1,10 @@
 package dev.droidtop.app
 
-import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.widget.RemoteViews
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.LibraryKinds
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.filterNotNull
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * "Continue playing" home-screen widget: a Nova/Apex-class launcher can
@@ -32,10 +23,8 @@ import kotlinx.coroutines.withTimeoutOrNull
  * -- the same launch-screen-memory-and-play-history path as a pinned
  * game icon -- never a second launch mechanism.
  *
- * Rows are rendered directly onto the widget's [RemoteViews] (no
- * RemoteViewsService/collection widget) because the row count is small
- * and fixed ([MAX_ROWS]); that keeps this a plain, statically-laid-out
- * widget rather than a second list-rendering stack to maintain.
+ * Drawn by [DroidtopWidgets.rows], the renderer every droidtop widget shares (Droidtop/tracker#563): a title and up to
+ * four rows, in the role tokens' colours.
  */
 class ContinuePlayingWidgetProvider : AppWidgetProvider() {
 
@@ -52,82 +41,36 @@ class ContinuePlayingWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        private const val MAX_ROWS = 4
-        private val ROW_IDS = intArrayOf(
-            R.id.widget_continue_playing_row1,
-            R.id.widget_continue_playing_row2,
-            R.id.widget_continue_playing_row3,
-            R.id.widget_continue_playing_row4,
-        )
-
-        // The widget provider's own process-owned scope: it must outlive
-        // any single onUpdate() call (goAsync()'s PendingResult keeps the
-        // process alive while this runs), but never outlives the process
-        // itself, so it is not tied to any Activity/Compose lifecycle.
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
         /** Called after a game actually launches, so the widget need not wait for the next periodic tick to show it as "last played". */
         fun requestUpdate(context: Context) {
-            val manager = AppWidgetManager.getInstance(context)
-            val ids = manager.getAppWidgetIds(
-                android.content.ComponentName(context, ContinuePlayingWidgetProvider::class.java),
-            )
-            for (id in ids) updateOne(context.applicationContext, manager, id)
+            DroidtopWidgets.update(context, ContinuePlayingWidgetProvider::class.java, build = ::render)
         }
 
         private fun updateOne(context: Context, manager: AppWidgetManager, widgetId: Int) {
-            scope.launch {
-                val recents = recentEntries(context)
-                val views = RemoteViews(context.packageName, R.layout.widget_continue_playing)
-                if (recents.isEmpty()) {
-                    views.setViewVisibility(R.id.widget_continue_playing_empty, android.view.View.VISIBLE)
-                    for (rowId in ROW_IDS) views.setViewVisibility(rowId, android.view.View.GONE)
-                } else {
-                    views.setViewVisibility(R.id.widget_continue_playing_empty, android.view.View.GONE)
-                    for ((index, rowId) in ROW_IDS.withIndex()) {
-                        val entry = recents.getOrNull(index)
-                        if (entry == null) {
-                            views.setViewVisibility(rowId, android.view.View.GONE)
-                            continue
-                        }
-                        views.setViewVisibility(rowId, android.view.View.VISIBLE)
-                        views.setTextViewText(rowId, entry.title)
-                        views.setOnClickPendingIntent(
-                            rowId,
-                            PendingIntent.getActivity(
-                                context,
-                                entry.id.hashCode(),
-                                GameLaunchActivity.intentFor(context, entry.id),
-                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-                            ),
-                        )
-                    }
-                }
-                manager.updateAppWidget(widgetId, views)
-            }
+            DroidtopWidgets.update(context, ContinuePlayingWidgetProvider::class.java, intArrayOf(widgetId), ::render)
         }
 
-        /**
-         * The most recently played entries, from the same in-RAM index
-         * [dev.droidtop.app.CompanionRecents] reads -- never a folder walk
-         * from here. With no scan published yet in this process (a cold
-         * process, the widget is the first surface to touch the library),
-         * this starts one and waits briefly rather than showing an empty
-         * widget for up to 30 minutes.
-         */
-        private suspend fun recentEntries(context: Context): List<LibraryEntry> {
-            val library = LibraryCore.library(context)
-            val state = library.backgroundScanState(LibraryKinds.GAMES)
-            val entries = state.value ?: run {
-                library.scanInBackground(LibraryKinds.GAMES)
-                withTimeoutOrNull(TIMEOUT_MS) { state.filterNotNull().first() }
-            } ?: emptyList()
-            return entries
+        private suspend fun render(context: Context, widgetId: Int): RemoteViews {
+            val rows = recentEntries(context).map { entry ->
+                DroidtopWidgets.Row(
+                    dev.droidtop.library.GameNaming.displayName(entry.title),
+                    DroidtopWidgets.activity(context, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)),
+                )
+            }
+            return DroidtopWidgets.rows(
+                context,
+                DroidtopWidgets.look(context),
+                context.getString(R.string.widget_continue_playing_title),
+                rows,
+                context.getString(R.string.widget_continue_playing_empty),
+            )
+        }
+
+        /** The most recently played games, from the library's in-RAM index ([DroidtopWidgets.libraryGames]). */
+        private suspend fun recentEntries(context: Context): List<LibraryEntry> =
+            DroidtopWidgets.libraryGames(context)
                 .filter { it.lastPlayedEpochMs != null }
                 .sortedByDescending { it.lastPlayedEpochMs }
-                .take(MAX_ROWS)
-        }
-
-        private const val TIMEOUT_MS = 5_000L
+                .take(DroidtopWidgets.MAX_ROWS)
     }
 }

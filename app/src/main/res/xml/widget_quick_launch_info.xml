@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Quick launch widget (QuickLaunchWidgetProvider): one game. Placing it opens its configure activity, which picks
+  the game; reconfigurable from a long press where the launcher offers it.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="60dp"
+    android:minHeight="60dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_quick_launch"
+    android:previewImage="@mipmap/ic_launcher"
+    android:resizeMode="horizontal|vertical"
+    android:configure="dev.droidtop.app.QuickLaunchConfigureActivity"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_quick_launch_title" />

@@ -1,82 +1,84 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Fixed-row layout for PluginStatusWidgetProvider: a title, up to four
-  rows (one per approved, enabled plugin declaring status_tile, refreshed
-  on the widget's own schedule, never a background loop the plugin
-  owns), and an empty state when none are installed or none returned a
-  usable result. Same shape and the same shared system-widget background
-  as widget_continue_playing.xml (docs/SPEC.md 7k: a launcher's
-  home-screen widgets are stock Android surfaces on a wallpaper, not
-  droidtop's own chrome).
+  A droidtop widget that is a title and up to four rows (DroidtopWidgets.rows): Continue playing, Plugin status. The
+  renderer sets every colour from the role tokens, the plate included; the text here is only what a picker preview
+  shows before the first render.
 -->
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@drawable/widget_continue_playing_background"
+    android:background="@drawable/widget_surface_dark"
     android:padding="12dp">
 
     <TextView
+        android:id="@+id/widget_title"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="@string/widget_plugin_status_title"
         android:textStyle="bold"
         android:textSize="14sp"
-        android:textColor="@android:color/white"
+        android:textColor="#FFFFFFFF"
         android:layout_marginBottom="6dp" />
 
     <TextView
-        android:id="@+id/widget_plugin_status_empty"
+        android:id="@+id/widget_empty"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/widget_plugin_status_empty"
         android:textSize="13sp"
         android:textColor="#CCFFFFFF"
         android:visibility="gone" />
 
     <TextView
-        android:id="@+id/widget_plugin_status_row1"
+        android:id="@+id/widget_row1"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="36dp"
         android:gravity="center_vertical"
-        android:textSize="13sp"
-        android:textColor="@android:color/white"
+        android:textSize="14sp"
         android:ellipsize="end"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
 
     <TextView
-        android:id="@+id/widget_plugin_status_row2"
+        android:id="@+id/widget_row2"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="36dp"
         android:gravity="center_vertical"
-        android:textSize="13sp"
-        android:textColor="@android:color/white"
+        android:textSize="14sp"
         android:ellipsize="end"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
 
     <TextView
-        android:id="@+id/widget_plugin_status_row3"
+        android:id="@+id/widget_row3"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="36dp"
         android:gravity="center_vertical"
-        android:textSize="13sp"
-        android:textColor="@android:color/white"
+        android:textSize="14sp"
         android:ellipsize="end"
-        android:maxLines="1" />
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
 
     <TextView
-        android:id="@+id/widget_plugin_status_row4"
+        android:id="@+id/widget_row4"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="36dp"
         android:gravity="center_vertical"
-        android:textSize="13sp"
-        android:textColor="@android:color/white"
+        android:textSize="14sp"
         android:ellipsize="end"
-        android:maxLines="1" />
-
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
 </LinearLayout>
