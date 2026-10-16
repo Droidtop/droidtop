@@ -4971,6 +4971,22 @@ rig check in the commit message.
   keyboard is sent away from the field's window while the request stands (`KeyboardTargets.hideAndroidKeyboard`, from
   `OwnFieldKeyboard` and `InWindowKeyboard`): the field keeps its focus and its keys, and nothing covers it on the
   screen the person is looking at. The text-entry design itself is the UI quality pass's (Droidtop/tracker#485 S7).
+- **The text-entry slab (Droidtop/tracker#485 S7; owner, 2026-10-14: "our text popup appears a lot different than
+  steams, which is weird"; built from slice 6, 2026-10-16).** One pad-driven keyboard slab in every host, whose
+  model is `Slab` (`:input-keyboard`, pure, `SlabTest`):
+  - layers: letters (a number row, qwerty, Shift row, bottom row), symbols (every printable ASCII character, Tab,
+    Esc) and email (`@` and `.` on the Shift row); a number entry opens on symbols, an email entry on email; Large
+    keys (automatic at font scale 1.3) drop the number row to symbols;
+  - the cursor: left and right wrap within a row, up and down land on the key nearest the current one's centre (a
+    wide key is never skipped), Up from the top row is the host's (the plate's controls), and the slab opens on `g`;
+  - the pad: A presses the focused key, X Backspace, Y Space, L1 Shift (one capital; a second press within 400 ms
+    holds Caps; another lets go), R1 the symbols layer and back, R2 Enter labelled by purpose (Search, Save, Done,
+    Next, Go), B Done on a Field and Cancel on a Prompt, Select the clipboard; each such key shows its pad button.
+  The face-button map and the double press for Caps are the design's own and are to compare with a Deck: Valve
+  documents none for the Deck's keyboard (coordinator, 2026-10-16, from the public reference on #485, comment
+  6224222271). There is no emoji page (the Deck's emoji menu is a difference noted there, not adopted); the email
+  layer follows the Deck API's email mode. The slab's drawing, the Field and Prompt entry (`TextEntry`, `:ui-shared`)
+  and where it shows are the next slices.
 - **Other apps on the add-on display: droidtop's input method, drawn where the app is.** droidtop's
   keyboard is already a selectable input method; its connection to the focused editor exists even
   where Android draws no keyboard window. When an editor asks it for the keyboard
