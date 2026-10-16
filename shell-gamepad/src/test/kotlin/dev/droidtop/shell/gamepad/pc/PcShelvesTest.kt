@@ -115,8 +115,8 @@ class PcShelvesTest {
 
         assertEquals(KindBadge(BadgeKind.PC, null), kindBadgeOf(game("/pc", kind = LibraryEntryKind.WINE_PROFILE), names))
         assertEquals(KindBadge(BadgeKind.APP, null), kindBadgeOf(app, names))
-        // An engine game names its engine (docs/SPEC.md 7i, "Badges").
-        assertEquals(KindBadge(BadgeKind.ENGINE, "Ren'Py"), kindBadgeOf(engine, names))
+        // An engine game is "Engine": its engine is an implementation category, not a badge (#496).
+        assertEquals(KindBadge(BadgeKind.ENGINE, null), kindBadgeOf(engine, names))
         assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names)?.text)
         assertEquals("Retro · gba", kindBadgeOf(rom.copy(systemId = "gba"), names)?.text)
         val steam = game("/steam", kind = LibraryEntryKind.WINE_PROFILE, pcInfo = PcInfo(storeId = "steam:1", installed = true))
@@ -127,6 +127,30 @@ class PcShelvesTest {
         assertEquals(null, kindBadgeOf(steam, names, origins = 2, style = dev.droidtop.library.CapsuleBadgeStyle.OFF))
         // A Retro badge is not the PC option's to drop.
         assertEquals("Retro · Super Nintendo", kindBadgeOf(rom, names, style = dev.droidtop.library.CapsuleBadgeStyle.OFF)?.text)
+    }
+
+    @Test
+    fun `a badge part every card of a view shares is dropped, and a badge left with nothing is not drawn`() {
+        val pc = KindBadge(BadgeKind.PC, null)
+        val pcSteam = KindBadge(BadgeKind.PC, "Steam")
+        val pcGog = KindBadge(BadgeKind.PC, "GOG")
+        val snes = KindBadge(BadgeKind.RETRO, "Super Nintendo")
+        val gba = KindBadge(BadgeKind.RETRO, "Game Boy Advance")
+        // All PC from one place: nothing to tell apart.
+        assertEquals(null, ViewBadges(listOf(pc, pc, pc)).of(pc))
+        // All PC from two stores: the store, without the word PC.
+        val stores = ViewBadges(listOf(pcSteam, pcGog))
+        assertEquals("Steam", stores.of(pcSteam)?.text)
+        assertEquals(listOf<Pair<String?, String?>>(null to "GOG"), stores.of(pcGog)?.forms)
+        // Retro games of two systems: the system only.
+        assertEquals("Super Nintendo", ViewBadges(listOf(snes, gba)).of(snes)?.text)
+        // A mixed page keeps the kind and the detail.
+        val mixed = ViewBadges(listOf(pcSteam, snes, KindBadge(BadgeKind.APP, null)))
+        assertEquals("PC · Steam", mixed.of(pcSteam)?.text)
+        assertEquals("Retro · Super Nintendo", mixed.of(snes)?.text)
+        // A view of one card keeps its badge; no badge stays none.
+        assertEquals("Retro · Super Nintendo", ViewBadges(listOf(snes)).of(snes)?.text)
+        assertEquals(null, mixed.of(null))
     }
 
     @Test

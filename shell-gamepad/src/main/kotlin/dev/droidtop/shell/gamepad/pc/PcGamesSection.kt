@@ -1171,6 +1171,8 @@ internal fun PcGamesSection(
                         // row centred in what is left (Steam's library grid);
                         // a cell is never stretched past the capsule.
                         val width = capsuleWidth()
+                        // A badge part every card here shares says nothing (#496).
+                        val gridBadges = remember(grid, systemNames, origins, badgeStyle) { ViewBadges(grid.map { badgeOf(it) }) }
                         LazyVerticalGrid(
                             state = gridState,
                             columns = GridCells.FixedSize(width),
@@ -1191,7 +1193,7 @@ internal fun PcGamesSection(
                                     onLongPress = { state.pageId = entry.id },
                                     download = entry.downloadKey()?.let { downloads[it] },
                                     parts = partsOf(entry),
-                                    badge = badgeOf(entry),
+                                    badge = gridBadges.of(badgeOf(entry)),
                                 )
                             }
                             // The last item, across the whole width: what the
@@ -1612,6 +1614,8 @@ private fun PcShelvesHome(
     home: HomeParts? = null,
 ) {
     val window = LocalShellWindow.current
+    // The page is the view: a badge part every card on its shelves shares says nothing (#496).
+    val pageBadges = remember(shelves, badgeOf) { ViewBadges(shelves.flatMap { it.entries }.distinctBy { it.id }.map { badgeOf(it) }) }
     if (shelves.isEmpty() && home == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Lg)) {
@@ -1702,8 +1706,8 @@ private fun PcShelvesHome(
                             download = entry.downloadKey()?.let { downloads[it] },
                             parts = partsOf(entry),
                             hero = hero,
-                            // Every shelf says what each game is (PC, Retro, App, Engine) and where it is from.
-                            badge = badgeOf(entry),
+                            // What each game is and where it is from, where that tells the cards apart (#496).
+                            badge = pageBadges.of(badgeOf(entry)),
                         )
                     }
                 }

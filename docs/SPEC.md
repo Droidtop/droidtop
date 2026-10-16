@@ -13890,18 +13890,17 @@ own games, in droidtop's own treatment:
   "Retro · Super Nintendo" (an emulated game, its system), "App" (an Android
   app). A PC or engine game's badge is `originLabel`'s (`:library-core`, one
   function with a table test, Droidtop/tracker#397 slice G): an engine game
-  reads "ENGINE · <engine>" ("ENGINE · REN'PY", "ENGINE · RPG MAKER MZ",
-  `LibraryEntryKind.engineFamily`, the one rule the Kind facet's Engine value
-  reads too), a PC game "PC", plus " · <source>" only when the library has rows
-  from more than one source ("PC · GOG"); a folder source is named by its
-  short label, `PcSource.badgeLabel`: the folder's last path segment, and when
-  that is longer than ten letters the initials of its words ("BstSharedFolder"
-  is "PC · BSF"), else its first letters and an ellipsis, so the badge is never
-  cut mid-word (the whole name stays on the focus line). A badge whose words
-  still do not fit its card (a long engine or system name on a narrow card:
+  reads "ENGINE" and a PC game "PC", plus " · <store>" (or the computer a game
+  is on) only when the library has rows from more than one source ("PC · GOG").
+  A folder's name and the engine a game is built on are never on a badge
+  (#496, the rule below): they are folder names and implementation
+  categories, and the focus line and the page carry them. Within one view (a
+  page of shelves, or a grid; `ViewBadges`) a part every card shares is
+  dropped: all PC, no "PC"; all one system, no system; nothing left, no badge. A badge whose words
+  still do not fit its card (a long system name on a narrow card:
   "ENGINE · RPG MAK...", "RETRO · SONY PLAY...", Droidtop/tracker#434, rig
   2026-10-14) is drawn in the longest form that fits, measured: the kind and
-  its detail, then the detail alone ("RPG MAKER MV", "SONY PLAYSTATION"), then
+  its detail, then the detail alone ("SONY PLAYSTATION"), then
   the kind alone (`KindBadge.forms`); the focus line keeps the whole text. Ownership is never text on a capsule:
   a game shared with you or gone from your library carries a small generic
   glyph in the bottom-right corner (no store logo). The focus line and the
