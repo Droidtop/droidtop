@@ -1065,6 +1065,15 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Plugin contributions in the launcher: status tiles (**built this change**), search providers and app actions (still not buildable -- see below) | PARTIAL | `PluginStatusWidgetProvider.kt`; see below |
 | Recent/frequently-used apps row in the app drawer | **built this change** | `RecentAppsStore`, `AlphabeticalAppsList.addRecentAppItems`; see below |
 
+**Following Murine upstream (2026-10-16).** The fork's upstream base is
+Murine `081e840` (v1.1.2, 2026-07-18), found by comparing contents since the
+import named none; `shell-default/UPSTREAM.md` records it and every upstream
+commit droidtop has decided (taken, already done here, or not for this tree),
+and `scripts/murine-upstream.sh` lists the upstream commits not decided yet.
+Upstream's fixes are taken as they come, its features as Standard's own work
+reaches them; its website, version bumps and build moves (droidtop's build is
+its own) are not.
+
 **A real plugin-fed launcher surface: the status-tile home-screen widget
 (built this change).** §12a's `PluginCapability.STATUS_TILE` and
 `PluginStore.runnableFor` already documented themselves as "what an

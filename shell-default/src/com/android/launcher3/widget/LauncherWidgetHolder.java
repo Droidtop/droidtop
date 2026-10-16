@@ -361,8 +361,15 @@ public class LauncherWidgetHolder {
             return;
         }
         getWidgetHolderExecutor().execute(() -> {
-            mWidgetHost.stopListening();
-            setListeningFlag(false);
+            try {
+                if (mWidgetHost != null) {
+                    mWidgetHost.stopListening();
+                }
+            } catch (Exception e) {
+                Log.e("LauncherWidgetHolder", "Error stopping widget listening", e);
+            } finally {
+                setListeningFlag(false);
+            }
         });
     }
 
