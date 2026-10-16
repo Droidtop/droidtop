@@ -67,6 +67,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.app.DownloadsWidgetProvider.watch(appContext)
         dev.droidtop.app.DesktopWidgetProvider.watch(appContext)
         dev.droidtop.app.CompanionWidgetProvider.watch(appContext)
+        // The one icon pack choice, Standard's launcher's, shown in the shared catalog's Appearance (#508).
+        dev.droidtop.library.settings.IconPacks.source = StandardIconPacks
         // A press on a Plugin widget redraws it with a fresh snapshot (PluginWidgetActionReceiver).
         dev.droidtop.library.integrations.PluginWidgets.onActed = { context, id ->
             dev.droidtop.app.PluginWidgetProvider.requestUpdate(context, id, force = true)
