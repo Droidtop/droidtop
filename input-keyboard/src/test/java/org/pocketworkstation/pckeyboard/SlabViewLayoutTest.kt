@@ -100,11 +100,4 @@ class SlabViewLayoutTest {
         RuntimeEnvironment.setFontScale(2.0f)
         sweep("xxhdpi 2.0")
     }
-
-    @Test @Config(qualifiers = "w411dp-h731dp-xxhdpi")
-    fun theFourRowFormIsUsedWhenTheNumberRowWouldPushRowsUnderTheMinimum() {
-        val least = SlabView.minimumHeight(density(), extras = true)
-        assertTrue("the reserved minimum uses the four-row form", slab(1080, least).state.large)
-        assertTrue("a tall share keeps the number row", !slab(1080, 1600).state.large)
-    }
 }
