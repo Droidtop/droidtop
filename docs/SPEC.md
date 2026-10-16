@@ -12475,7 +12475,9 @@ follows:
   person left on (every owned DLC until they choose, "DLC and versions" below),
   downloaded by
   JavaSteam's depot downloader into `<game folder>/Steam/<install folder>`,
-  chunks put together in the app's cache. A stopped download continues; an
+  chunks put together in the app's cache. JavaSteam decrypts the manifests' file names with Bouncy Castle's provider,
+  which it leaves to the app: `:stores` carries `bcprov-jdk18on` and R8 keeps its provider classes (console, build
+  1767: every Steam download died without it, Droidtop/tracker#313). A stopped download continues; an
   update fetches only what changed. Verify checks every file of the installed
   depots' manifests (which the download keeps in the game's
   `.DepotDownloader` folder) by size and SHA-1, with no network. The update
