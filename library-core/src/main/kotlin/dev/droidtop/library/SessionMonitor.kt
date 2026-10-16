@@ -109,7 +109,9 @@ object SessionMonitor {
             misses = SessionLiveness.misses(observation, misses)
             if (SessionLiveness.ended(misses)) {
                 Log.i(TAG, "$pkg is gone (stopped=${observation.packageGone}, task list misses=$misses): the session ends")
-                LaunchDisplay.clearRunning()
+                // The launch watchdog goes on: a game gone this young failed to start, and the watchdog is what says so
+                // (rig, 1931: Vita3K and Eden exited at once on the second display and nothing was shown).
+                LaunchDisplay.clearRunning(stopWatching = false)
                 return
             }
         }

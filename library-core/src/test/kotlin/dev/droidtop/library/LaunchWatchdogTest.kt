@@ -13,9 +13,10 @@ class LaunchWatchdogTest {
         notResponding: Boolean = false,
         taskListed: Boolean? = null,
         freshProcess: Boolean? = null,
-        missedBefore: Boolean = false,
+        missedBefore: Int = 0,
+        seenListed: Boolean = true,
     ) = LaunchWatchPolicy.judge(
-        WatchObservation(elapsedMs, shellCameBack, notResponding, taskListed, freshProcess = freshProcess, missedBefore = missedBefore),
+        WatchObservation(elapsedMs, shellCameBack, notResponding, taskListed, freshProcess = freshProcess, missedBefore = missedBefore, seenListed = seenListed),
     )
 
     @Test
@@ -48,10 +49,10 @@ class LaunchWatchdogTest {
 
     @Test
     fun anAppMissingFromTheTaskListIsGivenTimeToAppearBeforeItCounts() {
-        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS - 1, taskListed = false, missedBefore = true))
+        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS - 1, taskListed = false, missedBefore = 1))
         assertEquals(
             WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY),
-            look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = true),
+            look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = 1),
         )
     }
 
@@ -60,11 +61,31 @@ class LaunchWatchdogTest {
         // One miss is not enough: RetroArch restarts itself for a new core, an exit then a new process (rig, 1923).
         assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false))
         // A process that started after the launch is alive: the app is there, whatever the task list says this moment.
-        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = true, freshProcess = true))
+        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = 1, freshProcess = true))
         // Only processes from before the launch (a sideload's RetroArch) or none at all: gone.
         assertEquals(
             WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY),
-            look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = true, freshProcess = false),
+            look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = 1, freshProcess = false),
+        )
+    }
+
+    @Test
+    fun aLaunchNeverSeenOpenThatStaysMissingExitedAtOnceEvenWithTheShellInFront() {
+        // Two displays: the shell never left the front, so only the task list tells (rig, 1931: Vita3K).
+        assertEquals(
+            WatchVerdict.Trouble(LaunchTrouble.EXITED_AT_ONCE),
+            look(LaunchWatchPolicy.APPEAR_GRACE_MS + 3_000, taskListed = false, missedBefore = 1, freshProcess = false, seenListed = false),
+        )
+    }
+
+    @Test
+    fun aProcessLeftWithNoWindowCountsAsGoneAfterSomeLooks() {
+        // Eden's process stayed with nothing open (rig, 1931); RetroArch's restart is back within a look or two.
+        val grace = LaunchWatchPolicy.APPEAR_GRACE_MS
+        assertEquals(WatchVerdict.Keep, look(grace + 6_000, taskListed = false, missedBefore = LaunchWatchPolicy.LINGER_LOOKS - 2, freshProcess = true, seenListed = false))
+        assertEquals(
+            WatchVerdict.Trouble(LaunchTrouble.EXITED_AT_ONCE),
+            look(grace + 9_000, taskListed = false, missedBefore = LaunchWatchPolicy.LINGER_LOOKS - 1, freshProcess = true, seenListed = false),
         )
     }
 

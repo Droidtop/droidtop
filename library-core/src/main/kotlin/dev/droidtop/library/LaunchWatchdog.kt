@@ -21,7 +21,11 @@ import kotlinx.coroutines.launch
 
 /** What the watchdog found wrong with a launch. */
 enum class LaunchTrouble {
-    /** The shell came back within seconds of the launch and the app is not open. */
+    /**
+     * The app closed before it was ever seen open: the shell came back within seconds of the launch with the app not
+     * open, or the task list never held it and then kept missing it. The second is the only sign on two displays, where
+     * the shell never left the front (rig, droidtop 0.2.0-dev.1931: Vita3K and Eden).
+     */
     EXITED_AT_ONCE,
 
     /** Android reports the app's process as not responding. */
@@ -69,8 +73,10 @@ internal data class WatchObservation(
      * each process's start time); null when droidtop cannot tell. An older process ending is not this launch going.
      */
     val freshProcess: Boolean? = null,
-    /** The look before this one also found the app missing from the task list. */
-    val missedBefore: Boolean = false,
+    /** How many looks in a row before this one found the app missing from the task list. */
+    val missedBefore: Int = 0,
+    /** Some earlier look found the app in the task list. */
+    val seenListed: Boolean = false,
 )
 
 internal sealed interface WatchVerdict {
@@ -107,6 +113,13 @@ internal object LaunchWatchPolicy {
 
     /** An app listed and still alive this long after launch is no longer checked against the task list. */
     const val SETTLED_MS = 30_000L
+
+    /**
+     * Looks in a row missing from the task list after which a launch counts as gone even with a process of it alive: a
+     * process with no window that long is left over, not starting (rig, 1931: Eden's process stayed with nothing open).
+     * RetroArch's restart for a new core is back in the list within one or two looks.
+     */
+    const val LINGER_LOOKS = 4
 
     /** The most the watchdog ever watches; after this a stuck app is the person's to notice. */
     const val WATCH_MS = 90_000L
@@ -146,8 +159,11 @@ internal object LaunchWatchPolicy {
         // Gone only when it stays gone: two looks in a row miss it and no process of it started after the launch is
         // alive. RetroArch restarts itself for a new core (exit, then a new process), and a process from before the
         // launch (a sideload's RetroArch) may end just after it; either read once as gone (rig, droidtop 0.2.0-dev.1923).
-        o.taskListed == false && o.elapsedMs >= APPEAR_GRACE_MS && o.missedBefore && o.freshProcess != true ->
-            WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY)
+        // A process of this launch alive with no window for LINGER_LOOKS looks is gone too. Never seen open is a launch
+        // that failed, not a game that ended.
+        o.taskListed == false && o.elapsedMs >= APPEAR_GRACE_MS &&
+            ((o.missedBefore >= 1 && o.freshProcess != true) || o.missedBefore >= LINGER_LOOKS - 1) ->
+            WatchVerdict.Trouble(if (o.seenListed) LaunchTrouble.GONE_WHILE_AWAY else LaunchTrouble.EXITED_AT_ONCE)
         o.taskListed == true && o.elapsedMs >= SETTLED_MS -> WatchVerdict.Settled
         else -> WatchVerdict.Keep
     }
@@ -279,7 +295,8 @@ object LaunchWatchdog {
             // helper not ready) is tried again a check later.
             var stallChecked = !checkStall
             var nextStallCheckMs = LaunchWatchPolicy.STALL_CHECK_MS
-            var missedBefore = false
+            var missedBefore = 0
+            var seenListed = false
             // The launch on the boot clock, which a process's start time is counted on.
             val launchSinceBootMs = launchedAtMs - (System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime())
             while (isActive) {
@@ -306,8 +323,10 @@ object LaunchWatchdog {
                     cpuMs = cpuMs,
                     freshProcess = if (listed == false) freshProcess(packageName, launchSinceBootMs) else null,
                     missedBefore = missedBefore,
+                    seenListed = seenListed,
                 )
-                missedBefore = listed == false
+                missedBefore = if (listed == false) missedBefore + 1 else 0
+                if (listed == true) seenListed = true
                 when (val verdict = LaunchWatchPolicy.judge(observation)) {
                     WatchVerdict.Keep -> Unit
                     WatchVerdict.Settled -> settled = true
@@ -319,12 +338,23 @@ object LaunchWatchdog {
                             return@launch
                         }
                         ScanLog.write("launch watchdog: $packageName ${verdict.trouble} after $elapsed ms")
+                        // A process the failed launch left with no window is ended by the task manager's one close
+                        // path, Kill's, so the next launch starts clean (rig, 1931: Eden's stayed in the background).
+                        val leftOver = verdict.trouble != LaunchTrouble.NOT_RESPONDING && verdict.trouble != LaunchTrouble.STALLED &&
+                            observation.freshProcess == true
+                        val closed = leftOver && TaskManager.close(appContext, packageName).sessionOver
+                        if (leftOver) ScanLog.write("launch watchdog: $packageName left a process with no window: ${if (closed) "closed" else "could not close it"}")
                         val core = retroArchCorePath?.let { runCatching { RetroArchCores.suspect(packageName, it) }.getOrNull() }
                         alertFlow.value = LaunchAlert(
                             packageName,
                             appName,
                             verdict.trouble,
-                            listOfNotNull(LaunchWatchPolicy.message(appName, verdict.trouble), core?.let(RetroArchCores::troubleHint), note)
+                            listOfNotNull(
+                                LaunchWatchPolicy.message(appName, verdict.trouble),
+                                if (closed) "droidtop closed what it left running." else null,
+                                core?.let(RetroArchCores::troubleHint),
+                                note,
+                            )
                                 .joinToString(" "),
                             ScanLog.logPath(appContext),
                             core,
