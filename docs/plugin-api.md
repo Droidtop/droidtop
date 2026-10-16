@@ -3804,7 +3804,7 @@ Enforcement comes later.
 | P1-9 (#65) | Permission diff on update: new dangerous items → `ask`, "Wants new access" on the row | unit test on the diff |
 | P1-10 **oc** (#66) | Event namespacing + the events `game.launching`, `game.exited`, `library.scan_finished`, `mode.changed`; `default_player_changed` kept as an alias | unit tests on the args builders (like `DefaultPlayerChangedArgsTest`) |
 | P1-11 (#67) | Wire the two dead capabilities: `library_action` → a game's detail screen (C4), `metadata_source` → the scrape pass (A3) | a rig check with a test fixture |
-| P1-12 **oc** (#68) | The crash policy tells a system kill (LMK/process death with no plugin in a call) from a plugin crash: only the latter disables; a whole-process death disables the plugins that had calls in flight (today it returns without disabling) | unit tests with the fake runner |
+| P1-12 **oc** (#68) | The crash policy tells a system kill (LMK/process death with no plugin in a call) from a plugin crash: only the latter disables; a whole-process death disables the plugins that had calls in flight (built: `PluginCrashPolicy.processDied`) | unit tests with the fake runner |
 | P1-13 **oc** (#69) | Vault API (G1): per-plugin Keystore-wrapped storage, excluded from backups, deleted on uninstall | unit tests (JVM with a fake key provider) |
 | P1-14 **oc** (#70) | Manifest JSON Schema (`docs/plugin-manifest.schema.json`) + CI validating the test-fixture manifests | CI job green |
 | P1-15 **oc** (#71) | Fake host (`plugin-host-testing`) + the conformance script, run against the native and python test fixtures in CI | CI job green |
