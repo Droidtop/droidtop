@@ -4278,15 +4278,21 @@ droidtop 0.2.0-dev.1931).
   never the companion's own, so touching the companion never moves the target. Pin keeps typing to that screen
   while it is connected (stored by its unique id). Chord keys above the keyboard (Esc, Tab, Alt+Tab, Super, Ctrl+C,
   Ctrl+V, Ctrl+Z) are played by the vendored keyboard's `MacroPlayer` into the same keyboard destination as typed
-  keys, which keeps its own sticky modifiers and macro keys. **The keyboard is the whole Hacker's Keyboard layout
-  (Droidtop/tracker#486 item 2)**, the one view droidtop's input method draws (`KeyboardPanel`, no second keyboard):
-  its five rows (digits, Tab, Ctrl, Shift, then Esc, Alt, Super, space, Fn and the arrows) with its sixth row, F1 to
-  F12, Home and End, above them (`KeyboardPanel(functionRow = true)`, the layout's own "extension" row, which only the
-  input method ever turned on and so the panel never showed), and the Fn layer's Insert, Delete, Page Up and Down. Only
-  Input asks for the sixth row; the small drafts and overlays keep five. Ctrl, Alt, Shift and Super latch (a tap holds
-  one at the far side until the next key or a second tap) and Backspace, Delete, the arrows and Page Up and Down repeat
-  while held (400 ms, then 50 ms): the panel repeats for a destination that sees one key-down per press (an input
-  connection, a window, a draft, the accessibility field) and a sink whose far side repeats itself says so
+  keys, which keeps its own sticky modifiers and macro keys. **The keyboard is the S7 slab with a whole keyboard's keys**
+  (`SlabView(extras = true)`, Droidtop/tracker#567; it was the Hacker's Keyboard grid, #486 item 2, until the owner,
+  2026-10-16: "The keyboard in the keys menu moves things around, doesn't scale properly, and gets cut off in various
+  ways"). Above the letters: Esc, Tab, Ctrl, Alt and Super; above the symbols: F1 to F12; the bottom row is the layer
+  key, space and the four arrows, with no Clipboard, globe or Done, as nothing on the tab closes. It lays out from its
+  container's real size: the tab gives it three fifths of what is left under the header and the fact lines and never
+  less than `SlabView.minimumHeight` (every row at least 28 dp in the four-row form), so on a short screen the trackpad
+  gets what is left, down to nothing, and the keys are never cut off; rows are sized for the tallest layer, so switching
+  to the symbols never resizes a key; keys, gaps and labels scale together, labels never under 10 sp. The fact lines
+  (the target, Pin, the status, the input method and accessibility buttons, the controllers) keep their place when
+  hidden and have fixed heights, so a fact changing never moves the keys. A key that is a key press goes down on touch
+  and up on release with what is latched held under it (`Slab.held`), so a PC game sees an arrow or a letter held for
+  as long as the finger is on it; Ctrl, Alt and Super latch for the next key, Shift once or (twice) Caps; a held
+  character, space, Backspace or arrow repeats (400 ms, then 50 ms) for a destination that sees one key-down per press
+  (an input connection, a window, a draft, the accessibility field), and not where the far side repeats itself
   (`KeyboardSink.repeatsAtSource` false: Desktop's seat, the compositor's own repeat; the elevated `input` route, which
   starts a process per key). The trackpad's settings (Companion group > Trackpad,
   `TrackpadSettings`) are libinput's options with libinput's defaults: pointer speed, tap to click, tap time, hold
@@ -4963,8 +4969,9 @@ rig check in the commit message.
 - **One keyboard component.** `KeyboardPanel` (`:input-keyboard`) is the embedded Hacker's Keyboard
   grid (`SecondScreenKeyboard.createView`, the same view, layouts and themes droidtop's input method
   draws) wired to a `KeyboardSink`; `DroidtopKeyboard` (`:shell-gamepad`) is its one Compose adapter.
-  Every keyboard droidtop draws is that view, only the sink differs: the companion's Input tab
-  (`ImeConnectionSink`, or the container), its Keys button (`RoutedKeyboardSink`), the Social draft
+  Every keyboard droidtop draws is that view or the S7 slab, only the sink differs: the companion's Input tab
+  (the slab with a whole keyboard's keys, Droidtop/tracker#567; `ImeConnectionSink`, or the container), its Keys
+  button (`RoutedKeyboardSink`), the Social draft
   (the draft itself; its own keyboard composable is gone), droidtop's own fields and windows
   (`WindowKeySink`) and the keyboard over another app (`ImeConnectionSink`, or the accessibility
   service's `AccessibilityTyping.FieldSink`). `KeyMeta` is the one meta-state rule.

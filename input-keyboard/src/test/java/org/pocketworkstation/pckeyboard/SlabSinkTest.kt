@@ -44,4 +44,35 @@ class SlabSinkTest {
         val missing = (32..126).map { it.toChar() }.filter { SlabSink.UsKeys.of(it) == null }
         assertTrue("no key for $missing", missing.isEmpty())
     }
+
+    @Test
+    fun `a chord presses its modifiers around the key and lets them go in reverse`() {
+        val sink = Recorder(takesText = true)
+        SlabSink.deliver(Slab.Output.Chord(KeyEvent.KEYCODE_C, listOf(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_SHIFT_LEFT)), sink, onClose = {})
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_CTRL_LEFT to true, KeyEvent.KEYCODE_SHIFT_LEFT to true,
+                KeyEvent.KEYCODE_C to true, KeyEvent.KEYCODE_C to false,
+                KeyEvent.KEYCODE_SHIFT_LEFT to false, KeyEvent.KEYCODE_CTRL_LEFT to false,
+            ),
+            sink.keys,
+        )
+    }
+
+    @Test
+    fun `a held key goes down with its modifiers, repeats as key-downs, and comes up in reverse`() {
+        val sink = Recorder(takesText = true)
+        val hold = Slab.Output.Hold(KeyEvent.KEYCODE_DPAD_UP, listOf(KeyEvent.KEYCODE_SHIFT_LEFT))
+        SlabSink.deliver(Slab.Output.Down(hold), sink, onClose = {})
+        SlabSink.deliver(Slab.Output.Down(hold, repeat = true), sink, onClose = {})
+        SlabSink.deliver(Slab.Output.Up(hold), sink, onClose = {})
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_SHIFT_LEFT to true, KeyEvent.KEYCODE_DPAD_UP to true,
+                KeyEvent.KEYCODE_DPAD_UP to true,
+                KeyEvent.KEYCODE_DPAD_UP to false, KeyEvent.KEYCODE_SHIFT_LEFT to false,
+            ),
+            sink.keys,
+        )
+    }
 }

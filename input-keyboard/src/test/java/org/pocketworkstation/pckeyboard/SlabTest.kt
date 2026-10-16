@@ -118,4 +118,70 @@ class SlabTest {
         assertEquals(2, symbols.row)
         assertTrue(symbols.col in 3..5)
     }
+
+    @Test
+    fun `the extras add a whole keyboard's row above the letters and F1 to F12 above the symbols`() {
+        val letters = Slab.rows(Layer.LETTERS, false, extras = true)
+        assertEquals(listOf(Action.Escape, Action.Tab, Action.Ctrl, Action.Alt, Action.Super), letters.first().map { it.action })
+        // The bottom row is a whole keyboard's: no Clipboard, globe or Done, and the four arrows together.
+        assertEquals(
+            listOf(Action.Symbols, Action.Space, Action.CaretLeft, Action.ArrowUp, Action.ArrowDown, Action.CaretRight),
+            letters.last().map { it.action },
+        )
+        assertTrue(Slab.rows(Layer.SYMBOLS, false, extras = true).flatten().none { it.action == Action.Done || it.action == Action.Clipboard })
+        val symbols = Slab.rows(Layer.SYMBOLS, false, extras = true)
+        assertEquals((1..12).map { Action.Function(it) }, symbols.first().map { it.action })
+        assertEquals(Slab.rows(Layer.LETTERS, false).size + 1, letters.size)
+    }
+
+    @Test
+    fun `ctrl latches for one key and sends a chord, then lets go`() {
+        var state = Slab.State(extras = true)
+        state = Slab.press(state, Action.Ctrl, 0).first
+        assertTrue(state.latched(Slab.Key(Action.Ctrl)))
+        val (after, out) = Slab.press(state, Action.Char('c'), 0)
+        assertEquals(Output.Chord(KeyEvent.KEYCODE_C, listOf(KeyEvent.KEYCODE_CTRL_LEFT)), out)
+        assertTrue(after.modifiers.isEmpty())
+        // Without a modifier the same key is plain text again.
+        assertEquals(typed("c"), Slab.press(after, Action.Char('c'), 0).second)
+    }
+
+    @Test
+    fun `ctrl and shift together reach the key, and a modifier pressed twice lets go`() {
+        var state = Slab.State(extras = true, shift = ShiftState.ONCE)
+        state = Slab.press(state, Action.Ctrl, 0).first
+        val (after, out) = Slab.press(state, Action.Char('t'), 0)
+        assertEquals(Output.Chord(KeyEvent.KEYCODE_T, listOf(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_SHIFT_LEFT)), out)
+        assertEquals(ShiftState.OFF, after.shift)
+        val twice = Slab.press(Slab.press(Slab.State(extras = true), Action.Alt, 0).first, Action.Alt, 0).first
+        assertTrue(twice.modifiers.isEmpty())
+    }
+
+    @Test
+    fun `function keys and the arrows press their keys`() {
+        assertEquals(Output.Press(KeyEvent.KEYCODE_F1 + 4), Slab.press(Slab.State(), Action.Function(5), 0).second)
+        assertEquals(Output.Press(KeyEvent.KEYCODE_DPAD_UP), Slab.press(Slab.State(), Action.ArrowUp, 0).second)
+        assertEquals(
+            Output.Chord(KeyEvent.KEYCODE_TAB, listOf(KeyEvent.KEYCODE_ALT_LEFT)),
+            Slab.press(Slab.press(Slab.State(extras = true), Action.Alt, 0).first, Action.Tab, 0).second,
+        )
+    }
+
+    @Test
+    fun `a whole keyboard holds a key with what is latched, and lets the one-shots go after`() {
+        // Droidtop/tracker#567: a PC game sees a held arrow or letter for as long as the finger is on it.
+        val latched = Slab.press(Slab.State(extras = true, shift = ShiftState.ONCE), Action.Ctrl, 0).first
+        assertEquals(
+            Output.Hold(KeyEvent.KEYCODE_A, listOf(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.KEYCODE_SHIFT_LEFT)),
+            Slab.held(latched, Action.Char('a', 'A')),
+        )
+        assertEquals(Output.Hold(KeyEvent.KEYCODE_DPAD_UP, emptyList()), Slab.held(Slab.State(extras = true), Action.ArrowUp))
+        assertNull("Shift acts on release", Slab.held(Slab.State(extras = true), Action.Shift))
+        assertNull("a modifier latches on release", Slab.held(Slab.State(extras = true), Action.Alt))
+        val after = Slab.released(latched)
+        assertTrue(after.modifiers.isEmpty())
+        assertEquals(ShiftState.OFF, after.shift)
+        assertEquals(ShiftState.CAPS, Slab.released(Slab.State(shift = ShiftState.CAPS)).shift)
+        assertTrue(Slab.repeats(Action.Backspace) && Slab.repeats(Action.ArrowDown) && !Slab.repeats(Action.Enter))
+    }
 }

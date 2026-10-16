@@ -43,10 +43,6 @@ interface KeyboardSink {
  * method does not also put its own view up ([SecondScreenKeyboard.setAttached]). It follows window visibility,
  * not attachment, because a stopped Activity's views stay attached (Droidtop/tracker#156).
  *
- * [functionRow] adds Hacker's Keyboard's own sixth row above the five of the full layout: F1 to F12, Home and End
- * (its "extension" row, which its input method shows on request). The companion's Input tab, which stands in for a
- * whole keyboard, asks for it; the small drafts and overlays keep the five rows.
- *
  * [context] must belong to the display the panel is drawn on: the key grid sizes itself from its metrics.
  */
 class KeyboardPanel(
@@ -54,7 +50,6 @@ class KeyboardPanel(
     private val sink: KeyboardSink,
     private val heightPercent: Float = SecondScreenKeyboard.DEFAULT_HEIGHT_PERCENT,
     private val suppressImeView: Boolean = false,
-    private val functionRow: Boolean = false,
 ) : FrameLayout(context) {
 
     private var functionLayer = false
@@ -108,7 +103,7 @@ class KeyboardPanel(
     private val keyboardView: LatinKeyboardView? = run {
         // The key grid reads the form (full, split, one-handed) from the shared settings, which only the input method loads.
         LatinIME.sKeyboardSettings.form = ToolsPrefs.form(context)
-        runCatching { SecondScreenKeyboard.createView(context, listener, heightPercent, functionRow) }.getOrNull()
+        runCatching { SecondScreenKeyboard.createView(context, listener, heightPercent) }.getOrNull()
     }
 
     // The tool strip (clipboard history, macros, incognito) above the grid, or the grid alone when it is switched off.
@@ -143,13 +138,13 @@ class KeyboardPanel(
     /** The key grid again, for a form that changed: the same layer, built with the new shape. */
     private fun rebuildKeys() {
         val view = keyboardView ?: return
-        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent, functionRow)
+        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent)
     }
 
     private fun toggleLayout() {
         val view = keyboardView ?: return
         functionLayer = !functionLayer
-        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent, functionRow)
+        SecondScreenKeyboard.applyLayout(view, context, functionLayer, heightPercent)
     }
 
     private var countedForIme = false
