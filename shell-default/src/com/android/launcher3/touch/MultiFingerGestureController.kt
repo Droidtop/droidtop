@@ -8,7 +8,7 @@ import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherState
 import com.android.launcher3.MotionEventsUtils
 import com.android.launcher3.util.TouchController
-import kotlin.math.abs
+import dev.droidtop.runtime.StandardGestures
 import kotlin.math.hypot
 
 /**
@@ -42,12 +42,12 @@ class MultiFingerGestureController(private val mLauncher: Launcher) : TouchContr
                 }
                 val dy = midY(ev) - mStartMidY
                 val dSpan = span(ev) - mStartSpan
-                val slot = when {
-                    abs(dSpan) > mThreshold && abs(dSpan) > abs(dy) ->
-                        if (dSpan < 0) LauncherPrefs.GESTURE_PINCH_IN_ACTION else LauncherPrefs.GESTURE_PINCH_OUT_ACTION
-                    abs(dy) > mThreshold ->
-                        if (dy > 0) LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION else LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION
-                    else -> return false
+                // Which slot it is: StandardGestures, the one rule, tested in :runtime-common.
+                val slot = when (StandardGestures.twoFinger(dy, dSpan, mThreshold) ?: return false) {
+                    StandardGestures.Slot.PINCH_IN -> LauncherPrefs.GESTURE_PINCH_IN_ACTION
+                    StandardGestures.Slot.PINCH_OUT -> LauncherPrefs.GESTURE_PINCH_OUT_ACTION
+                    StandardGestures.Slot.TWO_FINGER_DOWN -> LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION
+                    StandardGestures.Slot.TWO_FINGER_UP -> LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION
                 }
                 mTracking = false
                 return slot.get(mLauncher).perform(mLauncher)
