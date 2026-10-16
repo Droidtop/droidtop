@@ -16,9 +16,10 @@ import kotlinx.coroutines.launch
 
 /**
  * The Desktop widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): start or go back to droidtop's
- * Desktop, saying whether its session is running, and open the containers. Gated by Desktop mode: its provider is
- * enabled only while Desktop is on ([ModeStartup]), which is how Android hides a widget from every launcher's picker.
- * Container apps on it come later (#563).
+ * Desktop, saying whether its session is running, open the containers, and run the apps containers exported to the
+ * desktop, two at most, through the one export launch ([ExportLaunch]: the running session, else Desktop starts one).
+ * Gated by Desktop mode: its provider is enabled only while Desktop is on ([ModeStartup]), which is how Android hides a
+ * widget from every launcher's picker.
  */
 class DesktopWidgetProvider : AppWidgetProvider() {
 
@@ -28,6 +29,11 @@ class DesktopWidgetProvider : AppWidgetProvider() {
 
     companion object {
         @Volatile private var watching = false
+
+        /** After the exported apps changed (a container page's export switch, a container removed). */
+        fun requestUpdate(context: Context) {
+            DroidtopWidgets.update(context, DesktopWidgetProvider::class.java, build = ::render)
+        }
 
         /** Follows the desktop session for the life of the process (from :app's start), so the widget says whether it runs. */
         fun watch(context: Context) {
@@ -57,7 +63,9 @@ class DesktopWidgetProvider : AppWidgetProvider() {
                 listOf(
                     DroidtopWidgets.Row(if (running) "Go to the desktop (running)" else "Start the desktop", DroidtopWidgets.activity(context, "desktop", open)),
                     DroidtopWidgets.Row("Containers", DroidtopWidgets.activity(context, "containers", CatalogScreenLink.intent(context, ContainersCatalog.SCREEN_ID))),
-                ),
+                ) + ExportLaunch.published(context).sortedBy { it.app.name.lowercase() }.take(DroidtopWidgets.MAX_ROWS - 2).map { export ->
+                    DroidtopWidgets.Row(export.title, DroidtopWidgets.activity(context, "export:${export.token}", ExportLaunchActivity.intentFor(context, export)))
+                },
                 "",
             )
         }

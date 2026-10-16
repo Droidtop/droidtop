@@ -10,13 +10,11 @@ import android.util.Log
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryKinds
-import dev.droidtop.runtime.ContainerApplications
 import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerExports
 import dev.droidtop.runtime.ContainerLauncher
 import dev.droidtop.runtime.ContainerLayout
 import dev.droidtop.runtime.DesktopLaunchRequests
-import dev.droidtop.runtime.ExportedApp
 import dev.droidtop.runtime.SharedVolume
 import java.io.File
 import java.util.concurrent.atomic.AtomicReference
@@ -111,7 +109,7 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
                 if (id == null) {
                     // An app another container exported (docs/SPEC.md 3d "Exported apps"); the list is a few lines.
                     val export = ContainerExports.forToken(ContainerExports.read(filesDir), token)
-                    if (export != null) launchExport(export) else Log.w(TAG, "A launch request named $token, which droidtop has not published; ignored")
+                    if (export != null) ExportLaunch.launch(export) else Log.w(TAG, "A launch request named $token, which droidtop has not published; ignored")
                     return
                 }
                 if (!DesktopLaunchRequests.offer(id)) Log.w(TAG, "No Desktop shell is showing to launch $id; request dropped")
@@ -119,21 +117,6 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
         }
         watched.startWatching()
         observer = watched
-    }
-
-    /**
-     * Runs an exported app in its own container, started first where the backend needs that, the same way the
-     * container page's Terminal reaches a sibling; its window appears on the shared desktop. A failure is the
-     * session's launch failure line, as for any other app.
-     */
-    private fun launchExport(export: ExportedApp) {
-        val started = DesktopSessionService.runInPrimary { runtime, _ ->
-            val info = runtime.listContainers().firstOrNull { it.container.id == export.containerId }
-                ?: return@runInPrimary "${export.containerName} no longer exists, so ${export.app.name} can't start"
-            if (runtime.siblingsNeedStart && !info.running) runtime.start(info.container)
-            ContainerApplications.launch(runtime, info.container, export.app)
-        }
-        if (!started) Log.w(TAG, "No desktop session to run ${export.title} in; request dropped")
     }
 
     private fun writeIfChanged(file: File, text: String) {
