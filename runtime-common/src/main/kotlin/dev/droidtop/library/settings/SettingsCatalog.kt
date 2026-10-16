@@ -97,7 +97,12 @@ sealed interface CatalogItem {
     val chip: String? get() = null
 }
 
-data class ChoiceOption(val value: String, val label: String)
+/**
+ * One choice of a [ChoiceItem]. [tone] marks a choice whose cost the person should see at a glance (a plugin's
+ * Ask first is caution, Blocked is danger; Droidtop/tracker#519); null is neutral. When any option of an item has a
+ * tone, renderers draw its value as a state chip in that tone, neutral ones included, so the states read as one set.
+ */
+data class ChoiceOption(val value: String, val label: String, val tone: NoticeTone? = null)
 
 /**
  * A pick-one setting. [current] is the live value at catalog-build time.
@@ -114,6 +119,11 @@ class ChoiceItem(
     val onSelect: (Context, String) -> Unit,
 ) : CatalogItem {
     fun currentLabel(): String? = options.firstOrNull { it.value == current }?.label ?: current
+
+    /** True when this item's values are states with tones, drawn as chips ([ChoiceOption.tone]). */
+    val toned: Boolean get() = options.any { it.tone != null }
+
+    fun currentTone(): NoticeTone? = options.firstOrNull { it.value == current }?.tone
 }
 
 class ToggleItem(

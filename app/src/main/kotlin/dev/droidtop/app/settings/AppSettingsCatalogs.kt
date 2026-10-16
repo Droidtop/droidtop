@@ -2850,9 +2850,10 @@ object AppSettingsCatalogs {
                 title = row.label,
                 subtitle = listOfNotNull(row.reason, wanted, lastUsed).joinToString(" - ").ifEmpty { null },
                 options = listOf(
+                    // State chips with tones (Droidtop/tracker#519): what a state costs shows at a glance.
                     dev.droidtop.library.settings.ChoiceOption(GrantState.GRANTED.name, "Allowed"),
-                    dev.droidtop.library.settings.ChoiceOption(GrantState.ASK.name, "Ask first"),
-                    dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked"),
+                    dev.droidtop.library.settings.ChoiceOption(GrantState.ASK.name, "Ask first", dev.droidtop.library.settings.NoticeTone.Caution),
+                    dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked", dev.droidtop.library.settings.NoticeTone.Danger),
                 ),
                 current = row.state.name,
                 onSelect = { ctx, value ->
