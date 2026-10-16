@@ -9,8 +9,8 @@ import dev.droidtop.runtime.ContainerLauncher
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.ContainerRole
-import dev.droidtop.runtime.DockerCli
-import dev.droidtop.runtime.DockerCommand
+import dev.droidtop.runtime.EngineCli
+import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineFeatures
 import dev.droidtop.runtime.EngineOptions
@@ -58,14 +58,14 @@ internal object ContainerEnterRequests {
             return
         }
         val cwd = runCatching { File(dir, "cwd").readText().trim() }.getOrNull()
-        if (token == DockerCli.TOKEN) {
+        EngineCli.forToken(token)?.let { cli ->
             // The device's kernel features (D10) only when the request needs them: probed once a boot, kept after.
             val features = if (args.firstOrNull() == "info" || (args.firstOrNull() == "run" && EngineOptions.mentioned(args))) {
                 EngineFeatureProbe.current(app)
             } else {
                 null
             }
-            docker(app, dir, DockerCli.parse(args, features), cwd, seenAt, writtenAt, features)
+            engine(app, dir, cli, cli.parse(args, features), cwd, seenAt, writtenAt, features)
             return
         }
         val command = ContainerEnter.forToken(ContainerEnter.read(app.filesDir), token)
@@ -122,42 +122,43 @@ internal object ContainerEnterRequests {
     }
 
     /**
-     * Answers a `docker` request (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c) from droidtop's own
+     * Answers a `docker` or `podman` request (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c, D11) from droidtop's own
      * state: the containers, their programs and the image store. Containers are named by their name or their id.
      */
-    private suspend fun docker(
+    private suspend fun engine(
         app: Context,
         dir: File,
-        command: DockerCommand,
+        cli: EngineCli,
+        command: EngineRequest,
         cwd: String?,
         seenAt: Long,
         writtenAt: Long?,
         features: EngineFeatures?,
     ) {
-        if (command is DockerCommand.Answer) {
+        if (command is EngineRequest.Answer) {
             if (command.code == 0) answer(dir, command.text, "", 0) else answer(dir, "", command.text, command.code)
             return
         }
-        if (command is DockerCommand.Info) {
+        if (command is EngineRequest.Info) {
             val backend = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime?.backend
-            answer(dir, DockerCli.formatInfo(features ?: EngineFeatureProbe.current(app), backend), "", 0)
+            answer(dir, cli.formatInfo(features ?: EngineFeatureProbe.current(app), backend), "", 0)
             return
         }
         val runtime = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime ?: run {
-            refuse(dir, "docker: the desktop is not running", 125)
+            refuse(dir, "${cli.name}: the desktop is not running", 125)
             return
         }
         val containers = runCatching { runtime.listContainers() }.getOrElse {
-            refuse(dir, "docker: ${it.message ?: it.javaClass.simpleName}", 1)
+            refuse(dir, "${cli.name}: ${it.message ?: it.javaClass.simpleName}", 1)
             return
         }
         fun find(name: String): ContainerInfo? = containers.firstOrNull { it.displayName == name } ?: containers.firstOrNull { it.container.id == name }
         when (command) {
-            is DockerCommand.Ps -> {
+            is EngineRequest.Ps -> {
                 val rows = containers.map { info ->
                     val state = ContainerPrograms.state(info.container.id)
                     val programUp = ContainerPrograms.isRunning(info.container.id)
-                    DockerCli.PsRow(
+                    EngineCli.PsRow(
                         name = info.displayName,
                         image = info.image ?: "",
                         status = dockerStatus(state, programUp, info.running),
@@ -165,29 +166,29 @@ internal object ContainerEnterRequests {
                         ports = runCatching { runtime.imageRunConfig(info.container)?.ports }.getOrNull().orEmpty(),
                     )
                 }
-                answer(dir, DockerCli.formatPs(rows, command), "", 0)
+                answer(dir, cli.formatPs(rows, command), "", 0)
             }
-            is DockerCommand.Images -> {
+            is EngineRequest.Images -> {
                 val images = runCatching { OciImageStore.of(app).entries() }.getOrElse {
-                    refuse(dir, "docker images: ${it.message ?: it.javaClass.simpleName}", 1)
+                    refuse(dir, "${cli.name} images: ${it.message ?: it.javaClass.simpleName}", 1)
                     return
                 }
-                answer(dir, DockerCli.formatImages(images, command), "", 0)
+                answer(dir, cli.formatImages(images, command), "", 0)
             }
-            is DockerCommand.Logs -> {
+            is EngineRequest.Logs -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
                 val lines = ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, info.container.id), command.tail)
                 answer(dir, lines.joinToString("") { it + "\n" }, "", 0)
             }
-            is DockerCommand.Start, is DockerCommand.Stop -> {
-                val names = if (command is DockerCommand.Start) command.containers else (command as DockerCommand.Stop).containers
+            is EngineRequest.Start, is EngineRequest.Stop -> {
+                val names = if (command is EngineRequest.Start) command.containers else (command as EngineRequest.Stop).containers
                 val out = StringBuilder()
                 val err = StringBuilder()
                 for (name in names) {
                     val info = find(name)
                     when {
                         info == null -> err.append("Error: No such container: $name\n")
-                        command is DockerCommand.Stop -> {
+                        command is EngineRequest.Stop -> {
                             ContainerPrograms.stop(info.container.id)
                             out.append(name).append('\n')
                         }
@@ -201,30 +202,30 @@ internal object ContainerEnterRequests {
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
             }
-            is DockerCommand.Exec -> {
+            is EngineRequest.Exec -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
-                enter(app, dir, Target(info.container.id, info.displayName, "docker exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
+                enter(app, dir, Target(info.container.id, info.displayName, "${cli.name} exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
             }
-            is DockerCommand.Pull -> {
+            is EngineRequest.Pull -> {
                 val pulled = runCatching { OciImageStore.of(app).pull(RootfsImage(reference = command.image)) }
                 pulled.fold(
                     onSuccess = { answer(dir, "${command.image}\nDigest: ${it.digest}\n", "", 0) },
-                    onFailure = { refuse(dir, "docker pull: ${it.message ?: it.javaClass.simpleName}", 1) },
+                    onFailure = { refuse(dir, "${cli.name} pull: ${it.message ?: it.javaClass.simpleName}", 1) },
                 )
             }
-            is DockerCommand.Run -> {
+            is EngineRequest.Run -> {
                 val names = containers.map { it.displayName }
                 val name = command.name ?: ContainerNames.defaultName(ContainerRole.SIBLING, command.image, names)
-                ContainerNames.problemWith(name, names)?.let { return refuse(dir, "docker run: $it", 1) }
+                ContainerNames.problemWith(name, names)?.let { return refuse(dir, "${cli.name} run: $it", 1) }
                 // A volume is a folder the person already mapped in some container (D3), found by its name: never a
                 // path the container chose (the review's bound for the docker request kind).
                 val mapped = containers.flatMap { runCatching { runtime.mounts(it.container).folders }.getOrDefault(emptyList()) }
                 val folders = command.volumes.map { wanted ->
                     mapped.firstOrNull { it.name == wanted }
-                        ?: return refuse(dir, "docker run: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
+                        ?: return refuse(dir, "${cli.name} run: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
                 }
                 val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
-                    return refuse(dir, "docker run: ${it.message ?: it.javaClass.simpleName}", 1)
+                    return refuse(dir, "${cli.name} run: ${it.message ?: it.javaClass.simpleName}", 1)
                 }
                 // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
                 runCatching {
@@ -239,13 +240,13 @@ internal object ContainerEnterRequests {
                 val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()
                     ?.let { ContainerProgram.effectiveConfig(app.filesDir, created.id, it) }?.program().orEmpty()
                 if (program.isEmpty()) {
-                    answer(dir, "$name\n", "$name's image names no program to run, so nothing was started; use docker exec $name sh\n", 0)
+                    answer(dir, "$name\n", "$name's image names no program to run, so nothing was started; use ${cli.name} exec $name sh\n", 0)
                 } else {
                     ContainerPrograms.start(app, runtime, created)
                     answer(dir, "$name\n", "", 0)
                 }
             }
-            is DockerCommand.Remove -> {
+            is EngineRequest.Remove -> {
                 val out = StringBuilder()
                 val err = StringBuilder()
                 for (target in command.containers) {
@@ -254,7 +255,7 @@ internal object ContainerEnterRequests {
                     when {
                         info == null -> err.append("Error: No such container: $target\n")
                         info.container.role == ContainerRole.PRIMARY -> err.append("Error: $target is the desktop's own container; droidtop does not remove it\n")
-                        running && !command.force -> err.append("Error: $target is running; stop it first or use docker rm -f\n")
+                        running && !command.force -> err.append("Error: $target is running; stop it first or use ${cli.name} rm -f\n")
                         else -> runCatching {
                             if (info.running && runtime.siblingsNeedStart) runtime.stop(info.container)
                             ContainerRemoval.remove(app, runtime, info)
@@ -266,7 +267,7 @@ internal object ContainerEnterRequests {
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
             }
-            is DockerCommand.Answer, DockerCommand.Info -> Unit
+            is EngineRequest.Answer, EngineRequest.Info -> Unit
         }
     }
 

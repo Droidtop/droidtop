@@ -2041,8 +2041,8 @@ stays mounted, and its four folders in droidtop's cache are removed one by one, 
 root helper the root column is "not tried", and the sentence says root would be needed rather than that the device
 lacks it.
 
-**Options that need a feature** (`EngineOptions`, one table for every front: `docker` now, `podman` and the API
-daemons with D11 to D15): `-m`/`--memory`, `--memory-swap`, `--memory-reservation`, `--cpus`, `-c`/`--cpu-shares`,
+**Options that need a feature** (`EngineOptions`, one table for every front: `docker` and `podman` (D11), the API daemons with
+D14 and D15): `-m`/`--memory`, `--memory-swap`, `--memory-reservation`, `--cpus`, `-c`/`--cpu-shares`,
 `--cpuset-cpus` and `--pids-limit` need cgroups; `--network`/`--net` network namespaces; `--pid` PID namespaces;
 `-h`/`--hostname` hostname namespaces; `--tmpfs` and `--read-only` mount namespaces. An option is never taken and
 silently ignored. Its answer names the feature and why it is not here: "`--memory` needs cgroups, which this device's
@@ -2483,6 +2483,17 @@ the `ContainerRuntime` interface that already exists (§3):
   containers do not have it. Docker words stay in the command; droidtop's
   screens keep "app" and "program". Nothing the container wrote reaches
   Android as a command, a path or an argv.
+  **The podman command (built 2026-10-16, Droidtop/tracker#555 D11).** Every container also has `podman` on its
+  `PATH`: a second command front over the same engine, not a second runtime (the owner's decision on #555: one
+  engine, docker and podman fronts). Both fronts are `EngineCli` (`EngineCli.DOCKER`, `EngineCli.PODMAN`), each
+  with its own command name, its own token (`droidtop:podman`) and its own wrapper in `desktop-launcher/commands`,
+  so a request says which front sent it. Each reads its tool's syntax into the one request model (`EngineRequest`:
+  ps, images, logs, start, stop, exec, pull, run, rm, info), which droidtop answers one way
+  (`ContainerEnterRequests`); a front's answers and refusals carry its own name ("podman run: --memory needs
+  cgroups, ..."). For this subset the two tools' syntax is the same. `podman pod`, `generate`, `play` and `kube`
+  answer "not built in droidtop yet" (pods come with D12). Their own defaults and output (Docker's daemon-style
+  defaults and field names, Podman's rootless defaults and output) are D12. Neither name can be exported by a
+  container.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy
