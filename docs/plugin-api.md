@@ -3415,7 +3415,14 @@ arrays under the manifest's own keys (`V2Declarations`).
     export, with Allowed / Ask first / Blocked, its reason, "tried to use
     this while you were not being asked" and when it was last used. New
     items from an update sit under "Wants new access" and the plugin's row
-    says so.
+    says so. The state is a chip with a tone (Droidtop/tracker#519, built
+    2026-10-16): Allowed neutral, Ask first caution, Blocked danger, from
+    the notice palette, so what a state costs shows without reading it.
+    The tone is the choice's own (`ChoiceOption.tone`); any settings choice
+    whose options carry tones is drawn as chips, in Gaming (`MenuRow`'s
+    value chip), on the companion and, as coloured bold text, in Standard
+    and Desktop. In Gaming a row that steps with Left/Right adds "◄ ►
+    Change" to the hint row.
   - A Waiting plugin's row says "Waiting" and its page says what it
     needs. An interface with more than one running provider has a "Provided
     by" choice on the Plugins screen. There is no "Get <provider>" row yet:

@@ -64,6 +64,8 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -435,6 +437,10 @@ internal fun MenuRow(
     leading: (@Composable () -> Unit)? = null,
     // A short tag on the row beside its title (CatalogItem.chip): "Unofficial". A fact, drawn on the row, not a tooltip.
     chip: String? = null,
+    // The value drawn as a state chip (ChoiceItem.toned): in [valueTone]'s colours, or neutral when it has none
+    // (Droidtop/tracker#519).
+    valueChip: Boolean = false,
+    valueTone: NoticeTone? = null,
     // The row has Info (a sentence beyond its title): a 20dp glyph says so, and a screen reader hears
     // "More info available" (docs/SPEC.md 7k, "Explanations").
     info: Boolean = false,
@@ -565,20 +571,43 @@ internal fun MenuRow(
                     modifier = Modifier.valueShare().then(if (columnWidth != null) Modifier.width(columnWidth + window.minTouchTarget * 2) else Modifier),
                 ) {
                     AdjustArrow("‹") { onAdjust(-1) }
-                    Text(
-                        value,
-                        color = valueColor,
-                        style = MaterialTheme.typography.bodyMedium,
-                        textAlign = if (columnWidth != null) TextAlign.Center else TextAlign.Unspecified,
-                        maxLines = valueLines,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = if (columnWidth != null) {
-                            Modifier.weight(1f)
-                        } else {
-                            Modifier.widthIn(max = MenuTokens.ValueColumnMaxWidth)
-                        },
-                    )
+                    if (valueChip) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = if (columnWidth != null) Modifier.weight(1f) else Modifier,
+                        ) { ValueChip(value, valueTone) }
+                    } else {
+                        Text(
+                            value,
+                            color = valueColor,
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = if (columnWidth != null) TextAlign.Center else TextAlign.Unspecified,
+                            maxLines = valueLines,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = if (columnWidth != null) {
+                                Modifier.weight(1f)
+                            } else {
+                                Modifier.widthIn(max = MenuTokens.ValueColumnMaxWidth)
+                            },
+                        )
+                    }
                     AdjustArrow("›") { onAdjust(+1) }
+                }
+            } else if (valueChip) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.valueShare().then(
+                        if (columnWidth != null) {
+                            Modifier.widthIn(min = columnWidth, max = MenuTokens.ValueColumnMaxWidth)
+                        } else {
+                            Modifier.widthIn(min = MenuTokens.ValueColumnMinWidth, max = MenuTokens.ValueColumnMaxWidth)
+                        },
+                    ),
+                ) {
+                    if (selected && adjustable) Text("‹ ", color = valueColor, style = MaterialTheme.typography.bodyMedium)
+                    ValueChip(value, valueTone)
+                    if (selected && adjustable) Text(" ›", color = valueColor, style = MaterialTheme.typography.bodyMedium)
                 }
             } else {
                 Text(
@@ -725,6 +754,17 @@ internal fun ShellProgressBar(fraction: Float, modifier: Modifier = Modifier) {
  * small capitals on a pill of [fill] with a hairline of its own [ink], so it reads over art and
  * over a page alike. A capsule's corner marks and a place's header facts are both this chip.
  */
+/** A setting's value as a state chip: [tone]'s plate and text, or the neutral chip when it has none. */
+@Composable
+private fun ValueChip(text: String, tone: NoticeTone?) {
+    val palette = LocalNoticePalette.current
+    if (tone == null) {
+        StatusChip(text, ink = MenuTokens.OnSurface, fill = MenuTokens.SurfaceSelected)
+    } else {
+        StatusChip(text, ink = palette.on(tone), fill = palette.plate(tone))
+    }
+}
+
 @Composable
 internal fun StatusChip(text: String, ink: Color, fill: Color, modifier: Modifier = Modifier) {
     Text(
