@@ -20,9 +20,9 @@ import com.android.launcher3.Utilities
  * (double-tap, swipe-down) does, assignable per slot instead of each
  * gesture hardcoding one fixed action -- Nova/Apex's "map any gesture to
  * any action" (docs/SPEC.md, Launcher mode survey, "Assignable gesture
- * actions"). Scoped to actions that already have a real handler in this
- * fork: launching an app or a specific shortcut is not offered yet (no
- * picker UI exists to name one), so it is left out rather than faked.
+ * actions"). [LAUNCH_APP] starts an app the person picked, kept beside the
+ * slot's own preference; dev.droidtop.shell.standard.HomeActions runs every
+ * slot, so that one value needs no handler here.
  * The slots are double-tap, swipe down, two-finger swipe down and up,
  * pinch in and out ([MultiFingerGestureController]), and the Home button
  * pressed while already on the first page.
@@ -61,6 +61,9 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
 
     /** The library's Games grid, as the home screen's menu opens it. */
     OPEN_GAMES(R.string.gesture_action_open_games, R.string.gesture_action_open_games_summary),
+
+    /** An app the person picked (Nova's and Apex's "open an app" gesture; Droidtop/tracker#564). */
+    LAUNCH_APP(R.string.gesture_action_launch_app, R.string.gesture_action_launch_app_summary),
     ;
 
     fun getDisplayName(context: Context): String = context.getString(displayNameRes)
@@ -109,6 +112,8 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
             dev.droidtop.shell.standard.DroidtopScreens.openGames(launcher)
             true
         }
+        // The app is the slot's, not the action's: HomeActions.runSlot starts it.
+        LAUNCH_APP -> false
     }
 
     companion object {

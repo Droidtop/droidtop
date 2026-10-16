@@ -126,6 +126,34 @@
     <string name="gesture_action_switch_mode_summary">Opens the mode switcher</string>
     <string name="gesture_action_open_games">Games</string>
     <string name="gesture_action_open_games_summary">Opens your games</string>
+    <string name="gesture_action_launch_app">Open an app</string>
+    <string name="gesture_action_launch_app_summary">Starts an app you choose</string>
+    <string name="home_action_open_app">Open %1$s</string>
+    <string name="home_action_app_missing">That app is not installed any more</string>
+    <string name="home_action_pick_app">Choose an app</string>
+    <string name="item_customize">Customize</string>
+    <string name="item_customize_title">Title: %1$s</string>
+    <string name="item_customize_title_ask">Title for this icon</string>
+    <string name="item_customize_picture">Choose a picture</string>
+    <string name="item_customize_picture_remove">Remove the picture</string>
+    <string name="item_customize_picture_failed">That picture could not be used</string>
+    <string name="item_customize_swipe_up">Swipe up: %1$s</string>
+    <string name="item_customize_swipe_down">Swipe down: %1$s</string>
+    <string name="item_customize_swipe_up_pick">Swipe up on this icon</string>
+    <string name="item_customize_swipe_down_pick">Swipe down on this icon</string>
+    <string name="folder_option_picture">Choose a picture</string>
+    <string name="launcher_import_title">Import from Nova or Apex</string>
+    <string name="launcher_import_desc">Your home screen, dock, folders, gestures and drawer from a .novabackup or .apexbackup file</string>
+    <string name="launcher_import_heading">Import from %1$s</string>
+    <string name="launcher_import_brought">What comes across</string>
+    <string name="launcher_import_changed">Changed on the way</string>
+    <string name="launcher_import_left_out">Not brought across</string>
+    <string name="launcher_import_replaces">This replaces your home screen and dock. Drawer tabs, hidden apps and app names are added to yours.</string>
+    <string name="launcher_import_nothing">There is nothing in this backup that droidtop can bring across.</string>
+    <string name="launcher_import_go">Import</string>
+    <string name="launcher_import_working">Importing your home screen…</string>
+    <string name="launcher_import_done">Your %1$s home screen is in place</string>
+    <string name="launcher_import_failed">This backup could not be imported</string>
     <string name="gesture_action_clear_all_apps_summary">Ends every open app except droidtop, after asking when there are several</string>
 
     <!-- Murine search bar -->

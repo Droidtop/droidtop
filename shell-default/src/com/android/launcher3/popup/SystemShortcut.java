@@ -392,6 +392,35 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
         }
     }
 
+    /**
+     * droidtop (Droidtop/tracker#564): an app icon's own options on the home screen, in the dock or in a folder:
+     * its title, a picture in place of its icon, and its swipes (ItemCustomize). Not while the home screen is
+     * locked.
+     */
+    public static final Factory<ActivityContext> CUSTOMIZE = (context, itemInfo, originalView) -> {
+        if (itemInfo.itemType != LauncherSettings.Favorites.ITEM_TYPE_APPLICATION || itemInfo.id < 0
+                || !(itemInfo.container == LauncherSettings.Favorites.CONTAINER_DESKTOP
+                        || itemInfo.container == LauncherSettings.Favorites.CONTAINER_HOTSEAT
+                        || itemInfo.container > 0)
+                || (context instanceof Launcher launcher && !launcher.isDraggingEnabled())) {
+            return null;
+        }
+        return new CustomizeShortcut(context, itemInfo, originalView);
+    };
+
+    private static class CustomizeShortcut<T extends ActivityContext> extends SystemShortcut<T> {
+        CustomizeShortcut(T target, ItemInfo itemInfo, View originalView) {
+            super(R.drawable.gm_edit_24, R.string.item_customize, target, itemInfo, originalView);
+        }
+
+        @Override
+        public void onClick(View view) {
+            dismissTaskMenuView();
+            dev.droidtop.shell.standard.ItemCustomize.INSTANCE.show(
+                    mOriginalView.getContext(), mItemInfo, mOriginalView);
+        }
+    }
+
     private static class DontSuggestApp<T extends ActivityContext> extends SystemShortcut<T> {
         DontSuggestApp(T target, ItemInfo itemInfo, View originalView) {
             super(R.drawable.ic_block_no_shadow, R.string.dismiss_prediction_label, target,

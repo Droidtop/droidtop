@@ -8,6 +8,7 @@ import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherState
 import com.android.launcher3.MotionEventsUtils
 import com.android.launcher3.util.TouchController
+import dev.droidtop.shell.standard.HomeActions
 import dev.droidtop.runtime.StandardGestures
 import kotlin.math.hypot
 
@@ -50,7 +51,7 @@ class MultiFingerGestureController(private val mLauncher: Launcher) : TouchContr
                     StandardGestures.Slot.TWO_FINGER_UP -> LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION
                 }
                 mTracking = false
-                return slot.get(mLauncher).perform(mLauncher)
+                return HomeActions.runSlot(mLauncher, slot)
             }
             MotionEvent.ACTION_POINTER_UP, MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> mTracking = false
         }
@@ -66,7 +67,7 @@ class MultiFingerGestureController(private val mLauncher: Launcher) : TouchContr
     private fun canIntercept(ev: MotionEvent) = !MotionEventsUtils.isTrackpadScroll(ev) &&
             mLauncher.isInState(LauncherState.NORMAL) &&
             AbstractFloatingView.getTopOpenView(mLauncher) == null &&
-            SLOTS.any { it.get(mLauncher) != GestureAction.NONE }
+            SLOTS.any { HomeActions.isSet(mLauncher, it) }
 
     private fun midY(ev: MotionEvent) = (ev.getY(0) + ev.getY(1)) / 2f
 

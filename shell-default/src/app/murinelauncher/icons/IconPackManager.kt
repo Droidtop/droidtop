@@ -118,6 +118,15 @@ object IconPackManager {
     fun getSelectedPack(context: Context): String =
         prefs(context).getString(PREF_ICON_PACK, SYSTEM_ICON_PACK) ?: SYSTEM_ICON_PACK
 
+    /**
+     * droidtop: uses [packageName] (or [SYSTEM_ICON_PACK]) as the settings page's picker does, and drops the cached
+     * pack icons so the next load draws from it. The caller reloads the launcher model.
+     */
+    fun setSelectedPack(context: Context, packageName: String) {
+        prefs(context).edit().putString(PREF_ICON_PACK, packageName).apply()
+        clearMainCache()
+    }
+
     fun isSystemOnly(context: Context): Boolean =
         prefs(context).getBoolean(PREF_ICON_PACK_SYSTEM_ONLY, false)
 

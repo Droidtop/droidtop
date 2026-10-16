@@ -447,7 +447,8 @@ public class PreviewItemManager {
             if (isActivePendingIcon(wii)) {
                 p.drawable = newPendingIcon(mContext, wii);
             } else {
-                p.drawable = wii.newIcon(mContext, FLAG_THEMED);
+                p.drawable = dev.droidtop.shell.standard.HomeItemExtras.newIcon(
+                        mContext, wii, FLAG_THEMED);
             }
             p.drawable.setBounds(0, 0, mIconSize, mIconSize);
         } else if (item instanceof AppPairInfo api) {
