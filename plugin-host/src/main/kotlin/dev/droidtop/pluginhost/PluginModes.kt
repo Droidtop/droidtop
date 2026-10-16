@@ -92,6 +92,8 @@ object PluginModes {
         /** Context actions (C4): a game's or app's detail screen in Gaming, Standard's long-press app menu. */
         const val GAME_DETAIL = "game.detail"
         const val STANDARD_APP_MENU = "standard.app_menu"
+        const val GAMING_GAME_MENU = "gaming.game_menu"
+        const val GAMING_APP_MENU = "gaming.app_menu"
         const val SETTINGS = "settings"
 
         /**
