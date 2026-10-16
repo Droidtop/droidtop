@@ -4303,7 +4303,8 @@ droidtop 0.2.0-dev.1931).
   screen (above), by `TrackpadRoute` chosen as each gesture starts and kept until its left button is let go: while
   droidtop's shell is what that screen shows it moves the shell's selection (focus steps, confirm, back:
   `FocusNavTrackpadSink`; pointer and focus are one selection in the shell, and a hover is how a mouse moves focus there,
-  so a cursor over droidtop's own chrome would only be a second selection), and in any other app it is a pointer.
+  so a cursor over droidtop's own chrome would only be a second selection), on droidtop's own Windows game screen it is
+  that game's mouse (5b, "Controller mouse mode", Droidtop/tracker#565), and in any other app it is a pointer.
   Android lets an ordinary app no system cursor (`INJECT_EVENTS` is a signature permission), so the pointer is built from
   what an accessibility service has, with no root: a cursor drawn in an accessibility overlay on that screen (never
   touchable, gone after five seconds without moving, `PointerCursor`) shows where the next touch lands, and a click, a
@@ -6456,10 +6457,15 @@ pointer (a Unity configuration window, say) works without touching the screen:
 - remembered per game (`PadMousePrefs`); off by default, unless the game's runner says it needs a mouse (none says so
   yet; `PadMouse.initial`).
 It is the pointer path the screen's touch trackpad already uses (`XServer.injectPointerMoveDelta`, button presses,
-the wheel as scroll-button presses), not a second one (`PadMouse`, pure and tested; `PadMouseDriver` in
-`WineGameActivity`, ahead of the XInput bridge). The Quick Menu row reaches the screen through
-`OwnGameScreens.Screen.padMouse`. The Keys tab and the companion as trackpads on the same path are the next part of
-#565.
+the wheel as scroll-button presses), not a second one: the screen offers it as `OwnGameScreens.Screen.pointer`
+(`XServerPointer`), and both `PadMouseDriver` (in `WineGameActivity`, ahead of the XInput bridge; `PadMouse`, pure and
+tested) and the companion drive that. The Quick Menu row reaches the screen through `OwnGameScreens.Screen.padMouse`.
+**The companion's Keys trackpad is the game's mouse** while droidtop's own game screen is on the screen the companion
+types to (`TrackpadRoute.GAME`, ahead of the accessibility pointer, after the shell's own selection when the Quick Menu
+is up): finger travel is scaled to the game's width, with the trackpad's acceleration and speed setting, tap to click,
+two-finger scroll and right-click as everywhere else (`GamePointerTrackpadSink`), and it needs no accessibility
+service. No second touch path is added on the main screen, which keeps the Windows screen's own trackpad (the owner's
+clarification above).
 
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with

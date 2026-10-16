@@ -36,7 +36,32 @@ object OwnGameScreens {
         val padMouse: Boolean? get() = null
 
         fun setPadMouse(on: Boolean) {}
+
+        /** The game's pointer, which mouse mode and the companion's trackpad both drive; null where there is none. */
+        val pointer: Pointer? get() = null
     }
+
+    /**
+     * The one way into a game screen's pointer (Droidtop/tracker#565): relative moves in the game's own pixels, the
+     * buttons, and wheel steps. Controller mouse mode and the companion's Keys trackpad both go through it, and it goes
+     * through the calls the screen's touch trackpad already makes. Main thread.
+     */
+    interface Pointer {
+        /** The display the game is drawn on, so the companion drives it only while that is the screen it types to. */
+        val displayId: Int?
+
+        /** The game's own screen width, in its pixels: what a trackpad's travel is scaled to. */
+        val widthPx: Int
+
+        fun move(dx: Int, dy: Int)
+
+        fun button(button: PointerButton, pressed: Boolean)
+
+        /** One wheel step, down (towards the person) or up. */
+        fun wheel(down: Boolean)
+    }
+
+    enum class PointerButton { LEFT, RIGHT, MIDDLE }
 
     @Volatile
     var current: Screen? = null
