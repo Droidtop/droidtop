@@ -215,7 +215,7 @@ object EmulatorsCatalog {
                                 id = "emulator_app_${app.packageName}",
                                 title = label,
                                 subtitle = "Can run ${names.size} " + (if (names.size == 1) "system" else "systems") +
-                                    (if (names.isEmpty()) "" else ": $shown") + ". Press A to open it for its own settings",
+                                    (if (names.isEmpty()) "" else ": $shown") + ". Opens it for its own settings",
                                 name = label,
                                 packageName = app.packageName,
                             )
@@ -453,7 +453,7 @@ object EmulatorsCatalog {
                 ActionItem(
                     id = "emulator_known_${system.id}_$pkg",
                     title = name,
-                    subtitle = if (isInstalled) pkg else "Not installed. Press A to get it.",
+                    subtitle = if (isInstalled) pkg else "Not installed. Choose it to get it.",
                     value = if (isInstalled) "Installed" else "Not installed",
                     run = if (isInstalled) ({ _ -> }) else AppSettingsCatalogs.installPackageAction(pkg),
                 )

@@ -8085,7 +8085,10 @@ every screen outside it (the text-entry slab, `TextEntry`, the safe-mode banner,
 alert overlay, store sign-in, pairing a computer, the launch cover's Back pass-through) through
 `org.pocketworkstation.pckeyboard.FaceKeys`, whose `swapped` `ControllerLayouts` keeps in step with the layout.
 No screen tests `KEYCODE_BUTTON_A` or `KEYCODE_BUTTON_B` itself; such handlers confirmed with the cancel button on a
-Nintendo-layout or toggled pad. A pill draws the glyph PRINTED on the button that does the job: Xbox A/B/X/Y, PlayStation cross, circle,
+Nintendo-layout or toggled pad. **No copy spells a button letter either** (review, 2026-10-16): a hint that
+asks for a press says it through `PressWords` (shell-gamepad), which names the confirm button's printed glyph on
+the active pad while a pad drives and says "tap" under touch ("press ✕ again", "tap again"). Copy that cannot follow
+the pad (a settings subtitle, a text-entry cue) uses role words instead: "Choose it", "Back returns". A pill draws the glyph PRINTED on the button that does the job: Xbox A/B/X/Y, PlayStation cross, circle,
 square, triangle, Nintendo with A on the right. So on an Xbox-printed handheld toggled to the Nintendo
 layout the confirm pill says B, because that is what the plastic says on the right button; pills always
 point at a real button. Resolution order, strongest first:
