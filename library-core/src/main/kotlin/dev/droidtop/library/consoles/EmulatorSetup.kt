@@ -55,6 +55,11 @@ data class EmulatorSetupSpec(
     val biosFolderKey: String? = null,
     val biosManual: String? = null,
     val config: ConfigSpec? = null,
+    /**
+     * The emulator reads BIOS files from the top of its folder only, under any name (the PCSX2 family scans one
+     * level), so a file goes there under the database's base name, not the database's subfolder.
+     */
+    val biosFlat: Boolean = false,
 )
 
 /** Reading and changing one key of a config file, by its format. Pure, for tests. */
@@ -246,6 +251,7 @@ object EmulatorSetup {
             biosFolderKey = obj.optString("biosFolderKey").takeIf { it.isNotEmpty() },
             biosManual = obj.optString("biosManual").takeIf { it.isNotEmpty() },
             config = config,
+            biosFlat = obj.optBoolean("biosFlat", false),
         )
     }
 
@@ -263,6 +269,48 @@ object EmulatorSetup {
 
     /** A BIOS database entry's path inside the emulator's BIOS folder ("bios/dc/dc_boot.bin" is "dc/dc_boot.bin"). */
     fun biosRelative(file: String): String = file.removePrefix("bios/")
+
+    /** Where [file] goes inside [spec]'s BIOS folder: the database's own path, or its base name for a flat folder. Pure. */
+    fun biosTarget(spec: EmulatorSetupSpec, file: BiosFileSpec): String =
+        biosRelative(file.file).let { if (spec.biosFlat) it.substringAfterLast('/') else it }
+
+    /** The files of [bios] that are not in a folder holding [present] (paths inside it, any case). Pure. */
+    fun missingBios(spec: EmulatorSetupSpec, bios: SystemBiosSpec, present: Set<String>): List<BiosFileSpec> =
+        bios.files.filter { want -> present.none { it.equals(biosTarget(spec, want), ignoreCase = true) } }
+
+    /**
+     * droidtop's own copy of [file]: in a games root's `bios` folder at the database's path (`bios/ps2/<name>`), else
+     * at that folder's top under the base name. The games roots are the one place droidtop keeps BIOS files; an
+     * emulator's folder gets a copy ([syncBios]). Background only.
+     */
+    fun droidtopBios(roots: List<File>, file: BiosFileSpec): File? {
+        val name = file.file.substringAfterLast('/')
+        return roots.asSequence()
+            .flatMap { root -> sequenceOf(File(root, file.file), File(File(root, "bios"), name)) }
+            .firstOrNull { runCatching { it.isFile && it.length() in 1..ElevatedFiles.MAX_WRITE_BYTES }.getOrDefault(false) }
+    }
+
+    /** What [syncBios] did: the files it copied in and the files the emulator's folder still lacks. */
+    data class BiosSync(val folder: String, val copied: List<String>, val missing: List<String>)
+
+    /**
+     * Copies into [spec]'s BIOS folder each file of [bios] it lacks that droidtop has in [roots], by the one write path
+     * ([write]: itself, else the helper behind Risky actions). Null when the folder is unknown or cannot be looked in,
+     * so nothing is claimed. Background only.
+     */
+    fun syncBios(spec: EmulatorSetupSpec, configText: String?, bios: SystemBiosSpec, roots: List<File>): BiosSync? {
+        val folder = biosFolder(spec, configText) ?: return null
+        val present = listFolder(folder) ?: return null
+        val copied = mutableListOf<String>()
+        val missing = mutableListOf<String>()
+        for (want in missingBios(spec, bios, present)) {
+            val target = biosTarget(spec, want)
+            val source = droidtopBios(roots, want)
+            val bytes = source?.let { runCatching { it.readBytes() }.getOrNull() }
+            if (bytes != null && write("$folder/$target", bytes)) copied += target else missing += target
+        }
+        return BiosSync(folder, copied, missing)
+    }
 
     /**
      * Where a picked BIOS file goes inside the folder: the database's own name when its md5 matches a listed file

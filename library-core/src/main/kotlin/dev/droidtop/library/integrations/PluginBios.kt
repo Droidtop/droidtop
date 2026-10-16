@@ -3,6 +3,7 @@ package dev.droidtop.library.integrations
 import android.content.Context
 import dev.droidtop.library.consoles.BiosFileSpec
 import dev.droidtop.library.consoles.EmulatorSetup
+import dev.droidtop.library.consoles.EmulatorSetupSpec
 import dev.droidtop.library.consoles.SystemBiosSpec
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -105,7 +106,7 @@ object PluginBios {
      * installed and allowed, opening a screen that asks each provider (when it opens, off the main thread) which of the
      * missing files it can supply. Null when there is no provider.
      */
-    fun row(context: Context, systemId: String, systemName: String, bios: SystemBiosSpec, folder: String, app: String, viaHelper: Boolean): CatalogItem? {
+    fun row(context: Context, systemId: String, systemName: String, bios: SystemBiosSpec, setup: EmulatorSetupSpec, folder: String, app: String, viaHelper: Boolean): CatalogItem? {
         val providers = providers(context)
         if (providers.isEmpty()) return null
         return NestedScreenItem(
@@ -116,14 +117,23 @@ object PluginBios {
                 id = "emulator_bios_get_screen_$systemId",
                 title = "Get the BIOS",
                 subtitle = "for $systemName",
-                groups = { ctx -> withContext(Dispatchers.IO) { groups(ctx, providers, systemId, bios, folder, app, viaHelper) } },
+                groups = { ctx -> withContext(Dispatchers.IO) { groups(ctx, providers, systemId, bios, setup, folder, app, viaHelper) } },
             ),
         )
     }
 
-    private suspend fun groups(context: Context, providers: List<PluginRecord>, systemId: String, bios: SystemBiosSpec, folder: String, app: String, viaHelper: Boolean): List<CatalogGroup> {
+    private suspend fun groups(
+        context: Context,
+        providers: List<PluginRecord>,
+        systemId: String,
+        bios: SystemBiosSpec,
+        setup: EmulatorSetupSpec,
+        folder: String,
+        app: String,
+        viaHelper: Boolean,
+    ): List<CatalogGroup> {
         val have = EmulatorSetup.listFolder(folder).orEmpty()
-        val missing = bios.files.filter { entry -> have.none { it.equals(EmulatorSetup.biosRelative(entry.file), ignoreCase = true) } }
+        val missing = EmulatorSetup.missingBios(setup, bios, have)
         if (missing.isEmpty()) {
             return listOf(CatalogGroup("bios_none", null, listOf(ActionItem("bios_none_row", "Every file droidtop knows of is already in $folder", run = {}))))
         }
@@ -138,14 +148,14 @@ object PluginBios {
                     listOf(ActionItem("bios_empty_${record.manifest.id}", "$label has none of the missing files", run = {}))
                 } else {
                     found.map { offer ->
-                        val target = EmulatorSetup.biosRelative(offer.entry.file)
+                        val target = EmulatorSetup.biosTarget(setup, offer.entry)
                         AsyncActionItem(
                             id = "bios_get_${record.manifest.id}_$target",
                             title = "Get $target",
                             subtitle = listOfNotNull(offer.candidate.source, offer.candidate.size?.let { "${it / 1024 / 1024 + 1} MB" }).joinToString(" · ").ifEmpty { null },
                             confirmTitle = RiskyPrompts.getBiosConfirm(label, offer.candidate.source, "$folder/$target", app, viaHelper),
                             run = { ctx, onStatus ->
-                                val result = get(ctx, record, systemId, offer, folder, app, onStatus)
+                                val result = get(ctx, record, systemId, offer, setup, folder, app, onStatus)
                                 if (result.ok) result.values["summary"] ?: "Added $target to $app's BIOS folder" else "Not added: ${result.error ?: "it failed"}"
                             },
                         )
@@ -162,11 +172,12 @@ object PluginBios {
         record: PluginRecord,
         systemId: String,
         offer: Offer,
+        setup: EmulatorSetupSpec,
         folder: String,
         app: String,
         onStatus: (String) -> Unit,
     ): PluginResult {
-        val target = EmulatorSetup.biosRelative(offer.entry.file)
+        val target = EmulatorSetup.biosTarget(setup, offer.entry)
         val args = JSONObject().put("system", systemId).put("name", offer.candidate.name).put("md5", JSONArray(offer.entry.md5))
         val job = PluginViews.runJob(context, record, POINT, "acquire", args, "Get $target", onStatus)
         if (!job.ok) return PluginResult.failure("${record.manifest.label}: ${job.error ?: "it failed"}")
