@@ -19683,6 +19683,19 @@ the secondary path for sources that publish no key.
   under the test directories (`plugin-host/src/test`, `library-core/src/test`),
   never a packaged plugin. A new plugin repository starts from the contract in
   `docs/plugin-api.md`, not from a droidtop-hosted sample.
+- **On-device plugin checks are instrumentation tests, never a test plugin or
+  a test origin (coordinator, 2026-10-16, Droidtop/tracker#130: "don't build a
+  test plugin or a test origin. That would add a trust anchor to the production
+  console, and the 2026-10-14 rule says no sample plugins ship. Instead, write
+  an androidTest (instrumentation) in droidtop").** A check that needs a
+  plugin to call droidtop's broker on a real console is a test in
+  `app/src/androidTest` with a stand-in caller that exists only in the test's
+  broker environment (never installed, listed or trusted), run by hand with
+  `am instrument` from CI's `droidtop-android-test` artifact; CI builds it and
+  never publishes it. A destructive check works only on a throwaway app the
+  test installs and removes itself ("never one of the owner's apps"). The
+  JVM-side fixtures and the fake host are in `:plugin-host-testing`
+  (`docs/plugin-api.md` 3 I2).
 - **Plugin bundles are signed by CI (owner, 2026-10-07).** Official plugin
   repos sign in their GitHub Actions jobs, not by
   hand: the repo secret `PLUGIN_SIGNING_KEY` (that repository's derived EC

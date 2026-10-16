@@ -13,7 +13,7 @@ another emulator. Read `docs/SPEC.md` (use its headings) before changing behavio
   Do not claim something works because it compiles: say what was and was not verified.
 - **No AI attribution anywhere.** No `Co-Authored-By`, no "Generated with", in commits or PRs. The review workflow `commit-hygiene.yml` fails any commit that carries it.
 - **Commit messages** are plain prose saying why, citing evidence (file:line, a log line, a rig run).
-- **Decisions go into `docs/SPEC.md`** in the same change. State comes from code, not from notes.
+- **Decisions go into `docs/SPEC.md`** in the same change. State comes from code, not from notes. Every decision acted on, the owner's or one relayed by the coordinator, goes into every spec it touches (`docs/SPEC.md`, `docs/plugin-api.md`, ...) in that change, with its source quoted; when a spec does not yet record something you were told to do, write it in and do it, without holding the work (owner, 2026-10-16: "Spec documents need to be updated with decisions.").
 - **One mechanism per job.** Consolidate duplicates; delete the dead code you replace.
 - **Non-root first.** Root is used only by the rooted desktop container stack
   (`runtime-linux-root`); handheld and launcher features never need it.
