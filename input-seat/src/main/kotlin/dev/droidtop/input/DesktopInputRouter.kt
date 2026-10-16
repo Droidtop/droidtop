@@ -86,6 +86,10 @@ class DesktopInputRouter {
         }
         view.setOnGenericMotionListener { _, event -> onMotionEvent(event) }
         view.setOnKeyListener { _, _, event -> onKeyEvent(event) }
+        // A key let go while the surface does not have input goes elsewhere, and the container would hold it forever
+        // (Ctrl stayed down in foot after a Ctrl combination, follow-up rig 2026-10-16): let go of all of it then.
+        view.setOnFocusChangeListener { _, focused -> if (!focused) releaseHeldInput() }
+        view.viewTreeObserver.addOnWindowFocusChangeListener { focused -> if (!focused) releaseHeldInput() }
         view.requestFocus()
     }
 

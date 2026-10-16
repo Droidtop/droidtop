@@ -981,7 +981,8 @@ type and the data source, which a third-party home cannot have.
 - *Recents.* The same single path as the gesture slot: `GLOBAL_ACTION_RECENTS` through the service.
 - *D-pad.* The window is not focusable, so it never steals keys from the app. The service's key filter
   (`canRequestFilterKeyEvents`, requested only while the setting is on) looks for exactly two keys, the Meta
-  key and the pad's Mode button, and consumes only those: a press makes the window focusable and puts focus on
+  key and the pad's Mode button, and consumes only those (Meta not while droidtop's Desktop is in front, where it
+  is the session's Super key; "Where Meta goes", 6b): a press makes the window focusable and puts focus on
   its first button, the D-pad moves between buttons, A or Enter acts, and B, Back or a second press of the
   trigger hands focus back to the app. No other key is read or consumed. Select/Start were not used as the
   trigger because emulators use them.
@@ -6747,6 +6748,33 @@ Control+minus saw a bare minus. Each modifier the meta state carries and the
 container does not already see held is pressed before the key (Shift, Ctrl,
 Alt, Meta, in that order, each by its left key) and released once every key it
 was pressed for is up (`DesktopInputRouter.synthesizeModifiersDown`).
+
+**Where Meta goes (decided 2026-10-16, follow-up rig on v0.2.0-dev.2011).** Meta
+is the session's Super key (evdev 125, Mod4) and sway decides what it does, as
+on a PC: a combination one of sway's bindings names runs that binding, and every
+other one goes to the focused client. droidtop adds no rule of its own on top.
+sway's bindings are the distro's stock `/etc/sway/config` plus droidtop's
+`$mod+d` (`DesktopPanel`), so Super+B is sway's `splith` and never reaches foot;
+the rig's `input keycombination META_LEFT B` hit that binding. To check that Meta
+reaches a client, use a combination sway does not bind. While droidtop's Desktop
+is in front, Standard's taskbar key filter leaves Meta alone
+(`StandardTaskbar.onKey`). It used to take Meta system-wide to focus the strip,
+so the session got only the meta state on the next key. Android's own Meta
+shortcuts (Meta+Enter as Home, a Meta+letter app launch, depending on the
+version) act before any app sees the key, and droidtop cannot stop them.
+
+**Keys reach the surface in order, and a lost release is let go (follow-up rig
+2026-10-16).** After `input keycombination CTRL_LEFT B`, foot read the next
+Enter as Ctrl+Enter and `xyz` as `^X^Y^Z`: Ctrl stayed down in the container.
+Two fixes:
+- With the pad gate off (Desktop), `PadGate.dispatchKey` no longer passes keys
+  through `KeySettle`. That queue held every key after a handled press for two
+  frames, and `cancel()` (on pause, or losing top-resumed) threw held releases
+  away.
+- `DesktopInputRouter.attachTo` lets go of everything held
+  (`releaseHeldInput`) when the surface loses view or window focus. A release
+  that went to another view or window would otherwise stay pressed in the
+  container.
 
 **Modifiers (decided 2026-10-14, Droidtop/tracker#147, #555 D1).** A key event
 alone never changed a modifier in the container. wlroots handles
