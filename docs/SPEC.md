@@ -2493,6 +2493,15 @@ the `ContainerRuntime` interface that already exists (§3):
   `unless-stopped` turns it off again when the person stops the program (its page's Stop it, `docker stop`) and on
   when they start it. Every policy waits longer after each quick exit and gives up after five in a row (or the N of
   `on-failure:N`), a clean exit counting for `always`: a program that exits at once would otherwise restart for ever.
+  **Each tool's output (built 2026-10-16, Droidtop/tracker#555 D12).** `ps` prints the columns both tools print:
+  CONTAINER ID (droidtop's container id), IMAGE, COMMAND (the program the container runs, with `run`'s command
+  applied), CREATED, STATUS, PORTS and NAMES. The docker front shortens Docker Hub's images (`gitea/gitea:1.22`) and
+  quotes the command, cut at 20 characters with an ellipsis; the podman front keeps the full image
+  (`docker.io/gitea/gitea:1.22`) and leaves the command bare, cut with three dots. `ps -q` prints ids, as both tools
+  do (it printed names). `images` keeps Docker's short repository names on the docker front and Podman's full ones
+  (`docker.io/library/nginx`, sizes as "21.4 MB") on the podman front. CREATED is the time droidtop made the
+  container (`ContainerPrograms.recordCreated`, from every place droidtop creates one: `run` and the two Create rows
+  in Containers); a container made before this has an empty CREATED rather than a guessed one.
   **The podman command (built 2026-10-16, Droidtop/tracker#555 D11).** Every container also has `podman` on its
   `PATH`: a second command front over the same engine, not a second runtime (the owner's decision on #555: one
   engine, docker and podman fronts). Both fronts are `EngineCli` (`EngineCli.DOCKER`, `EngineCli.PODMAN`), each

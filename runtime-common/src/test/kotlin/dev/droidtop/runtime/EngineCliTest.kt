@@ -59,17 +59,35 @@ class EngineCliTest {
     }
 
     @Test
-    fun `ps and images print Docker's columns`() {
+    fun `ps and images print each tool's own columns`() {
+        val now = 1_000_000_000L
         val rows = listOf(
-            EngineCli.PsRow("gitea", "docker.io/gitea/gitea:1.22", "Up", up = true, ports = listOf(ExposedPort(22), ExposedPort(3000))),
-            EngineCli.PsRow("arch", "docker.io/library/archlinux:latest", "Created", up = false, ports = emptyList()),
+            EngineCli.PsRow(
+                "droidtop-sibling-1a2b", "gitea", "docker.io/gitea/gitea:1.22", "Up", up = true,
+                ports = listOf(ExposedPort(22), ExposedPort(3000)),
+                command = listOf("/usr/bin/entrypoint", "/bin/s6-svscan", "/etc/s6"),
+                createdMs = now - 300_000,
+            ),
+            EngineCli.PsRow("droidtop-sibling-9f00", "arch", "docker.io/library/archlinux:latest", "Created", up = false, ports = emptyList()),
+        )
+        val running = EngineRequest.Ps(all = false, quiet = false)
+        assertEquals(
+            "CONTAINER ID            IMAGE              COMMAND                  CREATED         STATUS   PORTS              NAMES\n" +
+                "droidtop-sibling-1a2b   gitea/gitea:1.22   \"/usr/bin/entrypoint\u2026\"   5 minutes ago   Up       22/tcp, 3000/tcp   gitea\n",
+            EngineCli.DOCKER.formatPs(rows, running, now),
         )
         assertEquals(
-            "NAME    IMAGE                        STATUS   PORTS\n" +
-                "gitea   docker.io/gitea/gitea:1.22   Up       22/tcp, 3000/tcp\n",
-            EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(all = false, quiet = false)),
+            "CONTAINER ID            IMAGE                        COMMAND                CREATED         STATUS   PORTS              NAMES\n" +
+                "droidtop-sibling-1a2b   docker.io/gitea/gitea:1.22   /usr/bin/entrypoi...   5 minutes ago   Up       22/tcp, 3000/tcp   gitea\n",
+            EngineCli.PODMAN.formatPs(rows, running, now),
         )
-        assertEquals("gitea\narch\n", EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(all = true, quiet = true)))
+        // -q prints ids, as both tools do, so `docker rm $(docker ps -aq)` names what it means.
+        assertEquals("droidtop-sibling-1a2b\ndroidtop-sibling-9f00\n", EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(all = true, quiet = true), now))
+        // A container made before droidtop kept the time has no CREATED.
+        assertTrue(EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(all = true, quiet = false), now).lines()[2].contains("\"\"   "))
+        assertEquals("About a minute ago", EngineCli.DOCKER.ago(90_000))
+        assertEquals("3 days ago", EngineCli.DOCKER.ago(3 * 86_400_000L))
+
         val images = listOf(
             OciImageStore.Entry("sha256:0123456789abcdef0123", "docker.io/library/nginx:1.27-alpine", 21_400_000),
             OciImageStore.Entry("sha256:fedcba9876543210fedc", "ghcr.io/home-assistant/home-assistant", 1_520_000_000),
@@ -80,6 +98,17 @@ class EngineCliTest {
                 "ghcr.io/home-assistant/home-assistant   latest        fedcba987654   1.5GB\n",
             EngineCli.DOCKER.formatImages(images, EngineRequest.Images(quiet = false)),
         )
+        assertEquals(
+            "REPOSITORY                              TAG           IMAGE ID       SIZE\n" +
+                "docker.io/library/nginx                 1.27-alpine   0123456789ab   21.4 MB\n" +
+                "ghcr.io/home-assistant/home-assistant   latest        fedcba987654   1.5 GB\n",
+            EngineCli.PODMAN.formatImages(images, EngineRequest.Images(quiet = false)),
+        )
+        assertEquals("docker.io/library/alpine", EngineCli.PODMAN.fullRepository("alpine:3"))
+        assertEquals("docker.io/library/nginx:1.27-alpine", EngineCli.PODMAN.fullImage("nginx:1.27-alpine"))
+        assertEquals("docker.io/library/alpine:latest", EngineCli.PODMAN.fullImage("alpine"))
+        assertEquals("ghcr.io/x/y@sha256:abc", EngineCli.PODMAN.fullImage("ghcr.io/x/y@sha256:abc"))
+        assertEquals("docker.io/gitea/gitea", EngineCli.PODMAN.fullRepository("gitea/gitea"))
         assertEquals("localhost:5000/tools", EngineCli.DOCKER.repository("localhost:5000/tools:1"))
         assertEquals("<none>", EngineCli.DOCKER.tag("docker.io/library/alpine@sha256:abc"))
     }
