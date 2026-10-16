@@ -14192,7 +14192,7 @@ folder name when the name contains one under §7m's naming rules.
 An empty library shows **one empty state** (`EmptyLibrary`, Droidtop/tracker#533), the same on
 Retro Games, PC Games and Home: a glyph, one line ("No games yet"; PC Games says "No PC games yet"), and
 two buttons side by side in the middle of the page, the place's own action first and **Get games**
-beside it. Retro Games' action is **Add a folder** (the Game folders page drawn in place); PC Games'
+beside it (it opens the one search, scoped to the place; "There is no Get games sheet", 13). Retro Games' action is **Add a folder** (the Game folders page drawn in place); PC Games'
 and Home's is **Game sources**, which opens **PC setup** (`pc_stores`, the one settings-catalog screen
 for game folders, the Windows system files and Downloads -- store sign-ins are under Accounts and
 sources, §7f) in place; B leaves it, and the options menu's "PC setup" row opens the same screen.
@@ -14566,7 +14566,7 @@ the handful of places where the shape genuinely differs:
   the context control, shoulder glyphs, Quick Menu glyph and status cluster
   in that order when needed to preserve room for the selected tab;
 - the Quick Menu label stays on one line and gives way to its R2 glyph
-  when enlarged text would crowd the bar; the Get games sheet is bounded
+  when enlarged text would crowd the bar; a catalog sheet (`CatalogSheet`) is bounded
   by the persistent shell bars, and its selected-row detail area does not
   repeat a summary already shown on that row;
 - a modal panel's fixed width is capped by the window, because the half
@@ -15148,7 +15148,7 @@ a layer (`DeclareLayerHints`): while any layer is open the footer shows the
 topmost layer's hints and nothing else (no Start Menu, none of the screen's).
 A panel passes its own hints (`MenuPanel(hints = ...)`, default A Select,
 B Back) and draws no hint row inside itself; two sets never show at once.
-The Get games sheet is such a layer and paints the ground under itself
+A catalog sheet (`CatalogSheet`) is such a layer and paints the ground under itself
 (Droidtop/tracker#278). A failed source search says one plain sentence and
 keeps what the source reported behind a "Technical details" row, never the
 raw exception text. A layer is also the shell's rule for sound: while one is
@@ -20940,7 +20940,7 @@ undownloaded core now starts the reaction job, and cancel stopped a
 large in-flight download before it finished.
 
 **The "Get games" UI, unifying both acquire_content mechanisms (built
-2026-09-26).** Until now `acquire_content` had a real JSON half (§12) and
+2026-09-26; superseded 2026-10-16 by "There is no Get games sheet" in 13, Droidtop/tracker#218: kept as history).** Until now `acquire_content` had a real JSON half (§12) and
 a real plugin half (above) that could install, approve and show
 "Running", but nothing in droidtop's own UI ever actually called a
 plugin's `invoke`/`startJob` for this capability -- the settings screen's
@@ -21403,7 +21403,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   point (Settings, Plugins, Permissions). The second used to be asked anyway and
   came back as "X has not been allowed to get games from a source", one block
   with a Technical details row per plugin. Now it counts in the one "N sources
-  are waiting for your approval" row. The "Get games" screens say the same thing
+  are waiting for your approval" row. A source's page under Game sources says the same thing
   the same way (`UnavailableSource.waitingTitle`): when no source can answer, ONE
   row names the waiting ones and opens Plugins (the plugin's own page when it is
   one), never a block per plugin. When that row is ONE plugin missing only the
@@ -21421,10 +21421,8 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   "The site answered in a way droidtop could not read". A short plain reason
   is kept as the source wrote it. What the source said stays behind the
   "Technical details" row, with markup removed and at most 400 characters
-  (`SourceOutcome.technical`). The "Get games" entry (browsing a
-  source's own catalogue, `GetGamesEntry`) stays as the last row; it is
-  where a source's own filters live (`SourceScreens`), reached from the list
-  and never a second search. A plugin's own full screen (`ui.main`) is opened
+  (`SourceOutcome.technical`). There is no "Get games" row (2026-10-16, Droidtop/tracker#218, "There is no
+  Get games sheet" in 13); a source's own filters live on its page under Game sources (`SourceScreens`). A plugin's own full screen (`ui.main`) is opened
   from its page in Settings, Plugins, not from search results
   (`GameSourceProvider.hasMainUi`/`openMainUi` are deleted).
 - **Where it is opened.** The PC library's search (`PcGamesSection`), a
@@ -21478,7 +21476,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   opens the row, and typing puts the cursor back in the field. The cursor
   follows a row by its key, so a source answering above it does not move it.
 - **A page a row opens replaces the search, it is not drawn over it**
-  (Droidtop/tracker#542). Get games, a source's detail and a plugin's settings
+  (Droidtop/tracker#542). A source's detail and a plugin's settings
   open in a window of their own while the search panel is not composed; what was
   typed, the answers and the cursor stay in the dialog's state and are there
   when the page closes (the search runs again then, so an approval or an
@@ -21512,7 +21510,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 - **Paging.** The one search shows ten rows per source, so it asks for ten:
   `library.sources` `search` args carry `limit` (docs/plugin-api.md 1.8), and
   the host cuts a longer answer to it. A source that honours `limit` sends a
-  page, not its whole answer (a Get games screen asks without one and shows
+  page, not its whole answer (a source's own page under Game sources asks without one and shows
   up to 200).
 - **Unit tests** (`UnifiedSearchTest`): the rank order, device before source on
   a tie, a source's own order and cap, the device's rows before any source,
@@ -21800,43 +21798,48 @@ without its runtime said "Running". Decisions:
 - **A source declares the systems it serves (Droidtop/tracker#543).** A `library.sources` entry's
   `systems` (docs/plugin-api.md 1.6) is read from the manifest by `SourceSystems`
   (`ExtensionProtocols.kt`, pure, unit-tested), and one rule uses it everywhere:
-  `AcquireContentSource.serves(systemId)`. A system's Get games page and the "Your/Other systems" choice list
-  only what some source serves, the one search asks `GameSources.plugins(context, platform)` (so PC Games, which
+  `AcquireContentSource.serves(systemId)`. The one search asks `GameSources.plugins(context, platform)` (so PC Games, which
   searches as `pc`, asks only sources naming a PC system and a console list asks the sources naming that
   system), and a "not ready" note is shown only for a source that would have served. An entry with no
-  `systems` serves everything, as before. When sources exist but none serves a system, its page says so
+  `systems` serves everything, as before. When sources exist but none serves a system, that system's search says so
   ("No source gets <system> games") with the way to Plugins; it is never blank.
-- **"Get games" is offered everywhere, and it runs in search (owner,
-  2026-10-01: "Get Games should be offered from EVERY menu, and it should
-  also run in the global search bar").** One registered screen
-  (`AcquireContentSources.GET_GAMES_SCREEN_ID`, built by
-  `chooseSystemScreen`, registered in `AppSettingsCatalogs`) is what every
-  entry opens, through `SettingsScreenRegistry.get(id, systemId)`: with no
-  system id it asks which system to download for, then opens that system's
-  own source screen; deep-linked at a console system id it opens that
-  system's screen directly; with no source it says so in plain words and
-  leads to Plugins and App integrations. The system list is the systems that have a folder under a games folder
-  ("Your systems"), then every other system a folder can mean ("Other systems", `downloadTargets`) with the folder
-  made under the first games folder when the first download is placed (`startDownload`); Get games is never a
-  dead end for lack of "system folders", ES-DE vocabulary a newcomer does not have (Droidtop/tracker#536). `GetGamesEntry` (`library-core`,
-  pure) holds the label and the one rule for which contexts know their
-  system (`systemFor`: a system's menu, a game's page, an empty state
-  and a scoped search do; All games, a collection, PC Games, Apps ask; the PC list is never a destination). `getGamesScreen`,
-  `GetGamesSheet`, `GetGamesChip` and `CatalogSheet` (`GetGames.kt`,
-  :shell-gamepad) are the one way a surface hosts it, bounded by the
-  persistent shell bars. Offered from: the Select menu of All games, every
-  system, every collection and PC Games; the Apps section; a console
-  game's or app's page and a PC game's menu; the empty-library states
-  (Games, the launcher's Games grid, PC shelves); and the search dialog.
-  It is a contextual action, not a system setting (owner, 2026-10-01), so
-  it is deliberately not in the Quick Menu or any System group. A new surface (the left menu) adds a row that
-  calls `getGamesScreen`; it never builds its own screen.
-  **In search**, the shared search dialog (PC library, console lists, the
-  launcher search) already queries every runnable source off the main
-  thread; the sources' rows join the one result list as they answer and a
-  failed source is one line, then a Get games entry whose value follows
-  `GetMoreState` (no source, not ready, failed, sources). The Get games entry
-  is the one route to Plugins.
+- **There is no Get games sheet: sources answer in the one search (owner, 2026-10-16, Droidtop/tracker#218: "The
+  Get Games sheet shouldn't really be a sheet. Get Games results should be injected into the search by fetcher
+  plugins").** Getting a game is searching for it. Every source plugin (`library.sources`, the "fetcher" plugins)
+  answers the one search (`UnifiedSearch`, "One search" in 12a): a query goes in, results come out, and they join
+  the ranked list beside the device's games and apps and the web row, each saying where it comes from in its
+  detail line (the source's name with version, size and system). The source is a detail of the row, never a
+  screen to pick first ("de-emphasise providers", same decision). Picking a result opens its detail (the source's
+  `detail` view, or droidtop's default) whose Download is the source's existing get path, run as a job in
+  Downloads (`AcquireDownload`, `PluginJobsCenter`). Every place that offered "Get games" (the Select menu of All
+  games, a system, a collection and PC Games; the Apps section; a game's page and a PC game's menu; the
+  empty-library states) keeps a "Get games" entry, and it opens the one search, empty and ready for typing,
+  scoped as that place is (a system's entry searches that system and downloads to its folder; PC Games searches
+  PC). It is still not in the Quick Menu or any System group (owner, 2026-10-01).
+  A source's own filters (its `form` view) and its full browse are its page under Game sources (Places), the
+  per-source place that already exists (`SourceScreens`), not a step on the way to a download.
+  No sources installed, or none ready, is one line in the search with the way to Plugins (it replaces the Get
+  games row's `GetMoreState`).
+  Supersedes: the "Get games" screen and its "Your systems / Other systems" picker (`AcquireContentSources.
+  chooseSystemScreen`, `systemScreen`, `GET_GAMES_SCREEN_ID`, its registration and deep link), `GetGamesEntry`
+  and `GetMoreState`, `getGamesScreen`, `GetGamesSheet` and `GetGamesChip`, the search dialog's last "Get games"
+  row, a system folder's "Get games" settings row, and the owner's 2026-10-01 "offered from EVERY menu ... run in
+  the global search bar" as a separate screen (the entries stay; they open search). JSON `acquire_content`
+  integrations (§12), which only that screen listed, have no surface: they fire an `am start` and never answer, so
+  they cannot answer a search. That is an open point for the coordinator, not a decision.
+  **Results stay in the one ranked list, not a heading per plugin.** The coordinator's relay asked for "their own
+  rows or section"; rows are what "One search" (owner, 2026-10-07: "We don't want to separate plugin searches
+  from regular searches, that's kinda broken") already decided, with no heading per source and no "Get more"
+  group, and they keep the provider a detail. Loading is the one "Searching" line until every source has
+  answered or run out of time; a source with nothing is silent; a failed or slow source is one plain line
+  under the list naming it, as "Failures" in 12a says.
+  **The contract** is `library.sources@1` `search`, the point that already feeds the one search (plugin-api.md A2),
+  agreed with the plugin lane on Droidtop/tracker#218: in `{query, values, limit, context:{system, destination}}`,
+  out `{results:[{id, title, subtitle?, version?, size?, platform?, columns?, badges?, ref?}]}`, where `version`
+  is display text and `size` is bytes (a number) or display text. The search gives each source 8 seconds
+  (`UnifiedSearch.SEARCH_BUDGET_MS`); a source still working then is "<source> took too long" under the list, and
+  its late answer is dropped, so a slow source never holds the others. The download stays `detail` then the
+  `acquire` job.
 - **Failure text is plain, the detail is one press away (#167).** A
   plugin's disabled reason is the plain sentence
   (`PluginLoadErrorMessage`); the raw reason is kept in the log and in
