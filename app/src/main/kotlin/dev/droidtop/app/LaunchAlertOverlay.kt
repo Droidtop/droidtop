@@ -1,7 +1,6 @@
 package dev.droidtop.app
 
 import android.app.Application
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -15,6 +14,7 @@ import android.view.WindowManager
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.compose.ui.graphics.toArgb
 import dev.droidtop.library.LaunchAlert
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.LaunchWatchdog
@@ -55,7 +55,10 @@ internal object LaunchAlertOverlay {
             Log.i(TAG, "no overlay on display $displayId (no accessibility service, no Display over other apps)")
             return
         }
-        val context = ContextThemeWrapper(windowContext, android.R.style.Theme_DeviceDefault_Dialog)
+        // droidtop's palette in the current appearance (docs/SPEC.md 7k, "Light and dark"), not a fixed dark card.
+        val palette = dev.droidtop.shell.gamepad.GamingTheme.palette
+        val dialogTheme = if (palette.colors.isLight) android.R.style.Theme_DeviceDefault_Light_Dialog else android.R.style.Theme_DeviceDefault_Dialog
+        val context = ContextThemeWrapper(windowContext, dialogTheme)
         val wm = context.getSystemService(WindowManager::class.java) ?: return
         val density = context.resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
@@ -74,12 +77,12 @@ internal object LaunchAlertOverlay {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(12))
             background = GradientDrawable().apply {
-                setColor(Color.argb(240, 24, 24, 28))
+                setColor(palette.overlaySurface.copy(alpha = 0.94f).toArgb())
                 cornerRadius = dp(16).toFloat()
             }
             addView(TextView(context).apply {
                 text = alert.message
-                setTextColor(Color.WHITE)
+                setTextColor(palette.onSurface.toArgb())
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             })
             addView(
