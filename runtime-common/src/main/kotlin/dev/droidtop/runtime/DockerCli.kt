@@ -25,6 +25,27 @@ sealed interface DockerCommand {
     /** `docker stop`: stops each container's own program. */
     data class Stop(val containers: List<String>) : DockerCommand
 
+    /** `docker pull`: puts [image] in droidtop's one image store. */
+    data class Pull(val image: String) : DockerCommand
+
+    /**
+     * `docker run`: a new container from [image], named [name] (droidtop's default name when null), whose own program
+     * droidtop then starts, as its page's Start it does. Always detached: the program's output is its log.
+     */
+    data class Run(
+        val image: String,
+        val name: String?,
+        /** Replaces the image's `Cmd` when given (never its entrypoint). */
+        val args: List<String>? = null,
+        /** `NAME=VALUE` entries added after the image's own environment. */
+        val env: List<String> = emptyList(),
+        /** Folders the person already mapped (docs/SPEC.md 3d "Home and folders"), by name; never a host path. */
+        val volumes: List<String> = emptyList(),
+    ) : DockerCommand
+
+    /** `docker rm`: deletes each container; [force] stops a running program first, as Docker's `-f` does. */
+    data class Remove(val containers: List<String>, val force: Boolean) : DockerCommand
+
     /** `docker exec`: runs [command] in [container], through pipes ([ContainerEnter]), with [env] and in [workdir]. */
     data class Exec(val container: String, val command: List<String>, val env: Map<String, String>, val workdir: String?) : DockerCommand
 
@@ -46,7 +67,7 @@ object DockerCli {
     const val MAX_TAIL = 2000
 
     /** Docker subcommands droidtop does not answer yet, said as such rather than as unknown. */
-    private val LATER = setOf("run", "pull", "rm", "rmi", "create", "compose", "restart", "inspect")
+    private val LATER = setOf("rmi", "create", "compose", "restart", "inspect")
 
     /** Docker subcommands droidtop will not have: they need namespaces, a daemon or image building it does not have. */
     private val NEVER = setOf("build", "buildx", "push", "login", "network", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "info", "version", "search", "logout", "rename")
@@ -62,8 +83,12 @@ object DockerCli {
           stop CONTAINER...            Stop a container's own program
           exec [-e K=V] [-w DIR] CONTAINER COMMAND [ARG...]
                                        Run a command in another container (pipes, no terminal)
+          pull IMAGE                   Download an image into droidtop's store
+          run [-d] [--name NAME] IMAGE Make a container from an image and start its program
+          rm [-f] CONTAINER...         Delete a container (-f stops its program first)
 
-        Not yet: run, pull, rm, compose. Containers here share the device's network and
+        run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.
+        Not yet: -p, -w, --entrypoint, --rm, --restart, -u. Containers here share the device's network and
         processes: a port is the device's own, and there is no isolation between them.
     """.trimIndent() + "\n"
 
@@ -83,6 +108,9 @@ object DockerCli {
                 if (sub == "start") DockerCommand.Start(rest) else DockerCommand.Stop(rest)
             }
             "exec" -> exec(rest)
+            "pull" -> pull(rest)
+            "run" -> run(rest)
+            "rm" -> remove(rest)
             in LATER -> DockerCommand.Answer("docker $sub: not built in droidtop yet\n", 1)
             in NEVER -> DockerCommand.Answer("docker $sub: droidtop's containers do not have this (no Docker daemon, no namespaces)\n", 1)
             else -> DockerCommand.Answer("docker: '$sub' is not a docker command. See 'docker --help'\n", 1)
@@ -141,6 +169,99 @@ object DockerCli {
         val command = args.drop(i + 1)
         if (command.isEmpty()) return DockerCommand.Answer("docker exec: name a command to run in $container\n", 1)
         return DockerCommand.Exec(container, command, env, workdir)
+    }
+
+    /**
+     * An image reference droidtop hands its puller: a registry host, path, tag and digest made of the characters a
+     * reference uses, and nothing a shell or a flag would read. Pure.
+     */
+    private val REFERENCE = Regex("[a-z0-9][a-z0-9._:/@-]{0,254}", RegexOption.IGNORE_CASE)
+
+    fun validReference(reference: String): Boolean = REFERENCE.matches(reference) && !reference.contains("..")
+
+    private fun pull(args: List<String>): DockerCommand {
+        args.firstOrNull { it.startsWith("-") }?.let { return error("pull", it) }
+        val image = args.singleOrNull() ?: return DockerCommand.Answer("docker pull: name one image\n", 1)
+        if (!validReference(image)) return DockerCommand.Answer("docker pull: not an image reference: $image\n", 1)
+        return DockerCommand.Pull(image)
+    }
+
+    private fun run(args: List<String>): DockerCommand {
+        var name: String? = null
+        val envs = mutableListOf<String>()
+        val volumes = mutableListOf<String>()
+        var i = 0
+        while (i < args.size && args[i].startsWith("-")) {
+            when (val a = args[i]) {
+                "-d", "--detach", "-i", "-t", "-it", "-ti", "-dit", "-itd" -> Unit
+                "--name" -> name = args.getOrNull(++i) ?: return DockerCommand.Answer("docker run: --name needs a name\n", 1)
+                "-e", "--env" -> {
+                    val kv = args.getOrNull(++i) ?: return DockerCommand.Answer("docker run: $a needs NAME=VALUE\n", 1)
+                    env(kv) ?: return DockerCommand.Answer("docker run: not NAME=VALUE: $kv\n", 1)
+                    envs += kv
+                }
+                "-v", "--volume" -> {
+                    val spec = args.getOrNull(++i) ?: return DockerCommand.Answer("docker run: $a needs a folder\n", 1)
+                    volumes += volume(spec) ?: return volumeRefused(spec)
+                }
+                else -> when {
+                    a.startsWith("--name=") -> name = a.substringAfter('=')
+                    a.startsWith("--env=") -> {
+                        val kv = a.substringAfter('=')
+                        env(kv) ?: return DockerCommand.Answer("docker run: not NAME=VALUE: $kv\n", 1)
+                        envs += kv
+                    }
+                    a.startsWith("--volume=") -> {
+                        val spec = a.substringAfter('=')
+                        volumes += volume(spec) ?: return volumeRefused(spec)
+                    }
+                    a in NOT_YET_RUN || NOT_YET_RUN.any { a.startsWith("$it=") } ->
+                        return DockerCommand.Answer("docker run: $a is not built in droidtop yet\n", 1)
+                    else -> return error("run", a)
+                }
+            }
+            i++
+        }
+        val image = args.getOrNull(i) ?: return DockerCommand.Answer("docker run: name an image\n", 1)
+        if (!validReference(image)) return DockerCommand.Answer("docker run: not an image reference: $image\n", 1)
+        if (name != null && name.isBlank()) return DockerCommand.Answer("docker run: --name needs a name\n", 1)
+        val command = args.drop(i + 1).takeIf { it.isNotEmpty() }
+        return DockerCommand.Run(image, name?.trim(), command, envs, volumes)
+    }
+
+    /** `docker run` flags droidtop knows of and has not built: said as such, not as unknown. */
+    private val NOT_YET_RUN = setOf("-p", "--publish", "-w", "--workdir", "--entrypoint", "--rm", "--restart", "-u", "--user")
+
+    /** A folder name droidtop mapped (D3), as `ExtraMount.name` takes it. */
+    private val FOLDER_NAME = Regex("[A-Za-z0-9][A-Za-z0-9._ -]{0,63}")
+
+    /**
+     * The folder name a `-v` names: `NAME`, or `NAME:<where droidtop mounts it>` (`ContainerLayout.EXTRA_MOUNTS_DIR`/NAME,
+     * with an optional `:ro` or `:rw`). Null for a host path or another target, which droidtop does not do. Pure.
+     */
+    internal fun volume(spec: String): String? {
+        val parts = spec.split(':')
+        val name = parts[0]
+        if (!FOLDER_NAME.matches(name) || name.contains("..")) return null
+        return when {
+            parts.size == 1 -> name
+            parts.size in 2..3 && parts[1] == "${ContainerLayout.EXTRA_MOUNTS_DIR}/$name" && (parts.size == 2 || parts[2] in setOf("ro", "rw")) -> name
+            else -> null
+        }
+    }
+
+    private fun volumeRefused(spec: String) = DockerCommand.Answer(
+        "docker run: -v takes the name of a folder you mapped in Containers (it appears at " +
+            "${ContainerLayout.EXTRA_MOUNTS_DIR}/<name>); $spec is not one droidtop can mount\n",
+        1,
+    )
+
+    private fun remove(args: List<String>): DockerCommand {
+        val force = args.any { it == "-f" || it == "--force" }
+        args.firstOrNull { it.startsWith("-") && it != "-f" && it != "--force" }?.let { return error("rm", it) }
+        val names = args.filterNot { it.startsWith("-") }
+        if (names.isEmpty()) return DockerCommand.Answer("docker rm: name at least one container\n", 1)
+        return DockerCommand.Remove(names, force)
     }
 
     private val ENV_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")

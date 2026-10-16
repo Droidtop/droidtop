@@ -45,7 +45,7 @@ class DockerCliTest {
     fun `anything else is an answer, never a request`() {
         assertEquals(0, answer(emptyList()).code)
         assertTrue(answer(listOf("--help")).text.contains("exec"))
-        assertTrue(answer(listOf("run", "nginx")).text.contains("not built in droidtop yet"))
+        assertTrue(answer(listOf("compose", "up")).text.contains("not built in droidtop yet"))
         assertTrue(answer(listOf("build", ".")).text.contains("do not have this"))
         assertTrue(answer(listOf("frobnicate")).text.contains("not a docker command"))
         assertEquals(1, answer(listOf("ps", "--format", "{{.ID}}")).code)
@@ -92,5 +92,57 @@ class DockerCliTest {
         val docker = File(ContainerEnter.hostCommandsDir(files), DockerCli.NAME)
         assertEquals(DockerCli.wrapperScript(), docker.readText())
         assertTrue(docker.canExecute())
+    }
+
+    @Test
+    fun `pull, run and rm take only what droidtop does`() {
+        assertEquals(DockerCommand.Pull("docker.io/library/nginx:1.27-alpine"), DockerCli.parse(listOf("pull", "docker.io/library/nginx:1.27-alpine")))
+        assertEquals(1, answer(listOf("pull", "nginx", "redis")).code)
+        assertEquals(1, answer(listOf("pull", "-a", "nginx")).code)
+        assertEquals(1, answer(listOf("pull", "nginx;id")).code)
+        assertEquals(1, answer(listOf("pull", "../../etc")).code)
+
+        assertEquals(DockerCommand.Run("gitea/gitea:1.22", "git"), DockerCli.parse(listOf("run", "-d", "--name", "git", "gitea/gitea:1.22")))
+        assertEquals(DockerCommand.Run("redis", "cache"), DockerCli.parse(listOf("run", "-it", "--name=cache", "redis")))
+        assertEquals(DockerCommand.Run("redis", null), DockerCli.parse(listOf("run", "redis")))
+        // Known flags droidtop has not built say so; a command after the image is refused, not ignored.
+        assertTrue(answer(listOf("run", "-p", "8080:80", "nginx")).text.contains("-p is not built in droidtop yet"))
+        assertTrue(answer(listOf("run", "--entrypoint=sh", "nginx")).text.contains("not built in droidtop yet"))
+        assertEquals(1, answer(listOf("run", "--privileged", "nginx")).code)
+        assertEquals(1, answer(listOf("run")).code)
+
+        assertEquals(DockerCommand.Remove(listOf("a", "b"), force = false), DockerCli.parse(listOf("rm", "a", "b")))
+        assertEquals(DockerCommand.Remove(listOf("a"), force = true), DockerCli.parse(listOf("rm", "-f", "a")))
+        assertEquals(1, answer(listOf("rm", "-v", "a")).code)
+        assertEquals(1, answer(listOf("rm")).code)
+    }
+
+    @Test
+    fun `run takes a command, environment and folders the person mapped, never a host path`() {
+        val mounts = ContainerLayout.EXTRA_MOUNTS_DIR
+        assertEquals(
+            DockerCommand.Run("alpine", "box", listOf("sh", "-c", "echo hi"), listOf("A=1", "B="), listOf("Music", "Saves")),
+            DockerCli.parse(listOf("run", "--name", "box", "-e", "A=1", "--env=B=", "-v", "Music", "--volume=Saves:$mounts/Saves:ro", "alpine", "sh", "-c", "echo hi")),
+        )
+        // Flags after the image belong to its command.
+        assertEquals(listOf("ls", "-e"), (DockerCli.parse(listOf("run", "alpine", "ls", "-e")) as DockerCommand.Run).args)
+        assertEquals(null, (DockerCli.parse(listOf("run", "alpine")) as DockerCommand.Run).args)
+        assertTrue(answer(listOf("run", "-v", "/sdcard/Music:/music", "alpine")).text.contains("folder you mapped in Containers"))
+        assertTrue(answer(listOf("run", "-v", "Music:/music", "alpine")).text.contains("folder you mapped in Containers"))
+        assertTrue(answer(listOf("run", "-v", "../x", "alpine")).text.contains("folder you mapped in Containers"))
+        assertEquals(1, answer(listOf("run", "-e", "1A=x", "alpine")).code)
+    }
+
+    @Test
+    fun `what run asked for replaces the command, never the entrypoint, and adds to the environment`() {
+        val image = ImageRunConfig(env = listOf("PATH=/bin", "A=0"), entrypoint = listOf("/entry.sh"), cmd = listOf("serve"))
+        val overrides = ContainerProgram.RunOverrides(args = listOf("sh"), env = listOf("A=1"))
+        val run = overrides.applyTo(image)
+        assertEquals(listOf("/entry.sh", "sh"), run.program())
+        assertEquals("1", run.environment()["A"])
+        assertEquals(listOf("/entry.sh", "serve"), ContainerProgram.RunOverrides(env = listOf("B=2")).applyTo(image).program())
+        assertEquals(overrides, ContainerProgram.RunOverrides.decode(overrides.encode()))
+        assertEquals(ContainerProgram.RunOverrides(null, emptyList()), ContainerProgram.RunOverrides.decode(ContainerProgram.RunOverrides().encode()))
+        assertEquals(null, ContainerProgram.RunOverrides.decode("not json"))
     }
 }

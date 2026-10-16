@@ -280,6 +280,7 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
         runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
+            ?.let { image -> withContext(Dispatchers.IO) { ContainerProgram.effectiveConfig(context.filesDir, info.container.id, image) } }
             ?.takeIf { it.program().isNotEmpty() }
             ?.let { groups += CatalogGroup(id = "program", title = "Its own program", items = programItems(context, runtime, info, it)) }
         val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())
@@ -808,13 +809,8 @@ object ContainersCatalog {
             subtitle = "Removes the container and everything installed in it",
             confirmTitle = "Delete ${info.displayName} and everything in it?",
             run = { ctx, _ ->
-                runtime.destroy(info.container)
                 // What it exported into the desktop goes with it (docs/SPEC.md 3d "Exported apps").
-                withContext(Dispatchers.IO) {
-                    ContainerExports.save(ctx.filesDir, ContainerExports.without(ContainerExports.read(ctx.filesDir), info.container.id))
-                    ContainerEnter.save(ctx.filesDir, ContainerEnter.without(ContainerEnter.read(ctx.filesDir), info.container.id))
-                    ContainerPrograms.forget(ctx, info.container.id)
-                }
+                dev.droidtop.app.ContainerRemoval.remove(ctx, runtime, info)
                 "Deleted. Go back to Containers."
             },
         )

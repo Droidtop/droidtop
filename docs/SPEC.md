@@ -2432,8 +2432,22 @@ the `ContainerRuntime` interface that already exists (§3):
   COMMAND...` (the enter path with any command, behind the same
   per-container "Run its commands from the desktop" switch; `-i` and
   `-t` are taken, and it runs on pipes). A container is named by its name
-  or its id. `run`, `pull`, `rm` and `compose` answer "not built in
-  droidtop yet"; what needs namespaces, a daemon or image building
+  or its id. **Second slice (2026-10-16):** `pull IMAGE` puts an image in droidtop's
+  one store (`OciImageStore`); `run [-d] [--name NAME] IMAGE` makes a sibling from the image under that name (droidtop's
+  default name otherwise), gives it a Private home (an app container keeps its files to itself, the review's
+  default), and starts the image's own program as its page's Start it does, always detached (its output is the log;
+  an image that names no program is made and left for `docker exec`); `rm [-f] CONTAINER...` deletes through the one
+  removal path its page's Delete uses (`ContainerRemoval`: the tree, its exported apps and commands, its program),
+  never the desktop's own container, and a running one only with `-f`. **D6d (2026-10-16):** `run` also takes a
+  command after the image (it replaces the image's `Cmd`, never its entrypoint), `-e NAME=VALUE` (added after the
+  image's environment) and `-v FOLDER`: the name of a folder the person already mapped on some container's page (D3),
+  added to the new container at `ContainerLayout.EXTRA_MOUNTS_DIR/FOLDER` (`FOLDER:<that path>[:ro|:rw]` is accepted
+  too). A host path, another target or an unknown name is refused, so a path still never comes from the container.
+  The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
+  `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
+  "Its own program", and the start with the desktop. `-p`, `-w`, `--entrypoint`, `--restart`, `--rm` and `-u` answer
+  "not built in droidtop yet". A compose subset of droidtop's own is not built: the Docker Engine API daemon (D14)
+  serves the real `docker compose`; what needs namespaces, a daemon or image building
   (`build`, `network`, `volume`, `push`, ...) answers that droidtop's
   containers do not have it. Docker words stay in the command; droidtop's
   screens keep "app" and "program". Nothing the container wrote reaches
@@ -8679,6 +8693,24 @@ menu_displaylist.c and msg_hash_us.h). The rows and the manual steps read the sa
   target name comes from the database, never from the plugin; the file's md5 must be one the database lists for it.
   A failed placement keeps the download and says where. This is the one place droidtop fetches firmware, and only
   at the person's press, from a plugin they approved; without a provider nothing changes.
+- **One source of BIOS files: droidtop's own** (coordinator, 2026-10-16, after the 1923 rig: NetherSX2 sat black and
+  stalled while the PS2 BIOS was on the SD card and NetherSX2's own `files/bios` was empty, Droidtop/tracker#270).
+  droidtop keeps BIOS files in a games folder's `bios` folder (`bios/<system>/<name>` as the database names them,
+  or `bios/<name>`; `EmulatorSetup.droidtopBios`), and an emulator gets a copy in its own folder
+  (`EmulatorSetup.syncBios`, through the one write path, so another app's folder still needs Risky actions > Write
+  another app's files). The same pattern as RetroArch cores (7e2c): droidtop holds the file, the emulator's folder
+  is where it is handed over. It happens from the BIOS row's **Use droidtop's BIOS files** (shown when droidtop has
+  any of the missing files) and before every launch through a preset whose setup names a BIOS folder droidtop can
+  look in: copying a file droidtop already has into the emulator's own BIOS folder is not asking for file access
+  (the rule below stays), and nothing is asked. The BIOS row lists what the folder
+  lacks. The launch watchdog's sentence for that launch (`biosMissingSentence`) names the files and the folder only
+  when the folder holds none of the system's files after the copy (`BiosSync.none`): the database lists alternatives
+  and optional files (several PlayStation revisions, the DSi files beside the DS ones), and a folder with one of them
+  is not missing its BIOS. A row's `setup.biosFlat`
+  says the emulator reads BIOS files from the top of its folder under any name (the PCSX2 family: NetherSX2 and
+  AetherSX2 scan one level), so a file goes there under the database's base name, not its `ps2/` subfolder; the
+  "Add a BIOS file" and plugin rows use the same target (`EmulatorSetup.biosTarget`). Without a `setup` for the
+  emulator, the row says to open it, as before.
 - **Emulator options.** Each setting row shows the value the emulator's own config holds and cycles it on A,
   changing only that key (`ConfigText`: every other line is kept; an INI key goes in its own section). An
   emulator that writes its config back when it closes (`writesOnExit`, RetroArch) is named in the row, since
