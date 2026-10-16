@@ -243,17 +243,21 @@ class PointerGestureQueue(
 /**
  * Which output the companion trackpad drives (docs/SPEC.md, Input). Pointer and focus are one selection in droidtop's
  * own shell, so while the shell is what the target screen shows the trackpad moves that selection (focus steps,
- * confirm, back); in any other app it is a pointer, which needs the accessibility service.
+ * confirm, back); while droidtop's own game screen (a Windows game) is there it is that game's mouse, through the
+ * pointer controller mouse mode drives (Droidtop/tracker#565); in any other app it is a pointer, which needs the
+ * accessibility service.
  */
 enum class TrackpadRoute {
     FOCUS,
+    GAME,
     POINTER,
     UNAVAILABLE,
     ;
 
     companion object {
-        fun of(shellOnTarget: Boolean, pointerReachable: Boolean): TrackpadRoute = when {
+        fun of(shellOnTarget: Boolean, pointerReachable: Boolean, gameOnTarget: Boolean = false): TrackpadRoute = when {
             shellOnTarget -> FOCUS
+            gameOnTarget -> GAME
             pointerReachable -> POINTER
             else -> UNAVAILABLE
         }

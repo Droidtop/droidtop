@@ -4,8 +4,7 @@ import android.view.Choreographer
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
-import com.winlator.xserver.Pointer
-import com.winlator.xserver.XServer
+import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.PadMouse
 
 /**
@@ -14,12 +13,11 @@ import dev.droidtop.library.PadMouse
  * the stick's own click held turns the stick into a wheel; the pad's other keys still reach the game. Both stick
  * clicks held ([PadMouse.Combo]) turn it on and off at any time, [onToggled] keeping the choice for the game.
  *
- * Everything goes through the calls the screen's touch trackpad already makes on [xServer]
- * (`injectPointerMoveDelta`, `injectPointerButtonPress` and `Release`, the wheel as scroll-button presses), so there
- * is one pointer path. Main thread.
+ * Everything goes through the game's [pointer] ([OwnGameScreens.Pointer], the calls the screen's touch trackpad already
+ * makes), the same one the companion's trackpad drives, so there is one pointer path. Main thread.
  */
 internal class PadMouseDriver(
-    private val xServer: XServer,
+    private val pointer: OwnGameScreens.Pointer,
     var settings: PadMouse.Settings,
     private val onToggled: (PadMouse.Settings) -> Unit,
 ) {
@@ -53,11 +51,11 @@ internal class PadMouseDriver(
             val rate = PadMouse.scrollRate(stickY)
             if (rate == 0f) return false
             carryScroll += rate * dt
-            while (carryScroll >= 1f) { wheel(Pointer.Button.BUTTON_SCROLL_DOWN); carryScroll -= 1f }
-            while (carryScroll <= -1f) { wheel(Pointer.Button.BUTTON_SCROLL_UP); carryScroll += 1f }
+            while (carryScroll >= 1f) { pointer.wheel(down = true); carryScroll -= 1f }
+            while (carryScroll <= -1f) { pointer.wheel(down = false); carryScroll += 1f }
             return true
         }
-        val (vx, vy) = PadMouse.velocity(stickX, stickY, xServer.screenInfo.width.toInt())
+        val (vx, vy) = PadMouse.velocity(stickX, stickY, pointer.widthPx)
         if (vx == 0f && vy == 0f) return false
         carryX += vx * dt
         carryY += vy * dt
@@ -65,13 +63,8 @@ internal class PadMouseDriver(
         val dy = carryY.toInt()
         carryX -= dx
         carryY -= dy
-        if (dx != 0 || dy != 0) xServer.injectPointerMoveDelta(dx, dy)
+        pointer.move(dx, dy)
         return true
-    }
-
-    private fun wheel(button: Pointer.Button) {
-        xServer.injectPointerButtonPress(button)
-        xServer.injectPointerButtonRelease(button)
     }
 
     private fun ensureTicking() {
@@ -100,10 +93,10 @@ internal class PadMouseDriver(
         }
         val button = PadMouse.buttonFor(code, settings.clicks) ?: return false
         if (event.repeatCount > 0) return true
-        val x = if (button == PadMouse.Button.LEFT) Pointer.Button.BUTTON_LEFT else Pointer.Button.BUTTON_RIGHT
+        val x = if (button == PadMouse.Button.LEFT) OwnGameScreens.PointerButton.LEFT else OwnGameScreens.PointerButton.RIGHT
         when (event.action) {
-            KeyEvent.ACTION_DOWN -> xServer.injectPointerButtonPress(x)
-            KeyEvent.ACTION_UP -> xServer.injectPointerButtonRelease(x)
+            KeyEvent.ACTION_DOWN -> pointer.button(x, pressed = true)
+            KeyEvent.ACTION_UP -> pointer.button(x, pressed = false)
         }
         return true
     }
