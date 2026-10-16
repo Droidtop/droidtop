@@ -1,0 +1,59 @@
+{
+  "about": "The conformance cases (docs/plugin-api.md 1.3 and 3 I2, Droidtop/tracker#71): every plugin kind's test fixture must pass each one. Read by FakeHost's Conformance (JVM) and droidtop_fake_host.py (python); a case is changed here only.",
+  "fixture": {
+    "point": "ui.status_tile",
+    "permission": "notify.post",
+    "does": "state: ok with a label. action {id: notify}: calls host notify.post and answers ok with the broker reply under data.reply. action {id: fail}: answers FAILED with one plain sentence. A job under action {id: work}: reports 50 then completes with values {done: yes}."
+  },
+  "plainMessage": "HTTP|Traceback|Exception|\\bat [A-Za-z_$][\\w$]*\\.[\\w$.]+\\(|<[A-Za-z/!]",
+  "hostOps": {
+    "notify.post": { "permission": "notify.post", "data": { "posted": true } }
+  },
+  "cases": [
+    {
+      "name": "answers a point it declares",
+      "call": { "point": "ui.status_tile", "op": "state" },
+      "expect": [
+        { "path": "ok", "equals": true },
+        { "path": "data.label", "present": true }
+      ]
+    },
+    {
+      "name": "a granted host call succeeds",
+      "grants": { "notify.post": "granted" },
+      "call": { "point": "ui.status_tile", "op": "action", "args": { "id": "notify" } },
+      "expect": [
+        { "path": "ok", "equals": true },
+        { "path": "data.reply.ok", "equals": true }
+      ]
+    },
+    {
+      "name": "a turned-off permission is PERMISSION_DENIED",
+      "grants": { "notify.post": "denied" },
+      "call": { "point": "ui.status_tile", "op": "action", "args": { "id": "notify" } },
+      "expect": [
+        { "path": "ok", "equals": true },
+        { "path": "data.reply.ok", "equals": false },
+        { "path": "data.reply.error.code", "equals": "PERMISSION_DENIED" }
+      ]
+    },
+    {
+      "name": "an ordinary failure is one plain sentence",
+      "call": { "point": "ui.status_tile", "op": "action", "args": { "id": "fail" } },
+      "expect": [
+        { "path": "ok", "equals": false },
+        { "path": "error.code", "equals": "FAILED" },
+        { "path": "error.message", "plain": true }
+      ]
+    },
+    {
+      "name": "a job reports progress and completes",
+      "job": { "point": "ui.status_tile", "op": "action", "args": { "id": "work" } },
+      "expect": [
+        { "path": "progress.0.percent", "equals": 50 },
+        { "path": "ok", "equals": true },
+        { "path": "values.done", "equals": "yes" }
+      ]
+    }
+  ]
+}

@@ -81,6 +81,8 @@ dependencies {
     testImplementation(libs.junit)
     // Throwaway certificates for the signature tests (docs/SPEC.md 12a); test-only, never shipped.
     testImplementation(project(":test-pki"))
+    // FakeEnv, TestPlugins and the conformance cases (docs/plugin-api.md 3 I2).
+    testImplementation(project(":plugin-host-testing"))
     // android.jar's org.json is a set of stubs that throw at runtime; the
     // main sourceset relies on the real implementation bundled in the
     // Android platform, but a plain JVM unit test needs a real jar (same

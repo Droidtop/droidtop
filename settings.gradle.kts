@@ -114,6 +114,9 @@ include(":plugin-host")
 // Test-only certificate builder for the plugin, catalog and revocation signature tests.
 include(":test-pki")
 
+// Test-only fake host and conformance cases for plugins (docs/plugin-api.md 3 I2); plugin-host's own tests use it.
+include(":plugin-host-testing")
+
 // Secondary-display behaviour for EVERY mode, in one place: the single
 // SECONDARY_HOME activity plus the mode registry that selects what it
 // renders. Exists because shell-default's forked Launcher3 and the

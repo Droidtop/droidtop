@@ -1,0 +1,9 @@
+{
+  "id": "acme.fixture.py",
+  "origin": "acme",
+  "label": "Conformance fixture",
+  "kind": "python",
+  "contractVersion": 2,
+  "provides": [{ "point": "ui.status_tile" }],
+  "permissions": [{ "id": "notify.post" }]
+}
