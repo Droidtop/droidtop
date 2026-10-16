@@ -12,11 +12,24 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * What a Shelf widget shows (Droidtop/tracker#563), chosen in its maker ([ShelfConfigureActivity]) and kept by the
- * widget's id ([WidgetConfigs]): a [Kind] with its argument (a collection's or a system's id) and a [Layout].
+ * widget's id ([WidgetConfigs]): a [Kind] with its argument (a collection's or a system's id), a [Layout], the [Art]
+ * a grid shows and the [TextSize] of its names.
  */
-internal data class ShelfContent(val kind: Kind, val arg: String? = null, val layout: Layout = Layout.GRID) {
+internal data class ShelfContent(
+    val kind: Kind,
+    val arg: String? = null,
+    val layout: Layout = Layout.GRID,
+    val art: Art = Art.COVER,
+    val textSize: TextSize = TextSize.NORMAL,
+) {
     enum class Kind { RECENT, ADDED, FAVOURITES, COLLECTION, SYSTEM }
     enum class Layout { LIST, GRID }
+
+    /** Which of a game's pictures a grid cell shows: its cover first, or its square icon (a scraped one) first. */
+    enum class Art(val label: String) { COVER("Covers"), ICON("Icons") }
+
+    /** The names' size, in sp. */
+    enum class TextSize(val label: String, val sp: Float) { SMALL("Small", 11f), NORMAL("Normal", 13f), LARGE("Large", 16f) }
 
     /** One choice the maker offers: what it shows and its label ("Recently played", "Favourites", "SNES"). */
     class Choice(val kind: Kind, val arg: String?, val label: String)

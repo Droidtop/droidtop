@@ -23,7 +23,9 @@ internal object WidgetConfigs {
         val p = prefs(context)
         val kind = p.getString("$widgetId.shelf", null)?.let { name -> ShelfContent.Kind.entries.firstOrNull { it.name == name } } ?: return null
         val layout = p.getString("$widgetId.layout", null)?.let { name -> ShelfContent.Layout.entries.firstOrNull { it.name == name } } ?: ShelfContent.Layout.GRID
-        return ShelfContent(kind, p.getString("$widgetId.arg", null), layout)
+        val art = p.getString("$widgetId.art", null)?.let { name -> ShelfContent.Art.entries.firstOrNull { it.name == name } } ?: ShelfContent.Art.COVER
+        val size = p.getString("$widgetId.text", null)?.let { name -> ShelfContent.TextSize.entries.firstOrNull { it.name == name } } ?: ShelfContent.TextSize.NORMAL
+        return ShelfContent(kind, p.getString("$widgetId.arg", null), layout, art, size)
     }
 
     fun setShelf(context: Context, widgetId: Int, content: ShelfContent) {
@@ -31,6 +33,8 @@ internal object WidgetConfigs {
             .putString("$widgetId.shelf", content.kind.name)
             .putString("$widgetId.arg", content.arg)
             .putString("$widgetId.layout", content.layout.name)
+            .putString("$widgetId.art", content.art.name)
+            .putString("$widgetId.text", content.textSize.name)
             .apply()
     }
 
@@ -40,5 +44,5 @@ internal object WidgetConfigs {
         edit.apply()
     }
 
-    private val KEYS = listOf("entry", "shelf", "arg", "layout")
+    private val KEYS = listOf("entry", "shelf", "arg", "layout", "art", "text")
 }

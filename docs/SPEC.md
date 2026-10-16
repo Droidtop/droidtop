@@ -1068,7 +1068,8 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     recently played, recently added, favourites, one of the person's collections or a system that has games, as a
     grid of art (a `RemoteViewsService` collection, `ShelfWidgetService`, each cell filling in its game's id) or a
     list of names (the shared rows); 24 games at most. Its content is kept by the widget's id (`WidgetConfigs`).
-    Art style and text size in the maker come later.
+    The maker also chooses the grid's art (covers first, or square icons first) and the names' text size (small,
+    normal, large), for the grid and the list alike.
   - **Desktop**: start or go back to the Desktop, saying whether its session runs (following
     `DesktopSessionService.state`), and open Containers. Container apps on it come later.
   - **Companion and screens**: with one screen, open the companion as its pull-down sheet; with a second screen

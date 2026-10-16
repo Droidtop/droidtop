@@ -63,7 +63,15 @@ internal object DroidtopWidgets {
      * A title and up to [MAX_ROWS] rows, or [empty] when there are none: an honest empty state, never placeholder
      * data. [layout] is `widget_rows`, or a larger layout that holds the same ids (the full page, `widget_page`).
      */
-    fun rows(context: Context, look: Look, title: String, rows: List<Row>, empty: String, layout: Int = R.layout.widget_rows): RemoteViews {
+    fun rows(
+        context: Context,
+        look: Look,
+        title: String,
+        rows: List<Row>,
+        empty: String,
+        layout: Int = R.layout.widget_rows,
+        textSp: Float? = null,
+    ): RemoteViews {
         val views = RemoteViews(context.packageName, layout)
         plate(views, look)
         views.setTextViewText(R.id.widget_title, title)
@@ -77,6 +85,7 @@ internal object DroidtopWidgets {
             if (row == null) continue
             views.setTextViewText(id, row.text)
             views.setTextColor(id, look.ink)
+            textSp?.let { views.setTextViewTextSize(id, android.util.TypedValue.COMPLEX_UNIT_SP, it) }
             row.tap?.let { views.setOnClickPendingIntent(id, it) }
         }
         return views

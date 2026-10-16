@@ -57,8 +57,12 @@ class ShelfConfigureActivity : ComponentActivity() {
                 }
                 var picked by remember { mutableStateOf<ShelfContent.Choice?>(null) }
                 var layout by remember { mutableStateOf<ShelfContent.Layout?>(null) }
+                var art by remember { mutableStateOf<ShelfContent.Art?>(null) }
+                var textSize by remember { mutableStateOf<ShelfContent.TextSize?>(null) }
                 val current = saved.value
                 val chosenLayout = layout ?: current?.layout ?: ShelfContent.Layout.GRID
+                val chosenArt = art ?: current?.art ?: ShelfContent.Art.COVER
+                val chosenSize = textSize ?: current?.textSize ?: ShelfContent.TextSize.NORMAL
                 val chosen = picked ?: choices?.firstOrNull { it.kind == current?.kind && it.arg == current.arg } ?: choices?.firstOrNull()
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -74,6 +78,10 @@ class ShelfConfigureActivity : ComponentActivity() {
                                 }
                             }
                         }
+                        if (chosenLayout == ShelfContent.Layout.GRID) {
+                            Options("Art", ShelfContent.Art.entries, chosenArt, { it.label }) { art = it }
+                        }
+                        Options("Text size", ShelfContent.TextSize.entries, chosenSize, { it.label }) { textSize = it }
                         Text("Shows", style = MaterialTheme.typography.titleMedium)
                         val list = choices
                         if (list == null) {
@@ -96,10 +104,27 @@ class ShelfConfigureActivity : ComponentActivity() {
                         }
                         Button(
                             enabled = chosen != null,
-                            onClick = { chosen?.let { save(widgetId, ShelfContent(it.kind, it.arg, chosenLayout)) } },
+                            onClick = { chosen?.let { save(widgetId, ShelfContent(it.kind, it.arg, chosenLayout, chosenArt, chosenSize)) } },
                             modifier = Modifier.fillMaxWidth(),
                         ) { Text("Done") }
                     }
+                }
+            }
+        }
+    }
+
+    /** One labelled row of choices, one of them picked. */
+    @androidx.compose.runtime.Composable
+    private fun <T> Options(label: String, options: List<T>, picked: T, name: (T) -> String, pick: (T) -> Unit) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            options.forEach { option ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.selectable(selected = option == picked, onClick = { pick(option) }),
+                ) {
+                    RadioButton(selected = option == picked, onClick = null)
+                    Text(name(option))
                 }
             }
         }
