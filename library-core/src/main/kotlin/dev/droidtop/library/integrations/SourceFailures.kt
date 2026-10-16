@@ -24,6 +24,26 @@ object SourceFailures {
     /** A source that answered BROWSER_CHECK_REQUIRED; droidtop's Open the site follows it. */
     const val NEEDS_BROWSER_CHECK = "The site checks the browser first"
 
+    /**
+     * A source refused by droidtop's own permission check (PERMISSION_DENIED, or the broker's sentence passed through:
+     * '"<label>" is turned off for <plugin>.' / '<plugin> needs you to allow "<label>".'), as one sentence naming the
+     * permission, or null when [raw] is not such a refusal. Its page is where it is turned on, and the search offers it
+     * (Droidtop/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission).
+     */
+    fun permissionOff(raw: String?, code: dev.droidtop.pluginhost.PluginErrorCode? = null): String? {
+        val text = raw.orEmpty()
+        val label = TURNED_OFF.find(text)?.groupValues?.get(1) ?: NEEDS_ALLOW.find(text)?.groupValues?.get(1)
+        return when {
+            label != null -> "It needs \u201c$label\u201d, which is not allowed for it"
+            code == dev.droidtop.pluginhost.PluginErrorCode.PERMISSION_DENIED -> PERMISSION_OFF
+            else -> null
+        }
+    }
+
+    const val PERMISSION_OFF = "It needs a permission that is not allowed for it"
+    private val TURNED_OFF = Regex("\"([^\"]{1,80})\" is turned off for ")
+    private val NEEDS_ALLOW = Regex("needs you to allow \"([^\"]{1,80})\"")
+
     /** A reason that is a short plain sentence already is left as it is. */
     private const val PLAIN_MAX_CHARS = 140
     private const val TECHNICAL_MAX_CHARS = 400

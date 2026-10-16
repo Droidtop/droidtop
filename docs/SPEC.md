@@ -21464,7 +21464,10 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   unreachable host "It could not reach the site", an exception or stack
   "This source is not ready to run here yet", markup or a long unknown text
   "The site answered in a way droidtop could not read". A short plain reason
-  is kept as the source wrote it. What the source said stays behind the
+  is kept as the source wrote it. A source refused by droidtop's own permission check (PERMISSION_DENIED, or the
+  broker's '"<label>" is turned off for <plugin>' passed through by the plugin) reads "It needs "<label>", which is not
+  allowed for it", with "Open <source>'s page" under it, where it is allowed (`SourceFailures.permissionOff`;
+  Droidtop/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission). What the source said stays behind the
   "Technical details" row, with markup removed and at most 400 characters
   (`SourceOutcome.technical`). There is no "Get games" row (2026-10-16, Droidtop/tracker#218, "There is no
   Get games sheet" in 13); a source's own filters live on its page under Game sources (`SourceScreens`). A plugin's own full screen (`ui.main`) is opened
