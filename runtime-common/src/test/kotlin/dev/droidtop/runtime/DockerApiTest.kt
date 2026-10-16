@@ -180,7 +180,7 @@ class DockerApiTest {
     }
 
     @Test
-    fun `filters pick by label, name, id and status; logs are Docker's frames`() {
+    fun `filters pick by label, name, id and status, and logs are Docker's frames`() {
         val base = EngineInspect.Facts(
             id = "droidtop-sibling-1a2b", name = "demo-web-1", image = "nginx", imageDigest = null, createdMs = null,
             status = "running", exitCode = null, error = null, config = null, restart = ContainerProgram.RestartPolicy.No,
