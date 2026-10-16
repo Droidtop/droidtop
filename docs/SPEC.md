@@ -21577,8 +21577,11 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   available from multiple sources. When I clicked, it just gave an f95zone error". So:
   - **A game row opens the game's page**, where Play or Install is, never a raw start (`LauncherSearchScreen.onOpen`):
     Gaming's left-menu search and a system search open `nav.openDetail`; Standard opens the Games screen on the page
-    (`LauncherGamesActivity.pageIntent`) for a PC or engine game, the games Standard gives a page, and starts any
-    other as before; Desktop has no game page and plays it. An app row opens the app.
+    (`LauncherGamesActivity.pageIntent`) for a PC or engine game, the games Standard gives a page; Desktop has no game
+    page and plays it. An app row opens the app. **A console or Android game in Standard's search opens a mini-popup**
+    (the owner, 2026-10-16, asked whether Standard should get a page for them: "we can create a mini-popup"): a small
+    card over the search with Play and the game's few key actions and facts, not a full page. Until it is built,
+    Standard starts such a game as before.
   - **One game is one row.** The library's row and every source's row whose titles fold to one key
     (`StoreIdentity.titleKey`, the fold matching uses: case, accents, "&" as "and", a leading "The" and edition labels)
     are one row (`UnifiedSearch.merge`), the best-ranked in front, its detail naming every place ("Steam · Installed ·
