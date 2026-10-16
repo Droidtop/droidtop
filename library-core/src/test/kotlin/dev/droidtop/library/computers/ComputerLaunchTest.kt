@@ -1,22 +1,22 @@
-package dev.droidtop.stores
+package dev.droidtop.library.computers
 
 import dev.droidtop.net.peer.Computer
-import dev.droidtop.stores.steam.SteamLinkStream
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** "Stream with Steam Link": the words for each answer of the computer's agent, and which computer is asked (docs/SPEC.md 7o). */
-class SteamLinkStreamTest {
+/** Starting a game on a computer: the words for each answer of the computer's agent, and which computer is asked (docs/SPEC.md 7o). */
+class ComputerLaunchTest {
     private fun pc(name: String, primary: Boolean = false, lastSyncMs: Long = 0) =
         Computer(id = name.padEnd(64, '0'), name = name, addresses = emptyList(), pairedAtMs = 0, primary = primary, lastSyncMs = lastSyncMs)
 
-    private fun say(reply: String) = SteamLinkStream.describe(JSONObject(reply), "DESKTOP", "Portal", "Retroid")
+    private fun say(reply: String, key: String = "steam:400") = ComputerLaunch.describe(JSONObject(reply), "DESKTOP", "Portal", "Retroid", key)
 
     @Test
-    fun `started is the only answer that opens Steam Link`() {
+    fun `started is the only answer that starts`() {
         assertTrue(say("""{"result":"started"}""").started)
         listOf(
             """{"result":"not_allowed"}""",
@@ -48,7 +48,7 @@ class SteamLinkStreamTest {
 
     @Test
     fun `the primary computer is asked first, then the most recent`() {
-        val ordered = SteamLinkStream.order(listOf(pc("old", lastSyncMs = 1), pc("new", lastSyncMs = 9), pc("main", primary = true, lastSyncMs = 0)))
+        val ordered = ComputerLaunch.order(listOf(pc("old", lastSyncMs = 1), pc("new", lastSyncMs = 9), pc("main", primary = true, lastSyncMs = 0)))
         assertEquals(listOf("main", "new", "old"), ordered.map { it.name })
     }
 
@@ -56,12 +56,12 @@ class SteamLinkStreamTest {
     fun `an offline computer is skipped for one that answers, and all offline says so`() {
         val asked = mutableListOf<String>()
         val answers = mapOf("a" to """{"unreachable":"no route"}""", "b" to """{"result":"started"}""")
-        val (who, outcome) = SteamLinkStream.ask(listOf(pc("a"), pc("b")), "Portal", "Retroid") { asked += it.name; JSONObject(answers.getValue(it.name)) }!!
+        val (who, outcome) = ComputerLaunch.ask(listOf(pc("a"), pc("b")), "Portal", "Retroid", "steam:400") { asked += it.name; JSONObject(answers.getValue(it.name)) }!!
         assertEquals(listOf("a", "b"), asked)
         assertEquals("b", who.name)
         assertTrue(outcome.started)
 
-        val (_, none) = SteamLinkStream.ask(listOf(pc("a")), "Portal", "Retroid") { JSONObject(answers.getValue("a")) }!!
+        val (_, none) = ComputerLaunch.ask(listOf(pc("a")), "Portal", "Retroid", "steam:400") { JSONObject(answers.getValue("a")) }!!
         assertFalse(none.started)
         assertTrue("no route" in none.line)
     }
@@ -69,7 +69,20 @@ class SteamLinkStreamTest {
     @Test
     fun `a definitive refusal stops the asking`() {
         val asked = mutableListOf<String>()
-        SteamLinkStream.ask(listOf(pc("a"), pc("b")), "Portal", "Retroid") { asked += it.name; JSONObject("""{"result":"not_allowed"}""") }
+        ComputerLaunch.ask(listOf(pc("a"), pc("b")), "Portal", "Retroid", "steam:400") { asked += it.name; JSONObject("""{"result":"not_allowed"}""") }
         assertEquals(listOf("a"), asked)
+    }
+
+    @Test
+    fun `a started game says how it is shown`() {
+        assertEquals(ComputerLaunch.STREAM_WINDOWCAST, say("""{"result":"started","stream":"windowcast"}""", "pythia:12").stream)
+        assertNull(say("""{"result":"started"}""").stream)
+        assertNull(say("""{"result":"failed","message":"x","stream":"windowcast"}""").stream)
+    }
+
+    @Test
+    fun `an unknown game that is not Steam's says which programs start such games`() {
+        assertTrue("Pythia" in say("""{"result":"unknown_game"}""", "pythia:12").line)
+        assertFalse("Pythia" in say("""{"result":"unknown_game"}""").line)
     }
 }
