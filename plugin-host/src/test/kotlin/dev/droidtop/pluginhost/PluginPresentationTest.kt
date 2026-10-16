@@ -53,7 +53,7 @@ class PluginPresentationTest {
 
     @Test
     fun `it survives the record round trip`() {
-        val p = PluginPresentation(summary = "VPN", publisher = "Acme", homepage = "https://acme.example", category = "tools", icon = "res/icon.png")
+        val p = PluginPresentation(summary = "VPN", publisher = "Acme", homepage = "https://acme.example", category = "system", icon = "res/icon.png")
         val json = JSONObject().also { p.putInto(it) }
         assertEquals(p, PluginPresentation.fromJson(json, payload))
     }
