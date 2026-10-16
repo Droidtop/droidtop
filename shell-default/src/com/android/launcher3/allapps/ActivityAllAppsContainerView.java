@@ -1128,7 +1128,7 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
      * occur for an unrelated reason.
      */
     public void refreshRecentApps() {
-        mAH.get(AdapterHolder.MAIN).mAppsList.updateAdapterItems();
+        mAH.get(AdapterHolder.MAIN).mAppsList.refreshOnOpen();
     }
 
     @VisibleForTesting
