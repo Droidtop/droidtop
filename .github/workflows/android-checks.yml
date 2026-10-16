@@ -114,7 +114,13 @@ jobs:
         # never once run in CI. Add the module here the moment it grows its
         # first test; a test nothing runs is not a test.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest --stacktrace
+
+      - name: Plugin conformance (python fixture)
+        # docs/plugin-api.md 3 I2 (Droidtop/tracker#71): the python kind's fixture through the same
+        # conformance cases the native fixture passes in :plugin-host-testing's ConformanceTest.
+        if: always()
+        run: python3 -I plugin-host-testing/python/droidtop_fake_host.py plugin-host-testing/src/test/fixtures/python
 
       - name: Upload test reports
         if: always()
@@ -131,6 +137,7 @@ jobs:
             input-keyboard/build/reports/tests/
             host-bridge/build/reports/tests/
             plugin-host/build/reports/tests/
+            plugin-host-testing/build/reports/tests/
             display/build/reports/tests/
             ui-shared/build/reports/tests/
           if-no-files-found: ignore

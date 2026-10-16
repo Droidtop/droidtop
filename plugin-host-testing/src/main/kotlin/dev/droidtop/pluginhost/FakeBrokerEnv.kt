@@ -4,7 +4,7 @@ import dev.droidtop.pluginhost.TestPlugins.obj
 import org.json.JSONObject
 
 /** Droidtop's side, in memory: records, grants, the sheet's answer and every effect the broker causes. */
-internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
+class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
     var now = 1_000_000L
     val records = records.associateBy { it.manifest.id }.toMutableMap()
     val states = mutableMapOf<String, MutableMap<String, GrantState>>()
