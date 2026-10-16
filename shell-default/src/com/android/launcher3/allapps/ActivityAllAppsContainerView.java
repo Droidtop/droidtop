@@ -1131,6 +1131,25 @@ public class ActivityAllAppsContainerView<T extends Context & ActivityContext>
         mAH.get(AdapterHolder.MAIN).mAppsList.refreshOnOpen();
     }
 
+    /**
+     * droidtop patch (Droidtop/tracker#564): a drawer tab was chosen, or the tabs changed (DrawerTabsRow,
+     * DrawerTabs). The lists are filtered again and start from their top.
+     */
+    public void onDrawerTabChanged() {
+        for (int i = 0; i < mAH.size(); i++) {
+            AdapterHolder holder = mAH.get(i);
+            if (i == SEARCH || holder == null) continue;
+            holder.mAppsList.onAppsUpdated();
+            if (holder.mRecyclerView != null) holder.mRecyclerView.scrollToTop();
+        }
+    }
+
+    /** droidtop patch: the drawer's tab row, so an app's long-press menu can say its tabs changed. */
+    @Nullable
+    public DrawerTabsRow getDrawerTabsRow() {
+        return mHeader == null ? null : mHeader.findViewById(R.id.drawer_tabs);
+    }
+
     @VisibleForTesting
     public void onAppsUpdated() {
         Log.d(TAG, "onAppsUpdated; number of apps: " + mAllAppsStore.getApps().length);
