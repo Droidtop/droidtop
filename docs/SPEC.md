@@ -1061,8 +1061,13 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     playable games (one card per game, as the Games grid groups them) to pick from. The pick is kept by the widget's
     id (`WidgetConfigs`) and forgotten when the widget is removed. A game that left the library says so, and a tap
     picks again.
-- None of these is gated by a mode: the library is never mode-gated (2c). Gating applies to the Desktop and Gaming
-  entries still to come (#563).
+- None of these is gated by a mode: the library is never mode-gated (2c).
+- **Dynamic app shortcuts** (`DroidtopShortcuts`), beside the static four (Games, Social, Downloads, Updates, 7j): the
+  last three games played (each plays through `GameLaunchActivity`, with its art), then Search, the Quick Menu and
+  Switch mode, then Gaming and Desktop, each only while that mode is on. Rebuilt whole at start, whenever a mode is
+  switched on or off (`ModeStartup`) and after each game launch, off the main thread; the static shortcuts count
+  against the same per-activity cap. A launcher that shows only four (Launcher3, so Standard) shows the static ones;
+  one that shows more (Nova, Niagara) shows these after them, in this order.
 
 ### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
 

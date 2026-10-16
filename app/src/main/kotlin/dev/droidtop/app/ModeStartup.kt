@@ -33,6 +33,9 @@ object ModeStartup {
         val live = ModeGate.piecesToStart(Modes.enabled)
         fun on(piece: ModePiece) = piece in live
 
+        // droidtop's dynamic app shortcuts offer Gaming and Desktop only while each is on (Droidtop/tracker#563).
+        DroidtopShortcuts.refresh(app)
+
         // Launcher mode is the Launcher3 fork. Its Activities already
         // follow the HOME role (HomeRolePrefs enables exactly one of them,
         // and that is what Modes reads), but four of its components are
