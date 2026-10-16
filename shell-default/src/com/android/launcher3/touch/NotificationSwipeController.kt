@@ -9,6 +9,7 @@ import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherState
 import com.android.launcher3.MotionEventsUtils
 import com.android.launcher3.util.TouchController
+import dev.droidtop.shell.standard.HomeActions
 import kotlin.math.abs
 
 /**
@@ -38,7 +39,7 @@ class NotificationSwipeController(private val mLauncher: Launcher) : TouchContro
             val dx = ev.getX() - mDownPoint.x
 
             if (dy > mTouchSlop && dy > abs(dx)) {
-                LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.get(mLauncher).perform(mLauncher)
+                HomeActions.runSlot(mLauncher, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION)
                 return true
             }
             // Horizontal movement won; cancel gesture
@@ -54,7 +55,7 @@ class NotificationSwipeController(private val mLauncher: Launcher) : TouchContro
     }
 
     private fun canInterceptTouch(ev: MotionEvent) = !MotionEventsUtils.isTrackpadScroll(ev) &&
-            LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.get(mLauncher) != GestureAction.NONE &&
+            HomeActions.isSet(mLauncher, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION) &&
             mLauncher.isInState(LauncherState.NORMAL) &&
             AbstractFloatingView.getTopOpenView(mLauncher) == null &&
             // Ignore touches in the navbar region.
