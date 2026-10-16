@@ -302,6 +302,18 @@ object AcquireContentSources {
             .filter { it.serves(systemId) }
     }
 
+    /** A row opening [pluginId]'s page in Settings, Plugins: where it is approved, turned on, signed in and allowed. */
+    fun pluginPageRow(id: String, title: String, pluginId: String): NestedScreenItem {
+        val page = SettingsScreenRegistry.get(PLUGINS_SCREEN_ID, pluginId)
+        return NestedScreenItem(
+            id = id,
+            title = title,
+            subtitle = "In Settings, Plugins",
+            inline = page,
+            registryId = if (page == null) PLUGINS_SCREEN_ID else null,
+        )
+    }
+
     /**
      * What a source that cannot give games yet opens from Game sources: why, in one notice, and the one way on, at
      * the top: Allow it to get games (the point sheet, [askRow]) when only the point waits, else its page in Plugins
@@ -313,7 +325,6 @@ object AcquireContentSources {
         val point = pointState(listing.record, PluginGrants.forContext(context))
         if (listing.state == SourceState.READY && point == GrantState.GRANTED) return null
         val label = listing.label
-        val page = SettingsScreenRegistry.get(PLUGINS_SCREEN_ID, listing.pluginId)
         val (title, body) = when {
             listing.state == SourceState.WAITING_FOR_APPROVAL -> "Waiting for your approval" to "Approve it to see its systems and search them."
             listing.state == SourceState.DENIED -> "You denied it" to "Approve it on its page to use it as a source."
@@ -325,12 +336,10 @@ object AcquireContentSources {
         val way: CatalogItem = if (listing.state == SourceState.READY && point == GrantState.ASK) {
             askRow("source_blocked_ask_${listing.pluginId}", UnavailableSource(label, "is waiting for your approval", listing.pluginId, true, askable = true))
         } else {
-            NestedScreenItem(
-                id = "source_blocked_page_${listing.pluginId}",
-                title = if (listing.state == SourceState.WAITING_FOR_APPROVAL) "Review and approve $label" else "Open $label's page",
-                subtitle = "In Settings, Plugins",
-                inline = page,
-                registryId = if (page == null) PLUGINS_SCREEN_ID else null,
+            pluginPageRow(
+                "source_blocked_page_${listing.pluginId}",
+                if (listing.state == SourceState.WAITING_FOR_APPROVAL) "Review and approve $label" else "Open $label's page",
+                listing.pluginId,
             )
         }
         val items = listOf(

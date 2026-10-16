@@ -2,10 +2,13 @@ package dev.droidtop.library.integrations
 
 import android.content.Context
 import android.content.ContextWrapper
+import dev.droidtop.pluginhost.SourceFailures
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -157,5 +160,22 @@ class PluginSearchAggregatorTest {
         assertEquals("The site did not answer", plain.failure)
         assertEquals("socket closed after 3 s", plain.technical)
         assertEquals(null, plain.access)
+    }
+
+    @Test
+    fun `a failing source outcome carries the plain sentence and keeps its own words`() = runBlocking {
+        val source = object : GameSourceProvider {
+            override val id = "lewd"
+            override val label = "LewdCorner"
+            override suspend fun search(context: android.content.Context, query: String, platform: String?): Result<List<AcquireContentResult>> =
+                Result.failure(IllegalStateException("JavaScript is disabled. For a better experience, please enable JavaScript in your browser before proceeding."))
+            override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: java.io.File?) =
+                dev.droidtop.library.settings.CatalogScreen("d", result.title, groups = { emptyList() })
+        }
+        val outcome = PluginSearchAggregator.fanOutOutcomes(listOf(source)) { it.search(android.content.ContextWrapper(null), "q", null) }.single()
+        assertEquals(SourceFailures.SIGN_IN, outcome.failure)
+        assertNotNull(outcome.technical)
+        assertTrue(outcome.technical!!.startsWith("JavaScript is disabled"))
+        assertFalse(outcome.failure!!.contains("JavaScript"))
     }
 }

@@ -33,6 +33,18 @@ class PluginContractGapsTest {
         assertNull(PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, "no network"), emptySet(), "Couldn't finish").opensAccount)
     }
 
+    @Test
+    fun `a raw failure is drawn as a plain sentence, its own words kept for Info`() {
+        // The owner, 2026-10-16: "When I clicked, it just gave an f95zone error" (docs/SPEC.md 12a).
+        val wall = PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, "f95zone answered HTTP 403"), emptySet(), "Couldn't show this page")
+        assertEquals(SourceFailures.SIGN_IN, wall.subtitle)
+        assertEquals(PluginWebAccount.Need.SIGN_IN, wall.opensAccount)
+        assertEquals("FAILED: f95zone answered HTTP 403", wall.details)
+        val slow = PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.TIMEOUT, "timed out"), emptySet(), "Couldn't show this page")
+        assertEquals(SourceFailures.TIMED_OUT, slow.subtitle)
+        assertNull(slow.opensAccount)
+    }
+
     private fun tile(extra: JSONObject) = ProvidedPoint("ui.quick_tile", id = "t", extra = extra.toString())
 
     @Test

@@ -51,7 +51,16 @@ class SearchRow(
     val open: (() -> Unit)?,
     /** Set for a source row: the source and its result, for the detail and the download. */
     val hit: SourceHit?,
-)
+    /**
+     * The same game from elsewhere (owner, 2026-10-16: "Clicking on the game entry should give the game's page, or
+     * options if it's available from multiple sources"): the library's row and every source's row for one title are
+     * one row, and this holds every one of them as found, the front one first. Picking a row with others asks which.
+     */
+    val others: List<SearchRow> = emptyList(),
+) {
+    /** The places a pick offers: every row merged into this one, or this row alone. */
+    val choices: List<SearchRow> get() = others.ifEmpty { listOf(this) }
+}
 
 /** Where one source stands in the current search. */
 class SourceStatus(
@@ -261,13 +270,53 @@ object UnifiedSearch {
         }
         outcomes.forEach { outcome -> outcome.hits.take(MAX_ROWS_PER_SOURCE).forEachIndexed { i, hit -> sourceRow(hit, i) } }
         carried.groupBy { it.source.id }.values.forEach { group -> group.take(MAX_ROWS_PER_SOURCE).forEachIndexed { i, hit -> sourceRow(hit, i) } }
-        return rows.sortedWith(compareBy<SearchRow>({ it.score }, { it.kind.ordinal }, { it.order }))
+        return merge(rows.sortedWith(compareBy<SearchRow>({ it.score }, { it.kind.ordinal }, { it.order })))
     }
+
+    /**
+     * One row per game: a library game's row and the sources' rows whose titles fold to the same key
+     * (StoreIdentity.titleKey, the fold search matching and store matching use) are one row, the best-ranked in front
+     * and its detail naming every place it is from ("Game · F95zone · Nyaa"). Apps and the web row are never merged.
+     */
+    internal fun merge(ranked: List<SearchRow>): List<SearchRow> {
+        val groups = LinkedHashMap<String, MutableList<SearchRow>>()
+        val out = ArrayList<Any>()
+        ranked.forEach { row ->
+            val key = if (row.kind == SearchRowKind.GAME || row.kind == SearchRowKind.SOURCE) {
+                dev.droidtop.library.StoreIdentity.titleKey(row.title).takeIf { it.isNotEmpty() }
+            } else {
+                null
+            }
+            if (key == null) {
+                out += row
+            } else {
+                val group = groups[key]
+                if (group == null) {
+                    val created = mutableListOf(row)
+                    groups[key] = created
+                    out += created
+                } else {
+                    group += row
+                }
+            }
+        }
+        return out.map { item ->
+            @Suppress("UNCHECKED_CAST")
+            val group = item as? MutableList<SearchRow> ?: return@map item as SearchRow
+            val front = group.first()
+            if (group.size == 1) return@map front
+            val places = group.map { placeOf(it) }.distinct().joinToString(" · ")
+            SearchRow(front.key, front.kind, front.title, places, front.icon, front.score, front.order, front.open, front.hit, group.toList())
+        }
+    }
+
+    /** Where a row is from, for a merged row's detail and the choice list: the source's name, else the row's own detail. */
+    fun placeOf(row: SearchRow): String = row.hit?.source?.label ?: row.detail?.takeIf { it.isNotBlank() } ?: "Library"
 
     private const val SOURCE_ORDER_STRIDE = 100_000
 
     /** A source row's detail line: where it comes from first, then what the source says about it. */
-    internal fun sourceDetail(hit: SourceHit): String =
+    fun sourceDetail(hit: SourceHit): String =
         listOfNotNull(
             hit.source.label,
             hit.result.columns.joinToString(" · ").takeIf { it.isNotBlank() },

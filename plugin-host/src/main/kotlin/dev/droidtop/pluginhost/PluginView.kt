@@ -343,10 +343,19 @@ object PluginViewCall {
      * BROWSER_CHECK_REQUIRED become droidtop's own Sign in / Open the site ([ViewNode.Notice.opensAccount]); an older
      * SIGN_IN_REQUIRED's own action is kept for a plugin that declares no `web.session` site. Info shows the error's
      * `detail` when it gave one, else its message.
+     *
+     * With no subtitle of its own, the sentence under the title is [SourceFailures]'s, never the raw message: a page
+     * that failed with "f95zone answered HTTP 403" said exactly that (the owner, 2026-10-16: "When I clicked, it just
+     * gave an f95zone error"; docs/SPEC.md 12a). A failure that reads as a sign-in wall also offers droidtop's Sign in,
+     * which is drawn only for a plugin with a `web.session` site.
      */
     fun errorNotice(reply: PluginReply, declared: Set<String>, fallbackTitle: String, messages: MutableList<String>? = null): ViewNode.Notice {
         val title = (reply.title ?: fallbackTitle).cut(PluginViewLimits.length("noticeTitle"))
-        val body = (reply.subtitle ?: reply.message?.takeIf { reply.title == null && it.isNotBlank() })?.cut(PluginViewLimits.length("noticeSubtitle"))
+        val sentence = when (reply.code) {
+            PluginErrorCode.PERMISSION_DENIED -> SourceFailures.permissionOff(reply.message, reply.code)
+            else -> SourceFailures.plain(reply.message)
+        }
+        val body = (reply.subtitle ?: sentence?.takeIf { reply.title == null })?.cut(PluginViewLimits.length("noticeSubtitle"))
         var opensPermissions = false
         var action: ViewAction? = null
         var opensAccount: PluginWebAccount.Need? = null
@@ -363,7 +372,7 @@ object PluginViewCall {
                 action = ViewAction.parse(reply.action)?.copy(title = "Sign in")
             }
             PluginErrorCode.BROWSER_CHECK_REQUIRED -> opensAccount = PluginWebAccount.Need.BROWSER_CHECK
-            else -> Unit
+            else -> if (sentence == SourceFailures.SIGN_IN) opensAccount = PluginWebAccount.Need.SIGN_IN
         }
         val said = (reply.detail ?: reply.message)?.takeIf { it.isNotBlank() }
         val details = listOfNotNull(reply.code?.name, said).joinToString(": ")

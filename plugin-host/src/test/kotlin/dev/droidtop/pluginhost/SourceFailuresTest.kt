@@ -1,9 +1,6 @@
-package dev.droidtop.library.integrations
+package dev.droidtop.pluginhost
 
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -55,23 +52,6 @@ class SourceFailuresTest {
     }
 
     @Test
-    fun `a failing source outcome carries the plain sentence and keeps its own words`() = runBlocking {
-        val source = object : GameSourceProvider {
-            override val id = "lewd"
-            override val label = "LewdCorner"
-            override suspend fun search(context: android.content.Context, query: String, platform: String?): Result<List<AcquireContentResult>> =
-                Result.failure(IllegalStateException(lewdCorner))
-            override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: java.io.File?) =
-                dev.droidtop.library.settings.CatalogScreen("d", result.title, groups = { emptyList() })
-        }
-        val outcome = PluginSearchAggregator.fanOutOutcomes(listOf(source)) { it.search(android.content.ContextWrapper(null), "q", null) }.single()
-        assertEquals(SourceFailures.SIGN_IN, outcome.failure)
-        assertNotNull(outcome.technical)
-        assertTrue(outcome.technical!!.startsWith("JavaScript is disabled"))
-        assertFalse(outcome.failure!!.contains("JavaScript"))
-    }
-
-    @Test
     fun `droidtop's own refusal names the permission and is not a site failure`() {
         // Rig 2026-10-15 (#485 step 5): LewdCorner's search line was the broker's own refusal, passed through.
         assertEquals(
@@ -82,7 +62,7 @@ class SourceFailuresTest {
             "It needs \u201cUse your sign-in on its sites\u201d, which is not allowed for it",
             SourceFailures.permissionOff("LewdCorner needs you to allow \"Use your sign-in on its sites\"."),
         )
-        assertEquals(SourceFailures.PERMISSION_OFF, SourceFailures.permissionOff("no", dev.droidtop.pluginhost.PluginErrorCode.PERMISSION_DENIED))
+        assertEquals(SourceFailures.PERMISSION_OFF, SourceFailures.permissionOff("no", PluginErrorCode.PERMISSION_DENIED))
         assertNull(SourceFailures.permissionOff(lewdCorner))
     }
 }
