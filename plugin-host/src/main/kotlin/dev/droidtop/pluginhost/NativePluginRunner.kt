@@ -84,6 +84,21 @@ class NativePluginRunner(
         }
     }
 
+    /** The plugins handed a Shizuku relay, handed a new one whenever Shizuku sends droidtop a new binder. */
+    private val relayed = ConcurrentHashMap<String, PluginRecord>()
+
+    private val listening = java.util.concurrent.atomic.AtomicBoolean()
+
+    /** Listens for Shizuku's binder from the first relay on, so a runner that never hands one (a rig test's) never listens. */
+    private fun listenForShizuku() {
+        if (!listening.compareAndSet(false, true)) return
+        runCatching {
+            rikka.shizuku.Shizuku.addBinderReceivedListener {
+                relayed.forEach { (id, record) -> runtimes[id]?.let { runtime -> runCatching { ShizukuRelays.attach(appContext, runtime, record) } } }
+            }
+        }
+    }
+
     /** The callback this runner registered with each process, so [unbind] can unregister the very same stub. */
     private val callbacks = ConcurrentHashMap<IBinder, ProcessCallback>()
 
@@ -100,9 +115,13 @@ class NativePluginRunner(
         val id = record.manifest.id
         loadFailures.remove(id)
         // An open plugin with only the network hole runs isolated, its sockets the broker's (docs/plugin-api.md 5.6).
-        val isolatedNet = tier == PluginTier.OPEN &&
-            PluginTiers.runsIsolated(withContext(Dispatchers.IO) { PluginTiers.holes(record, PluginGrants.forContext(appContext).read(id)) })
-        val runtime = PluginProcesses.acquire(appContext, id, if (isolatedNet) PluginTier.CONTAINED else tier, network = isolatedNet)
+        val grants = withContext(Dispatchers.IO) { PluginGrants.forContext(appContext).read(id) }
+        val isolatedNet = tier == PluginTier.OPEN && PluginTiers.runsIsolated(PluginTiers.holes(record, grants))
+        // Full access isolated, behind its switch until every plugin has passed (5.6, "Every plugin is isolated, full
+        // access included"): the contained loader with the network, and droidtop's relays for the system services it was allowed.
+        val isolatedFull = tier == PluginTier.FULL_TRUST && PluginTiers.fullAccessRunsIsolated(record, PluginTiers.fullAccessIsolated())
+        val isolated = isolatedNet || isolatedFull
+        val runtime = PluginProcesses.acquire(appContext, id, if (isolated) PluginTier.CONTAINED else tier, network = isolated)
             ?: return failLoad(id, if (tier == PluginTier.CONTAINED) "its contained process could not be started" else "the plugin process could not be started")
         if (runtimes.put(id, runtime) != null) PluginProcesses.release(appContext, id)
         val binder = runtime.asBinder()
@@ -116,14 +135,22 @@ class NativePluginRunner(
             val loaded = withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
                 withContext(Dispatchers.IO) {
                     when (tier) {
-                        PluginTier.FULL_TRUST ->
+                        PluginTier.FULL_TRUST -> if (isolatedFull) {
+                            loadContained(runtime, record, tier)
+                        } else {
                             // entryClass is null for any kind but native_bundle; the AIDL parameter is a non-null placeholder there.
                             runtime.loadPlugin(id, installDir, record.manifest.entryClass ?: "", record.rootApproved, PluginBrokers.binderFor(appContext, id))
+                        }
                         // An open process loads the plugin from the same descriptors as a contained one; it differs only in
                         // being non-isolated, with the holes the person granted (docs/plugin-api.md 5.3, "Open processes").
                         PluginTier.CONTAINED, PluginTier.OPEN -> loadContained(runtime, record, tier)
                     }
                 }
+            }
+            if (loaded && isolatedFull && ShizukuRelays.allowed(record, grants)) {
+                relayed[id] = record
+                listenForShizuku()
+                withContext(Dispatchers.IO) { runCatching { ShizukuRelays.attach(appContext, runtime, record) } }
             }
             if (!loaded) {
                 // The reason is the process's own (runtime missing, version mismatch, a refusal); a crash it also reported already disabled the plugin.
@@ -159,8 +186,13 @@ class NativePluginRunner(
         val names = files.map { it.first }.toMutableList()
         try {
             files.forEach { (_, file) -> opened += ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY) }
-            val holes = if (tier == PluginTier.OPEN) PluginTiers.holes(record, PluginGrants.forContext(appContext).read(id)) else emptySet()
-            val broker = SandboxBroker.serve(appContext, id, tier, holes)
+            // Full access in an isolated process has the network and a contained process's files: the rest is the API's.
+            val holes = when (tier) {
+                PluginTier.OPEN -> PluginTiers.holes(record, PluginGrants.forContext(appContext).read(id))
+                PluginTier.FULL_TRUST -> setOf(PluginTiers.NET_SOCKETS)
+                PluginTier.CONTAINED -> emptySet()
+            }
+            val broker = SandboxBroker.serve(appContext, id, if (tier == PluginTier.FULL_TRUST) PluginTier.CONTAINED else tier, holes)
             if (broker == null) {
                 loadFailures[id] = "its file broker could not be started"
                 return false
@@ -190,6 +222,7 @@ class NativePluginRunner(
     }
 
     override fun unload(pluginId: String) {
+        relayed.remove(pluginId)
         runCatching { runtimes[pluginId]?.unloadPlugin(pluginId) }
     }
 

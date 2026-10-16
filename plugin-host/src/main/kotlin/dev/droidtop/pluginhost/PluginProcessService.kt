@@ -190,6 +190,18 @@ abstract class PluginProcessService : Service() {
             }
         }
 
+        override fun attachRelay(pluginId: String, name: String, relay: IBinder?) {
+            requireApp()
+            relay ?: return
+            when (name) {
+                ShizukuRelayPolicy.RELAY_NAME -> {
+                    rikka.shizuku.Shizuku.onBinderReceived(relay, packageName)
+                    ShizukuRelays.received = true
+                }
+                else -> Log.w("droidtop.plugin", "$pluginId: no relay named $name")
+            }
+        }
+
         override fun unloadPlugin(pluginId: String) {
             requireApp()
             runCatching { loaded.remove(pluginId)?.onUnload() }
@@ -514,7 +526,10 @@ internal open class BrokerPluginContext(private val broker: IPluginHostBroker) :
     // The library folder is resolved by :app before a call and passed in its arguments; this process never reads it.
     override fun libraryFolderPath(systemId: String): String? = null
     override fun hasRootApproval(): Boolean = false
-    override fun hasShizukuAccess(): Boolean = false
+    // Only with droidtop's relay (full access isolated, `os.shizuku`, docs/plugin-api.md 5.6): Shizuku answers for droidtop.
+    override fun hasShizukuAccess(): Boolean = ShizukuRelays.received && runCatching {
+        rikka.shizuku.Shizuku.pingBinder() && rikka.shizuku.Shizuku.checkSelfPermission() == android.content.pm.PackageManager.PERMISSION_GRANTED
+    }.getOrDefault(false)
 
     override fun isAppInstalled(packageName: String): Boolean = runCatching {
         // The reply carries one boolean per package: read it by name.
