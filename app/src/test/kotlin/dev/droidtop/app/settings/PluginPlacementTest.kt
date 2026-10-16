@@ -9,8 +9,9 @@ import org.junit.Test
 class PluginPlacementTest {
     @Test
     fun `a point with a mode shows it and a point with no particular place shows nothing`() {
-        assertEquals("Gaming", AppSettingsCatalogs.placementWords("Gaming"))
-        assertEquals("Desktop", AppSettingsCatalogs.placementWords("Desktop"))
+        assertEquals("In Gaming", AppSettingsCatalogs.placementWords("Gaming"))
+        assertEquals("On the Android home screen", AppSettingsCatalogs.placementWords("Android"))
+        assertEquals("In Desktop", AppSettingsCatalogs.placementWords("Desktop"))
         assertNull(AppSettingsCatalogs.placementWords(PluginConsent.MODE_ANY))
     }
 }

@@ -109,9 +109,10 @@ object PluginConsent {
             val risky = tier != PermissionTier.NORMAL
             // An operation droidtop runs under an Android permission it may not hold yet: Android asks the person too (4.1).
             val androidNote = PluginPermissions.find(declared.id)?.android?.takeIf { it.fromSdk > 0 }?.let { "Android asks you too, the first time" }
+            // The title is the permission's own words; which sites, apps or folder is a sentence under it (#516).
             val line = ConsentLine(
-                title = label + (scope?.let { " ($it)" } ?: ""),
-                detail = listOfNotNull(PluginPermissions.find(declared.id)?.caution, declared.reason, androidNote).joinToString(" - ").ifEmpty { null },
+                title = label,
+                detail = sentences(PluginPermissions.find(declared.id)?.caution, scope, declared.reason, androidNote),
                 id = if (newContract) declared.id else null,
                 highRisk = risky,
                 ticked = !risky,
@@ -124,12 +125,12 @@ object PluginConsent {
             val provider = installed.firstOrNull { rec ->
                 rec.manifest.id != manifest.id && rec.manifest.v2.exports.any { it.api == req.api }
             }
-            val detail = buildList {
-                if (req.minLevel != null) add("level ${req.minLevel}")
-                req.reason?.let { add(it) }
-            }.joinToString(" - ").ifEmpty { null }
+            // What the plugin uses, in the words of what its provider offers; never the interface's id (#516).
+            val offered = provider?.manifest?.v2?.exports?.firstOrNull { it.api == req.api }
+                ?.ops?.firstNotNullOfOrNull { PluginPermissions.labelFor(it.permission) }
+            val level = req.minLevel?.let { if (it == "adb") "Needs ADB-level access" else "Needs $it access" }
             ConsentUse(
-                line = ConsentLine(req.api, detail),
+                line = ConsentLine(offered ?: "Something another plugin provides", sentences(level, req.reason)),
                 optional = req.optional,
                 providerLabel = provider?.manifest?.label,
                 providerBadge = provider?.let { badgeFor(it.manifest.origin) },
@@ -148,13 +149,26 @@ object PluginConsent {
         )
     }
 
-    /** The parameter a scoped permission was declared with, as text: the domain list, the package list, the folder scope. */
+    /** The parameter a scoped permission was declared with, as a sentence: which sites, which apps, which folder. */
     private fun scopeText(id: String, extra: JSONObject): String? = when (id) {
-        "net.domains" -> extra.optJSONArray("domains")?.let { a -> (0 until a.length()).joinToString(", ") { a.optString(it) } }
-        "apps.bind", "apps.check", "apps.intents.out" -> extra.optJSONArray("packages")?.let { a ->
-            (0 until a.length()).joinToString(", ") { i -> a.optString(i).let { if (it == "*") "any app" else it } }
-        } ?: if (extra.optString("scope") == "any") "any app" else null
-        "library.folders.write" -> if (extra.optString("scope") == "destination") "only the folder you choose" else null
+        "net.domains" -> extra.optJSONArray("domains")?.let { a -> (0 until a.length()).map { a.optString(it) } }
+            ?.filter { it.isNotBlank() }?.takeIf { it.isNotEmpty() }
+            ?.let { if (it.size == 1) "Only the site ${it[0]}" else "Only these sites: ${it.joinToString(", ")}" }
+        "apps.bind", "apps.check", "apps.intents.out" -> {
+            val packages = extra.optJSONArray("packages")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+            when {
+                "*" in packages || extra.optString("scope") == "any" -> "Any app"
+                packages.size == 1 -> "Only the app ${packages[0]}"
+                packages.isNotEmpty() -> "Only these apps: ${packages.joinToString(", ")}"
+                else -> null
+            }
+        }
+        "library.folders.write" -> if (extra.optString("scope") == "destination") "Only the folder you choose" else null
         else -> null
     }?.takeIf { it.isNotBlank() }
+
+    /** [parts] as sentences, each with its own full stop (#516: never fragments joined with " - "); null when none. */
+    fun sentences(vararg parts: String?): String? = parts.mapNotNull { it?.trim()?.takeIf { p -> p.isNotEmpty() } }
+        .map { p -> p.replaceFirstChar { it.uppercaseChar() }.let { if (it.last() in ".!?") it else "$it." } }
+        .joinToString(" ").ifEmpty { null }
 }

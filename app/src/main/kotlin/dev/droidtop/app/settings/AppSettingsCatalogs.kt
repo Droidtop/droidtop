@@ -2940,12 +2940,13 @@ object AppSettingsCatalogs {
         fun line(key: String, l: dev.droidtop.pluginhost.ConsentLine, lead: String? = null, trail: String? = null, value: String? = null): CatalogItem {
             val grantKey = l.id
             if (ticks == null || grantKey == null) {
-                return info(key, l.title, listOfNotNull(lead, l.detail, trail).joinToString(" - ").ifEmpty { null }, value)
+                return info(key, l.title, PluginConsent.sentences(lead, l.detail, trail), value)
             }
             return ToggleItem(
                 id = "plugin_${m.id}_${scope}tick_$grantKey",
                 title = l.title,
-                subtitle = listOfNotNull(lead, l.detail, trail, if (l.highRisk) "High risk: allow it only for a plugin you trust" else null).joinToString(" - ").ifEmpty { null },
+                // Sentences, never fragments joined with " - " (Droidtop/tracker#516).
+                subtitle = PluginConsent.sentences(lead, l.detail, trail, if (l.highRisk) "High risk: allow it only for a plugin you trust" else null),
                 current = grantKey in ticks,
                 onToggle = { _, on -> if (on) ticks.add(grantKey) else ticks.remove(grantKey) },
             )
@@ -2984,7 +2985,7 @@ object AppSettingsCatalogs {
                 view.uses.mapIndexed { i, u ->
                     info(
                         "uses_$i", u.line.title,
-                        listOfNotNull(u.line.detail, if (u.optional) "Optional" else "Needed").joinToString(" - "),
+                        PluginConsent.sentences(u.line.detail, if (u.optional) "It works without it" else "It needs this to work"),
                         if (u.providerLabel != null) "${u.providerLabel} (${u.providerBadge})" else "No plugin provides this yet",
                     )
                 },
@@ -2994,7 +2995,13 @@ object AppSettingsCatalogs {
     }
 
     /** Where a plugin's extension point shows, in plain words, or null when it has no particular place (nothing is shown rather than a placeholder). */
-    internal fun placementWords(mode: String): String? = mode.takeIf { it != PluginConsent.MODE_ANY }
+    internal fun placementWords(mode: String): String? = when (mode) {
+        PluginConsent.MODE_ANY -> null
+        "Gaming" -> "In Gaming"
+        "Android" -> "On the Android home screen"
+        "Desktop" -> "In Desktop"
+        else -> mode
+    }
 
     /** The most activity lines one plugin's Activity screen shows; the log keeps up to 2,000. */
     private const val ACTIVITY_SHOWN = 200
