@@ -2022,6 +2022,35 @@ image works. Pulled images are kept on-device by digest in `OciImageStore`
 clear-cache action) rather than an invisible always-on cache, since it
 trades storage for avoiding re-downloads when containers are recreated.
 
+### Kernel features, detected at runtime (built 2026-10-16, Droidtop/tracker#555 D10)
+
+droidtop's container engine uses namespaces, cgroups and overlayfs where a device has them and runs without them where
+it does not (the owner's decision on #555: one engine, runtime detection). Nothing is assumed at build time.
+`EngineFeatureProbe` finds them once a boot (`/proc/sys/kernel/random/boot_id`; kept in droidtop's preferences, so a
+second request that boot reads the record) and only when something asks: `docker info`, or a `run` that names an
+option from the table below.
+
+| Feature | Kernel has it | droidtop can use it as itself | ... with root |
+|---|---|---|---|
+| user, mount, PID, network and hostname namespaces | the entry in `/proc/self/ns` | a trial `unshare -U` (the others inside a new user namespace mapped to root: `unshare -U -r -m`, ...) | a trial `unshare -m` (and so on) through the root helper |
+| cgroups (v2) | `cgroup2` in `/proc/filesystems`; the controllers from `/sys/fs/cgroup/cgroup.controllers` | never: an app is given no cgroup | yes, when the root helper runs |
+| overlayfs | `overlay` in `/proc/filesystems` | a trial overlay mount inside `unshare -U -r -m` | a trial mount inside `unshare -m` |
+
+Every trial is an argv, never a shell line. The overlay trial mounts inside a mount namespace of its own, so nothing
+stays mounted, and its four folders in droidtop's cache are removed one by one, empty, never recursively. Without a
+root helper the root column is "not tried", and the sentence says root would be needed rather than that the device
+lacks it.
+
+**Options that need a feature** (`EngineOptions`, one table for every front: `docker` now, `podman` and the API
+daemons with D11 to D15): `-m`/`--memory`, `--memory-swap`, `--memory-reservation`, `--cpus`, `-c`/`--cpu-shares`,
+`--cpuset-cpus` and `--pids-limit` need cgroups; `--network`/`--net` network namespaces; `--pid` PID namespaces;
+`-h`/`--hostname` hostname namespaces; `--tmpfs` and `--read-only` mount namespaces. An option is never taken and
+silently ignored. Its answer names the feature and why it is not here: "`--memory` needs cgroups, which this device's
+kernel does not have", "... which droidtop can use here only with root (Shizuku or Sui started as root)", "... which
+this device does not let droidtop use"; where the feature is here, "not built in droidtop yet (this device has
+cgroups)" until the engine applies it. `--network host` and `--pid host` are what droidtop's containers already are
+and are taken. The RP5 is expected to have none of them; `docker info` there is the check.
+
 ## 3a. Image index — populated live, not a pinned/prepopulated catalog
 
 Picking an image (primary container's base+compositor, or a sibling's
@@ -2444,8 +2473,12 @@ the `ContainerRuntime` interface that already exists (§3):
   The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
   `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
   "Its own program", and the start with the desktop. `-p`, `-w`, `--entrypoint`, `--restart`, `--rm` and `-u` answer
-  "not built in droidtop yet". A compose subset of droidtop's own is not built: the Docker Engine API daemon (D14)
-  serves the real `docker compose`; what needs namespaces, a daemon or image building
+  "not built in droidtop yet". Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
+  `--tmpfs`, `--read-only`, ...) answer from the one table in "Kernel features, detected at runtime" (section 3);
+  `--network host` and `--pid host` are taken, being what the containers already are. `docker info` (D10) says the
+  engine, the backend running now and each feature in plain words. A compose subset of droidtop's own is not built
+  (decided 2026-10-16): the real `docker compose` and `podman-compose` run through the Docker Engine API and libpod
+  API daemons (D14, D15), one mechanism; what needs a daemon or image building
   (`build`, `network`, `volume`, `push`, ...) answers that droidtop's
   containers do not have it. Docker words stay in the command; droidtop's
   screens keep "app" and "program". Nothing the container wrote reaches

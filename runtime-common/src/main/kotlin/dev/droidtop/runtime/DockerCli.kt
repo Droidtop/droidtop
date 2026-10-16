@@ -51,6 +51,9 @@ sealed interface DockerCommand {
 
     /** Not run: [text] goes to stdout when [code] is 0 (help), to stderr otherwise. */
     data class Answer(val text: String, val code: Int) : DockerCommand
+
+    /** `docker info`: what droidtop's engine is and which kernel features this device gives it (D10). */
+    data object Info : DockerCommand
 }
 
 object DockerCli {
@@ -70,7 +73,7 @@ object DockerCli {
     private val LATER = setOf("rmi", "create", "compose", "restart", "inspect")
 
     /** Docker subcommands droidtop will not have: they need namespaces, a daemon or image building it does not have. */
-    private val NEVER = setOf("build", "buildx", "push", "login", "network", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "info", "version", "search", "logout", "rename")
+    private val NEVER = setOf("build", "buildx", "push", "login", "network", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "version", "search", "logout", "rename")
 
     val USAGE: String = """
         Usage: docker COMMAND
@@ -86,13 +89,19 @@ object DockerCli {
           pull IMAGE                   Download an image into droidtop's store
           run [-d] [--name NAME] IMAGE Make a container from an image and start its program
           rm [-f] CONTAINER...         Delete a container (-f stops its program first)
+          info                         The engine, and the kernel features this device gives it
 
         run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.
-        Not yet: -p, -w, --entrypoint, --rm, --restart, -u. Containers here share the device's network and
-        processes: a port is the device's own, and there is no isolation between them.
+        Not yet: -p, -w, --entrypoint, --rm, --restart, -u. Options that need a kernel feature (--memory, --cpus,
+        --network, --hostname, --tmpfs, ...) say which one and whether this device has it; see docker info.
+        Containers here share the device's network and processes: a port is the device's own.
     """.trimIndent() + "\n"
 
-    fun parse(args: List<String>): DockerCommand {
+    /**
+     * [args] as a request. [features] is this device's (D10), read only when a `run` names an option from
+     * [EngineOptions] ([EngineOptions.mentioned]), so the sentence for it can say what the device lacks.
+     */
+    fun parse(args: List<String>, features: EngineFeatures? = null): DockerCommand {
         val sub = args.firstOrNull() ?: return DockerCommand.Answer(USAGE, 0)
         val rest = args.drop(1)
         return when (sub) {
@@ -109,7 +118,8 @@ object DockerCli {
             }
             "exec" -> exec(rest)
             "pull" -> pull(rest)
-            "run" -> run(rest)
+            "run" -> run(rest, features)
+            "info" -> flags(rest, emptySet())?.let { bad -> error("info", bad) } ?: DockerCommand.Info
             "rm" -> remove(rest)
             in LATER -> DockerCommand.Answer("docker $sub: not built in droidtop yet\n", 1)
             in NEVER -> DockerCommand.Answer("docker $sub: droidtop's containers do not have this (no Docker daemon, no namespaces)\n", 1)
@@ -186,7 +196,7 @@ object DockerCli {
         return DockerCommand.Pull(image)
     }
 
-    private fun run(args: List<String>): DockerCommand {
+    private fun run(args: List<String>, features: EngineFeatures?): DockerCommand {
         var name: String? = null
         val envs = mutableListOf<String>()
         val volumes = mutableListOf<String>()
@@ -205,6 +215,18 @@ object DockerCli {
                     volumes += volume(spec) ?: return volumeRefused(spec)
                 }
                 else -> when {
+                    EngineOptions.option(a) != null -> {
+                        // One table for every option that needs a kernel feature (docs/SPEC.md 3, D10).
+                        val option = EngineOptions.option(a)!!
+                        val value = when {
+                            a.contains('=') -> a.substringAfter('=')
+                            EngineOptions.takesValue(option) -> args.getOrNull(++i)
+                            else -> null
+                        }
+                        if (!EngineOptions.asIs(option, value)) {
+                            return DockerCommand.Answer(EngineOptions.refusal("docker run", option, features) + "\n", 1)
+                        }
+                    }
                     a.startsWith("--name=") -> name = a.substringAfter('=')
                     a.startsWith("--env=") -> {
                         val kv = a.substringAfter('=')
@@ -273,6 +295,20 @@ object DockerCli {
     }
 
     /** One `docker ps` row as droidtop knows it. */
+    /** `docker info`'s answer: droidtop's engine, the backend running now if the desktop is up, and [features]. Pure. */
+    fun formatInfo(features: EngineFeatures, backend: ContainerBackend?): String = buildString {
+        append("Engine: droidtop's own (no Docker daemon)\n")
+        append(
+            "Backend: " + when (backend) {
+                ContainerBackend.DROIDSPACES -> "root (namespaces and cgroups through the root helper)"
+                ContainerBackend.PROOT -> "no root (proot)"
+                null -> "the desktop is not running"
+            } + "\n",
+        )
+        append("Kernel features (this boot):\n")
+        EngineOptions.describe(features).forEach { append(it).append('\n') }
+    }
+
     data class PsRow(val name: String, val image: String, val status: String, val up: Boolean, val ports: List<ExposedPort>)
 
     fun formatPs(rows: List<PsRow>, command: DockerCommand.Ps): String {
