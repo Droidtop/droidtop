@@ -282,4 +282,81 @@ class EngineCliTest {
         assertEquals(pods, ContainerPods.read(dir))
         assertEquals(64, ContainerPods.newId().length)
     }
+
+    @Test
+    fun `create, restart and inspect are read on both fronts`() {
+        assertEquals(
+            EngineRequest.Run("nginx", "web", start = false),
+            EngineCli.DOCKER.parse(listOf("create", "--name", "web", "nginx")),
+        )
+        assertTrue((EngineCli.PODMAN.parse(listOf("create", "--restart", "x", "nginx")) as EngineRequest.Answer).text.startsWith("podman create: --restart takes"))
+        assertEquals(EngineRequest.Restart(listOf("a", "b")), EngineCli.DOCKER.parse(listOf("restart", "a", "b")))
+        assertEquals(1, answer(listOf("restart", "-t", "3", "a")).code)
+        assertEquals(EngineRequest.Inspect(listOf("web")), EngineCli.PODMAN.parse(listOf("inspect", "--type", "container", "web")))
+        assertTrue(answer(listOf("inspect", "-f", "{{.Id}}", "web")).text.contains("--format is not built in droidtop yet"))
+        assertTrue(answer(listOf("inspect", "--type=image", "nginx")).text.contains("not built in droidtop yet"))
+        assertEquals(1, answer(listOf("inspect")).code)
+    }
+
+    @Test
+    fun `-p on a port's own number is taken, another number needs network namespaces`() {
+        val none = EngineFeatures("b", EngineFeature.entries.associateWith { FeatureState(kernel = false) })
+        val run = EngineCli.DOCKER.parse(listOf("run", "-p", "8080:8080", "--publish=0.0.0.0:53:53/udp", "app"), none) as EngineRequest.Run
+        assertEquals(listOf(ExposedPort(8080), ExposedPort(53, "udp")), run.publish)
+        val remap = EngineCli.DOCKER.parse(listOf("run", "-p", "8080:80", "nginx"), none) as EngineRequest.Answer
+        assertTrue(remap.text.contains("-p needs network namespaces, which this device's kernel does not have"))
+        assertTrue(remap.text.contains("-p 80:80 is what happens"))
+        // A host port Docker would choose is a remap too.
+        assertTrue((EngineCli.DOCKER.parse(listOf("run", "-p", "80", "nginx"), none) as EngineRequest.Answer).text.contains("network namespaces"))
+        assertTrue(answer(listOf("run", "-p", "127.0.0.1:80:80", "nginx")).text.contains("on one address (127.0.0.1) is not built"))
+        assertTrue(answer(listOf("run", "-p", "x:y", "nginx")).text.contains("not a port"))
+        assertTrue(answer(listOf("run", "-p", "80:80/sctp", "nginx")).text.contains("not a port"))
+    }
+
+    @Test
+    fun `inspect says what droidtop knows in Docker's shape, with Podman's names on its front`() {
+        val facts = EngineInspect.Facts(
+            id = "droidtop-sibling-1a2b",
+            name = "web",
+            image = "docker.io/library/nginx:1.27-alpine",
+            imageDigest = "sha256:abc",
+            createdMs = 0L,
+            status = "exited",
+            exitCode = 3,
+            error = null,
+            config = ImageRunConfig(
+                env = listOf("PATH=/bin"),
+                entrypoint = listOf("/docker-entrypoint.sh"),
+                cmd = listOf("nginx", "-g", "daemon off;"),
+                workingDir = "/srv",
+                ports = listOf(ExposedPort(80)),
+            ),
+            restart = ContainerProgram.RestartPolicy.OnFailure(2),
+            folders = listOf("Music"),
+            podId = "pod123",
+        )
+        val docker = EngineInspect.container(facts, EngineCli.Front.DOCKER).toString()
+        assertTrue(docker.contains("\"Id\":\"droidtop-sibling-1a2b\""))
+        assertTrue(docker.contains("\"Name\":\"/web\""))
+        assertTrue(docker.contains("\"Created\":\"1970-01-01T00:00:00Z\""))
+        assertTrue(docker.contains("\"Path\":\"/docker-entrypoint.sh\""))
+        assertTrue(docker.contains("\"Args\":[\"nginx\",\"-g\",\"daemon off;\"]"))
+        assertTrue(docker.contains("\"Status\":\"exited\""))
+        assertTrue(docker.contains("\"ExitCode\":3"))
+        assertTrue(docker.contains("\"RestartPolicy\":{\"Name\":\"on-failure\",\"MaximumRetryCount\":2}"))
+        assertTrue(docker.contains("\"NetworkMode\":\"host\""))
+        assertTrue(docker.contains("\"Destination\":\"${ContainerLayout.EXTRA_MOUNTS_DIR}/Music\""))
+        assertTrue(docker.contains("\"ExposedPorts\":{\"80/tcp\":{}}"))
+        assertTrue(docker.contains("\"Cmd\":[\"nginx\",\"-g\",\"daemon off;\"]"))
+        assertFalse(docker.contains("\"Pod\""))
+        val podman = EngineInspect.container(facts, EngineCli.Front.PODMAN).toString()
+        assertTrue(podman.contains("\"Name\":\"web\""))
+        assertTrue(podman.contains("\"Pod\":\"pod123\""))
+        assertTrue(podman.contains("\"ImageName\":\"docker.io/library/nginx:1.27-alpine\""))
+        // Nothing known: Docker's empty values, never invented ones.
+        val bare = EngineInspect.container(facts.copy(createdMs = null, config = null, exitCode = null), EngineCli.Front.DOCKER).toString()
+        assertTrue(bare.contains("\"Created\":\"0001-01-01T00:00:00Z\""))
+        assertTrue(bare.contains("\"Cmd\":null"))
+        assertTrue(EngineInspect.format(listOf(facts), EngineCli.Front.DOCKER).startsWith("[\n"))
+    }
 }

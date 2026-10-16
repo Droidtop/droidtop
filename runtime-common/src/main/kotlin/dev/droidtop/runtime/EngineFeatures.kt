@@ -69,6 +69,9 @@ object EngineOptions {
         "--cpu-shares" to EngineFeature.CGROUPS,
         "--cpuset-cpus" to EngineFeature.CGROUPS,
         "--pids-limit" to EngineFeature.CGROUPS,
+        // -p on another number than the container's: remapping needs a network of the container's own (D13).
+        "-p" to EngineFeature.NETWORK_NAMESPACES,
+        "--publish" to EngineFeature.NETWORK_NAMESPACES,
         "--network" to EngineFeature.NETWORK_NAMESPACES,
         "--net" to EngineFeature.NETWORK_NAMESPACES,
         "--pid" to EngineFeature.PID_NAMESPACES,
