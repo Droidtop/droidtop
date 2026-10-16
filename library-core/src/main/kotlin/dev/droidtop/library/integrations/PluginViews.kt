@@ -435,14 +435,24 @@ private class PluginPage(
         val named = view?.sections?.flatMap { it.needs.values }?.toSet().orEmpty()
         if (named.isEmpty()) return emptySet()
         val snapshot = PluginGrants.forContext(context).read(record.manifest.id)
-        return named.filterTo(HashSet()) { PluginGrants.stateOf(record, snapshot, it) == GrantState.DENIED }
+        val off = named.filterTo(HashSet()) { PluginGrants.stateOf(record, snapshot, it) == GrantState.DENIED }
+        // `needs: "app"` (#520): the app the plugin manages is not installed.
+        missingApp = if (PluginManagedApp.NEEDS in named) PluginManagedApp.missing(context, record) else null
+        if (missingApp != null) off += PluginManagedApp.NEEDS
+        return off
     }
+
+    /** The managed app, while it is missing and a node of this page needs it (#520). */
+    @Volatile private var missingApp: PluginManagedApp.App? = null
 
     /**
      * A node whose permission is turned off (#521 item 5): its own title, droidtop's sentence instead of what it does,
      * and pressing it opens the plugin's Permissions. Only this node changes; the page and its other nodes stay.
      */
     private fun turnedOffItem(screenId: String, node: ViewNode, permission: String): CatalogItem {
+        missingApp?.takeIf { permission == PluginManagedApp.NEEDS }?.let { app ->
+            return ActionItem(id = "pv_${screenId}_${node.id}_no_app", title = node.title, subtitle = PluginManagedApp.reason(app), run = {})
+        }
         val what = PluginPermissions.labelFor(permission) ?: permission
         return NestedScreenItem(
             id = "pv_${screenId}_${node.id}_off",

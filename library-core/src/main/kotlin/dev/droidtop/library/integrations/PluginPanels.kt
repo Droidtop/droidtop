@@ -172,7 +172,10 @@ object PluginPanels {
         val record = panel.record
         val hostContext = JSONObject().put("surface", surface)
         game?.let { hostContext.put("game", targetArg(context, record, it)) }
-        val tiles: suspend (Context) -> List<CatalogGroup> = { ctx -> tileGroups(ctx, panel, onReplyScreen) }
+        // A bridge plugin whose app is missing gets droidtop's one notice first (#520), never its own rows.
+        val tiles: suspend (Context) -> List<CatalogGroup> = { ctx ->
+            withContext(Dispatchers.IO) { listOfNotNull(PluginManagedApp.noticeGroup(ctx, record, surface)) } + tileGroups(ctx, panel, onReplyScreen)
+        }
         val more: List<CatalogGroup> = if (withMore) moreGroups(record) else emptyList()
         val id = "plugin_panel_${panel.pluginId}_$surface"
         val entry = panel.entry
@@ -201,8 +204,16 @@ object PluginPanels {
     /** The plugin's tiles as rows: asked for their state when the panel opens (and after each press), never polled. */
     private suspend fun tileGroups(context: Context, panel: Panel, onReplyScreen: (CatalogScreen) -> Unit): List<CatalogGroup> {
         if (panel.tiles.isEmpty()) return emptyList()
-        val states = PluginTiles.refresh(context, panel.tiles)
+        // A tile that needs the managed app (`"needs": "app"`, #520) is inert with the reason while the app is missing.
+        val missing = withContext(Dispatchers.IO) { PluginManagedApp.missing(context, panel.record) }
+        val needsApp: (PluginTiles.Tile) -> Boolean = { tile ->
+            missing != null && runCatching { JSONObject(tile.entry.extra).optString("needs") }.getOrNull() == PluginManagedApp.NEEDS
+        }
+        val states = PluginTiles.refresh(context, panel.tiles.filterNot(needsApp))
         val items = panel.tiles.map { tile ->
+            if (needsApp(tile)) {
+                return@map ActionItem(id = "plugin_tile_${tile.key}", title = tile.fallbackLabel, subtitle = PluginManagedApp.reason(missing!!), run = {})
+            }
             val state = states[tile.key]
             val title = state?.label ?: tile.fallbackLabel
             if (tile.quick) {
