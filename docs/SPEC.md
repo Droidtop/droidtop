@@ -14699,8 +14699,13 @@ one system. A PC/engine gamelist is a themed view like any console system's (§7
 **Light and dark (decided 2026-10-16, Droidtop/tracker#559).** One setting, Settings > Appearance > Light or dark
 (`AppearancePrefs`): Light, Dark, or Follow Android, the default (Android's night mode). It covers droidtop's whole
 UI through the one palette (`GamingPalette`) every token reads:
-- With a Gaming theme held, the theme's palette (7k2). Choosing the theme's colour scheme whose ground matches the
-  appearance, or deriving one, is the next step of this change and is written there when it lands.
+- With a Gaming theme held, the theme's palette (7k2), in the colour scheme Settings > Appearance > Theme color scheme
+  names. Its default, Automatic, is the first scheme the theme declares whose ground is the appearance's
+  (`ThemeAssets.colorSchemeFor`: the theme parsed once per scheme, the answer cached per theme and appearance), so the
+  themed views and the chrome turn light together. A scheme the person names is drawn as the theme wrote it, whatever
+  the appearance. When no scheme matches (or the theme has one), the themed views keep the theme's colours and the
+  chrome's palette is derived for the appearance (`GamingThemeMapping.map(theme, light)`): the theme's accent and fonts
+  over droidtop's own ground, every text role derived again at 4.5:1, no texture.
 - With none held, droidtop's own palette in that appearance: `GamingThemeColors.DEFAULT` or its light twin
   (`GamingThemeMapping.defaultFor`), built the way a theme's palette is, over a pale grey ground with a blue accent,
   every text role at 4.5:1. `MenuTokens` read outside a Gaming surface give this palette, not a fixed dark one.

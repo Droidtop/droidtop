@@ -124,6 +124,8 @@ object GamingSettingsCatalog {
     const val ID_RESCAN_LIBRARY = "pref_gaming_rescan_library"
     const val ID_THEME = "pref_gaming_theme"
     const val ID_THEME_COLOR_SCHEME = "pref_gaming_theme_colorscheme"
+    /** The colour scheme choice that follows Light or dark rather than naming a scheme (stored as no choice). */
+    const val SCHEME_AUTOMATIC = "automatic"
     const val ID_THEME_VARIANT = "pref_gaming_theme_variant"
     const val ID_THEME_ASPECT_RATIO = "pref_gaming_theme_aspect_ratio"
     const val ID_BROWSE_THEMES = "pref_gaming_browse_themes"
@@ -1582,12 +1584,15 @@ object GamingSettingsCatalog {
         val themeName = ThemeAssets.activeThemeName(context) ?: return null
         val schemes = caps.colorSchemes
         if (schemes.size <= 1) return null
+        // Automatic, the default, is the scheme whose ground matches Light or dark (docs/SPEC.md 7k, "Light and dark");
+        // a named scheme is the person's own choice and is drawn as the theme wrote it, whatever the appearance.
         return ChoiceItem(
             id = ID_THEME_COLOR_SCHEME,
             title = "Theme color scheme",
-            options = schemes.map { ChoiceOption(it, caps.colorSchemeLabels[it] ?: it) },
-            current = ThemePrefs.colorScheme(context, themeName) ?: schemes.first(),
-            onSelect = { ctx, value -> ThemePrefs.setColorScheme(ctx, themeName, value) },
+            options = listOf(ChoiceOption(SCHEME_AUTOMATIC, "Automatic (matches Light or dark)")) +
+                schemes.map { ChoiceOption(it, caps.colorSchemeLabels[it] ?: it) },
+            current = ThemePrefs.colorScheme(context, themeName) ?: SCHEME_AUTOMATIC,
+            onSelect = { ctx, value -> ThemePrefs.setColorScheme(ctx, themeName, value.takeIf { it != SCHEME_AUTOMATIC }) },
         )
     }
 
