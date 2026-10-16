@@ -280,6 +280,7 @@ object ContainersCatalog {
         groups += CatalogGroup(id = "devices", title = "USB devices", items = deviceItems(context, runtime, info))
         groups += CatalogGroup(id = "sockets", title = "Sockets", items = socketItems(context, runtime, info))
         runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
+            ?.let { image -> withContext(Dispatchers.IO) { ContainerProgram.effectiveConfig(context.filesDir, info.container.id, image) } }
             ?.takeIf { it.program().isNotEmpty() }
             ?.let { groups += CatalogGroup(id = "program", title = "Its own program", items = programItems(context, runtime, info, it)) }
         val mounts = runCatching { runtime.mounts(info.container) }.getOrDefault(EnvironmentMounts())

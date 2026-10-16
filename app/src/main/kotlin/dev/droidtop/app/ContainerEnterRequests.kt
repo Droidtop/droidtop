@@ -20,6 +20,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The host side of the enter path (docs/SPEC.md 3d "Entering another container", Droidtop/tracker#555 D7): one
@@ -193,12 +194,28 @@ internal object ContainerEnterRequests {
                 val names = containers.map { it.displayName }
                 val name = command.name ?: ContainerNames.defaultName(ContainerRole.SIBLING, command.image, names)
                 ContainerNames.problemWith(name, names)?.let { return refuse(dir, "docker run: $it", 1) }
+                // A volume is a folder the person already mapped in some container (D3), found by its name: never a
+                // path the container chose (the review's bound for the docker request kind).
+                val mapped = containers.flatMap { runCatching { runtime.mounts(it.container).folders }.getOrDefault(emptyList()) }
+                val folders = command.volumes.map { wanted ->
+                    mapped.firstOrNull { it.name == wanted }
+                        ?: return refuse(dir, "docker run: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
+                }
                 val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
                     return refuse(dir, "docker run: ${it.message ?: it.javaClass.simpleName}", 1)
                 }
                 // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
-                runCatching { runtime.setMounts(created, runtime.mounts(created).copy(home = HomeChoice.Private)) }
-                val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()?.program().orEmpty()
+                runCatching {
+                    val current = runtime.mounts(created)
+                    runtime.setMounts(created, current.copy(home = HomeChoice.Private, folders = (current.folders + folders).distinctBy { it.name }))
+                }
+                if (command.args != null || command.env.isNotEmpty()) {
+                    withContext(Dispatchers.IO) {
+                        ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(command.args, command.env))
+                    }
+                }
+                val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()
+                    ?.let { ContainerProgram.effectiveConfig(app.filesDir, created.id, it) }?.program().orEmpty()
                 if (program.isEmpty()) {
                     answer(dir, "$name\n", "$name's image names no program to run, so nothing was started; use docker exec $name sh\n", 0)
                 } else {

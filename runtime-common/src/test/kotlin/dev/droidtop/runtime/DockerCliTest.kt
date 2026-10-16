@@ -107,8 +107,7 @@ class DockerCliTest {
         assertEquals(DockerCommand.Run("redis", null), DockerCli.parse(listOf("run", "redis")))
         // Known flags droidtop has not built say so; a command after the image is refused, not ignored.
         assertTrue(answer(listOf("run", "-p", "8080:80", "nginx")).text.contains("-p is not built in droidtop yet"))
-        assertTrue(answer(listOf("run", "--env=A=1", "nginx")).text.contains("not built in droidtop yet"))
-        assertTrue(answer(listOf("run", "alpine", "sh")).text.contains("not built in droidtop yet"))
+        assertTrue(answer(listOf("run", "--entrypoint=sh", "nginx")).text.contains("not built in droidtop yet"))
         assertEquals(1, answer(listOf("run", "--privileged", "nginx")).code)
         assertEquals(1, answer(listOf("run")).code)
 
@@ -116,5 +115,34 @@ class DockerCliTest {
         assertEquals(DockerCommand.Remove(listOf("a"), force = true), DockerCli.parse(listOf("rm", "-f", "a")))
         assertEquals(1, answer(listOf("rm", "-v", "a")).code)
         assertEquals(1, answer(listOf("rm")).code)
+    }
+
+    @Test
+    fun `run takes a command, environment and folders the person mapped, never a host path`() {
+        val mounts = ContainerLayout.EXTRA_MOUNTS_DIR
+        assertEquals(
+            DockerCommand.Run("alpine", "box", listOf("sh", "-c", "echo hi"), listOf("A=1", "B="), listOf("Music", "Saves")),
+            DockerCli.parse(listOf("run", "--name", "box", "-e", "A=1", "--env=B=", "-v", "Music", "--volume=Saves:$mounts/Saves:ro", "alpine", "sh", "-c", "echo hi")),
+        )
+        // Flags after the image belong to its command.
+        assertEquals(listOf("ls", "-e"), (DockerCli.parse(listOf("run", "alpine", "ls", "-e")) as DockerCommand.Run).args)
+        assertEquals(null, (DockerCli.parse(listOf("run", "alpine")) as DockerCommand.Run).args)
+        assertTrue(answer(listOf("run", "-v", "/sdcard/Music:/music", "alpine")).text.contains("folder you mapped in Containers"))
+        assertTrue(answer(listOf("run", "-v", "Music:/music", "alpine")).text.contains("folder you mapped in Containers"))
+        assertTrue(answer(listOf("run", "-v", "../x", "alpine")).text.contains("folder you mapped in Containers"))
+        assertEquals(1, answer(listOf("run", "-e", "1A=x", "alpine")).code)
+    }
+
+    @Test
+    fun `what run asked for replaces the command, never the entrypoint, and adds to the environment`() {
+        val image = ImageRunConfig(env = listOf("PATH=/bin", "A=0"), entrypoint = listOf("/entry.sh"), cmd = listOf("serve"))
+        val overrides = ContainerProgram.RunOverrides(args = listOf("sh"), env = listOf("A=1"))
+        val run = overrides.applyTo(image)
+        assertEquals(listOf("/entry.sh", "sh"), run.program())
+        assertEquals("1", run.environment()["A"])
+        assertEquals(listOf("/entry.sh", "serve"), ContainerProgram.RunOverrides(env = listOf("B=2")).applyTo(image).program())
+        assertEquals(overrides, ContainerProgram.RunOverrides.decode(overrides.encode()))
+        assertEquals(ContainerProgram.RunOverrides(null, emptyList()), ContainerProgram.RunOverrides.decode(ContainerProgram.RunOverrides().encode()))
+        assertEquals(null, ContainerProgram.RunOverrides.decode("not json"))
     }
 }

@@ -63,7 +63,8 @@ internal object ContainerPrograms {
         if (isRunning(container.id)) return
         val app = context.applicationContext
         val job = scope.launch {
-            val config = runtime.imageRunConfig(container)?.takeIf { it.program().isNotEmpty() } ?: run {
+            val config = runtime.imageRunConfig(container)?.let { ContainerProgram.effectiveConfig(app.filesDir, container.id, it) }
+                ?.takeIf { it.program().isNotEmpty() } ?: run {
                 set(container.id, State.Failed("Its image names no program to run"))
                 return@launch
             }
@@ -170,6 +171,7 @@ internal object ContainerPrograms {
         props.remove(containerId + KEY_AUTOSTART)
         runCatching { settingsFile(context).outputStream().use { props.store(it, "droidtop app container programs") } }
         ContainerProgram.hostLogFile(context.filesDir, containerId).delete()
+        ContainerProgram.overridesFile(context.filesDir, containerId).delete()
         states.value = states.value - containerId
     }
 }
