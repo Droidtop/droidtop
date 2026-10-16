@@ -1,84 +1,36 @@
 package dev.droidtop.runtime
 
 /**
- * The `docker` command in every container (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c): a thin
- * client of droidtop's own container engine, not a second runtime. Its wrapper runs [ContainerEnter.HELPER] with
- * [TOKEN], so a docker request travels the one request channel the enter path uses, with the same argument bound and
- * the same stdin, stdout, stderr and exit status. droidtop reads the arguments into a [DockerCommand] from a closed
- * set ([parse]); nothing the container wrote reaches Android as a command, a path or an argv.
+ * A command front of droidtop's own container engine (docs/SPEC.md 3d "The docker command" and "The podman command",
+ * Droidtop/tracker#555 D6c, D11): `docker` ([DOCKER]) and `podman` ([PODMAN]) in every container, thin clients of one
+ * engine, not second runtimes. Each front's wrapper runs [ContainerEnter.HELPER] with the front's own [token], so its
+ * request travels the one request channel the enter path uses, with the same argument bound and the same stdin,
+ * stdout, stderr and exit status. droidtop reads the arguments into an [EngineRequest] from a closed set ([parse]);
+ * nothing the container wrote reaches Android as a command, a path or an argv. The fronts share one request model and
+ * one answer; their own defaults and output are D12.
  *
- * Docker words stay here, in the CLI; droidtop's own screens say "app" and "program".
+ * Docker and Podman words stay here, in the CLI; droidtop's own screens say "app" and "program".
  */
-sealed interface DockerCommand {
-    /** `docker ps`: containers whose program or container is up; [all] lists every one, [quiet] only names. */
-    data class Ps(val all: Boolean, val quiet: Boolean) : DockerCommand
+class EngineCli private constructor(val front: Front) {
+    /** The two command fronts, each its tool's own name on every container's PATH. */
+    enum class Front(val command: String, val daemon: String) {
+        DOCKER("docker", "no Docker daemon"),
+        PODMAN("podman", "no Podman service"),
+    }
 
-    /** `docker images`: the images droidtop's store holds. */
-    data class Images(val quiet: Boolean) : DockerCommand
-
-    /** `docker logs`: the last [tail] lines of a container's program log. */
-    data class Logs(val container: String, val tail: Int) : DockerCommand
-
-    /** `docker start`: starts each container's own program. */
-    data class Start(val containers: List<String>) : DockerCommand
-
-    /** `docker stop`: stops each container's own program. */
-    data class Stop(val containers: List<String>) : DockerCommand
-
-    /** `docker pull`: puts [image] in droidtop's one image store. */
-    data class Pull(val image: String) : DockerCommand
-
-    /**
-     * `docker run`: a new container from [image], named [name] (droidtop's default name when null), whose own program
-     * droidtop then starts, as its page's Start it does. Always detached: the program's output is its log.
-     */
-    data class Run(
-        val image: String,
-        val name: String?,
-        /** Replaces the image's `Cmd` when given (never its entrypoint). */
-        val args: List<String>? = null,
-        /** `NAME=VALUE` entries added after the image's own environment. */
-        val env: List<String> = emptyList(),
-        /** Folders the person already mapped (docs/SPEC.md 3d "Home and folders"), by name; never a host path. */
-        val volumes: List<String> = emptyList(),
-    ) : DockerCommand
-
-    /** `docker rm`: deletes each container; [force] stops a running program first, as Docker's `-f` does. */
-    data class Remove(val containers: List<String>, val force: Boolean) : DockerCommand
-
-    /** `docker exec`: runs [command] in [container], through pipes ([ContainerEnter]), with [env] and in [workdir]. */
-    data class Exec(val container: String, val command: List<String>, val env: Map<String, String>, val workdir: String?) : DockerCommand
-
-    /** Not run: [text] goes to stdout when [code] is 0 (help), to stderr otherwise. */
-    data class Answer(val text: String, val code: Int) : DockerCommand
-
-    /** `docker info`: what droidtop's engine is and which kernel features this device gives it (D10). */
-    data object Info : DockerCommand
-}
-
-object DockerCli {
     /** The command's name on every container's PATH; no exported command may take it ([ContainerEnter.validName]). */
-    const val NAME = "docker"
+    val name: String get() = front.command
 
-    /** The token the wrapper hands the helper: droidtop's own, never one of an exported command. */
-    val TOKEN: String = ContainerLauncher.token("droidtop:docker")
+    /** The token the wrapper hands the helper: droidtop's own for this front, never one of an exported command. */
+    val token: String = ContainerLauncher.token("droidtop:${front.command}")
 
-    /** Lines `docker logs` gives without `--tail`, the most a page shows too. */
-    const val DEFAULT_TAIL = 100
+    /** This front's subcommands droidtop does not answer yet, said as such rather than as unknown. */
+    private val later: Set<String> = LATER + if (front == Front.PODMAN) setOf("pod", "generate", "play", "kube") else emptySet()
 
-    /** The most lines one `docker logs` answers with; the log itself is kept under [ContainerProgram.LOG_MAX_BYTES]. */
-    const val MAX_TAIL = 2000
+    val usage: String = """
+        Usage: ${front.command} COMMAND
 
-    /** Docker subcommands droidtop does not answer yet, said as such rather than as unknown. */
-    private val LATER = setOf("rmi", "create", "compose", "restart", "inspect")
-
-    /** Docker subcommands droidtop will not have: they need namespaces, a daemon or image building it does not have. */
-    private val NEVER = setOf("build", "buildx", "push", "login", "network", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "version", "search", "logout", "rename")
-
-    val USAGE: String = """
-        Usage: docker COMMAND
-
-        droidtop's containers, through droidtop's own engine (no Docker daemon):
+        droidtop's containers, through droidtop's own engine (${front.daemon}):
           ps [-a] [-q]                 List containers (running ones without -a)
           images [-q]                  List the images droidtop holds
           logs [-n N] CONTAINER        Show the last lines of a container's program
@@ -93,7 +45,7 @@ object DockerCli {
 
         run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.
         Not yet: -p, -w, --entrypoint, --rm, --restart, -u. Options that need a kernel feature (--memory, --cpus,
-        --network, --hostname, --tmpfs, ...) say which one and whether this device has it; see docker info.
+        --network, --hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.
         Containers here share the device's network and processes: a port is the device's own.
     """.trimIndent() + "\n"
 
@@ -101,63 +53,63 @@ object DockerCli {
      * [args] as a request. [features] is this device's (D10), read only when a `run` names an option from
      * [EngineOptions] ([EngineOptions.mentioned]), so the sentence for it can say what the device lacks.
      */
-    fun parse(args: List<String>, features: EngineFeatures? = null): DockerCommand {
-        val sub = args.firstOrNull() ?: return DockerCommand.Answer(USAGE, 0)
+    fun parse(args: List<String>, features: EngineFeatures? = null): EngineRequest {
+        val sub = args.firstOrNull() ?: return EngineRequest.Answer(usage, 0)
         val rest = args.drop(1)
         return when (sub) {
-            "-h", "--help", "help" -> DockerCommand.Answer(USAGE, 0)
+            "-h", "--help", "help" -> EngineRequest.Answer(usage, 0)
             "ps" -> flags(rest, setOf("-a", "--all", "-q", "--quiet", "-aq", "-qa"))?.let { bad -> error("ps", bad) }
-                ?: DockerCommand.Ps(all = rest.any { it in setOf("-a", "--all", "-aq", "-qa") }, quiet = rest.any { it in setOf("-q", "--quiet", "-aq", "-qa") })
+                ?: EngineRequest.Ps(all = rest.any { it in setOf("-a", "--all", "-aq", "-qa") }, quiet = rest.any { it in setOf("-q", "--quiet", "-aq", "-qa") })
             "images" -> flags(rest, setOf("-q", "--quiet"))?.let { bad -> error("images", bad) }
-                ?: DockerCommand.Images(quiet = rest.isNotEmpty())
+                ?: EngineRequest.Images(quiet = rest.isNotEmpty())
             "logs" -> logs(rest)
             "start", "stop" -> {
                 rest.firstOrNull { it.startsWith("-") }?.let { return error(sub, it) }
-                if (rest.isEmpty()) return DockerCommand.Answer("docker $sub: name at least one container\n", 1)
-                if (sub == "start") DockerCommand.Start(rest) else DockerCommand.Stop(rest)
+                if (rest.isEmpty()) return EngineRequest.Answer("${front.command} $sub: name at least one container\n", 1)
+                if (sub == "start") EngineRequest.Start(rest) else EngineRequest.Stop(rest)
             }
             "exec" -> exec(rest)
             "pull" -> pull(rest)
             "run" -> run(rest, features)
-            "info" -> flags(rest, emptySet())?.let { bad -> error("info", bad) } ?: DockerCommand.Info
+            "info" -> flags(rest, emptySet())?.let { bad -> error("info", bad) } ?: EngineRequest.Info
             "rm" -> remove(rest)
-            in LATER -> DockerCommand.Answer("docker $sub: not built in droidtop yet\n", 1)
-            in NEVER -> DockerCommand.Answer("docker $sub: droidtop's containers do not have this (no Docker daemon, no namespaces)\n", 1)
-            else -> DockerCommand.Answer("docker: '$sub' is not a docker command. See 'docker --help'\n", 1)
+            in later -> EngineRequest.Answer("${front.command} $sub: not built in droidtop yet\n", 1)
+            in NEVER -> EngineRequest.Answer("${front.command} $sub: droidtop's containers do not have this (${front.daemon})\n", 1)
+            else -> EngineRequest.Answer("${front.command}: '$sub' is not a ${front.command} command. See '${front.command} --help'\n", 1)
         }
     }
 
     /** The first argument of [args] that is not one of [allowed], or null when all are. */
     private fun flags(args: List<String>, allowed: Set<String>): String? = args.firstOrNull { it !in allowed }
 
-    private fun error(sub: String, arg: String) = DockerCommand.Answer(
-        if (arg.startsWith("-")) "docker $sub: unknown flag: $arg\n" else "docker $sub: unexpected argument: $arg\n",
+    private fun error(sub: String, arg: String) = EngineRequest.Answer(
+        if (arg.startsWith("-")) "${front.command} $sub: unknown flag: $arg\n" else "${front.command} $sub: unexpected argument: $arg\n",
         1,
     )
 
-    private fun logs(args: List<String>): DockerCommand {
+    private fun logs(args: List<String>): EngineRequest {
         var tail = DEFAULT_TAIL
         var container: String? = null
         var i = 0
         while (i < args.size) {
             val a = args[i]
             val value = when {
-                a == "-n" || a == "--tail" -> args.getOrNull(++i) ?: return DockerCommand.Answer("docker logs: $a needs a number\n", 1)
+                a == "-n" || a == "--tail" -> args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} logs: $a needs a number\n", 1)
                 a.startsWith("--tail=") -> a.substringAfter('=')
-                a == "-f" || a == "--follow" -> return DockerCommand.Answer("docker logs: following is not built in droidtop yet\n", 1)
+                a == "-f" || a == "--follow" -> return EngineRequest.Answer("${front.command} logs: following is not built in droidtop yet\n", 1)
                 a.startsWith("-") -> return error("logs", a)
                 container == null -> { container = a; null }
                 else -> return error("logs", a)
             }
             if (value != null) {
-                tail = if (value == "all") MAX_TAIL else value.toIntOrNull()?.takeIf { it >= 0 } ?: return DockerCommand.Answer("docker logs: not a number of lines: $value\n", 1)
+                tail = if (value == "all") MAX_TAIL else value.toIntOrNull()?.takeIf { it >= 0 } ?: return EngineRequest.Answer("${front.command} logs: not a number of lines: $value\n", 1)
             }
             i++
         }
-        return container?.let { DockerCommand.Logs(it, tail.coerceAtMost(MAX_TAIL)) } ?: DockerCommand.Answer("docker logs: name a container\n", 1)
+        return container?.let { EngineRequest.Logs(it, tail.coerceAtMost(MAX_TAIL)) } ?: EngineRequest.Answer("${front.command} logs: name a container\n", 1)
     }
 
-    private fun exec(args: List<String>): DockerCommand {
+    private fun exec(args: List<String>): EngineRequest {
         val env = linkedMapOf<String, String>()
         var workdir: String? = null
         var i = 0
@@ -167,18 +119,18 @@ object DockerCli {
                 // No terminal through the request's pipes: a -t is taken and the command runs on pipes all the same.
                 "-t", "--tty", "-it", "-ti" -> Unit
                 "-e", "--env" -> {
-                    val kv = args.getOrNull(++i) ?: return DockerCommand.Answer("docker exec: $a needs NAME=VALUE\n", 1)
-                    env(kv)?.let { (k, v) -> env[k] = v } ?: return DockerCommand.Answer("docker exec: not NAME=VALUE: $kv\n", 1)
+                    val kv = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} exec: $a needs NAME=VALUE\n", 1)
+                    env(kv)?.let { (k, v) -> env[k] = v } ?: return EngineRequest.Answer("${front.command} exec: not NAME=VALUE: $kv\n", 1)
                 }
-                "-w", "--workdir" -> workdir = args.getOrNull(++i) ?: return DockerCommand.Answer("docker exec: $a needs a folder\n", 1)
+                "-w", "--workdir" -> workdir = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} exec: $a needs a folder\n", 1)
                 else -> return error("exec", a)
             }
             i++
         }
-        val container = args.getOrNull(i) ?: return DockerCommand.Answer("docker exec: name a container and a command\n", 1)
+        val container = args.getOrNull(i) ?: return EngineRequest.Answer("${front.command} exec: name a container and a command\n", 1)
         val command = args.drop(i + 1)
-        if (command.isEmpty()) return DockerCommand.Answer("docker exec: name a command to run in $container\n", 1)
-        return DockerCommand.Exec(container, command, env, workdir)
+        if (command.isEmpty()) return EngineRequest.Answer("${front.command} exec: name a command to run in $container\n", 1)
+        return EngineRequest.Exec(container, command, env, workdir)
     }
 
     /**
@@ -189,14 +141,14 @@ object DockerCli {
 
     fun validReference(reference: String): Boolean = REFERENCE.matches(reference) && !reference.contains("..")
 
-    private fun pull(args: List<String>): DockerCommand {
+    private fun pull(args: List<String>): EngineRequest {
         args.firstOrNull { it.startsWith("-") }?.let { return error("pull", it) }
-        val image = args.singleOrNull() ?: return DockerCommand.Answer("docker pull: name one image\n", 1)
-        if (!validReference(image)) return DockerCommand.Answer("docker pull: not an image reference: $image\n", 1)
-        return DockerCommand.Pull(image)
+        val image = args.singleOrNull() ?: return EngineRequest.Answer("${front.command} pull: name one image\n", 1)
+        if (!validReference(image)) return EngineRequest.Answer("${front.command} pull: not an image reference: $image\n", 1)
+        return EngineRequest.Pull(image)
     }
 
-    private fun run(args: List<String>, features: EngineFeatures?): DockerCommand {
+    private fun run(args: List<String>, features: EngineFeatures?): EngineRequest {
         var name: String? = null
         val envs = mutableListOf<String>()
         val volumes = mutableListOf<String>()
@@ -204,14 +156,14 @@ object DockerCli {
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
                 "-d", "--detach", "-i", "-t", "-it", "-ti", "-dit", "-itd" -> Unit
-                "--name" -> name = args.getOrNull(++i) ?: return DockerCommand.Answer("docker run: --name needs a name\n", 1)
+                "--name" -> name = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: --name needs a name\n", 1)
                 "-e", "--env" -> {
-                    val kv = args.getOrNull(++i) ?: return DockerCommand.Answer("docker run: $a needs NAME=VALUE\n", 1)
-                    env(kv) ?: return DockerCommand.Answer("docker run: not NAME=VALUE: $kv\n", 1)
+                    val kv = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: $a needs NAME=VALUE\n", 1)
+                    env(kv) ?: return EngineRequest.Answer("${front.command} run: not NAME=VALUE: $kv\n", 1)
                     envs += kv
                 }
                 "-v", "--volume" -> {
-                    val spec = args.getOrNull(++i) ?: return DockerCommand.Answer("docker run: $a needs a folder\n", 1)
+                    val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: $a needs a folder\n", 1)
                     volumes += volume(spec) ?: return volumeRefused(spec)
                 }
                 else -> when {
@@ -224,13 +176,13 @@ object DockerCli {
                             else -> null
                         }
                         if (!EngineOptions.asIs(option, value)) {
-                            return DockerCommand.Answer(EngineOptions.refusal("docker run", option, features) + "\n", 1)
+                            return EngineRequest.Answer(EngineOptions.refusal("${front.command} run", option, features) + "\n", 1)
                         }
                     }
                     a.startsWith("--name=") -> name = a.substringAfter('=')
                     a.startsWith("--env=") -> {
                         val kv = a.substringAfter('=')
-                        env(kv) ?: return DockerCommand.Answer("docker run: not NAME=VALUE: $kv\n", 1)
+                        env(kv) ?: return EngineRequest.Answer("${front.command} run: not NAME=VALUE: $kv\n", 1)
                         envs += kv
                     }
                     a.startsWith("--volume=") -> {
@@ -238,20 +190,20 @@ object DockerCli {
                         volumes += volume(spec) ?: return volumeRefused(spec)
                     }
                     a in NOT_YET_RUN || NOT_YET_RUN.any { a.startsWith("$it=") } ->
-                        return DockerCommand.Answer("docker run: $a is not built in droidtop yet\n", 1)
+                        return EngineRequest.Answer("${front.command} run: $a is not built in droidtop yet\n", 1)
                     else -> return error("run", a)
                 }
             }
             i++
         }
-        val image = args.getOrNull(i) ?: return DockerCommand.Answer("docker run: name an image\n", 1)
-        if (!validReference(image)) return DockerCommand.Answer("docker run: not an image reference: $image\n", 1)
-        if (name != null && name.isBlank()) return DockerCommand.Answer("docker run: --name needs a name\n", 1)
+        val image = args.getOrNull(i) ?: return EngineRequest.Answer("${front.command} run: name an image\n", 1)
+        if (!validReference(image)) return EngineRequest.Answer("${front.command} run: not an image reference: $image\n", 1)
+        if (name != null && name.isBlank()) return EngineRequest.Answer("${front.command} run: --name needs a name\n", 1)
         val command = args.drop(i + 1).takeIf { it.isNotEmpty() }
-        return DockerCommand.Run(image, name?.trim(), command, envs, volumes)
+        return EngineRequest.Run(image, name?.trim(), command, envs, volumes)
     }
 
-    /** `docker run` flags droidtop knows of and has not built: said as such, not as unknown. */
+    /** `run` flags droidtop knows of and has not built: said as such, not as unknown. */
     private val NOT_YET_RUN = setOf("-p", "--publish", "-w", "--workdir", "--entrypoint", "--rm", "--restart", "-u", "--user")
 
     /** A folder name droidtop mapped (D3), as `ExtraMount.name` takes it. */
@@ -272,18 +224,18 @@ object DockerCli {
         }
     }
 
-    private fun volumeRefused(spec: String) = DockerCommand.Answer(
-        "docker run: -v takes the name of a folder you mapped in Containers (it appears at " +
+    private fun volumeRefused(spec: String) = EngineRequest.Answer(
+        "${front.command} run: -v takes the name of a folder you mapped in Containers (it appears at " +
             "${ContainerLayout.EXTRA_MOUNTS_DIR}/<name>); $spec is not one droidtop can mount\n",
         1,
     )
 
-    private fun remove(args: List<String>): DockerCommand {
+    private fun remove(args: List<String>): EngineRequest {
         val force = args.any { it == "-f" || it == "--force" }
         args.firstOrNull { it.startsWith("-") && it != "-f" && it != "--force" }?.let { return error("rm", it) }
         val names = args.filterNot { it.startsWith("-") }
-        if (names.isEmpty()) return DockerCommand.Answer("docker rm: name at least one container\n", 1)
-        return DockerCommand.Remove(names, force)
+        if (names.isEmpty()) return EngineRequest.Answer("${front.command} rm: name at least one container\n", 1)
+        return EngineRequest.Remove(names, force)
     }
 
     private val ENV_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
@@ -294,10 +246,9 @@ object DockerCli {
         return name to kv.substringAfter('=')
     }
 
-    /** One `docker ps` row as droidtop knows it. */
-    /** `docker info`'s answer: droidtop's engine, the backend running now if the desktop is up, and [features]. Pure. */
+    /** `info`'s answer: droidtop's engine, the backend running now if the desktop is up, and [features]. Pure. */
     fun formatInfo(features: EngineFeatures, backend: ContainerBackend?): String = buildString {
-        append("Engine: droidtop's own (no Docker daemon)\n")
+        append("Engine: droidtop's own (${front.daemon})\n")
         append(
             "Backend: " + when (backend) {
                 ContainerBackend.DROIDSPACES -> "root (namespaces and cgroups through the root helper)"
@@ -309,15 +260,16 @@ object DockerCli {
         EngineOptions.describe(features).forEach { append(it).append('\n') }
     }
 
+    /** One `ps` row as droidtop knows it. */
     data class PsRow(val name: String, val image: String, val status: String, val up: Boolean, val ports: List<ExposedPort>)
 
-    fun formatPs(rows: List<PsRow>, command: DockerCommand.Ps): String {
+    fun formatPs(rows: List<PsRow>, command: EngineRequest.Ps): String {
         val shown = if (command.all) rows else rows.filter { it.up }
         if (command.quiet) return shown.joinToString("") { it.name + "\n" }
         return table(listOf("NAME", "IMAGE", "STATUS", "PORTS"), shown.map { listOf(it.name, it.image, it.status, it.ports.joinToString(", ")) })
     }
 
-    fun formatImages(images: List<OciImageStore.Entry>, command: DockerCommand.Images): String {
+    fun formatImages(images: List<OciImageStore.Entry>, command: EngineRequest.Images): String {
         if (command.quiet) return images.joinToString("") { it.digest.substringAfter(':').take(12) + "\n" }
         return table(
             listOf("REPOSITORY", "TAG", "IMAGE ID", "SIZE"),
@@ -352,10 +304,33 @@ object DockerCli {
         }
     }
 
-    /** The `docker` wrapper on every container's PATH. */
+    /** This front's wrapper on every container's PATH. */
     fun wrapperScript(): String = buildString {
         appendLine("#!/bin/sh")
-        appendLine("# droidtop's docker command (docs/SPEC.md 3d \"The docker command\"). Installed by droidtop.")
-        appendLine("exec sh ${ContainerEnter.HELPER} $TOKEN \"\$@\"")
+        appendLine("# droidtop's ${front.command} command (docs/SPEC.md 3d). Installed by droidtop.")
+        appendLine("exec sh ${ContainerEnter.HELPER} $token \"\$@\"")
+    }
+
+    companion object {
+        /** Lines `logs` gives without `--tail`, the most a page shows too. */
+        const val DEFAULT_TAIL = 100
+
+        /** The most lines one `logs` answers with; the log itself is kept under [ContainerProgram.LOG_MAX_BYTES]. */
+        const val MAX_TAIL = 2000
+
+        /** Subcommands droidtop does not answer yet on either front, said as such rather than as unknown. */
+        private val LATER = setOf("rmi", "create", "compose", "restart", "inspect")
+
+        /** Subcommands droidtop will not have: they need a daemon or image building it does not have. */
+        private val NEVER = setOf("build", "buildx", "push", "login", "network", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "version", "search", "logout", "rename", "machine")
+
+        val DOCKER = EngineCli(Front.DOCKER)
+        val PODMAN = EngineCli(Front.PODMAN)
+
+        /** Every front, each a command on every container's PATH. */
+        val FRONTS: List<EngineCli> = listOf(DOCKER, PODMAN)
+
+        /** The front whose wrapper hands [token], or null for an exported command's. */
+        fun forToken(token: String): EngineCli? = FRONTS.firstOrNull { it.token == token }
     }
 }
