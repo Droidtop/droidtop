@@ -201,7 +201,7 @@ fun PluginContextActions.screen(
                     run = { ctx, _ ->
                         val outcome = run(ctx, action, target, place)
                         outcome.screen?.let(onReplyScreen)
-                        outcome.message
+                        outcome.message ?: "${action.label} done"
                     },
                 )
             }.ifEmpty {
