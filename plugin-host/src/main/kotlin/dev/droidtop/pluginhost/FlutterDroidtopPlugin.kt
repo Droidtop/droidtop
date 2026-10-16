@@ -311,10 +311,7 @@ class FlutterDroidtopPlugin internal constructor(
             fd.close()
             return errorReply("RATE_LIMITED", "this plugin has ${FlutterOpenFiles.MAX} files open; close one with hostClose")
         }
-        val writable = runCatching {
-            val flags = android.system.Os.fcntlInt(fd.fileDescriptor, android.system.OsConstants.F_GETFL, 0)
-            (flags and android.system.OsConstants.O_ACCMODE) != android.system.OsConstants.O_RDONLY
-        }.getOrDefault(false)
+        val writable = runCatching { (openFlags(fd) and android.system.OsConstants.O_ACCMODE) != android.system.OsConstants.O_RDONLY }.getOrDefault(false)
         val path = FlutterOpenFiles.pathOf(slot)
         if (source.contained) {
             val shared = SandboxFiles.share(path, fd, writable)
@@ -326,6 +323,13 @@ class FlutterDroidtopPlugin internal constructor(
         }
         openDescriptors[path] = fd
         return FlutterOpenFiles.withPath(file.reply, "/proc/self/fd/${fd.fd}")
+    }
+
+    /** The descriptor's open flags: `fcntl(F_GETFL)` where Android offers it (API 30), else the kernel's own fdinfo line. */
+    private fun openFlags(fd: android.os.ParcelFileDescriptor): Int {
+        if (android.os.Build.VERSION.SDK_INT >= 30) return android.system.Os.fcntlInt(fd.fileDescriptor, android.system.OsConstants.F_GETFL, 0)
+        val line = java.io.File("/proc/self/fdinfo/${fd.fd}").readLines().first { it.startsWith("flags:") }
+        return line.substringAfter(':').trim().toInt(8)
     }
 
     /** `hostClose {path}`: lets a file [handleHostOpen] gave a path go. True when it was one. */
