@@ -51,6 +51,8 @@
 
     <string name="pref_label_visibility_title">Labels visibility</string>
     <string name="label_visibility_never">Never</string>
+    <string name="label_visibility_drawer_only">Drawer only</string>
+    <string name="label_visibility_home_only">Home only</string>
     <string name="label_visibility_auto">Auto</string>
     <string name="label_visibility_always">Always</string>
 
@@ -70,9 +72,13 @@
 
     <string name="pref_drawer_grid_width_override_title">Override grid width</string>
     <string name="pref_drawer_grid_width_override_summary">Use a custom number of columns in the app drawer</string>
+    <string name="pref_drawer_padding_title">Side padding</string>
 
     <string name="pref_blur_preview_title">Blur preview mode</string>
     <string name="pref_blur_preview_desc">Blur wallpaper while dragging icons and widgets</string>
+
+    <string name="pref_lock_home_screen_title">Lock home screen</string>
+    <string name="pref_lock_home_screen_summary">Prevent moving icons and widgets</string>
 
     <string name="pref_double_tap_action_title">Double tap</string>
     <string name="pref_swipe_down_action_title">Swipe down</string>

@@ -35,6 +35,11 @@ upstream commits since the base that are not in this table, so a new upstream co
 | `571606d` | BUGFIX - FloatingSurfaceView - don't send a stale icon position | Taken |
 | `2d99e32` | BUGFIX - crash on shortcut long-press on some Android 8/9 devices (non-convex icon mask outline) | Taken |
 | `4fd9b01` | BLUR - fix unnecessary heap allocation | Taken |
+| `93e7abe` | HOME_LOCK - add home screen lock option | Taken (Droidtop/tracker#564); its settings, strings and the long-press menu hunks fitted by hand around droidtop's rows |
+| `3346dfa` | HOME_LOCK - disable adding new icons to homescreen when locked | Taken; the settings hunk fitted by hand |
+| `7f84e03` | LABELS - full hide option (both home and drawer) | Taken |
+| `aa1bb09` | DRAWER - add side padding option | Taken |
+| `09fc582` | LABELS - show only in home option | Taken |
 | `e0f2e25` | ICONS - resolve correct icon while dragging on Android 8-11 | Waits for upstream's icon options (`ce7a74b`..`70d3436`), which it builds on |
 
 Not yet decided: the rest of the list `scripts/murine-upstream.sh` prints. Of those, the website (`WEBSITE - ...`),
