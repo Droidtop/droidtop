@@ -112,6 +112,19 @@ class QuickTilesTest {
     }
 
     @Test
+    fun `no rail entry and none of the tiles the review named draws the placeholder`() {
+        // Droidtop/tracker#534: Screenshot, Stop the app in front, Companion screen, Location, Flashlight, Plugins.
+        assertTrue(QuickSection.entries.none { it.glyph == QuickGlyph.GENERIC })
+        listOf(
+            GamingSettingsCatalog.ID_SCREENSHOT to QuickGlyph.CAMERA,
+            GamingSettingsCatalog.ID_STOP_FOREGROUND to QuickGlyph.STOP,
+            GamingSettingsCatalog.ID_COMPANION_WAKE to QuickGlyph.SECOND_SCREEN,
+            GamingSettingsCatalog.ID_SYSTEM_LOCATION to QuickGlyph.LOCATION,
+            GamingSettingsCatalog.ID_SYSTEM_FLASHLIGHT to QuickGlyph.FLASHLIGHT,
+        ).forEach { (id, glyph) -> assertEquals(id, glyph, QuickTiles.glyphFor(toggle(id, false))) }
+    }
+
+    @Test
     fun `an item this view has never heard of still gets a tile`() {
         val tile = QuickTiles.tile(toggle("pref_something_new", false))
         assertEquals(QuickGlyph.GENERIC, tile.glyph)

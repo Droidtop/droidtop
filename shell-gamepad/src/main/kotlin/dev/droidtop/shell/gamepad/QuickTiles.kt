@@ -36,6 +36,8 @@ enum class QuickGlyph {
     APPS, BELL, GAUGE, DOWNLOAD, POWER, AIRPLANE,
     // The companion's tabs (docs/SPEC.md "The companion's tabs"), drawn by the same rail.
     HOME, KEYBOARD, PEOPLE, MORE,
+    // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
+    CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
 }
 
 /**
@@ -53,7 +55,7 @@ enum class QuickSection(val label: String, val glyph: QuickGlyph, val panel: Con
     AUDIO("Audio", QuickGlyph.VOLUME, ControlPanel.AUDIO),
     DISPLAY("Display", QuickGlyph.DISPLAY, ControlPanel.DISPLAY),
     DOWNLOADS("Downloads and jobs", QuickGlyph.DOWNLOAD, ControlPanel.DOWNLOADS),
-    PLUGINS("Plugins", QuickGlyph.GENERIC, ControlPanel.PLUGINS),
+    PLUGINS("Plugins", QuickGlyph.PLUGIN, ControlPanel.PLUGINS),
 }
 
 /**
@@ -263,6 +265,24 @@ object QuickTiles {
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET -> QuickGlyph.GAMEPAD
         GamingSettingsCatalog.ID_DISPLAY_SWAP -> QuickGlyph.SWAP
         GamingSettingsCatalog.ID_DISPLAY_REINIT -> QuickGlyph.DISPLAY
+        GamingSettingsCatalog.ID_SCREENSHOT -> QuickGlyph.CAMERA
+        GamingSettingsCatalog.ID_STOP_FOREGROUND -> QuickGlyph.STOP
+        GamingSettingsCatalog.ID_COMPANION_WAKE,
+        GamingSettingsCatalog.ID_DISPLAY_COMPANION,
+        -> QuickGlyph.SECOND_SCREEN
+        GamingSettingsCatalog.ID_SYSTEM_LOCATION -> QuickGlyph.LOCATION
+        GamingSettingsCatalog.ID_SYSTEM_FLASHLIGHT -> QuickGlyph.FLASHLIGHT
+        GamingSettingsCatalog.ID_SYSTEM_SOCIAL -> QuickGlyph.PEOPLE
+        GamingSettingsCatalog.ID_PERFORMANCE_MODE -> QuickGlyph.GAUGE
+        GamingSettingsCatalog.ID_DOWNLOADS -> QuickGlyph.DOWNLOAD
+        GamingSettingsCatalog.ID_CONTROLLER -> QuickGlyph.GAMEPAD
+        GamingSettingsCatalog.ID_DISPLAY_KEYBOARD,
+        GamingSettingsCatalog.ID_DISPLAY_KEYBOARD_ACCESSIBILITY,
+        GamingSettingsCatalog.ID_DISPLAY_KEYBOARD_PLACEMENT,
+        GamingSettingsCatalog.ID_DISPLAY_KEYBOARD_RESTRICTED,
+        GamingSettingsCatalog.ID_KEYBOARD_PICK,
+        GamingSettingsCatalog.ID_KEYBOARD_ENABLE,
+        -> QuickGlyph.KEYBOARD
         // An item this file has never heard of still gets a real tile --
         // that is the point of rendering the catalog rather than a
         // hand-listed set.
