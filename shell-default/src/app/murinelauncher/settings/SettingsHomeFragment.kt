@@ -14,6 +14,7 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.Preference
 import androidx.preference.SwitchPreferenceCompat
 import app.murinelauncher.receiver.ScreenOffAdminReceiver
+import app.murinelauncher.widget.CustomSeekBarPreference
 import app.murinelauncher.widget.radio.RadioGroupPreference
 import app.murinelauncher.widget.smartspace.SmartspaceMode
 import app.murinelauncher.service.MurineAccessibilityService
@@ -35,6 +36,8 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val GRID_SIZE_WIDTH: String = "pref_grid_size_width"
         const val GRID_SIZE_HEIGHT: String = "pref_grid_size_height"
         const val LOCK_HOME_SCREEN: String = "pref_lock_home_screen"
+        const val DOCK_ICONS_OVERRIDE_SWITCH: String = "pref_dock_icons_override_switch"
+        const val DOCK_ICONS: String = "pref_dock_icons"
         // droidtop patch: superseded by DOUBLE_TAP_ACTION/SWIPE_DOWN_ACTION
         // below -- kept only as the migration source key
         // (GestureActionMigration), never bound to a preference row itself.
@@ -121,6 +124,29 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                 preference.setDefaultValue(LauncherPrefs.defaultGridHeight(isTablet))
                 return true
             }
+            // The dock's own size, as the drawer's own width is set (SettingsDrawerFragment): off is 0, the grid's
+            // width; on starts at the grid's width.
+            DOCK_ICONS_OVERRIDE_SWITCH -> {
+                val launcherPrefs = LauncherPrefs.get(preference.context)
+                val current = launcherPrefs.get(LauncherPrefs.DOCK_ICONS)
+                preference as SwitchPreferenceCompat
+                preference.isChecked = current != 0
+                updateDockIconsVisibility(current != 0)
+                preference.setOnPreferenceChangeListener { _, newValue ->
+                    val enabled = newValue as Boolean
+                    val value = if (enabled) launcherPrefs.get(LauncherPrefs.GRID_WIDTH) else 0
+                    launcherPrefs.put(LauncherPrefs.DOCK_ICONS, value)
+                    if (enabled) findPreference<CustomSeekBarPreference>(DOCK_ICONS)?.setValue(value)
+                    updateDockIconsVisibility(enabled)
+                    true
+                }
+                return true
+            }
+            DOCK_ICONS -> {
+                preference as CustomSeekBarPreference
+                preference.min = if (LauncherPrefs.DOCK_ICONS.get(requireContext()) == 0) 0 else 3
+                return true
+            }
             TASKBAR -> {
                 // Turning it on asks for the accessibility access its window needs.
                 preference.setOnPreferenceChangeListener { _, newValue ->
@@ -204,6 +230,14 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
      * function since both gesture slots (double-tap, swipe-down) offer
      * the same GestureAction choices.
      */
+    private fun updateDockIconsVisibility(enabled: Boolean) {
+        findPreference<CustomSeekBarPreference>(DOCK_ICONS)?.apply {
+            isEnabled = enabled
+            isVisible = enabled
+            min = if (enabled) 3 else 0
+        }
+    }
+
     private fun bindGestureAction(preference: RadioGroupPreference, defaultAction: GestureAction) {
         preference.asEnum(GestureAction::class.java).apply {
             setDefaultValue(defaultAction)

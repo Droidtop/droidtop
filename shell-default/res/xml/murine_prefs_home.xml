@@ -84,6 +84,22 @@
                 app:showIncrementButtons="false"
                 app:showTicks="true">
             </app.murinelauncher.widget.CustomSeekBarPreference>
+
+            <SwitchPreferenceCompat
+                android:key="pref_dock_icons_override_switch"
+                android:title="@string/pref_dock_icons_override_title"
+                android:summary="@string/pref_dock_icons_override_summary"
+                android:persistent="false" />
+
+            <!-- Min value set to 3 in code once the switch is on: 0 is "as the grid's width". -->
+            <app.murinelauncher.widget.CustomSeekBarPreference
+                android:title="@string/pref_label_dock_icons"
+                android:key="pref_dock_icons"
+                android:min="0"
+                android:max="10"
+                app:showIncrementButtons="false"
+                app:showTicks="true">
+            </app.murinelauncher.widget.CustomSeekBarPreference>
         </com.android.settingslib.widget.ExpandablePreference>
     </PreferenceCategory>
 
