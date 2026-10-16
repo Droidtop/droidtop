@@ -47,11 +47,6 @@
         <com.android.settingslib.widget.ExpandablePreference
             android:title="@string/pref_group_qsb_transparency"
             android:summary="@string/pref_group_qsb_transparency_desc">
-            <SwitchPreferenceCompat
-                android:key="qsb_box_blur"
-                android:title="@string/pref_qsb_box_blur"
-                android:summary="@string/pref_qsb_box_blur_desc"
-                android:persistent="true" />
             <app.murinelauncher.widget.CustomSeekBarPreference
                 android:title="@string/pref_qsb_bar_alpha"
                 android:summary="@string/pref_group_qsb_transparency"
@@ -65,46 +60,8 @@
                 app:showTicks="true">
             </app.murinelauncher.widget.CustomSeekBarPreference>
 
-            <app.murinelauncher.widget.CustomSeekBarPreference
-                android:title="@string/pref_qsb_box_alpha"
-                android:key="qsb_box_alpha"
-                android:summary="@string/pref_group_qsb_transparency"
-                android:defaultValue="90"
-                android:min="75"
-                android:max="100"
-                app:units="%"
-                app:tickInterval="5"
-                app:showIncrementButtons="true"
-                app:showTicks="true">
-            </app.murinelauncher.widget.CustomSeekBarPreference>
         </com.android.settingslib.widget.ExpandablePreference>
 
-        <app.murinelauncher.widget.WarningCardPreference
-            android:key="pref_blur_warning"
-            android:visible="false"
-            app:formatHtml="true"
-            app:cardIcon="@android:drawable/ic_dialog_alert"
-            app:cardText="@string/pref_blur_unsupported_warning"
-            app:cardBackgroundColor="@color/settingslib_colorBackgroundLevel_medium"
-            app:cardContentColor="@color/settingslib_materialColorOnSurface" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="@string/pref_subcategory_persistency">
-        <app.murinelauncher.widget.CustomSeekBarPreference
-            android:key="qsb_history_size"
-            android:title="@string/pref_qsb_history_size_title"
-            android:summary="@string/pref_qsb_history_size_summary"
-            android:defaultValue="50"
-            android:min="0"
-            android:max="100"
-            app:tickInterval="10"
-            app:showIncrementButtons="true"
-            app:showTicks="true" />
-
-        <Preference
-            android:key="qsb_clear_history"
-            android:icon="@drawable/ic_murine_delete"
-            android:title="@string/pref_qsb_clear_history_title"
-            android:summary="@string/pref_qsb_clear_history_summary" />
-    </PreferenceCategory>
 </androidx.preference.PreferenceScreen>
