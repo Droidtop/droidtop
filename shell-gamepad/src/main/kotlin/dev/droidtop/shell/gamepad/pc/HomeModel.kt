@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad.pc
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.format.ValueFormat
+import dev.droidtop.shell.gamepad.query.addedEpochMs
 
 /*
  * Home's strip (docs/SPEC.md 7i, "Home"; Droidtop/tracker#485 F7a, final design B.2): What's new, Friends and

@@ -6,6 +6,8 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcInfo
 import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibrarySortKey
+import dev.droidtop.shell.gamepad.query.addedEpochMs
+import dev.droidtop.shell.gamepad.query.comparator
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -78,6 +80,30 @@ class PcShelvesTest {
         assertEquals(listOf("com.example.game", "/rom", "/pc"), shelves.first { it.id == SHELF_RECENTLY_ADDED }.entries.map { it.id })
         // Other shelves are the PC fold's own.
         assertTrue(shelves.filter { it.id != SHELF_CONTINUE && it.id != SHELF_RECENTLY_ADDED }.flatMap { it.entries }.all { it.id == "/pc" })
+    }
+
+    @Test
+    fun `added is the install time when known, else first seen, and the sort, recently added and what's new agree`() {
+        // Both seen by droidtop's first scan an hour ago; the app was installed ten days ago, the folder game is
+        // known only by that scan, and a second game arrived yesterday.
+        val day = 24L * 60 * 60 * 1000
+        val app = game("com.example.app", kind = LibraryEntryKind.NATIVE_ANDROID_APP, firstSeen = now - 3_600_000)
+            .copy(appFacts = InstalledAppFacts(firstInstalledEpochMs = now - 10 * day))
+        val scanned = game("/scanned", firstSeen = now - 3_600_000)
+        val newer = game("/newer", firstSeen = now - day)
+        assertEquals(now - 10 * day, app.addedEpochMs())
+        assertEquals(now - day, newer.addedEpochMs())
+
+        val expected = listOf("/scanned", "/newer", "com.example.app")
+        // The Added sort (LibraryQuery), newest first.
+        assertEquals(expected, listOf(app, newer, scanned).sortedWith(LibrarySortKey.ADDED.comparator()).map { it.id })
+        // PC Games' Recently added, with the app merged in.
+        val shelf = pcShelves(listOf(scanned, newer), now, others = listOf(app)).first { it.id == SHELF_RECENTLY_ADDED }
+        assertEquals(expected, shelf.entries.map { it.id })
+        // Home's What's new: one card per place and day, in the same order.
+        val added = HomeModel.added(listOf(app, scanned, newer), now, placeOf = { it.id }, systemOf = { null })
+        val whatsNew = HomeModel.whatsNew(emptyList(), added, pluginUpdates = 0, attention = 0)
+        assertEquals(expected, whatsNew.map { (it as HomeCard.Added).place })
     }
 
     @Test
