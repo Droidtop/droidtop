@@ -55,7 +55,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
         private fun downloads(jobs: List<PluginJobsCenter.Entry>) = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.kind) }
 
         private suspend fun render(context: Context, widgetId: Int): RemoteViews {
-            val open = DroidtopWidgets.activity(context, "downloads", CatalogScreenLink.intent(context, DOWNLOADS_SCREEN))
+            val open = DroidtopWidgets.activity(context, widgetId, "downloads", CatalogScreenLink.intent(context, DOWNLOADS_SCREEN))
             val rows = downloads(PluginJobsCenter.entries().value).map { job ->
                 val state = when {
                     job.paused -> job.hold ?: "Paused"
@@ -68,7 +68,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
             val updateRow = updates.takeIf { it > 0 }?.let { n ->
                 DroidtopWidgets.Row(
                     if (n == 1) "1 game update" else "$n game updates",
-                    DroidtopWidgets.activity(context, "updates", CatalogScreenLink.intent(context, UPDATES_SCREEN)),
+                    DroidtopWidgets.activity(context, widgetId, "updates", CatalogScreenLink.intent(context, UPDATES_SCREEN)),
                 )
             }
             // The updates row is always shown when there is one, so it takes the last of the four places.

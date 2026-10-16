@@ -182,8 +182,16 @@ public class LauncherAppWidgetProviderInfo extends AppWidgetProviderInfo impleme
         this.minSpanY = Math.min(spanY, minSpanY);
         this.maxSpanX = maxSpanX;
         this.maxSpanY = maxSpanY;
-        this.mIsMinSizeFulfilled = Math.min(spanX, minSpanX) <= idp.numColumns
-            && Math.min(spanY, minSpanY) <= idp.numRows;
+        // droidtop patch (Droidtop/tracker#563): a widget is offered only when its smallest size has a place on
+        // the grid: its resize minimum when it resizes that way, else its own size; and only when a profile
+        // measured it. Stock let a widget that cannot shrink and is wider than the grid through, clamped to the
+        // grid, and one no profile measured through as 0x0 ("Calendar 0x0", rig, build 2011).
+        boolean resizesX = (resizeMode & RESIZE_HORIZONTAL) != 0 || forceResizableX;
+        boolean resizesY = (resizeMode & RESIZE_VERTICAL) != 0 || forceResizableY;
+        this.mIsMinSizeFulfilled = dev.droidtop.runtime.WidgetFit.INSTANCE.fits(
+                dev.droidtop.runtime.WidgetFit.INSTANCE.smallest(spanX, minSpanX, resizesX),
+                dev.droidtop.runtime.WidgetFit.INSTANCE.smallest(spanY, minSpanY, resizesY),
+                idp.numColumns, idp.numRows);
         // Ensures the default span X and span Y will not exceed the current grid size.
         this.spanX = Math.min(spanX, idp.numColumns);
         this.spanY = Math.min(spanY, idp.numRows);

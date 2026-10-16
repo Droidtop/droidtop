@@ -133,6 +133,7 @@ class LauncherGamesActivity : AppCompatActivity() {
                             dev.droidtop.library.settings.Place.openIntent(this, dev.droidtop.library.settings.Place.DOWNLOADS),
                         )
                     },
+                    openPageId = intent?.getStringExtra(EXTRA_PAGE_ID),
                 )
             }
         }
@@ -144,6 +145,16 @@ class LauncherGamesActivity : AppCompatActivity() {
          * app shortcut and the home screen's "droidtop games" menu entry.
          */
         const val ACTION_SHOW_GAMES = "dev.droidtop.app.action.SHOW_GAMES"
+
+        /** With [ACTION_SHOW_GAMES]: the game whose page opens at once (one that needs installing first). */
+        const val EXTRA_PAGE_ID = "dev.droidtop.app.extra.PAGE_ID"
+
+        /** The Games screen opened on [entryId]'s page, from anywhere (a widget, a pinned icon). */
+        fun pageIntent(context: Context, entryId: String): Intent =
+            Intent(ACTION_SHOW_GAMES)
+                .setClassName(context.packageName, LauncherGamesActivity::class.java.name)
+                .putExtra(EXTRA_PAGE_ID, entryId)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
         /** Off the process scope: an icon being built must not die with the screen that asked. */
         private val pinScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

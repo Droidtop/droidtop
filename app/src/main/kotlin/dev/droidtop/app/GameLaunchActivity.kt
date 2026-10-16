@@ -65,6 +65,8 @@ class GameLaunchActivity : Activity() {
                 when (result) {
                     is LaunchResult.Refused ->
                         android.os.Handler(android.os.Looper.getMainLooper()).post { report(app, result.reason) }
+                    // Not installed: its page, where Install is, never a launch that fails unseen.
+                    is LaunchResult.NeedsInstall -> app.startActivity(LauncherGamesActivity.pageIntent(app, result.entryId))
                     // Play history just moved, so the "Continue playing"
                     // widget (docs/SPEC.md Launcher mode) shows this game
                     // as most-recent now rather than at its next 30-minute

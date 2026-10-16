@@ -43,7 +43,7 @@ class FullPageWidgetProvider : AppWidgetProvider() {
                 .map { entry ->
                     DroidtopWidgets.Row(
                         dev.droidtop.library.GameNaming.displayName(entry.title),
-                        DroidtopWidgets.activity(context, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)),
+                        DroidtopWidgets.activity(context, widgetId, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)),
                     )
                 }
             val views = DroidtopWidgets.rows(
@@ -56,7 +56,7 @@ class FullPageWidgetProvider : AppWidgetProvider() {
             val pkg = context.packageName
             views.setTextColor(R.id.widget_search_hint, look.muted)
             views.setInt(R.id.widget_icon, "setColorFilter", look.ink)
-            views.setOnClickPendingIntent(R.id.widget_search, DroidtopWidgets.activity(context, "page-search", Intent(LauncherSearch.ACTION_SEARCH).setPackage(pkg)))
+            views.setOnClickPendingIntent(R.id.widget_search, DroidtopWidgets.activity(context, widgetId, "page-search", Intent(LauncherSearch.ACTION_SEARCH).setPackage(pkg)))
             fun mode(mode: Mode) = Intent(Intent.ACTION_MAIN).setClassName(pkg, MainActivity::class.java.name).putExtra(BackButtonMenu.EXTRA_MODE, mode.id)
             val actions = listOfNotNull(
                 "Quick Menu" to Intent(Intent.ACTION_MAIN).setClassName(pkg, DroidtopScreens.QUICK_MENU_ACTIVITY),
@@ -71,7 +71,7 @@ class FullPageWidgetProvider : AppWidgetProvider() {
                 if (action == null) continue
                 views.setTextViewText(id, action.first)
                 views.setTextColor(id, look.ink)
-                views.setOnClickPendingIntent(id, DroidtopWidgets.activity(context, "page:${action.first}", action.second))
+                views.setOnClickPendingIntent(id, DroidtopWidgets.activity(context, widgetId, "page:${action.first}", action.second))
             }
             return views
         }

@@ -1196,11 +1196,36 @@ neither of them specific to the new widget:
    the receiver's metadata, disabled ones included. `WidgetManifestTest`
    ties the manifest's widget receivers to `DroidtopWidgets.PROVIDERS` and
    to that rule, and checks each has its own `android:label` (pickers show
-   it; without one they show the app's name). Murine's own clock
-   (`MurineClockWidgetPlugin`) is hidden from the picker
-   (`WIDGET_FEATURE_HIDE_FROM_PICKER`): the Smartspace setting places it,
-   and in the picker it showed under droidtop as a nameless "Calendar
-   0 x 0".
+   it; without one they show the app's name). "Calendar 0×0" was
+   com.android.calendar's own widget, not Murine's clock (rig, build 2011,
+   2026-10-16; coordinator: "The picker should drop providers whose declared
+   size can't fit (as stock Launcher3 does), not show 0×0. Undo the Murine
+   clock hide if it was only a guess"). It was only a guess, so Murine's
+   clock is in the picker again. A widget is offered only when it has a
+   place on the grid (`WidgetFit`, `:runtime-common`, tested, read by
+   `LauncherAppWidgetProviderInfo.initSpans`): its smallest size, its resize
+   minimum when it resizes that way or else its own size, measured by a
+   grid profile (never 0) and inside the grid. Stock let a widget that
+   cannot shrink and is larger than the grid through, clamped.
+   **Widget taps are each widget's own** (rig, build 2011: a tap on a freshly
+   placed Downloads widget once started a game; coordinator: "Use unique
+   request codes per widget id"). Every tap is keyed by its widget's id and
+   its own key (`WidgetTaps`, tested): the request code, and for an intent
+   naming its component a data address as well (`droidtop-widget://<id>/<key>`,
+   compared, never resolved), so one widget's update can never rewrite
+   another's launch. Whether this was that tap's cause is not proven.
+   **A store game that is not installed opens its page** (rig, build 2011: a
+   Quick launch widget did nothing; coordinator: "The tap should open the
+   game's page with Install"): `Library.launch` answers
+   `LaunchResult.NeedsInstall` for a store's game with no install
+   (`LibraryEntry.needsInstall`, tested), and a widget's or pinned icon's tap
+   (`GameLaunchActivity`) opens the Games screen on that game's page
+   (`LauncherGamesActivity.pageIntent`), where Install is.
+   **A long press anywhere on a widget starts its drag** (rig, build 2011:
+   the Shelf could not be dragged off): the host view watches the long press
+   on every event it gets (`dispatchTouchEvent`), not only those offered to
+   `onInterceptTouchEvent`, which a grid or list inside the widget switches
+   off once it handles a touch.
 2. **A `native_bundle` plugin self-disables on its very first real call on
    Android 10+.** Android refuses `DexClassLoader` on a file that is still
    writable by the app ("Writable dex file ... is not allowed"); this

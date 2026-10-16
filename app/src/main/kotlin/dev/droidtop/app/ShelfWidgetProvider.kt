@@ -37,14 +37,14 @@ class ShelfWidgetProvider : AppWidgetProvider() {
             val content = WidgetConfigs.shelf(context, widgetId)
                 ?: return DroidtopWidgets.rows(
                     context, look, context.getString(R.string.widget_shelf_title),
-                    listOf(DroidtopWidgets.Row("Choose what this shelf shows", DroidtopWidgets.activity(context, "shelf:$widgetId", maker(context, widgetId)))),
+                    listOf(DroidtopWidgets.Row("Choose what this shelf shows", DroidtopWidgets.activity(context, widgetId, "shelf:$widgetId", maker(context, widgetId)))),
                     "",
                 )
             val title = ShelfContent.title(context, content)
             val empty = context.getString(R.string.widget_shelf_empty)
             if (content.layout == ShelfContent.Layout.LIST) {
                 val rows = ShelfContent.entries(context, content).map { entry ->
-                    DroidtopWidgets.Row(ShelfContent.name(entry), DroidtopWidgets.activity(context, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)))
+                    DroidtopWidgets.Row(ShelfContent.name(entry), DroidtopWidgets.activity(context, widgetId, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)))
                 }
                 return DroidtopWidgets.rows(context, look, title, rows, empty, textSp = content.textSize.sp)
             }
@@ -62,10 +62,12 @@ class ShelfWidgetProvider : AppWidgetProvider() {
             views.setRemoteAdapter(R.id.widget_grid, service)
             views.setEmptyView(R.id.widget_grid, R.id.widget_empty)
             // Each cell fills in its game's id (ShelfWidgetService); the template must be mutable for that.
+            // Keyed by this widget as every tap is (WidgetTaps): a cell fills in only its game's id, never the address.
             val template = PendingIntent.getActivity(
                 context,
-                "shelf-play:$widgetId".hashCode(),
+                dev.droidtop.runtime.WidgetTaps.requestCode(widgetId, "shelf-play"),
                 GameLaunchActivity.intentFor(context, "").apply { removeExtra(GameLaunchActivity.EXTRA_ENTRY_ID) }
+                    .setData(Uri.parse(dev.droidtop.runtime.WidgetTaps.address(widgetId, "shelf-play")))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
             )
