@@ -134,6 +134,23 @@ class DockerCliTest {
     }
 
     @Test
+    fun `run options that need a kernel feature say which, and info is answered by droidtop`() {
+        val none = EngineFeatures("b", EngineFeature.entries.associateWith { FeatureState(kernel = false) })
+        val memory = DockerCli.parse(listOf("run", "--memory", "512m", "alpine"), none) as DockerCommand.Answer
+        assertEquals(1, memory.code)
+        assertTrue(memory.text.contains("--memory needs cgroups, which this device's kernel does not have"))
+        assertTrue((DockerCli.parse(listOf("run", "--cpus=2", "alpine"), none) as DockerCommand.Answer).text.contains("cgroups"))
+        // What the containers already are is taken as given.
+        assertEquals(DockerCommand.Run("alpine", null), DockerCli.parse(listOf("run", "--network", "host", "alpine"), none))
+        assertEquals(DockerCommand.Run("alpine", null), DockerCli.parse(listOf("run", "--pid=host", "alpine"), none))
+        assertEquals(DockerCommand.Info, DockerCli.parse(listOf("info")))
+        assertEquals(1, answer(listOf("info", "-f", "x")).code)
+        val info = DockerCli.formatInfo(none, null)
+        assertTrue(info.contains("the desktop is not running"))
+        assertTrue(info.contains("overlayfs: not in this device's kernel"))
+    }
+
+    @Test
     fun `what run asked for replaces the command, never the entrypoint, and adds to the environment`() {
         val image = ImageRunConfig(env = listOf("PATH=/bin", "A=0"), entrypoint = listOf("/entry.sh"), cmd = listOf("serve"))
         val overrides = ContainerProgram.RunOverrides(args = listOf("sh"), env = listOf("A=1"))
