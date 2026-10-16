@@ -25,6 +25,7 @@ import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.LegacyManifest
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginErrorCode
+import dev.droidtop.pluginhost.PluginRefusals
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginMessages
 import dev.droidtop.pluginhost.PluginRecord
@@ -271,6 +272,9 @@ private class PluginPage(
 
     /** The call was refused because the user did not allow this point: shown as "not allowed", with the way to change it, never as a plugin failure. */
     @Volatile private var denied: Boolean = false
+
+    /** The last load failed on one declared permission droidtop refused (#518): asked again when drawn, as [denied] is. */
+    @Volatile private var refusedOne: Boolean = false
     @Volatile private var stale: Boolean = initial == null
     @Volatile private var notice: String? = null
 
@@ -308,9 +312,26 @@ private class PluginPage(
         val op = op ?: return
         // A denied page asks again each time its rows are read: the person may have allowed the point on the Permissions
         // screen it links to and come back with B, and a refused call never reaches the plugin (docs/plugin-api.md 4.3).
-        if (!stale && !denied) return
-        val reply = PluginViews.call(context, record, point, op, PluginViewCall.args(args, values, hostContext))
+        if (!stale && !denied && !refusedOne) return
+        val started = System.currentTimeMillis()
+        val answered = PluginViews.call(context, record, point, op, PluginViewCall.args(args, values, hostContext))
+        // A plugin that passed on droidtop's refusal of one of its declared permissions without naming it (#518): the
+        // page is about that one permission, never "not allowed to show this", which is for a refused point.
+        val refused = if (!answered.ok && answered.code == PluginErrorCode.PERMISSION_DENIED && answered.permission == null) {
+            PluginRefusals.refusedSince(record.manifest.id, started)?.takeIf { it in PluginViews.declared(record) }
+        } else {
+            null
+        }
+        val reply = refused?.let { permission ->
+            answered.aboutPermission(
+                permission,
+                title = "${record.manifest.label} needs a permission for this",
+                subtitle = answered.message?.takeIf { it.isNotBlank() },
+            )
+        } ?: answered
         stale = false
+        // Asked again each time it is drawn, like a denied page: the person may allow it on the Permissions page and come back.
+        refusedOne = refused != null
         // An error naming a permission the plugin declared is about that grant, not the whole point.
         denied = !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED && reply.permission == null
         errorReply = if (reply.ok) null else reply

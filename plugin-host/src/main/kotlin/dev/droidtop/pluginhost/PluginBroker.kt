@@ -34,6 +34,15 @@ interface BrokerEnvironment {
     fun grants(pluginId: String): PluginGrants.Snapshot
     fun setGrant(pluginId: String, permission: String, state: GrantState)
     fun noteWanted(pluginId: String, permission: String)
+
+    /** Whether the person chose Not now for [permission] of [pluginId] in this run of droidtop ([PluginRefusals]). */
+    fun notNow(pluginId: String, permission: String): Boolean = false
+
+    /** Keeps a Not now for the rest of this run, so the same page does not ask on every visit. */
+    fun rememberNotNow(pluginId: String, permission: String) = Unit
+
+    /** The broker refused [permission] to [pluginId]: a page reads it to degrade to that one permission. */
+    fun noteRefused(pluginId: String, permission: String) = Unit
     fun audit(pluginId: String, entry: AuditEntry)
 
     /** True while a user-initiated host to plugin call is in flight for [pluginId]: only then may a call in `ask` state show the sheet. */
@@ -838,21 +847,31 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
      * that the plugin wants this ("Wants <label>" on its row).
      */
     private fun requireGrant(record: PluginRecord, permission: String, tier: PermissionTier, reason: String?, label: String) {
+        fun refuse(message: String): Nothing {
+            env.noteRefused(pluginId, permission)
+            throw BrokerException(PluginErrorCode.PERMISSION_DENIED, message)
+        }
+        val putOff = "You chose Not now for \"$label\". Allow it on ${record.manifest.label}'s Permissions page to use this."
         when (PluginGrants.stateOf(record, env.grants(pluginId), permission)) {
             GrantState.GRANTED -> return
-            GrantState.DENIED -> throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "$label is turned off for this plugin")
+            GrantState.DENIED -> refuse("\"$label\" is turned off for ${record.manifest.label}.")
             GrantState.ASK, null -> {
                 if (!env.userInitiated(pluginId)) {
                     env.noteWanted(pluginId, permission)
-                    throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "this plugin needs you to allow: $label")
+                    refuse("${record.manifest.label} needs you to allow \"$label\".")
                 }
+                // Not now lasts this run of droidtop (Droidtop/tracker#518): the same page does not ask on every visit.
+                if (env.notNow(pluginId, permission)) refuse(putOff)
                 val answer = env.prompt(GrantPromptRequest(pluginId, record.manifest.label, permission, label, reason, tier))
                 when (answer) {
                     GrantAnswer.ALLOW -> env.setGrant(pluginId, permission, GrantState.GRANTED)
-                    GrantAnswer.NOT_NOW -> throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "not now")
+                    GrantAnswer.NOT_NOW -> {
+                        env.rememberNotNow(pluginId, permission)
+                        refuse(putOff)
+                    }
                     GrantAnswer.NEVER -> {
                         env.setGrant(pluginId, permission, GrantState.DENIED)
-                        throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "$label is turned off for this plugin")
+                        refuse("\"$label\" is turned off for ${record.manifest.label}.")
                     }
                 }
             }

@@ -2694,6 +2694,18 @@ When they are asked:
     schedule, a service) fails with `PERMISSION_DENIED` and never shows
     a prompt. The plugin row shows "Wants <label>", and the user can
     grant it there. Plugins cannot pop prompts on their own.
+  - **Not now lasts this run of droidtop** (2026-10-16,
+    Droidtop/tracker#518): the same permission is not asked again until
+    droidtop restarts or the person chooses on the plugin's Permissions
+    page; until then the call fails with `PERMISSION_DENIED` and a whole
+    sentence saying so.
+  - **A refused permission degrades only what needs it.** A page whose
+    call failed because droidtop refused one of the plugin's declared
+    permissions, which the plugin passed on without naming, is drawn as
+    a notice about that permission that opens its grant, never as "Not
+    allowed to show this" (that is for a refused point). A plugin keeps
+    the rest of its page by marking the nodes that need it with `needs`
+    (1.6) and not making the call while it builds the page.
 - **Revocable.** Accounts and sources → Plugins → <plugin> → Permissions
   lists every declared permission with its state and when it was last
   used (from the audit log). Changing a state takes effect on the next

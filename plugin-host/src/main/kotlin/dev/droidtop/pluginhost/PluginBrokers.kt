@@ -153,6 +153,12 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         auditLog.append(pluginId, entry)
     }
 
+    override fun notNow(pluginId: String, permission: String): Boolean = PluginRefusals.isNotNow(pluginId, permission)
+
+    override fun rememberNotNow(pluginId: String, permission: String) = PluginRefusals.rememberNotNow(pluginId, permission)
+
+    override fun noteRefused(pluginId: String, permission: String) = PluginRefusals.noteRefused(pluginId, permission)
+
     override fun userInitiated(pluginId: String): Boolean = PluginBrokers.userInitiated(pluginId)
 
     override fun remainingMs(pluginId: String): Long? = PluginBrokers.remainingMs(pluginId)

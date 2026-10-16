@@ -33,6 +33,15 @@ internal class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
     override fun noteWanted(pluginId: String, permission: String) {
         wanted += pluginId to permission
     }
+    val putOff = mutableSetOf<Pair<String, String>>()
+    val refused = mutableListOf<Pair<String, String>>()
+    override fun notNow(pluginId: String, permission: String) = (pluginId to permission) in putOff
+    override fun rememberNotNow(pluginId: String, permission: String) {
+        putOff += pluginId to permission
+    }
+    override fun noteRefused(pluginId: String, permission: String) {
+        refused += pluginId to permission
+    }
     override fun audit(pluginId: String, entry: AuditEntry) {
         audits += pluginId to entry
     }

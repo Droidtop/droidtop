@@ -18849,6 +18849,13 @@ Advanced.
   Android's `LinkProperties`, the active one first. Next: the Syncthing
   plugin itself, paired through droidtop's own device pairing
   (Droidtop/tracker#556).
+- **Declining one permission costs only what needs it** (2026-10-16,
+  Droidtop/tracker#518). Not now on the first-use sheet lasts the run of
+  droidtop (`PluginRefusals`), so a page does not ask on every visit; a
+  choice on the plugin's Permissions page replaces it. A page whose call
+  failed on one refused declared permission, passed on unnamed by the
+  plugin, shows a notice about that permission that opens its grant
+  instead of blocking the whole page. Refusal messages are whole sentences.
 - **An open process's shared folders, and the battery** (2026-10-16,
   Droidtop/tracker#553, found by the Syncthing plugin). An open process
   reaches the shared-storage folders its granted `files.shared` entries
