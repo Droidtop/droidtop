@@ -311,6 +311,9 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         }
         @JvmField
         val DRAWER_GRID_WIDTH_OVERRIDE = backedUpItem(SettingsDrawerFragment.GRID_SIZE_WIDTH_DRAWER_OVERRIDE, 0)
+        // droidtop patch (Droidtop/tracker#564): the dock's own icon count, Nova/Apex-style; 0 is the grid's width.
+        @JvmField
+        val DOCK_ICONS = backedUpItem(SettingsHomeFragment.DOCK_ICONS, 0)
         @JvmField
         val DRAWER_PADDING = backedUpItem(SettingsDrawerFragment.DRAWER_PADDING, 100)
         @JvmField
