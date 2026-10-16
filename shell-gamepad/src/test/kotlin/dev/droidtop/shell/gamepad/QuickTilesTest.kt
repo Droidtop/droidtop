@@ -132,7 +132,7 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `the tab is the System group plus the display-role rows, in that order`() {
+    fun `the tab is the System group plus the Android settings link, and not the display roles`() {
         val groups = listOf(
             CatalogGroup(
                 GamingSettingsCatalog.GROUP_GAMING, null,
@@ -140,6 +140,7 @@ class QuickTilesTest {
                     toggle(GamingSettingsCatalog.ID_SHOW_HINTS, true),
                     choice(GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET, 4),
                     choice(GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET, 2),
+                    toggle(GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS, false),
                 ),
             ),
             CatalogGroup(
@@ -148,14 +149,8 @@ class QuickTilesTest {
             ),
         )
         val ids = QuickTiles.systemGroups(groups).single().items.map { it.id }
-        assertEquals(
-            listOf(
-                GamingSettingsCatalog.ID_SYSTEM_DND,
-                GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
-                GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
-            ),
-            ids,
-        )
+        // The display roles are the Display tab's (DISPLAY_IDS).
+        assertEquals(listOf(GamingSettingsCatalog.ID_SYSTEM_DND, GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS), ids)
     }
 
     @Test
