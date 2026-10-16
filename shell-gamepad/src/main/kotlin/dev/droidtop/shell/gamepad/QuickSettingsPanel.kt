@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.runtime.FailureText
 import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -172,7 +173,7 @@ internal fun QuickSettingsPanel(
                 scope.launch {
                     statusById[action.id] = withContext(Dispatchers.IO) {
                         runCatching { action.run(context) { text -> statusById[action.id] = text } }
-                            .getOrElse { "Failed: ${it.message}" }
+                            .getOrElse { "Failed: ${FailureText.of("QuickSettings", it)}" }
                     }
                     refresh()
                 }

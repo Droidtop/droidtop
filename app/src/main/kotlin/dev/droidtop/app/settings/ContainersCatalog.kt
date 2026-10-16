@@ -1,5 +1,7 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.runtime.FailureText
+import dev.droidtop.runtime.PlainFailure
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.content.Context
 import android.content.Intent
@@ -170,7 +172,7 @@ object ContainersCatalog {
                     }
             },
             onFailure = { error ->
-                listOf(ActionItem(id = "containers_error", title = "Couldn't list the containers", subtitle = error.message, run = {}))
+                listOf(ActionItem(id = "containers_error", title = "Couldn't list the containers", subtitle = FailureText.of("Containers", error), run = {}))
             },
         )
         return listOf(
@@ -267,7 +269,7 @@ object ContainersCatalog {
                     onChange = { _, value ->
                         runCatching { runtime.rename(container, value) }
                             .onSuccess { renameProblems.remove(id) }
-                            .onFailure { renameProblems[id] = "Not renamed: ${it.message}" }
+                            .onFailure { renameProblems[id] = "Not renamed: ${FailureText.of("Containers", it)}" }
                     },
                 ),
             )
@@ -327,7 +329,7 @@ object ContainersCatalog {
                 onPicked = { ctx, uri ->
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: error("could not open that file")
+                            val out = ctx.contentResolver.openOutputStream(uri, "wt") ?: throw PlainFailure("the file could not be opened")
                             out.use { runtime.exportData(container, it) }
                         }
                         "Saved."
@@ -335,7 +337,7 @@ object ContainersCatalog {
                         // The picker already made the file; a half-written archive
                         // that looks like a backup is worse than none.
                         runCatching { android.provider.DocumentsContract.deleteDocument(ctx.contentResolver, uri) }
-                        "Not saved: ${it.message}"
+                        "Not saved: ${FailureText.of("Containers", it)}"
                     }
                 },
             ),
@@ -347,11 +349,11 @@ object ContainersCatalog {
                 onPicked = { ctx, uri ->
                     runCatching {
                         withContext(Dispatchers.IO) {
-                            val input = ctx.contentResolver.openInputStream(uri) ?: error("could not open that file")
+                            val input = ctx.contentResolver.openInputStream(uri) ?: throw PlainFailure("the file could not be opened")
                             input.use { runtime.importData(container, it) }
                         }
                         "Restored."
-                    }.getOrElse { "Not restored: ${it.message}" }
+                    }.getOrElse { "Not restored: ${FailureText.of("Containers", it)}" }
                 },
             ),
         )
@@ -1111,7 +1113,7 @@ object ContainersCatalog {
                             )
                         },
                         onFailure = { error ->
-                            add(ActionItem(id = "create_version", title = "Couldn't list the versions", subtitle = error.message, run = {}))
+                            add(ActionItem(id = "create_version", title = "Couldn't list the versions", subtitle = FailureText.of("Containers", error), run = {}))
                         },
                     )
                     add(

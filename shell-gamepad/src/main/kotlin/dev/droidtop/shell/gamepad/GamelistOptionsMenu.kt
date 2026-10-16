@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.runtime.FailureText
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -293,7 +294,7 @@ internal fun GamelistOptionsMenu(
                     status = withContext(Dispatchers.IO) {
                         runCatching {
                             dev.droidtop.library.consoles.PlatformDatabases.refresh(context) { status = it }
-                        }.getOrElse { "Update failed: ${it.message}" }
+                        }.getOrElse { "Update failed: ${FailureText.of("GamelistOptions", it)}" }
                     }
                     busy = false
                 }

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.runtime.FailureText
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
@@ -592,7 +593,7 @@ fun CatalogNavigator(
                 scope.launch {
                     statusById[item.id] = withContext(Dispatchers.IO) {
                         runCatching { item.run(context) { status -> statusById[item.id] = status } }
-                            .getOrElse { "Failed: ${it.message}" }
+                            .getOrElse { "Failed: ${FailureText.of("Settings", it)}" }
                     }
                     refresh()
                 }

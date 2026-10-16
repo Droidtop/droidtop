@@ -7986,6 +7986,11 @@ finished count with nothing in it says nothing was found.
 Sentence case. One dash convention. One name per concept — "game folders" is never also "ROM
 folders". No developer notation in a user-facing string (no `<folder>/<system>/<romFile>`, no
 package or class names, no backend error text). Button labels are the verb of what happens.
+A failure is shown through `FailureText` (runtime-common), the one mechanism for it: the throwable goes to
+the log, and the screen gets a plain clause for its kind (no connection, the file could not be found, Android did
+not allow it, reading or writing failed). Code that already knows the words a person should read throws
+`PlainFailure` with them, and only those words are shown as they are. An exception's own message never reaches the
+screen (the owner's review, 2026-10-16: "raw exception text → plain sentences, with the throwable logged").
 A sentence that describes a consequence belongs where the consequence is chosen.
 
 ### Permissions are asked at the feature, once, with the reason first
