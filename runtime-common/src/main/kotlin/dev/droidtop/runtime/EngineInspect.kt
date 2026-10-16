@@ -38,6 +38,8 @@ object EngineInspect {
         /** The folders the person mapped into it, by name. */
         val folders: List<String>,
         val podId: String?,
+        /** The labels it was made with. */
+        val labels: Map<String, String> = emptyMap(),
     )
 
     private val JSON = Json { prettyPrint = true }
@@ -92,6 +94,7 @@ object EngineInspect {
             put("Cmd", strings(f.config?.let { program.drop(it.entrypoint.size) }))
             put("Entrypoint", strings(f.config?.entrypoint))
             put("WorkingDir", f.config?.workingDir ?: "")
+            putJsonObject("Labels") { f.labels.forEach { (k, v) -> put(k, v) } }
             putJsonObject("ExposedPorts") { f.config?.ports?.forEach { put(it.toString(), JsonObject(emptyMap())) } }
         }
     }

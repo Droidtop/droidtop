@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -32,6 +33,7 @@ internal object DockerApiServer {
     private const val TAG = "droidtop.DockerApi"
     private const val MAX_CONNECTIONS = 16
     private const val IDLE_MS = 60_000
+    private const val WAIT_LOOK_MS = 250L
 
     @Volatile private var server: LocalServerSocket? = null
     @Volatile private var stopping = false
@@ -156,6 +158,7 @@ internal object DockerApiServer {
             }
             is DockerApi.Call.Containers -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
+                DockerApi.unknownFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return DockerApi.notBuilt("filters ${it.joinToString(", ")}") }
                 val pods = EngineFacts.pods(app)
                 val rows = runtime.listContainers().map { info ->
                     val id = info.container.id
@@ -164,7 +167,7 @@ internal object DockerApiServer {
                         EngineFacts.statusText(ContainerPrograms.state(id), ContainerPrograms.isRunning(id), info.running),
                     )
                 }
-                EngineHttp.Response.json(200, DockerApi.containers(rows, call.all))
+                EngineHttp.Response.json(200, DockerApi.containers(rows, call.all, call.filters))
             }
             is DockerApi.Call.Container -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
@@ -172,9 +175,101 @@ internal object DockerApiServer {
                 EngineHttp.Response.json(200, DockerApi.container(EngineFacts.of(app, runtime, info, EngineFacts.pods(app))))
             }
             DockerApi.Call.Images -> EngineHttp.Response.json(200, DockerApi.images(OciImageStore.of(app).entries()))
+            is DockerApi.Call.Create -> {
+                runtime ?: return DockerApi.error(500, "the desktop is not running")
+                val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
+                val (create, refused) = DockerApi.createRequest(String(request.body, Charsets.UTF_8), call.name, features)
+                refused?.let { return it }
+                val made = EngineActions.make(app, runtime, runtime.listContainers(), create!!).getOrElse {
+                    return DockerApi.error(409, it.message ?: "could not create the container")
+                }
+                EngineHttp.Response.json(201, DockerApi.created(made.container.id, made.notes))
+            }
+            is DockerApi.Call.Start -> withContainer(runtime, call.id) { rt, info ->
+                when {
+                    ContainerPrograms.isRunning(info.container.id) -> EngineHttp.Response(304, "text/plain", ByteArray(0))
+                    EngineActions.start(app, rt, info) -> EngineHttp.Response(204, "text/plain", ByteArray(0))
+                    else -> DockerApi.error(500, "${info.displayName} has no program of its own to start (its image names none)")
+                }
+            }
+            is DockerApi.Call.Stop -> withContainer(runtime, call.id) { _, info ->
+                if (!ContainerPrograms.isRunning(info.container.id)) {
+                    EngineHttp.Response(304, "text/plain", ByteArray(0))
+                } else {
+                    EngineActions.stop(app, info)
+                    EngineHttp.Response(204, "text/plain", ByteArray(0))
+                }
+            }
+            is DockerApi.Call.Restart -> withContainer(runtime, call.id) { rt, info ->
+                if (EngineActions.restart(app, rt, info)) {
+                    EngineHttp.Response(204, "text/plain", ByteArray(0))
+                } else {
+                    DockerApi.error(500, "${info.displayName} has no program of its own to restart (its image names none)")
+                }
+            }
+            is DockerApi.Call.Kill -> withContainer(runtime, call.id) { _, info ->
+                if (!ContainerPrograms.isRunning(info.container.id)) {
+                    DockerApi.error(409, "Container ${info.displayName} is not running")
+                } else {
+                    EngineActions.stop(app, info)
+                    EngineHttp.Response(204, "text/plain", ByteArray(0))
+                }
+            }
+            is DockerApi.Call.Remove -> withContainer(runtime, call.id) { rt, info ->
+                when (val removal = EngineActions.remove(app, rt, info, call.force)) {
+                    EngineActions.Removal.Removed -> EngineHttp.Response(204, "text/plain", ByteArray(0))
+                    EngineActions.Removal.Primary -> DockerApi.error(409, "${info.displayName} is the desktop's own container; droidtop does not remove it")
+                    EngineActions.Removal.Running -> DockerApi.error(
+                        409,
+                        "You cannot remove a running container ${info.displayName}. Stop the container before attempting removal or force remove",
+                    )
+                    is EngineActions.Removal.Failed -> DockerApi.error(500, removal.message)
+                }
+            }
+            is DockerApi.Call.Pull -> EngineActions.pull(app, call.reference).fold(
+                onSuccess = { EngineHttp.Response.json(200, DockerApi.pulled(call.reference, it)) },
+                onFailure = { DockerApi.error(500, it.message ?: it.javaClass.simpleName) },
+            )
+            is DockerApi.Call.Logs -> withContainer(runtime, call.id) { _, info ->
+                EngineHttp.Response(200, "application/vnd.docker.multiplexed-stream", DockerApi.logFrames(EngineActions.logs(app, info, call.tail)))
+            }
+            is DockerApi.Call.Wait -> withContainer(runtime, call.id) { _, info ->
+                val id = info.container.id
+                if (!ContainerPrograms.isRunning(id) && call.condition == "next-exit") {
+                    DockerApi.notBuilt("wait?condition=next-exit on a stopped container")
+                } else {
+                    // Until the program is no longer running; its exit code, 125 when it could not start.
+                    // Both the job and the state must say it is over: the state lags a start that has just been asked
+                    // for, and the job outlives the state's last change by its clean-up. A quarter-second look covers both.
+                    while (ContainerPrograms.isRunning(id) || ContainerPrograms.state(id).let {
+                            it is ContainerPrograms.State.Running || it is ContainerPrograms.State.Waiting
+                        }
+                    ) {
+                        delay(WAIT_LOOK_MS)
+                    }
+                    val code = when (val state = ContainerPrograms.state(id)) {
+                        is ContainerPrograms.State.Ended -> state.exitCode
+                        is ContainerPrograms.State.Failed -> 125
+                        else -> 0
+                    }
+                    EngineHttp.Response.json(200, DockerApi.waited(code))
+                }
+            }
+            is DockerApi.Call.Refused -> DockerApi.error(call.status, call.message)
             is DockerApi.Call.NotBuilt -> DockerApi.notBuilt(call.what)
             DockerApi.Call.NotFound -> DockerApi.error(404, "page not found")
         }
+    }
+
+    /** [block] with the running desktop's runtime and the container [ref] names; 500 or 404 otherwise. */
+    private suspend fun withContainer(
+        runtime: dev.droidtop.runtime.ContainerRuntime?,
+        ref: String,
+        block: suspend (dev.droidtop.runtime.ContainerRuntime, ContainerInfo) -> EngineHttp.Response,
+    ): EngineHttp.Response {
+        runtime ?: return DockerApi.error(500, "the desktop is not running")
+        val info = find(runtime.listContainers(), ref) ?: return DockerApi.error(404, "No such container: $ref")
+        return block(runtime, info)
     }
 
     /** A container by name, id, or a unique start of its id, as Docker's daemon takes them. */

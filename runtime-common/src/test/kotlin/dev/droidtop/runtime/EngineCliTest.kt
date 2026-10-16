@@ -192,6 +192,12 @@ class EngineCliTest {
         assertEquals(overrides, ContainerProgram.RunOverrides.decode(overrides.encode()))
         assertEquals(ContainerProgram.RunOverrides(null, emptyList()), ContainerProgram.RunOverrides.decode(ContainerProgram.RunOverrides().encode()))
         assertEquals(null, ContainerProgram.RunOverrides.decode("not json"))
+        val labelled = ContainerProgram.RunOverrides(labels = mapOf("a" to "1"))
+        assertEquals(labelled, ContainerProgram.RunOverrides.decode(labelled.encode()))
+        assertEquals(
+            mapOf("com.docker.compose.project" to "demo", "tier" to ""),
+            (EngineCli.DOCKER.parse(listOf("run", "-l", "com.docker.compose.project=demo", "--label=tier", "alpine")) as EngineRequest.Run).labels,
+        )
     }
 
     @Test
