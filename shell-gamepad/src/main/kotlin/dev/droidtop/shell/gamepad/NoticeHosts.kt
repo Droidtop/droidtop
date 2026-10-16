@@ -11,6 +11,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.currentStateAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,7 +64,24 @@ internal fun NoticeDialogHost() {
     val request by NoticeDialogs.pending.collectAsState()
     val open = request ?: return
     if (hosts.lastOrNull() !== token) return
+    // A question asked while the shell is not in front waits for it: its window would have no live token.
+    if (!windowAllowed()) return
     NoticeDialogWindow(open)
+}
+
+/**
+ * Whether a host may add a window now (Droidtop/tracker#410): only while its activity is at least started. A
+ * notice's Popup or Dialog is driven by global state ([Notices], [NoticeDialogs]), so without this it could be
+ * composed while the activity is stopping or gone, and adding its window then throws
+ * `WindowManager$BadTokenException` (crash-267, console, v0.2.0-dev.1649).
+ */
+internal fun canAddWindow(state: androidx.lifecycle.Lifecycle.State): Boolean =
+    state.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+
+@Composable
+private fun windowAllowed(): Boolean {
+    val state by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateAsState()
+    return canAddWindow(state)
 }
 
 @Composable
@@ -164,6 +182,8 @@ internal fun NoticeFlashHost() {
         Notices.shown(flash)
     }
     if (layerOpen) return
+    // Not while the shell is stopping or gone (#410): the flash is then marked shown by its timer only.
+    if (!windowAllowed()) return
     val fontScale = LocalDensity.current.fontScale
     val offset = with(density) { IntOffset(-16.dp.roundToPx(), -(MenuTokens.HintBarRoom + 8.dp).roundToPx()) }
     Popup(alignment = Alignment.BottomEnd, offset = offset) {
