@@ -43,8 +43,10 @@ object StoreMarks {
         for (url in candidates) {
             val bitmap = runCatching { decode(Http.get(url, maxBytes = MAX_BYTES).body) }.getOrNull() ?: continue
             save(context, store.id, bitmap)
+            timber.log.Timber.i("Store mark: %s from %s", store.id, url)
             return true
         }
+        timber.log.Timber.w("Store mark: none for %s (page %s, %d candidates)", store.id, if (page == null) "unreadable" else "read", candidates.size)
         return false
     }
 
