@@ -19,6 +19,9 @@ import re
 import sys
 import types
 
+# A fixture is loaded from the source tree: leave no __pycache__ beside it.
+sys.dont_write_bytecode = True
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 CASES = os.path.join(HERE, "..", "src", "main", "resources", "dev", "droidtop", "pluginhost", "conformance.json")
 
