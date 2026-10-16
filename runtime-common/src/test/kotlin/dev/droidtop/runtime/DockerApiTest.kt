@@ -66,7 +66,7 @@ class DockerApiTest {
         assertEquals(DockerApi.Call.Containers(all = false), DockerApi.route("GET", "/containers/json/", emptyMap()))
         assertEquals(DockerApi.Call.Container("web"), DockerApi.route("GET", "/v1.43/containers/web/json", emptyMap()))
         assertEquals(DockerApi.Call.Images, DockerApi.route("GET", "/images/json", emptyMap()))
-        assertEquals(DockerApi.Call.NotBuilt("POST /containers/create"), DockerApi.route("POST", "/v1.43/containers/create", emptyMap()))
+        assertEquals(DockerApi.Call.NotBuilt("POST /containers/web/attach"), DockerApi.route("POST", "/v1.43/containers/web/attach", emptyMap()))
         assertEquals(DockerApi.Call.NotBuilt("POST /exec/abc/start"), DockerApi.route("POST", "/exec/abc/start", emptyMap()))
         assertEquals(DockerApi.Call.NotFound, DockerApi.route("GET", "/nonsense", emptyMap()))
         assertTrue(String(DockerApi.notBuilt("POST /containers/create").body).contains("not built in droidtop's engine yet"))
