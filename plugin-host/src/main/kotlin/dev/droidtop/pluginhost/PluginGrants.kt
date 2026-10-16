@@ -125,8 +125,9 @@ class PluginGrants(private val dir: File) {
 
     /**
      * Sets one state, as the user's own choice: it also clears "wanted" and "wants new access" for that item. A changed
-     * hole permission ([PluginTiers.HOLES]) retires the plugin's process, whose filter can never change: the next call
-     * starts it afresh with the holes granted now, so a refused network is gone at once (docs/plugin-api.md 5.3).
+     * hole permission ([PluginTiers.HOLES]) or shared-files permission ([SharedFiles.PERMISSIONS]) retires the
+     * plugin's process, whose filter and file rules can never change: the next call starts it afresh with what is granted
+     * now, so a refused network or folder is gone at once (docs/plugin-api.md 5.3).
      */
     fun set(pluginId: String, permission: String, state: GrantState) {
         val changedHole = synchronized(LOCK) {
@@ -140,7 +141,7 @@ class PluginGrants(private val dir: File) {
                     corrupt = false,
                 ),
             )
-            permission in PluginTiers.HOLES && snap.states[permission] != state
+            (permission in PluginTiers.HOLES || permission in SharedFiles.PERMISSIONS) && snap.states[permission] != state
         }
         if (changedHole) runCatching { PluginProcesses.retire(pluginId) }
     }

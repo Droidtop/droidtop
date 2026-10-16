@@ -135,6 +135,9 @@ interface BrokerEnvironment {
     fun announceToDevices(pluginId: String, value: JSONObject?): Unit =
         throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop announces nothing to paired devices")
 
+    /** D7 (`power.state`): the battery now. */
+    fun powerState(): PowerState = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no battery state")
+
     /** The role tokens in use (docs/SPEC.md 7k), for `ui.get_theme` and `host.get_info`'s `theme`. */
     fun roleTokens(): dev.droidtop.library.theme.RoleTokens.Set =
         dev.droidtop.library.theme.RoleTokens.of(dev.droidtop.library.theme.GamingThemeColors.DEFAULT)
@@ -574,7 +577,7 @@ object HostApis {
     }
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
-    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops + HostDevicesApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops }
 
     private fun vaultOf(env: BrokerEnvironment): PluginVault =
         env.vault() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no plugin secrets")
