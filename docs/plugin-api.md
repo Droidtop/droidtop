@@ -711,6 +711,12 @@ no destination, such as the PC library). Ops:
   filled under a hidden name and renamed when whole, an existing folder is never
   touched, and a failed unpack keeps the download and fails the job with a
   sentence. An engine hint pins the unpacked folder like it pins a placed file.
+  **BIOS files:** a single file that is a BIOS file of the screen's system goes
+  to the games folder's `bios` folder under droidtop's BIOS database's name for
+  it, created when missing, not among the games: its md5 is one the database
+  lists for the system, or, from a plugin that also provides `emulator.bios`,
+  its name is the database's (`AcquireBios`, Droidtop/tracker#558). The page
+  then says what the download did ("Added <file>"), not only "Finished".
   **Several files:** instead of `download` the reply may return `downloads`,
   a JSON string holding a list of 1 to 16 descriptors (each as above, with its
   own `fileName`, digests and headers; both `download` and `downloads`, or an
