@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
@@ -51,6 +50,10 @@ class WebSessionActivity : Activity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
+        // droidtop's colours for a screen it draws with plain views (docs/SPEC.md 7k "Light and dark",
+        // Droidtop/tracker#559): the role tokens in use, and the system's light or dark widgets to match them.
+        val tokens = dev.droidtop.library.theme.RoleTokens.current(this)
+        setTheme(if (tokens.light) android.R.style.Theme_Material_Light_NoActionBar else android.R.style.Theme_Material_NoActionBar)
         super.onCreate(savedInstanceState)
         val id = intent.getStringExtra(EXTRA_ID)
         val asked = id?.let { requests[it] }
@@ -68,7 +71,7 @@ class WebSessionActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(16, 20, 24))
+            setBackgroundColor(tokens.color("ground"))
         }
         val bar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -83,11 +86,11 @@ class WebSessionActivity : Activity() {
                 WebSessionRequest.Mode.OPEN -> "${asked.label}: open in your session"
                 WebSessionRequest.Mode.BROWSE -> asked.label
             }
-            setTextColor(Color.WHITE)
+            setTextColor(tokens.color("onSurface"))
             textSize = 18f
         })
         location = TextView(this).apply {
-            setTextColor(Color.rgb(170, 180, 190))
+            setTextColor(tokens.color("onSurfaceMuted"))
             textSize = 13f
         }
         titles.addView(location)
@@ -111,7 +114,7 @@ class WebSessionActivity : Activity() {
                 WebSessionRequest.Mode.BROWSE ->
                     "${asked.label}'s own pages. Paying happens on them; droidtop never sees or keeps payment details. B goes back a page."
             }
-            setTextColor(Color.rgb(170, 180, 190))
+            setTextColor(tokens.color("onSurfaceMuted"))
             textSize = 12f
             setPadding(dp(16), 0, dp(16), dp(6))
         })

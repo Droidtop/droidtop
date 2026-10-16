@@ -303,6 +303,8 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
             .put("vpn", caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true)
     }
 
+    override fun roleTokens(): dev.droidtop.library.theme.RoleTokens.Set = dev.droidtop.library.theme.RoleTokens.current(appContext)
+
     override fun pairedDevices(pluginId: String): List<dev.droidtop.net.peer.PairedDevices.Device> =
         dev.droidtop.net.peer.PairedDevices.forPlugin(appContext, pluginId)
 
