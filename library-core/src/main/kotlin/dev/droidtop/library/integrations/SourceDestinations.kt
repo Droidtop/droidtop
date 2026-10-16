@@ -34,7 +34,7 @@ object SourceDestinations {
         return withContext(Dispatchers.IO) {
             val systems = ConsoleSystemsRepository.allSystems(context)
             val folders = SystemFolders.all(context, systems.associateBy { it.id })
-            pick(listSystemId, null, platform, systems, folders, GamesRoots.configured(context))
+            pick(listSystemId, null, platform, systems, folders, GamesRoots.configured(context), GamesRoots.current(context).firstOrNull())
         }
     }
 
@@ -46,18 +46,24 @@ object SourceDestinations {
         systems: List<ConsoleSystemDef>,
         folders: List<Pair<File, ConsoleSystemDef>>,
         pcRoots: List<File>,
+        // The first games folder: a console system with no folder of its own yet gets one there, made when the first
+        // download is placed (Droidtop/tracker#536: never a dead end for lack of a system folder). A DS game listed
+        // under Nintendo DS by its own name, sitting in a folder that resolved as another system, left DS with no
+        // folder, and Get games said "No games folder for Nintendo DS yet" (rig on 0.2.0-dev.2070).
+        firstRoot: File? = null,
     ): Pick {
         fun nameOf(id: String?) = systems.firstOrNull { it.id == id }?.displayName ?: id
+        fun folderOf(id: String) = folders.firstOrNull { it.second.id == id }?.first ?: firstRoot?.let { File(it, id) }
         if (listFolder != null) return Pick(listSystemId, nameOf(listSystemId), listFolder)
         // A console list knows its system even before its folder is found.
         if (listSystemId != null && listSystemId !in PC_IDS) {
-            return Pick(listSystemId, nameOf(listSystemId), folders.firstOrNull { it.second.id == listSystemId }?.first)
+            return Pick(listSystemId, nameOf(listSystemId), folderOf(listSystemId))
         }
         val words = platform.orEmpty().split(PLATFORM_SPLIT).map { it.trim().lowercase() }.filter { it.isNotEmpty() }
         val console = words.firstNotNullOfOrNull { word ->
             systems.firstOrNull { it.id !in PC_IDS && (it.id.lowercase() == word || it.displayName.lowercase() == word) }
         }
-        if (console != null) return Pick(console.id, console.displayName, folders.firstOrNull { it.second.id == console.id }?.first)
+        if (console != null) return Pick(console.id, console.displayName, folderOf(console.id))
         val pcFolder = folders.firstOrNull { it.second.id in PC_IDS }?.first ?: pcRoots.firstOrNull()
         return Pick(PC_SYSTEM_ID, "PC", pcFolder)
     }

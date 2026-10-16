@@ -21612,7 +21612,12 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   and goes to the PC folder, which is a `windows` or `pc` system folder when
   the person has one, else the first games folder they named under Settings,
   Game folders (the PC walk finds a game under any of them). The plugin's
-  context carries `system` `pc` there. When no folder exists the result
+  context carries `system` `pc` there. A console system with no folder of its
+  own yet goes to `<first games folder>/<system id>`, made when the first
+  download is placed (#536's rule; rig on 0.2.0-dev.2070: a DS game listed
+  under Nintendo DS by its own file name, in a folder that resolved as another
+  system, left DS without a folder and Get games said "No games folder for
+  Nintendo DS yet"). When no games folder exists at all the result
   still opens, on a page that says which games folder is missing and where to
   add it, so a row is never a dead end and nothing is sent to `startJob`
   with an invented path.
