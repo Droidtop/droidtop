@@ -22,6 +22,7 @@ import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.net.peer.AgentNative
 import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
+import dev.droidtop.net.peer.PairedDevices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -82,6 +83,14 @@ object ComputersCatalog {
                         )
                         add(
                             ActionItem(
+                                id = "computers_pair_handheld",
+                                title = "Pair a handheld",
+                                subtitle = "Another handheld running droidtop, for plugins that keep the two in step, such as Syncthing",
+                                run = { ctx -> ctx.startActivity(PairComputerActivity.intent(ctx, handheld = true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+                            ),
+                        )
+                        add(
+                            ActionItem(
                                 id = "computers_get_agent",
                                 title = "Get droidtop-agent",
                                 subtitle = "For Windows, Linux and macOS: the program the computer runs",
@@ -95,6 +104,11 @@ object ComputersCatalog {
             )
             if (computers.isNotEmpty()) {
                 add(CatalogGroup(id = "computers_paired", title = "Paired", items = computers.map { computerRow(it) }))
+            }
+            // Handhelds paired with this one (Droidtop/tracker#556): nothing syncs with them by itself, plugins do.
+            val handhelds = Computers.devices(context).filter { it.handheld }
+            if (handhelds.isNotEmpty()) {
+                add(CatalogGroup(id = "computers_handhelds", title = "Handhelds", items = handhelds.map { handheldRow(it) }))
             }
             add(CatalogGroup(id = "computers_library", title = "In this device's library", items = libraryRows(context)))
             add(CatalogGroup(id = "computers_share", title = "When a computer is away", items = shareRows(context)))
@@ -219,6 +233,59 @@ object ComputersCatalog {
         icon = CatalogIcon.DESKTOP,
     )
 
+    private fun handheldRow(device: Computer) = NestedScreenItem(
+        id = "handheld_${device.id.take(16)}",
+        title = device.name,
+        subtitle = "Paired " + DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(device.pairedAtMs)),
+        inline = handheldScreen(device.id),
+        icon = CatalogIcon.CONTROLLER,
+    )
+
+    /** A paired handheld: when it was paired, the key it was pinned by, and Forget. */
+    private fun handheldScreen(id: String) = CatalogScreen(
+        id = "handheld_$id",
+        title = "Handheld",
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val device = Computers.devices(context).firstOrNull { it.id == id && it.handheld }
+                    ?: return@withContext listOf(CatalogGroup(id = "handheld_gone", title = null, items = listOf(ActionItem(id = "handheld_gone_row", title = "This handheld is no longer paired", run = {}))))
+                listOf(
+                    CatalogGroup(
+                        id = "handheld_state",
+                        title = device.name,
+                        items = listOf(
+                            ActionItem(
+                                id = "handheld_about",
+                                title = "Paired " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(device.pairedAtMs)),
+                                subtitle = "Plugins you allow to see your paired devices can keep things in step with it. Its key " +
+                                    (device.fingerprint?.take(16)?.chunked(4)?.joinToString(" ") ?: "was pinned before fingerprints were shown"),
+                                run = {},
+                            ),
+                        ),
+                    ),
+                    CatalogGroup(
+                        id = "handheld_forget",
+                        title = null,
+                        items = listOf(
+                            ActionItem(
+                                id = "handheld_forget_row",
+                                title = "Forget this handheld",
+                                subtitle = "Plugins stop seeing it; to use it again, pair it again",
+                                confirmTitle = "Forget ${device.name}?",
+                                run = { ctx ->
+                                    Thread {
+                                        Computers.remove(ctx.applicationContext, device.id)
+                                        runCatching { PairedDevices.changed(ctx.applicationContext) }
+                                    }.start()
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            }
+        },
+    )
+
     private fun computerScreen(id: String) = CatalogScreen(
         id = "computer_$id",
         title = "Computer",
@@ -313,7 +380,12 @@ object ComputersCatalog {
                         title = "Forget this computer",
                         subtitle = "Stops syncing with it; to sync again, pair it again",
                         confirmTitle = "Forget ${computer.name}?",
-                        run = { ctx -> Thread { Computers.remove(ctx.applicationContext, computer.id) }.start() },
+                        run = { ctx ->
+                            Thread {
+                                Computers.remove(ctx.applicationContext, computer.id)
+                                runCatching { PairedDevices.changed(ctx.applicationContext) }
+                            }.start()
+                        },
                     ),
                 ),
             ),

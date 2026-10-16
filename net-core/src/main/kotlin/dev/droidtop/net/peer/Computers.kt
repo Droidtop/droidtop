@@ -6,7 +6,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** A computer paired with this device through droidtop-agent. */
+/**
+ * A device paired with this one through droidtop-agent: a computer (droidtop-agent, or a desktop manager such as
+ * Pythia) or another handheld running droidtop ([kind], Droidtop/tracker#556).
+ */
 data class Computer(
     /** Its id: the public key droidtop pinned at pairing, in hex. */
     val id: String,
@@ -35,7 +38,13 @@ data class Computer(
     val showGames: Boolean = false,
     /** Its other applications are shown in Apps ("Show this computer's apps"). */
     val showApps: Boolean = false,
-)
+    /** [Computers.KIND_COMPUTER] or [Computers.KIND_HANDHELD], as it said at pairing; a pairing from before kinds is a computer. */
+    val kind: String = Computers.KIND_COMPUTER,
+    /** Its certificate's fingerprint as pinned at pairing (droidtop-agent docs/DESIGN.md section 3), null for a pairing from before. */
+    val fingerprint: String? = null,
+) {
+    val handheld: Boolean get() = kind == Computers.KIND_HANDHELD
+}
 
 /**
  * The computers this device is paired with (docs/SPEC.md 7o "Computers"), and
@@ -51,6 +60,9 @@ data class Computer(
  * is open.
  */
 object Computers {
+    const val KIND_COMPUTER = "computer"
+    const val KIND_HANDHELD = "handheld"
+
     const val PATH_LAN = "lan"
     const val PATH_WIREGUARD = "wireguard"
     const val PATH_RENDEZVOUS = "rendezvous"
@@ -73,9 +85,15 @@ object Computers {
 
     private fun file(context: Context): File = File(folder(context), "computers.json")
 
-    /** The paired computers. Reads a small file the first time: never on the main thread. */
+    /**
+     * The paired computers, not the paired handhelds: what save sync, library sync, plugin contexts and Steam Link
+     * reach. Reads a small file the first time: never on the main thread.
+     */
+    fun list(context: Context): List<Computer> = devices(context).filter { !it.handheld }
+
+    /** Every paired device, computers and handhelds (Droidtop/tracker#556). Reads a small file the first time: never on the main thread. */
     @Synchronized
-    fun list(context: Context): List<Computer> {
+    fun devices(context: Context): List<Computer> {
         cache?.let { return it }
         val read = runCatching {
             val array = JSONArray(file(context).readText())
@@ -90,16 +108,16 @@ object Computers {
      * false until [list] has run in this process. A game's launch reads the list
      * before its exit asks this.
      */
-    fun anyKnown(): Boolean = cache?.isNotEmpty() == true
+    fun anyKnown(): Boolean = cache?.any { !it.handheld } == true
 
     @Synchronized
     fun put(context: Context, computer: Computer) {
-        write(context, list(context).filter { it.id != computer.id } + computer)
+        write(context, devices(context).filter { it.id != computer.id } + computer)
     }
 
     @Synchronized
     fun update(context: Context, id: String, change: (Computer) -> Computer) {
-        val current = list(context)
+        val current = devices(context)
         if (current.none { it.id == id }) return
         write(context, current.map { if (it.id == id) change(it) else it })
     }
@@ -127,7 +145,7 @@ object Computers {
     /** Makes [id] the primary computer, or none with null: the newest saves win then. */
     @Synchronized
     fun setPrimary(context: Context, id: String?) {
-        write(context, list(context).map { it.copy(primary = it.id == id) })
+        write(context, devices(context).map { it.copy(primary = it.id == id && !it.handheld) })
     }
 
     /**
@@ -138,7 +156,7 @@ object Computers {
     @Synchronized
     private fun moved(context: Context, old: String, new: String) {
         if (!ID.matches(old) || !ID.matches(new) || old == new) return
-        val current = list(context)
+        val current = devices(context)
         if (current.none { it.id == old }) return
         val from = File(folder(context), old)
         val to = File(folder(context), new)
@@ -149,7 +167,7 @@ object Computers {
     /** Forgets a computer and everything kept for it on this device. */
     @Synchronized
     fun remove(context: Context, id: String) {
-        write(context, list(context).filter { it.id != id })
+        write(context, devices(context).filter { it.id != id })
         if (ID.matches(id)) File(folder(context), id).deleteRecursively()
     }
 
@@ -191,7 +209,7 @@ object Computers {
      */
     fun call(context: Context, computer: Computer, op: String, args: JSONObject = JSONObject()): JSONObject {
         val seed = DeviceIdentity.seed(context) ?: return JSONObject().put("error", "this device's key could not be opened")
-        val known = list(context).firstOrNull { it.id == computer.id } ?: computer
+        val known = devices(context).firstOrNull { it.id == computer.id } ?: computer
         args.put("seed", seed)
             .put("peer", computer.id)
             .put("addresses", JSONArray(known.addresses + known.endpoints))
@@ -258,6 +276,8 @@ object Computers {
         .put("primary", c.primary)
         .put("showGames", c.showGames)
         .put("showApps", c.showApps)
+        .put("kind", c.kind)
+        .put("fingerprint", c.fingerprint ?: JSONObject.NULL)
 
     private fun fromJson(o: JSONObject): Computer? {
         val id = o.optString("id").takeIf { ID.matches(it) } ?: return null
@@ -277,6 +297,8 @@ object Computers {
             primary = o.optBoolean("primary"),
             showGames = o.optBoolean("showGames"),
             showApps = o.optBoolean("showApps"),
+            kind = if (o.optString("kind") == KIND_HANDHELD) KIND_HANDHELD else KIND_COMPUTER,
+            fingerprint = text("fingerprint"),
         )
     }
 

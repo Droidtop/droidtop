@@ -124,6 +124,17 @@ interface BrokerEnvironment {
      */
     fun netLinks(): List<NetLinks.Link> = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop reports no network links")
 
+    /**
+     * D21 (docs/plugin-api.md 3, `devices.list_paired`): the devices paired with this one as [pluginId] sees them, its
+     * own counterpart's announced value on each ([dev.droidtop.net.peer.PairedDevices]).
+     */
+    fun pairedDevices(pluginId: String): List<dev.droidtop.net.peer.PairedDevices.Device> =
+        throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop has no paired devices")
+
+    /** D21 (`devices.announce`): keeps [value] as what [pluginId] announces (null withdraws it) and sends it on, off the call. */
+    fun announceToDevices(pluginId: String, value: JSONObject?): Unit =
+        throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop announces nothing to paired devices")
+
     /** The addresses [host] resolves to; asked only once the plugin may reach [host]. */
     fun addressesOf(host: String): List<java.net.InetAddress> = emptyList()
 
@@ -555,7 +566,7 @@ object HostApis {
     }
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
-    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops }
+    val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops + HostDevicesApis.ops }
 
     private fun vaultOf(env: BrokerEnvironment): PluginVault =
         env.vault() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no plugin secrets")

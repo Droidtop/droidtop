@@ -100,6 +100,27 @@ object PluginEventBus {
 }
 
 /**
+ * Fires [PluginEvent.DEVICES_CHANGED] (docs/plugin-api.md D21) at every runnable plugin that subscribed to it and holds
+ * `devices.paired`: a device was paired or forgotten, or what one announced changed. Set as
+ * [dev.droidtop.net.peer.PairedDevices.onChanged] at start; called on a background thread.
+ */
+fun notifyDevicesChanged(context: Context) {
+    CoroutineScope(Dispatchers.IO).launch {
+        val grants = dev.droidtop.pluginhost.PluginGrants.forContext(context)
+        val candidates = PluginStore.installed(context)
+            .filter { it.runnable() && it.manifest.subscribesTo(PluginEvent.DEVICES_CHANGED) }
+            .filter { dev.droidtop.pluginhost.PluginGrants.stateOf(it, grants.read(it.manifest.id), "devices.paired") == dev.droidtop.pluginhost.GrantState.GRANTED }
+        if (candidates.isEmpty()) return@launch
+        val policy = PluginCrashPolicy(context.applicationContext)
+        try {
+            candidates.forEach { runCatching { policy.notifyEvent(it, PluginEvent.DEVICES_CHANGED, emptyMap()) } }
+        } finally {
+            policy.shutdown()
+        }
+    }
+}
+
+/**
  * The exact args map [PluginEventBus.notifyDefaultPlayerChanged] delivers
  * as [PluginEvent.DEFAULT_PLAYER_CHANGED]'s payload -- pulled out of the
  * suspend dispatch (which needs a real [Context], the plugin store and a

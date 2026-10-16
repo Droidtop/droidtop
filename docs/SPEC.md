@@ -16490,12 +16490,40 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
     "Use a code from the computer" on the same screen takes them and
     connects (`pair_connect`); the computer is then kept at that address on
     the agent's port 47610.
+- **Paired devices have a kind** (Droidtop/tracker#556, droidtop-agent
+  build-67): the core's pairing says whether the other side is a `computer`
+  (droidtop-agent, or a desktop manager such as Pythia) or a `handheld`
+  (another droidtop), and gives its certificate's fingerprint; both are kept
+  with the device. `Computers.list` is the paired computers, the only ones
+  save sync, library sync, plugin contexts and Steam Link reach;
+  `Computers.devices` is every paired device. Since build-67 every session is
+  mutual TLS, so a computer whose droidtop-agent is older than build-67
+  cannot be reached until it updates; its pairing stays.
+- **Pairing a handheld** is the same screen (`PairComputerActivity` with
+  `EXTRA_HANDHELD`, Settings > Computers > Pair a handheld): one handheld
+  shows its address and code, the other types both under "Use a code from
+  the other handheld". Handhelds share no library or saves yet; they are
+  paired for the plugins that keep them in step (below). Each paired
+  handheld has a page with when it was paired, its key and Forget.
+- **Paired devices for plugins** (`PairedDevices`, docs/plugin-api.md D21,
+  Droidtop/tracker#553): `devices.list_paired` gives each paired device's
+  id, name, kind, when it was paired, whether it was seen in the last 10
+  minutes, and what the same plugin id announced there; `devices.announce`
+  keeps the plugin's value (at most 4 KiB) in `announce-own.json` and sends
+  every value of this device to every paired device (the agent's
+  `announce`), whose answers are kept in `announced.json`. The event
+  `devices.changed` follows a pairing, a Forget, or a changed value. A paired
+  handheld is reached only while it serves: droidtop serves the paired
+  handhelds (`serve_start`) while at least one is paired and at least one
+  plugin has announced, and stops when not; what they announce lands in
+  `served.json`, watched by a `FileObserver`.
 - **No resident process.** droidtop reaches a computer only:
   - before a game starts and after it ends;
   - when the person presses "Sync the library now";
-  - when a plugin calls `context.sync`;
+  - when a plugin calls `context.sync` or `devices.announce`;
   - while the pairing screen is open.
-  Nothing listens or polls otherwise.
+  The one listener is the handhelds' server above, and only while a plugin
+  has something for them. Nothing polls.
 
 ### Saves
 

@@ -42,6 +42,7 @@ import dev.droidtop.library.credentials.handoff.HandoffServer
 import dev.droidtop.net.peer.AgentNative
 import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
+import dev.droidtop.net.peer.PairedDevices
 import dev.droidtop.net.peer.DeviceIdentity
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -61,6 +62,10 @@ import org.json.JSONObject
  * While this screen is open, and only then, droidtop listens for the computer
  * on the local network; the code works once, and three wrong ones end the
  * attempt. Opened from Settings > Accounts and sources > Computers.
+ *
+ * The same screen pairs two handhelds running droidtop ([EXTRA_HANDHELD], Droidtop/tracker#556): one shows its code
+ * and its address, the other types both under "Use a code from the other handheld". The agent core runs the same
+ * pairing either way and says which kind of device answered.
  */
 class PairComputerActivity : AppCompatActivity() {
     private var multicast: WifiManager.MulticastLock? = null
@@ -74,7 +79,7 @@ class PairComputerActivity : AppCompatActivity() {
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
                     Column(Modifier.fillMaxSize().groundBackground()) {
                         Box(Modifier.weight(1f)) {
-                            PairScreen(onDone = { finish() }, holdMulticast = ::holdMulticast)
+                            PairScreen(handheld = intent.getBooleanExtra(EXTRA_HANDHELD, false), onDone = { finish() }, holdMulticast = ::holdMulticast)
                         }
                         HintRow(bindings = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back")))
                     }
@@ -114,19 +119,25 @@ class PairComputerActivity : AppCompatActivity() {
         /** The page where droidtop-agent's builds are. */
         const val AGENT_RELEASES = "https://github.com/Droidtop/droidtop-agent/releases/latest"
 
-        fun intent(context: Context): Intent = Intent(context, PairComputerActivity::class.java)
+        /** Pairing another handheld running droidtop rather than a computer: the same pairing, worded for it. */
+        const val EXTRA_HANDHELD = "dev.droidtop.extra.PAIR_HANDHELD"
+
+        fun intent(context: Context, handheld: Boolean = false): Intent =
+            Intent(context, PairComputerActivity::class.java).putExtra(EXTRA_HANDHELD, handheld)
     }
 }
 
 private sealed interface PairState {
     data object Starting : PairState
-    data class Showing(val code: String, val uri: String) : PairState
+    /** [at] is this device's address and pairing port, which another handheld types: it has no broadcast to find it by. */
+    data class Showing(val code: String, val uri: String, val at: String?) : PairState
     data class Paired(val computer: Computer) : PairState
     data class Failed(val reason: String) : PairState
 }
 
 @Composable
-private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
+private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () -> Unit) {
+    val other = if (handheld) "handheld" else "computer"
     val context = LocalContext.current
     var state by remember { mutableStateOf<PairState>(PairState.Starting) }
     var attempt by remember { mutableStateOf(0) }
@@ -136,12 +147,14 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
         state = withContext(Dispatchers.IO) {
             if (!AgentNative.available) return@withContext PairState.Failed("This build of droidtop has no computer sync library.")
             val seed = DeviceIdentity.seed(context) ?: return@withContext PairState.Failed("This device's key could not be made.")
+            val lan = HandoffServer.lanAddress()
             val started = AgentNative.call(
                 "pair_start",
-                JSONObject().put("seed", seed).put("name", Computers.deviceName(context)).put("address", HandoffServer.lanAddress() ?: ""),
+                JSONObject().put("seed", seed).put("name", Computers.deviceName(context)).put("address", lan ?: ""),
             )
             AgentNative.failure(started)?.let { return@withContext PairState.Failed(it) }
-            PairState.Showing(started.optString("code"), started.optString("uri"))
+            val port = started.optInt("port")
+            PairState.Showing(started.optString("code"), started.optString("uri"), lan?.takeIf { port > 0 }?.let { "$it:$port" })
         }
         if (state !is PairState.Showing) return@LaunchedEffect
         val waited = withContext(Dispatchers.IO) {
@@ -161,23 +174,33 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
         modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Pair a computer", style = MaterialTheme.typography.headlineSmall)
+        Text("Pair a $other", style = MaterialTheme.typography.headlineSmall)
         when (val s = state) {
             PairState.Starting -> Text("Getting a code…", style = MaterialTheme.typography.bodyLarge)
             is PairState.Showing -> Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text("On the computer, open droidtop-agent, choose Pair a handheld and type:", style = MaterialTheme.typography.bodyLarge)
-                    Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
-                    Text("(or at a command line: droidtop-agent pair ${s.code})", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Keep this screen open until the computer says it is paired. Both have to be on the same network. " +
-                            "No droidtop-agent yet? It is at github.com/Droidtop/droidtop-agent.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    if (handheld) {
+                        Text(
+                            "On the other handheld, open Settings > Computers > Pair a handheld, and under Use a code from the other handheld type this address and code:",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(s.at ?: "This device is on no network", style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace)
+                        Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
+                        Text("Keep this screen open until the other handheld says it is paired. Both have to be on the same network.", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        Text("On the computer, open droidtop-agent, choose Pair a handheld and type:", style = MaterialTheme.typography.bodyLarge)
+                        Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
+                        Text("(or at a command line: droidtop-agent pair ${s.code})", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            "Keep this screen open until the computer says it is paired. Both have to be on the same network. " +
+                                "No droidtop-agent yet? It is at github.com/Droidtop/droidtop-agent.",
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
                 QrCode(content = s.uri, size = 220.dp)
             }
-            is PairState.Paired -> PairedChoices(s.computer, onDone)
+            is PairState.Paired -> if (s.computer.handheld) PairedHandheld(s.computer, onDone) else PairedChoices(s.computer, onDone)
             is PairState.Failed -> {
                 Text(s.reason, style = MaterialTheme.typography.bodyLarge)
                 Button(onClick = { attempt++ }, modifier = Modifier.fillMaxWidth()) { Text("Get a new code") }
@@ -186,15 +209,19 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
         // The other way round, for a computer that cannot reach this device (an emulator, a guest network):
         // `droidtop-agent pair` on the computer shows its address and a code, and this device connects.
         if (state !is PairState.Paired) {
-            Text("Use a code from the computer", style = MaterialTheme.typography.titleMedium)
+            Text("Use a code from the other $other", style = MaterialTheme.typography.titleMedium)
             Text(
-                "If the computer cannot find this device, choose Show a code in droidtop-agent's Pair a handheld on the computer, and type the address and code it shows.",
+                if (handheld) {
+                    "Or the other way round: open Pair a handheld on the other handheld, and type the address and code it shows."
+                } else {
+                    "If the computer cannot find this device, choose Show a code in droidtop-agent's Pair a handheld on the computer, and type the address and code it shows."
+                },
                 style = MaterialTheme.typography.bodyMedium,
             )
             OutlinedTextField(
                 value = address,
                 onValueChange = { address = it.trim() },
-                label = { Text("Computer's address, such as 192.168.1.20:47612") },
+                label = { Text("The $other's address, such as 192.168.1.20:47612") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -229,25 +256,44 @@ private fun PairScreen(onDone: () -> Unit, holdMulticast: () -> Unit) {
                 },
                 enabled = connecting != "Pairing…" && address.isNotBlank() && typed.length == 6,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Pair with this computer") }
+            ) { Text("Pair with this $other") }
         }
     }
 }
 
 /**
- * Keeps the computer a pairing reply names. Its games and apps stay out of the
- * library until the person turns them on. Writes a small file: never on the
- * main thread.
+ * Keeps the device a pairing reply names, with the kind it said it is and its certificate's fingerprint. A computer's
+ * games and apps stay out of the library until the person turns them on. Writes a small file: never on the main
+ * thread. Then the plugins that work with paired devices hear of it ([PairedDevices.changed], on its own thread: it
+ * may reach every paired device).
  */
 private fun keep(context: Context, reply: JSONObject): Computer {
+    val handheld = reply.optString("kind") == Computers.KIND_HANDHELD
     val computer = Computer(
         id = reply.optString("peer"),
-        name = reply.optString("name").ifBlank { "Computer" },
+        name = reply.optString("name").ifBlank { if (handheld) "Handheld" else "Computer" },
         addresses = listOfNotNull(reply.optString("address").takeIf { it.isNotBlank() }),
         pairedAtMs = System.currentTimeMillis(),
+        kind = if (handheld) Computers.KIND_HANDHELD else Computers.KIND_COMPUTER,
+        fingerprint = reply.optString("fingerprint").takeIf { it.isNotBlank() },
     )
     Computers.put(context, computer)
+    val appContext = context.applicationContext
+    Thread({ runCatching { PairedDevices.changed(appContext) } }, "devices-changed").start()
     return computer
+}
+
+/** A handheld paired: nothing to choose (handhelds share no library yet), only what pairing it does. */
+@Composable
+private fun PairedHandheld(device: Computer, onDone: () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Text("Paired with ${device.name}.", style = MaterialTheme.typography.titleLarge)
+        Text(
+            "Plugins that work with your devices, such as Syncthing, can now find it, once you allow them to see your paired devices.",
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+    }
 }
 
 /**

@@ -2290,6 +2290,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | D18 | Accessibility bridge | read the screen or act for the user (e.g. an auto-skipper, a TTS reader of game text) | `a11y.*`: **host only exposes the droidtop-owned service's events for droidtop's own windows** | — | `a11y.bridge` (critical, official origins only) | critical | not built; §10 Q3 |
 | D19 | Location | region-aware stores, time zones | not offered (droidtop holds no location permission; a plugin that needs it is the wrong shape) | — | — | — | not offered |
 | D20 | Camera | QR pairing | not offered by the host; QR *display* is C14; scanning goes to an app bridge | — | — | — | not offered |
+| D21 | Paired devices | a plugin that keeps the person's devices in step with its own counterparts on them (the Syncthing plugin accepts exactly the devices droidtop paired, so its own pairing is never shown) | `devices.list_paired()` → {devices: [{id, name, kind: "computer"\|"handheld", pairedAt, online, announced}]}, `announced` being what the same plugin id announced on that device or null; `devices.announce {value}`: an object of at most 4 KiB (null withdraws it) sent to every paired device, kept there per device, answered at once while droidtop sends it; event `devices.changed` (a device paired or forgotten, or a value it announced changed) | data | `devices.paired` (dangerous) | medium | built (2026-10-16, Droidtop/tracker#556, #553; `PairedDevices` over droidtop-agent build-67's `announce`, `serve_start` and `serve_stop`) |
 
 ### E. Desktop and computer
 
@@ -2477,6 +2478,7 @@ wording the host uses, so it is identical in every mode.
 | `retroarch.commands` | normal | Send commands to RetroArch while you play: save and load states, slots, shaders, fast-forward | B8 |
 | `gpu.render` | dangerous | Use the graphics chip to draw its screen | §5.3 |
 | `net.sockets` | dangerous | Make its own connections to other devices and the internet | §5.3 ("Open processes") |
+| `devices.paired` | dangerous | See and reach the devices you paired with droidtop | D21 |
 | `notify.post` | normal | Send you notifications | C6 |
 | `net.state` | normal | See whether you are online | D1 |
 | `net.wifi_details` | dangerous | See the name of your Wi-Fi network | D1 |
@@ -3550,6 +3552,12 @@ version was bumped.
   plugin still works.
 
 **Changelog (additive changes; no version moved).**
+
+- 2026-10-16 (Droidtop/tracker#556, #553): paired devices (D21):
+  `devices.list_paired`, `devices.announce` and the event
+  `devices.changed`, under the new `devices.paired`. A plugin sees, on each
+  paired computer or handheld, only what the same plugin id announced there;
+  never an address, a key or another plugin's value.
 
 - 2026-10-15 (Droidtop/tracker#553): `net.get_links` (D12), under
   `net.sockets`.
