@@ -364,7 +364,7 @@ object PluginCatalogScreen {
                 if (toInstall > 0) {
                     add(
                         AsyncActionItem(
-                            id = "plugins_catalog_install_all",
+                            id = "plugins_catalog_install_all_$sourceId",
                             title = "Install all",
                             subtitle = "$toInstall plugin${if (toInstall == 1) "" else "s"} from ${current.name}. Each one waits for your approval before it runs",
                             value = toInstall.toString(),
@@ -377,7 +377,7 @@ object PluginCatalogScreen {
                 if (toUpdate > 0) {
                     add(
                         AsyncActionItem(
-                            id = "plugins_catalog_update_all",
+                            id = "plugins_catalog_update_all_$sourceId",
                             title = "Update all",
                             subtitle = "$toUpdate plugin${if (toUpdate == 1) "" else "s"} installed from ${current.name} ${if (toUpdate == 1) "has" else "have"} a newer version",
                             value = toUpdate.toString(),
@@ -390,7 +390,7 @@ object PluginCatalogScreen {
                 lastBulk[sourceId]?.let { said ->
                     add(
                         NoticeItem(
-                            id = "plugins_catalog_bulk_result",
+                            id = "plugins_catalog_bulk_result_$sourceId",
                             notice = Notice(
                                 tone = if (said.contains("Not installed") || said.contains("Couldn't")) NoticeTone.Caution else NoticeTone.Info,
                                 title = if (said.startsWith("Installed") || said.startsWith("Updated")) "Done" else "Finished",
