@@ -208,6 +208,7 @@
         -->
         <receiver
             android:name="dev.droidtop.app.ContinuePlayingWidgetProvider"
+            android:label="@string/widget_continue_playing_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -232,6 +233,7 @@
         -->
         <receiver
             android:name="dev.droidtop.app.LibrarySearchWidgetProvider"
+            android:label="@string/widget_search_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -242,6 +244,7 @@
         </receiver>
         <receiver
             android:name="dev.droidtop.app.QuickLaunchWidgetProvider"
+            android:label="@string/widget_quick_launch_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -252,6 +255,7 @@
         </receiver>
         <receiver
             android:name="dev.droidtop.app.DownloadsWidgetProvider"
+            android:label="@string/widget_downloads_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -262,6 +266,7 @@
         </receiver>
         <receiver
             android:name="dev.droidtop.app.DesktopWidgetProvider"
+            android:label="@string/widget_desktop_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -272,6 +277,7 @@
         </receiver>
         <receiver
             android:name="dev.droidtop.app.CompanionWidgetProvider"
+            android:label="@string/widget_companion_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -282,6 +288,7 @@
         </receiver>
         <receiver
             android:name="dev.droidtop.app.FullPageWidgetProvider"
+            android:label="@string/widget_page_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -292,6 +299,7 @@
         </receiver>
         <receiver
             android:name="dev.droidtop.app.ShelfWidgetProvider"
+            android:label="@string/widget_shelf_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -333,6 +341,7 @@
 
         <receiver
             android:name="dev.droidtop.app.PluginStatusWidgetProvider"
+            android:label="@string/widget_plugin_status_title"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
