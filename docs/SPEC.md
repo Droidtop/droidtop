@@ -15215,7 +15215,9 @@ topmost layer's hints and nothing else (no Start Menu, none of the screen's).
 A panel passes its own hints (`MenuPanel(hints = ...)`, default A Select,
 B Back) and draws no hint row inside itself; two sets never show at once.
 A catalog sheet (`CatalogSheet`) is such a layer and paints the ground under itself
-(Droidtop/tracker#278). A failed source search says one plain sentence and
+(Droidtop/tracker#278). It is the one way a catalog page opens over another screen: a page a search result opens,
+the Plugins page reached from search, a plugin action's reply, a plugin page from a game page (a bare dialog around
+`CatalogNavigator` drew translucent, the screen behind showing through; rig on 0.2.0-dev.2070). A failed source search says one plain sentence and
 keeps what the source reported behind a "Technical details" row, never the
 raw exception text. A layer is also the shell's rule for sound: while one is
 open, nothing plays beneath it (docs/SPEC.md "Launch audio hand-off": the

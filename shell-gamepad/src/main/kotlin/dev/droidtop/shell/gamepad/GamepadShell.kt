@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad
 
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.util.Log
 import dev.droidtop.library.userFacingErrorMessage
@@ -2001,10 +2000,8 @@ private fun EntryDetailScreen(
     }
     pluginActionScreen?.let { screen ->
         val close = { pluginActionScreen = null }
-        androidx.compose.ui.window.Dialog(onDismissRequest = close) {
-            GatePadInThisDialog()
-            dev.droidtop.shell.gamepad.CatalogNavigator(root = screen, onExit = close)
-        }
+        // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
+        CatalogSheet(root = screen, onExit = close)
     }
 }
 
