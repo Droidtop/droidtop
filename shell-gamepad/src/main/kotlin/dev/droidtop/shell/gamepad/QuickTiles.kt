@@ -104,7 +104,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_ADAPTIVE,
         GamingSettingsCatalog.ID_SYSTEM_ROTATE,
         GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
-        GamingSettingsCatalog.ID_ORIENTATION,
+        GamingSettingsCatalog.ID_ORIENTATION_HERE,
         dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT,
         dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_DISPLAY_SIZE,
         GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
