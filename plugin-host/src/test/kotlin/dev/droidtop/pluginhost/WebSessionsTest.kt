@@ -102,6 +102,26 @@ class WebSessionsTest {
     }
 
     @Test
+    fun `a page that offers several files is taken in one visit, each a token of its own`() {
+        val first = WebSessionDownload("https://files.example/get/1", "UA", "attachment; filename=\"Game.part1.rar\"", null, 10L, "https://forum.example/t/1", "s=1")
+        val second = WebSessionDownload("https://files.example/get/2", "UA", "attachment; filename=\"Game.part2.rar\"", null, 10L, "https://forum.example/t/1", "s=1")
+        var asked: WebSessionRequest? = null
+        val (_, env) = env { request -> asked = request; WebSessionResult(true, null, first, listOf(first, second)) }
+        val reply = call(env, "web.session", "open_in_session", JSONObject().put("url", "https://forum.example/masked/1").put("max", 4))
+        assertEquals(4, asked!!.maxDownloads)
+        val downloads = reply.data.getJSONArray("downloads")
+        assertEquals(2, downloads.length())
+        assertEquals("Game.part2.rar", downloads.getJSONObject(1).getString("fileName"))
+        assertTrue(downloads.getJSONObject(0).getString("session") != downloads.getJSONObject(1).getString("session"))
+        assertEquals(downloads.getJSONObject(0).toString(), reply.data.getJSONObject("download").toString())
+        // At most the acquire reply's limit, and one when the plugin asks for none.
+        call(env, "web.session", "open_in_session", JSONObject().put("url", "https://forum.example/masked/1").put("max", 99))
+        assertEquals(HostWebApis.MAX_CAPTURED, asked!!.maxDownloads)
+        call(env, "web.session", "open_in_session", JSONObject().put("url", "https://forum.example/masked/1"))
+        assertEquals(1, asked!!.maxDownloads)
+    }
+
+    @Test
     fun `the acquire reply names a capture by its token`() {
         val parsed = AcquireDownloadDescriptor.parse("""{"url":"https://files.example/a.zip","fileName":"a.zip","session":"w-00000000-0000-0000-0000-000000000000"}""")!!
         assertEquals("w-00000000-0000-0000-0000-000000000000", parsed.session)

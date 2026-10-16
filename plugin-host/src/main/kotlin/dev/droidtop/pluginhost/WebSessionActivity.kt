@@ -32,8 +32,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * - **Sign-in** (a plugin): the site's own page; the person signs in there (the plugin never sees the password or the
  *   cookies). Done (or the site setting the plugin's `doneCookie`) ends it, and the cookies of the plugin's declared
  *   sites are handed back to be sealed in the plugin's vault. Back with nothing done is "not signed in".
- * - **Open** (a plugin): a protected link opened with the stored session; the first download the page starts is
- *   captured (its address, the cookies it needs, the user agent and the page it came from) and the view closes.
+ * - **Open** (a plugin): a protected link opened with the stored session; the download the page starts is captured
+ *   (its address, the cookies it needs, the user agent and the page it came from) and the view closes. Asked for
+ *   several ([WebSessionRequest.maxDownloads], Droidtop/tracker#419), it stays open, says how many it has and closes at
+ *   the most asked for or on Done.
  * - **Browse** (a store): the store's pages, to look around, claim and buy. Only https pages load. The view reads
  *   nothing of a page: there is no script bridge and no script is run in it, so what a person types into a store's
  *   checkout (a card, an address) goes to the store and nowhere else; droidtop learns only the addresses of the pages
@@ -47,6 +49,10 @@ class WebSessionActivity : Activity() {
     private var webView: WebView? = null
     private var location: TextView? = null
     private var request: WebSessionRequest? = null
+
+    /** What an Open view has taken so far, in order, each address once. */
+    private val captured = mutableListOf<WebSessionDownload>()
+    private var takenLine: TextView? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -95,7 +101,8 @@ class WebSessionActivity : Activity() {
         }
         titles.addView(location)
         bar.addView(titles, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        if (asked.mode.endsWithDone) {
+        val several = asked.mode == WebSessionRequest.Mode.OPEN && asked.maxDownloads > 1
+        if (asked.mode.endsWithDone || several) {
             bar.addView(Button(this).apply {
                 text = "Done"
                 setOnClickListener { finishWith(completed = true, download = null) }
@@ -110,7 +117,11 @@ class WebSessionActivity : Activity() {
             text = when (asked.mode) {
                 WebSessionRequest.Mode.SIGN_IN -> "Sign in on the site's own page. Press Done when you are signed in. B goes back a page."
                 WebSessionRequest.Mode.CHECK -> "Let the site finish its check and show its page, then press Done. B goes back a page."
-                WebSessionRequest.Mode.OPEN -> "Choose the download on the page; droidtop takes the file into Downloads. B goes back a page."
+                WebSessionRequest.Mode.OPEN -> if (several) {
+                    "Choose each download on the page, up to ${asked.maxDownloads}; droidtop takes them into Downloads. Press Done when you have them all. B goes back a page."
+                } else {
+                    "Choose the download on the page; droidtop takes the file into Downloads. B goes back a page."
+                }
                 WebSessionRequest.Mode.BROWSE ->
                     "${asked.label}'s own pages. Paying happens on them; droidtop never sees or keeps payment details. B goes back a page."
             }
@@ -118,6 +129,15 @@ class WebSessionActivity : Activity() {
             textSize = 12f
             setPadding(dp(16), 0, dp(16), dp(6))
         })
+        if (several) {
+            takenLine = TextView(this).apply {
+                text = "Nothing taken yet."
+                setTextColor(tokens.color("onSurface"))
+                textSize = 13f
+                setPadding(dp(16), 0, dp(16), dp(6))
+            }
+            root.addView(takenLine)
+        }
 
         val view = WebView(this).apply {
             settings.javaScriptEnabled = true
@@ -149,18 +169,21 @@ class WebSessionActivity : Activity() {
             }
             setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
                 if (asked.mode != WebSessionRequest.Mode.OPEN) return@setDownloadListener
-                finishWith(
-                    completed = true,
-                    download = WebSessionDownload(
-                        url = url,
-                        userAgent = userAgent,
-                        contentDisposition = contentDisposition,
-                        mimeType = mimeType,
-                        size = contentLength.takeIf { it > 0 },
-                        referer = this.url,
-                        cookie = cookies.getCookie(url),
-                    ),
+                if (captured.any { it.url == url }) return@setDownloadListener
+                captured += WebSessionDownload(
+                    url = url,
+                    userAgent = userAgent,
+                    contentDisposition = contentDisposition,
+                    mimeType = mimeType,
+                    size = contentLength.takeIf { it > 0 },
+                    referer = this.url,
+                    cookie = cookies.getCookie(url),
                 )
+                if (captured.size >= asked.maxDownloads) {
+                    finishWith(completed = true, download = null)
+                } else {
+                    takenLine?.text = "Taken ${captured.size} of up to ${asked.maxDownloads}. Press Done when you have them all."
+                }
             }
         }
         webView = view
@@ -199,7 +222,9 @@ class WebSessionActivity : Activity() {
         asked?.domains?.forEach { purge(cookies, it) }
         cookies.flush()
         id?.let { requests.remove(it) }
-        id?.let { closers.remove(it)?.invoke(WebSessionResult(completed, session, download)) }
+        // An Open view answers with everything it took; a single capture is the first of them.
+        val taken = (captured + listOfNotNull(download)).distinctBy { it.url }
+        id?.let { closers.remove(it)?.invoke(WebSessionResult(completed, session, taken.firstOrNull(), taken)) }
         webView?.apply {
             stopLoading()
             destroy()
