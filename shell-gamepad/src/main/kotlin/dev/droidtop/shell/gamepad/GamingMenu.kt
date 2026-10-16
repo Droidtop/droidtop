@@ -844,9 +844,9 @@ internal fun MenuPanel(
                     .focusRequester(focus)
                     .focusable()
                     .onPad(preview = true) { press ->
-                        PanelEdge.atEdge = false
+                        MenuRowEnd.atEdge = false
                         val handled = onPad(press)
-                        val direction = panelScrollDirection(press.action, PanelEdge.atEdge, scroll.canScrollForward, scroll.canScrollBackward)
+                        val direction = panelScrollDirection(press.action, MenuRowEnd.atEdge, scroll.canScrollForward, scroll.canScrollBackward)
                         if (direction != 0) {
                             scope.launch { scroll.animateScrollBy(direction * scrollStepPx) }
                             true
@@ -1011,7 +1011,7 @@ internal fun menuMove(index: Int, count: Int, press: PadPress): Int {
     val next = menuStep(index, count, if (press.action == GamepadAction.UP) -1 else 1)
     moveCue(next != index, press.repeat)
     // The panel this menu is in scrolls on a press that went nowhere (MenuPanel, Droidtop/tracker#381).
-    PanelEdge.atEdge = next == index
+    MenuRowEnd.atEdge = next == index
     return next
 }
 
@@ -1019,7 +1019,7 @@ internal fun menuMove(index: Int, count: Int, press: PadPress): Int {
  * Whether the last cursor step ([menuMove]) went nowhere: the rows ended. [MenuPanel] reads it after its menu's
  * handler, to scroll content past the rows (an action's result) with the D-pad. Main thread only, like the pad.
  */
-internal object PanelEdge {
+internal object MenuRowEnd {
     var atEdge: Boolean = false
 }
 
