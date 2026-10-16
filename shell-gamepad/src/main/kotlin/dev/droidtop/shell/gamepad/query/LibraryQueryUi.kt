@@ -509,6 +509,10 @@ internal fun LibrarySearchDialog(
     // What was typed and where the cursor was stay in this composition and are there when the page closes.
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
     var firstShow by remember { mutableStateOf(true) }
+    // The sources' processes start from the plugins' app zygote: it is started as the search opens, while the person
+    // types (docs/plugin-api.md 5.3, "The rigs").
+    val appContext = LocalContext.current.applicationContext
+    LaunchedEffect(Unit) { dev.droidtop.library.integrations.UnifiedSearch.prepare(appContext) }
     LaunchedEffect(activeCatalog == null) {
         if (activeCatalog != null) return@LaunchedEffect
         // The field lives in the dialog's own composition, which attaches a frame or more after this

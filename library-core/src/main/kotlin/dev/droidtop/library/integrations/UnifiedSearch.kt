@@ -133,6 +133,12 @@ object SearchRank {
  * per settled query, on the IO dispatcher.
  */
 object UnifiedSearch {
+    /**
+     * The search is open: the plugins' app zygote is started now, while the person types, so the sources' processes do
+     * not wait for it (docs/plugin-api.md 5.3, "The rigs"). Cheap; call it when the search opens.
+     */
+    fun prepare(context: Context) = dev.droidtop.pluginhost.PluginZygoteWarmup.warm(context)
+
     /** How long the text must rest before any source is asked. */
     const val SOURCE_DEBOUNCE_MS = 350L
 

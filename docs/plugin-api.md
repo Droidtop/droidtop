@@ -3103,7 +3103,12 @@ with it:
   (`android:useAppZygote`), whose preload (`PluginZygotePreload`) loads the
   library once; each plugin process forked from it finds the library loaded.
   The zygote's UID is in the isolated range too, so its own load is
-  expected to wait once, while it starts. `PluginStartRigTest` (by hand)
+  expected to wait once, while it starts; droidtop starts it ahead of any
+  plugin (`PluginZygoteWarmup`), as the one search opens and 5 s after
+  droidtop's start goes idle, with one empty sandbox process that is
+  dropped once a plugin's own process runs or after 2 minutes. The
+  coordinator, 2026-10-16: "so no person ever sees the first search time
+  out". `PluginStartRigTest` (by hand)
   holds a second contained plugin's start to 3 s. Needs a rig check on
   BlueStacks.
 
