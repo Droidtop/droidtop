@@ -80,7 +80,9 @@ import dev.droidtop.library.scraper.ScraperSource
 import dev.droidtop.library.scraper.ScraperSourcePrefs
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
+import dev.droidtop.library.settings.ButtonRole
 import dev.droidtop.library.settings.CatalogChip
+import dev.droidtop.library.settings.CatalogPage
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
@@ -96,6 +98,9 @@ import dev.droidtop.library.settings.NoticeAction
 import dev.droidtop.library.settings.NoticeItem
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.library.settings.Notices
+import dev.droidtop.library.settings.PageButton
+import dev.droidtop.library.settings.PageHeader
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.TextInputItem
@@ -1827,6 +1832,32 @@ object AppSettingsCatalogs {
         dev.droidtop.library.integrations.PluginCatalogSources.added(dev.droidtop.library.integrations.PluginCatalogSources.storeFile(context))
             .associate { it.id to it.name }
 
+    /** A plugin's state in one word or two, the same on its list card and in its page's header (Droidtop/tracker#512). */
+    private fun pluginState(
+        record: dev.droidtop.pluginhost.PluginRecord,
+        grants: PluginGrants.Snapshot,
+        runtimeNeed: RuntimeNeed?,
+        updateAvailable: Boolean,
+        waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
+    ): String = when {
+        record.trust == PluginTrustState.PENDING -> "Needs approval"
+        record.trust == PluginTrustState.DENIED -> "Denied"
+        // A plugin that stopped has a way forward on the list too: a newer version to install, or its page's "Try again".
+        record.disabledReason != null -> if (updateAvailable) "Needs an update" else "Stopped"
+        // Written before it could ask for the access it needs (PluginTiers.refusal): only a newer version can run.
+        record.trust == PluginTrustState.APPROVED && PluginTiers.refusal(record, grants) != null &&
+            !PluginTiers.declaresFullTrust(record.manifest) -> "Needs an update"
+        record.trust == PluginTrustState.APPROVED && !record.enabled -> "Off"
+        // Approved but its runtime is not on the device: it cannot run, so it is never "Running".
+        runtimeNeed != null -> "Needs setup"
+        // Waiting is not disabled: the plugin resumes by itself when a provider returns (docs/plugin-api.md 2.3).
+        waiting != null -> "Waiting"
+        record.trust == PluginTrustState.APPROVED && grants.wantsNewAccess -> "Wants new access"
+        record.trust == PluginTrustState.APPROVED && updateAvailable -> "Update available"
+        record.trust == PluginTrustState.APPROVED -> "Running"
+        else -> "Unknown"
+    }
+
     /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
     private fun pluginCard(
         record: dev.droidtop.pluginhost.PluginRecord,
@@ -1838,7 +1869,6 @@ object AppSettingsCatalogs {
         updateAvailable: Boolean = false,
     ): NestedScreenItem {
         val m = record.manifest
-        val wantsNewAccess = grants.wantsNewAccess
         val enabledPoints = when (record.trust) {
             PluginTrustState.PENDING -> PluginGrants.approvalTicked(record, grants)
                 .filterTo(HashSet()) { it.startsWith(PluginPermissions.PROVIDE_PREFIX) }
@@ -1847,24 +1877,7 @@ object AppSettingsCatalogs {
             }
             else -> emptySet()
         }
-        val state = when {
-            record.trust == PluginTrustState.PENDING -> "Needs approval"
-            record.trust == PluginTrustState.DENIED -> "Denied"
-            // A plugin that stopped has a way forward on the list too: a newer version to install, or its page's "Try again".
-            record.disabledReason != null -> if (updateAvailable) "Needs an update" else "Stopped"
-            // Written before it could ask for the access it needs (PluginTiers.refusal): only a newer version can run.
-            record.trust == PluginTrustState.APPROVED && PluginTiers.refusal(record, grants) != null &&
-                !PluginTiers.declaresFullTrust(record.manifest) -> "Needs an update"
-            record.trust == PluginTrustState.APPROVED && !record.enabled -> "Disabled"
-            // Approved but its runtime is not on the device: it cannot run, so it is never "Running".
-            runtimeNeed != null -> "Needs setup"
-            // Waiting is not disabled: the plugin resumes by itself when a provider returns (docs/plugin-api.md 2.3).
-            waiting != null -> "Waiting"
-            record.trust == PluginTrustState.APPROVED && wantsNewAccess -> "Wants new access"
-            record.trust == PluginTrustState.APPROVED && updateAvailable -> "Update available"
-            record.trust == PluginTrustState.APPROVED -> "Running"
-            else -> "Unknown"
-        }
+        val state = pluginState(record, grants, runtimeNeed, updateAvailable, waiting)
         val trustBadge = pluginTrustBadge(m.origin, userKeys, catalogNames)
         return NestedScreenItem(
             id = "plugin_${m.id}",
@@ -1917,19 +1930,24 @@ object AppSettingsCatalogs {
                     )
                 } else {
                     val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
-                    pluginDetailGroups(context, record, userKeys, catalogNames(context))
+                    pluginDetailPage(context, record, userKeys, catalogNames(context)).asGroups()
                 }
             }
         },
         live = PluginGrants.changes,
     )
 
-    private fun pluginDetailGroups(
+    /**
+     * One plugin's page (Droidtop/tracker#512): a header saying which plugin it is (its icon, name, maker and version, its
+     * trust and its state), the bar with the one thing to do now (Approve, Update, Try again, Turn on), and More holding
+     * the rest, Deny and Uninstall in danger with a confirm. The sections follow, what it does first.
+     */
+    private fun pluginDetailPage(
         context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,
         userKeys: Map<String, UserOriginKey>,
         catalogNames: Map<String, String>,
-    ): List<CatalogGroup> {
+    ): CatalogPage {
         val m = record.manifest
         val resolution = PluginApiResolver.current(context)
         val grantSnapshot = PluginGrants.forContext(context).read(m.id)
@@ -1993,15 +2011,18 @@ object AppSettingsCatalogs {
             // A pending status used to look like a button but had no action. The approval controls below
             // are the action; keep the trust/status row for plugins that already have a decision.
             if (record.trust != PluginTrustState.PENDING) {
-                add(
-                    ActionItem(
-                        id = "plugin_${m.id}_status",
-                        title = statusLine,
-                        subtitle = trustLine,
-                        chip = PluginTiers.badge(record, grantSnapshot)?.let { "Full access" },
-                        run = {},
-                    ),
-                )
+                // The header says its state and trust; a row is left only for what the header cannot: a stop's
+                // reason, and an origin droidtop no longer trusts.
+                if (record.disabledReason != null || trustLine.startsWith("NOT TRUSTED")) {
+                    add(
+                        ActionItem(
+                            id = "plugin_${m.id}_status",
+                            title = statusLine,
+                            subtitle = trustLine,
+                            run = {},
+                        ),
+                    )
+                }
                 // The only access rows the person ever sees are the full-access warning, a plugin that needs it and has
                 // not been allowed it (docs/plugin-api.md 4.6), and the plain warning of a granted permission that lets
                 // the plugin reach past droidtop's checks (gpu.render, 5.3). A plugin on the safe default carries no
@@ -2019,24 +2040,30 @@ object AppSettingsCatalogs {
             }
             // A stopped plugin always has something to press: the newer version when the catalog has one (the row under
             // "Version" below says which), otherwise another go. Switching it back on clears the reason; it stops again if it fails again.
-            if (record.disabledReason != null) {
-                add(
-                    if (catalogOffer != null) {
-                        AsyncActionItem(
-                            id = "plugin_${m.id}_retry",
-                            title = "Update ${m.label}",
-                            subtitle = "Version ${catalogOffer.release.version} is available",
-                            run = { ctx, onStatus -> PluginCatalog.install(ctx, catalogOffer.plugin, catalogOffer.release, onStatus) },
-                        )
-                    } else {
-                        ActionItem(
-                            id = "plugin_${m.id}_retry",
-                            title = "Try again",
-                            subtitle = "Turn it back on and run it once more",
-                            run = { ctx -> PluginStore.setEnabled(ctx, m.id, true); pluginsChanged(ctx) },
-                        )
-                    },
-                )
+            // A stopped plugin's way forward (Update, or Try again) is the page's primary button.
+            // A main job the person left blocked (Droidtop/tracker#519): high-risk points start unticked, and a plugin whose
+            // point is off looks broken ("search finds nothing") unless its page says why, with the way to turn it on.
+            if (record.trust == PluginTrustState.APPROVED) {
+                m.v2.provides.map { it.point }.distinct().forEach { point ->
+                    val registry = dev.droidtop.pluginhost.ExtensionPoints.find(point) ?: return@forEach
+                    if (!registry.risk.needsConsent || PluginGrants.provideState(record, grantSnapshot, point) != GrantState.DENIED) return@forEach
+                    add(
+                        NoticeItem(
+                            id = "plugin_${m.id}_blocked_$point",
+                            notice = Notice(
+                                tone = NoticeTone.Caution,
+                                title = "${registry.label} is off",
+                                body = "${m.label} can't do its job here until you allow it. ${registry.lets}",
+                                action = NoticeAction("Allow") { ctx ->
+                                    withContext(Dispatchers.IO) {
+                                        PluginGrants.forContext(ctx).set(m.id, PluginPermissions.PROVIDE_PREFIX + point, GrantState.GRANTED)
+                                    }
+                                    withContext(Dispatchers.Main) { pluginsChanged(ctx) }
+                                },
+                            ),
+                        ),
+                    )
+                }
             }
             // The headline above is a plain sentence; what the plugin actually reported is one press away,
             // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167).
@@ -2083,20 +2110,7 @@ object AppSettingsCatalogs {
                     ),
                 )
             }
-            when (record.trust) {
-                PluginTrustState.PENDING -> Unit
-                PluginTrustState.APPROVED -> {
-                    add(
-                        ToggleItem(
-                            id = "plugin_${m.id}_enabled",
-                            title = "Enabled",
-                            current = record.enabled,
-                            onToggle = { ctx, on -> PluginStore.setEnabled(ctx, m.id, on); pluginsChanged(ctx) },
-                        ),
-                    )
-                }
-                PluginTrustState.DENIED -> Unit
-            }
+            // On and off are the page's buttons (Turn on is primary while it is off; Turn off is in More).
             if (m.requestsRoot) {
                 add(
                     ActionItem(
@@ -2111,9 +2125,8 @@ object AppSettingsCatalogs {
 
         // Approval is a list (docs/plugin-api.md 4.3): every item is a tick box, the actions come after it, and the plugin runs with exactly what is ticked.
         val approvalTicks = if (record.trust == PluginTrustState.PENDING) tickBuffer(m.id, PluginGrants.approvalTicked(record, grantSnapshot)) else null
-        val approveItems: List<CatalogItem> = if (approvalTicks == null) {
-            emptyList()
-        } else {
+        var approveAction: (suspend (Context, Boolean) -> String)? = null
+        if (approvalTicks != null) {
             fun approve(ctx: Context, root: Boolean) {
                 PluginStore.setApproval(ctx, m.id, approved = true, grantRoot = root, ticked = approvalTicks.toSet())
                 pendingTicks.remove(m.id)
@@ -2130,39 +2143,7 @@ object AppSettingsCatalogs {
                 withContext(Dispatchers.Main) { approve(ctx, root) }
                 return "Approved"
             }
-            buildList {
-                add(
-                    AsyncActionItem(
-                        id = "plugin_${m.id}_approve",
-                        title = "Approve",
-                        subtitle = if (m.requestsRoot) {
-                            "Allows what is ticked above. This plugin can also use root as an optional enhancement when your device has it -- its core function must still work without it. Approving here does NOT grant root; use \"Approve and allow root\" for that."
-                        } else {
-                            "Allows what is ticked above. You can change any of it later under Permissions."
-                        },
-                        run = { ctx, _ -> approveAsking(ctx, false) },
-                    ),
-                )
-                if (m.requestsRoot) {
-                    add(
-                        AsyncActionItem(
-                            id = "plugin_${m.id}_approve_root",
-                            title = "Approve and allow root",
-                            subtitle = "Only used if this device has root",
-                            confirmTitle = "Let \"${m.label}\" use root on this device?",
-                            run = { ctx, _ -> approveAsking(ctx, true) },
-                        ),
-                    )
-                }
-                add(
-                    ActionItem(
-                        id = "plugin_${m.id}_deny",
-                        title = "Deny",
-                        subtitle = "Stays installed, never runs",
-                        run = { ctx -> pendingTicks.remove(m.id); PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); pluginsChanged(ctx) },
-                    ),
-                )
-            }
+            approveAction = { ctx, root -> approveAsking(ctx, root) }
         }
         // An update that added items asks about those only, on the same list (docs/plugin-api.md 4.3, "Updates").
         val freshIds = if (record.trust == PluginTrustState.APPROVED) grantSnapshot.fresh.filterTo(HashSet()) { grantSnapshot.states[it] == GrantState.ASK } else emptySet<String>()
@@ -2432,7 +2413,7 @@ object AppSettingsCatalogs {
         // A runtime the plugin cannot run without goes straight under the status line that says so, where
         // the person is looking; an installed one (only its removal) stays further down.
         val runtimeGroupItem = if (runtimeGroup.isEmpty()) null else CatalogGroup(id = "plugin_${m.id}_runtime_group", title = "Runtime", items = runtimeGroup)
-        return listOfNotNull(
+        val groups = listOfNotNull(
             CatalogGroup(
                 id = "plugin_${m.id}_status_group",
                 title = null,
@@ -2441,27 +2422,116 @@ object AppSettingsCatalogs {
             ),
             runtimeGroupItem.takeIf { runtimeNeed != null },
             useGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_use_group", title = null, items = it) },
-        ) + newAccessGroups + consentGroups + listOfNotNull(
-            approveItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_approve_group", title = null, items = it) },
+        ).filterNot { it.items.isEmpty() && it.id == "plugin_${m.id}_status_group" } + newAccessGroups + consentGroups + listOfNotNull(
             permissionsGroup,
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
             runtimeGroupItem.takeIf { runtimeNeed == null },
             aboutGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_about_group", title = "About", items = it) },
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
-            CatalogGroup(
-                id = "plugin_${m.id}_uninstall_group",
-                title = null,
-                items = listOf(
-                    ActionItem(
-                        id = "plugin_${m.id}_uninstall",
-                        title = "Uninstall",
-                        confirmTitle = "Remove ${m.label} and its data?",
-                        run = { ctx -> PluginStore.uninstall(ctx, m.id); pluginsChanged(ctx) },
-                    ),
-                ),
-            ),
             CatalogGroup(id = "plugin_${m.id}_advanced_group", title = "Advanced", items = advancedGroup),
         )
+        return pluginPageTop(context, record, userKeys, catalogNames, grantSnapshot, runtimeNeed, catalogOffer, approveAction, groups)
+    }
+
+    /** [pluginDetailPage]'s header and bar, around its [groups]. */
+    private fun pluginPageTop(
+        context: Context,
+        record: dev.droidtop.pluginhost.PluginRecord,
+        userKeys: Map<String, UserOriginKey>,
+        catalogNames: Map<String, String>,
+        grants: PluginGrants.Snapshot,
+        runtimeNeed: RuntimeNeed?,
+        offer: dev.droidtop.library.integrations.PluginCatalog.Offer?,
+        approve: (suspend (Context, Boolean) -> String)?,
+        groups: List<CatalogGroup>,
+    ): CatalogPage {
+        val m = record.manifest
+        val app = context.applicationContext
+        /** Runs a page action that waits on dialogs or the network off the button, then says what happened. */
+        fun later(action: suspend (Context) -> String?) {
+            noticeScope.launch {
+                val said = runCatching { action(app) }.getOrElse { it.message ?: "That did not work" }
+                said?.let { Notices.flash(it, source = m.label, context = app) }
+                pluginsChanged(app)
+            }
+        }
+        val state = pluginState(record, grants, runtimeNeed, offer != null, PluginApiResolver.current(context).waiting[m.id])
+        val chips = listOfNotNull(
+            CatalogChip(state, ok = state == "Running"),
+            CatalogChip(if (isUnofficial(m.origin, userKeys)) "Unofficial" else pluginTrustBadge(m.origin, userKeys, catalogNames)),
+            PluginTiers.badge(record, grants)?.let { CatalogChip("Full access") },
+        )
+        val icon = m.presentation.icon?.let { path ->
+            val root = PluginStore.payloadDirFor(context, m.id)
+            File(root, path).takeIf { f -> f.isFile && f.canonicalPath.startsWith(root.canonicalPath + File.separator) }?.path
+        }
+        val header = PageHeader(
+            title = m.label,
+            byline = listOfNotNull(m.presentation.publisher, "v${m.version}").joinToString(" · "),
+            chips = chips,
+            imagePath = icon,
+        )
+        val uninstall = PageButton(
+            id = "plugin_${m.id}_uninstall",
+            label = "Uninstall",
+            role = ButtonRole.DANGER,
+            confirmTitle = "Remove ${m.label} and its data?",
+            run = { ctx -> PluginStore.uninstall(ctx, m.id); pluginsChanged(ctx) },
+        )
+        val buttons = mutableListOf<PageButton>()
+        val more = mutableListOf<PageButton>()
+        when {
+            record.trust == PluginTrustState.PENDING && approve != null -> {
+                buttons += PageButton(
+                    id = "plugin_${m.id}_approve",
+                    label = "Approve",
+                    role = ButtonRole.PRIMARY,
+                    run = { later { ctx -> approve(ctx, false).also { if (it == "Approved") Notices.flash("${m.label} is on", source = m.label, context = ctx) }.takeIf { it != "Approved" } } },
+                )
+                if (m.requestsRoot) {
+                    more += PageButton(
+                        id = "plugin_${m.id}_approve_root",
+                        label = "Approve and allow root",
+                        confirmTitle = "Let \"${m.label}\" use root on this device?",
+                        run = { later { ctx -> approve(ctx, true) } },
+                    )
+                }
+                more += PageButton(
+                    id = "plugin_${m.id}_deny",
+                    label = "Deny",
+                    role = ButtonRole.DANGER,
+                    confirmTitle = "Deny ${m.label}? It stays installed and never runs",
+                    run = { ctx -> pendingTicks.remove(m.id); PluginStore.setApproval(ctx, m.id, approved = false, grantRoot = false); pluginsChanged(ctx) },
+                )
+            }
+            offer != null && (record.disabledReason != null || record.trust == PluginTrustState.APPROVED) -> buttons += PageButton(
+                id = "plugin_${m.id}_update_button",
+                label = "Update to ${offer.release.version}",
+                role = ButtonRole.PRIMARY,
+                run = { later { ctx -> withContext(Dispatchers.IO) { PluginCatalog.install(ctx, offer.plugin, offer.release) {} } } },
+            )
+            record.disabledReason != null -> buttons += PageButton(
+                id = "plugin_${m.id}_retry",
+                label = "Try again",
+                role = ButtonRole.PRIMARY,
+                run = { ctx -> PluginStore.setEnabled(ctx, m.id, true); pluginsChanged(ctx) },
+            )
+            record.trust == PluginTrustState.APPROVED && !record.enabled -> buttons += PageButton(
+                id = "plugin_${m.id}_turn_on",
+                label = "Turn on",
+                role = ButtonRole.PRIMARY,
+                run = { ctx -> PluginStore.setEnabled(ctx, m.id, true); pluginsChanged(ctx); Notices.flash("${m.label} is on", source = m.label, context = ctx) },
+            )
+        }
+        if (record.trust == PluginTrustState.APPROVED && record.enabled && record.disabledReason == null) {
+            more += PageButton(
+                id = "plugin_${m.id}_turn_off",
+                label = "Turn off",
+                run = { ctx -> PluginStore.setEnabled(ctx, m.id, false); pluginsChanged(ctx); Notices.flash("${m.label} is off", source = m.label, context = ctx) },
+            )
+        }
+        more += uninstall
+        return CatalogPage(header = header, buttons = buttons, more = more, groups = groups)
     }
 
     /**
