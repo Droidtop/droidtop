@@ -14,6 +14,8 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
 import dev.droidtop.library.OwnGameScreens
+import dev.droidtop.library.PadMouse
+import dev.droidtop.library.PadMousePrefs
 import dev.droidtop.runtime.windows.data.TouchGestureConfig
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
@@ -94,6 +96,10 @@ class WineGameActivity : Activity() {
     /** What the Quick Menu's Game section reaches this screen through (Resume is a relaunch, Stop is [stop]). */
     private val ownScreen = object : OwnGameScreens.Screen {
         override val entryId: String? get() = this@WineGameActivity.entryId
+        override val padMouse: Boolean? get() = this@WineGameActivity.padMouse?.settings?.on
+        override fun setPadMouse(on: Boolean) {
+            runOnUiThread { padMouse?.let { it.set(it.settings.copy(on = on)) } }
+        }
         override fun stop() {
             // The guest's teardown is queued now (off the main thread), so a relaunch that follows
             // (Restart) waits for it; the screen then closes.
@@ -204,6 +210,15 @@ class WineGameActivity : Activity() {
         }
         touchMouse = TouchMouse(xServer)
         keyboard = Keyboard(xServer)
+        // Controller mouse mode (docs/SPEC.md 5b, Droidtop/tracker#565): off until the game's remembered choice is read.
+        val mouseMode = PadMouseDriver(xServer, PadMouse.Settings()) { settings -> padMouseChanged(settings) }
+        padMouse = mouseMode
+        entryId?.let { id ->
+            startupExecutor.execute {
+                val initial = PadMouse.initial(PadMousePrefs.stored(applicationContext, id), runnerNeedsMouse = false)
+                runOnUiThread { mouseMode.settings = initial; showPadMouse(initial.on, announce = false) }
+            }
+        }
 
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.BLACK)
@@ -233,6 +248,7 @@ class WineGameActivity : Activity() {
         val soft = WineKeyboard(this) { event -> keyboard?.onKeyEvent(event) == true }
         softKeyboard = soft
         root.addView(soft)
+        root.addView(padMouseBadge, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, android.view.Gravity.TOP or android.view.Gravity.END))
         touchpad.setShowKeyboardCallback { soft.toggle() }
         touchpad.setKeyboardSwipeCallback { soft.show() }
         setContentView(root)
@@ -342,6 +358,8 @@ class WineGameActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP) it.hide()
             return true
         }
+        // Mouse mode takes its clicks and scroll hold first, and always watches for its on/off combination.
+        if (padMouse?.onKey(event) == true) return true
         if (winHandler?.onKeyEvent(event) == true) return true
         if (keyboard?.onKeyEvent(event) == true) return true
         // Only a back press nothing else wanted leaves the game, and it does not end it: the shell
@@ -365,9 +383,39 @@ class WineGameActivity : Activity() {
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (padMouse?.onMotion(event) == true) return true
         if (winHandler?.onGenericMotionEvent(event) == true) return true
         if (touchMouse?.onExternalMouseEvent(event) == true) return true
         return super.onGenericMotionEvent(event)
+    }
+
+    // ---- controller mouse mode ----------------------------------------
+
+    private var padMouse: PadMouseDriver? = null
+
+    /** The visible sign that the pad is a mouse: a small badge in the top corner while it is on. */
+    private val padMouseBadge by lazy {
+        android.widget.TextView(this).apply {
+            text = "Mouse mode"
+            setTextColor(Color.WHITE)
+            textSize = 14f
+            setBackgroundColor(0xB0000000.toInt())
+            val pad = (8 * resources.displayMetrics.density).toInt()
+            setPadding(pad * 2, pad, pad * 2, pad)
+            visibility = View.GONE
+        }
+    }
+
+    private fun showPadMouse(on: Boolean, announce: Boolean) {
+        padMouseBadge.visibility = if (on) View.VISIBLE else View.GONE
+        if (announce) padMouseBadge.announceForAccessibility(if (on) "Mouse mode on" else "Mouse mode off")
+    }
+
+    /** Turned on or off (the combination, the Quick Menu): shown at once, and kept for this game. */
+    private fun padMouseChanged(settings: PadMouse.Settings) {
+        showPadMouse(settings.on, announce = true)
+        val id = entryId ?: return
+        startupExecutor.execute { PadMousePrefs.set(applicationContext, id, settings) }
     }
 
     // ---- lifecycle ---------------------------------------------------

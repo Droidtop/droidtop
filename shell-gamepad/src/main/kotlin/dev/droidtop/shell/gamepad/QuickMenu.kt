@@ -885,9 +885,13 @@ private fun GameTab(
     val scope = rememberCoroutineScope()
     val emulators = rememberSystemEmulators(entry)
     var emulatorChoice by remember(entry.id) { mutableStateOf<String?>(null) }
+    // Controller mouse mode (docs/SPEC.md 5b, Droidtop/tracker#565), when this game runs in droidtop's own screen that
+    // has a pointer: null there is nothing to offer.
+    val ownScreen = dev.droidtop.library.OwnGameScreens.current?.takeIf { it.entryId == entry.id }
+    var padMouse by remember(entry.id) { mutableStateOf(ownScreen?.padMouse) }
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
-    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode) {
+    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse) {
         fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = GameQuickTile(
             title = title,
             subtitle = when {
@@ -929,6 +933,18 @@ private fun GameTab(
                             scope.launch {
                                 if (dev.droidtop.library.consoles.GameEmulatorChoice.save(library, entry, next)) emulatorChoice = next
                             }
+                        },
+                    ),
+                )
+            }
+            padMouse?.let { on ->
+                add(
+                    GameQuickTile(
+                        title = "Mouse mode",
+                        subtitle = if (on) "On. Both stick clicks held also turn it off" else "Off",
+                        action = {
+                            ownScreen?.setPadMouse(!on)
+                            padMouse = !on
                         },
                     ),
                 )
