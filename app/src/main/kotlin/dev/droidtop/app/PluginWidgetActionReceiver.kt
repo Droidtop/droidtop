@@ -5,10 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Handler
-import android.os.Looper
-import android.widget.Toast
 import dev.droidtop.library.integrations.PluginWidgets
+import dev.droidtop.library.settings.Notices
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -17,7 +15,7 @@ import kotlinx.coroutines.launch
 /**
  * A press on a plugin's part of a droidtop widget (docs/plugin-api.md 3 C10 and C2, Droidtop/tracker#563). The widget
  * renderer's taps are [intent]s to this receiver; it calls the plugin through the broker off the main thread
- * ([PluginWidgets.act]), shows the reply's message, and asks the renderer to redraw that widget
+ * ([PluginWidgets.act]), flashes the reply's message, and asks the renderer to redraw that widget
  * ([PluginWidgets.onActed]). Not exported, and reached only by droidtop's own immutable PendingIntents.
  */
 class PluginWidgetActionReceiver : BroadcastReceiver() {
@@ -31,10 +29,9 @@ class PluginWidgetActionReceiver : BroadcastReceiver() {
         scope.launch {
             try {
                 val outcome = runCatching { PluginWidgets.act(app, key, actionId) }.getOrNull()
+                // On a launcher's page no droidtop surface is drawn, so the flash shows as a toast led by the plugin's name.
                 outcome?.message?.let { message ->
-                    val name = PluginWidgets.find(app, key)?.pluginLabel
-                    val text = if (name == null) message else "$name: $message"
-                    Handler(Looper.getMainLooper()).post { Toast.makeText(app, text, Toast.LENGTH_SHORT).show() }
+                    Notices.flash(message, source = PluginWidgets.find(app, key)?.pluginLabel, context = app)
                 }
                 if (widgetId != -1) runCatching { PluginWidgets.onActed?.invoke(app, widgetId) }
             } finally {
