@@ -320,6 +320,19 @@ object DockerApi {
         putJsonObject("Labels") { n.labels.forEach { (k, v) -> put(k, v) } }
     }
 
+    /** `GET /networks/{id}`: one network as text. */
+    fun networkJson(n: Network, names: Map<String, String>): String = network(n, names).toString() + "\n"
+
+    /** The container a network connect or disconnect body names (`{"Container": ...}`), or null. Pure. */
+    fun connectTarget(body: String): String? =
+        runCatching { (Json.parseToJsonElement(body) as JsonObject)["Container"] as? JsonPrimitive }.getOrNull()?.content?.takeIf { it.isNotEmpty() }
+
+    /** `POST /networks/create`'s answer. */
+    fun networkCreated(id: String): String = buildJsonObject {
+        put("Id", id)
+        put("Warning", "")
+    }.toString() + "\n"
+
     /** `GET /networks`: [all] that pass [filters] (name, id, label). */
     fun networks(all: List<Network>, names: Map<String, String>, filters: Map<String, List<String>>): String = JsonArray(
         all.filter { n ->

@@ -242,6 +242,11 @@ class DockerApiTest {
         assertEquals(emptyList<String>(), nets.single().members)
         assertEquals(emptyMap<String, List<String>>(), nets.single().aliases)
         assertEquals(setOf("driver"), DockerApi.unknownNetworkFilters(mapOf("driver" to listOf("bridge"), "name" to listOf("x"))))
+        assertEquals("web", DockerApi.connectTarget("""{"Container":"web","EndpointConfig":{}}"""))
+        assertNull(DockerApi.connectTarget("{}"))
+        assertNull(DockerApi.connectTarget("not json"))
+        assertTrue(DockerApi.networkCreated(demo.id).contains("\"Id\":\"${demo.id}\""))
+        assertTrue(DockerApi.networkJson(demo, emptyMap()).endsWith("}\n"))
     }
 
     @Test
