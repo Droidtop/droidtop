@@ -10,7 +10,6 @@ import android.widget.EditText
 import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
-import android.widget.Toast
 import app.murinelauncher.settings.prefs.DrawerTabs
 import com.android.launcher3.R
 
@@ -113,7 +112,7 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
     companion object {
         /**
          * Asks for a tab's name, filled with [current]; [accept] says whether it was taken. A blank or
-         * taken name keeps the dialog's answer from being used and says so.
+         * taken name keeps the dialog open and says why on the field.
          */
         @JvmStatic
         fun askName(context: Context, current: String?, accept: (String) -> Boolean) {
@@ -122,16 +121,22 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
                 setSingleLine()
                 selectAll()
             }
-            AlertDialog.Builder(context)
+            val dialog = AlertDialog.Builder(context)
                 .setTitle(if (current == null) R.string.drawer_tab_new else R.string.drawer_tab_rename)
                 .setView(field)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    if (!accept(field.text.toString())) {
-                        Toast.makeText(context, R.string.drawer_tab_name_taken, Toast.LENGTH_SHORT).show()
+                .setPositiveButton(android.R.string.ok, null)
+                .setNegativeButton(android.R.string.cancel, null)
+                .create()
+            dialog.setOnShowListener {
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    if (accept(field.text.toString())) {
+                        dialog.dismiss()
+                    } else {
+                        field.error = context.getString(R.string.drawer_tab_name_taken)
                     }
                 }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
+            }
+            dialog.show()
         }
     }
 }
