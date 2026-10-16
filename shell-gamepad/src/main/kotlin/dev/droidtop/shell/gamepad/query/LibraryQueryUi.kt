@@ -4,7 +4,6 @@ import dev.droidtop.ui.shared.NoticeCard
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notice
-import dev.droidtop.shell.gamepad.getGamesScreen
 import dev.droidtop.shell.gamepad.input.onPad
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
@@ -56,11 +55,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
 import java.io.File
-import dev.droidtop.library.integrations.GetGamesContext
 import dev.droidtop.library.integrations.GetGamesEntry
-import dev.droidtop.library.integrations.GetMoreState
+import dev.droidtop.library.integrations.SourceGets
 import dev.droidtop.library.integrations.PluginGameSource
 import dev.droidtop.library.integrations.LocalSearchRow
+import dev.droidtop.library.integrations.SearchRowKind
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.SourceDestinations
 import dev.droidtop.library.integrations.SourceHit
@@ -505,7 +504,7 @@ internal fun LibrarySearchDialog(
     val fieldFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val view = LocalView.current
-    // A page a result opens (Get games, a source's detail, a plugin's settings) takes the window over: the
+    // A page a result opens (a source's detail, a plugin's settings) takes the window over: the
     // search panel is not drawn under it, because two translucent windows put text on text (Droidtop/tracker#542).
     // What was typed and where the cursor was stay in this composition and are there when the page closes.
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
@@ -559,14 +558,30 @@ internal fun LibrarySearchDialog(
     // Typing puts the cursor back in the field.
     LaunchedEffect(text) { focusKey = null }
 
+    // JSON acquire_content integrations, read once off the main thread: each is one hand-off row, after every source's
+    // (docs/SPEC.md 13, "There is no Get games sheet"; IntegrationHandoff), in the searches its template can fill.
+    val handoffs by produceState(emptyList<dev.droidtop.library.integrations.Integration>()) {
+        value = withContext(Dispatchers.IO) {
+            dev.droidtop.library.integrations.IntegrationStore.available(context, dev.droidtop.library.integrations.IntegrationCapability.ACQUIRE_CONTENT)
+        }
+    }
+    val scopedToSystem = GetGamesEntry.searchSystem(systemId) != null && sourcePlatform == null
+    fun handoffRows(q: String): List<LocalSearchRow> =
+        handoffs.filter { dev.droidtop.library.integrations.IntegrationHandoff.covers(it.argumentsTemplate, scopedToSystem) }.map { integration ->
+            val (title, detail) = dev.droidtop.library.integrations.IntegrationHandoff.text(integration.label, integration.argumentsTemplate, q)
+            LocalSearchRow("handoff:${integration.id}", SearchRowKind.WEB, title, detail ?: integration.description.orEmpty()) {
+                SourceGets.handOff(context, integration, systemId, systemFolder, q) { statusLine = it }
+            }
+        }
+
     // Restarted by every keystroke: the previous query is cancelled, the device's rows are back at once and the sources
     // are asked only once the text rests (UnifiedSearch.SOURCE_DEBOUNCE_MS).
-    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey) {
+    LaunchedEffect(text, systemId, sourcePlatform, searchTick, localKey, handoffs) {
         UnifiedSearch.search(
             context = context,
             query = text,
             platform = sourcePlatform ?: systemId,
-            local = { q -> currentLocal?.invoke(q).orEmpty() },
+            local = { q -> currentLocal?.invoke(q).orEmpty() + handoffRows(q) },
             carry = state.sourceHits,
             keep = { result -> currentFilter?.invoke(result) ?: true },
         ).collect { state = it }
@@ -574,10 +589,18 @@ internal fun LibrarySearchDialog(
 
     // Opening a source's result: its destination is worked out off the main thread, then its detail opens. The row is
     // never a dead end: a result with no folder to go to opens a page that says which one is missing.
+    // A result that carries `get` is fetched from its row as a job (docs/SPEC.md 13, "Get from the row"); the search stays
+    // open and says so. Without `get`, or with no folder to put it in, the result's page opens (it says what is missing).
     fun openHit(hit: SourceHit) {
         coroutineScope.launch {
             val pick = SourceDestinations.resolve(context, systemId, systemFolder, hit.result.platform)
-            activeCatalog = hit.source.detailScreen(hit.result, pick.systemId, pick.systemName, pick.folder)
+            val folder = pick.folder
+            if (folder != null && hit.source.canGet(hit.result)) {
+                statusLine = SourceGets.startedLine(hit.result.title)
+                SourceGets.start(context, hit, pick.systemId, pick.systemName, folder) { statusLine = it }
+            } else {
+                activeCatalog = hit.source.detailScreen(hit.result, pick.systemId, pick.systemName, folder)
+            }
         }
     }
 
@@ -616,7 +639,14 @@ internal fun LibrarySearchDialog(
         if (text.isNotBlank()) {
             state.rows.forEach { row ->
                 add(
-                    SearchLine.Entry("row:${row.kind}:${row.key}", row.title, subtitle = row.detail, icon = row.icon) {
+                    SearchLine.Entry(
+                        "row:${row.kind}:${row.key}",
+                        row.title,
+                        subtitle = row.detail,
+                        // A source's row says what pressing it does: Get when it can be fetched from here, else it opens.
+                        value = row.hit?.let { if (it.source.canGet(it.result)) "Get" else null },
+                        icon = row.icon,
+                    ) {
                         val hit = row.hit
                         val open = row.open
                         when {
@@ -725,13 +755,11 @@ internal fun LibrarySearchDialog(
                         )
                     }
                 }
-                // The one way on from a search that found nothing to get: browse the sources, or install one.
-                val getGames = GetMoreState.of(state.sources.mapNotNull { it.outcome }, state.unavailable)
-                add(
-                    SearchLine.Entry("get_games", GetGamesEntry.LABEL, subtitle = GetGamesEntry.searchSubtitle(getGames)) {
-                        activeCatalog = getGamesScreen(GetGamesContext.SEARCH, systemId)
-                    },
-                )
+                // No source could be asked at all: one line that leads to Plugins (docs/SPEC.md 13, "There is no Get games
+                // sheet"). A source waiting or turned off already has its own row above.
+                GetGamesEntry.noSourceLine(state.sources.size, state.unavailable.size, scoped = systemId != null || sourcePlatform != null)?.let { line ->
+                    add(SearchLine.Entry("no_source", line, subtitle = "Open Plugins") { openPlugin(null) })
+                }
             }
             statusLine?.let { add(SearchLine.Note(it)) }
         }
