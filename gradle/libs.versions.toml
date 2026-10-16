@@ -99,7 +99,9 @@ collection-ktx = "1.6.0-beta01"
 # droidtop-specific — not part of the shell-default (Murine Launcher) fork's
 # own catalog, used by :app/:host-bridge/:shell-desktop/:shell-gamepad.
 lifecycleRuntimeKtx = "2.8.4"
-composeBom = "2024.09.00"
+# The BOM whose Compose is the one the app ships: shell-default's material3 1.4.0 brings foundation and ui 1.9 at
+# runtime, so every module compiles against 1.9 too (Droidtop/tracker#566; checkComposeVersions keeps it so).
+composeBom = "2025.10.00"
 media3 = "1.4.1"
 # okhttp 5 (Apache-2.0): :stores and the Windows runtime (:runtime-windows), with its DNS-over-HTTPS module.
 okhttp = "5.1.0"
