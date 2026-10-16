@@ -500,20 +500,20 @@ fun queryCountLine(shown: Int, total: Int, filtering: Boolean, scope: LibraryQue
 }
 
 /**
- * The one search-text rule: a blank text matches everything, otherwise the
- * text must be inside the title, genre or developer (case-insensitive).
- * [LibraryQuery.matches] and the console gamelist's search (docs/SPEC.md
- * 12a "Search fan-out") both call this, so a search means the same thing in
- * every list.
+ * The one search-text rule: a blank text matches everything, otherwise every word of it must be in the title as
+ * stored, the name the lists show for it (GameNaming.displayName), the genre or the developer, folded the way titles
+ * are compared (StoreIdentity.matchesSearch: "&" is "and", punctuation and accents folded). [LibraryQuery.matches],
+ * the console gamelist's search and the one search's device rows (docs/SPEC.md 12a) all call this, so a search means
+ * the same thing in every list. Owner, 2026-10-16: "Love & Sex: Second Base ... can't be found using search".
  */
 fun matchesSearchText(entry: LibraryEntry, text: String): Boolean {
-    val wanted = text.trim()
-    if (wanted.isBlank()) return true
+    if (text.isBlank()) return true
     return listOfNotNull(
         entry.title,
+        dev.droidtop.library.GameNaming.displayName(entry.title),
         entry.genre?.takeIf { it.isNotBlank() },
         entry.developer?.takeIf { it.isNotBlank() },
-    ).any { it.contains(wanted, ignoreCase = true) }
+    ).any { dev.droidtop.library.StoreIdentity.matchesSearch(it, text) }
 }
 
 /**

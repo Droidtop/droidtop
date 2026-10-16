@@ -50,6 +50,7 @@ object StoreIdentity {
     private val TRADEMARKS = Regex("[\\u2122\\u00AE\\u00A9\\u2120]")
     private val APOSTROPHES = Regex("['\\u2018\\u2019\\u02BC`]")
     private val MARKS = Regex("\\p{M}+")
+    private val SPACES = Regex(" +")
     private val NOT_ALNUM = Regex("[^a-z0-9]+")
 
     /**
@@ -59,18 +60,39 @@ object StoreIdentity {
      * trailing edition labels. Keeps every number.
      */
     fun titleKey(title: String): String {
-        val folded = Normalizer.normalize(title.replace(TRADEMARKS, ""), Normalizer.Form.NFKD)
-            .replace(MARKS, "")
-            .lowercase()
-            .replace(APOSTROPHES, "")
-            .replace("&", " and ")
-            .replace(NOT_ALNUM, " ")
-            .trim()
+        val folded = fold(title)
         if (folded.isEmpty()) return ""
         var tokens = folded.split(' ').filter { it.isNotEmpty() }
         if (tokens.size > 1 && tokens.first() == ARTICLE) tokens = tokens.drop(1)
         tokens = stripEditions(tokens)
         return tokens.joinToString("")
+    }
+
+    /**
+     * The fold every title comparison shares: trademark signs and accents gone, lower case, apostrophes dropped, "&"
+     * read as "and", every other run of punctuation a single space. "Love & Sex: Second Base" folds to
+     * "love and sex second base". [titleKey] builds on it, and so does the library's search (matchesSearchText).
+     */
+    fun fold(text: String): String = Normalizer.normalize(text.replace(TRADEMARKS, ""), Normalizer.Form.NFKD)
+        .replace(MARKS, "")
+        .lowercase()
+        .replace(APOSTROPHES, "")
+        .replace("&", " and ")
+        .replace(NOT_ALNUM, " ")
+        .trim()
+        .replace(SPACES, " ")
+
+    /**
+     * Whether [text] typed into a search finds [title]: every word of it, folded the same way, is somewhere in the
+     * folded title (a word being typed matches its start or any part, "seco" finds "Second"). Owner, 2026-10-16:
+     * "Love & Sex: Second Base ... can't be found using search": the raw substring "Love & Sex" is not in
+     * "Love and Sex: Second Base". Pure.
+     */
+    fun matchesSearch(title: String, text: String): Boolean {
+        val words = fold(text).split(' ').filter { it.isNotEmpty() }
+        if (words.isEmpty()) return true
+        val folded = fold(title)
+        return words.all { it in folded }
     }
 
     private fun stripEditions(all: List<String>): List<String> {
