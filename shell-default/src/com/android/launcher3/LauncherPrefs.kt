@@ -351,6 +351,25 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
                 SettingsHomeFragment.SWIPE_DOWN_ACTION,
                 com.android.launcher3.touch.GestureAction.OPEN_NOTIFICATIONS,
             )
+        // More slots, Nova/Apex-style (Droidtop/tracker#564): two-finger swipes and pinches
+        // (MultiFingerGestureController) and the Home button pressed on the first page
+        // (Launcher.onNewIntent). Two-finger swipe down opens the Quick Menu out of the box, so
+        // Standard has a gesture into it; the rest start as nothing.
+        @JvmField
+        val GESTURE_TWO_FINGER_DOWN_ACTION =
+            backedUpItem(SettingsHomeFragment.TWO_FINGER_DOWN_ACTION, com.android.launcher3.touch.GestureAction.OPEN_QUICK_MENU)
+        @JvmField
+        val GESTURE_TWO_FINGER_UP_ACTION =
+            backedUpItem(SettingsHomeFragment.TWO_FINGER_UP_ACTION, com.android.launcher3.touch.GestureAction.NONE)
+        @JvmField
+        val GESTURE_PINCH_IN_ACTION =
+            backedUpItem(SettingsHomeFragment.PINCH_IN_ACTION, com.android.launcher3.touch.GestureAction.NONE)
+        @JvmField
+        val GESTURE_PINCH_OUT_ACTION =
+            backedUpItem(SettingsHomeFragment.PINCH_OUT_ACTION, com.android.launcher3.touch.GestureAction.NONE)
+        @JvmField
+        val GESTURE_HOME_BUTTON_ACTION =
+            backedUpItem(SettingsHomeFragment.HOME_BUTTON_ACTION, com.android.launcher3.touch.GestureAction.NONE)
         // Standard mode's taskbar on tablet-sized and larger displays (docs/SPEC.md 2c,
         // "Taskbar on large screens"). On by default; it draws only once the accessibility
         // service, which owns its window, is enabled.
