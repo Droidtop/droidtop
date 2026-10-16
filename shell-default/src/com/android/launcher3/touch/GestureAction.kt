@@ -23,6 +23,9 @@ import com.android.launcher3.Utilities
  * actions"). Scoped to actions that already have a real handler in this
  * fork: launching an app or a specific shortcut is not offered yet (no
  * picker UI exists to name one), so it is left out rather than faked.
+ * The slots are double-tap, swipe down, two-finger swipe down and up,
+ * pinch in and out ([MultiFingerGestureController]), and the Home button
+ * pressed while already on the first page.
  */
 enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
     NONE(R.string.gesture_action_none, R.string.gesture_action_none_summary),
@@ -46,6 +49,18 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
 
     /** droidtop's companion as a pull-down sheet, for a device with one screen (docs/SPEC.md "The companion's tabs", One screen). */
     OPEN_COMPANION(R.string.gesture_action_open_companion, R.string.gesture_action_open_companion_summary),
+
+    /** droidtop's one search over apps, the library and the download sources (docs/SPEC.md 12a "Launcher search"). */
+    OPEN_SEARCH(R.string.gesture_action_open_search, R.string.gesture_action_open_search_summary),
+
+    /** The Quick Menu, the sheet Gaming's R2 and Desktop's tray open (`dev.droidtop.app.QuickMenuActivity`). */
+    OPEN_QUICK_MENU(R.string.gesture_action_open_quick_menu, R.string.gesture_action_open_quick_menu_summary),
+
+    /** The mode switcher, as the Back button's menu opens it. */
+    SWITCH_MODE(R.string.gesture_action_switch_mode, R.string.gesture_action_switch_mode_summary),
+
+    /** The library's Games grid, as the home screen's menu opens it. */
+    OPEN_GAMES(R.string.gesture_action_open_games, R.string.gesture_action_open_games_summary),
     ;
 
     fun getDisplayName(context: Context): String = context.getString(displayNameRes)
@@ -76,6 +91,22 @@ enum class GestureAction(val displayNameRes: Int, val summaryRes: Int) {
         }
         OPEN_COMPANION -> {
             dev.droidtop.runtime.CompanionSheet.open(launcher, false)
+            true
+        }
+        OPEN_SEARCH -> {
+            dev.droidtop.shell.standard.LauncherSearch.open(launcher)
+            true
+        }
+        OPEN_QUICK_MENU -> {
+            dev.droidtop.shell.standard.DroidtopScreens.openQuickMenu(launcher)
+            true
+        }
+        SWITCH_MODE -> {
+            dev.droidtop.shell.standard.ModeSwitcher.open(launcher)
+            true
+        }
+        OPEN_GAMES -> {
+            dev.droidtop.shell.standard.DroidtopScreens.openGames(launcher)
             true
         }
     }
