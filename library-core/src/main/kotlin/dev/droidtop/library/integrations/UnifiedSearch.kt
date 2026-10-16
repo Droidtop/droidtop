@@ -294,13 +294,13 @@ object UnifiedSearch {
                 null
             }
             if (key == null) {
-                out += row
+                out.add(row)
             } else {
                 val group = groups[key]
                 if (group == null) {
                     val created = mutableListOf(row)
                     groups[key] = created
-                    out += created
+                    out.add(created)
                 } else {
                     group += row
                 }
