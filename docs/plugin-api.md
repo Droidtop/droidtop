@@ -3540,7 +3540,7 @@ arrays under the manifest's own keys (`V2Declarations`).
   - The provider streams the staged file into `pm install -S <size>` on
     stdin, after checking the size and digest and refusing its own app, and
     deletes the staged copy when it ends. It replies `{installed: true,
-    package, versionName}`; Android's `Failure [INSTALL_FAILED_...]` is
+    package}`; Android's `Failure [INSTALL_FAILED_...]` is
     `FAILED` with a plain sentence and the raw line in `detail`. Downgrades
     and a different signer stay Android's own refusals.
   - **Why stdin and not a staged path the shell user reads:** droidtop cannot

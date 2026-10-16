@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A throwaway app for droidtop's priv.packages rig check: nothing to run. Camera is declared only so the check can
+     grant and revoke a runtime permission. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <application
+        android:hasCode="false"
+        android:label="droidtop rig throwaway" />
+</manifest>
