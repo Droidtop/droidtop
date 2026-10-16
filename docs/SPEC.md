@@ -4962,7 +4962,10 @@ rig check in the commit message.
   dialog, the metadata editor, a new collection's name) draw `OwnFieldKeyboard` under the field. Its
   keys are dispatched into the field's own window as keys of Android's virtual keyboard device, the
   path an attached keyboard takes: no input method, no window focus, no permission. The panel is
-  never a focus target, so a tap on a key leaves focus on the field.
+  never a focus target, so a tap on a key leaves focus on the field. It stands only while the person
+  types in the field: a page whose cursor moves from the field to its rows (the search) closes it,
+  wherever it is shown, the companion's Input controller included, and it comes back with the cursor
+  (`OwnFieldKeyboard(active)`; the companion's stayed up over the results, Droidtop/tracker#485 rig step 1).
 - **One keyboard at a time (Droidtop/tracker#523).** When a droidtop field's keys are served on another screen
   (`KeyboardTargets.open` answers `Elsewhere`: the companion's Input controller or the internal screen), Android's own
   keyboard is sent away from the field's window while the request stands (`KeyboardTargets.hideAndroidKeyboard`, from
