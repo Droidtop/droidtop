@@ -572,6 +572,39 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         return true
     }
 
+    override fun apkInfo(file: java.io.File): ApkInfo? = runCatching {
+        val pm = appContext.packageManager
+        @Suppress("DEPRECATION")
+        val info = pm.getPackageArchiveInfo(file.absolutePath, 0) ?: return null
+        val app = info.applicationInfo ?: return null
+        // The archive's own resources name it; without these two the label is read from nowhere.
+        app.sourceDir = file.absolutePath
+        app.publicSourceDir = file.absolutePath
+        val versionCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
+        ApkInfo(info.packageName, pm.getApplicationLabel(app).toString().ifBlank { info.packageName }, info.versionName, versionCode)
+    }.getOrNull()
+
+    override fun installRefusal(packageName: String): String? {
+        if (packageName == appContext.packageName) return "droidtop does not replace itself through a plugin."
+        val home = runCatching {
+            appContext.packageManager.resolveActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY,
+            )?.activityInfo?.packageName
+        }.getOrNull()
+        if (packageName == home) return "$packageName is the home screen in use."
+        val system = runCatching {
+            val flags = appContext.packageManager.getApplicationInfo(packageName, 0).flags
+            flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0
+        }.getOrDefault(false)
+        if (system) return "$packageName is part of the system."
+        return null
+    }
+
+    override fun stageApk(file: java.io.File): java.io.File? = runCatching {
+        PrivInstall.stage(file, java.io.File(appContext.cacheDir, "priv-install"), System.currentTimeMillis())
+    }.getOrNull()
+
     override fun cancelBrokeredJob(caller: PluginRecord, jobId: String): Boolean {
         val entry = PluginJobsCenter.find(jobId)?.takeIf { it.pluginId == caller.manifest.id && !it.done } ?: return false
         PluginJobsCenter.cancel(entry.jobId)

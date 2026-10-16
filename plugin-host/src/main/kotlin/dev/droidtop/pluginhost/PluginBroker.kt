@@ -211,6 +211,18 @@ interface BrokerEnvironment {
 
     /** Records the privilege level [provider] holds right now for its export of [api] ([ProviderLevels]); false when not kept. */
     fun reportProviderLevel(provider: PluginRecord, api: String, level: String): Boolean = false
+
+    /** What the APK [file] is, read by Android, or null when it is not one (docs/plugin-api.md 2.7 install). */
+    fun apkInfo(file: java.io.File): ApkInfo? = null
+
+    /**
+     * Why droidtop never installs over [packageName] through a provider, or null when it may: droidtop itself, the
+     * app Android opens on Home now (the active mode's launcher), or an app that is part of the system.
+     */
+    fun installRefusal(packageName: String): String? = "This droidtop does not install apps."
+
+    /** [file] copied to droidtop's private staging folder for one install ([PrivInstall.stage]), or null when it could not be. */
+    fun stageApk(file: java.io.File): java.io.File? = null
 }
 
 /** At most [perHour] uses per key in any hour (docs/plugin-api.md 8: notifications). */
@@ -933,6 +945,8 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
             // The chain is attributed and limited: at most three plugins, no repeats.
             if (providerRecord.manifest.id in chain) throw BrokerException(PluginErrorCode.INVALID_ARGS, "a plugin cannot call itself through a provider")
             if (chain.size + 1 > MAX_CHAIN) throw BrokerException(PluginErrorCode.INVALID_ARGS, "calls between plugins are limited to $MAX_CHAIN deep")
+            // priv.packages install: droidtop reads, confirms and stages the APK itself; the provider gets only that (2.7).
+            val args = if (PrivInstall.applies(request.api, request.op)) PrivInstall.prepare(env, record, providerRecord, request.args) else request.args
             val callerBlock = JSONObject()
                 .put("kind", "plugin")
                 .put("id", callerId)
@@ -952,7 +966,7 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
                 version = request.version,
                 op = request.op,
                 caller = callerBlock,
-                args = request.args,
+                args = args,
             )
             if (exportedOp.job) {
                 val jobId = env.startBrokeredJob(record, providerRecord, call)
