@@ -311,6 +311,8 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val DRAWER_GRID_WIDTH_OVERRIDE = backedUpItem(SettingsDrawerFragment.GRID_SIZE_WIDTH_DRAWER_OVERRIDE, 0)
         @JvmField
+        val DRAWER_PADDING = backedUpItem(SettingsDrawerFragment.DRAWER_PADDING, 100)
+        @JvmField
         val ICON_SIZE = backedUpItem(SettingsIconsFragment.ICON_SIZE_KEY, 100)
         @JvmField
         val ICON_LABEL_SIZE = backedUpItem(SettingsIconsFragment.ICON_LABEL_SIZE_KEY, 100)
@@ -335,6 +337,8 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val TASKBAR_PINNING_IN_DESKTOP_MODE =
             backedUpItem(TASKBAR_PINNING_DESKTOP_MODE_KEY, true, EncryptionType.DEVICE_PROTECTED)
+        @JvmField
+        val LOCK_HOME_SCREEN = backedUpItem(SettingsHomeFragment.LOCK_HOME_SCREEN, false)
         // droidtop patch: one action per gesture slot instead of one
         // hardcoded action toggled on/off (docs/SPEC.md, Launcher mode
         // survey, "Assignable gesture actions"). Defaults match the old

@@ -42,6 +42,8 @@
 
     <string name="pref_label_visibility_title">Visibilità etichette</string>
     <string name="label_visibility_never">Mai</string>
+    <string name="label_visibility_drawer_only">Solo cassetto</string>
+    <string name="label_visibility_home_only">Solo home</string>
     <string name="label_visibility_auto">Auto</string>
     <string name="label_visibility_always">Sempre</string>
 
@@ -61,9 +63,13 @@
 
     <string name="pref_drawer_grid_width_override_title">Larghezza griglia personalizzata</string>
     <string name="pref_drawer_grid_width_override_summary">Usa un numero personalizzato di colonne nel cassetto app</string>
+    <string name="pref_drawer_padding_title">Spaziatura laterale</string>
 
     <string name="pref_blur_preview_title">Sfocatura modalità anteprima</string>
     <string name="pref_blur_preview_desc">Sfoca lo sfondo durante il trascinamento di icone e widget</string>
+
+    <string name="pref_lock_home_screen_title">Blocco schermata home</string>
+    <string name="pref_lock_home_screen_summary">Impedisce di spostare icone e widget</string>
 
     <!-- Murine search bar -->
     <string name="murine_search_hint">Cerca…</string>
