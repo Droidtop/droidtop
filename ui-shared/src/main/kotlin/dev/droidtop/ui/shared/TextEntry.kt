@@ -277,7 +277,7 @@ private class SystemKeyboardHandOff(private val show: () -> Unit, private val hi
     var active by mutableStateOf(false)
         private set
 
-    val cue: String? get() = if (active) "System keyboard. B returns to droidtop's" else null
+    val cue: String? get() = if (active) "System keyboard. Back returns to droidtop's" else null
 
     fun use() {
         active = true

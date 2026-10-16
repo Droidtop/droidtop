@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import dev.droidtop.runtime.FailureText
+import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -53,7 +54,7 @@ private const val SORT_BY = "Sort by"
 private const val FILTER = "Filter"
 private const val SYSTEM_SETTINGS = "System settings"
 private const val ORPHANS_FIND = "Find orphaned media"
-private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
+private const val ORPHANS_DELETE = "Delete orphaned media"
 
 /**
  * The in-gamelist options overlay (the ES-DE GuiGamelistOptions
@@ -266,7 +267,7 @@ internal fun GamelistOptionsMenu(
                     status = if (report.isEmpty) {
                         report.describe()
                     } else {
-                        report.describe() + "\nPress A again to delete them."
+                        report.describe() + "\n${PressWords.againSentence} to delete them."
                     }
                     orphansArmed = !report.isEmpty
                     busy = false
@@ -451,7 +452,7 @@ internal fun GamelistOptionsMenu(
             } else {
                 actions.forEachIndexed { index, label ->
                     MenuRow(
-                        title = label,
+                        title = if (label == ORPHANS_DELETE) "$label: ${PressWords.again}" else label,
                         selected = index == focusIndex,
                         danger = label == ORPHANS_DELETE,
                         onClick = {

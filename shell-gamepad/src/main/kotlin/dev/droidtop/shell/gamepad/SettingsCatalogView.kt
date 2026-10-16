@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import dev.droidtop.runtime.FailureText
+import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
@@ -1596,7 +1597,7 @@ private fun CatalogRowView(
     val value = if (toggle != null) null else catalogRowValue(item, context)
     val placeholder = status == null && value == null && item is TextInputItem
     MenuRow(
-        title = if (confirmArmed) "${item.title}: ${if (PadModality.showsFocus) "press A" else "tap"} again to confirm" else item.title,
+        title = if (confirmArmed) "${item.title}: ${PressWords.again} to confirm" else item.title,
         value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
         chip = item.chip,
         // A state with a tone (a plugin's Allowed / Ask first / Blocked) is a chip in that tone (tracker#519).
