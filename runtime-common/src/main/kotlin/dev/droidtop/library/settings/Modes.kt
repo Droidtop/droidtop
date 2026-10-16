@@ -314,11 +314,21 @@ object Modes {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LAST_MODE, Mode.LAUNCHER.id) ?: Mode.LAUNCHER.id
 
+    private val lastState = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /**
+     * The mode last switched to in this process, null before any switch: what a screen that outlives a switch watches
+     * to follow it (the companion kept Desktop's input pad and Input tab after Desktop to Gaming, rig 1931). The value
+     * is [lastMode]'s; read that for the mode itself.
+     */
+    val lastModeFlow: kotlinx.coroutines.flow.StateFlow<String?> get() = lastState
+
     @JvmStatic
     fun setLastMode(context: Context, mode: Mode) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putString(KEY_LAST_MODE, mode.id)
             .apply()
+        lastState.value = mode.id
     }
 
     fun defaultMode(context: Context): String? =

@@ -3594,6 +3594,11 @@ launcher-style surface used to stand in for them, so a Standard user's add-on di
 Performance, System or Keys, did not scroll and carried a prose line; its one unique piece, the quick-launch
 row of recent apps, became Home's Recent apps section for every mode.
 
+Every host reads the mode through `SecondaryDisplayContent.followedMode`, which watches `Modes.lastModeFlow`, so a
+companion that stays up across a mode switch redraws as the new mode's: its bar, its opening tab and its input
+surface. Read once when the host came up, it kept Desktop's keyboard pad and Input tab after Desktop to Gaming (rig,
+droidtop 0.2.0-dev.1931).
+
 - **Tabs (redesigned 2026-10-09, Droidtop/tracker#414, slice C2):** Home (the widgets and info surface,
   `CompanionSurface`, the host's own add/remove controls where it has them), Game (only while a game runs: the
   running game's card), System, Apps (the task manager, formerly Tasks), Performance, Input (the keyboard and
