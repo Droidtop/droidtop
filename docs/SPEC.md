@@ -2432,8 +2432,14 @@ the `ContainerRuntime` interface that already exists (§3):
   COMMAND...` (the enter path with any command, behind the same
   per-container "Run its commands from the desktop" switch; `-i` and
   `-t` are taken, and it runs on pipes). A container is named by its name
-  or its id. `run`, `pull`, `rm` and `compose` answer "not built in
-  droidtop yet"; what needs namespaces, a daemon or image building
+  or its id. **Second slice (2026-10-16):** `pull IMAGE` puts an image in droidtop's
+  one store (`OciImageStore`); `run [-d] [--name NAME] IMAGE` makes a sibling from the image under that name (droidtop's
+  default name otherwise), gives it a Private home (an app container keeps its files to itself, the review's
+  default), and starts the image's own program as its page's Start it does, always detached (its output is the log;
+  an image that names no program is made and left for `docker exec`); `rm [-f] CONTAINER...` deletes through the one
+  removal path its page's Delete uses (`ContainerRemoval`: the tree, its exported apps and commands, its program),
+  never the desktop's own container, and a running one only with `-f`. A command after the image, `-e`, `-p`, `-v`,
+  `-w`, `--entrypoint`, `--restart`, `--rm` and `-u` answer "not built in droidtop yet", as does `compose`; what needs namespaces, a daemon or image building
   (`build`, `network`, `volume`, `push`, ...) answers that droidtop's
   containers do not have it. Docker words stay in the command; droidtop's
   screens keep "app" and "program". Nothing the container wrote reaches

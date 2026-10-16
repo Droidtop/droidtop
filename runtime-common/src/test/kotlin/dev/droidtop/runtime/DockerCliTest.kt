@@ -45,7 +45,7 @@ class DockerCliTest {
     fun `anything else is an answer, never a request`() {
         assertEquals(0, answer(emptyList()).code)
         assertTrue(answer(listOf("--help")).text.contains("exec"))
-        assertTrue(answer(listOf("run", "nginx")).text.contains("not built in droidtop yet"))
+        assertTrue(answer(listOf("compose", "up")).text.contains("not built in droidtop yet"))
         assertTrue(answer(listOf("build", ".")).text.contains("do not have this"))
         assertTrue(answer(listOf("frobnicate")).text.contains("not a docker command"))
         assertEquals(1, answer(listOf("ps", "--format", "{{.ID}}")).code)
@@ -92,5 +92,29 @@ class DockerCliTest {
         val docker = File(ContainerEnter.hostCommandsDir(files), DockerCli.NAME)
         assertEquals(DockerCli.wrapperScript(), docker.readText())
         assertTrue(docker.canExecute())
+    }
+
+    @Test
+    fun `pull, run and rm take only what droidtop does`() {
+        assertEquals(DockerCommand.Pull("docker.io/library/nginx:1.27-alpine"), DockerCli.parse(listOf("pull", "docker.io/library/nginx:1.27-alpine")))
+        assertEquals(1, answer(listOf("pull", "nginx", "redis")).code)
+        assertEquals(1, answer(listOf("pull", "-a", "nginx")).code)
+        assertEquals(1, answer(listOf("pull", "nginx;id")).code)
+        assertEquals(1, answer(listOf("pull", "../../etc")).code)
+
+        assertEquals(DockerCommand.Run("gitea/gitea:1.22", "git"), DockerCli.parse(listOf("run", "-d", "--name", "git", "gitea/gitea:1.22")))
+        assertEquals(DockerCommand.Run("redis", "cache"), DockerCli.parse(listOf("run", "-it", "--name=cache", "redis")))
+        assertEquals(DockerCommand.Run("redis", null), DockerCli.parse(listOf("run", "redis")))
+        // Known flags droidtop has not built say so; a command after the image is refused, not ignored.
+        assertTrue(answer(listOf("run", "-p", "8080:80", "nginx")).text.contains("-p is not built in droidtop yet"))
+        assertTrue(answer(listOf("run", "--env=A=1", "nginx")).text.contains("not built in droidtop yet"))
+        assertTrue(answer(listOf("run", "alpine", "sh")).text.contains("not built in droidtop yet"))
+        assertEquals(1, answer(listOf("run", "--privileged", "nginx")).code)
+        assertEquals(1, answer(listOf("run")).code)
+
+        assertEquals(DockerCommand.Remove(listOf("a", "b"), force = false), DockerCli.parse(listOf("rm", "a", "b")))
+        assertEquals(DockerCommand.Remove(listOf("a"), force = true), DockerCli.parse(listOf("rm", "-f", "a")))
+        assertEquals(1, answer(listOf("rm", "-v", "a")).code)
+        assertEquals(1, answer(listOf("rm")).code)
     }
 }

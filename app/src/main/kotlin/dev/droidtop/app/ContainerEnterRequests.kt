@@ -6,10 +6,14 @@ import android.util.Log
 import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLauncher
+import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerProgram
+import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.DockerCli
 import dev.droidtop.runtime.DockerCommand
+import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.OciImageStore
+import dev.droidtop.runtime.RootfsImage
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -177,6 +181,51 @@ internal object ContainerEnterRequests {
             is DockerCommand.Exec -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
                 enter(app, dir, Target(info.container.id, info.displayName, "docker exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
+            }
+            is DockerCommand.Pull -> {
+                val pulled = runCatching { OciImageStore.of(app).pull(RootfsImage(reference = command.image)) }
+                pulled.fold(
+                    onSuccess = { answer(dir, "${command.image}\nDigest: ${it.digest}\n", "", 0) },
+                    onFailure = { refuse(dir, "docker pull: ${it.message ?: it.javaClass.simpleName}", 1) },
+                )
+            }
+            is DockerCommand.Run -> {
+                val names = containers.map { it.displayName }
+                val name = command.name ?: ContainerNames.defaultName(ContainerRole.SIBLING, command.image, names)
+                ContainerNames.problemWith(name, names)?.let { return refuse(dir, "docker run: $it", 1) }
+                val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
+                    return refuse(dir, "docker run: ${it.message ?: it.javaClass.simpleName}", 1)
+                }
+                // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
+                runCatching { runtime.setMounts(created, runtime.mounts(created).copy(home = HomeChoice.Private)) }
+                val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()?.program().orEmpty()
+                if (program.isEmpty()) {
+                    answer(dir, "$name\n", "$name's image names no program to run, so nothing was started; use docker exec $name sh\n", 0)
+                } else {
+                    ContainerPrograms.start(app, runtime, created)
+                    answer(dir, "$name\n", "", 0)
+                }
+            }
+            is DockerCommand.Remove -> {
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (target in command.containers) {
+                    val info = find(target)
+                    val running = info != null && (ContainerPrograms.isRunning(info.container.id) || (info.running && runtime.siblingsNeedStart))
+                    when {
+                        info == null -> err.append("Error: No such container: $target\n")
+                        info.container.role == ContainerRole.PRIMARY -> err.append("Error: $target is the desktop's own container; droidtop does not remove it\n")
+                        running && !command.force -> err.append("Error: $target is running; stop it first or use docker rm -f\n")
+                        else -> runCatching {
+                            if (info.running && runtime.siblingsNeedStart) runtime.stop(info.container)
+                            ContainerRemoval.remove(app, runtime, info)
+                        }.fold(
+                            onSuccess = { out.append(target).append('\n') },
+                            onFailure = { err.append("Error: $target: ${it.message ?: it.javaClass.simpleName}\n") },
+                        )
+                    }
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
             }
             is DockerCommand.Answer -> Unit
         }
