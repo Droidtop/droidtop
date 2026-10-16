@@ -1,12 +1,8 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
-import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.consoles.ConsoleSystemDef
-import dev.droidtop.library.consoles.ConsoleSystemsRepository
-import dev.droidtop.library.consoles.SystemFolders
 import dev.droidtop.library.consoles.canResolveFromFolder
-import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
@@ -17,7 +13,6 @@ import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notice
 import dev.droidtop.library.settings.NoticeItem
 import dev.droidtop.library.settings.SettingsScreenRegistry
-import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginCrashPolicy
@@ -47,10 +42,8 @@ import org.json.JSONArray
  *   `startJob(action=download)` is a real job with progress and a real
  *   completion signal droidtop rescans on.
  *
- * [systemScreen] is the per-system "Get games" entry point both :app and
- * :shell-gamepad's gamelist options menu still offer. As of the "Search
- * fan-out" change (SPEC 12a), [search] is also the backing call for the
- * search in `dev.droidtop.library.integrations.UnifiedSearch`, which asks
+ * There is no Get games screen (docs/SPEC.md 13, "There is no Get games sheet"). [search] is the contract 1
+ * backing call for the search in `dev.droidtop.library.integrations.UnifiedSearch`, which asks
  * every source in parallel and ranks the answers in the one result list
  * with the device's own rows -- so a plugin never needs a second, dedicated
  * screen to be found; droidtop's own search already asks it.
@@ -81,14 +74,8 @@ sealed interface AcquireContentSource {
     val label: String
     val description: String?
 
-    /** Whether this source is listed under [systemId] and asked by a search scoped to it (a blank id: every source). A JSON integration names no systems, so it serves all. */
+    /** Whether this source is listed under [systemId] and asked by a search scoped to it (a blank id: every source). */
     fun serves(systemId: String?): Boolean = true
-
-    data class Json(val integration: Integration) : AcquireContentSource {
-        override val id get() = "json_${integration.id}"
-        override val label get() = integration.label
-        override val description get() = integration.description
-    }
 
     data class Plugin(val record: PluginRecord) : AcquireContentSource {
         override val id get() = "plugin_${record.manifest.id}"
@@ -136,8 +123,7 @@ data class AcquireContentOption(val label: String, val index: Int)
  * never re-derives or edits it beyond the generic display shape SPEC 12a
  * settled on: [id], [title], [subtitle], [platform], an optional [artUrl],
  * and an [options] list of labelled choices (source/mirror/region/format).
- * [sizeLabel] is kept for the older per-system "Get games" screen this
- * file already renders. [version], [sizeBytes] and [getValuesJson] are a
+ * [sizeLabel] is the size as a row shows it. [version], [sizeBytes] and [getValuesJson] are a
  * contract 2 result's for the one search (docs/plugin-api.md "Fetchers
  * answer in the one search", Droidtop/tracker#218): [getValuesJson] is set
  * when the result can be fetched from its row without its detail page
@@ -238,7 +224,7 @@ data class UnavailableSource(
             return UnavailableSource(label, reason, pluginId, waiting, askable)
         }
 
-        /** The one row that stands for every source waiting for the person, in the search and in Get games alike. */
+        /** The one row that stands for every source waiting for the person, in the search and on Game sources alike. */
         fun waitingTitle(waiting: List<UnavailableSource>): String =
             if (waiting.size == 1) "${waiting.first().label} is waiting for your approval" else "${waiting.size} sources are waiting for your approval"
 
@@ -250,9 +236,6 @@ data class UnavailableSource(
 object AcquireContentSources {
     /** The registered settings screen id of Accounts and sources > Plugins: where "no source" and "needs approval" lead. */
     const val PLUGINS_SCREEN_ID = "plugins"
-
-    /** The registered id of the one "Get games" screen every menu opens (see [chooseSystemScreen]); deep-link it with a console system id. */
-    const val GET_GAMES_SCREEN_ID = "get_games"
 
     /** The registered settings screen id of Accounts and sources > App integrations. */
     const val INTEGRATIONS_SCREEN_ID = "integrations"
@@ -310,17 +293,6 @@ object AcquireContentSources {
             }
     }
 
-    /**
-     * Every available source for a "Get games" surface: installed+approved plugins declaring ACQUIRE_CONTENT, plus JSON
-     * integrations of the same capability. Plugins first -- a real result list beats a one-way launch. With [systemId],
-     * only the sources that serve that system (a plugin's declared `systems`, Droidtop/tracker#543).
-     */
-    fun available(context: Context, systemId: String? = null): List<AcquireContentSource> =
-        (
-            availablePlugins(context) +
-                IntegrationStore.available(context, IntegrationCapability.ACQUIRE_CONTENT).map { AcquireContentSource.Json(it) }
-            ).filter { it.serves(systemId) }
-
     /** Just the plugin sources -- what [PluginSearchAggregator] fans a query out to; JSON integrations stay one-way/fire-and-forget and have no results to merge. [systemId] scopes it to the sources serving that system ("pc": the PC library). */
     fun availablePlugins(context: Context, systemId: String? = null): List<AcquireContentSource.Plugin> {
         val grants = PluginGrants.forContext(context)
@@ -329,115 +301,6 @@ object AcquireContentSources {
             .map { AcquireContentSource.Plugin(it) }
             .filter { it.serves(systemId) }
     }
-
-    /**
-     * The one "Get games" screen for one system -- lists every source
-     * [available], a JSON one as its existing text-field-or-button shape,
-     * a plugin one as a [NestedScreenItem] opening [SourceScreens.searchScreen]. Both
-     * :app's per-system settings screen and :shell-gamepad's gamelist
-     * options menu ("Get games") push exactly this screen, through their
-     * own renderer (`CatalogNavigator`/the Preference surface).
-     */
-    fun systemScreen(systemId: String, systemName: String, systemFolder: File): CatalogScreen = CatalogScreen(
-        id = "acquire_system_$systemId",
-        title = "Get games",
-        subtitle = "for $systemName",
-        groups = { context ->
-            withContext(Dispatchers.IO) {
-                val sources = available(context, systemId)
-                if (sources.isEmpty()) {
-                    if (available(context).isEmpty()) listOf(noSourceGroup(context, systemId)) else listOf(noSourceForSystemGroup(systemId, systemName))
-                } else {
-                    listOf(
-                        CatalogGroup(
-                            id = "acquire_sources",
-                            title = null,
-                            items = sources.map { source ->
-                                when (source) {
-                                    is AcquireContentSource.Plugin -> NestedScreenItem(
-                                        id = "acquire_src_${source.id}",
-                                        title = source.label,
-                                        subtitle = source.description ?: "Search ${source.label} for $systemName",
-                                        inline = SourceScreens.searchScreen(source, systemId, systemName, systemFolder),
-                                    )
-                                    is AcquireContentSource.Json -> jsonSourceItem(source, systemId, systemName, systemFolder)
-                                }
-                            },
-                        ),
-                    )
-                }
-            }
-        },
-    )
-
-    /**
-     * What a "Get games" screen says when no source can answer: in plain words whether nothing is
-     * installed or something is installed but waiting (approval, turned off), and a way to Plugins and
-     * App integrations from right there. Reads the plugin store: call off the main thread.
-     */
-    private fun noSourceGroup(context: Context, key: String): CatalogGroup {
-        val unavailable = unavailablePlugins(context)
-        val waiting = unavailable.filter { it.waitingForApproval }
-        val others = unavailable.filter { !it.waitingForApproval }
-        return CatalogGroup(
-            id = "acquire_empty",
-            title = null,
-            items = buildList {
-                add(
-                    ActionItem(
-                        id = "acquire_empty_$key",
-                        title = if (unavailable.isEmpty()) "No download source is installed" else "No download source is ready",
-                        subtitle = if (unavailable.isEmpty()) "A download source is a plugin or an app integration that finds games for you." else null,
-                        run = {},
-                    ),
-                )
-                // Every source waiting for the person is ONE row that leads to where they are approved, however many there are.
-                val ask = waiting.singleOrNull()?.takeIf { it.askable }
-                if (ask != null) {
-                    add(askRow("acquire_empty_waiting_$key", ask))
-                } else if (waiting.isNotEmpty()) {
-                    add(pluginsLink("acquire_empty_waiting_$key", UnavailableSource.waitingTitle(waiting), UnavailableSource.waitingSubtitle(waiting), waiting.singleOrNull()?.pluginId))
-                }
-                others.forEach { off -> add(pluginsLink("acquire_empty_off_${off.pluginId}_$key", "${off.label} ${off.reason}", "Open its page", off.pluginId)) }
-                add(
-                    NestedScreenItem(
-                        id = "acquire_empty_plugins_$key",
-                        title = "Plugins",
-                        subtitle = "Install a plugin that offers downloads, or approve one you already added",
-                        registryId = PLUGINS_SCREEN_ID,
-                    ),
-                )
-                add(
-                    NestedScreenItem(
-                        id = "acquire_empty_integrations_$key",
-                        title = "App integrations",
-                        subtitle = "Hook another installed app in as a download source",
-                        registryId = INTEGRATIONS_SCREEN_ID,
-                    ),
-                )
-            },
-        )
-    }
-
-    /** Sources are installed, but none of them declares this system: said so, with the way to the plugins that could be added. */
-    private fun noSourceForSystemGroup(systemId: String, systemName: String): CatalogGroup = CatalogGroup(
-        id = "acquire_empty",
-        title = null,
-        items = listOf(
-            ActionItem(
-                id = "acquire_empty_system_$systemId",
-                title = "No source gets $systemName games",
-                subtitle = "The sources you have list the systems they serve, and $systemName is not one of them.",
-                run = {},
-            ),
-            NestedScreenItem(
-                id = "acquire_empty_system_plugins_$systemId",
-                title = "Plugins",
-                subtitle = "Install a plugin that offers downloads",
-                registryId = PLUGINS_SCREEN_ID,
-            ),
-        ),
-    )
 
     /**
      * What a source that cannot give games yet opens from Game sources: why, in one notice, and the one way on, at
@@ -496,7 +359,7 @@ object AcquireContentSources {
         title = UnavailableSource.waitingTitle(listOf(source)),
         subtitle = "Press to allow it to get games",
         run = { ctx, _ ->
-            if (askSource(ctx, source)) "${source.label} can get games now. Go back and open Get games again"
+            if (askSource(ctx, source)) "${source.label} can get games now. Go back and search again"
             else "${source.label} is still not allowed to get games"
         },
     )
@@ -521,55 +384,6 @@ object AcquireContentSources {
     }
 
     /**
-     * The registered "Get games" screen (docs/SPEC.md 12a "Get games everywhere"): the ONE screen every
-     * menu, page, empty state and the search dialog opens, through
-     * `SettingsScreenRegistry.get(GET_GAMES_SCREEN_ID, systemId)`. With no system id it asks which
-     * system to download for, then opens that system's own [systemScreen]; deep-linked at a console
-     * system id it opens that system's [systemScreen] directly. With no source it says so and leads to
-     * Plugins instead of an empty list of systems.
-     */
-    fun chooseSystemScreen(): CatalogScreen = CatalogScreen(
-        id = GET_GAMES_SCREEN_ID,
-        title = "Get games",
-        subtitle = "Pick the system to download for",
-        forDeepLink = { systemId -> deepLinkedSystemScreen(systemId) },
-        // Settings search must not walk the systems' folders to index a screen that is entered from a menu.
-        indexGroups = { emptyList() },
-        groups = { context ->
-            withContext(Dispatchers.IO) {
-                if (available(context).isEmpty()) {
-                    listOf(noSourceGroup(context, "all"))
-                } else {
-                    val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-                    val sources = available(context)
-                    // Only the systems some installed source serves (Droidtop/tracker#543): a list of every system
-                    // would lead to pages that say nothing can be found there.
-                    val (yours, others) = downloadTargets(
-                        existing = SystemFolders.all(context, systemsById),
-                        all = systemsById.values,
-                        root = GamesRoots.current(context).first(),
-                    ).let { (a, b) -> a.filter { (_, s) -> sources.any { it.serves(s.id) } } to b.filter { (_, s) -> sources.any { it.serves(s.id) } } }
-                    fun item(folder: File, system: ConsoleSystemDef) = NestedScreenItem(
-                        id = "acquire_pick_${system.id}",
-                        title = system.displayName,
-                        inline = systemScreen(system.id, system.displayName, folder),
-                    )
-                    listOfNotNull(
-                        yours.takeIf { it.isNotEmpty() }?.let { list ->
-                            CatalogGroup(id = "acquire_choose_systems", title = "Your systems", items = list.map { (folder, system) -> item(folder, system) })
-                        },
-                        CatalogGroup(
-                            id = "acquire_choose_other",
-                            title = if (yours.isEmpty()) null else "Other systems",
-                            items = others.map { (folder, system) -> item(folder, system) },
-                        ),
-                    )
-                }
-            }
-        },
-    )
-
-    /**
      * The systems "Get games" offers to download for: those with a folder already ([existing], by name), then every
      * other system a folder can mean ([all] without the store-owned ones), each with the folder a download would create
      * under [root] (the first games folder) the first time one is placed there. Nothing is refused for lack of a system
@@ -586,74 +400,6 @@ object AcquireContentSources {
             .sortedBy { it.displayName.lowercase() }
             .map { File(root, it.id) to it }
         return yours to others
-    }
-
-    /** [systemScreen] for a system known only by id: its name and folder are read when the screen opens, off the main thread. */
-    private fun deepLinkedSystemScreen(systemId: String): CatalogScreen = CatalogScreen(
-        id = "acquire_system_$systemId",
-        title = "Get games",
-        indexGroups = { emptyList() },
-        groups = { context ->
-            withContext(Dispatchers.IO) {
-                val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
-                val name = systemsById[systemId]?.displayName ?: systemId
-                // No folder for the system yet: the first games folder's own, made when a download is placed (#536).
-                val folder = SystemFolders.all(context, systemsById).firstOrNull { (_, system) -> system.id == systemId }?.first
-                    ?: File(GamesRoots.current(context).first(), systemId)
-                systemScreen(systemId, name, folder).groups(context)
-            }
-        },
-    )
-
-    private fun jsonSourceItem(
-        source: AcquireContentSource.Json,
-        systemId: String,
-        systemName: String,
-        systemFolder: File,
-    ): dev.droidtop.library.settings.CatalogItem {
-        val integration = source.integration
-        // A template that uses {query} needs a search string before it
-        // can run: it is offered as a text field, and committing the
-        // text runs it -- unchanged from §12's original shape.
-        if (IntegrationPlaceholders.QUERY in IntegrationPlaceholders.usedIn(integration.argumentsTemplate)) {
-            return TextInputItem(
-                id = "acquire_json_${integration.id}_$systemId",
-                title = integration.label,
-                subtitle = integration.description
-                    ?: "Type what to search for; ${integration.packageName} opens with it for $systemName",
-                value = "",
-                onChange = { ctx, query ->
-                    if (query.isNotBlank()) {
-                        runJson(context = ctx, source = source, systemId = systemId, systemName = systemName, systemFolder = systemFolder, query = query.trim())
-                    }
-                },
-            )
-        }
-        return ActionItem(
-            id = "acquire_json_${integration.id}_$systemId",
-            title = integration.label,
-            subtitle = integration.description ?: "Opens ${integration.packageName} for $systemName",
-            run = { ctx -> runJson(context = ctx, source = source, systemId = systemId, systemName = systemName, systemFolder = systemFolder) },
-        )
-    }
-
-    /** Runs the JSON integration's own mechanism, unchanged -- see [IntegrationStore.run]. */
-    fun runJson(
-        context: Context,
-        source: AcquireContentSource.Json,
-        systemId: String,
-        systemName: String,
-        systemFolder: File,
-        query: String? = null,
-    ) {
-        IntegrationStore.run(
-            context = context,
-            integration = source.integration,
-            systemId = systemId,
-            systemName = systemName,
-            systemFolder = systemFolder,
-            query = query,
-        )
     }
 
     /**
@@ -761,7 +507,7 @@ object AcquireContentSources {
         onComplete: (AcquireDownloadOutcome) -> Unit,
     ): AcquireContentJob? {
         val startedAt = System.currentTimeMillis()
-        // A system whose folder does not exist yet (Get games offers every system): made now, under the games folder.
+        // A system whose folder does not exist yet: made now, under the games folder.
         if (!systemFolder.isDirectory) withContext(Dispatchers.IO) { systemFolder.mkdirs() }
         val trackingId = PluginJobsCenter.start(
             context = context,

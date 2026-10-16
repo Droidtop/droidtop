@@ -21809,9 +21809,9 @@ without its runtime said "Running". Decisions:
   answers the one search (`UnifiedSearch`, "One search" in 12a): a query goes in, results come out, and they join
   the ranked list beside the device's games and apps and the web row, each saying where it comes from in its
   detail line (the source's name with version, size and system). The source is a detail of the row, never a
-  screen to pick first ("de-emphasise providers", same decision). Picking a result opens its detail (the source's
-  `detail` view, or droidtop's default) whose Download is the source's existing get path, run as a job in
-  Downloads (`AcquireDownload`, `PluginJobsCenter`). Every place that offered "Get games" (the Select menu of All
+  screen to pick first ("de-emphasise providers", same decision). Picking a result gets it (below, "Get from the
+  row") or opens its detail, whose Download is the same `acquire` job, run in Downloads (`AcquireDownload`,
+  `PluginJobsCenter`). Every place that offered "Get games" (the Select menu of All
   games, a system, a collection and PC Games; the Apps section; a game's page and a PC game's menu; the
   empty-library states) keeps a "Get games" entry, and it opens the one search, empty and ready for typing,
   scoped as that place is (a system's entry searches that system and downloads to its folder; PC Games searches
@@ -21833,13 +21833,15 @@ without its runtime said "Running". Decisions:
   group, and they keep the provider a detail. Loading is the one "Searching" line until every source has
   answered or run out of time; a source with nothing is silent; a failed or slow source is one plain line
   under the list naming it, as "Failures" in 12a says.
-  **The contract** is `library.sources@1` `search`, the point that already feeds the one search (plugin-api.md A2),
-  agreed with the plugin lane on Droidtop/tracker#218: in `{query, values, limit, context:{system, destination}}`,
-  out `{results:[{id, title, subtitle?, version?, size?, platform?, columns?, badges?, ref?}]}`, where `version`
-  is display text and `size` is bytes (a number) or display text. The search gives each source 8 seconds
-  (`UnifiedSearch.SEARCH_BUDGET_MS`); a source still working then is "<source> took too long" under the list, and
-  its late answer is dropped, so a slow source never holds the others. The download stays `detail` then the
-  `acquire` job.
+  **The contract** is the plugin lane's, agreed on Droidtop/tracker#218: docs/plugin-api.md "Fetchers answer in
+  the one search". `library.sources@1` `search` as before, a result optionally carrying `version`, `size` (bytes)
+  and `get`; every search has a 10 s budget whose miss is a "did not answer in time" line under the list, not a
+  crash, and a source has one search in flight, the newest query asked next.
+  **Get from the row.** A result with `get` is fetched from its row: pressing it starts the source's `acquire` as a
+  job (`GameSourceProvider.get`), into the folder "Download destination" (12a) picks, and the search stays open
+  with one line saying it is getting the game and that it is in Downloads; when no folder can be picked the
+  result's page opens and says which is missing. A result without `get` opens its detail page, whose Download is
+  the same job.
 - **Failure text is plain, the detail is one press away (#167).** A
   plugin's disabled reason is the plain sentence
   (`PluginLoadErrorMessage`); the raw reason is kept in the log and in

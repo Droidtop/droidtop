@@ -194,8 +194,6 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
-        // The one "Get games" screen every menu opens (docs/SPEC.md 12a "Get games everywhere").
-        SettingsScreenRegistry.register(AcquireContentSources.chooseSystemScreen())
         SettingsScreenRegistry.register(pluginsScreen())
         SettingsScreenRegistry.register(pluginKeysScreen())
         // Opened on their own by droidtop:// action links (LinkActivity, LinkRouter); More catalogs is also inside Plugins > Add.
@@ -281,9 +279,7 @@ object AppSettingsCatalogs {
         // into Settings"): the gamelist options menu's "System settings"
         // row re-opens this screen with the system id it was opened
         // from, so the folder section below lands on that one system's
-        // rows instead of the top of the whole list -- the same targeted
-        // deep link that menu's "Get games" row already uses
-        // (AcquireContentSources.systemScreen). A system with no folder
+        // rows instead of the top of the whole list. A system with no folder
         // here (a group whose id matches no console system, or one whose
         // folders live outside every games root) resolves to no rows and
         // the screen falls back to the full list rather than a dead
@@ -575,23 +571,6 @@ object AppSettingsCatalogs {
                                                     subtitle = "Bring in another scraper's results (Skraper, Skyscraper, ARRM, ES-DE) " +
                                                         "for this folder: game details go into droidtop, artwork is used from where it sits",
                                                     run = { ctx, _ -> importGamelistXml(ctx, folder) },
-                                                ),
-                                            )
-                                            // Third-party "get games for this system"
-                                            // hooks the user declared (docs/SPEC.md
-                                            // section 12/12a): the JSON and plugin
-                                            // mechanisms unified into ONE "Get
-                                            // games" screen (AcquireContentSources,
-                                            // library-core) -- the system and its
-                                            // real destination folder are both
-                                            // known here, exactly what that screen
-                                            // needs.
-                                            add(
-                                                NestedScreenItem(
-                                                    id = "folder_acquire_${resolved.id}",
-                                                    title = "Get games",
-                                                    subtitle = "Search an installed plugin or integration for ${resolved.displayName}",
-                                                    inline = AcquireContentSources.systemScreen(resolved.id, resolved.displayName, folder),
                                                 ),
                                             )
                                             // EmuDeck-style setup helper: firmware

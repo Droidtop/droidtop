@@ -812,6 +812,7 @@ internal fun PcGamesSection(
             line = if (state.home) "No games yet" else "No PC games yet",
             actionLabel = "Game sources",
             onAction = { state.setupOpen = true },
+            pc = !state.home,
         )
         return
     }
@@ -1621,7 +1622,7 @@ private fun PcShelvesHome(
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Lg)) {
                 Text("Nothing on the shelves yet", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                 if (mixed) HomeDestinations(selected = state.destIndex.takeIf { onDest }, onOpen = onOpenSection)
-                dev.droidtop.shell.gamepad.GetGamesChip(dev.droidtop.library.integrations.GetGamesContext.EMPTY_STATE)
+                dev.droidtop.shell.gamepad.GetGamesChip()
             }
         }
         return
