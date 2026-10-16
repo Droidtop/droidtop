@@ -24,7 +24,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.isActive
@@ -176,6 +175,12 @@ internal object EngineApiServer {
                 // A streamed body (attach) is written as it comes, until it ends or the client goes.
                 response.stream?.let { stream ->
                     runCatching { stream(output) }
+                    // End the stream for the client as well as closing: a relay into the container (the socket its
+                    // docker reaches) passes the end on when the writing half is shut, and the client waits for that
+                    // end before it reads the exit (`docker run --rm` hung there, rig, build 2011).
+                    runCatching { output.flush() }
+                    runCatching { socket.shutdownOutput() }
+                    Log.i(TAG, "${request.path.substringBefore('?')} stream ended")
                     return
                 }
                 // A hijacked connection (101) carries one stream and then ends.
@@ -286,23 +291,23 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.Wait -> withContainer(libpod, runtime, call.id) { _, info ->
                 val id = info.container.id
-                if (!ContainerPrograms.isRunning(id) && call.condition == "next-exit") {
-                    DockerApi.notBuilt("wait?condition=next-exit on a stopped container")
-                } else {
-                    // Until the program is no longer running; its exit code, 125 when it could not start.
-                    // Both the job and the state must say it is over: the state lags a start that has just been asked
-                    // for, and the job outlives the state's last change by its clean-up. A quarter-second look covers both.
-                    while (ContainerPrograms.isRunning(id) || ContainerPrograms.state(id).let {
-                            it is ContainerPrograms.State.Running || it is ContainerPrograms.State.Waiting
-                        }
-                    ) {
-                        delay(WAIT_LOOK_MS)
-                    }
+                val before = ContainerPrograms.state(id)
+                // Both the job and the state must say it is over: the state lags a start that has just been asked for,
+                // and the job outlives the state's last change by its clean-up ([ContainerPrograms.busy]).
+                when (DockerApi.waitPlan(call.condition, ContainerPrograms.busy(id))) {
+                    DockerApi.WaitPlan.NOW -> Unit
+                    DockerApi.WaitPlan.OVER -> ContainerPrograms.awaitOver(id)
+                    // `docker run` asks before it starts the container: wait for the start, then the end.
+                    DockerApi.WaitPlan.RUN -> ContainerPrograms.awaitRun(id, before, ATTACH_START_WAIT_MS)
+                }
+                run {
+                    // Its exit code, 125 when it could not start.
                     val code = when (val state = ContainerPrograms.state(id)) {
                         is ContainerPrograms.State.Ended -> state.exitCode
                         is ContainerPrograms.State.Failed -> 125
                         else -> 0
                     }
+                    Log.i(TAG, "wait ${call.condition} for ${id.take(12)}: exit $code")
                     // removed (docker run --rm): the exit code once --rm has removed it, or after half a minute.
                     if (call.condition == "removed") {
                         val giveUp = System.currentTimeMillis() + REMOVED_WAIT_MS
@@ -323,17 +328,17 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.Networks -> {
                 DockerApi.unknownNetworkFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return notBuilt(libpod, "network filters ${it.joinToString(", ")}") }
-                val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                val all = EngineActions.networks(app)
                 val names = containerNames(runtime)
                 EngineHttp.Response.json(200, if (libpod != null) LibpodApi.networks(all, names, call.filters) else DockerApi.networks(all, names, call.filters))
             }
             is DockerApi.Call.NetworkGet -> {
-                val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                val all = EngineActions.networks(app)
                 val network = ContainerNetworks.find(all, call.id) ?: return missing(libpod, DockerApi.Kind.NETWORK, call.id)
                 val names = containerNames(runtime)
                 EngineHttp.Response.json(200, if (libpod != null) LibpodApi.networkJson(network, names) else DockerApi.networkJson(network, names))
             }
-            is DockerApi.Call.NetworkCreate -> networksLock.withLock {
+            is DockerApi.Call.NetworkCreate -> EngineActions.networksLock.withLock {
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
                 val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
                 val body = String(request.body, Charsets.UTF_8)
@@ -353,20 +358,15 @@ internal object EngineApiServer {
                 withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.with(existing, network!!)) }
                 EngineHttp.Response.json(200, LibpodApi.networkJson(network!!, names))
             }
-            is DockerApi.Call.NetworkRemove -> networksLock.withLock {
-                if (ContainerNetworks.PREDEFINED.any { it == call.id || ContainerNetworks.predefinedId(it) == call.id }) {
-                    return@withLock DockerApi.error(403, "${call.id} is a pre-defined network and cannot be removed")
-                }
-                val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
-                val network = ContainerNetworks.find(existing, call.id) ?: return@withLock missing(libpod, DockerApi.Kind.NETWORK, call.id)
-                val live = runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty().map { it.container.id }.toSet()
-                if (network.members.any { it in live }) {
-                    return@withLock DockerApi.error(403, "error while removing network: network ${network.name} has active endpoints")
-                }
-                withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.without(existing, network.id)) }
-                if (libpod != null) EngineHttp.Response.json(200, LibpodApi.networkRemoved(network.name)) else EngineHttp.Response(204, "text/plain", ByteArray(0))
+            is DockerApi.Call.NetworkRemove -> when (val removal = EngineActions.removeNetwork(app, runtime, call.id)) {
+                EngineActions.NetworkRemoval.Predefined -> DockerApi.error(403, "${call.id} is a pre-defined network and cannot be removed")
+                EngineActions.NetworkRemoval.Missing -> missing(libpod, DockerApi.Kind.NETWORK, call.id)
+                is EngineActions.NetworkRemoval.InUse ->
+                    DockerApi.error(403, "error while removing network: network ${removal.network.name} has active endpoints")
+                is EngineActions.NetworkRemoval.Removed ->
+                    if (libpod != null) EngineHttp.Response.json(200, LibpodApi.networkRemoved(removal.network.name)) else EngineHttp.Response(204, "text/plain", ByteArray(0))
             }
-            is DockerApi.Call.NetworkConnect -> networksLock.withLock {
+            is DockerApi.Call.NetworkConnect -> EngineActions.networksLock.withLock {
                 runtime ?: return@withLock DockerApi.error(500, "the desktop is not running")
                 val body = String(request.body, Charsets.UTF_8)
                 val ref = DockerApi.connectTarget(body) ?: return@withLock DockerApi.error(400, "name a Container")
@@ -588,9 +588,9 @@ internal object EngineApiServer {
     private suspend fun followLog(log: File, containerId: String, fromStart: Boolean, live: Boolean, out: java.io.OutputStream) {
         var offset = if (fromStart) 0L else withContext(Dispatchers.IO) { log.length() }
         val startBy = System.currentTimeMillis() + ATTACH_START_WAIT_MS
-        var started = ContainerPrograms.isRunning(containerId)
         // A program that starts and ends between two looks is seen by its state changing to over since the attach.
         val before = ContainerPrograms.state(containerId)
+        var started = ContainerPrograms.isRunning(containerId)
         while (true) {
             offset = withContext(Dispatchers.IO) {
                 val size = log.length()
@@ -609,8 +609,7 @@ internal object EngineApiServer {
             }
             if (!live) return
             val running = ContainerPrograms.isRunning(containerId)
-            val now = ContainerPrograms.state(containerId)
-            if (running || (now !== before && (now is ContainerPrograms.State.Ended || now is ContainerPrograms.State.Failed))) started = true
+            if (ContainerPrograms.ranSince(containerId, before)) started = true
             if (started && !running) {
                 if (withContext(Dispatchers.IO) { log.length() } <= offset) return
             } else if (!started && System.currentTimeMillis() > startBy) {
@@ -625,8 +624,6 @@ internal object EngineApiServer {
     private const val REMOVED_WAIT_MS = 30_000L
     private const val MAX_FRAME = 64 * 1024
 
-    /** One network change at a time: each reads, changes and writes networks.json whole. */
-    private val networksLock = Mutex()
 
     /** Every container's name by its id, for a network's members; empty with the desktop down. */
     private suspend fun containerNames(runtime: dev.droidtop.runtime.ContainerRuntime?): Map<String, String> =

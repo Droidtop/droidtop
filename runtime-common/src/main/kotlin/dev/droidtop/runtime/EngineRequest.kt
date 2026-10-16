@@ -97,4 +97,13 @@ sealed interface EngineRequest {
 
     /** Podman's `pod stop`: stops the program of every container in each pod. */
     data class PodStop(val pods: List<String>) : EngineRequest
+
+    /** `network create`: a new network named [name] (docs/SPEC.md 3d, "Networks"). */
+    data class NetworkCreate(val name: String) : EngineRequest
+
+    /** `network ls`: every network, droidtop's own three first; [quiet] prints only ids. */
+    data class NetworkList(val quiet: Boolean) : EngineRequest
+
+    /** `network rm`: removes each network no running container is on. */
+    data class NetworkRemove(val networks: List<String>) : EngineRequest
 }
