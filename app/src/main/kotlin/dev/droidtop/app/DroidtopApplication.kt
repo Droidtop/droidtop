@@ -53,14 +53,6 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.runtime.systemstatus.VolumeControl.watchKidCap(this)
         // Kid's play-time limits: counts play while a game runs and closes it at the limit (SPEC 7f, tracker#421).
         PlayTimeLimiter.install(this)
-        // The plugins' app zygote, started once droidtop's own start has settled, so the first search does not wait for
-        // it (docs/plugin-api.md 5.3, "The rigs"). droidtop's main process only, never a plugin host's.
-        if (android.os.Build.VERSION.SDK_INT >= 29 && android.app.Application.getProcessName() == packageName) {
-            android.os.Looper.myQueue().addIdleHandler {
-                android.os.Handler(mainLooper).postDelayed({ dev.droidtop.pluginhost.PluginZygoteWarmup.warm(this) }, WARM_AFTER_IDLE_MS)
-                false
-            }
-        }
         // Crash notes and crash-loop safe mode (SPEC 10c): after ScanLog so
         // a note can carry its tail, before anything that could crash.
         dev.droidtop.library.diagnostics.CrashRecovery.install(this)
@@ -181,10 +173,5 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         return ImageLoader.Builder(context)
             .components { add(SvgDecoder.Factory()) }
             .build()
-    }
-
-    private companion object {
-        /** After the main thread first goes idle: the warm-up stays out of droidtop's own start. */
-        const val WARM_AFTER_IDLE_MS = 5_000L
     }
 }

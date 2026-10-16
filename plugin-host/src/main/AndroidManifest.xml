@@ -1,14 +1,11 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
-      The app zygote's preload (API 29+): droidtop's plugin library is loaded
-      once there, so a contained plugin's isolated process does not pay the
-      first app library load itself (PluginZygotePreload, docs/plugin-api.md
-      5.3, "The rigs").
+      No app zygote (docs/plugin-api.md 5.3, "The rigs"): on BlueStacks the
+      library preloaded there left libbinder's ProcessState in the zygote, and
+      every plugin process forked from it aborted ("libbinder ProcessState
+      can not be used after fork", release 0.2.0-dev.2097).
     -->
-    <application
-        android:zygotePreloadName="dev.droidtop.pluginhost.PluginZygotePreload"
-        tools:targetApi="29">
+    <application>
         <!--
           Plugin processes (docs/plugin-api.md 5.3). Not exported: only :app
           binds to them, and only :app decides which plugin loads where.
@@ -45,8 +42,7 @@
             android:name="dev.droidtop.pluginhost.PluginSandboxService"
             android:process=":plugin_sandbox"
             android:exported="false"
-            android:isolatedProcess="true"
-            android:useAppZygote="true" />
+            android:isolatedProcess="true" />
         <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot0" android:process=":plugin_sandbox0" android:exported="false" android:isolatedProcess="true" />
         <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot1" android:process=":plugin_sandbox1" android:exported="false" android:isolatedProcess="true" />
         <service android:name="dev.droidtop.pluginhost.PluginSandboxSlot2" android:process=":plugin_sandbox2" android:exported="false" android:isolatedProcess="true" />

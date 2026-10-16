@@ -267,9 +267,6 @@ internal object PluginProcesses {
 
     private val unloads = java.util.concurrent.Executors.newSingleThreadExecutor()
 
-    /** True when a plugin's own contained process from the app zygote is running ([PluginZygoteWarmup]). */
-    fun containedRunning(): Boolean = synchronized(lock) { processes.values.any { it.instance != null && it.runtime != null } }
-
     /** `bindIsolatedService` names the instance; the plugin id hashed keeps it short and free of odd characters. */
     private fun instanceName(pluginId: String): String =
         "p" + java.security.MessageDigest.getInstance("SHA-256").digest(pluginId.toByteArray()).take(8).joinToString("") { "%02x".format(it) }
@@ -292,8 +289,6 @@ internal object PluginProcesses {
                     process.connecting.also { process.connecting = null }
                 }
                 waiting?.complete(runtime)
-                // A plugin's own process from the app zygote keeps it up: the warm-up's empty one is no longer needed.
-                if (process.instance != null) PluginZygoteWarmup.pluginProcessStarted()
             }
 
             // The death recipient reports the process dying; this only means the connection is gone with it.
