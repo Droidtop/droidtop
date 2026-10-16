@@ -339,6 +339,31 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The Plugin widget (Droidtop/tracker#563): one plugin's ui.widget or tile, drawn by droidtop's renderer.
+          Its configure activity picks the source; a launcher starts it for the widget it places.
+        -->
+        <receiver
+            android:name="dev.droidtop.app.PluginWidgetProvider"
+            android:label="@string/widget_plugin_title"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_plugin_info" />
+        </receiver>
+        <activity
+            android:name="dev.droidtop.app.PluginWidgetConfigureActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name="dev.droidtop.app.PluginStatusWidgetProvider"
             android:label="@string/widget_plugin_status_title"

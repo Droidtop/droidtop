@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Plugin widget (Droidtop/tracker#563): one plugin's ui.widget, quick tile or status tile, chosen when it is placed
+  and again from a long press where the launcher offers reconfiguring. Drawn by droidtop from the plugin's data; no
+  plugin code runs in the launcher.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="80dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_plugin"
+    android:previewImage="@mipmap/ic_launcher"
+    android:resizeMode="horizontal|vertical"
+    android:configure="dev.droidtop.app.PluginWidgetConfigureActivity"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_plugin_title" />

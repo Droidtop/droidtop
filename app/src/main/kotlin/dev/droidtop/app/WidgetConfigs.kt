@@ -4,7 +4,7 @@ import android.content.Context
 
 /**
  * What each placed droidtop widget was set up to show, by its appWidgetId (Droidtop/tracker#563): the game a Quick
- * launch widget plays, and a Shelf widget's content and layout. Kept in droidtop's own preferences, written by the widget's configure activity and
+ * launch widget plays, a Shelf widget's content and layout, and a Plugin widget's source. Kept in droidtop's own preferences, written by the widget's configure activity and
  * forgotten when the launcher removes the widget. Read off the main thread, in the widget's render.
  */
 internal object WidgetConfigs {
@@ -16,6 +16,13 @@ internal object WidgetConfigs {
 
     fun setEntryId(context: Context, widgetId: Int, entryId: String) {
         prefs(context).edit().putString("$widgetId.entry", entryId).apply()
+    }
+
+    /** The plugin source a Plugin widget shows ([dev.droidtop.library.integrations.PluginWidgets.Source.key]), or null. */
+    fun pluginSource(context: Context, widgetId: Int): String? = prefs(context).getString("$widgetId.plugin", null)
+
+    fun setPluginSource(context: Context, widgetId: Int, key: String) {
+        prefs(context).edit().putString("$widgetId.plugin", key).apply()
     }
 
     /** What a Shelf widget shows, or null when it was never set up. */
@@ -44,5 +51,5 @@ internal object WidgetConfigs {
         edit.apply()
     }
 
-    private val KEYS = listOf("entry", "shelf", "arg", "layout", "art", "text")
+    private val KEYS = listOf("entry", "shelf", "arg", "layout", "art", "text", "plugin")
 }
