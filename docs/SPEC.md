@@ -14717,8 +14717,17 @@ UI through the one palette (`GamingPalette`) every token reads:
   overlay surface at 92%, so their text keeps 4.5:1 over any artwork. They were the ink at 58%, pale text on a pale
   pill over light art (rig 1931). A theme's own clock or system status that names no colour is white, as in ES-DE,
   unless its declared background is one white cannot be read on; then it is black.
-- Not yet covered: the Standard home screen (Launcher3's XML views), the Wine desktop's views and droidtop's
-  keyboard; each is its own issue.
+- Not yet covered, each its own issue: the Standard home screen's Launcher3 XML views (Droidtop/tracker#560), the
+  Windows runtime's views (#561) and droidtop's keyboard (#562).
+- **The role tokens** for UI droidtop does not draw itself (a plugin's own pages, #559): one set, read from the palette
+  in use (`GamingTheme.palette`, the theme's in Gaming, droidtop's own otherwise), never restated. `theme` is `light`
+  or `dark` (`colors.isLight`); `ground` is the page background (`ground`); `surface` is a sheet or panel
+  (`overlaySurface`); `surfaceVariant` is a raised or focused card (`cardFocused`); `onSurface` and `onSurfaceMuted`
+  are text (`onSurface`, `onSurfaceMuted`, both 4.5:1 on every surface above); `primary` and `onPrimary` are the
+  accent and the ink on it (`accent`, `onAccent`); `caution` and `danger` are the notice inks (`notice.colors
+  .cautionInk`, `.dangerInk`, readable and told apart under every colour-vision simulation); `focus` is the focus
+  ring's outer edge (`accent`) and `focusInner` its inner edge (`FocusRingInks.inner(accent)`). The plugin lane carries
+  them to plugins (`host.info.theme`, `ui.theme`, `host.theme_changed`; docs/plugin-api.md).
 
 **Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
 top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width
