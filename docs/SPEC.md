@@ -15929,6 +15929,45 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   - while the pairing screen is open.
   Nothing listens or polls otherwise.
 
+### Pairing with Pythia (Pythia UX review A19, AG5)
+
+Pythia (bi0shacker001/pythia) is a game manager for the computer that
+carries droidtop-agent's functions on its own: it links the agent's crates,
+and while it serves, the agent is stopped. Pairing with Pythia is pairing
+with the agent's crates, so one identity and one trust list per computer
+hold whichever program pairs. Pythia's docs/SPEC.md section 7 is the same
+protocol, written in the same change. What it adds to the pairing above:
+
+- **Being found.** Pair a computer broadcasts a query for computers that
+  can pair: UDP port 47610, magic `DTCQ1` and a fresh nonce, every two
+  seconds while the screen is open. A computer answers `DTCR1` with its
+  PeerId, its name, its pairing port (47612) and its program (`pythia` or
+  `droidtop-agent`), the mirror of `DTPQ1`/`DTPR1`. Pythia answers only
+  while its Devices page is open or its Sync with droidtop is on. droidtop
+  lists each answer (Pythia's as "Pythia on <computer name>"); the wording
+  of its own menu is droidtop's to set. Nothing in an answer is trusted.
+- **One code on both screens.** Picking a listed computer runs a numeric
+  comparison over TCP to its pairing port, label
+  `droidtop-agent pair-confirm v1`: the handheld sends its PeerId and a
+  SHA-256 commitment to a fresh 32-byte value; the computer replies with
+  its PeerId and its own fresh value; the handheld reveals its value and
+  the computer checks the commitment. Both derive a 6-digit code by
+  HKDF-SHA256 over the label, both PeerIds and both values, and show it.
+  The person confirms on both that the codes match; each side then sends
+  its name and its identity's signature over the transcript and pins the
+  other's PeerId. A mismatch on either side ends the attempt on both, and
+  the screen allows one attempt each time it opens.
+- **Typing a code** stays the fallback, both ways, unchanged (the SPAKE2
+  exchange above).
+- **When nothing answers** within 60 seconds, the screen says what to check
+  (the same network as the computer; Pythia's Devices page open, or its
+  sync on) and offers typing a code.
+- No step needs a camera; the QR code stays an extra.
+- The new exchange and the `DTCQ1` answer belong in droidtop-agent's
+  `discovery` and `pair` crates, so droidtop (`libdroidtop_agent.so`),
+  droidtop-agent and Pythia get one implementation. Not built yet; the
+  pairing build is Pythia UX review C1.
+
 ### Saves
 
 - **One launch seam, two save sources.** `StoreSaves.sync` keeps a game
