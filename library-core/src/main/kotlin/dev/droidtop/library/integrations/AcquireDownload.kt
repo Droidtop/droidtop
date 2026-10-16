@@ -1,7 +1,10 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import dev.droidtop.library.GamesRoots
+import dev.droidtop.library.consoles.BiosDatabase
 import dev.droidtop.pluginhost.AcquireDownloadDescriptor
+import dev.droidtop.pluginhost.ExtensionPoints
 import dev.droidtop.pluginhost.AcquireFileName
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.DownloadPart
@@ -9,6 +12,9 @@ import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginResult
 import dev.droidtop.pluginhost.SplitArchives
 import dev.droidtop.pluginhost.WebSessions
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 /**
@@ -47,6 +53,17 @@ internal object AcquireDownload {
                 if (systemHint != null) "there is no games folder for $systemHint; add one under Settings > Game folders" else "the game folder is not available",
             )
         }
+        // A BIOS file goes to the games folder's bios folder under the database's name, not among the games (#558).
+        val systemId = systemHint ?: hostContext.optJSONObject("system")?.optString("id")?.takeIf { it.isNotBlank() }
+        val bios = descriptors.singleOrNull()?.takeIf { !it.unpack && systemId != null }?.let { only ->
+            withContext(Dispatchers.IO) {
+                val files = BiosDatabase.forSystem(context, systemId!!)?.files.orEmpty()
+                val provides = ExtensionPoints.declares(record.manifest, PluginBios.POINT)
+                AcquireBios.entryFor(files, only.fileName, only.md5, provides)?.let { entry ->
+                    AcquireBios.targetFor(AcquireBios.rootFor(GamesRoots.current(context), File(destination)), entry)
+                }
+            }
+        }
         if (descriptors.size > 1 && descriptors.any { it.unpack } &&
             (!descriptors.all { it.unpack } || SplitArchives.detect(descriptors.map { it.fileName }) == null)
         ) {
@@ -79,8 +96,8 @@ internal object AcquireDownload {
             headers = first.headers,
             more = parts.drop(1),
             extra = buildMap {
-                put("destinationPath", destination)
-                put("targetName", first.targetName)
+                put("destinationPath", bios?.parentFile?.absolutePath ?: destination)
+                put("targetName", bios?.name ?: first.targetName)
                 AcquireEngineHint.valid(values[AcquireEngineHint.KEY])?.let { put(AcquireEngineHint.KEY, it) }
             },
             onStatus = onStatus,
