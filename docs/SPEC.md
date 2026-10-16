@@ -16988,9 +16988,10 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
 - **Any number of computers and handhelds** (owner, 2026-10-10: "if we have 5
   droidtop devices and 5 desktops, we should be able to connect and pair any
   number of permutations of these devices and have them work"). Each device
-  pairs with any number of the other kind. A computer and a handheld exchange
-  what each has, so saves and library changes reach devices that are not
-  paired directly through the devices they share.
+  pairs with any number of other devices of either kind: computers with
+  handhelds and with computers (decided 2026-10-16, below). Paired devices
+  exchange what each has, so saves and library changes reach devices that
+  are not paired directly through the devices they share.
 - **Paired computers** (`Computers`, `:net-core`) are kept in
   `files/agent/computers.json`. Each computer has a folder,
   `files/agent/<id>/`, for its save baselines and kept copies. One of them
@@ -17076,7 +17077,7 @@ Pythia (bi0shacker001/pythia) is a game manager for the computer. It does droidt
 - No step needs a camera. The QR code stays an extra.
 - The new exchange and the `DTCQ1` answer belong in droidtop-agent's `discovery` and `pair` crates. That gives droidtop (`libdroidtop_agent.so`), droidtop-agent and Pythia one implementation. It is not built yet: that is Pythia UX review C1.
 
-Open point for the owner: Pythia's owner decision 1.5 says "A computer can also pair with another computer". droidtop-agent's DESIGN.md section 3 ("Kinds of device") says a computer refuses to pair with a computer. Nothing changes until that is settled.
+**Computers pair with computers (decided 2026-10-16).** The owner: "Computer to computer pairing is ABSOLUTELY a pythia feature, it's the whole fucking reason it exists". A computer pairs with other computers as well as with handhelds, through the same mutual-TLS device certificates and the same exchange. droidtop itself is a handheld, so nothing changes on its side beyond this text; Pythia and droidtop-agent build the computer side (droidtop-agent's DESIGN.md section 3, which had a computer refuse another computer, follows this decision).
 
 ### Saves
 
