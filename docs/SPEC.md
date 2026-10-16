@@ -17784,6 +17784,14 @@ release; every other version's release is untouched, so nothing is ever
 pruned by this path (old releases are kept; a future pruning pass would
 still keep every non-dev version and at least the last 50).
 
+**A main build that started finishes (2026-10-16).** A newer push to a
+branch cancels that branch's build in progress, except on `main`, whose
+build publishes the release a rig installs. On 2026-10-16 a burst of
+landings cancelled every main build from 83dd9acc to 939f7a3d, so the rig
+had no release for the build it was asked to test. On `main` a newer push
+waits as the one pending run, replacing any older pending one, so a burst
+costs the build in progress plus one, and the newest main always publishes.
+
 **Version bump to 0.2.0 and CHANGELOG.md (owner, Droidtop/tracker#119,
 2026-09-28).** `BASE_VERSION` in `release_channel.py` is the one place the
 version base lives; `app/build.gradle.kts`'s `versionName` and this script's
