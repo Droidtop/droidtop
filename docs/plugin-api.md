@@ -2763,7 +2763,7 @@ wording the host uses, so it is identical in every mode.
 | `plugins.export` | normal | Offer features to other plugins | §2.8 |
 | `plugins.export_privileged` | critical | Give other plugins full control of the device | §2.7 |
 | `host.full_trust` | critical | Full access | §5.3 |
-| `os.shizuku` | critical | Use Shizuku through droidtop | §5.6 (full access only: the Shizuku relay) |
+| `os.shizuku` | critical | Use system access through droidtop | §5.6 (full access only: the Shizuku relay) |
 | `priv.shell.adb` | critical | Run system commands | F7, §2 |
 | `priv.shell.root` | critical | Full control of the device | F7, §2 |
 | `priv.packages` | critical | Install and remove apps without asking | F7 |
@@ -3659,7 +3659,7 @@ relay.
   other code goes to the service's policy, and every decision goes to the
   plugin's activity log. A refusal reaches the plugin as a
   `SecurityException` naming why, never a crash of droidtop.
-- **Shizuku.** The new full-access permission `os.shizuku` ("Use Shizuku
+- **Shizuku.** The new full-access permission `os.shizuku` ("Use system access
   through droidtop", critical). droidtop hands it to the plugin with
   `IPluginRuntime.attachRelay`, and again whenever Shizuku sends droidtop a
   new binder. `ShizukuRelayPolicy` forwards the state reads, droidtop's
