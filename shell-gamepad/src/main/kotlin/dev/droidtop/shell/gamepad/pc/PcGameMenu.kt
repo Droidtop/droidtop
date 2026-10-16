@@ -337,11 +337,8 @@ internal fun PcGameMenu(
         return
     }
     if (gettingGames) {
-        // The one Get games screen (docs/SPEC.md 12a "Get games everywhere"), asking which system.
-        dev.droidtop.shell.gamepad.GetGamesSheet(
-            dev.droidtop.library.integrations.GetGamesContext.PC,
-            onDismiss = { gettingGames = false },
-        )
+        // Get games is the one search for PC games (docs/SPEC.md 13, "There is no Get games sheet").
+        dev.droidtop.shell.gamepad.GetGamesSearch(pc = true) { gettingGames = false }
         return
     }
     wineScreen?.let { screen ->

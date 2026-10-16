@@ -21848,8 +21848,9 @@ without its runtime said "Running". Decisions:
   agreed with the plugin lane on Droidtop/tracker#218: in `{query, values, limit, context:{system, destination}}`,
   out `{results:[{id, title, subtitle?, version?, size?, platform?, columns?, badges?, ref?}]}`, where `version`
   is display text and `size` is bytes (a number) or display text. The search gives each source 8 seconds
-  (`UnifiedSearch.SEARCH_BUDGET_MS`); a source still working then is "<source> took too long" under the list, and
-  its late answer is dropped, so a slow source never holds the others. The download stays `detail` then the
+  (`UnifiedSearch.SEARCH_BUDGET_MS`); a source still working then is one line under the list, "<source>: It did not
+  answer in time; try again in a moment" (the timed-out sentence every failure line uses), and its late answer is
+  dropped, so a slow source never holds the others. The download stays `detail` then the
   `acquire` job.
 - **Failure text is plain, the detail is one press away (#167).** A
   plugin's disabled reason is the plain sentence

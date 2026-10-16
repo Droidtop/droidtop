@@ -140,6 +140,14 @@ object UnifiedSearch {
     const val MAX_ROWS_PER_SOURCE = 10
 
     /**
+     * How long the search waits for one source (Droidtop/tracker#218, docs/SPEC.md 13 "There is no Get games sheet"):
+     * a source still working then is one "did not answer in time" line and its late answer is dropped, so a slow source
+     * never holds the list. Shorter than a plugin call's own watchdog ([PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS]),
+     * which is for a call that never returns, because a person is waiting on this one.
+     */
+    const val SEARCH_BUDGET_MS = 8_000L
+
+    /**
      * The search for [query]. [local] answers for the device (called off the
      * main thread, must not touch the disk); [platform] scopes the sources
      * to one system when the surface has one: only the sources whose manifest declares that system (or
@@ -176,7 +184,7 @@ object UnifiedSearch {
         carry: List<SourceHit> = emptyList(),
         debounceMs: Long = SOURCE_DEBOUNCE_MS,
         keep: (AcquireContentResult) -> Boolean = { true },
-        timeoutMs: Long = PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS,
+        timeoutMs: Long = SEARCH_BUDGET_MS,
         loadSources: suspend () -> Pair<List<GameSourceProvider>, List<UnavailableSource>>,
         fetch: suspend (GameSourceProvider) -> Result<List<AcquireContentResult>>,
         needOf: (GameSourceProvider) -> RuntimeNeed? = { null },
@@ -269,6 +277,7 @@ object UnifiedSearch {
     internal fun sourceDetail(hit: SourceHit): String =
         listOfNotNull(
             hit.source.label,
+            hit.result.version?.takeIf { it.isNotBlank() },
             hit.result.columns.joinToString(" · ").takeIf { it.isNotBlank() },
             hit.result.platform?.takeIf { it.isNotBlank() },
             hit.result.sizeLabel?.takeIf { it.isNotBlank() },

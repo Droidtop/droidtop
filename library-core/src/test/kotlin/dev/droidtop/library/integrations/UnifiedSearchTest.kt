@@ -194,4 +194,16 @@ class UnifiedSearchTest {
         delay(50)
         assertFalse(finished)
     }
+
+    @Test
+    fun `a source row names its source, then version, then size`() {
+        val hit = SourceHit(source("romz"), result("zelda").copy(version = "v1.1", sizeLabel = "4 MB", platform = "snes"))
+        assertEquals("ROMZ · v1.1 · snes · 4 MB", UnifiedSearch.sourceDetail(hit))
+    }
+
+    @Test
+    fun `the search gives a source eight seconds, under a plugin call's own watchdog`() {
+        assertEquals(8_000L, UnifiedSearch.SEARCH_BUDGET_MS)
+        assertTrue(UnifiedSearch.SEARCH_BUDGET_MS < PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS)
+    }
 }

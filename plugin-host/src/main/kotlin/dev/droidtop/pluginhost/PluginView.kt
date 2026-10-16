@@ -385,8 +385,9 @@ object PluginViewCall {
 
 /**
  * One result a `library.sources` `search` returned in the contract 2 shape (docs/plugin-api.md
- * 1.6): `{id, title, subtitle?, columns?, badges?, platform?, ref?}`. [refJson] is handed back
- * unread in `detail` and `acquire`; droidtop never parses it (12a checklist point 5).
+ * 1.6): `{id, title, subtitle?, version?, size?, columns?, badges?, platform?, ref?}`. [refJson] is handed back
+ * unread in `detail` and `acquire`; droidtop never parses it (12a checklist point 5). [version] is the source's
+ * display text; [size] is ready to show (a byte count is formatted by [SourceResultProtocol.sizeText]).
  */
 data class SourceResultRow(
     val id: String,
@@ -396,6 +397,8 @@ data class SourceResultRow(
     val badges: List<String>,
     val platform: String?,
     val refJson: String,
+    val version: String? = null,
+    val size: String? = null,
 )
 
 object SourceResultProtocol {
@@ -417,10 +420,35 @@ object SourceResultProtocol {
                         badges = obj.strings("badges").map { it.cut(PluginView.MAX_TITLE) },
                         platform = obj.text("platform"),
                         refJson = (obj.optJSONObject("ref") ?: JSONObject()).toString(),
+                        version = obj.text("version")?.cut(PluginView.MAX_TITLE),
+                        size = sizeText(if (obj.isNull("size")) null else obj.opt("size")),
                     ),
                 )
             }
         }
+    }
+
+    /**
+     * A result's `size` as a row shows it (Droidtop/tracker#218): a number is bytes, written in the largest unit that
+     * keeps it at least 1 (1024 steps, one decimal under 10); text is the source's own label; anything else is none.
+     */
+    fun sizeText(value: Any?): String? = when (value) {
+        is Number -> value.toDouble().takeIf { it >= 0 && !it.isNaN() && !it.isInfinite() }?.let { bytes ->
+            val units = listOf("bytes", "KB", "MB", "GB", "TB")
+            var amount = bytes
+            var unit = 0
+            while (amount >= 1024 && unit < units.lastIndex) {
+                amount /= 1024
+                unit++
+            }
+            when {
+                unit == 0 -> "${amount.toLong()} bytes"
+                amount < 10 -> "%.1f %s".format(java.util.Locale.ROOT, amount, units[unit])
+                else -> "${amount.toLong()} ${units[unit]}"
+            }
+        }
+        is String -> value.trim().takeIf { it.isNotEmpty() && it != "null" }?.cut(PluginView.MAX_TITLE)
+        else -> null
     }
 }
 

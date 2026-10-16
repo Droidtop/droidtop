@@ -26,7 +26,6 @@ import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
-import dev.droidtop.library.integrations.GetGamesContext
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.GamingSettingsCatalog
@@ -102,15 +101,9 @@ internal fun GamelistOptionsMenu(
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     // Non-null while a real settings catalog screen is hosted over this
-    // menu -- the "Get games" screen (AcquireContentSources, docs/SPEC.md
-    // 12/12a) or Console systems ("System settings" below, docs/SPEC.md
+    // menu -- Console systems ("System settings" below, docs/SPEC.md
     // "One settings entry point") -- rendered by the SAME generic
-    // CatalogNavigator Gaming's own Settings section uses, so real
-    // controller/touch text entry and a focusable results list come for
-    // free rather than a second hand-built input widget here. One state
-    // slot for both: only ever one of them is open at a time, and a
-    // second slot would be a second mechanism for "show a settings
-    // screen over this menu".
+    // CatalogNavigator Gaming's own Settings section uses.
     var acquireScreen by remember { mutableStateOf<CatalogScreen?>(null) }
     // Per-system launch-screen default (docs/SPEC.md section 4c: "Select
     // which display to open ROMs from this tab" / "Tune individual
@@ -135,12 +128,9 @@ internal fun GamelistOptionsMenu(
     val orphansLabel = if (orphansArmed) ORPHANS_DELETE else ORPHANS_FIND
 
     val libraryScope = groupKey.isEmpty()
-    val getGamesContext = when {
-        libraryScope -> GetGamesContext.LIBRARY
-        systemId == PC_SYSTEM_ID -> GetGamesContext.PC
-        systemId != null -> GetGamesContext.SYSTEM
-        else -> GetGamesContext.COLLECTION
-    }
+    // Get games opens the one search (docs/SPEC.md 13, "There is no Get games sheet"): a console system's list searches
+    // that system, the PC list searches PC, All games and a collection search every source.
+    var gettingGames by remember { mutableStateOf(false) }
     // A system's list searches that system ("Search SNES", the owner's per-console search, 2026-10-14): its
     // games and the sources that serve it, a download landing in its folder (docs/SPEC.md 12a).
     val searchRowLabel = when {
@@ -179,8 +169,8 @@ internal fun GamelistOptionsMenu(
                 add("Get artwork and details")
                 add("Import from ES-DE")
             }
-            // Wherever games are listed, not only one console system: All games and the PC list ask
-            // which system to download for (rig, 2026-09-30: the entry was unreachable from the Games tab).
+            // Wherever games are listed, not only one console system (rig, 2026-09-30: the entry was unreachable
+            // from the Games tab).
             add(GetGamesEntry.LABEL)
             // Offered wherever PC or engine games are actually on
             // screen, which is the same "act on what you are looking
@@ -360,11 +350,7 @@ internal fun GamelistOptionsMenu(
                     onScraped()
                 }
             }
-            GetGamesEntry.LABEL -> {
-                // One screen for every list: with a console system it opens that system's sources, otherwise it asks which system.
-                val screen = getGamesScreen(getGamesContext, systemId)
-                if (screen != null) acquireScreen = screen else status = "Get games isn't available."
-            }
+            GetGamesEntry.LABEL -> gettingGames = true
             PC_SETUP -> {
                 onDismiss()
                 onOpenStores()
@@ -373,7 +359,7 @@ internal fun GamelistOptionsMenu(
                 // The same registered screen Settings > Library > Console
                 // systems opens (registryId "console_systems",
                 // AppSettingsCatalogs), through the same generic
-                // CatalogNavigator dialog "Get games" uses -- but
+                // CatalogNavigator dialog -- but
                 // DEEP-LINKED: the registry argument re-opens that one
                 // screen parameterized with THIS system (docs/SPEC.md
                 // "One consistent way into Settings"), so it lands on
@@ -389,6 +375,14 @@ internal fun GamelistOptionsMenu(
         }
     }
 
+    if (gettingGames) {
+        GetGamesSearch(systemId = systemId.takeIf { !libraryScope }, pc = systemId == PC_SYSTEM_ID && !libraryScope) {
+            gettingGames = false
+            // A download may have just landed a file in this system's folder: rescan so it shows up.
+            onScraped()
+        }
+        return
+    }
     val openAcquireScreen = acquireScreen
     if (openAcquireScreen != null) {
         CatalogSheet(

@@ -614,7 +614,7 @@ games for, next to `point` and `id`:
 `system.id` below), or `"*"` (alone or in the list) for every system. droidtop
 decides from the manifest alone, without loading the plugin:
 
-- a system's Get games page lists the source only if it names that system;
+- a system's search (its "Search SNES" and its Get games entry) asks the source only if it names that system;
 - the PC library (PC Games, search scoped to `pc`) asks only the sources that
   name a PC system (`pc`, `windows`, `windows3x`, `windows9x`, `dos`, `linux`,
   `mac`, `macos`); a source naming `pc` serves all of them, and a source that
@@ -630,7 +630,9 @@ contract bump; a build that does not know the field ignores it. Several
 `library.sources` entries in one plugin serve the union of their `systems`
 (one entry without it makes the plugin undeclared).
 
-**`library.sources` with views (the Get games flow).** Every call on this
+**`library.sources` with views (getting games through the one search).** There is no Get games screen (owner,
+2026-10-16, Droidtop/tracker#218; docs/SPEC.md 13 "There is no Get games sheet"): a source's `search` answers the
+one search, and its rows sit in the ranked list beside the device's games and apps. Every call on this
 point carries `context: {system: {id, name}, destination}`; `system.id` is
 droidtop's system id (the ES-DE short name, `snes`), `destination` the
 system's own games folder, resolved by droidtop (absent when a search has
@@ -642,10 +644,13 @@ no destination, such as the PC library). Ops:
   that answers UNSUPPORTED (or a contract 1 source) gets droidtop's default
   form, one `text` node `query`.
 - `search {query, values, limit?, context}` → `{results: [result]}`, where a result
-  is `{id, title, subtitle?, columns?[], badges?[], platform?, ref?}`.
-  `limit` is how many results the host will show (ten per source in the one
+  is `{id, title, subtitle?, version?, size?, columns?[], badges?[], platform?, ref?}`.
+  `version` (text) and `size` (bytes as a number, or text) are optional and are shown in the row's detail line
+  after the source's name (added 2026-10-16, Droidtop/tracker#218; a build that does not know them ignores them,
+  so no contract bump). `limit` is how many results the host will show (ten per source in the one
   search): send at most that many, a page and not the whole answer; the host
-  cuts a longer list to it. A failing search answers `ok: false` with one
+  cuts a longer list to it. The one search gives each source 8 seconds per query; a source still working then is
+  one "did not answer in time" line under the list and its late answer is dropped, so answer the first page fast. A failing search answers `ok: false` with one
   plain `message` and, optionally, a `detail` (§1.3); the host shows its own
   sentence when the message is not a plain one ("It could not reach the
   site"), and keeps the `detail` (or the message), with markup removed, behind
@@ -656,7 +661,8 @@ no destination, such as the PC library). Ops:
   with its own Sign in / Open the site under the source's name.
   `ref` is any JSON object; droidtop hands it back unread in `detail` and
   `acquire` and never parses it (12a checklist point 5). droidtop renders a
-  result as a `row` that opens `detail`. At most 200 results are shown.
+  result as a `row` that opens `detail`. At most 200 results are shown (on the source's own page under Game
+  sources, which asks without a `limit`).
 - `detail {ref, context}` → a view: the result's own sections (description
   rows, its files), its pickers (`choice` nodes for version, region,
   format, mirror) and its actions, at least one `job` action with op
@@ -695,8 +701,8 @@ no destination, such as the PC library). Ops:
 
   **System hint, file names, unpacking and redirects** (2026-10-09,
   Droidtop/tracker#417). With `download`, a job may return `system`, droidtop's
-  id for the game's platform (`dos`, `windows`, `snes`, ...). When the Get games
-  screen is not already that system's own (a search from the PC library or from
+  id for the game's platform (`dos`, `windows`, `snes`, ...). When the search is
+  not already that system's own (a search from the PC library or from
   global search), the download is placed in that system's games folder, so the
   system's player finds it; a system with no games folder fails the job with a
   sentence saying so, and the game is never dropped in another system's folder.
@@ -835,12 +841,11 @@ a contract 1 plugin keeps the legacy translation.
   as `hostContext`, and the message stays on the status line.
 - `handle` for contract 2 `python` and `flutter_embed` plugins, and the
   approval grant of every provided point.
-- `library.sources` Get games flow: `SourceScreens` opens a plugin `form`
-  and adds source results after committed inputs; `PluginGameSource` calls
-  contract 2 `search` and opens source `detail` views, with contract 1
-  droidtop defaults. `AcquireContentSources` delegates its per-system
-  screen to `SourceScreens`; Gaming's shared search opens the same detail
-  screen. A successful acquire job's files are indexed (A2), not rescanned.
+- `library.sources`: `PluginGameSource` calls contract 2 `search` for the
+  one search (`UnifiedSearch`) and opens source `detail` views, with contract 1
+  droidtop defaults. A source's own page under Game sources (`SourceScreens`)
+  opens its `form` and adds results after committed inputs. There is no Get
+  games screen (2026-10-16, Droidtop/tracker#218). A successful acquire job's files are indexed (A2), not rescanned.
 - **Not built yet** (queued): reply views for `ui.context_action` and
   `ui.quick_tile`, and samples that use views.
 
@@ -1437,11 +1442,8 @@ Names elsewhere in this document that predate 2.1 mean the op in this table.
     entry. A source that put a file in a game folder says so and droidtop
     indexes that file.
 - **Surfaces:**
-  - G: gamelist Options → Get games, and global search results (#12);
-  - A: a system's settings → Get games, and the launcher's Games grid
-    search;
-  - D: the file manager's "Get games" on a library folder, and desktop
-    search.
+  - every mode: the one search (Gaming's search and Get games entries, Standard's search, Desktop's
+    Start menu search, the companion's search), and the source's own page under Game sources.
 - **Permission:**
   - `provide:library.sources`;
   - `library.folders.write`, scoped to the destination the host passes;

@@ -120,4 +120,29 @@ class PluginViewTest {
         assertEquals("Index downloaded", PluginViewCall.replyMessage(data))
         assertEquals("x", PluginViewCall.replyView(data)!!.sections.single().nodes.single().id)
     }
+
+    @Test
+    fun `a result's version and size are read, a byte count written in its unit`() {
+        val data = JSONObject().put(
+            "results",
+            JSONArray()
+                .put(JSONObject().put("id", "a").put("title", "A").put("version", "1.0.3").put("size", 734_003_200L))
+                .put(JSONObject().put("id", "b").put("title", "B").put("size", "about 2 GB"))
+                .put(JSONObject().put("id", "c").put("title", "C")),
+        )
+        val rows = SourceResultProtocol.results(data)
+        assertEquals("1.0.3", rows[0].version)
+        assertEquals("700 MB", rows[0].size)
+        assertEquals("about 2 GB", rows[1].size)
+        assertEquals(null, rows[2].version)
+        assertEquals(null, rows[2].size)
+    }
+
+    @Test
+    fun `sizes under ten keep one decimal and small ones stay in bytes`() {
+        assertEquals("512 bytes", SourceResultProtocol.sizeText(512))
+        assertEquals("1.5 GB", SourceResultProtocol.sizeText(1_610_612_736L))
+        assertEquals(null, SourceResultProtocol.sizeText(-1))
+        assertEquals(null, SourceResultProtocol.sizeText(true))
+    }
 }
