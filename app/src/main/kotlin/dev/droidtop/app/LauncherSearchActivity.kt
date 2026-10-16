@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.scanFollowingGamesRoots
+import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.query.LauncherSearchApp
 import dev.droidtop.shell.gamepad.query.LauncherSearchScreen
 import dev.droidtop.shell.standard.LauncherSearch
@@ -58,7 +59,16 @@ class LauncherSearchActivity : ComponentActivity() {
                             )
                         }
                     },
-                    onPlay = { GameLaunchActivity.dispatch(this@LauncherSearchActivity, it) },
+                    // The game's page on the Games screen, where Play or Install is (docs/SPEC.md 12a). Standard gives
+                    // PC and engine games a page; any other game starts as before.
+                    onOpen = { entry ->
+                        if (entry.isPcOrEngineGame) {
+                            startActivity(LauncherGamesActivity.pageIntent(this@LauncherSearchActivity, entry.id))
+                            finish()
+                        } else {
+                            GameLaunchActivity.dispatch(this@LauncherSearchActivity, entry)
+                        }
+                    },
                     // Standard's own settings (the Global settings screen) are searched with the rest.
                     settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(dev.droidtop.app.settings.DroidtopWideSettings.SCREEN_GLOBAL) },
                     // The web, with the search bar's provider, as one row (Droidtop/tracker#564).

@@ -154,7 +154,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         val args = dev.droidtop.pluginhost.PluginViewCall.args(org.json.JSONObject().put("ref", org.json.JSONObject(result.raw)), values, hostContext)
         val title = result.getTitle ?: "Getting ${result.title}"
         val done = PluginViews.acquire(context, source.record, title, hostContext, args, onStatus)
-        val message = if (done.ok) done.values["summary"] ?: done.values["message"] ?: "Got ${result.title}" else "$label: ${done.error ?: "failed"}"
+        val message = if (done.ok) done.values["summary"] ?: done.values["message"] ?: "Got ${result.title}" else "$label: ${dev.droidtop.pluginhost.SourceFailures.plain(done.error)}"
         return AcquireDownloadOutcome(done.ok, message, done.values["filePath"])
     }
 
@@ -177,6 +177,10 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         }
         return PluginViews.screen(source.record, "library.sources", "detail", "source_detail_${source.record.manifest.id}_${result.id}", result.title,
             org.json.JSONObject().put("ref", ref), context, fallback,
+            // A page that failed always has a way on: the plugin's own page, where it is signed in, allowed or fixed.
+            extraWhenFailed = {
+                listOf(AcquireContentSources.pluginPageRow("source_detail_page_${source.record.manifest.id}", "Open $label's page", source.record.manifest.id))
+            },
         )
     }
 

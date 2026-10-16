@@ -771,7 +771,8 @@ private fun DesktopSearch(
                 LauncherSearchApp(key = "linux:" + app.id, title = app.name, icon = null, open = { launch?.invoke(app) })
             }
         },
-        onPlay = onPlay,
+        // Desktop has no game page; the Start menu's search plays the game.
+        onOpen = onPlay,
         // Desktop's own settings are searched with the rest.
         settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get("desktop_settings") },
         onDismiss = onDismiss,
