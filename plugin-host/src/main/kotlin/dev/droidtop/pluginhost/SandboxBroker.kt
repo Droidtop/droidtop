@@ -34,6 +34,11 @@ internal object SandboxBroker {
     /** The library's SBX_DECIDE: the broker's decider is asked about every call under the rule (here, the quota). */
     private const val DECIDE = 0x20
 
+    // The library's SBX_NET_* grants (sbx.h).
+    private const val NET_CONNECT = 0x1
+    private const val NET_LISTEN = 0x2
+    private const val NET_RESOLVE = 0x4
+
     init {
         System.loadLibrary("droidtoppy")
     }
@@ -46,6 +51,7 @@ internal object SandboxBroker {
         aliasTo: Array<String>,
         quotaRoot: String?,
         quotaBytes: Long,
+        netGrants: Int,
     ): Int
 
     /**
@@ -134,6 +140,8 @@ internal object SandboxBroker {
             pluginId, rules.keys.toTypedArray(), rules.values.toIntArray(),
             aliases.map { it.first }.toTypedArray(), aliases.map { it.second }.toTypedArray(),
             PluginStore.dataDirFor(context, pluginId).path, PluginDataStore.LIMIT_BYTES,
+            // The network hole: out, in and name lookups, made by this broker for a process that may make no socket (5.6).
+            if (PluginTiers.NET_SOCKETS in holes) NET_CONNECT or NET_LISTEN or NET_RESOLVE else 0,
         )
         if (fd < 0) {
             android.util.Log.w("droidtop.sandbox", "$pluginId: the file broker did not start (errno ${-fd})")

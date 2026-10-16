@@ -98,10 +98,16 @@ Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jcla
     unsigned open_count = take_strings(env, own_opens, opens, open_refs, SBX_OWN_OPENS_MAX);
     unsigned claim_count = take_strings(env, claims, claimed, claim_refs, SBX_CLAIMS_MAX);
     int contained = claims != NULL;
-    /* The network hole only in an open process; the isolated sandbox is outside the inet group anyway. */
+    /*
+     * The network hole: an open process makes its own internet sockets; an isolated one may create none, so the broker
+     * makes, connects and accepts them under droidtop's identity (docs/plugin-api.md 5.6, the sandbox's
+     * SBX_LOCK_NET_BROKERED).
+     */
     int inet = network && !contained;
+    int brokered_net = network && contained;
     struct sbx_lockdown_options options = {
-        .flags = (inet ? SBX_LOCK_INET : SBX_LOCK_LOG_SOCKET) | (contained ? SBX_LOCK_PASSTHROUGH : 0),
+        .flags = (inet ? SBX_LOCK_INET : SBX_LOCK_LOG_SOCKET) | (contained ? SBX_LOCK_PASSTHROUGH : 0) |
+                 (brokered_net ? SBX_LOCK_NET_BROKERED : 0),
         .own_opens = opens,
         .own_open_count = open_count,
         .claims = claimed,
@@ -131,6 +137,7 @@ Java_dev_droidtop_pluginhost_PluginSyscallFilter_nativeInstall(JNIEnv *env, jcla
     snprintf(report, sizeof(report), "on: %s, %s, no programs, no io_uring, no ptrace, "
              "no namespaces, no signals to other processes (every thread)",
              contained ? "its own folder through droidtop's broker" : "files only through droidtop's broker",
-             inet ? "internet sockets (net.sockets) and no other socket" : "no sockets but local datagrams");
+             inet ? "internet sockets (net.sockets) and no other socket"
+             : brokered_net ? "internet sockets made by droidtop's broker (net.sockets)" : "no sockets but local datagrams");
     return (*env)->NewStringUTF(env, report);
 }

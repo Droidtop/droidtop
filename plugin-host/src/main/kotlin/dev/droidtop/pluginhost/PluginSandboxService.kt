@@ -64,7 +64,8 @@ open class PluginSandboxService : PluginProcessService() {
         val before = android.os.SystemClock.uptimeMillis()
         val brokerFd = files[ContainedFiles.BROKER]?.detachFd() ?: return failLoad(pluginId, "droidtop did not hand over its file broker")
         val claims = if (requiresIsolation) SandboxBroker.claims(applicationInfo) else null
-        val granted = if (requiresIsolation) emptySet() else holes[pluginId].orEmpty()
+        // An isolated process takes the network hole alone, its sockets made by droidtop's broker (5.6); never the GPU.
+        val granted = if (requiresIsolation) holes[pluginId].orEmpty().filterTo(HashSet()) { it == PluginTiers.NET_SOCKETS } else holes[pluginId].orEmpty()
         val gpu = PluginTiers.GPU_RENDER in granted
         softwareRendering = !gpu
         val report = PluginSyscallFilter.install(brokerFd, claims, gpu = gpu, network = PluginTiers.NET_SOCKETS in granted).also { filter = it }
@@ -244,12 +245,13 @@ internal object PluginSyscallFilter {
      * process's end of its broker's socket (taken). [claims] are the folders the broker answers for in the isolated
      * sandbox ([SandboxBroker.claims]), whose other paths stay the kernel's; null in an open process, whose every path
      * goes to the broker. [gpu] and [network] are an open process's granted holes: the graphics devices opened first,
-     * and internet sockets. A contained process's files are also capped at the data store's quota each.
+     * and internet sockets. A contained process's files are also capped at the data store's quota each, and its
+     * [network] is the broker's: the sockets are made, connected and accepted there (docs/plugin-api.md 5.6).
      */
     @Synchronized
     fun install(brokerFd: Int, claims: Array<String>?, gpu: Boolean = false, network: Boolean = false): String =
         nativeInstall(
-            brokerFd, if (claims == null && gpu) OWN_OPENS else emptyArray(), claims, claims == null && network,
+            brokerFd, if (claims == null && gpu) OWN_OPENS else emptyArray(), claims, network,
             PluginDataStore.LIMIT_BYTES,
         )
 

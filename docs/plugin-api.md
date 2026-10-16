@@ -206,12 +206,32 @@ meaning, and a v1 manifest is translated into this shape by one function
 - **`subscribes`** lists the events the plugin wants, each with a
   version. An unknown id is ignored, not refused, as today.
 - **`exports`** and **`requires`** cover plugin-provided APIs (§2).
+- **Categories** (decided 2026-10-16, Droidtop/tracker#179; the owner,
+  verbatim: "Yeah, plugins are channeled, too. They should also have
+  categories"). A plugin names one category, `category`, from this fixed
+  list; the catalog index repeats it on the plugin's entry, and the
+  Plugins page filters by it:
+
+  | id | Shown as |
+  | --- | --- |
+  | `sources` | Sources and fetchers |
+  | `emulators` | Emulators and runners |
+  | `system` | System tools |
+  | `sync` | Sync and backup |
+  | `integrations` | Integrations |
+  | `appearance` | Appearance |
+  | `other` | Other |
+
+  The ids of the first list (2026-10-15) are read as their successors:
+  `tools` as `system`, `themes` as `appearance`, `social` as
+  `integrations`, `games` as `sources`. A missing category is `other`. The
+  release line a plugin is offered on is the catalog's business, not the
+  manifest's (SPEC 12a, "Channels").
 - **Presentation** (Droidtop/tracker#521 item 2; `PluginPresentation`):
   `summary` (one line, at most 80 characters, under the plugin's name on
   its page and in the list), `publisher` (at most 60, "Made by"),
-  `homepage` (https only, "Its page"), `category` (`sources`,
-  `emulators`, `games`, `tools`, `system`, `themes`, `social`, `other`;
-  anything else is `other`), `icon` (a payload path of a square PNG or
+  `homepage` (https only, "Its page"), `category` (one id of the fixed
+  list below; anything else is `other`), `icon` (a payload path of a square PNG or
   WebP) and `screenshots` (up to six payload paths of PNG or WebP). All
   optional and never refused: text is cut, a home page that is not https
   is dropped, and an image is kept only when it is an entry of the signed
@@ -2645,7 +2665,6 @@ wording the host uses, so it is identical in every mode.
 | `perf.profile.set` | dangerous | Change performance and fan settings | B7 |
 | `overlay.toast` | normal | Show short messages during games | B4 |
 | `retroarch.commands` | normal | Send commands to RetroArch while you play: save and load states, slots, shaders, fast-forward | B8 |
-| `gpu.render` | dangerous | Use the graphics chip to draw its screen | §5.3 |
 | `net.sockets` | dangerous | Make its own connections to other devices and the internet | §5.3 ("Open processes") |
 | `devices.paired` | dangerous | See and reach the devices you paired with droidtop | D21 |
 | `notify.post` | normal | Send you notifications | C6 |
@@ -3252,12 +3271,15 @@ the plugin declared and the person granted (`PluginTiers.holes`):
 
 | Hole permission | What it opens | What stays shut |
 | --- | --- | --- |
-| `gpu.render` | the graphics chip: its device nodes in the broker's rules and opened before the lockdown; Flutter draws with hardware | the network, every socket but liblog's datagram one |
-| `net.sockets` | internet sockets: the sandbox library's `SBX_LOCK_INET` (`AF_INET` and `AF_INET6` stream and datagram sockets, `bind`, `connect`) | the graphics devices; every other socket family, Unix sockets included (so no logd socket, and no stream socket to a daemon on the device); netlink |
+| `net.sockets` | internet sockets. From Android 11 (API 30) the process is isolated, under a UID of its own, and the sockets are made, connected, bound and accepted by droidtop's broker (`SBX_LOCK_NET_BROKERED`, 5.6), with name lookups through it; below API 30, a process of droidtop's UID with the sandbox library's `SBX_LOCK_INET` (`AF_INET` and `AF_INET6` stream and datagram sockets, `bind`, `connect`) until the broker's byte relay is built | the graphics devices; every other socket family; netlink |
 
-- **Each hole is its own grant.** A plugin with only `net.sockets` gets no
-  graphics device; one with only `gpu.render` gets no socket; both, both.
-  A hole the plugin did not declare is never opened. Full access and a
+`gpu.render`, the graphics-chip hole, is **retired** (2026-10-16, 5.6):
+plugins never get the GPU. A manifest that still declares it is told the
+permission is not supported by this version of droidtop and runs contained.
+
+- **Each hole is its own grant.** `net.sockets` is the one hole left; it
+  opens no graphics device. A hole the plugin did not declare is never
+  opened. Full access and a
   plugin that cannot run contained get none (`PluginTiers.holes`).
 - **Who decides.** :app writes the granted holes into the load request
   (`_droidtopHoles`, replacing anything a plugin's own manifest says) and
@@ -3476,8 +3498,8 @@ droidtop's UID).
 | Files outside the plugin's own folder | contained | closed: the isolated UID and SELinux; droidtop's private names are the plugin's own folder | 2026-10-14 to 10-16 | `ContainedFilesRigTest` (rig), sandbox `sbx_test` |
 | `/proc` of other processes | open | closed: the broker refuses another pid | sandbox library | `sbx_test` |
 | Environment and inherited descriptors | all | closed: only the python variables are set; the broker socket is close-on-exec, load descriptors are closed after the load, exec is refused | earlier | `sbx_test` (exec) |
-| droidtop's other non-exported components (services started by intent, receivers, activities, `LauncherProvider` and the shell's providers) as droidtop's UID | open, full | **open**: a start, a broadcast or an activity launch carries no caller Android lets droidtop check before API 34; the shell's providers are the UI lane's to guard | the separate-UID decision below | none |
-| droidtop's Android permissions through binder (the OS rule) | open | **open**: binder cannot be filtered by the system-call filter | the separate-UID decision below | none |
+| droidtop's other non-exported components (services started by intent, receivers, activities, `LauncherProvider` and the shell's providers) as droidtop's UID | open, full | open tier: closed from Android 11 (an isolated UID cannot reach droidtop's non-exported components); **open** below 11 and for full access: a start, a broadcast or an activity launch carries no caller Android lets droidtop check before API 34 | the separate-UID commit; full access waits on the owner | none |
+| droidtop's Android permissions through binder (the OS rule) | open | closed from Android 11: the plugin runs isolated under a UID of its own with no permission, its sockets the broker's (`SBX_LOCK_NET_BROKERED`); **open** below Android 11 until the byte relay | the separate-UID commit | sandbox `sbx_test` (net checks), `PluginTiersTest` |
 | droidtop's classes, Application and files in-process | full | **open by design today** (droidtop's UID, the whole Application started, droidtop's class loader as parent) | the separate-UID decision below | none |
 | droidtop's classes in-process (no filtering class loader) | contained, open | partial: loadable, but droidtop's Application returns early there, so its state never starts | to do | none |
 | Several full-access plugins in one slot past eight | full | partial: they share droidtop's UID anyway | the separate-UID decision below | none |
@@ -3498,25 +3520,61 @@ isolated process, with AOSP sources, is in the sandbox's `docs/design.md`,
   over, and answers DNS. Below API 30 the plugin gets a Unix stream the
   broker splices to the network socket. Its traffic is droidtop's on
   Android's per-app network rules.
-- **The GPU (`gpu.render`): not inside an isolated process, on any Android
-  version** (sepolicy `neverallow` on `gpu_device` for `isolated_app_all`).
-  A plugin draws on the CPU into frames droidtop composites, as a contained
-  Flutter screen already does, unless a GPU process under droidtop's UID
-  runs its drawing (Chromium's model; not built).
+- **The GPU: not inside an isolated process, on any Android version**
+  (sepolicy `neverallow` on `gpu_device` for `isolated_app_all`). The
+  sandbox's `own_opens` (a device the process opens itself before the
+  lockdown) is how a confined process keeps the GPU, and it works only in
+  its app's own SELinux domain, so it stays the GPU mechanism for confined
+  processes that keep it (windowcast, Enginehost) and cannot serve an
+  isolated plugin. **Decided by the owner (2026-10-16), verbatim:** "We
+  already handled the GPU stuff with the 'create abd collapse' design in
+  our sandbox library we use for windowcast, right? Plugins shouldn't be
+  drawing stuff themselves anyway, but why is it an issue?" So plugins
+  never get the GPU: they render through droidtop's declarative views, and
+  a contained Flutter screen keeps sending CPU frames droidtop composites.
+  `gpu.render` is retired (no permission, no hole; a manifest declaring it
+  gets "not supported", never a refusal). No official plugin declared it.
 - **Direct OS use for full access: not under an identity of its own.** An
   isolated UID holds no Android permission and can never be granted
-  Shizuku (Shizuku authorizes by the caller's package). What the sandbox
-  can give is a **binder relay**: the plugin's calls to an allowlisted
-  system service (and to Shizuku's binder, which droidtop holds) go through
-  a relay in droidtop's process that refuses any transaction naming one of
-  droidtop's own components and forwards the rest; the OS sees droidtop's
-  identity and permissions, and droidtop's internals stay out of reach.
+  Shizuku (Shizuku authorizes by the caller's package).
 
-Two choices are the owner's before this is built (asked 2026-10-16): what
-`gpu.render` becomes (CPU frames only, a GPU process under droidtop's UID,
-or a named exception), and whether full access's direct OS use is the
-relay under droidtop's identity. Until then the rows above marked open
-stay open.
+**Every plugin is isolated, full access included (decided by the owner,
+2026-10-16).** Verbatim: "every plugin is isolated, regardless of access.
+We have to assume that plugins are untrusted third party code from our
+perspective, so full access does NOT mean they get to fuck with stuff not
+prescribed by the API". So:
+
+- **No plugin runs under droidtop's UID, at any tier.** Contained, open and
+  full access are all isolated processes under UIDs of their own, loaded
+  from descriptors through droidtop's broker. The full-access process
+  slots under droidtop's UID (`PluginRuntimeService`, `:pluginhost*`) go,
+  and so does the open process type once the broker's byte relay covers
+  the network below Android 11.
+- **Full access reaches the OS and Shizuku only through the binder relay,
+  and the relay is allowlist-only.** A full-access API point (the dedicated
+  restricted points of "Everything goes over the API", above) declares the
+  system services, and within each the transactions, that it prescribes;
+  the relay forwards exactly those, under droidtop's identity, and refuses
+  the rest. It is never a generic pass-through: a binder with no
+  allowlist entry is never handed to a plugin, and a transaction code not
+  listed for its service is refused. Anything addressed to droidtop's own
+  components (its package in an intent, a component name, a content
+  authority) is refused whatever the allowlist says. Each forwarded call is
+  logged with the plugin and the point it came under, like every broker
+  call.
+- **Shizuku moves onto the relay.** Shizuku authorizes droidtop's package;
+  droidtop holds Shizuku's binder and hands the Shizuku plugin a relay to
+  it whose allowlist is the plugin's declared `priv.*` points (a shell
+  command for `priv.shell`, the package calls for `priv.packages`), so the
+  plugin's Shizuku calls are made as droidtop and only those calls.
+
+Built (2026-10-16): an open plugin's `net.sockets` runs isolated on
+Android 11 and later (`PluginTiers.runsIsolated`; the sandbox's
+`SBX_LOCK_NET_BROKERED`; droidtop's broker grants out, in and name lookups,
+and connects netd's `dnsproxyd` and `fwmarkd` for it). Below Android 11 it
+stays in an open process of droidtop's UID until the broker's byte relay.
+Full access on the relay, and the Shizuku plugin with it, are being built
+next; until then the full-access rows above stay open.
 
 ---
 

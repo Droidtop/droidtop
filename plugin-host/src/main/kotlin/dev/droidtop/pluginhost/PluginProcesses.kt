@@ -52,7 +52,14 @@ internal object PluginProcesses {
     /** When each single-plugin slot's process was last ended, so a fresh process goes to the slot ended longest ago. */
     private val endedAt = HashMap<String, Long>()
 
-    private class Process(val key: String, val tier: PluginTier, val service: Class<out PluginProcessService>, val instance: String?) {
+    /** [network]: an isolated process whose sockets droidtop's broker makes (an open plugin's net.sockets, 5.6). */
+    private class Process(
+        val key: String,
+        val tier: PluginTier,
+        val service: Class<out PluginProcessService>,
+        val instance: String?,
+        val network: Boolean = false,
+    ) {
         var runtime: IPluginRuntime? = null
         var connection: ServiceConnection? = null
         var connecting: CompletableDeferred<IPluginRuntime?>? = null
@@ -71,11 +78,12 @@ internal object PluginProcesses {
     /**
      * The runtime of [pluginId]'s process for [tier], bound and started when needed, counted as one user until
      * [release]. Null when the process could not be started (or, below API 29, every contained slot is busy).
+     * [network]: a contained process whose sockets droidtop's broker makes, never the same process as one without.
      */
-    suspend fun acquire(context: Context, pluginId: String, tier: PluginTier): IPluginRuntime? {
+    suspend fun acquire(context: Context, pluginId: String, tier: PluginTier, network: Boolean = false): IPluginRuntime? {
         val app = context.applicationContext
         val (process, wait) = synchronized(lock) {
-            val process = processFor(pluginId, tier) ?: return null
+            val process = processFor(pluginId, tier, network) ?: return null
             process.users++
             process.app = app
             process.lastUsedMs = System.currentTimeMillis()
@@ -158,15 +166,15 @@ internal object PluginProcesses {
         }
     }
 
-    private fun processFor(pluginId: String, tier: PluginTier): Process? {
+    private fun processFor(pluginId: String, tier: PluginTier, network: Boolean = false): Process? {
         byPlugin[pluginId]?.let { current ->
-            if (current.tier == tier) return current
-            // Full access was allowed or taken away: the plugin leaves the process of its old tier.
+            if (current.tier == tier && current.network == network) return current
+            // Full access or the network was allowed or taken away: the plugin leaves the process of its old tier.
             detach(pluginId, current)
         }
         val process = if (tier == PluginTier.CONTAINED && Build.VERSION.SDK_INT >= 29) {
-            val key = "contained:$pluginId"
-            processes.getOrPut(key) { Process(key, tier, PluginSandboxService::class.java, instanceName(pluginId)) }
+            val key = if (network) "contained-net:$pluginId" else "contained:$pluginId"
+            processes.getOrPut(key) { Process(key, tier, PluginSandboxService::class.java, instanceName(if (network) "$pluginId#net" else pluginId), network) }
         } else {
             // Open and full-trust processes are not isolated, so there is no per-instance bindIsolatedService form; below
             // API 29 a contained plugin falls here too. All three draw from a fixed pool of declared slot services.

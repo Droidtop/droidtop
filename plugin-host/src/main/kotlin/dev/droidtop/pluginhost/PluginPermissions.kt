@@ -52,10 +52,9 @@ object PluginPermissions {
         PluginPermission("perf.profile.set", PermissionTier.DANGEROUS, "Change performance and fan settings"),
         PluginPermission("overlay.toast", PermissionTier.NORMAL, "Show short messages during games"),
         PluginPermission("retroarch.commands", PermissionTier.NORMAL, "Send commands to RetroArch while you play: save and load states, slots, shaders, fast-forward"),
-        PluginPermission(
-            "gpu.render", PermissionTier.DANGEROUS, "Use the graphics chip to draw its screen",
-            caution = "A plugin with this could reach past droidtop's checks, so only allow it for a plugin from a source you trust",
-        ),
+        // gpu.render is retired (2026-10-16, docs/plugin-api.md 5.6): plugins never get the GPU. They draw through droidtop's
+        // views, and a contained Flutter screen sends CPU frames droidtop puts on screen. A manifest that still declares it
+        // gets "not supported by this version of droidtop", never a refusal.
         PluginPermission("notify.post", PermissionTier.NORMAL, "Send you notifications", android = AndroidNeed("android.permission.POST_NOTIFICATIONS", fromSdk = 33)),
         PluginPermission("net.state", PermissionTier.NORMAL, "See whether you are online", android = AndroidNeed("android.permission.ACCESS_NETWORK_STATE")),
         PluginPermission("net.wifi_details", PermissionTier.DANGEROUS, "See the name of your Wi-Fi network"),
