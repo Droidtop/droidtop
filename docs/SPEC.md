@@ -1117,7 +1117,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Feature | State | Where |
 |---|---|---|
 | Dock, folders, drawer, widgets, rotation, grid size | HAVE (stock Launcher3 + Murine) | `com.android.launcher3.Workspace`/`CellLayout`/`Folder`; grid size `SettingsHomeFragment.GRID_SIZE_WIDTH`/`HEIGHT` |
-| Icon packs, including **per-app** override | HAVE | `app/murinelauncher/icons/IconPackManager.kt:1067` (`buildIconPackEntries(perAppComponent)`), `SettingsIconPackFragment.kt` |
+| Icon packs, including **per-app** override; the same pack on Gaming's Apps tiles (Droidtop/tracker#508, 2026-10-16) | HAVE | `app/murinelauncher/icons/IconPackManager.kt:1067` (`buildIconPackEntries(perAppComponent)`), `SettingsIconPackFragment.kt`. Gaming's Apps tiles come from the same icon cache (`NativeAppProvider`), whose per-app state includes the pack, so they already followed Standard's choice. The choice is now also in the shared catalog's Appearance as **Icon pack** (system icons by default), through `IconPacks` (`:runtime-common`), which `:app` backs with `IconPackManager` (`StandardIconPacks`): one choice, one mechanism. Choosing there drops the pack cache, reloads the launcher model and rescans the Apps kinds |
 | Notification badges/dots | HAVE, wired | `NotificationBadgeCounter.kt`, consumed by `BubbleTextView.java` and `FolderIcon.java` |
 | Hidden apps / app lock | HAVE | `settings/hiddenapps/{AppLock,HiddenAppsRepository}.kt` |
 | Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
