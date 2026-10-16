@@ -31,28 +31,41 @@ object AppearancePrefs {
     /**
      * The Settings row that chooses it. Built where the settings catalog is built (it reads the active theme, as the
      * theme rows beside it do). When the Gaming theme has a colour scheme of its own chosen, that scheme wins over this
-     * on every Gaming-themed screen, so the row says so and how to undo it (rig 2026-10-16, Droidtop/tracker#559: the
-     * settings page stayed dark on Light until the scheme was Automatic).
+     * on every Gaming-themed screen, so the row says so ON the row, as its chip with the scheme's own label, and how
+     * to undo it in its explanation (rig 2026-10-16, Droidtop/tracker#559: the settings page stayed dark on Light
+     * until the scheme was Automatic; the follow-up rig found the explanation alone unseen, since Gaming keeps a
+     * subtitle on the focus line and in Info).
      */
-    fun item(context: Context): ChoiceItem = ChoiceItem(
-        id = KEY_APPEARANCE,
-        title = "Light or dark",
-        subtitle = chosenScheme(context)?.let { scheme ->
-            "The Gaming theme's colour scheme is set to $scheme, which droidtop's screens keep whatever this says; " +
-                "set Theme color scheme to Automatic to follow it"
-        } ?: "How droidtop draws its screens; the Gaming theme's matching colour scheme is used when it has one",
-        options = listOf(
-            ChoiceOption(FOLLOW_ANDROID, "Follow Android"),
-            ChoiceOption(LIGHT, "Light"),
-            ChoiceOption(DARK, "Dark"),
-        ),
-        current = choice(context),
-        onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_APPEARANCE, value).apply() },
-    )
+    fun item(context: Context): ChoiceItem {
+        val scheme = chosenScheme(context)
+        return ChoiceItem(
+            id = KEY_APPEARANCE,
+            title = "Light or dark",
+            subtitle = scheme?.let {
+                "The Gaming theme's colour scheme is set to $it, which droidtop's screens keep whatever this says; " +
+                    "set Theme color scheme to Automatic to follow it"
+            } ?: "How droidtop draws its screens; the Gaming theme's matching colour scheme is used when it has one",
+            options = listOf(
+                ChoiceOption(FOLLOW_ANDROID, "Follow Android"),
+                ChoiceOption(LIGHT, "Light"),
+                ChoiceOption(DARK, "Dark"),
+            ),
+            current = choice(context),
+            onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_APPEARANCE, value).apply() },
+            chip = schemeChip(scheme),
+        )
+    }
 
-    /** The colour scheme the person named for the active Gaming theme, or null when it is Automatic or there is no theme. */
+    /** The row's chip while the theme's named scheme [schemeLabel] overrides it, or null. Pure, for tests. */
+    fun schemeChip(schemeLabel: String?): String? = schemeLabel?.let { "Theme keeps $it" }
+
+    /** The label [schemeLabels] gives [scheme], else [scheme] itself; null stays null. Pure, for tests. */
+    fun schemeLabel(scheme: String?, schemeLabels: Map<String, String>): String? = scheme?.let { schemeLabels[it] ?: it }
+
+    /** The colour scheme the person named for the active Gaming theme, by its label, or null when it is Automatic or there is no theme. */
     private fun chosenScheme(context: Context): String? = runCatching {
         val theme = dev.droidtop.library.theme.ThemeAssets.activeThemeName(context) ?: return null
-        dev.droidtop.library.theme.ThemePrefs.colorScheme(context, theme)
+        val labels = dev.droidtop.library.theme.ThemeAssets.activeThemeCapabilities(context)?.colorSchemeLabels.orEmpty()
+        schemeLabel(dev.droidtop.library.theme.ThemePrefs.colorScheme(context, theme), labels)
     }.getOrNull()
 }

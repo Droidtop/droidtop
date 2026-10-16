@@ -664,7 +664,7 @@ class CatalogPreferenceNavigator(
     private fun toPreference(context: Context, item: CatalogItem): Preference = when (item) {
         is ChoiceItem -> ListPreference(context).apply {
             key = item.id
-            title = item.title
+            title = titleWithChip(item.title, item.chip)
             isPersistent = false
             isIconSpaceReserved = false
             entries = item.options.map { it.label }.toTypedArray()
