@@ -137,8 +137,10 @@ object UpdateNow {
         val info = try {
             AppSelfUpdate.fetch(application)
         } catch (error: Exception) {
+            AppSelfUpdate.recordFailure(application, error)
             return log("Update check failed: " + (error.message ?: error.javaClass.simpleName))
         }
+        AppSelfUpdate.recordSeen(application, info)
         if (verdict(installed, info.versionCode) == Verdict.ALREADY_CURRENT) {
             return log(
                 "already current: installed build " + installed + ", published build " + info.versionCode +

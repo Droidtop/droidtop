@@ -117,8 +117,22 @@ internal fun rememberHomeStrip(all: List<LibraryEntry>, systemNames: Map<String,
     LaunchedEffect(systemsWithGames.keys) {
         bios = withContext(Dispatchers.IO) { runCatching { biosAttention(context, systemsWithGames) }.getOrDefault(emptyList()) }
     }
+    // Installed plugins with a newer release in a catalog as last fetched (the Updates page's own count): read once off
+    // the main thread. It was passed as 0, so the card never showed (Droidtop/tracker#570).
+    var pluginUpdates by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        pluginUpdates = withContext(Dispatchers.IO) {
+            runCatching {
+                dev.droidtop.library.integrations.PluginCatalog.offersFor(
+                    dev.droidtop.pluginhost.PluginStore.installed(context),
+                    dev.droidtop.library.integrations.PluginCatalog.listings(context),
+                    dev.droidtop.pluginhost.UserOriginKeys.load(dev.droidtop.pluginhost.UserOriginKeys.storeFile(context)),
+                ).size
+            }.getOrDefault(0)
+        }
+    }
     var built by remember { mutableStateOf(HomeStripData()) }
-    LaunchedEffect(all, systemNames, jobs, friends, bios, keep) {
+    LaunchedEffect(all, systemNames, jobs, friends, bios, keep, pluginUpdates) {
         built = withContext(Dispatchers.Default) {
             val now = System.currentTimeMillis()
             val artwork = HomeModel.artworkItem(all.count { !it.hidden && HomeModel.lacksArt(it) })
@@ -128,7 +142,7 @@ internal fun rememberHomeStrip(all: List<LibraryEntry>, systemNames: Map<String,
                 placeOf = { e -> e.systemId?.let { systemNames[it] ?: it.uppercase() } ?: if (e.kind == LibraryEntryKind.NATIVE_ANDROID_APP) "Apps" else "PC Games" },
                 systemOf = { it.systemId },
             )
-            val whatsNew = HomeModel.whatsNew(HomeModel.updates(all), added, pluginUpdates = 0, attention = attention.size)
+            val whatsNew = HomeModel.whatsNew(HomeModel.updates(all), added, pluginUpdates = pluginUpdates, attention = attention.size)
             val downloads = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.kind) }.map { job ->
                 HomeCard.Download(job.jobId, job.title, job.percent, remainingSeconds = 0L, paused = job.paused)
             }

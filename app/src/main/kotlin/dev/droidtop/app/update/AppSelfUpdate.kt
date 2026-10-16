@@ -53,6 +53,7 @@ object AppSelfUpdate {
     private const val KEY_LAST_ATTEMPT = "last_attempt_ms"
     private const val KEY_SEEN_CODE = "newest_seen_version_code"
     private const val KEY_SEEN_NAME = "newest_seen_version_name"
+    private const val KEY_LAST_FAILURE = "last_check_failure"
     private const val KEY_CHANNEL = "updates_channel"
     private const val KEY_DEBUG_BUILDS = "updates_debug_builds"
 
@@ -157,54 +158,7 @@ object AppSelfUpdate {
     }
 
     /**
-     * The scheduled background pass, called at process start (from
-     * SettingsCatalogInitProvider). When it is due, enabled and allowed on
-     * the current network it asks what the newest build is and brings the
-     * platform databases up to date; otherwise nothing. Never throws, never
-     * blocks the caller.
-     */
-    fun maybeCheck(context: Context) {
-        val application = context.applicationContext
-        val now = System.currentTimeMillis()
-        val allowed = mayCheck(
-            forced = false,
-            frequency = frequency(application),
-            lastAttemptMs = prefs(application).getLong(KEY_LAST_ATTEMPT, 0L),
-            nowMs = now,
-            unmeteredOnly = unmeteredOnly(application),
-            metered = isMetered(application),
-        )
-        if (!allowed) return
-        prefs(application).edit().putLong(KEY_LAST_ATTEMPT, now).apply()
-        Thread {
-            // The platform databases ride along on the same pass, the way
-            // enginehost's engine detection rules ride along on its plugin
-            // check: they are the part of droidtop that changes faster than
-            // the app, and a person whose new emulator or engine is missing
-            // has no way to know a fix was published. The index-driven
-            // refresh downloads one small document when nothing changed,
-            // and validate-before-replace means a bad download changes
-            // nothing. The manual button in Settings runs the same call.
-            runCatching { dev.droidtop.library.consoles.PlatformDatabases.refresh(application) }
-            // Plugins from repositories the person trusts ride along too (docs/SPEC.md 12a "Plugin
-            // repositories"): one cheap release listing per repository, bundles only on an
-            // unmetered connection, and a notification when something was updated.
-            runCatching {
-                dev.droidtop.library.integrations.PluginRepoUpdates.runDue(application, isMetered(application)) { repo, result ->
-                    PluginRepoUpdateNotification.show(application, repo, result)
-                }
-            }
-            runCatching { fetch(application) }.onSuccess { info ->
-                prefs(application).edit()
-                    .putLong(KEY_SEEN_CODE, info.versionCode)
-                    .putString(KEY_SEEN_NAME, info.versionName)
-                    .apply()
-            }
-        }.start()
-    }
-
-    /**
-     * The one gate both update paths ask. The scheduled pass calls it with
+     * The one gate both update paths ask. The scheduled job ([UpdateChecks.scheduled]) calls it with
      * forced = false and obeys all three conditions the user set: the
      * frequency (OFF means no automatic traffic at all), the interval since
      * the last attempt, and the unmetered-only option. UpdateNow calls it
@@ -222,12 +176,10 @@ object AppSelfUpdate {
     ): Boolean {
         if (forced) return true
         if (frequency == Frequency.OFF) return false
-        if (nowMs - lastAttemptMs < frequency.intervalMs) return false
+        // A tenth early still counts: Android runs a periodic job anywhere in a window before its period ends.
+        if (nowMs - lastAttemptMs < frequency.intervalMs - frequency.intervalMs / 10) return false
         return !(unmeteredOnly && metered)
     }
-
-    private fun isMetered(context: Context): Boolean =
-        context.getSystemService(android.net.ConnectivityManager::class.java)?.isActiveNetworkMetered ?: false
 
     /**
      * After an install succeeded the new process finds the build it now is: its own APK and every older
@@ -235,6 +187,46 @@ object AppSelfUpdate {
      */
     fun cleanStaleDownloads(context: Context) {
         UpdateFiles.clean(context, installedVersionCode(context), target = null)
+    }
+
+    /**
+     * What a check saw, whichever check it was (the scheduled one, the Updates page's Check now, or Update now): the
+     * newest build, so the Updates page lists droidtop while it is newer than this one. Only the scheduled pass used to
+     * record it, and that runs when the process starts, which a launcher's seldom does, so the page said "Up to date"
+     * whatever Check now found (Droidtop/tracker#570).
+     */
+    fun recordSeen(context: Context, info: Info) {
+        prefs(context.applicationContext).edit()
+            .putLong(KEY_SEEN_CODE, info.versionCode)
+            .putString(KEY_SEEN_NAME, info.versionName)
+            .remove(KEY_LAST_FAILURE)
+            .apply()
+    }
+
+    /** A check that could not ask: kept so the Updates page says the last check failed instead of "up to date". */
+    fun recordFailure(context: Context, error: Throwable) {
+        prefs(context.applicationContext).edit()
+            .putString(KEY_LAST_FAILURE, error.message ?: error.javaClass.simpleName)
+            .apply()
+    }
+
+    /** Why the last check failed, or null when it succeeded (or none ran). */
+    fun lastFailure(context: Context): String? = prefs(context).getString(KEY_LAST_FAILURE, null)
+
+    /**
+     * Checks now and only records: no download, no install (the Updates page's Check now; Update on droidtop's row
+     * installs). Blocking: call off the main thread. Returns the line to show.
+     */
+    fun check(context: Context): String {
+        noteAttempt(context)
+        return try {
+            val info = fetch(context)
+            recordSeen(context, info)
+            if (info.versionCode > installedVersionCode(context)) "droidtop ${info.versionName} is available" else "droidtop is up to date"
+        } catch (error: Exception) {
+            recordFailure(context, error)
+            "droidtop could not check: " + (error.message ?: error.javaClass.simpleName)
+        }
     }
 
     /** Records that a check ran now; the manual check calls this so "last checked" stays truthful. */

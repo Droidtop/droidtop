@@ -819,6 +819,12 @@
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
 
+        <!-- Every kind of update, checked on droidtop's own schedule (docs/SPEC.md 10b, Droidtop/tracker#570). -->
+        <service
+            android:name="dev.droidtop.app.update.UpdateCheckJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <!--
           Where plugin pages open in Standard and Desktop (docs/plugin-api.md 1.9): the Plugins list and
           a panel from the home screen's menu or the Desktop taskbar.
