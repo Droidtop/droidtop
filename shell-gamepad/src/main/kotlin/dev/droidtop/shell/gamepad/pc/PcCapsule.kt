@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -32,7 +33,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -419,28 +422,45 @@ private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownload
 
 /**
  * The kind badge as a capsule chip (the look of [CapsuleChip]): the kind in
- * bold, then its store or system quieter, in small capitals.
+ * bold, then its store or system quieter, in small capitals. It draws the
+ * longest of the badge's [KindBadge.forms] that fits the card, measured, so
+ * a long engine or system name drops the kind word, then the name, rather
+ * than being cut mid-word.
  */
 @Composable
 private fun KindMark(badge: KindBadge, modifier: Modifier) {
     val muted = MenuTokens.OnSurfaceMuted
-    Text(
-        buildAnnotatedString {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(badge.kind.word.labelCase()) }
-            badge.detail?.let { detail ->
-                withStyle(SpanStyle(color = muted)) { append(" · ${detail.labelCase()}") }
+    val style = TypeRole.eyebrow
+    val measurer = rememberTextMeasurer()
+    val lines = remember(badge, muted) {
+        badge.forms.map { (kind, detail) ->
+            buildAnnotatedString {
+                kind?.let { withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(it.labelCase()) } }
+                if (kind != null && detail != null) withStyle(SpanStyle(color = muted)) { append(" · ") }
+                detail?.let { withStyle(SpanStyle(color = if (kind != null) muted else Color.Unspecified)) { append(it.labelCase()) } }
             }
-        },
-        color = MenuTokens.OnSurface,
-        style = TypeRole.eyebrow,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier
-            .padding(Space.Sm)
-            .background(MenuTokens.Scrim, Corners.Pill)
-            .border(1.dp, MenuTokens.OnSurface.copy(alpha = 0.3f), Corners.Pill)
-            .padding(horizontal = Space.Sm, vertical = Space.Hair),
-    )
+        }
+    }
+    BoxWithConstraints(modifier) {
+        // The chip's own room: the card's width less its margin, its border and its inner padding on both sides.
+        val chrome = with(LocalDensity.current) { (Space.Sm * 4 + 2.dp).roundToPx() }
+        val room = if (constraints.hasBoundedWidth) constraints.maxWidth - chrome else Int.MAX_VALUE
+        val text = remember(lines, room, style) {
+            lines.firstOrNull { measurer.measure(it, style, maxLines = 1, softWrap = false).size.width <= room } ?: lines.last()
+        }
+        Text(
+            text,
+            color = MenuTokens.OnSurface,
+            style = style,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .padding(Space.Sm)
+                .background(MenuTokens.Scrim, Corners.Pill)
+                .border(1.dp, MenuTokens.OnSurface.copy(alpha = 0.3f), Corners.Pill)
+                .padding(horizontal = Space.Sm, vertical = Space.Hair),
+        )
+    }
 }
 
 /**

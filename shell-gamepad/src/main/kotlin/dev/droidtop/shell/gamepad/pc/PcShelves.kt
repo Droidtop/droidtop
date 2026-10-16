@@ -227,6 +227,15 @@ internal enum class BadgeKind(val word: String) { PC("PC"), ENGINE("Engine"), RE
  */
 internal data class KindBadge(val kind: BadgeKind, val detail: String?) {
     val text: String get() = if (detail == null) kind.word else "${kind.word} · $detail"
+
+    /**
+     * The forms a capsule's badge may take, longest first: the kind and its detail, the detail alone (it says more
+     * than the kind: "RPG Maker MV", "Sony PlayStation"), the kind alone. The capsule draws the first that fits its
+     * card, so a badge is never cut in the middle of a word (Droidtop/tracker#434, rig 2026-10-14: "ENGINE · RPG
+     * MAK...", "RETRO · SONY PLAY..."). Each is the kind's part and the detail's part, either null.
+     */
+    val forms: List<Pair<String?, String?>>
+        get() = if (detail == null) listOf(kind.word to null) else listOf(kind.word to detail, null to detail, kind.word to null)
 }
 
 /** The kinds that are no engine (a Windows or Linux program, a remote PC, an app, a console ROM): the one rule, [engineFamily]. */
