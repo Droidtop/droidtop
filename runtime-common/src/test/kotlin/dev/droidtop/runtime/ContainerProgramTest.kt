@@ -1,5 +1,6 @@
 package dev.droidtop.runtime
 
+import dev.droidtop.runtime.ContainerProgram.RestartPolicy
 import java.io.File
 import java.io.RandomAccessFile
 import org.junit.Assert.assertEquals
@@ -31,34 +32,33 @@ class ContainerProgramTest {
     @Test
     fun `waits grow after each quick failure up to a minute, and a working program restarts only on failure`() {
         assertEquals(listOf(2_000L, 4_000L, 8_000L, 16_000L, 32_000L, 60_000L, 60_000L), (1..7).map { ContainerProgram.restartDelayMs(it) })
-        val onFailure = ContainerProgram.RestartPolicy.OnFailure()
+        val onFailure = RestartPolicy.OnFailure()
         assertTrue(ContainerProgram.restarts(onFailure, exitCode = 1, failuresInARow = 1))
         assertFalse(ContainerProgram.restarts(onFailure, exitCode = 0, failuresInARow = 0))
-        assertFalse(ContainerProgram.restarts(ContainerProgram.RestartPolicy.No, exitCode = 1, failuresInARow = 1))
+        assertFalse(ContainerProgram.restarts(RestartPolicy.No, exitCode = 1, failuresInARow = 1))
         assertFalse(ContainerProgram.restarts(onFailure, exitCode = 1, failuresInARow = ContainerProgram.MAX_FAILURES_IN_A_ROW))
     }
 
     @Test
     fun `restart policies in Docker's words, and how each restarts`() {
-        val p = ContainerProgram.RestartPolicy
-        assertEquals(p.No, p.parse("no"))
-        assertEquals(p.OnFailure(3), p.parse("on-failure:3"))
-        assertEquals(p.OnFailure(), p.parse("on-failure"))
-        assertEquals(p.Always, p.parse("always"))
-        assertEquals(p.UnlessStopped, p.parse("unless-stopped"))
-        assertEquals(null, p.parse("sometimes"))
-        assertEquals(null, p.parse("on-failure:x"))
-        listOf(p.No, p.OnFailure(), p.OnFailure(2), p.Always, p.UnlessStopped).forEach { assertEquals(it, p.parse(it.words())) }
+        assertEquals(RestartPolicy.No, RestartPolicy.parse("no"))
+        assertEquals(RestartPolicy.OnFailure(3), RestartPolicy.parse("on-failure:3"))
+        assertEquals(RestartPolicy.OnFailure(), RestartPolicy.parse("on-failure"))
+        assertEquals(RestartPolicy.Always, RestartPolicy.parse("always"))
+        assertEquals(RestartPolicy.UnlessStopped, RestartPolicy.parse("unless-stopped"))
+        assertEquals(null, RestartPolicy.parse("sometimes"))
+        assertEquals(null, RestartPolicy.parse("on-failure:x"))
+        listOf(RestartPolicy.No, RestartPolicy.OnFailure(), RestartPolicy.OnFailure(2), RestartPolicy.Always, RestartPolicy.UnlessStopped).forEach { assertEquals(it, RestartPolicy.parse(it.words())) }
         // The page's old switch reads as before; nothing stored is the page's default.
-        assertEquals(p.OnFailure(), p.stored("true"))
-        assertEquals(p.No, p.stored("false"))
-        assertEquals(p.PAGE_DEFAULT, p.stored(null))
+        assertEquals(RestartPolicy.OnFailure(), RestartPolicy.stored("true"))
+        assertEquals(RestartPolicy.No, RestartPolicy.stored("false"))
+        assertEquals(RestartPolicy.PAGE_DEFAULT, RestartPolicy.stored(null))
         // on-failure:N stops after N quick failures; always restarts a clean exit too, but still gives up on a loop.
-        assertFalse(ContainerProgram.restarts(p.OnFailure(2), exitCode = 1, failuresInARow = 2))
-        assertTrue(ContainerProgram.restarts(p.Always, exitCode = 0, failuresInARow = 1))
-        assertFalse(ContainerProgram.restarts(p.Always, exitCode = 0, failuresInARow = ContainerProgram.MAX_FAILURES_IN_A_ROW))
-        assertTrue(p.UnlessStopped.withDesktop)
-        assertFalse(p.OnFailure().withDesktop)
+        assertFalse(ContainerProgram.restarts(RestartPolicy.OnFailure(2), exitCode = 1, failuresInARow = 2))
+        assertTrue(ContainerProgram.restarts(RestartPolicy.Always, exitCode = 0, failuresInARow = 1))
+        assertFalse(ContainerProgram.restarts(RestartPolicy.Always, exitCode = 0, failuresInARow = ContainerProgram.MAX_FAILURES_IN_A_ROW))
+        assertTrue(RestartPolicy.UnlessStopped.withDesktop)
+        assertFalse(RestartPolicy.OnFailure().withDesktop)
     }
 
     @Test
