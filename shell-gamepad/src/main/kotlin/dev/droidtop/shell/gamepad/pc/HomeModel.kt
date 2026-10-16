@@ -109,6 +109,13 @@ internal sealed interface AttentionTarget {
 }
 
 internal object HomeModel {
+    /**
+     * Home's Random game (Droidtop/tracker#507): one of [entries] picked at random, hidden ones and repeats of one
+     * id left out, so a game listed twice is not twice as likely. Null when there is none.
+     */
+    fun randomGame(entries: List<LibraryEntry>, random: kotlin.random.Random = kotlin.random.Random.Default): LibraryEntry? =
+        entries.filter { !it.hidden }.distinctBy { it.id }.randomOrNull(random)
+
     /** What's new holds at most this many cards before "+N more" (the final design, B.2). */
     const val WHATS_NEW_CAP = 12
 

@@ -13692,11 +13692,16 @@ What I was playing, what changed, who is around, and the way into my library. Ho
   - **What's new** (`HomeModel.whatsNew`): at most 12 cards, newest first: a game update ("v0.9.6", opens the game's page), games one scan added to one place ("212 games added to SNES", counted as the library counts, hidden games left out; one game reads by its name, "Added 2 days ago"; opens that library), one card for plugin updates, "+N more" past the cap (opens Updates), and **last, at most one Needs attention card** ("3 things need attention"). Chores are never news.
   - **Friends**: in game first, then unread, then online ("Playing Hades"); A opens Social.
   - **Downloads**: name, progress and state ("45% · Paused"); A opens Downloads.
-- **Shelves** a plugin asks for (plugin-api C11), then **Your library** (the Retro Games and PC Games tiles) as the last stop.
+- **Shelves** a plugin asks for (plugin-api C11), then **Your library** (the Retro Games and PC Games tiles, then
+  **Random game**) as the last stop. Random game (Droidtop/tracker#507, decided 2026-10-16) picks one game at random
+  from everything Home holds, PC games, Retro games and game apps, never a hidden one (`HomeModel.randomGame`), and
+  opens its page (a PC game) or its options (a Retro game or a game app), so Play is one press from there. Home has no
+  filter or system of its own, so the pick is from the whole library; a list's own Random game (List options) keeps to
+  that list.
 
 **Needs attention** (`needsAttentionScreen`): one row per item, each with one verb as its value. A system that has games in the library and is missing a BIOS file ("PlayStation needs a BIOS") or has one that matches no known good dump ("PlayStation BIOS doesn't match") are separate items with **Set up PlayStation**, which opens that system's settings (its BIOS files); the check reads every game folder's `bios` files against `BiosDatabase`, off the main thread, once per change in the set of systems with games. Games with no artwork are one item, **Find artwork**, which starts the scrape job. A seen item is meant to stay quiet until its state changes (`HomeModel.unseen`, keyed by the item's state).
 
-Not built yet (tracked on tracker#485): the unrecognised-files item (the scan does not keep its unmatched files), plugin update counts on the card, the hero following focus and the art order (F7b), Your library's systems and Random game (F7b), the Shelves page and the shelf cap (F7b), and sending the items to Notifications (needs S1's Recent list on main).
+Not built yet (tracked on tracker#485): the unrecognised-files item (the scan does not keep its unmatched files), plugin update counts on the card, the hero following focus and the art order (F7b), Your library's systems (F7b), the Shelves page and the shelf cap (F7b), and sending the items to Notifications (needs S1's Recent list on main).
 
 ### Home art
 
