@@ -16977,7 +16977,10 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
   droidtop devices and 5 desktops, we should be able to connect and pair any
   number of permutations of these devices and have them work"). Each device
   pairs with any number of other devices of either kind: computers with
-  handhelds and with computers (decided 2026-10-16, below). Paired devices
+  handhelds and with computers (decided 2026-10-16, below). Owner,
+  2026-10-16: "Yes, droidtop can pair with multiple computers. That's why
+  save syncing has a 'preferred computer' entry" (see "Prefer this
+  computer's saves" under Saves, below). Paired devices
   exchange what each has, so saves and library changes reach devices that
   are not paired directly through the devices they share.
 - **Paired computers** (`Computers`, `:net-core`) are kept in
