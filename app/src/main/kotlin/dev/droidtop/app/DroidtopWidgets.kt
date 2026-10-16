@@ -43,6 +43,7 @@ internal object DroidtopWidgets {
         ShelfWidgetProvider::class.java,
         CompanionWidgetProvider::class.java,
         FullPageWidgetProvider::class.java,
+        PluginWidgetProvider::class.java,
     )
 
     /** The four rows [rows] fills, in order. */

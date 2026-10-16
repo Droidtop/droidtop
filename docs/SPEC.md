@@ -1082,6 +1082,14 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     own home screen. The one search's bar, the last games played, then droidtop's places: Quick Menu, Downloads, and
     Gaming or Desktop while that mode is on, then Switch mode, four at most. Drawn again after a launch and when a
     mode is switched.
+  - **Plugin** (`PluginWidgetProvider`): one plugin source on a widget, chosen on placement and to reconfigure
+    (`PluginWidgetConfigureActivity`, listing `PluginWidgets.sources`, from manifests alone). A C10 `ui.widget` is
+    drawn from its snapshot at the widget's size (the launcher's options) through the same rows
+    (`PluginWidgetContent`: a value is one row, a list its first four items, a gauge its percent, a media template
+    its subtitle and buttons; a media or picture image sits under the title, `widget_plugin`). A quick tile is one
+    row that presses it, and a status tile one row that shows it. Each tap with an action is a
+    `PluginWidgetActionReceiver` broadcast, and the widget is then drawn again with a fresh snapshot
+    (`PluginWidgets.onActed`). A source that is gone says so, and a tap chooses again.
 - The library widgets are not gated by a mode: the library is never mode-gated (2c). The Desktop widget is: its
   provider is enabled only while Desktop is on (`ModeStartup`, `ModePiece.DESKTOP_SESSION`), which is how Android
   hides a widget from every launcher's picker. What a launcher does with one already placed is for the rig to see.
