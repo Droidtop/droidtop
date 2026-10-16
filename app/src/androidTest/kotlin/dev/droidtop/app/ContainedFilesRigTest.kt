@@ -121,7 +121,7 @@ class ContainedFilesRigTest {
 
         private fun sqlite(app: Context, name: String, wal: Boolean) {
             val file = app.getDatabasePath(name).also { it.parentFile?.mkdirs() }
-            val db = SQLiteDatabase.openOrCreateDatabase(file, null)
+            val db = SQLiteDatabase.openOrCreateDatabase(file.path, null)
             try {
                 if (wal) require(db.enableWriteAheadLogging()) { "WAL refused" }
                 db.execSQL("create table if not exists t(x text)")
