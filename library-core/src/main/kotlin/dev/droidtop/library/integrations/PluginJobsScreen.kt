@@ -1,6 +1,7 @@
 package dev.droidtop.library.integrations
 
 import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
@@ -189,13 +190,27 @@ object PluginJobsScreen {
                     ),
                 )
             }
+            // A store download that stopped (a crash left it Paused with an empty bar, Droidtop/tracker#313) can be started
+            // over: Resume continues from the files on disk, Start over deletes them first, and asks.
+            if (entry.nativeKind == dev.droidtop.library.stores.StoreInstallJob.KIND && entry.paused) {
+                add(
+                    AsyncActionItem(
+                        id = "plugin_job_${jobId}_restart",
+                        title = "Start over",
+                        subtitle = "Deletes what was downloaded so far and downloads the game again",
+                        confirmTitle = "Start this download over? What was downloaded so far is deleted.",
+                        run = { ctx, _ -> if (dev.droidtop.library.stores.StoreInstallJob.restart(ctx, jobId)) "Starting over" else "This download can no longer be started over" },
+                    ),
+                )
+            }
             add(
                 ActionItem(
                     id = "plugin_job_${jobId}_cancel",
                     title = "Cancel",
                     subtitle = when (entry.nativeKind) {
                         null -> "Best effort: the plugin decides whether it actually stops"
-                        DownloadJobs.KIND -> "Stops the download and deletes what was downloaded so far"
+                        // A store install's cancel deletes its partial files too (StoreInstallJob.discard).
+                        DownloadJobs.KIND, dev.droidtop.library.stores.StoreInstallJob.KIND -> "Stops the download and deletes what was downloaded so far"
                         else -> "Stops at the next game"
                     },
                     confirmTitle = "Cancel this job?",

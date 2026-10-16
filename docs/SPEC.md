@@ -12497,7 +12497,11 @@ follows:
   JavaSteam's depot downloader into `<game folder>/Steam/<install folder>`,
   chunks put together in the app's cache. JavaSteam decrypts the manifests' file names with Bouncy Castle's provider,
   which it leaves to the app: `:stores` carries `bcprov-jdk18on` and R8 keeps its provider classes (console, build
-  1767: every Steam download died without it, Droidtop/tracker#313). A stopped download continues; an
+  1767: every Steam download died without it, Droidtop/tracker#313). A store download that stopped (a crash left it
+  Paused with an empty bar) has, on its page in Downloads, Resume, which continues from the files on disk, and
+  Start over, which asks first and then cancels it, deleting what was downloaded, and starts the same game again into
+  the same folder (`StoreInstallJob.restart`); its Cancel says it deletes what was downloaded so far. A folder a store
+  is still downloading into is not a game to the library walk (`ScanPrune`), whatever state its job is in. A stopped download continues; an
   update fetches only what changed. Verify checks every file of the installed
   depots' manifests (which the download keeps in the game's
   `.DepotDownloader` folder) by size and SHA-1, with no network. The update
