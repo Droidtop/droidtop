@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every droidtop widget's plate (DroidtopWidgets): a rounded card the renderer tints with the role tokens' surface
+  colour on Android 12 and later. Before 12 RemoteViews cannot tint a background, and the renderer picks
+  widget_surface_dark or widget_surface_light by the appearance instead.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="16dp" />
+</shape>

@@ -58,7 +58,11 @@ class SettingsCatalogInitProvider : ContentProvider() {
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.serve(appContext) } }, "devices-serve").start()
         // The role tokens UI droidtop does not draw follows (docs/SPEC.md 7k, Droidtop/tracker#559): plugins hear when
         // they change, looked at again on Light or dark, on Android's night mode, and by the Gaming shell on a theme.
-        dev.droidtop.library.theme.RoleTokens.onChanged = { ctx, set -> dev.droidtop.library.integrations.notifyThemeChanged(ctx, set.light) }
+        // droidtop's home-screen widgets are drawn in the same tokens, so they are drawn again too (Droidtop/tracker#563).
+        dev.droidtop.library.theme.RoleTokens.onChanged = { ctx, set ->
+            dev.droidtop.library.integrations.notifyThemeChanged(ctx, set.light)
+            dev.droidtop.app.DroidtopWidgets.refreshAll(ctx)
+        }
         dev.droidtop.library.theme.RoleTokens.attach(appContext)
         appearanceWatch = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == dev.droidtop.library.settings.AppearancePrefs.KEY_APPEARANCE) dev.droidtop.library.theme.RoleTokens.checkSoon()

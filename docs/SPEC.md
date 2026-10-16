@@ -1041,6 +1041,29 @@ service's `GLOBAL_ACTION_RECENTS`, the same single path the lock-screen action a
   carries weather or calendar data of droidtop's own, and droidtop fabricates none; a weather
   or calendar card would arrive as a plugin data source, not as placeholder text.
 
+### Widgets on any launcher (Droidtop/tracker#563, decided 2026-10-16)
+
+droidtop's own surfaces as Android app widgets and shortcuts, so they live on any launcher's pages (Niagara, Lawnchair,
+a stock launcher, Standard's own) through the standard AppWidget and ShortcutManager surfaces. The full plan, the
+widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a widget) are on #563.
+
+- **One renderer** (`DroidtopWidgets`, `:app`). Every widget is built off the main thread from what droidtop already
+  holds in memory (the library's in-RAM index, the plugin store), never a folder walk. It is drawn in the role tokens
+  (`RoleTokens`, #559): the plate is the tokens' surface colour (tinted on Android 12 and later; before that a light
+  or dark plate by the appearance), the text their ink. Every placed widget is drawn again when the tokens change
+  (`RoleTokens.onChanged`, so Light or dark, Android's night mode and the Gaming theme all reach it). Empty states are
+  honest ("No games played yet"). Taps go through droidtop's own entry points: a game through `GameLaunchActivity`,
+  so sessions, Kill and the watchdog hold.
+- **Built:**
+  - Continue playing and Plugin status, moved onto the renderer (`widget_rows`: a title and up to four rows);
+  - **Library search**, a bar that opens the one search (`LauncherSearchActivity`);
+  - **Quick launch**, one game's art and title. Placing it opens `QuickLaunchConfigureActivity`, which lists the
+    playable games (one card per game, as the Games grid groups them) to pick from. The pick is kept by the widget's
+    id (`WidgetConfigs`) and forgotten when the widget is removed. A game that left the library says so, and a tap
+    picks again.
+- None of these is gated by a mode: the library is never mode-gated (2c). Gating applies to the Desktop and Gaming
+  entries still to come (#563).
+
 ### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
 
 The owner's direction: droidtop on the console "needs to make the android
