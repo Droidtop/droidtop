@@ -16,16 +16,6 @@ internal const val PC_SYSTEM_ID = "pc"
 private const val WINDOWS_SYSTEM_ID = "windows"
 
 /**
- * :app's "PC setup" settings screen (game folders, the Windows system
- * files, Downloads), by [dev.droidtop.library.settings.SettingsScreenRegistry]
- * id because this module cannot depend on :app -- the same way
- * `GamingSettingsCatalog` names the console-systems and Windows-games
- * screens it opens. The PC Games tab opens it in place from its options
- * menu, and shows it instead of an empty library (docs/SPEC.md 7i).
- */
-internal const val PC_STORES_SCREEN_ID = "pc_stores"
-
-/**
  * Which tab a game is on (docs/SPEC.md 7i, 2026-10-01): PC Games holds
  * every game that is not a console system's ROM -- a detected engine
  * game, a store or Wine title, and whatever sits in a `pc` folder --

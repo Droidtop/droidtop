@@ -14,7 +14,7 @@ import kotlinx.coroutines.withContext
 /**
  * Settings, Download rules (docs/SPEC.md, "Download rules", Droidtop/tracker#226): the one place the download
  * policy is set. Every row writes [DownloadPolicy], which every download job reads, so nothing here is specific to
- * a store or a source. The same screen is reached from "Downloads and installs" and from PC setup.
+ * a store or a source. The same screen is reached from "Downloads and installs".
  */
 object DownloadRulesCatalog {
     const val SCREEN_ID = "download_rules"

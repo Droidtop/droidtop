@@ -4,7 +4,6 @@ import android.content.Context
 import android.media.AudioManager
 import android.os.SystemClock
 import android.util.Log
-import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -20,68 +19,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-/**
- * The launch-static experiment (docs/SPEC.md "Launch audio hand-off",
- * Droidtop/tracker#160): which of three ways droidtop treats the theme's
- * launch sample between the A press on a game and the launch itself. The
- * owner listens to each on the console and says which one stops the burst;
- * every line logged under [AudioHandOff.TAG] carries the letter. The setting
- * is a row in the Shell group of Settings, default [A]. (Silencing the
- * preview and the theme sounds while a modal layer is open is not a variant
- * but a rule, see [AudioHandOff.setQuiet].)
- */
-enum class LaunchSoundVariant(val label: String) {
-    /** The launch sample plays at the A press. */
-    A("A: launch sound at the press (as now)"),
-
-    /** The launch sample waits until the launch is really dispatched, after the screen question. */
-    B("B: launch sound after the screen question"),
-
-    /** Nothing of droidtop's sound from the A press on (a control: no launch sample, preview silenced). */
-    D("D: no droidtop sound while launching"),
-}
-
-/** What each [LaunchSoundVariant] does; pure, so the table is unit-tested. */
-object LaunchSoundPlan {
-    /** The theme's launch sample is played the moment A is pressed. */
-    fun launchSoundAtPress(variant: LaunchSoundVariant) = variant == LaunchSoundVariant.A
-
-    /** The theme's launch sample is held back until the launch is really dispatched. */
-    fun launchSoundAtDispatch(variant: LaunchSoundVariant) = variant == LaunchSoundVariant.B
-
-    /** Everything of droidtop's is silenced from the A press itself (before any screen question). */
-    fun quietFromPress(variant: LaunchSoundVariant) = variant == LaunchSoundVariant.D
-
-    /**
-     * Whether droidtop's themed sound is silenced: while a modal layer is
-     * open (a rule, whatever the variant) and, in the control variant, from
-     * the A press on. Handed off means another app has the audio and the
-     * layer no longer matters.
-     */
-    fun silenced(layerOpen: Boolean, handedOff: Boolean) = layerOpen && !handedOff
-
-    /** The stored value back to a variant; anything unknown is [LaunchSoundVariant.A]. */
-    fun parse(stored: String?): LaunchSoundVariant =
-        LaunchSoundVariant.entries.firstOrNull { it.name == stored } ?: LaunchSoundVariant.A
-}
-
-/** The stored choice of [LaunchSoundVariant], in droidtop's one preferences file. */
-object LaunchSoundExperiment {
-    private const val KEY = "droidtop_launch_sound_variant"
-
-    /** Reads the choice (an in-memory preferences read) and tells the log which letter is in force. */
-    fun variant(context: Context): LaunchSoundVariant =
-        LaunchSoundPlan.parse(
-            context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getString(KEY, null),
-        ).also { AudioHandOff.variantTag = it.name }
-
-    fun set(context: Context, variant: LaunchSoundVariant) {
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-            .edit().putString(KEY, variant.name).apply()
-        AudioHandOff.variantTag = variant.name
-    }
-}
 
 /**
  * The one launch audio hand-off (docs/SPEC.md "Launch audio hand-off",
@@ -105,6 +42,12 @@ object LaunchSoundExperiment {
  * shows the hand-off happened.
  */
 object AudioHandOff {
+    /**
+     * Whether droidtop's themed sound is silenced: while a modal layer is open, unless another app already has the
+     * audio (handed off), when the layer no longer matters. Pure, unit-tested.
+     */
+    fun silenced(layerOpen: Boolean, handedOff: Boolean) = layerOpen && !handedOff
+
     const val TAG = "droidtop.audio"
 
     interface Holder {
@@ -124,20 +67,14 @@ object AudioHandOff {
 
         /**
          * Silences (true) or restores (false) what this holder has open,
-         * without closing it: the launch-static experiment's "quiet while
-         * asking which screen" ([LaunchSoundVariant.C], [LaunchSoundVariant.D]).
-         * Called on the main thread.
+         * without closing it: nothing of droidtop's plays beneath a modal
+         * layer ([silenced]). Called on the main thread.
          */
         fun setQuiet(quiet: Boolean) = Unit
 
         /** What this holder has open right now, for the launch timeline; null when it does not say. */
         fun status(): String? = null
     }
-
-    /** The experiment letter every line of the timeline carries; see [LaunchSoundExperiment]. */
-    @Volatile
-    var variantTag: String = LaunchSoundVariant.A.name
-        internal set
 
     /**
      * One line of the launch audio timeline: a monotonic timestamp
@@ -147,7 +84,7 @@ object AudioHandOff {
      * (Droidtop/tracker#160).
      */
     fun mark(what: String) {
-        Log.i(TAG, "t=${SystemClock.uptimeMillis()} [$variantTag] $what")
+        Log.i(TAG, "t=${SystemClock.uptimeMillis()} $what")
     }
 
     private val holders = CopyOnWriteArrayList<Holder>()
@@ -161,9 +98,8 @@ object AudioHandOff {
     /**
      * Silences or restores every holder's open streams without closing them
      * (see [Holder.setQuiet]): the preview video pauses and mutes, the
-     * theme's navigation sounds mute. A rule, not a variant: it is on while
-     * any modal layer is open (the shell reports it, [LaunchSoundPlan.silenced])
-     * and, in the control variant, from the A press. Sounds are restored when
+     * theme's navigation sounds mute. It is on while any modal layer is open
+     * (the shell reports it, [silenced]). Sounds are restored when
      * the last reason is withdrawn. Main thread.
      */
     fun setQuiet(reason: String, quiet: Boolean) {
