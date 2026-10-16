@@ -23,7 +23,6 @@
     <string name="pref_subcategory_day_night">Tema interfaccia</string>
     <string name="pref_subcategory_layout">Disposizione</string>
     <string name="pref_subcategory_appearance">Aspetto</string>
-    <string name="pref_subcategory_persistency">Persistenza</string>
     <string name="pref_subcategory_gestures">Gesti</string>
     <string name="pref_subcategory_options">Opzioni</string>
     <string name="pref_subcategory_backup">Backup</string>
@@ -91,18 +90,8 @@
     <string name="pref_qsb_search_provider_title">Motore di ricerca</string>
     <string name="pref_qsb_enable_lens_title">Attiva Lens</string>
     <string name="pref_qsb_enable_lens_summary">Mostra il pulsante Google Lens nella ricerca rapida</string>
-    <string name="pref_qsb_box_blur">Sfocatura pannello di ricerca</string>
-    <string name="pref_qsb_box_blur_desc">Mostra effetto MICA nel pannello di ricerca</string>
     <string name="pref_qsb_bar_alpha">Opacità barra di ricerca</string>
-    <string name="pref_qsb_box_alpha">Opacità pannello di ricerca</string>
     <string name="pref_qsb_custom_provider_title">URL di ricerca personalizzato</string>
-    <string name="pref_qsb_history_size_title">Dimensione cronologia ricerche</string>
-    <string name="pref_qsb_history_size_summary">Voci massime</string>
-    <string name="pref_qsb_clear_history_title">Cancella cronologia ricerche</string>
-    <string name="pref_qsb_clear_history_summary">Elimina tutte le ricerche salvate</string>
-    <string name="pref_qsb_clear_history_confirm_title">Cancellare la cronologia?</string>
-    <string name="pref_qsb_clear_history_confirm_message">Verranno eliminate definitivamente tutte le ricerche salvate.</string>
-    <string name="pref_qsb_clear_history_toast">Cronologia cancellata</string>
 
     <!-- Murine smartspace / clock widget -->
     <string name="smartspace_mode_clock">Orologio</string>

@@ -299,7 +299,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import app.murinelauncher.graphics.WorkspaceBlurUtils;
-import app.murinelauncher.widget.search.MurineSearchBoxView;
 import app.murinelauncher.widget.smartspace.SmartspaceMode;
 
 /**
@@ -997,7 +996,8 @@ public class Launcher extends StatefulActivity<LauncherState>
                 if (results != null && !results.isEmpty()) {
                     // Result with highest confidence
                     String query = results.get(0);
-                    MurineSearchBoxView.performDetachedWebSearch(this, query);
+                    // droidtop patch: what was said goes to the one search, as typed text would.
+                    dev.droidtop.shell.standard.LauncherSearch.open(this, query);
                 }
             }
             return;

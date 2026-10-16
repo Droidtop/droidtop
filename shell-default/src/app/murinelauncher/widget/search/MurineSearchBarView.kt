@@ -88,9 +88,9 @@ class MurineSearchBarView @JvmOverloads constructor(
         lensButton.setOnClickListener { openLensOrVisualSearch() }
     }
 
+    /** droidtop patch (Droidtop/tracker#564): the bar opens droidtop's one search, where the web is one row ([WebSearch]). */
     private fun openSearch() {
-        val launcher = ActivityContext.lookupContext<Launcher>(context)
-        MurineSearchBoxView.show(launcher)
+        dev.droidtop.shell.standard.LauncherSearch.open(ActivityContext.lookupContext<Launcher>(context))
     }
 
     private fun openVoiceSearch() {
