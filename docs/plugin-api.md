@@ -3096,6 +3096,16 @@ with it:
   no such call; the load completes after the wait, inside the 15 s budget.
   A device without that bridge (the Retroid's arm64) is expected not to wait;
   its rig run says.
+  Every plugin process paid it, and the processes restart after a minute
+  idle, so the first search after a start ran out of its 10 s for several
+  sources at once (rig, release 0.2.0-dev.2070, Droidtop/tracker#218). From
+  Android 10 (API 29) the sandbox runs in droidtop's app zygote
+  (`android:useAppZygote`), whose preload (`PluginZygotePreload`) loads the
+  library once; each plugin process forked from it finds the library loaded.
+  The zygote's UID is in the isolated range too, so its own load is
+  expected to wait once, while it starts. `PluginStartRigTest` (by hand)
+  holds a second contained plugin's start to 3 s. Needs a rig check on
+  BlueStacks.
 
 **ui.main in the sandbox (plugin-enforce-8, emulator-5560 and BlueStacks).**
 A contained plugin's own screen stayed black for two reasons, both rules of
