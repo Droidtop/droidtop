@@ -197,6 +197,26 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     }
 
     /**
+     * droidtop (Droidtop/tracker#564): a drawer folder's icon and its folder, the same views as the home
+     * screen's, made read only (Folder.setDrawerFolder) before they are bound. [folderInfo] is the drawer's
+     * own, in no database.
+     */
+    public static <T extends Context & ActivityContext> FolderIcon inflateDrawerFolder(
+            T activityContext, ViewGroup group, FolderInfo folderInfo) {
+        Folder folder = Folder.fromXml(activityContext);
+        folder.setDrawerFolder();
+
+        FolderIcon icon = inflateIcon(R.layout.folder_icon, activityContext, group, folderInfo);
+        folder.setFolderIcon(icon);
+        folder.bind(folderInfo);
+
+        icon.setFolder(folder);
+        icon.setOnLongClickListener(null);
+        icon.setLongClickable(false);
+        return icon;
+    }
+
+    /**
      * Builds a FolderIcon to be added to the activity.
      * This method doesn't add any listeners to the FolderInfo, and hence any changes to the info
      * will not be reflected in the folder.

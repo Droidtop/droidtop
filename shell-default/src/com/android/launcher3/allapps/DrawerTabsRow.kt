@@ -17,7 +17,8 @@ import com.android.launcher3.R
  * droidtop (Droidtop/tracker#564): the app drawer's tabs, a row of chips at the top of the drawer that stays
  * with the header as the list scrolls (a [FloatingHeaderRow], as Launcher3's own rows). "All" first, then
  * the person's tabs ([DrawerTabs]). A tap shows that tab; a long press renames, moves or deletes it. The row
- * shows only once a tab exists: a tab is made from an app's long-press menu ("Drawer tabs").
+ * shows only once a tab exists: a tab is made from an app's long-press menu ("Drawer tabs"). A tab can also
+ * be shown as a drawer folder in All ("Show as a folder in All").
  */
 class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
     HorizontalScrollView(context, attrs), FloatingHeaderRow {
@@ -92,7 +93,11 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
         menu.menu.add(0, 0, 0, R.string.drawer_tab_rename)
         menu.menu.add(0, 1, 1, R.string.drawer_tab_move_left)
         menu.menu.add(0, 2, 2, R.string.drawer_tab_move_right)
-        menu.menu.add(0, 3, 3, R.string.drawer_tab_delete)
+        menu.menu.add(0, 4, 3, R.string.drawer_tab_as_folder).apply {
+            isCheckable = true
+            isChecked = DrawerTabs.tabs(context).firstOrNull { it.name == tab }?.folder == true
+        }
+        menu.menu.add(0, 3, 4, R.string.drawer_tab_delete)
         menu.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 0 -> askName(context, tab) { name ->
@@ -101,6 +106,7 @@ class DrawerTabsRow @JvmOverloads constructor(context: Context, attrs: Attribute
                 1 -> { DrawerTabs.move(context, tab, -1); onTabsChanged() }
                 2 -> { DrawerTabs.move(context, tab, +1); onTabsChanged() }
                 3 -> { DrawerTabs.delete(context, tab); onTabsChanged() }
+                4 -> { DrawerTabs.setFolder(context, tab, !item.isChecked); onTabsChanged() }
             }
             true
         }
