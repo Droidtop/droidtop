@@ -17,6 +17,7 @@ class FakeHost(
     val env: FakeEnv = FakeEnv(TestPlugins.record(manifest)),
 ) {
     private val broker = BrokerCore(manifest.id, env)
+    private val providers = java.util.concurrent.ConcurrentHashMap<String, DroidtopPlugin>()
 
     val context: PluginContext = object : PluginContext {
         override fun call(api: String, version: Int, op: String, argsJson: String): String {
@@ -35,6 +36,31 @@ class FakeHost(
 
     init {
         plugin.onLoad(context)
+        env.forwarder = { provider, call ->
+            providers[provider.manifest.id]?.handle(call)
+                ?: PluginReply.error(PluginErrorCode.PROVIDER_UNAVAILABLE, "${provider.manifest.label} is not loaded in the fake host")
+        }
+    }
+
+    /**
+     * Installs and loads a provider beside the plugin (docs/plugin-api.md 2.4 and 2.6, Droidtop/tracker#129): the
+     * plugin's calls to an API [manifest] exports reach [plugin]'s `handle` through the broker, as `api:<id>` calls.
+     * The provider's own host calls are not served; it answers from what the call carries.
+     */
+    fun provide(manifest: PluginManifest, plugin: DroidtopPlugin) {
+        env.records[manifest.id] = TestPlugins.record(manifest)
+        providers[manifest.id] = plugin
+    }
+
+    /** Turns a provider off or on again, as the person does on its page; its calls wait while it is off. */
+    fun setEnabled(pluginId: String, enabled: Boolean) {
+        env.records[pluginId] = env.records.getValue(pluginId).copy(enabled = enabled)
+    }
+
+    /** Uninstalls a provider; [provide] installs it again. */
+    fun remove(pluginId: String) {
+        env.records.remove(pluginId)
+        providers.remove(pluginId)
     }
 
     fun grant(permission: String, state: GrantState) = env.setGrant(manifest.id, permission, state)

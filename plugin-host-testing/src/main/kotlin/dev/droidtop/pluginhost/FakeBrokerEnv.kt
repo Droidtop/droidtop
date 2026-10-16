@@ -105,11 +105,14 @@ class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
     }
     override fun chainServedBy(pluginId: String) = chain
     val personStartedForwards = mutableListOf<Boolean>()
+
+    /** When set, a forwarded call is answered by this (FakeHost's providers) instead of [forwardReply]. */
+    var forwarder: ((PluginRecord, PluginCall) -> PluginReply)? = null
     override fun forward(provider: PluginRecord, call: PluginCall, timeoutMs: Long, personStarted: Boolean): PluginReply {
         forwards += provider.manifest.id to call
         personStartedForwards += personStarted
         lastTimeout = timeoutMs
-        return forwardReply
+        return forwarder?.invoke(provider, call) ?: forwardReply
     }
     var lastTimeout = 0L
 
