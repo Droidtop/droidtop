@@ -17,10 +17,21 @@ class SessionLivenessTest {
     }
 
     @Test
-    fun `a force-stopped or uninstalled app ends the session at once`() {
+    fun `a force-stopped or uninstalled app ends the session on two looks`() {
         val o = look(ageMs = 1_000, gone = true, listed = null)
 
-        assertTrue(SessionLiveness.ended(o, SessionLiveness.misses(o, 0)))
+        val once = SessionLiveness.misses(o, 0)
+        assertFalse(SessionLiveness.ended(once))
+        assertTrue(SessionLiveness.ended(SessionLiveness.misses(o, once)))
+    }
+
+    @Test
+    fun `a listed task outweighs the stopped flag`() {
+        // An emulator relaunched into a process that outlived a force-stop runs with the flag still set (rig, 1931).
+        val o = look(ageMs = 6_000, gone = true, listed = true)
+
+        assertEquals(0, SessionLiveness.misses(o, 1))
+        assertFalse(SessionLiveness.ended(SessionLiveness.misses(o, 5)))
     }
 
     @Test
@@ -30,13 +41,13 @@ class SessionLivenessTest {
         val early = look(ageMs = SessionLiveness.APPEAR_GRACE_MS - 1, listed = false)
         misses = SessionLiveness.misses(early, misses)
         assertEquals(0, misses)
-        assertFalse(SessionLiveness.ended(early, misses))
+        assertFalse(SessionLiveness.ended(misses))
 
         val late = look(ageMs = SessionLiveness.APPEAR_GRACE_MS + 3_000, listed = false)
         misses = SessionLiveness.misses(late, misses)
-        assertFalse(SessionLiveness.ended(late, misses))
+        assertFalse(SessionLiveness.ended(misses))
         misses = SessionLiveness.misses(late, misses)
-        assertTrue(SessionLiveness.ended(late, misses))
+        assertTrue(SessionLiveness.ended(misses))
     }
 
     @Test
@@ -47,7 +58,7 @@ class SessionLivenessTest {
         val after = SessionLiveness.misses(present, SessionLiveness.misses(missing, 0))
 
         assertEquals(0, after)
-        assertFalse(SessionLiveness.ended(present, after))
+        assertFalse(SessionLiveness.ended(after))
     }
 
     @Test
@@ -55,7 +66,7 @@ class SessionLivenessTest {
         val o = look(ageMs = 10 * 60_000, listed = null)
 
         assertEquals(0, SessionLiveness.misses(o, 1))
-        assertFalse(SessionLiveness.ended(o, 0))
+        assertFalse(SessionLiveness.ended(0))
     }
 
     @Test
@@ -63,6 +74,6 @@ class SessionLivenessTest {
         val o = look(ageMs = 60_000, listed = false, own = true)
 
         assertEquals(0, SessionLiveness.misses(o, 5))
-        assertFalse(SessionLiveness.ended(o, 0))
+        assertFalse(SessionLiveness.ended(0))
     }
 }

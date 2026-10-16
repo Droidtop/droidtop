@@ -60,6 +60,16 @@ internal object LaunchReplace {
             running.packageName == nextPackage && running.gameId != nextGameId
 
     /**
+     * Whether a launch is the running game again, in the same app: its task is brought to the front instead of the
+     * launch being delivered a second time. A second delivery restarts or confuses the emulator: NetherSX2 handed the
+     * same game while it ran joined its folder with the whole content URI and read nothing (rig, droidtop
+     * 0.2.0-dev.1931: a black screen after Play on the companion).
+     */
+    fun resumes(running: Running?, nextPackage: String?, nextGameId: String?): Boolean =
+        running != null && nextPackage != null && nextGameId != null &&
+            running.packageName == nextPackage && running.gameId == nextGameId
+
+    /**
      * Whether a launch that could not end the running game first is delivered a second time. RetroArch's
      * `RetroActivityFuture` is `singleInstance`, and its `onNewIntent` restarts itself for a different ROM or core with
      * `startActivity` followed at once by `System.exit(0)` (RetroArch, pkg/android/phoenix, RetroActivityFuture.java),
@@ -331,6 +341,19 @@ object LaunchDisplay {
         // One launch replaces the running game in the same emulator (docs/SPEC.md "One launch replaces the running
         // game"): the old one is ended by the task manager's one close path first, so the emulator starts clean. When
         // nothing can end it, a RetroArch launch is delivered a second time below.
+        if (packageName != null && LaunchReplace.resumes(replacing, packageName, runningGame?.gameId)) {
+            val front = context.packageManager.getLaunchIntentForPackage(packageName)
+                ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            if (front != null) {
+                val resolved = LaunchScreenResolution.resolveDisplay(displayId, shellDisplayId)
+                AudioHandOff.mark("resuming ${runningGame?.gameId} in $packageName: brought to the front, not launched again")
+                context.startActivity(front, ActivityOptions.makeBasic().setLaunchDisplayId(resolved).toBundle())
+                runningPackageName = packageName
+                parkedDisplayId = resolved
+                onLaunched?.invoke(resolved)
+                return
+            }
+        }
         var redeliver = false
         if (packageName != null && LaunchReplace.replaces(replacing, packageName, runningGame?.gameId)) {
             LaunchWatchdog.cancel()

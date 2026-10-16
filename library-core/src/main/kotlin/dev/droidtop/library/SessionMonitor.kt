@@ -50,11 +50,21 @@ internal object SessionLiveness {
 
     fun intervalMs(ageMs: Long): Long = if (ageMs < FAST_WINDOW_MS) FAST_MS else SLOW_MS
 
-    /** The count of looks in a row that found the app missing from the task list, after this one. */
-    fun misses(o: SessionObservation, before: Int): Int =
-        if (o.taskListed == false && !o.ownPackage && o.ageMs >= APPEAR_GRACE_MS) before + 1 else 0
+    /**
+     * The count of looks in a row that found the app gone, after this one. Gone is missing from the task list past the
+     * grace, or Android's stopped flag while the task list does not hold the app. A listed task outweighs the flag: a
+     * launch into an emulator process that outlived a force-stop runs with the flag still set (rig, droidtop
+     * 0.2.0-dev.1931: 007 relaunched into NetherSX2's background process after Kill ran untracked, no Game tab, no Kill).
+     */
+    fun misses(o: SessionObservation, before: Int): Int {
+        if (o.ownPackage) return 0
+        val missingFromList = o.taskListed == false && o.ageMs >= APPEAR_GRACE_MS
+        val stopped = o.packageGone && o.taskListed != true
+        return if (missingFromList || stopped) before + 1 else 0
+    }
 
-    fun ended(o: SessionObservation, misses: Int): Boolean = o.packageGone || misses >= MISSES_TO_END
+    /** Ended only on [MISSES_TO_END] looks in a row: one odd read, of either signal, never ends a game. */
+    fun ended(misses: Int): Boolean = misses >= MISSES_TO_END
 }
 
 /**
@@ -97,7 +107,7 @@ object SessionMonitor {
                 ownPackage = pkg == app.packageName,
             )
             misses = SessionLiveness.misses(observation, misses)
-            if (SessionLiveness.ended(observation, misses)) {
+            if (SessionLiveness.ended(misses)) {
                 Log.i(TAG, "$pkg is gone (stopped=${observation.packageGone}, task list misses=$misses): the session ends")
                 LaunchDisplay.clearRunning()
                 return
