@@ -8,6 +8,9 @@ import org.json.JSONObject
  * sites the plugin declared; the session's cookies never reach the plugin.
  */
 internal object HostWebApis {
+    /** The most downloads one `open_in_session` takes: an acquire reply's limit for several files. */
+    const val MAX_CAPTURED = DownloadJobs.MAX_FILES
+
     private fun invalid(message: String): Nothing = throw BrokerException(PluginErrorCode.INVALID_ARGS, message)
 
     private fun domains(record: PluginRecord): List<String> =
@@ -88,29 +91,33 @@ internal object HostWebApis {
             // still go only to the declared sites; the person sees the site the page is on in the view's header.
             val url = args.optString("url").trim().takeIf { NetScope.isHttps(it) && NetScope.hostOf(it) != null }
                 ?: invalid("url must be an https address")
-            val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null))
+            // A page that offers several files (a game in parts, a game and its patch) is taken in one visit (#419): up to
+            // `max` downloads, the acquire reply's limit for several files.
+            val max = args.optInt("max", 1).coerceIn(1, MAX_CAPTURED)
+            val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null, maxDownloads = max))
             // The site may have renewed the session while the person was there.
             result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it) }
-            val download = result.download ?: return@HostOp JSONObject().put("captured", false)
-            NetScope.hostOf(download.url) ?: invalid("the page started a download that is not an http or https address")
-            val fileName = WebSessions.safeFileName(WebSessions.fileNameFor(download.url, download.contentDisposition))
-            val headers = buildMap {
-                download.cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
-                download.userAgent?.takeIf { it.isNotBlank() }?.let { put("User-Agent", it) }
-                download.referer?.takeIf { it.isNotBlank() }?.let { put("Referer", it) }
+            if (result.downloads.isEmpty()) return@HostOp JSONObject().put("captured", false)
+            val described = result.downloads.take(max).map { download ->
+                NetScope.hostOf(download.url) ?: invalid("the page started a download that is not an http or https address")
+                val fileName = WebSessions.safeFileName(WebSessions.fileNameFor(download.url, download.contentDisposition))
+                val headers = buildMap {
+                    download.cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
+                    download.userAgent?.takeIf { it.isNotBlank() }?.let { put("User-Agent", it) }
+                    download.referer?.takeIf { it.isNotBlank() }?.let { put("Referer", it) }
+                }
+                val token = WebSessions.keep(
+                    WebSessions.Captured(record.manifest.id, download.url, fileName, download.size?.takeIf { it > 0 }, download.mimeType, headers, env.nowMs()),
+                )
+                JSONObject().put("url", download.url).put("fileName", fileName).put("session", token).apply {
+                    download.size?.takeIf { it > 0 }?.let { put("size", it) }
+                    download.mimeType?.let { put("mimeType", it) }
+                }
             }
-            val token = WebSessions.keep(
-                WebSessions.Captured(record.manifest.id, download.url, fileName, download.size?.takeIf { it > 0 }, download.mimeType, headers, env.nowMs()),
-            )
             JSONObject()
                 .put("captured", true)
-                .put(
-                    "download",
-                    JSONObject().put("url", download.url).put("fileName", fileName).put("session", token).apply {
-                        download.size?.takeIf { it > 0 }?.let { put("size", it) }
-                        download.mimeType?.let { put("mimeType", it) }
-                    },
-                )
+                .put("download", described.first())
+                .put("downloads", org.json.JSONArray(described))
         },
     )
 }
@@ -128,6 +135,11 @@ data class WebSessionRequest(
     val doneCookie: String?,
     /** [Mode.BROWSE]: told the address of each page the view finishes showing, on the main thread. Nothing else of a page is read. */
     val onPage: ((String) -> Unit)? = null,
+    /**
+     * [Mode.OPEN]: how many downloads the page may start before the view closes (Droidtop/tracker#419); above 1 the view
+     * stays open, says how many it has, and Done ends it sooner.
+     */
+    val maxDownloads: Int = 1,
 ) {
     /**
      * A plugin's sign-in, a site's browser check passed in the plugin's session (docs/plugin-api.md 1.3

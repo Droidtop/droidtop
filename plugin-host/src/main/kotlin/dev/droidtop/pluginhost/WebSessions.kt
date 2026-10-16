@@ -126,6 +126,8 @@ data class WebSessionResult(
     val completed: Boolean,
     val session: WebSessions.Stored?,
     val download: WebSessionDownload?,
+    /** Every download the page started, in order, when the request took more than one ([WebSessionRequest.maxDownloads]). */
+    val downloads: List<WebSessionDownload> = listOfNotNull(download),
 )
 
 /** A download a page started in the web view, as the web view reported it. */
