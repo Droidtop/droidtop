@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +51,7 @@ import dev.droidtop.shell.gamepad.QuickTiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import coil3.compose.AsyncImage
 import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.ui.shared.NoticeCard
 
@@ -117,7 +119,7 @@ internal fun CompanionCatalogItems(
                 is SliderItem -> CatalogSliderRow(item, onChanged)
                 is ToggleItem -> CatalogToggleRow(item, onChanged)
                 is ChoiceItem -> CatalogChoiceRow(item, onChanged)
-                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null) {
+                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile) {
                     if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
                 }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
@@ -171,6 +173,8 @@ private fun CatalogRow(
     // The value as a state chip (ChoiceItem.toned), in its tone or neutral (Droidtop/tracker#519).
     valueChip: Boolean = false,
     valueTone: NoticeTone? = null,
+    // A picture before the title (CatalogItem.iconFile: a plugin's own icon, a store's mark; tracker#513).
+    iconFile: String? = null,
     onClick: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -183,6 +187,14 @@ private fun CatalogRow(
             .let { if (onClick != null) it.clickable(role = Role.Button, onClick = onClick) else it }
             .padding(horizontal = 8.dp, vertical = 6.dp),
     ) {
+        if (iconFile != null) {
+            AsyncImage(
+                model = java.io.File(iconFile),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.padding(end = 12.dp).size(32.dp),
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface)
             if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)

@@ -15748,7 +15748,14 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   notification (`PlaceLinks`, below). Settings > System no longer
   carries a "Software updates" row of its own.
 - **Plugins** (`plugins`): the existing Plugins screen (installed,
-  approvals, repositories, catalog), opened in place.
+  approvals, repositories, catalog), opened in place. Each plugin's card and
+  each catalog row carries the plugin's own icon (its presentation icon,
+  `PluginStore.iconFile`; a catalog row only once the plugin is installed,
+  the catalog index having no icon) and its one-line summary under its
+  name, shown at all times on every surface (`CatalogItem.summaryShown`;
+  in Gaming one line even with Info text under rows off, the full text in
+  Info) (Droidtop/tracker#513, #514, built 2026-10-16). The companion draws a
+  row's picture too.
 
 **Places in every mode (decided 2026-10-08, Droidtop/tracker#346).** The
 places were Gaming sections only: Standard reached Stores, Social, Downloads
