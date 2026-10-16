@@ -870,7 +870,14 @@ in the Gaming theme when Gaming was the last mode and droidtop's own look
 otherwise. The rows and what each does stay in `:shell-default`
 (`BackButtonMenu.choices`), in `ModeGate.switcherModes` order (unit-tested in
 `ModesTest`): Android always, Desktop and Gaming only while enabled, then Modes
-and settings, Reinitialize displays and Close all apps. The first row holds the
+and settings, Reinitialize displays and Close all apps. Each mode's row carries
+its glyph (Standard's apps grid, Gaming's controller, Desktop's window) and the
+mode in use says "Current" in the value column; the three rows that are not
+modes sit below them under a quiet "Also here" heading, so a press meant for a
+mode does not land on Close all apps (2026-10-16, Droidtop/tracker#530). They
+stay in this sheet rather than moving to Gaming's System tab: this is the one
+menu every mode reaches, and the recovery route from Standard and Desktop.
+The first row holds the
 cursor from the start, so one A chooses it; B closes; the sheet draws its own
 hint row (A Select, B Cancel), the touch route to those presses, because the
 window has no shell footer.
