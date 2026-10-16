@@ -147,7 +147,11 @@ public class FolderAnimationManager {
         // Match size/scale of icons in the preview
         float previewScale = rule.scaleForItem(itemsInPreview.size());
         float previewSize = rule.getIconSize() * previewScale;
-        float baseIconSize = getBubbleTextView(itemsInPreview.get(0)).getIconSize();
+        // The folder can be opened before its child views are bound;
+        // Fall back to the preview icon size instead of crashing.
+        float baseIconSize = itemsInPreview.isEmpty()
+                ? rule.getIconSize()
+                : getBubbleTextView(itemsInPreview.get(0)).getIconSize();
         float initialScale = previewSize / baseIconSize * scaleRelativeToDragLayer;
         final float finalScale = 1f;
         float scale = mIsOpening ? initialScale : finalScale;
@@ -375,6 +379,10 @@ public class FolderAnimationManager {
 
         TimeInterpolator previewItemInterpolator = getPreviewItemInterpolator();
 
+        if (numItemsInPreview == 0) {
+            // nothing bound yet, no animators to add and no page to read.
+            return;
+        }
         ShortcutAndWidgetContainer cwc = mContent.getPageAt(0).getShortcutsAndWidgets();
         for (int i = 0; i < numItemsInPreview; ++i) {
             final View v = itemsInPreview.get(i);

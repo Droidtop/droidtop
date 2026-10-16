@@ -46,5 +46,6 @@
         android:layout_height="@dimen/deep_shortcut_icon_size"
         android:layout_marginStart="@dimen/popup_padding_start"
         android:layout_gravity="start|center_vertical"
+        android:outlineProvider="none"
         android:background="@drawable/ic_deepshortcut_placeholder"/>
 </com.android.launcher3.shortcuts.DeepShortcutView>

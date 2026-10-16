@@ -305,7 +305,9 @@ public class WallpaperOffsetInterpolator {
         private void setOffsetSafely(IBinder token) {
             try {
                 mWM.setWallpaperOffsets(token, mCurrentOffset, 0.5f);
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException | SecurityException e) {
+                // SecurityException: Huawei's HwWallpaperManager reads the wallpaper bitmap inside
+                // setWallpaperOffsets, which needs READ_EXTERNAL_STORAGE on Android 8/9.
                 Log.e(TAG, "Error updating wallpaper offset: " + e);
             }
         }

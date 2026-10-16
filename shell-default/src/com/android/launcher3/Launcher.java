@@ -1707,14 +1707,16 @@ public class Launcher extends StatefulActivity<LauncherState>
             // Show resize frame on the newly inflated LauncherAppWidgetHostView.
             LauncherAppWidgetHostView reInflatedHostView =
                     getWorkspace().getWidgetForAppWidgetId(appWidgetId);
-            showWidgetResizeFrame(
-                    reInflatedHostView,
-                    (LauncherAppWidgetInfo) reInflatedHostView.getTag(),
-                    presenterPos);
-            // We always update widget size after re-inflating PendingAppWidgetHostView
-            WidgetSizes.updateWidgetSizeRanges(
-                    reInflatedHostView, this, itemInfo.spanX, itemInfo.spanY);
-            return;
+            if (reInflatedHostView != null) {
+                showWidgetResizeFrame(
+                        reInflatedHostView,
+                        (LauncherAppWidgetInfo) reInflatedHostView.getTag(),
+                        presenterPos);
+                // We always update widget size after re-inflating PendingAppWidgetHostView
+                WidgetSizes.updateWidgetSizeRanges(
+                        reInflatedHostView, this, itemInfo.spanX, itemInfo.spanY);
+                return;
+            }
         }
         if (updateWidgetSize) {
             WidgetSizes.updateWidgetSizeRanges(hostView, this, itemInfo.spanX, itemInfo.spanY);

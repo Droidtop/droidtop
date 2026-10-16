@@ -27,6 +27,7 @@ import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_QUIET_MODE_ENABLED;
 import static com.android.launcher3.model.BgDataModel.Callbacks.FLAG_WORK_PROFILE_QUIET_MODE_ENABLED;
 
+import android.content.pm.LauncherApps;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.util.Log;
@@ -42,6 +43,7 @@ import com.android.launcher3.R;
 import com.android.launcher3.Utilities;
 import com.android.launcher3.allapps.BaseAllAppsAdapter.AdapterItem;
 import com.android.launcher3.logging.StatsLogManager;
+import com.android.launcher3.model.data.AppInfo;
 import com.android.launcher3.pm.UserCache;
 import com.android.launcher3.workprofile.PersonalWorkSlidingTabStrip;
 
@@ -73,8 +75,35 @@ public class WorkProfileManager extends UserProfileManager
      * Posts quite mode enable/disable call for work profile user
      */
     public void setWorkProfileEnabled(boolean enabled) {
+        if (!Utilities.ATLEAST_P) {
+            // There is no public API to change quiet mode before API 28. Launching a work app
+            // makes the system show its own "Turn on work profile?" dialog instead.
+            if (enabled) {
+                launchAnyWorkApp();
+            }
+            return;
+        }
         updateCurrentState(STATE_TRANSITION);
         setQuietMode(!enabled, mAllApps.mActivityContext);
+    }
+
+    private void launchAnyWorkApp() {
+        AppInfo app = Stream.of(mAllApps.getAppsStore().getApps())
+                .filter(getItemInfoMatcher())
+                .findFirst()
+                .orElse(null);
+        if (app == null || app.componentName == null) {
+            Log.w(TAG, "No work app found to request work profile unpause");
+            return;
+        }
+        try {
+            // Android 8 / 8.1 workaround: trigger work profile unlock by starting an activity
+            LauncherApps launcherApps = mAllApps.getContext().getSystemService(LauncherApps.class);
+            // Launch random app info instead of the app itself
+            launcherApps.startAppDetailsActivity(app.componentName, app.user, null, null);
+        } catch (RuntimeException e) {
+            Log.w(TAG, "Unable to request work profile unpause", e);
+        }
     }
 
     @Override
@@ -130,6 +159,10 @@ public class WorkProfileManager extends UserProfileManager
      * Creates and attaches for profile toggle button to {@link ActivityAllAppsContainerView}
      */
     public boolean attachWorkUtilityViews() {
+        if (!Utilities.ATLEAST_P) {
+            // Pausing needs UserManager#requestQuietModeEnabled, added in API 28.
+            return false;
+        }
         if (!mAllApps.getAppsStore().hasModelFlag(
                 FLAG_HAS_SHORTCUT_PERMISSION | FLAG_QUIET_MODE_CHANGE_PERMISSION)) {
             Log.e(TAG, "unable to attach work mode switch; Missing required permissions");
