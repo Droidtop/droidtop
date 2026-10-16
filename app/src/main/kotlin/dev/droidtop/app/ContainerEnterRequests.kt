@@ -167,7 +167,7 @@ internal object ContainerEnterRequests {
                         id = info.container.id,
                         name = info.displayName,
                         image = info.image ?: "",
-                        status = dockerStatus(state, programUp, info.running),
+                        status = EngineFacts.statusText(state, programUp, info.running),
                         up = programUp || (info.running && runtime.siblingsNeedStart),
                         ports = config?.ports.orEmpty(),
                         command = config?.program().orEmpty(),
@@ -324,29 +324,12 @@ internal object ContainerEnterRequests {
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
             }
             is EngineRequest.Inspect -> {
-                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                val pods = EngineFacts.pods(app)
                 val facts = mutableListOf<EngineInspect.Facts>()
                 val err = StringBuilder()
                 for (name in command.containers) {
                     val info = find(name) ?: run { err.append("Error: No such object: $name\n"); null } ?: continue
-                    val id = info.container.id
-                    val config = runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
-                        ?.let { ContainerProgram.effectiveConfig(app.filesDir, id, it) }
-                    val state = ContainerPrograms.state(id)
-                    facts += EngineInspect.Facts(
-                        id = id,
-                        name = info.displayName,
-                        image = info.image ?: "",
-                        imageDigest = info.digest,
-                        createdMs = withContext(Dispatchers.IO) { ContainerPrograms.created(app, id) },
-                        status = inspectStatus(state, ContainerPrograms.isRunning(id)),
-                        exitCode = (state as? ContainerPrograms.State.Ended)?.exitCode,
-                        error = (state as? ContainerPrograms.State.Failed)?.message,
-                        config = config,
-                        restart = withContext(Dispatchers.IO) { ContainerPrograms.restartPolicy(app, id) },
-                        folders = runCatching { runtime.mounts(info.container).folders.map { it.name } }.getOrDefault(emptyList()),
-                        podId = pods.firstOrNull { id in it.members }?.id,
-                    )
+                    facts += EngineFacts.of(app, runtime, info, pods)
                 }
                 // Docker prints what it found and the errors for the rest, failing if any was missing.
                 answer(dir, if (facts.isEmpty()) "[]\n" else EngineInspect.format(facts, cli.front), err.toString(), if (err.isEmpty()) 0 else 1)
@@ -420,24 +403,6 @@ internal object ContainerEnterRequests {
             }
             is EngineRequest.Answer, EngineRequest.Info -> Unit
         }
-    }
-
-    /** Docker's State.Status for `inspect`: created, running, restarting or exited. */
-    private fun inspectStatus(state: ContainerPrograms.State, programUp: Boolean): String = when {
-        programUp && state is ContainerPrograms.State.Waiting -> "restarting"
-        programUp -> "running"
-        state is ContainerPrograms.State.Ended || state is ContainerPrograms.State.Failed -> "exited"
-        else -> "created"
-    }
-
-    /** What `docker ps` says a container is doing, from its program first: that is what Docker's STATUS describes. */
-    private fun dockerStatus(state: ContainerPrograms.State, programUp: Boolean, running: Boolean): String = when {
-        programUp && state is ContainerPrograms.State.Waiting -> "Restarting (${state.lastExit})"
-        programUp -> "Up"
-        state is ContainerPrograms.State.Ended -> "Exited (${state.exitCode})"
-        state is ContainerPrograms.State.Failed -> "Exited (couldn't start)"
-        running -> "Running (no program)"
-        else -> "Created"
     }
 
     /**

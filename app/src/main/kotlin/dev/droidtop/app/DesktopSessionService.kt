@@ -125,6 +125,7 @@ class DesktopSessionService : Service() {
         DesktopKeyboardLayout.stopWatching(applicationContext)
         libraryEntries?.stop()
         libraryEntries = null
+        DockerApiServer.stop(applicationContext)
         val connected = _stateHolder.value as? DesktopSessionState.Connected
         connected?.hostBridge?.disconnect()
         val live = connected?.let { it.runtime to it.container } ?: booting
@@ -221,6 +222,8 @@ class DesktopSessionService : Service() {
             primary,
         )
         libraryEntries = DesktopLibraryEntries(applicationContext, LibraryCore.library(applicationContext)).also { it.start(scope) }
+        // The Docker Engine API on docker.sock, for clients that talk to a daemon (docs/SPEC.md 3d, D14).
+        DockerApiServer.start(applicationContext, scope)
         // App containers whose program starts with the desktop (docs/SPEC.md 3, "The image's own program").
         scope.launch { runCatching { ContainerPrograms.startWithDesktop(applicationContext, runtime) } }
         // Fonts for all languages are a Downloads job, not part of the boot (Droidtop/tracker#390): started only

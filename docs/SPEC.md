@@ -2517,6 +2517,25 @@ the `ContainerRuntime` interface that already exists (§3):
   saying so; another number, or a host port Docker would choose (`-p 80`), needs network namespaces to remap and is
   answered from the feature table ("-p needs network namespaces, which this device's kernel does not have (here a
   port is the device's own: -p 80:80 is what happens)"); one address other than all of them is not built yet.
+  **The Docker Engine API (built 2026-10-16, Droidtop/tracker#555 D14, first slice).** For clients that talk to a
+  daemon rather than run droidtop's `docker` wrapper (a docker CLI a container installed, `docker compose`,
+  lazydocker, an IDE), droidtop serves a subset of Engine API v1.43 on a Unix socket, `docker.sock` in its app
+  storage, which every container sees as `/run/droidtop-app-storage/docker.sock`; `DOCKER_HOST` names it in every
+  container's environment (`ContainerLayout.clientEnvironment`). A distro's own docker binary comes before
+  droidtop's wrapper on the `PATH`, so installing one is all it takes. It is on demand: droidtop holds only the
+  listening socket while the desktop runs (`DockerApiServer`, started and stopped with the desktop session) and
+  serves each connection off the main thread; nothing runs inside a container for it, and with the desktop down
+  nothing listens, which to a client is the same as no daemon. The HTTP is `EngineHttp`: one request at a time on a
+  kept-alive connection, bodies by Content-Length or chunks, at most 64 KB of headers and 1 MB of body (413
+  beyond), a connection idle for a minute closed, at most 16 served at once. Routes (`DockerApi.route`, with or
+  without the `/vX.Y` prefix): `_ping`, `version` (Docker 24.0, the release whose API is v1.43, on a platform
+  named droidtop's container engine), `info` (counts, architecture, kernel, CPUs, memory, and each kernel feature
+  from D10 as a warning line), `containers/json` (running, or all with `all=1`), `containers/{id}/json` (the same
+  JSON as the docker front's `inspect`) and `images/json`. They are answered from the same facts as the command
+  fronts (`EngineFacts`), so a client never sees two answers for one container. Every other route Docker has
+  answers 501 with "not built in droidtop's engine yet"; an unknown one 404. Containers report NetworkMode `host`
+  and no published ports, which is what they have. Writes (create, start, stop, kill, remove, pull, logs, wait)
+  are the next slice; exec and attach, which take over the connection, the one after.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept
