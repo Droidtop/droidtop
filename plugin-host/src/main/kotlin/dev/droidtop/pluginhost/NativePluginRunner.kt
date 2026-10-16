@@ -29,7 +29,7 @@ class NativePluginRunner(
     /** The runtime each plugin was loaded on by this runner. */
     private val runtimes = ConcurrentHashMap<String, IPluginRuntime>()
 
-    /** The processes this runner registered [callback] with, so [unbind] can unregister the very same stub. */
+    /** The processes this runner registered a callback with ([callbacks]). */
     private val registered = ConcurrentHashMap<IBinder, IPluginRuntime>()
 
     /** The process each plugin last answered a call in: a call on any other runtime of it is the first since that process started. */
@@ -52,28 +52,40 @@ class NativePluginRunner(
     /**
      * Every process broadcasts every crash and job report to every registered callback, and each runner filters by the
      * plugin and job ids it knows (a single callback field was silently stolen by the second connection, 2026-09-27).
+     * Each process gets a callback of its own, which believes a report only about a plugin this runner loaded in that
+     * very process (docs/plugin-api.md 5.6): code in one plugin process can no longer disable another plugin by
+     * reporting its crash, or draw into another plugin's screen.
      */
-    private val callback = object : IPluginRuntimeCallback.Stub() {
+    private inner class ProcessCallback(private val process: IBinder) : IPluginRuntimeCallback.Stub() {
+        private fun ours(pluginId: String): Boolean {
+            val ok = PluginProcessOwnership.reports(runtimes[pluginId]?.asBinder(), process)
+            if (!ok) Log.w("droidtop.plugin", "ignored a report about $pluginId from a process it does not run in")
+            return ok
+        }
+
         override fun onPluginCrashed(pluginId: String, capability: String, reason: String) {
-            onCrash(pluginId, capability, reason)
+            if (ours(pluginId)) onCrash(pluginId, capability, reason)
         }
 
         override fun onJobProgress(pluginId: String, jobId: String, percent: Int, statusLine: String, resumePayload: String?) {
-            this@NativePluginRunner.onJobProgress(pluginId, jobId, percent, statusLine, resumePayload)
+            if (ours(pluginId)) this@NativePluginRunner.onJobProgress(pluginId, jobId, percent, statusLine, resumePayload)
         }
 
         override fun onJobComplete(pluginId: String, jobId: String, resultJson: String) {
-            this@NativePluginRunner.onJobComplete(pluginId, jobId, decode(resultJson))
+            if (ours(pluginId)) this@NativePluginRunner.onJobComplete(pluginId, jobId, decode(resultJson))
         }
 
         override fun onScreenClosed(pluginId: String) {
-            PluginScreenActivity.closed(pluginId)
+            if (ours(pluginId)) PluginScreenActivity.closed(pluginId)
         }
 
         override fun onScreenFrame(pluginId: String, index: Int, width: Int, height: Int) {
-            PluginScreenActivity.frame(pluginId, index, width, height)
+            if (ours(pluginId)) PluginScreenActivity.frame(pluginId, index, width, height)
         }
     }
+
+    /** The callback this runner registered with each process, so [unbind] can unregister the very same stub. */
+    private val callbacks = ConcurrentHashMap<IBinder, ProcessCallback>()
 
     override suspend fun load(record: PluginRecord, installDir: String): Boolean {
         val grants = withContext(Dispatchers.IO) { PluginGrants.forContext(appContext).read(record.manifest.id) }
@@ -91,7 +103,10 @@ class NativePluginRunner(
             ?: return failLoad(id, if (tier == PluginTier.CONTAINED) "its contained process could not be started" else "the plugin process could not be started")
         if (runtimes.put(id, runtime) != null) PluginProcesses.release(appContext, id)
         val binder = runtime.asBinder()
-        if (registered.putIfAbsent(binder, runtime) == null) runCatching { runtime.registerCallback(callback) }
+        if (registered.putIfAbsent(binder, runtime) == null) {
+            val callback = ProcessCallback(binder).also { callbacks[binder] = it }
+            runCatching { runtime.registerCallback(callback) }
+        }
         return try {
             // A blocking binder call: on the IO dispatcher so the budget below can fire and a caller on the main thread is
             // never held for a cold start (rig, 2026-09-30: 15 s of skipped frames while a Flutter plugin started).
@@ -277,8 +292,9 @@ class NativePluginRunner(
 
     /** Lets go of every process this runner used: its callback is unregistered and each process starts its idle countdown. */
     fun unbind() {
-        registered.values.forEach { runtime -> runCatching { runtime.unregisterCallback(callback) } }
+        registered.forEach { (binder, runtime) -> callbacks[binder]?.let { runCatching { runtime.unregisterCallback(it) } } }
         registered.clear()
+        callbacks.clear()
         runtimes.keys.toList().forEach { PluginProcesses.release(appContext, it) }
         runtimes.clear()
     }

@@ -167,15 +167,24 @@ open class PluginSandboxService : PluginProcessService() {
 }
 
 // Contained slots for API 26 to 28, where bindIsolatedService does not exist (docs/plugin-api.md 5.3): each is the same
-// isolated service in a process of its own, `:plugin_sandbox0` to `:plugin_sandbox7` in this module's manifest.
-class PluginSandboxSlot0 : PluginSandboxService()
-class PluginSandboxSlot1 : PluginSandboxService()
-class PluginSandboxSlot2 : PluginSandboxService()
-class PluginSandboxSlot3 : PluginSandboxService()
-class PluginSandboxSlot4 : PluginSandboxService()
-class PluginSandboxSlot5 : PluginSandboxService()
-class PluginSandboxSlot6 : PluginSandboxService()
-class PluginSandboxSlot7 : PluginSandboxService()
+// isolated service in a process of its own, `:plugin_sandbox0` to `:plugin_sandbox7` in this module's manifest. Like an
+// open process, one serves one plugin and ends with it (5.6): the filter and the broker it installed are that plugin's
+// for good, so the next plugin in the slot must start in a fresh process.
+open class PluginSandboxSlotService : PluginSandboxService() {
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        android.util.Log.i("droidtop.plugin", "contained slot process ${android.os.Process.myPid()}: unbound, ending with its plugin")
+        android.os.Process.killProcess(android.os.Process.myPid())
+        return false
+    }
+}
+class PluginSandboxSlot0 : PluginSandboxSlotService()
+class PluginSandboxSlot1 : PluginSandboxSlotService()
+class PluginSandboxSlot2 : PluginSandboxSlotService()
+class PluginSandboxSlot3 : PluginSandboxSlotService()
+class PluginSandboxSlot4 : PluginSandboxSlotService()
+class PluginSandboxSlot5 : PluginSandboxSlotService()
+class PluginSandboxSlot6 : PluginSandboxSlotService()
+class PluginSandboxSlot7 : PluginSandboxSlotService()
 
 // An open process (docs/plugin-api.md 5.3, "Open processes: one hole per permission"): the same broker-only loader as the
 // sandbox, but in a process of droidtop's own UID that is NOT isolated, so the holes the person granted can be opened:

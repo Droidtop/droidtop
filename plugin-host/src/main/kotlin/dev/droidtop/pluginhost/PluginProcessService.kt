@@ -98,18 +98,45 @@ abstract class PluginProcessService : Service() {
     /** Anything this process knows about how its plugins loaded, added to [reachabilityReport]. */
     protected open fun loadNotes(): JSONObject = JSONObject()
 
+    /**
+     * Who may drive this process (docs/plugin-api.md 5.6): droidtop's own main process and nothing else. An open or
+     * full-access plugin runs as droidtop's UID and could bind this service itself and load code or call another
+     * plugin; every call below is refused unless it comes from :app.
+     */
+    private val appCaller by lazy {
+        AppCaller(DroidtopCallers.isIsolatedUid(Process.myUid()), applicationInfo.uid) { pid ->
+            DroidtopCallers.processName(this, pid)?.let { DroidtopCallers.isAppProcess(packageName, it) } == true
+        }
+    }
+
+    private fun requireApp() {
+        val uid = android.os.Binder.getCallingUid()
+        val pid = android.os.Binder.getCallingPid()
+        if (!appCaller.allows(uid, pid)) {
+            Log.w("droidtop.plugin", "refused a call from uid $uid pid $pid: only droidtop drives a plugin process")
+            throw SecurityException("only droidtop drives a plugin process")
+        }
+    }
+
     private val binder = object : IPluginRuntime.Stub() {
         override fun registerCallback(cb: IPluginRuntimeCallback?) {
-            cb?.let { callbacks.register(it) }
+            requireApp()
+            cb ?: return
+            callbacks.register(cb)
+            // When droidtop's process dies its pid may be reused: a non-isolated process asks the system again.
+            val pid = android.os.Binder.getCallingPid()
+            if (!appCaller.isolated) runCatching { cb.asBinder().linkToDeath({ appCaller.forget(pid) }, 0) }
         }
 
         override fun unregisterCallback(cb: IPluginRuntimeCallback?) {
+            requireApp()
             cb?.let { callbacks.unregister(it) }
         }
 
         // A plugin already loaded is already loaded: onLoad runs once (a second FlutterEngine in one process
         // broke its channel on the rig, 2026-09-26), so a repeated load returns true without touching it.
         override fun loadPlugin(pluginId: String, installDir: String, entryClass: String, rootApproved: Boolean, broker: IPluginHostBroker): Boolean {
+            requireApp()
             synchronized(loadLock) {
                 if (loaded.containsKey(pluginId)) return true
                 loadErrors.remove(pluginId)
@@ -118,6 +145,7 @@ abstract class PluginProcessService : Service() {
         }
 
         override fun loadContained(pluginId: String, manifestJson: String, files: Array<ParcelFileDescriptor>?, names: Array<String>?, broker: IPluginHostBroker): Boolean {
+            requireApp()
             synchronized(loadLock) {
                 try {
                     if (loaded.containsKey(pluginId)) return true
@@ -147,22 +175,30 @@ abstract class PluginProcessService : Service() {
             }
         }
 
-        override fun lastLoadError(pluginId: String): String = loadErrors[pluginId].orEmpty()
+        override fun lastLoadError(pluginId: String): String {
+            requireApp()
+            return loadErrors[pluginId].orEmpty()
+        }
 
-        override fun reachability(): String = try {
-            reachabilityReport().toString()
-        } catch (t: Throwable) {
-            Log.w("droidtop.plugin", "containment report failed", t)
-            JSONObject().put("error", t.toString()).toString()
+        override fun reachability(): String {
+            requireApp()
+            return try {
+                reachabilityReport().toString()
+            } catch (t: Throwable) {
+                Log.w("droidtop.plugin", "containment report failed", t)
+                JSONObject().put("error", t.toString()).toString()
+            }
         }
 
         override fun unloadPlugin(pluginId: String) {
+            requireApp()
             runCatching { loaded.remove(pluginId)?.onUnload() }
             loaded.remove(pluginId)
             loadErrors.remove(pluginId)
         }
 
         override fun invoke(pluginId: String, capability: String, argsJson: String): String? {
+            requireApp()
             val plugin = loaded[pluginId] ?: return null
             // Event ids and capability ids share this one string slot on purpose (docs/SPEC.md 12a "Event hooks"):
             // both are one JSON-in, JSON-out, watchdog-bound call. The two id sets are disjoint by construction.
@@ -185,6 +221,7 @@ abstract class PluginProcessService : Service() {
         }
 
         override fun handle(pluginId: String, envelopeJson: String): String? {
+            requireApp()
             val plugin = loaded[pluginId] ?: return null
             val call = PluginCall.fromJson(envelopeJson)
                 ?: return PluginReply.error(PluginErrorCode.INVALID_ARGS, "the call envelope is not valid").encode()
@@ -197,6 +234,7 @@ abstract class PluginProcessService : Service() {
         }
 
         override fun startJob(pluginId: String, capability: String, argsJson: String, jobId: String): Boolean {
+            requireApp()
             val plugin = loaded[pluginId] ?: return false
             val cap = PluginCapability.fromId(capability) ?: return false
             val argsMap = try {
@@ -206,14 +244,17 @@ abstract class PluginProcessService : Service() {
             }
             val progress = object : PluginJobProgress {
                 override fun report(percent: Int, statusLine: String) {
+            requireApp()
                     broadcastJobProgress(pluginId, jobId, percent, statusLine, null)
                 }
 
                 override fun checkpoint(percent: Int, statusLine: String, resumePayload: String?) {
+            requireApp()
                     broadcastJobProgress(pluginId, jobId, percent, statusLine, resumePayload?.takeIf { it.length <= MAX_RESUME_PAYLOAD_CHARS })
                 }
 
                 override fun complete(result: PluginResult) {
+            requireApp()
                     broadcastJobComplete(pluginId, jobId, result)
                 }
             }
@@ -232,6 +273,7 @@ abstract class PluginProcessService : Service() {
         }
 
         override fun cancelJob(pluginId: String, jobId: String) {
+            requireApp()
             runCatching { loaded[pluginId]?.cancelJob(jobId) }
         }
 
@@ -246,6 +288,7 @@ abstract class PluginProcessService : Service() {
             height: Int,
             density: Float,
         ): String? {
+            requireApp()
             val screen = loaded[pluginId] as? HostedScreen ?: return "this plugin has no screen of its own here"
             val target = ScreenTarget(surface, frames, framesCapacity) { index, w, h -> broadcastScreenFrame(pluginId, index, w, h) }
             return screen.attachScreen(PluginMainUi.Entry(entrypoint, library?.ifBlank { null }), target, width, height, density) {
@@ -254,18 +297,22 @@ abstract class PluginProcessService : Service() {
         }
 
         override fun resizeScreen(pluginId: String, width: Int, height: Int) {
+            requireApp()
             (loaded[pluginId] as? HostedScreen)?.resizeScreen(width, height)
         }
 
         override fun screenTouch(pluginId: String, event: android.view.MotionEvent) {
+            requireApp()
             (loaded[pluginId] as? HostedScreen)?.screenTouch(event)
         }
 
         override fun screenKey(pluginId: String, event: android.view.KeyEvent) {
+            requireApp()
             (loaded[pluginId] as? HostedScreen)?.screenKey(event)
         }
 
         override fun detachScreen(pluginId: String) {
+            requireApp()
             (loaded[pluginId] as? HostedScreen)?.detachScreen()
         }
     }
