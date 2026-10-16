@@ -46,7 +46,7 @@ class ShelfWidgetProvider : AppWidgetProvider() {
                 val rows = ShelfContent.entries(context, content).map { entry ->
                     DroidtopWidgets.Row(ShelfContent.name(entry), DroidtopWidgets.activity(context, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)))
                 }
-                return DroidtopWidgets.rows(context, look, title, rows, empty)
+                return DroidtopWidgets.rows(context, look, title, rows, empty, textSp = content.textSize.sp)
             }
             val views = RemoteViews(context.packageName, R.layout.widget_shelf)
             DroidtopWidgets.plate(views, look)

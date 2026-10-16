@@ -25,14 +25,17 @@ class ShelfWidgetService : RemoteViewsService() {
 
         private var cells: List<Cell> = emptyList()
         private var ink = 0
+        private var textSp = ShelfContent.TextSize.NORMAL.sp
 
         override fun onCreate() = Unit
 
         override fun onDataSetChanged() {
             val content = WidgetConfigs.shelf(context, widgetId) ?: run { cells = emptyList(); return }
             ink = DroidtopWidgets.look(context).ink
+            textSp = content.textSize.sp
             cells = runBlocking { ShelfContent.entries(context, content) }.map { entry ->
-                val art = (entry.artworkUri ?: entry.iconUri)?.takeIf { it.isNotBlank() }
+                val picture = if (content.art == ShelfContent.Art.ICON) entry.iconUri ?: entry.artworkUri else entry.artworkUri ?: entry.iconUri
+                val art = picture?.takeIf { it.isNotBlank() }
                     ?.let { LibraryArtwork.decodeSquareBitmap(context, it, ART_PX) }
                 Cell(entry.id, ShelfContent.name(entry), art)
             }
@@ -44,6 +47,7 @@ class ShelfWidgetService : RemoteViewsService() {
             if (cell.art != null) views.setImageViewBitmap(R.id.widget_icon, cell.art) else views.setImageViewResource(R.id.widget_icon, R.mipmap.ic_launcher)
             views.setTextViewText(R.id.widget_title, cell.name)
             views.setTextColor(R.id.widget_title, ink)
+            views.setTextViewTextSize(R.id.widget_title, android.util.TypedValue.COMPLEX_UNIT_SP, textSp)
             views.setOnClickFillInIntent(R.id.widget_cell, Intent().putExtra(GameLaunchActivity.EXTRA_ENTRY_ID, cell.id))
             return views
         }
