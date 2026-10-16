@@ -59,6 +59,12 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
     GAME_EXITED("game.exited", 1, "Game exited"),
     LIBRARY_SCAN_FINISHED("library.scan_finished", 1, "Library scan finished"),
     MODE_CHANGED("mode.changed", 1, "Mode changed"),
+
+    /**
+     * A device was paired or forgotten, or what one announced changed (docs/plugin-api.md D21, Droidtop/tracker#556):
+     * the plugin reads `devices.list_paired` again. Only to a plugin holding `devices.paired`. No args.
+     */
+    DEVICES_CHANGED("devices.changed", 1, "Paired devices changed"),
     ;
 
     companion object {
