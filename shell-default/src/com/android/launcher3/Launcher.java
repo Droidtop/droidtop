@@ -1875,7 +1875,16 @@ public class Launcher extends StatefulActivity<LauncherState>
                 }
 
                 if (shouldMoveToDefaultScreen && !mWorkspace.isHandlingTouch()) {
-                    mWorkspace.post(mWorkspace::moveToDefaultScreen);
+                    // droidtop patch (Droidtop/tracker#564): Home pressed while already on the
+                    // first page runs the Home button's gesture slot, as in Nova and Apex; on any
+                    // other page it still goes to the first page.
+                    if (mWorkspace.getNextPage() == Workspace.DEFAULT_PAGE
+                            && LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this)
+                                    != com.android.launcher3.touch.GestureAction.NONE) {
+                        mWorkspace.post(() -> LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this).perform(this));
+                    } else {
+                        mWorkspace.post(mWorkspace::moveToDefaultScreen);
+                    }
                 }
             }
 
@@ -2968,7 +2977,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     public TouchController[] createTouchControllers() {
-        return new TouchController[] {getDragController(), new NotificationSwipeController(this), new AllAppsSwipeController(this)};
+        return new TouchController[] {getDragController(), new com.android.launcher3.touch.MultiFingerGestureController(this), new NotificationSwipeController(this), new AllAppsSwipeController(this)};
     }
 
     public void onDragLayerHierarchyChanged() {

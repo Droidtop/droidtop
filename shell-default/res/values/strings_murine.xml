@@ -79,6 +79,11 @@
 
     <string name="pref_double_tap_action_title">Double tap</string>
     <string name="pref_swipe_down_action_title">Swipe down</string>
+    <string name="pref_two_finger_down_action_title">Two-finger swipe down</string>
+    <string name="pref_two_finger_up_action_title">Two-finger swipe up</string>
+    <string name="pref_pinch_in_action_title">Pinch in</string>
+    <string name="pref_pinch_out_action_title">Pinch out</string>
+    <string name="pref_home_button_action_title">Home button on the first page</string>
 
     <string name="pref_accessibility_disclosure_desc">droidtop needs accessibility access to lock the screen and open recent apps from gestures, and, on tablet-sized and external displays, to draw the taskbar.\n\nFor the taskbar it sees only the name of the app that comes to the front, never what is on screen, and it looks at key presses only to notice the Meta key or the Mode button, which move focus into the taskbar.\n\nNo data is collected, shared, or transmitted.</string>
     <string name="pref_taskbar_title">Taskbar on large screens</string>
@@ -98,6 +103,14 @@
     <string name="gesture_action_open_companion">Companion</string>
     <string name="gesture_action_open_companion_summary">Pulls down droidtop\'s companion: pinned controls, notifications, apps and more</string>
     <string name="droidtop_companion_option">Companion</string>
+    <string name="gesture_action_open_search">Search</string>
+    <string name="gesture_action_open_search_summary">Searches apps, your games and the download sources</string>
+    <string name="gesture_action_open_quick_menu">Quick Menu</string>
+    <string name="gesture_action_open_quick_menu_summary">Running apps, notifications, system, audio, display, downloads and plugins</string>
+    <string name="gesture_action_switch_mode">Switch mode</string>
+    <string name="gesture_action_switch_mode_summary">Opens the mode switcher</string>
+    <string name="gesture_action_open_games">Games</string>
+    <string name="gesture_action_open_games_summary">Opens your games</string>
     <string name="gesture_action_clear_all_apps_summary">Ends every open app except droidtop, after asking when there are several</string>
 
     <!-- Murine search bar -->

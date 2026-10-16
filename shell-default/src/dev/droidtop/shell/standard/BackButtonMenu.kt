@@ -259,3 +259,31 @@ object ModeSwitcher {
         )
     }
 }
+
+/**
+ * droidtop's own screens the launcher opens, by class name since `:shell-default` cannot depend on `:app`:
+ * the Games grid (the home screen's menu) and the Quick Menu (the home screen's menu and gestures;
+ * docs/SPEC.md, Launcher mode "Gestures").
+ */
+object DroidtopScreens {
+    const val GAMES_ACTIVITY = "dev.droidtop.app.LauncherGamesActivity"
+    const val QUICK_MENU_ACTIVITY = "dev.droidtop.app.QuickMenuActivity"
+
+    @JvmStatic
+    fun openGames(context: Context) {
+        context.startActivity(
+            Intent("dev.droidtop.app.action.SHOW_GAMES")
+                .setClassName(context.packageName, GAMES_ACTIVITY)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    @JvmStatic
+    fun openQuickMenu(context: Context) {
+        context.startActivity(
+            Intent(Intent.ACTION_MAIN)
+                .setClassName(context.packageName, QUICK_MENU_ACTIVITY)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+}

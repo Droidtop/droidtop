@@ -403,6 +403,17 @@
           by the action below (the launcher module cannot name this class).
           Translucent, so the drawer shows behind it. Not exported.
         -->
+        <!--
+          The Quick Menu over Standard's home screen, opened by a home-screen gesture
+          (QuickMenuActivity; docs/SPEC.md, Launcher mode "Gestures").
+        -->
+        <activity
+            android:name="dev.droidtop.app.QuickMenuActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name="dev.droidtop.app.LauncherSearchActivity"
             android:exported="false"
