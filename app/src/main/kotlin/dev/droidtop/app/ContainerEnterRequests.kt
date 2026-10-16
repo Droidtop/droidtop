@@ -189,13 +189,13 @@ internal object ContainerEnterRequests {
                     when {
                         info == null -> err.append("Error: No such container: $name\n")
                         command is EngineRequest.Stop -> {
-                            ContainerPrograms.stop(info.container.id)
+                            ContainerPrograms.stoppedByPerson(app, info.container.id)
                             out.append(name).append('\n')
                         }
                         runCatching { runtime.imageRunConfig(info.container) }.getOrNull()?.program().isNullOrEmpty() ->
                             err.append("Error: $name has no program of its own to start (its image names none)\n")
                         else -> {
-                            ContainerPrograms.start(app, runtime, info.container)
+                            ContainerPrograms.startedByPerson(app, runtime, info.container)
                             out.append(name).append('\n')
                         }
                     }
@@ -232,6 +232,8 @@ internal object ContainerEnterRequests {
                     val current = runtime.mounts(created)
                     runtime.setMounts(created, current.copy(home = HomeChoice.Private, folders = (current.folders + folders).distinctBy { it.name }))
                 }
+                // The tools' own default, no restart, unless --restart said otherwise (docs/SPEC.md 3d, "Restart policies").
+                withContext(Dispatchers.IO) { ContainerPrograms.setRestartPolicy(app, created.id, command.restart) }
                 if (command.args != null || command.env.isNotEmpty()) {
                     withContext(Dispatchers.IO) {
                         ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(command.args, command.env))

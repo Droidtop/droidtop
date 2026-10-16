@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The app containers' own programs that droidtop runs (docs/SPEC.md 3 "The image's own program", Droidtop/tracker#555
@@ -101,8 +102,9 @@ internal object ContainerPrograms {
                     val ranMs = SystemClock.elapsedRealtime() - startedAt
                     failures = if (ranMs >= ContainerProgram.RAN_LONG_ENOUGH_MS) 0 else failures + 1
                     Log.i(TAG, "${container.id}: ended with $exit after $ranMs ms")
-                    if (!ContainerProgram.restarts(restartOnFailure(app, container.id), exit, failures)) {
-                        val gaveUp = exit != 0 && restartOnFailure(app, container.id)
+                    val policy = restartPolicy(app, container.id)
+                    if (!ContainerProgram.restarts(policy, exit, failures)) {
+                        val gaveUp = policy != ContainerProgram.RestartPolicy.No && (exit != 0 || policy.withDesktop)
                         set(container.id, result.exceptionOrNull()?.let { State.Failed(it.message ?: it.javaClass.simpleName) } ?: State.Ended(exit, gaveUp))
                         break
                     }
@@ -147,15 +149,48 @@ internal object ContainerPrograms {
     private fun saveSetting(context: Context, key: String, on: Boolean) {
         val props = settings(context)
         props[key] = on.toString()
+        store(context, props)
+    }
+
+    private fun store(context: Context, props: Properties) {
         val file = settingsFile(context).apply { parentFile?.mkdirs() }
         file.outputStream().use { props.store(it, "droidtop app container programs") }
     }
 
-    /** Restart when it fails: on by default, as a server is expected to stay up. */
-    fun restartOnFailure(context: Context, containerId: String): Boolean =
-        settings(context).getProperty(containerId + KEY_RESTART)?.toBooleanStrictOrNull() ?: true
+    /**
+     * When the program is started again (docs/SPEC.md 3d, "Restart policies"): droidtop's default, restart when it
+     * fails, for a container made on its page; the one `--restart` gave (`no` by default) for one `docker run` or
+     * `podman run` made. The page's old true and false read as on-failure and no.
+     */
+    fun restartPolicy(context: Context, containerId: String): ContainerProgram.RestartPolicy =
+        ContainerProgram.RestartPolicy.stored(settings(context).getProperty(containerId + KEY_RESTART))
 
-    fun setRestartOnFailure(context: Context, containerId: String, on: Boolean) = saveSetting(context, containerId + KEY_RESTART, on)
+    /** Sets the policy; `always` and `unless-stopped` start the program with the desktop, as Docker's daemon does. */
+    fun setRestartPolicy(context: Context, containerId: String, policy: ContainerProgram.RestartPolicy) {
+        val props = settings(context)
+        props[containerId + KEY_RESTART] = policy.words()
+        if (policy.withDesktop) props[containerId + KEY_AUTOSTART] = "true"
+        store(context, props)
+    }
+
+    /**
+     * The person stopped the program (its page's Stop it, `docker stop`): under `unless-stopped` it then stays stopped
+     * when the desktop starts again, until it is started.
+     */
+    suspend fun stoppedByPerson(context: Context, containerId: String) {
+        stop(containerId)
+        withContext(Dispatchers.IO) {
+            if (restartPolicy(context, containerId) == ContainerProgram.RestartPolicy.UnlessStopped) setAutostart(context, containerId, false)
+        }
+    }
+
+    /** The person started the program: under `unless-stopped` it starts with the desktop again. */
+    suspend fun startedByPerson(context: Context, runtime: ContainerRuntime, container: Container) {
+        withContext(Dispatchers.IO) {
+            if (restartPolicy(context, container.id) == ContainerProgram.RestartPolicy.UnlessStopped) setAutostart(context, container.id, true)
+        }
+        start(context, runtime, container)
+    }
 
     /** Start with the desktop: off by default; a program runs because the person started it or asked for this. */
     fun autostart(context: Context, containerId: String): Boolean =

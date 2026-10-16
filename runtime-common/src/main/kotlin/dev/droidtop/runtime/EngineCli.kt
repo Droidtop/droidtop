@@ -44,8 +44,9 @@ class EngineCli private constructor(val front: Front) {
           info                         The engine, and the kernel features this device gives it
 
         run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.
-        Not yet: -p, -w, --entrypoint, --rm, --restart, -u. Options that need a kernel feature (--memory, --cpus,
-        --network, --hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.
+        run takes --restart no|on-failure[:N]|always|unless-stopped (no by default). Not yet: -p, -w, --entrypoint,
+        --rm, -u. Options that need a kernel feature (--memory, --cpus, --network, --hostname, --tmpfs, ...) say
+        which one and whether this device has it; see ${front.command} info.
         Containers here share the device's network and processes: a port is the device's own.
     """.trimIndent() + "\n"
 
@@ -152,6 +153,7 @@ class EngineCli private constructor(val front: Front) {
         var name: String? = null
         val envs = mutableListOf<String>()
         val volumes = mutableListOf<String>()
+        var restart: ContainerProgram.RestartPolicy = ContainerProgram.RestartPolicy.No
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
@@ -165,6 +167,10 @@ class EngineCli private constructor(val front: Front) {
                 "-v", "--volume" -> {
                     val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: $a needs a folder\n", 1)
                     volumes += volume(spec) ?: return volumeRefused(spec)
+                }
+                "--restart" -> {
+                    val words = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} run: --restart needs a policy\n", 1)
+                    restart = ContainerProgram.RestartPolicy.parse(words) ?: return restartRefused(words)
                 }
                 else -> when {
                     EngineOptions.option(a) != null -> {
@@ -185,6 +191,10 @@ class EngineCli private constructor(val front: Front) {
                         env(kv) ?: return EngineRequest.Answer("${front.command} run: not NAME=VALUE: $kv\n", 1)
                         envs += kv
                     }
+                    a.startsWith("--restart=") -> {
+                        val words = a.substringAfter('=')
+                        restart = ContainerProgram.RestartPolicy.parse(words) ?: return restartRefused(words)
+                    }
                     a.startsWith("--volume=") -> {
                         val spec = a.substringAfter('=')
                         volumes += volume(spec) ?: return volumeRefused(spec)
@@ -200,11 +210,16 @@ class EngineCli private constructor(val front: Front) {
         if (!validReference(image)) return EngineRequest.Answer("${front.command} run: not an image reference: $image\n", 1)
         if (name != null && name.isBlank()) return EngineRequest.Answer("${front.command} run: --name needs a name\n", 1)
         val command = args.drop(i + 1).takeIf { it.isNotEmpty() }
-        return EngineRequest.Run(image, name?.trim(), command, envs, volumes)
+        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart)
     }
 
     /** `run` flags droidtop knows of and has not built: said as such, not as unknown. */
-    private val NOT_YET_RUN = setOf("-p", "--publish", "-w", "--workdir", "--entrypoint", "--rm", "--restart", "-u", "--user")
+    private val NOT_YET_RUN = setOf("-p", "--publish", "-w", "--workdir", "--entrypoint", "--rm", "-u", "--user")
+
+    private fun restartRefused(words: String) = EngineRequest.Answer(
+        "${front.command} run: --restart takes no, on-failure[:N], always or unless-stopped, not $words\n",
+        1,
+    )
 
     /** A folder name droidtop mapped (D3), as `ExtraMount.name` takes it. */
     private val FOLDER_NAME = Regex("[A-Za-z0-9][A-Za-z0-9._ -]{0,63}")
