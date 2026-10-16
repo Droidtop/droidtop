@@ -107,4 +107,13 @@ class AcquireContentSourcesParseTest {
         assertEquals(listOf(java.io.File("/games/roms/snes")), yours.map { it.first })
         assertEquals(listOf("gba"), others.map { it.second.id })
     }
+
+    @Test
+    fun `a result's size in bytes is written in decimal units`() {
+        assertEquals("512 B", SourceSize.label(512))
+        assertEquals("640 KB", SourceSize.label(640_000))
+        assertEquals("1.2 GB", SourceSize.label(1_234_567_890))
+        assertEquals("2 MB", SourceSize.label(2_000_000))
+        assertEquals("15 GB", SourceSize.label(15_400_000_000))
+    }
 }

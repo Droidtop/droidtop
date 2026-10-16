@@ -161,17 +161,10 @@ object PluginViews {
                 }
             }
             ViewAction.Kind.JOB -> {
-                val startedAt = System.currentTimeMillis()
-                var result = runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
-                if (result.ok && point == "library.sources" && action.op == "acquire") {
-                    val descriptors = AcquireDownloads.parse(result.values)
-                    if (descriptors == null) {
-                        // The plugin put the file there itself: it says which, or the library is told what is known.
-                        val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }?.let(::File)
-                        withContext(Dispatchers.IO) { AcquireIndexing.afterAcquire(context, record.manifest.id, startedAt, destination, result.values) }
-                    } else {
-                        result = AcquireDownload.run(context, record, action.title ?: label, hostContext, result.values, descriptors, onStatus)
-                    }
+                val result = if (point == "library.sources" && action.op == "acquire") {
+                    acquire(context, record, action.title ?: label, hostContext, callArgs, onStatus)
+                } else {
+                    runJob(context, record, point, action.op, callArgs, action.title ?: label, onStatus)
                 }
                 onJobDone(context, result)
                 val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text), messages) }.getOrNull() }
@@ -220,6 +213,31 @@ object PluginViews {
         } finally {
             policy.shutdown()
         }
+    }
+
+    /**
+     * A source's `acquire` as a job, then what it fetched to the library (docs/plugin-api.md 1.6, `acquire`): the
+     * files the job placed itself are indexed, and a `download` or `downloads` reply is fetched and placed by
+     * droidtop. The one path for the detail page's job action and a search row's Get ("Fetchers answer in the one
+     * search", Droidtop/tracker#218). [callArgs] already carries `ref`, `values` and the host's `context`.
+     */
+    suspend fun acquire(
+        context: Context,
+        record: PluginRecord,
+        title: String,
+        hostContext: JSONObject,
+        callArgs: JSONObject,
+        onStatus: (String) -> Unit,
+    ): PluginResult {
+        val startedAt = System.currentTimeMillis()
+        val result = runJob(context, record, "library.sources", "acquire", callArgs, title, onStatus)
+        if (!result.ok) return result
+        val descriptors = AcquireDownloads.parse(result.values)
+        if (descriptors != null) return AcquireDownload.run(context, record, title, hostContext, result.values, descriptors, onStatus)
+        // The plugin put the file there itself: it says which, or the library is told what is known.
+        val destination = hostContext.optString("destination").takeIf { it.isNotBlank() }?.let(::File)
+        withContext(Dispatchers.IO) { AcquireIndexing.afterAcquire(context, record.manifest.id, startedAt, destination, result.values) }
+        return result
     }
 
     /**

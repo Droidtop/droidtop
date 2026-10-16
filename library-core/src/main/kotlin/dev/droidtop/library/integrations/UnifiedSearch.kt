@@ -165,7 +165,8 @@ object UnifiedSearch {
         loadSources = {
             withContext(Dispatchers.IO) { GameSources.plugins(context, platform) to AcquireContentSources.unavailablePlugins(context, platform) }
         },
-        fetch = { source -> source.search(context, query.trim(), platform) },
+        // One search per source in flight, the newest query asked next ("Fetchers answer in the one search").
+        fetch = { source -> SourceSearchFlight.shared.run(source.id) { source.search(context, query.trim(), platform) } },
         needOf = { source -> PluginSearchAggregator.runtimeNeedOf(context, source) },
     )
 

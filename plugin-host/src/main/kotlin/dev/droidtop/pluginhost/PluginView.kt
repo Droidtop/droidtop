@@ -385,8 +385,9 @@ object PluginViewCall {
 
 /**
  * One result a `library.sources` `search` returned in the contract 2 shape (docs/plugin-api.md
- * 1.6): `{id, title, subtitle?, columns?, badges?, platform?, ref?}`. [refJson] is handed back
- * unread in `detail` and `acquire`; droidtop never parses it (12a checklist point 5).
+ * 1.6): `{id, title, subtitle?, columns?, badges?, platform?, ref?, version?, size?, get?}`. [refJson] is handed back
+ * unread in `detail` and `acquire`; droidtop never parses it (12a checklist point 5). [version], [sizeBytes] and [get]
+ * are the one search's ("Fetchers answer in the one search", Droidtop/tracker#218).
  */
 data class SourceResultRow(
     val id: String,
@@ -396,7 +397,16 @@ data class SourceResultRow(
     val badges: List<String>,
     val platform: String?,
     val refJson: String,
+    val version: String? = null,
+    val sizeBytes: Long? = null,
+    val get: SourceGet? = null,
 )
+
+/**
+ * A result that can be fetched without its detail page: `acquire` is started with [valuesJson] as its `values`,
+ * titled [title] when the source gave one. Null on a result that needs its detail page first.
+ */
+data class SourceGet(val valuesJson: String, val title: String?)
 
 object SourceResultProtocol {
     const val MAX_RESULTS = 200
@@ -417,10 +427,39 @@ object SourceResultProtocol {
                         badges = obj.strings("badges").map { it.cut(PluginView.MAX_TITLE) },
                         platform = obj.text("platform"),
                         refJson = (obj.optJSONObject("ref") ?: JSONObject()).toString(),
+                        version = obj.text("version")?.cut(PluginView.MAX_TITLE),
+                        sizeBytes = (obj.opt("size") as? Number)?.toLong()?.takeIf { it > 0 },
+                        get = get(obj.opt("get")),
                     ),
                 )
             }
         }
+    }
+
+    /**
+     * `get`: an object `{values?, title?}` whose `values` are strings (a number or a boolean is written as text; any
+     * other value is left out). `get: true` is read as `{}`. Over the action args limit, or of any other shape, there
+     * is no Get from the row and the result opens its detail page, as it does without one.
+     */
+    internal fun get(raw: Any?): SourceGet? {
+        val json = when (raw) {
+            true -> JSONObject()
+            is JSONObject -> raw
+            else -> return null
+        }
+        val values = JSONObject()
+        json.optJSONObject("values")?.let { given ->
+            given.keys().forEach { key ->
+                when (val value = given.opt(key)) {
+                    is String -> values.put(key, value)
+                    is Number, is Boolean -> values.put(key, value.toString())
+                    else -> Unit
+                }
+            }
+        }
+        val text = values.toString()
+        if (text.toByteArray(Charsets.UTF_8).size > PluginView.MAX_ARGS_BYTES) return null
+        return SourceGet(text, json.text("title")?.cut(PluginView.MAX_TITLE))
     }
 }
 

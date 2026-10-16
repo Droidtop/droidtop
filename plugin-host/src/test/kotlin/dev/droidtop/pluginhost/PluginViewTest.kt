@@ -112,6 +112,42 @@ class PluginViewTest {
         assertEquals(1, rows.size)
         assertEquals(listOf("SNES"), rows.single().columns)
         assertEquals(1, JSONObject(rows.single().refJson).getInt("k"))
+        assertNull(rows.single().version)
+        assertNull(rows.single().sizeBytes)
+        assertNull("no get: the result opens its detail page", rows.single().get)
+    }
+
+    @Test
+    fun `a result for the one search carries its version, size and a get`() {
+        val data = JSONObject().put(
+            "results",
+            JSONArray()
+                .put(
+                    JSONObject().put("id", "a").put("title", "Game A").put("version", " v0.12 Final ").put("size", 1_234_567_890L)
+                        .put("get", JSONObject().put("values", JSONObject().put("mirror", "main").put("part", 2).put("nested", JSONObject())).put("title", "Get Game A")),
+                )
+                .put(JSONObject().put("id", "b").put("title", "Game B").put("size", -5).put("get", true))
+                .put(JSONObject().put("id", "c").put("title", "Game C").put("size", "1 GB").put("get", "yes")),
+        )
+        val (a, b, c) = SourceResultProtocol.results(data)
+        assertEquals("v0.12 Final", a.version)
+        assertEquals(1_234_567_890L, a.sizeBytes)
+        val values = JSONObject(a.get!!.valuesJson)
+        assertEquals("main", values.getString("mirror"))
+        assertEquals("a number is written as text", "2", values.getString("part"))
+        assertTrue("an object is not a value", !values.has("nested"))
+        assertEquals("Get Game A", a.get!!.title)
+        assertNull("a size is a positive count of bytes", b.sizeBytes)
+        assertEquals("{}", b.get!!.valuesJson)
+        assertNull(b.get!!.title)
+        assertNull("a size given as text is not a size", c.sizeBytes)
+        assertNull("get is an object or true", c.get)
+    }
+
+    @Test
+    fun `a get whose values are over the args limit is no get`() {
+        val big = JSONObject().put("values", JSONObject().put("x", "y".repeat(PluginView.MAX_ARGS_BYTES)))
+        assertNull(SourceResultProtocol.get(big))
     }
 
     @Test

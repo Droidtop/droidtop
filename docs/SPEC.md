@@ -18851,6 +18851,32 @@ where droidtop needs something back"), and the trust-boundary checklist
 below, now applied to droidtop's own install path instead of
 Enginehost's.
 
+**Everything a plugin does goes over the API (owner, 2026-10-16; the rule
+above the rest of 12a).** The owner, verbatim: "Remember that ALL plugin
+activity happens over the API. This means programmatic control should be
+simpler, because plugins need to be uniform. We need to ensure that plugins
+have absolutely zero access to droidtop ANYTHING except through the API".
+A plugin of any kind and any tier reaches droidtop only through the points
+it declared and the host APIs it was granted; droidtop's classes, context,
+resources, preferences, databases, files, components, binder services, UID,
+memory, environment and descriptors are never reachable another way. Full
+access means more API grants, not a back door into droidtop's internals.
+And, verbatim, the same day: "Full access should ALSO mean restricted
+access API paths designed specifically for those purposes": inside
+droidtop's API each full-access purpose is its own dedicated point,
+declared, granted only to a full-access plugin, shown in plain words,
+logged and shaped to its one job, never the same API with its checks
+switched off. The OS is a separate rule; the owner, verbatim: "Shizuku
+does need direct access to android APIs. We can allow for that, but our
+plugin sandbox needs to block it when full access isn't enabled. I said the
+only path into DROIDTOP is through teh API. I didn't say that about the
+OS". So a full-access plugin may use Android's APIs, system services and
+Shizuku directly, and without full access the sandbox blocks that (a
+contained or open plugin reaches the OS only through droidtop's API or a
+granted permission's one hole). `docs/plugin-api.md` "Everything goes over
+the API" holds both rules and §5.6 the audit, with the fix and the test
+that proves each path closed (Droidtop/tracker#53).
+
 **Plugins are installed, approved and run in droidtop's own context.**
 droidtop downloads or accepts nothing through Enginehost's apparatus; it
 has its own manifest format, its own signing/pinning, its own install
@@ -21286,10 +21312,11 @@ interface GameSourceProvider {
   source, unread beyond these fields (unchanged trust rule from before
   this change: a plugin's own values are untrusted).
 - **Threading/timeout/errors**: every method is `suspend` and expected to
-  do its own work off the caller's thread; a plugin implementation is
-  bounded by the plugin runner's own watchdog (`PluginRunner.CALL_TIMEOUT_MS`,
-  15s) for `search`/`lookup`, with `PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS`
-  (16s) as the caller-side backstop for a source that never returns;
+  do its own work off the caller's thread; a plugin's `search`/`lookup` has
+  its own budget (`PluginGameSource.SEARCH_TIMEOUT_MS`, 10 s, a miss never a
+  crash, since 2026-10-16: docs/plugin-api.md "Fetchers answer in the one
+  search"), with `PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS` (11 s) as the
+  caller-side backstop for a source that never returns;
   `search`/`lookup` return `Result.failure` rather than throwing across
   this boundary. A future store adapter must honor the same shape.
 - **Versioning**: this is droidtop's own internal Kotlin interface, not a
