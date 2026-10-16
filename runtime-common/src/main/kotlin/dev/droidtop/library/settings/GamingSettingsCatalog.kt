@@ -94,12 +94,46 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_RESTART = "pref_gaming_system_restart"
     const val ID_AUDIO_OUTPUT = "pref_gaming_audio_output"
     const val ID_ORIENTATION = "pref_screen_orientation_gaming"
+
+    /**
+     * The Quick Menu's and the companion's Display "Screen orientation": the mode droidtop is in now, where
+     * [ID_ORIENTATION] (Gaming's own settings page) is always Gaming's (Droidtop/tracker#571 row 34: the shared row
+     * edited Gaming's orientation from Standard and Desktop too).
+     */
+    const val ID_ORIENTATION_HERE = "pref_screen_orientation_current"
     const val ID_PERFORMANCE_MODE = "pref_gaming_performance_mode"
     const val ID_SYSTEM_MIC_MUTE = "pref_gaming_system_mic_mute"
     const val ID_SYSTEM_FLASHLIGHT = "pref_gaming_system_flashlight"
     const val ID_SYSTEM_LOCATION = "pref_gaming_system_location"
     const val ID_SYSTEM_WIFI = "pref_gaming_system_wifi"
     const val ID_PRIVACY_DASHBOARD = "action_privacy_dashboard"
+
+    /**
+     * Screen orientation for the mode droidtop is in now ([Modes.lastMode]), stored under that mode's own key
+     * (`pref_screen_orientation_<mode>`, the key ScreenOrientationPrefs applies; Gaming has no portrait). Quick
+     * Menu and companion only ([ID_ORIENTATION_HERE]).
+     */
+    private fun currentModeOrientationItem(context: Context): ChoiceItem {
+        val mode = Mode.byId(Modes.lastMode(context)) ?: Mode.GAMING
+        val key = "pref_screen_orientation_" + mode.id
+        val options = buildList {
+            add(ChoiceOption("follow", "Follow device"))
+            if (mode != Mode.GAMING) {
+                add(ChoiceOption("portrait", "Portrait"))
+                add(ChoiceOption("portrait_flipped", "Portrait (flipped)"))
+            }
+            add(ChoiceOption("landscape", "Landscape"))
+            add(ChoiceOption("landscape_flipped", "Landscape (flipped)"))
+        }
+        return ChoiceItem(
+            id = ID_ORIENTATION_HERE,
+            title = "Screen orientation",
+            subtitle = "In ${mode.label} mode",
+            options = options,
+            current = CatalogPrefs.prefs(context).getString(key, "follow"),
+            onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(key, value).apply() },
+        )
+    }
 
     private val TIMEOUT_OPTIONS = dev.droidtop.runtime.systemstatus.SystemControls.SCREEN_TIMEOUTS
     const val ID_DOWNLOADS = "pref_gaming_downloads"
@@ -673,6 +707,7 @@ object GamingSettingsCatalog {
                             onToggle = { ctx, on -> controls.setAutoRotate(ctx, on) },
                         ),
                     )
+                    add(currentModeOrientationItem(context))
                     add(
                         ChoiceItem(
                             id = ID_SYSTEM_TIMEOUT,
