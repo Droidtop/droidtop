@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Shelf widget (ShelfWidgetProvider): a shelf of games the widget maker chose. Placing it opens its maker
+  (ShelfConfigureActivity); reconfigurable where the launcher offers it.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/widget_shelf"
+    android:previewImage="@mipmap/ic_launcher"
+    android:resizeMode="horizontal|vertical"
+    android:configure="dev.droidtop.app.ShelfConfigureActivity"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen"
+    android:description="@string/widget_shelf_title" />

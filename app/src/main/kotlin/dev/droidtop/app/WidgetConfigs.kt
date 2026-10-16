@@ -3,8 +3,8 @@ package dev.droidtop.app
 import android.content.Context
 
 /**
- * What each placed droidtop widget was set up to show, by its appWidgetId (Droidtop/tracker#563): today, the game a
- * Quick launch widget plays. Kept in droidtop's own preferences, written by the widget's configure activity and
+ * What each placed droidtop widget was set up to show, by its appWidgetId (Droidtop/tracker#563): the game a Quick
+ * launch widget plays, and a Shelf widget's content and layout. Kept in droidtop's own preferences, written by the widget's configure activity and
  * forgotten when the launcher removes the widget. Read off the main thread, in the widget's render.
  */
 internal object WidgetConfigs {
@@ -18,9 +18,27 @@ internal object WidgetConfigs {
         prefs(context).edit().putString("$widgetId.entry", entryId).apply()
     }
 
+    /** What a Shelf widget shows, or null when it was never set up. */
+    fun shelf(context: Context, widgetId: Int): ShelfContent? {
+        val p = prefs(context)
+        val kind = p.getString("$widgetId.shelf", null)?.let { name -> ShelfContent.Kind.entries.firstOrNull { it.name == name } } ?: return null
+        val layout = p.getString("$widgetId.layout", null)?.let { name -> ShelfContent.Layout.entries.firstOrNull { it.name == name } } ?: ShelfContent.Layout.GRID
+        return ShelfContent(kind, p.getString("$widgetId.arg", null), layout)
+    }
+
+    fun setShelf(context: Context, widgetId: Int, content: ShelfContent) {
+        prefs(context).edit()
+            .putString("$widgetId.shelf", content.kind.name)
+            .putString("$widgetId.arg", content.arg)
+            .putString("$widgetId.layout", content.layout.name)
+            .apply()
+    }
+
     fun forget(context: Context, widgetIds: IntArray) {
         val edit = prefs(context).edit()
-        for (id in widgetIds) edit.remove("$id.entry")
+        for (id in widgetIds) KEYS.forEach { edit.remove("$id.$it") }
         edit.apply()
     }
+
+    private val KEYS = listOf("entry", "shelf", "arg", "layout")
 }
