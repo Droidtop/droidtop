@@ -235,7 +235,8 @@ class DockerApiTest {
         var nets = ContainerNetworks.withMember(listOf(demo), demo.id, "droidtop-sibling-1", listOf("web"))
         val json = DockerApi.networks(ContainerNetworks.predefined() + nets, mapOf("droidtop-sibling-1" to "demo-web-1"), mapOf("label" to listOf("com.docker.compose.project=demo")))
         assertTrue(json.contains("\"Name\":\"demo_default\""))
-        assertTrue(json.contains("\"droidtop-sibling-1\":{\"Name\":\"demo-web-1\""))
+        // Members by their engine id, as every container is named to a client (docs/SPEC.md 3d, "Container ids").
+        assertTrue(json.contains("\"${EngineIds.of("droidtop-sibling-1")}\":{\"Name\":\"demo-web-1\""))
         assertTrue(!json.contains("\"Name\":\"bridge\""))
         assertTrue(DockerApi.networks(ContainerNetworks.predefined(), emptyMap(), emptyMap()).contains("\"Driver\":\"host\""))
         assertEquals(ContainerNetworks.predefinedId("bridge"), ContainerNetworks.predefinedId("bridge"))

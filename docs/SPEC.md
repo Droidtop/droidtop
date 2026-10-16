@@ -2494,12 +2494,14 @@ the `ContainerRuntime` interface that already exists (§3):
   when they start it. Every policy waits longer after each quick exit and gives up after five in a row (or the N of
   `on-failure:N`), a clean exit counting for `always`: a program that exits at once would otherwise restart for ever.
   **Each tool's output (built 2026-10-16, Droidtop/tracker#555 D12).** `ps` prints the columns both tools print:
-  CONTAINER ID (droidtop's container id), IMAGE, COMMAND (the program the container runs, with `run`'s command
+  CONTAINER ID (the first twelve of its engine id, below), IMAGE, COMMAND (the program the container runs, with `run`'s command
   applied), CREATED, STATUS, PORTS and NAMES. The docker front shortens Docker Hub's images (`gitea/gitea:1.22`) and
   quotes the command, cut at 20 characters with an ellipsis; the podman front keeps the full image
   (`docker.io/gitea/gitea:1.22`) and leaves the command bare, cut with three dots. `ps -q` prints ids, as both tools
   do (it printed names). `images` keeps Docker's short repository names on the docker front and Podman's full ones
-  (`docker.io/library/nginx`, sizes as "21.4 MB") on the podman front. CREATED is the time droidtop made the
+  (`docker.io/library/nginx`, sizes as "21.4 MB") on the podman front, and both print CREATED, when the image was
+  built (its config's `created`, kept on the store's entry; empty when the config does not say), which the Engine
+  API's and libpod's image lists and inspects give too. A container's CREATED is the time droidtop made the
   container (`ContainerPrograms.recordCreated`, from every place droidtop creates one: `run` and the two Create rows
   in Containers); a container made before this has an empty CREATED rather than a guessed one.
   **inspect, create, restart and -p (built 2026-10-16, Droidtop/tracker#555 D13), on both fronts.** `create` reads
@@ -2618,8 +2620,16 @@ the `ContainerRuntime` interface that already exists (§3):
   every front. Image ids are the digest's hex without `sha256:`, as Podman writes them. Checked against Podman's own
   remote clients, 5.2.5 and 4.9.5 built from source, over these shapes: `version`, `info`, `ps` (`-a`, `--pod`,
   `--filter label=`), `inspect`, `images`, `image inspect`, `pod ps`, `pod inspect`, `network ls`, `network
-  inspect` and each `exists`. Containers' short ids are droidtop's own (`droidtop-sibling-...`), which both
-  tools' `ps` cut to the same twelve characters, so NAMES is what tells them apart.
+  inspect` and each `exists`.
+  **Container ids (decided 2026-10-16).** Both tools show a container's id cut to twelve characters, and droidtop's
+  own ids (`droidtop-sibling-1a2b3c4d`) share theirs, so every container read `droidtop-sib` in `ps`. The engine,
+  on every front and API, now calls a container by its engine id (`EngineIds.of`): 64 hex digits, a digest of
+  droidtop's id, the same on every boot and never stored. It is the Id of `inspect`, `containers/json` and a
+  network's members, what `run` and `create` print and the create answers, and the start of it is CONTAINER ID in
+  both fronts' `ps`. Everywhere a container is named (`EngineIds.find`, one lookup for the fronts and both APIs) it
+  is found by its name (with or without Docker's leading `/`), its engine id or droidtop's own id, or a unique start
+  of either, three characters or more; `droidtop-sib`, which starts every droidtop id, names none. droidtop's own
+  screens keep the person's names for containers, never an id.
   **libpod writes (built 2026-10-16, D15 second slice).** `podman run`, `create`, `start`, `stop`, `restart`,
   `kill`, `wait`, `rm`, `pull`, `logs` and `exec` work against the libpod API, through the same `EngineActions` as
   every other front. The routes whose paths and answers are the same in both APIs (start, stop, restart, kill,

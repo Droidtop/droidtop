@@ -354,7 +354,7 @@ object DockerApi {
         put("Ingress", false)
         putJsonObject("Containers") {
             n.members.forEach { id ->
-                putJsonObject(id) {
+                putJsonObject(EngineIds.of(id)) {
                     put("Name", names[id] ?: id)
                     put("EndpointID", "")
                     put("MacAddress", "")
@@ -425,7 +425,7 @@ object DockerApi {
         putJsonArray("RepoTags") { add(JsonPrimitive(EngineCli.PODMAN.fullImage(e.reference).removePrefix("docker.io/library/").removePrefix("docker.io/"))) }
         putJsonArray("RepoDigests") { }
         put("Parent", "")
-        put("Created", EngineInspect.ZERO_TIME)
+        put("Created", EngineInspect.time(e.createdMs))
         put("Os", "linux")
         put("Architecture", arch)
         put("Size", e.sizeBytes)
@@ -684,7 +684,7 @@ object DockerApi {
                 put("ParentId", "")
                 putJsonArray("RepoTags") { add(JsonPrimitive(EngineCli.PODMAN.fullImage(e.reference).removePrefix("docker.io/library/").removePrefix("docker.io/"))) }
                 put("RepoDigests", buildJsonArray { })
-                put("Created", 0)
+                put("Created", (e.createdMs ?: 0L) / 1000)
                 put("Size", e.sizeBytes)
                 put("SharedSize", -1)
                 put("Labels", JsonObject(emptyMap()))

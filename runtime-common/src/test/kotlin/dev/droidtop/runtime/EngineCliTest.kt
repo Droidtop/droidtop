@@ -89,20 +89,20 @@ class EngineCliTest {
         assertEquals("3 days ago", EngineCli.DOCKER.ago(3 * 86_400_000L))
 
         val images = listOf(
-            OciImageStore.Entry("sha256:0123456789abcdef0123", "docker.io/library/nginx:1.27-alpine", 21_400_000),
+            OciImageStore.Entry("sha256:0123456789abcdef0123", "docker.io/library/nginx:1.27-alpine", 21_400_000, createdMs = now - 3 * 86_400_000L),
             OciImageStore.Entry("sha256:fedcba9876543210fedc", "ghcr.io/home-assistant/home-assistant", 1_520_000_000),
         )
         assertEquals(
-            "REPOSITORY                              TAG           IMAGE ID       SIZE\n" +
-                "nginx                                   1.27-alpine   0123456789ab   21MB\n" +
-                "ghcr.io/home-assistant/home-assistant   latest        fedcba987654   1.5GB\n",
-            EngineCli.DOCKER.formatImages(images, EngineRequest.Images(quiet = false)),
+            "REPOSITORY                              TAG           IMAGE ID       CREATED      SIZE\n" +
+                "nginx                                   1.27-alpine   0123456789ab   3 days ago   21MB\n" +
+                "ghcr.io/home-assistant/home-assistant   latest        fedcba987654                1.5GB\n",
+            EngineCli.DOCKER.formatImages(images, EngineRequest.Images(quiet = false), now),
         )
         assertEquals(
-            "REPOSITORY                              TAG           IMAGE ID       SIZE\n" +
-                "docker.io/library/nginx                 1.27-alpine   0123456789ab   21.4 MB\n" +
-                "ghcr.io/home-assistant/home-assistant   latest        fedcba987654   1.5 GB\n",
-            EngineCli.PODMAN.formatImages(images, EngineRequest.Images(quiet = false)),
+            "REPOSITORY                              TAG           IMAGE ID       CREATED      SIZE\n" +
+                "docker.io/library/nginx                 1.27-alpine   0123456789ab   3 days ago   21.4 MB\n" +
+                "ghcr.io/home-assistant/home-assistant   latest        fedcba987654                1.5 GB\n",
+            EngineCli.PODMAN.formatImages(images, EngineRequest.Images(quiet = false), now),
         )
         assertEquals("docker.io/library/alpine", EngineCli.PODMAN.fullRepository("alpine:3"))
         assertEquals("docker.io/library/nginx:1.27-alpine", EngineCli.PODMAN.fullImage("nginx:1.27-alpine"))

@@ -124,7 +124,7 @@ class LibpodApiTest {
         val n = list(LibpodApi.networks(ContainerNetworks.predefined() + network, mapOf(web.id to "web"), mapOf("label" to listOf("p=demo")))).single().jsonObject
         assertEquals("demo_default", n.str("name"))
         assertEquals("bridge", n.str("driver"))
-        assertEquals("web", n.getValue("containers").jsonObject.getValue(web.id).jsonObject.str("name"))
+        assertEquals("web", n.getValue("containers").jsonObject.getValue(EngineIds.of(web.id)).jsonObject.str("name"))
     }
 
     @Test
