@@ -430,16 +430,21 @@ class SecondScreenInputView(
 
     /**
      * What the trackpad drives outside Desktop right now: droidtop's own selection while the shell is what the target
-     * screen shows (pointer and focus are one selection there), else a pointer on that screen when droidtop's
-     * accessibility service can play touches on it, else nothing.
+     * screen shows (pointer and focus are one selection there), else the game's mouse while droidtop's own game screen
+     * is there (Droidtop/tracker#565), else a pointer on that screen when droidtop's accessibility service can play
+     * touches on it, else nothing.
      */
     private fun currentRoute(): TrackpadRoute {
         val id = targetId()
         return TrackpadRoute.of(
             shellOnTarget = id != null && shellDisplayId() == id,
             pointerReachable = id != null && AccessibilityPointer.canReach(id),
+            gameOnTarget = id != null && gamePointer()?.displayId == id,
         )
     }
+
+    /** The pointer of droidtop's own game screen while one runs. */
+    private fun gamePointer(): dev.droidtop.library.OwnGameScreens.Pointer? = dev.droidtop.library.OwnGameScreens.current?.pointer
 
     private fun syncPointerHelp() {
         val missing = mode != SecondaryDisplayContent.Mode.DESKTOP && targetId() != null && currentRoute() == TrackpadRoute.UNAVAILABLE
@@ -458,6 +463,7 @@ class SecondScreenInputView(
             naturalScroll = settings.naturalScroll,
         )
         pointerSink = pointer
+        val game = GamePointerTrackpadSink(::gamePointer, userSpeed = trackpadSpeed(settings), naturalScroll = settings.naturalScroll)
         var lastTarget: Int? = null
         return RoutedTrackpadOutput {
             val id = targetId()
@@ -475,6 +481,7 @@ class SecondScreenInputView(
             }
             when (route) {
                 TrackpadRoute.FOCUS -> focus
+                TrackpadRoute.GAME -> game
                 TrackpadRoute.POINTER -> pointer
                 TrackpadRoute.UNAVAILABLE -> null
             }
@@ -573,6 +580,7 @@ class SecondScreenInputView(
     /** What the trackpad is doing outside Desktop, in a few words. */
     private fun padLine(): String = when (currentRoute()) {
         TrackpadRoute.FOCUS -> "Trackpad moves the selection"
+        TrackpadRoute.GAME -> "Trackpad is the game's mouse"
         TrackpadRoute.POINTER -> "Trackpad is a pointer"
         TrackpadRoute.UNAVAILABLE ->
             if (targetId() == null) "No other screen" else "Pointer needs the accessibility service"

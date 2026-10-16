@@ -73,6 +73,7 @@ import com.winlator.PrefManager as WinlatorPrefManager
 class WineGameActivity : Activity() {
 
     private var xServer: XServer? = null
+    private var gamePointer: OwnGameScreens.Pointer? = null
     private var rendererView: XServerRendererView? = null
     private var session: WineXSession? = null
     private var touchpadView: TouchpadView? = null
@@ -97,6 +98,7 @@ class WineGameActivity : Activity() {
     private val ownScreen = object : OwnGameScreens.Screen {
         override val entryId: String? get() = this@WineGameActivity.entryId
         override val padMouse: Boolean? get() = this@WineGameActivity.padMouse?.settings?.on
+        override val pointer: OwnGameScreens.Pointer? get() = this@WineGameActivity.gamePointer
         override fun setPadMouse(on: Boolean) {
             runOnUiThread { padMouse?.let { it.set(it.settings.copy(on = on)) } }
         }
@@ -211,7 +213,10 @@ class WineGameActivity : Activity() {
         touchMouse = TouchMouse(xServer)
         keyboard = Keyboard(xServer)
         // Controller mouse mode (docs/SPEC.md 5b, Droidtop/tracker#565): off until the game's remembered choice is read.
-        val mouseMode = PadMouseDriver(xServer, PadMouse.Settings()) { settings -> padMouseChanged(settings) }
+        // The game's one pointer: mouse mode and the companion's trackpad both drive it (Droidtop/tracker#565).
+        val pointer = XServerPointer(xServer) { window?.decorView?.display?.displayId }
+        gamePointer = pointer
+        val mouseMode = PadMouseDriver(pointer, PadMouse.Settings()) { settings -> padMouseChanged(settings) }
         padMouse = mouseMode
         entryId?.let { id ->
             startupExecutor.execute {
