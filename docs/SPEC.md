@@ -6441,6 +6441,26 @@ keyboard" still toggles it. Back with it up closes the keyboard, not the game
 (`WineGameActivity.dispatchKeyEvent`); when the IME took Back itself and went
 away, the window insets say so and the next Back is the game's again.
 
+**Controller mouse mode** (decided 2026-10-16, Droidtop/tracker#565; owner: "For PC games, we need to somehow
+simulate mouse input. ... Perhaps something like GPD's solution, where they can set the controller into mouse mode?",
+and "The screen maps to a trackpad, which is standard for wine on android. I'm just complaining that that's not the
+ideal solution"). The touchscreen stays the trackpad it is. With mouse mode on, the pad is the mouse, so a game's
+pointer (a Unity configuration window, say) works without touching the screen:
+- the right stick (or the left, per game) moves the pointer; a push under 15% is rest, and the speed rises with the
+  square of the push to 1.5 screen widths a second at full, so a small push places it and a full one crosses quickly;
+- R1 clicks and L1 right-clicks (or, per game, A and B), held for a drag;
+- the moving stick's own click held turns that stick into a wheel (up to 12 steps a second);
+- the other buttons and the other stick still reach the game; the stick that moves the pointer does not;
+- both stick clicks held 0.6 s turn it on or off at any time, and the Quick Menu's Game section has a Mouse mode row;
+  a "Mouse mode" badge in the top corner shows while it is on, and TalkBack hears the change;
+- remembered per game (`PadMousePrefs`); off by default, unless the game's runner says it needs a mouse (none says so
+  yet; `PadMouse.initial`).
+It is the pointer path the screen's touch trackpad already uses (`XServer.injectPointerMoveDelta`, button presses,
+the wheel as scroll-button presses), not a second one (`PadMouse`, pure and tested; `PadMouseDriver` in
+`WineGameActivity`, ahead of the XInput bridge). The Quick Menu row reaches the screen through
+`OwnGameScreens.Screen.padMouse`. The Keys tab and the companion as trackpads on the same path are the next part of
+#565.
+
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with
 the Gaming Quick Menu open on its Game section (Resume, Restart, Stop with two
