@@ -15943,7 +15943,8 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   these repositories automatically", and covers catalog plugins too; an update asking for more access still waits for
   approval); Android apps ask by default ("Update apps without asking" stays: it decides whether Android asks, where
   Android allows it not to); Store games is the existing "Keep installed store games up to date" (off by default; it
-  follows Download rules). Not yet: Enginehost's engines, which Enginehost updates itself.
+  follows Download rules). The owner confirmed these defaults (2026-10-16): "Those defaults work well". Not yet:
+  Enginehost's engines, which Enginehost updates itself.
   **One Updates screen, one list of ways in** (2026-10-03, Droidtop/tracker#273):
   the plugin updates status and "Update all" that the Plugins screen also
   carried are gone (its "N updates" row opens Updates, 2026-10-16) (the Plugins screen lists plugins, approvals, repositories
