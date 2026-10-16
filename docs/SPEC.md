@@ -347,12 +347,10 @@ system dark/light setting through one shared Material theme
 (`app/.../ui/DroidtopTheme.kt`) — screens take colors from
 `MaterialTheme.colorScheme` tokens, never literals (the previous state:
 every screen hardcoded its palette, and no light mode existed at all).
-Two deliberate exceptions stay always-dark regardless of the system
-setting: surfaces living inside the Gaming shell's world (Console
-systems opens from Gaming's Settings tab and takes the Gaming theme,
-section 7k2) and ambient second-screen companion surfaces; ES-DE-themed
-Gaming views take every color from the active ES-DE theme (§7f) and
-are outside Material theming entirely.
+Redecided 2026-10-16 (Droidtop/tracker#559): light or dark is droidtop's
+own Appearance setting, not the system's alone and not always-dark for
+any root; see 7k "Light and dark". ES-DE-themed Gaming views still take
+every color from the active ES-DE theme (§7f).
 
 ## 2b. Desktop mode gets the library context, and Android apps as windows (directed 2026-09-01)
 
@@ -7228,8 +7226,8 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
   in landscape. Nothing is vertically centred in a tall window.
 - One gutter, the shell's own (`ShellWindow.edgePadding`), one spacing scale, one type scale,
   one colour source (§7j). Touch targets meet `minTouchTarget` in every orientation.
-- Onboarding is dark, like the shell it hands over to; it does not follow the system
-  light/dark setting into a white first run.
+- Onboarding follows the Appearance setting like the shell it hands over to (7k, "Light and dark"), so a first
+  run and the shell after it are never one light and one dark.
 
 ### The one choice component
 
@@ -14697,6 +14695,25 @@ else — onboarding, the shell's chrome and menus, the settings catalog, the Qui
 PC game's detail screen, the desktop panels — is **droidtop's own chrome**, and all of it obeys
 one system. A PC/engine gamelist is a themed view like any console system's (§7i, redecided
 2026-09-26) and is out of scope here too.
+
+**Light and dark (decided 2026-10-16, Droidtop/tracker#559).** One setting, Settings > Appearance > Light or dark
+(`AppearancePrefs`): Light, Dark, or Follow Android, the default (Android's night mode). It covers droidtop's whole
+UI through the one palette (`GamingPalette`) every token reads:
+- With a Gaming theme held, the theme's palette (7k2). Choosing the theme's colour scheme whose ground matches the
+  appearance, or deriving one, is the next step of this change and is written there when it lands.
+- With none held, droidtop's own palette in that appearance: `GamingThemeColors.DEFAULT` or its light twin
+  (`GamingThemeMapping.defaultFor`), built the way a theme's palette is, over a pale grey ground with a blue accent,
+  every text role at 4.5:1. `MenuTokens` read outside a Gaming surface give this palette, not a fixed dark one.
+- Every Compose root droidtop draws (`DroidtopTheme`) takes that palette's Material scheme and notice colours. The 17
+  roots that forced dark, the companion among them, and onboarding no longer do; there is no `darkTheme` parameter.
+- A change applies at once: `rememberLightAppearance` watches the setting and the configuration's night mode in every
+  root, and the Gaming palette is re-read when either changes.
+- Controls floating over art (the status cluster, the Start and R2 pills) sit on `MenuTokens.FloatingPlate`, the
+  overlay surface at 92%, so their text keeps 4.5:1 over any artwork. They were the ink at 58%, pale text on a pale
+  pill over light art (rig 1931). A theme's own clock or system status that names no colour is white, as in ES-DE,
+  unless its declared background is one white cannot be read on; then it is black.
+- Not yet covered: the Standard home screen (Launcher3's XML views), the Wine desktop's views and droidtop's
+  keyboard; each is its own issue.
 
 **Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
 top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width

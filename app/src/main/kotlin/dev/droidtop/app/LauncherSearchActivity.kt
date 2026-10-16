@@ -43,7 +43,7 @@ class LauncherSearchActivity : ComponentActivity() {
         val games = library.backgroundScanState(LibraryKinds.GAMES)
         val initialText = intent?.getStringExtra(LauncherSearch.EXTRA_TEXT).orEmpty()
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+            dev.droidtop.app.ui.DroidtopTheme {
                 val entries by games.collectAsStateWithLifecycle()
                 LauncherSearchScreen(
                     initialText = initialText,

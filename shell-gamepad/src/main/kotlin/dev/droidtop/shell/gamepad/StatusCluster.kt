@@ -73,7 +73,7 @@ internal fun FloatingStatusCluster(onClick: () -> Unit, modifier: Modifier = Mod
         modifier = modifier
             .onSizeChanged { px -> StatusClusterRoom.size = with(density) { DpSize(px.width.toDp(), px.height.toDp()) } }
             .padding(horizontal = window.barPadding, vertical = 8.dp)
-            .background(MenuTokens.Surface.copy(alpha = 0.58f), Corners.Pill)
+            .background(MenuTokens.FloatingPlate, Corners.Pill)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         StatusCluster(showBatteryPercent = true, onClick = onClick)

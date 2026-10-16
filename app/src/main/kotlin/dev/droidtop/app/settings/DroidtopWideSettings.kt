@@ -139,6 +139,12 @@ object DroidtopWideSettings {
                     items = listOf(RiskyActionsCatalog.linkRow("pref_global_risky_actions")),
                 ),
                 CatalogGroup(
+                    id = "global_appearance",
+                    title = "Light and dark",
+                    category = "Appearance",
+                    items = listOf(dev.droidtop.library.settings.AppearancePrefs.item(context)),
+                ),
+                CatalogGroup(
                     id = "global_accessibility",
                     title = "Accessibility",
                     category = "Appearance",

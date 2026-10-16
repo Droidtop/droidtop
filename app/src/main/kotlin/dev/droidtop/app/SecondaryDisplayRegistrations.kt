@@ -49,7 +49,7 @@ object SecondaryDisplayRegistrations {
      */
     fun registerStandard() {
         SecondaryDisplayContent.register(SecondaryDisplayContent.Mode.STANDARD) {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+            dev.droidtop.app.ui.DroidtopTheme {
                 CompanionTabs(SecondaryDisplayContent.Mode.STANDARD) { CompanionSurfaceHost(null) }
             }
         }
@@ -68,7 +68,7 @@ object SecondaryDisplayRegistrations {
         // One tab host for every mode: Home is the companion, the input surface is the default tab
         // where the mode's role says so (Desktop by default), and Tasks, Performance and System are
         // beside them (docs/SPEC.md "The companion's tabs").
-        dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+        dev.droidtop.app.ui.DroidtopTheme {
             CompanionTabs(mode) { CompanionSurfaceHost(settledFocusedEntry()) }
         }
     }

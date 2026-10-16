@@ -41,7 +41,7 @@ class PluginHubActivity : AppCompatActivity() {
             return
         }
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
                     Column(Modifier.fillMaxSize().groundBackground()) {
                         Box(Modifier.weight(1f)) {
