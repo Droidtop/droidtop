@@ -29,7 +29,6 @@ class WorkspaceBlurUtils {
         @JvmStatic private val BLUR_TYPES: MutableList<BlurType> = mutableListOf<BlurType>()
         @JvmStatic val PREVIEW : BlurType = DetachedBlurType(20, false)
         @JvmStatic val NONE : BlurType = DetachedBlurType(0, false)
-        @JvmStatic val SEARCH : BlurType = DetachedBlurType(88, false)
 
         enum class DRAWER_TYPES(val type: DrawerBlurType, val label: Int, val icon: Int) {
             GLASS(DrawerBlurType.GLASS, R.string.drawer_type_frosted, R.drawable.ic_pref_drawer_frosted),

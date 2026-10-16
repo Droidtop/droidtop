@@ -24,7 +24,6 @@
     <string name="pref_subcategory_day_night">Tema de la interfaz</string>
     <string name="pref_subcategory_layout">Diseño</string>
     <string name="pref_subcategory_appearance">Apariencia</string>
-    <string name="pref_subcategory_persistency">Persistencia</string>
     <string name="pref_subcategory_gestures">Gestos</string>
     <string name="pref_subcategory_options">Opciones</string>
     <string name="pref_subcategory_backup">Copia de seguridad</string>
@@ -93,18 +92,8 @@
     <string name="pref_qsb_search_provider_title">Proveedor de búsqueda</string>
     <string name="pref_qsb_enable_lens_title">Activar Lens</string>
     <string name="pref_qsb_enable_lens_summary">Mostrar el botón de Google Lens en la búsqueda rápida</string>
-    <string name="pref_qsb_box_blur">Desenfoque de la burbuja de búsqueda</string>
-    <string name="pref_qsb_box_blur_desc">Mostrar efecto MICA en la burbuja de búsqueda</string>
     <string name="pref_qsb_bar_alpha">Transparencia de la barra de búsqueda</string>
-    <string name="pref_qsb_box_alpha">Transparencia de la burbuja de búsqueda</string>
     <string name="pref_qsb_custom_provider_title">URL de búsqueda personalizada</string>
-    <string name="pref_qsb_history_size_title">Tamaño del historial de búsqueda</string>
-    <string name="pref_qsb_history_size_summary">Número máximo de entradas</string>
-    <string name="pref_qsb_clear_history_title">Borrar historial de búsqueda</string>
-    <string name="pref_qsb_clear_history_summary">Eliminar todas las búsquedas guardadas</string>
-    <string name="pref_qsb_clear_history_confirm_title">¿Borrar historial de búsqueda?</string>
-    <string name="pref_qsb_clear_history_confirm_message">Esto eliminará permanentemente todas las búsquedas guardadas.</string>
-    <string name="pref_qsb_clear_history_toast">Historial de búsqueda borrado</string>
 
     <!-- Murine smartspace / clock widget -->
     <string name="smartspace_mode_clock">Reloj</string>

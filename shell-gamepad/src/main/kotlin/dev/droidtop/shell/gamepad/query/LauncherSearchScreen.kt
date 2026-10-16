@@ -65,6 +65,8 @@ fun LauncherSearchScreen(
     onDismiss: () -> Unit,
     // The settings of this surface, searched with the rest (null: this surface has none to search).
     settingsRoot: dev.droidtop.library.settings.CatalogScreen? = null,
+    // A web search for the text, as one row of the list (Standard's search bar, Droidtop/tracker#564); null: none.
+    webSearch: ((String) -> Unit)? = null,
 ) {
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         val context = LocalContext.current
@@ -104,7 +106,17 @@ fun LauncherSearchScreen(
                 val matching = playable.filter { matchesSearchText(it, text) }.take(MAX_GAME_ROWS).map { game ->
                     LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), kindBadgeOf(game, systemNames)?.text.orEmpty()) { onPlay(game) }
                 }
-                apps + matching
+                // The web is one row, after everything else: the query is its detail, not its title, so the title never
+                // matches it and the row ranks last (SearchRank OTHER, then SearchRowKind.WEB). Picking it searches and
+                // closes this search.
+                val web = webSearch?.takeIf { text.isNotBlank() }?.let { search ->
+                    val query = text.trim()
+                    LocalSearchRow("web", SearchRowKind.WEB, WEB_TITLE, "\u201c$query\u201d") {
+                        search(query)
+                        onDismiss()
+                    }
+                }
+                apps + matching + listOfNotNull(web)
             },
         )
     }
@@ -112,3 +124,4 @@ fun LauncherSearchScreen(
 
 private const val MAX_GAME_ROWS = 20
 private const val APP_DETAIL = "App"
+private const val WEB_TITLE = "Search the web"
