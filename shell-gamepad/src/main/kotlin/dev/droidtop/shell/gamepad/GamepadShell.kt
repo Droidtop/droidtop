@@ -1848,10 +1848,7 @@ private fun EntryDetailScreen(
                 )
             }
             // More games for this game's own system (an app's page asks which system).
-            GetGamesChip(
-                dev.droidtop.library.integrations.GetGamesContext.GAME_PAGE,
-                systemId = entry.systemId.takeIf { isRomEntry },
-            )
+            GetGamesChip(systemId = entry.systemId.takeIf { isRomEntry })
             if (media.size > 1) {
                 ShellChip("View media (${media.size})", onClick = { viewingMedia = true })
             }
@@ -3671,7 +3668,7 @@ private fun AppsSection(
                         modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding),
                     ) {
                         GetAppsChip()
-                        GetGamesChip(dev.droidtop.library.integrations.GetGamesContext.APPS)
+                        GetGamesChip()
                     }
                 }
             }

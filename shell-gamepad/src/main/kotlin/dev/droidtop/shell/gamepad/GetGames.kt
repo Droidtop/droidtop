@@ -13,25 +13,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import dev.droidtop.library.integrations.AcquireContentSources
-import dev.droidtop.library.integrations.GetGamesContext
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
-
-/**
- * The ONE "Get games" action (docs/SPEC.md 12a "Get games everywhere"). A menu, a page, an empty
- * state or the Quick Menu shows a row labelled [GetGamesEntry.LABEL] and, when it is pressed,
- * either sets `acquireScreen = getGamesScreen(...)` to host it in its own sheet or composes
- * [GetGamesSheet]. The screen asks which system when [context] has none, opens that system's
- * source list when it has one, and says so and leads to Plugins when no source is installed.
- * A new surface (the left menu, #258) adds a row that calls this; it never builds its own.
- */
-internal fun getGamesScreen(context: GetGamesContext, systemId: String? = null): CatalogScreen? =
-    SettingsScreenRegistry.get(AcquireContentSources.GET_GAMES_SCREEN_ID, GetGamesEntry.systemFor(context, systemId))
 
 private val CATALOG_SHEET_HINTS = listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, "Back"))
 
@@ -62,42 +49,47 @@ internal fun CatalogSheet(root: CatalogScreen, onExit: () -> Unit) {
 }
 
 /**
- * The "Get games" entry as a chip, for the places that are rows of chips (an empty state, a game's
- * page, the Apps section): it owns whether its sheet is open, so a caller is one line.
+ * The "Get games" entry as a chip, for the places that are rows of chips (an empty state, a game's page, the Apps
+ * section): it owns whether its search is open, so a caller is one line. [systemId] scopes it to a console system;
+ * [pc] searches for PC games.
  */
 @Composable
 internal fun GetGamesChip(
-    context: GetGamesContext,
     modifier: Modifier = Modifier,
     systemId: String? = null,
+    pc: Boolean = false,
     primary: Boolean = false,
     onChanged: () -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     ShellChip(GetGamesEntry.LABEL, modifier = modifier, primary = primary, onClick = { open = true })
-    if (open) GetGamesSheet(context, systemId, onDismiss = { open = false }, onChanged = onChanged)
+    if (open) {
+        GetGamesSearch(systemId, pc = pc) {
+            open = false
+            onChanged()
+        }
+    }
 }
 
 /**
- * The "Get games" screen for [context] in a [CatalogSheet]. [onChanged] runs when it closes, so a
- * list that a download may have just filled can rescan.
+ * What every "Get games" entry opens (docs/SPEC.md 13, "There is no Get games sheet"; owner, 2026-10-16,
+ * Droidtop/tracker#218): the one search, empty and ready for typing, where the download sources answer. A console
+ * [systemId] searches that system's sources and downloads to its folder; [pc] asks the sources for PC games. It has
+ * no device rows of its own: the place it was opened from already lists what is here.
  */
 @Composable
-internal fun GetGamesSheet(
-    context: GetGamesContext,
-    systemId: String? = null,
-    onDismiss: () -> Unit,
-    onChanged: () -> Unit = {},
-) {
-    val screen = androidx.compose.runtime.remember(context, systemId) { getGamesScreen(context, systemId) }
-    if (screen == null) {
-        androidx.compose.runtime.LaunchedEffect(Unit) { onDismiss() }
-        return
-    }
-    CatalogSheet(screen) {
-        onDismiss()
-        onChanged()
-    }
+internal fun GetGamesSearch(systemId: String? = null, systemFolder: java.io.File? = null, pc: Boolean = false, onDismiss: () -> Unit) {
+    dev.droidtop.shell.gamepad.query.LibrarySearchDialog(
+        query = dev.droidtop.shell.gamepad.query.LibraryQuery(),
+        matchCount = 0,
+        totalCount = 0,
+        onTextChange = {},
+        onDismiss = onDismiss,
+        systemId = GetGamesEntry.searchSystem(systemId),
+        systemFolder = systemFolder,
+        local = { emptyList() },
+        sourcePlatform = if (pc) dev.droidtop.library.integrations.SourceDestinations.PC_PLATFORM else null,
+    )
 }
 
 /**
