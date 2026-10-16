@@ -5,6 +5,7 @@ import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerPods
 import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.EngineIds
 import dev.droidtop.runtime.EngineInspect
 import dev.droidtop.runtime.Pod
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +25,8 @@ internal object EngineFacts {
         val times = ContainerPrograms.times(id)
         val pod = pods.firstOrNull { id in it.members }
         return EngineInspect.Facts(
-            id = id,
+            // The engine id: what every front and API calls it (docs/SPEC.md 3d, "Container ids").
+            id = EngineIds.of(id),
             name = info.displayName,
             image = info.image ?: "",
             imageDigest = info.digest,

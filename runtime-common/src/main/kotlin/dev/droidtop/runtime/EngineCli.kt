@@ -466,16 +466,19 @@ class EngineCli private constructor(val front: Front) {
     }
 
     /**
-     * `images` in this front's own columns: REPOSITORY, TAG, IMAGE ID, SIZE. Docker shortens Docker Hub's names
-     * (`nginx`); Podman keeps them whole (`docker.io/library/nginx`) and spaces its sizes ("21.4 MB").
+     * `images` in this front's own columns: REPOSITORY, TAG, IMAGE ID, CREATED (when the image was built, from its
+     * config), SIZE. Docker shortens Docker Hub's names (`nginx`); Podman keeps them whole (`docker.io/library/nginx`)
+     * and spaces its sizes ("21.4 MB").
      */
-    fun formatImages(images: List<OciImageStore.Entry>, command: EngineRequest.Images): String {
+    fun formatImages(images: List<OciImageStore.Entry>, command: EngineRequest.Images, nowMs: Long = System.currentTimeMillis()): String {
         if (command.quiet) return images.joinToString("") { it.digest.substringAfter(':').take(12) + "\n" }
         return table(
-            listOf("REPOSITORY", "TAG", "IMAGE ID", "SIZE"),
+            listOf("REPOSITORY", "TAG", "IMAGE ID", "CREATED", "SIZE"),
             images.map {
                 val repo = if (front == Front.DOCKER) repository(it.reference) else fullRepository(it.reference)
-                listOf(repo, tag(it.reference), it.digest.substringAfter(':').take(12), size(it.sizeBytes))
+                // When the image was built, from its config; empty when the config does not say.
+                val created = it.createdMs?.let { ms -> ago(nowMs - ms) }.orEmpty()
+                listOf(repo, tag(it.reference), it.digest.substringAfter(':').take(12), created, size(it.sizeBytes))
             },
         )
     }

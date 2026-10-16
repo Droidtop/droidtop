@@ -56,7 +56,8 @@ class OciImageStore(
     )
 
     /** One stored image for the cache-management UI: [sizeBytes] counts every blob it uses, shared ones included. */
-    data class Entry(val digest: String, val reference: String, val sizeBytes: Long)
+    /** One stored image; [createdMs] is when its config says it was built, null when the config does not say. */
+    data class Entry(val digest: String, val reference: String, val sizeBytes: Long, val createdMs: Long? = null)
 
     /** The file holding blob [digest], after checking the digest is one (it comes from JSON the registry wrote). */
     fun blob(digest: String): File {
@@ -119,6 +120,7 @@ class OciImageStore(
                     digest = stored.digest,
                     reference = stored.reference,
                     sizeBytes = (entry.long("size") ?: 0) + stored.config.size + stored.layers.sumOf { it.size },
+                    createdMs = runCatching { createdMs(blob(stored.config.digest).readText()) }.getOrNull(),
                 )
             }
         }
@@ -247,6 +249,12 @@ class OciImageStore(
 
         private val lock = Mutex()
         private val json = Json { prettyPrint = true }
+
+        /** When an image config ([text], its config blob) says the image was built: its `created`, or null. */
+        fun createdMs(text: String): Long? = runCatching {
+            val created = (json.parseToJsonElement(text).jsonObject["created"] as? JsonPrimitive)?.contentOrNull ?: return null
+            java.time.Instant.parse(created).toEpochMilli().takeIf { it > 0 }
+        }.getOrNull()
 
         /** The store in app-private storage, pulling with the packaged crane for this install's ABI. */
         fun of(context: Context): OciImageStore {

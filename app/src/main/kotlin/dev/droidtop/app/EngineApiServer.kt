@@ -13,6 +13,7 @@ import dev.droidtop.runtime.Pod
 import dev.droidtop.runtime.DockerApi
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineHttp
+import dev.droidtop.runtime.EngineIds
 import dev.droidtop.runtime.LibpodApi
 import dev.droidtop.runtime.OciImageStore
 import java.io.File
@@ -212,7 +213,7 @@ internal object EngineApiServer {
                 val made = EngineActions.make(app, runtime, runtime.listContainers(), create!!).getOrElse {
                     return DockerApi.error(409, it.message ?: "could not create the container")
                 }
-                EngineHttp.Response.json(201, DockerApi.created(made.container.id, made.notes))
+                EngineHttp.Response.json(201, DockerApi.created(EngineIds.of(made.container.id), made.notes))
             }
             is DockerApi.Call.Start -> withContainer(libpod, runtime, call.id) { rt, info ->
                 when {
@@ -417,7 +418,7 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.ExecGet -> {
                 val exec = execs[call.execId] ?: return noExec(libpod, call.execId)
-                EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, exec.containerId, exec.spec, exec.running, exec.exitCode))
+                EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, EngineIds.of(exec.containerId), exec.spec, exec.running, exec.exitCode))
             }
             DockerApi.Call.PodCreate -> {
                 val (name, labels, refused) = LibpodApi.podRequest(String(request.body, Charsets.UTF_8), runCatching { EngineFeatureProbe.current(app) }.getOrNull())
@@ -440,7 +441,7 @@ internal object EngineApiServer {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
                 val pod = ContainerPods.find(EngineFacts.pods(app), call.id) ?: return missing(libpod, DockerApi.Kind.POD, call.id)
                 when (val removal = EngineActions.removePod(app, runtime, pod, runtime.listContainers(), call.force)) {
-                    is EngineActions.PodRemoval.Removed -> EngineHttp.Response.json(200, LibpodApi.podRemoved(pod.id, removal.containerIds))
+                    is EngineActions.PodRemoval.Removed -> EngineHttp.Response.json(200, LibpodApi.podRemoved(pod.id, removal.containerIds.map { EngineIds.of(it) }))
                     is EngineActions.PodRemoval.Running -> DockerApi.error(
                         409,
                         "pod ${pod.name} has running containers (${removal.names.joinToString(", ")}); stop it first or use podman pod rm -f",
@@ -480,7 +481,7 @@ internal object EngineApiServer {
         force: Boolean,
     ): EngineHttp.Response = when (val removal = EngineActions.remove(app, runtime, info, force)) {
         EngineActions.Removal.Removed ->
-            if (libpod != null) EngineHttp.Response.json(200, LibpodApi.removed(listOf(info.container.id))) else EngineHttp.Response(204, "text/plain", ByteArray(0))
+            if (libpod != null) EngineHttp.Response.json(200, LibpodApi.removed(listOf(EngineIds.of(info.container.id)))) else EngineHttp.Response(204, "text/plain", ByteArray(0))
         EngineActions.Removal.Primary -> DockerApi.error(409, "${info.displayName} is the desktop's own container; droidtop does not remove it")
         EngineActions.Removal.Running -> DockerApi.error(
             409,
@@ -615,11 +616,7 @@ internal object EngineApiServer {
         return block(runtime, info)
     }
 
-    /** A container by name, id, or a unique start of its id, as Docker's daemon takes them. */
-    private fun find(containers: List<ContainerInfo>, ref: String): ContainerInfo? =
-        containers.firstOrNull { it.displayName == ref || it.displayName == ref.removePrefix("/") }
-            ?: containers.firstOrNull { it.container.id == ref }
-            ?: containers.filter { ref.length >= 3 && it.container.id.startsWith(ref) }.singleOrNull()
+    private fun find(containers: List<ContainerInfo>, ref: String): ContainerInfo? = EngineIds.find(containers, ref)
 
     private fun arch(): String = DockerApi.arch(System.getProperty("os.arch").orEmpty())
 

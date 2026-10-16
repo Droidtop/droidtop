@@ -12,6 +12,7 @@ import dev.droidtop.runtime.EngineCli
 import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineFeatures
+import dev.droidtop.runtime.EngineIds
 import dev.droidtop.runtime.EngineInspect
 import dev.droidtop.runtime.EngineOptions
 import dev.droidtop.runtime.OciImageStore
@@ -150,7 +151,7 @@ internal object ContainerEnterRequests {
             refuse(dir, "${cli.name}: ${it.message ?: it.javaClass.simpleName}", 1)
             return
         }
-        fun find(name: String): ContainerInfo? = containers.firstOrNull { it.displayName == name } ?: containers.firstOrNull { it.container.id == name }
+        fun find(name: String): ContainerInfo? = EngineIds.find(containers, name)
         when (command) {
             is EngineRequest.Ps -> {
                 val rows = containers.map { info ->
@@ -159,7 +160,8 @@ internal object ContainerEnterRequests {
                     val config = runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
                         ?.let { ContainerProgram.effectiveConfig(app.filesDir, info.container.id, it) }
                     EngineCli.PsRow(
-                        id = info.container.id,
+                        // The engine id's first twelve, as both tools print (docs/SPEC.md 3d, "Container ids").
+                        id = EngineIds.of(info.container.id).take(12),
                         name = info.displayName,
                         image = info.image ?: "",
                         status = EngineFacts.statusText(state, programUp, info.running),
@@ -221,7 +223,7 @@ internal object ContainerEnterRequests {
                 if (command.start && !made.hasProgram) {
                     notes += "${made.name}'s image names no program to run, so nothing was started; use ${cli.name} exec ${made.name} sh"
                 }
-                answer(dir, "${made.container.id}\n", notes.joinToString("") { it + "\n" }, 0)
+                answer(dir, "${EngineIds.of(made.container.id)}\n", notes.joinToString("") { it + "\n" }, 0)
             }
             is EngineRequest.Remove -> {
                 val out = StringBuilder()

@@ -516,7 +516,7 @@ object LibpodApi {
                 put("ParentId", "")
                 putJsonArray("RepoTags") { add(JsonPrimitive(name)) }
                 putJsonArray("RepoDigests") { add(JsonPrimitive("${EngineCli.PODMAN.fullRepository(e.reference)}@${e.digest}")) }
-                put("Created", 0)
+                put("Created", (e.createdMs ?: 0L) / 1000)
                 put("Size", e.sizeBytes)
                 put("SharedSize", 0)
                 put("VirtualSize", e.sizeBytes)
@@ -536,6 +536,8 @@ object LibpodApi {
         putJsonArray("RepoTags") { add(JsonPrimitive(name)) }
         putJsonArray("RepoDigests") { add(JsonPrimitive("${EngineCli.PODMAN.fullRepository(e.reference)}@${e.digest}")) }
         put("Parent", "")
+        // Podman's Created is a pointer: absent when droidtop does not know it.
+        e.createdMs?.let { put("Created", EngineInspect.time(it)) }
         putJsonObject("Config") {
             put("Env", strings(config?.env))
             put("Cmd", strings(config?.cmd))
@@ -635,7 +637,7 @@ object LibpodApi {
         putJsonObject("labels") { n.labels.forEach { (k, v) -> put(k, v) } }
         putJsonObject("options") { }
         putJsonObject("ipam_options") { }
-        putJsonObject("containers") { n.members.forEach { id -> putJsonObject(id) { put("name", names[id] ?: id) } } }
+        putJsonObject("containers") { n.members.forEach { id -> putJsonObject(EngineIds.of(id)) { put("name", names[id] ?: id) } } }
     }
 
     /** `GET /libpod/networks/json`: [all] that pass [filters] (name, id, label). */
