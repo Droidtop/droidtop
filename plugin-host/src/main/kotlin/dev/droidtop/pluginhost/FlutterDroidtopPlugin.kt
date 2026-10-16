@@ -3,7 +3,6 @@ package dev.droidtop.pluginhost
 import android.content.Context
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.dart.DartExecutor
-import io.flutter.embedding.android.AndroidTouchProcessor
 import io.flutter.embedding.engine.renderer.FlutterRenderer
 import io.flutter.embedding.engine.systemchannels.KeyEventChannel
 import io.flutter.plugin.common.BinaryMessenger
@@ -318,7 +317,6 @@ class FlutterDroidtopPlugin internal constructor(
     private var screenEngine: FlutterEngine? = null
     private var bridged = false
     private var bridgeReport: String? = null
-    private var screenTouch: AndroidTouchProcessor? = null
     private var screenKeys: KeyEventChannel? = null
 
     /**
@@ -379,7 +377,6 @@ class FlutterDroidtopPlugin internal constructor(
                     override fun onFlutterUiNoLongerDisplayed() = Unit
                 })
                 screenEngine = engine
-                screenTouch = AndroidTouchProcessor(engine.renderer, false)
                 screenKeys = KeyEventChannel(engine.dartExecutor.binaryMessenger)
             }
             null
@@ -414,10 +411,19 @@ class FlutterDroidtopPlugin internal constructor(
         }
     }
 
+    /**
+     * Touches go to the engine as droidtop packs them ([FlutterPointerPacket]), never through Flutter's
+     * AndroidTouchProcessor, which asks the input service about the device and kills a contained process on the first
+     * touch (Droidtop/tracker#511).
+     */
     override fun screenTouch(event: android.view.MotionEvent) {
+        val touch = runCatching { ScreenTouches.of(event) }.getOrNull()
+        event.recycle()
+        touch ?: return
         mainHandler.post {
-            screenTouch?.onTouchEvent(event)
-            event.recycle()
+            val engine = screenEngine ?: return@post
+            val packet = FlutterPointerPacket.pack(touch) ?: return@post
+            engine.renderer.dispatchPointerDataPacket(packet, packet.position())
         }
     }
 
@@ -440,7 +446,6 @@ class FlutterDroidtopPlugin internal constructor(
     private fun detachScreenOnMain() {
         val engine = screenEngine ?: return
         screenEngine = null
-        screenTouch = null
         screenKeys = null
         runCatching { engine.renderer.stopRenderingToSurface() }
         runCatching { engine.destroy() }
