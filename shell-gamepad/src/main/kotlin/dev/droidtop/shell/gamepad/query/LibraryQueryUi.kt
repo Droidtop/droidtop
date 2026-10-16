@@ -859,8 +859,9 @@ internal fun LibrarySearchDialog(
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
-            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
-            dev.droidtop.shell.gamepad.OwnFieldKeyboard()
+            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314), only
+            // while the cursor is in the field: on the rows it closes, the companion's included (#485 rig step 1).
+            dev.droidtop.shell.gamepad.OwnFieldKeyboard(active = focusKey == null)
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 lines.forEach { line ->
                     when (line) {

@@ -58,10 +58,12 @@ fun DroidtopKeyboard(
  * droidtop's keyboard under a droidtop text field, drawn only on a screen where Android draws no keyboard
  * (a secondary display droidtop has not set to show Android's own, [AddonKeyboardRules.ownFieldNeedsKeyboard]).
  * It types into whichever field of this window has focus, through the window's own key path ([WindowKeySink]),
- * so it needs no input method, no window focus and no permission.
+ * so it needs no input method, no window focus and no permission. [active] is whether the person is typing in the
+ * field now: a page whose cursor left the field for its rows passes false, and the keyboard closes wherever it was
+ * shown (the companion's stayed up over search results, Droidtop/tracker#485 rig step 1), coming back with the cursor.
  */
 @Composable
-fun OwnFieldKeyboard(modifier: Modifier = Modifier) {
+fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
     val view = LocalView.current
     val local by AddonKeyboard.localDisplays.collectAsState()
     var displayId by remember(view) { mutableStateOf<Int?>(null) }
@@ -81,7 +83,11 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier) {
     val companions by KeyboardTargets.companionsChanged.collectAsState()
     val display = displayId ?: return
     var opened by remember(view) { mutableStateOf<KeyboardTargets.Opened?>(null) }
-    DisposableEffect(sink, display, setting, hosts, companions) {
+    DisposableEffect(sink, display, setting, hosts, companions, active) {
+        if (!active) {
+            opened = null
+            return@DisposableEffect onDispose {}
+        }
         val now = KeyboardTargets.open(display, sink)
         opened = now
         onDispose { (now as? KeyboardTargets.Opened.Elsewhere)?.let { KeyboardTargets.close(it.request) } }
