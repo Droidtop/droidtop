@@ -28,6 +28,14 @@ object Slab {
         data object CaretRight : Action
         data object Tab : Action
         data object Escape : Action
+
+        /** The extras (a whole keyboard's keys, for the companion's Input tab and Desktop): one-shot modifiers. */
+        data object Ctrl : Action
+        data object Alt : Action
+        data object Super : Action
+        data object ArrowUp : Action
+        data object ArrowDown : Action
+        data class Function(val n: Int) : Action
     }
 
     /** The pad button a key's keycap shows, when one does that key's job; the host draws the glyph its layout prints. */
@@ -41,7 +49,7 @@ object Slab {
     enum class ShiftState { OFF, ONCE, CAPS }
 
     /** What Enter says on its key and keycap: the purpose of the entry, never "Enter". */
-    enum class EnterPurpose(val label: String) { SEARCH("Search"), SAVE("Save"), DONE("Done"), NEXT("Next"), GO("Go") }
+    enum class EnterPurpose(val label: String) { SEARCH("Search"), SAVE("Save"), DONE("Done"), NEXT("Next"), GO("Go"), ENTER("Enter") }
 
     /** What the entry is for, which picks the first layer (a number opens on symbols, an email on the email layer). */
     enum class Kind { PLAIN, SEARCH, URL, NUMBER, EMAIL }
@@ -63,11 +71,41 @@ object Slab {
         Key(Action.Done, 1.5f, Cap.B),
     )
 
+    /** The extras' row above the letters: what a whole keyboard has and a text field does not need. */
+    private fun extrasRow() = listOf(
+        Key(Action.Escape), Key(Action.Tab), Key(Action.Ctrl), Key(Action.Alt), Key(Action.Super),
+    )
+
     /**
-     * The rows of [layer]. [large] is the Large keys form (automatic at font scale 1.3): four rows, the digits moved to
-     * the symbols layer, as the S7 layout has it (5.2).
+     * A whole keyboard's bottom row: no Clipboard, globe or Done, which belong to a text field that can close, and the
+     * four arrows together. Nothing on the Input tab closes (Droidtop/tracker#567).
      */
-    fun rows(layer: Layer, large: Boolean, form: Form = Form.FIELD): List<List<Key>> {
+    private fun extrasBottomRow(first: Key) = listOf(
+        first,
+        Key(Action.Space, 5f, Cap.Y),
+        Key(Action.CaretLeft),
+        Key(Action.ArrowUp),
+        Key(Action.ArrowDown),
+        Key(Action.CaretRight),
+    )
+
+    /**
+     * The rows of [layer]. [large] is the Large keys form (automatic at font scale 1.3, or when the slab's container is
+     * too short for the number row): four letter rows, the digits on the symbols layer, as the S7 layout has it (5.2).
+     * [extras] adds a whole keyboard's keys for the companion's Input tab and Desktop (Droidtop/tracker#567): Esc, Tab,
+     * Ctrl, Alt, Super and the up and down arrows above the letters, and F1 to F12 above the symbols.
+     */
+    fun rows(layer: Layer, large: Boolean, form: Form = Form.FIELD, extras: Boolean = false): List<List<Key>> {
+        val base = baseRows(layer, large, form)
+        if (!extras) return base
+        val whole = base.dropLast(1) + listOf(extrasBottomRow(base.last().first()))
+        return when (layer) {
+            Layer.SYMBOLS -> listOf((1..12).map { Key(Action.Function(it)) }) + whole
+            else -> listOf(extrasRow()) + whole
+        }
+    }
+
+    private fun baseRows(layer: Layer, large: Boolean, form: Form): List<List<Key>> {
         val backspace = Key(Action.Backspace, 1.5f, Cap.X)
         val enter = Key(Action.Enter, 1.75f, Cap.R2)
         val shift = Key(Action.Shift, 1.5f, Cap.L1)
@@ -104,6 +142,18 @@ object Slab {
         /** An Android key to send down and up (Backspace, Enter, Tab, Escape, the caret's arrows). */
         data class Press(val keyCode: Int) : Output
 
+        /** A key under held modifiers (Ctrl+C, Alt+Tab): [modifiers] down, the key down and up, the modifiers up. */
+        data class Chord(val keyCode: Int, val modifiers: List<Int>) : Output
+
+        /**
+         * A whole keyboard's key held under a finger: [modifiers] then the key go down on touch ([Down]), and come up in
+         * reverse on release ([Up]); a repeat is another key-down. The host keeps the pair.
+         */
+        data class Hold(val keyCode: Int, val modifiers: List<Int>)
+
+        data class Down(val hold: Hold, val repeat: Boolean = false) : Output
+        data class Up(val hold: Hold) : Output
+
         /** B: keep the text and close (Field) or cancel (Prompt), the host decides by its [Form]. */
         data object Close : Output
         data object OpenClipboard : Output
@@ -120,8 +170,11 @@ object Slab {
         val form: Form = Form.FIELD,
         /** When Shift was last pressed (ms), for the double press that sets Caps. */
         val lastShiftAt: Long = Long.MIN_VALUE / 2,
+        val extras: Boolean = false,
+        /** The extras' modifiers pressed for the next key (Ctrl, Alt, Super), one shot each. */
+        val modifiers: Set<Action> = emptySet(),
     ) {
-        val keys: List<List<Key>> get() = rows(layer, large, form)
+        val keys: List<List<Key>> get() = rows(layer, large, form, extras)
         val focused: Key? get() = keys.getOrNull(row)?.getOrNull(col)
 
         /** The label a key shows now: a letter follows Shift, everything else is its fixed name. */
@@ -140,12 +193,21 @@ object Slab {
             Action.CaretRight -> "→"
             Action.Tab -> "Tab"
             Action.Escape -> "Esc"
+            Action.Ctrl -> "Ctrl"
+            Action.Alt -> "Alt"
+            Action.Super -> "Super"
+            Action.ArrowUp -> "\u2191"
+            Action.ArrowDown -> "\u2193"
+            is Action.Function -> "F${a.n}"
         }
+
+        /** Whether a modifier key is pressed for the next key, so the slab draws it lit. */
+        fun latched(key: Key): Boolean = key.action in modifiers || (key.action == Action.Shift && shift != ShiftState.OFF)
     }
 
     /** Where the slab opens: the first key with [lower] on the first layer of [kind], else the top-left key. */
-    fun open(kind: Kind, large: Boolean, form: Form, lower: Char = 'g'): State {
-        val base = State(layer = firstLayer(kind), large = large, form = form)
+    fun open(kind: Kind, large: Boolean, form: Form, lower: Char = 'g', extras: Boolean = false): State {
+        val base = State(layer = firstLayer(kind), large = large, form = form, extras = extras)
         base.keys.forEachIndexed { r, row ->
             row.forEachIndexed { c, key -> if ((key.action as? Action.Char)?.lower == lower) return base.copy(row = r, col = c) }
         }
@@ -200,7 +262,72 @@ object Slab {
     )
 
     /** Pressing a key whose action is [action] (A on the focused key, or its pad button). */
-    fun press(state: State, action: Action, now: Long): Pair<State, Output?> = when (action) {
+    fun press(state: State, action: Action, now: Long): Pair<State, Output?> {
+        if (action in MODIFIERS) {
+            val next = if (action in state.modifiers) state.modifiers - action else state.modifiers + action
+            return state.copy(modifiers = next) to null
+        }
+        if (state.modifiers.isNotEmpty()) chord(state, action)?.let { return it }
+        return plain(state, action, now)
+    }
+
+    private val MODIFIERS = setOf(Action.Ctrl, Action.Alt, Action.Super)
+
+    private fun modifierCode(action: Action) = when (action) {
+        Action.Ctrl -> KeyEvent.KEYCODE_CTRL_LEFT
+        Action.Alt -> KeyEvent.KEYCODE_ALT_LEFT
+        else -> KeyEvent.KEYCODE_META_LEFT
+    }
+
+    /** A key under the latched modifiers: one chord, after which the modifiers (and a one-shot Shift) let go. */
+    private fun chord(state: State, action: Action): Pair<State, Output?>? {
+        val held = held(state, action) ?: return null
+        return released(state) to Output.Chord(held.keyCode, held.modifiers)
+    }
+
+    /**
+     * The key a whole keyboard sends while [action]'s key is held (Droidtop/tracker#567: a PC game moves while an arrow
+     * or a letter is held), with what is latched held under it: Ctrl, Alt and Super, and Shift for an upper-case
+     * character or a named key while Shift is on. Null for a key that is not a key press (Shift, a modifier, a layer
+     * switch), which acts on release through [press].
+     */
+    fun held(state: State, action: Action): Output.Hold? {
+        if (action in MODIFIERS) return null
+        val (code, shifted) = when (action) {
+            is Action.Char -> {
+                val ch = if (state.shift != ShiftState.OFF) action.upper else action.lower
+                SlabSink.UsKeys.of(ch) ?: return null
+            }
+            else -> (keyCodeOf(action) ?: return null) to false
+        }
+        val mods = state.modifiers.sortedBy { modifierCode(it) }.map(::modifierCode)
+        val withShift = if (shifted || (state.shift != ShiftState.OFF && action !is Action.Char)) mods + KeyEvent.KEYCODE_SHIFT_LEFT else mods
+        return Output.Hold(code, withShift)
+    }
+
+    /** After a held key or a chord: the one-shot modifiers let go, and a one-shot Shift goes off; Caps stays. */
+    fun released(state: State): State =
+        state.copy(modifiers = emptySet(), shift = if (state.shift == ShiftState.ONCE) ShiftState.OFF else state.shift)
+
+    /** Whether a held key repeats (400 ms, then every 50 ms) for a destination that does not repeat it itself. */
+    fun repeats(action: Action): Boolean = action == Action.Backspace || action == Action.Space || action is Action.Char ||
+        action == Action.CaretLeft || action == Action.CaretRight || action == Action.ArrowUp || action == Action.ArrowDown
+
+    private fun keyCodeOf(action: Action): Int? = when (action) {
+        Action.Space -> KeyEvent.KEYCODE_SPACE
+        Action.Backspace -> KeyEvent.KEYCODE_DEL
+        Action.Enter -> KeyEvent.KEYCODE_ENTER
+        Action.Tab -> KeyEvent.KEYCODE_TAB
+        Action.Escape -> KeyEvent.KEYCODE_ESCAPE
+        Action.CaretLeft -> KeyEvent.KEYCODE_DPAD_LEFT
+        Action.CaretRight -> KeyEvent.KEYCODE_DPAD_RIGHT
+        Action.ArrowUp -> KeyEvent.KEYCODE_DPAD_UP
+        Action.ArrowDown -> KeyEvent.KEYCODE_DPAD_DOWN
+        is Action.Function -> KeyEvent.KEYCODE_F1 + action.n - 1
+        else -> null
+    }
+
+    private fun plain(state: State, action: Action, now: Long): Pair<State, Output?> = when (action) {
         is Action.Char -> {
             val ch = if (state.shift != ShiftState.OFF) action.upper else action.lower
             val next = if (state.shift == ShiftState.ONCE) state.copy(shift = ShiftState.OFF) else state
@@ -211,8 +338,8 @@ object Slab {
         Action.Enter -> state to Output.Press(KeyEvent.KEYCODE_ENTER)
         Action.Tab -> state to Output.Press(KeyEvent.KEYCODE_TAB)
         Action.Escape -> state to Output.Press(KeyEvent.KEYCODE_ESCAPE)
-        Action.CaretLeft -> state to Output.Press(KeyEvent.KEYCODE_DPAD_LEFT)
-        Action.CaretRight -> state to Output.Press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        Action.CaretLeft, Action.CaretRight, Action.ArrowUp, Action.ArrowDown, is Action.Function ->
+            state to Output.Press(keyCodeOf(action)!!)
         Action.Shift -> {
             val double = now - state.lastShiftAt <= DOUBLE_PRESS_MS
             val shift = when {
@@ -228,6 +355,7 @@ object Slab {
         Action.Done -> state to Output.Close
         Action.Clipboard -> state to Output.OpenClipboard
         Action.SystemKeyboard -> state to Output.UseSystemKeyboard
+        Action.Ctrl, Action.Alt, Action.Super -> state to null
     }
 
     /** Another layer keeps the cursor on the same row, at the nearest key, so a switch never throws it to a corner. */
@@ -260,6 +388,20 @@ object SlabSink {
             is Slab.Output.Press -> {
                 sink.key(output.keyCode, true)
                 sink.key(output.keyCode, false)
+            }
+            is Slab.Output.Chord -> {
+                output.modifiers.forEach { sink.key(it, true) }
+                sink.key(output.keyCode, true)
+                sink.key(output.keyCode, false)
+                output.modifiers.asReversed().forEach { sink.key(it, false) }
+            }
+            is Slab.Output.Down -> {
+                if (!output.repeat) output.hold.modifiers.forEach { sink.key(it, true) }
+                sink.key(output.hold.keyCode, true)
+            }
+            is Slab.Output.Up -> {
+                sink.key(output.hold.keyCode, false)
+                output.hold.modifiers.asReversed().forEach { sink.key(it, false) }
             }
             Slab.Output.Close -> onClose()
             else -> onOther(output)
