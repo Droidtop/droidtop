@@ -15536,13 +15536,20 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   group below it is droidtop's own update settings and Check now, as
   before. **Android apps** (Droidtop/tracker#261, 10b "Installing apps"):
   installed apps against the app catalogs' cached offers, one row per update
-  ("Update to <version>", the one install path) and Update all apps; an offer
+  ("<version> available", the one install path) and Update all apps; an offer
   signed by another key than the installed app is listed as "Different key"
   and not offered. Below them an "Android apps" group: Get apps (the app
   catalogs' screen), Check app catalogs now (refreshes every source of every
   catalog plugin, then the offers) and **Update apps without asking** (on by
   default; the owner's setting of 2026-10-01: it only matters where Android or
   a privilege allows a silent install, Android asks every time otherwise).
+  **One group per kind, the bulk action first (2026-10-16, Droidtop/tracker#506).**
+  What was one "Available" group is a group each for droidtop, Plugins, Apps and
+  Games, in that order, a group with nothing in it left out. "Update all
+  plugins" and "Update all apps" (with how many in the value column) lead the
+  group they cover, as a store's Downloads page puts its bulk action above the
+  list, instead of sitting between items; and an update's value is "<version>
+  available", one short line, where "Update to <version>" wrapped onto two.
   **One Updates screen, one list of ways in** (2026-10-03, Droidtop/tracker#273):
   the plugin updates status and "Update all" that the Plugins screen also
   carried are gone (the Plugins screen lists plugins, approvals, repositories
@@ -19840,7 +19847,7 @@ what the index says is display data, never a trust decision.
   - **Updates** moved out (2026-10-03): the status ("N updates
     available", "Up to date", never "Up to date" on a catalog that was
     never read) and "Update all" (`PluginCatalog.updateAll`) are the
-    Updates screen's "Available" group, see "Places".
+    Updates screen's Plugins group, see "Places".
   - **Add** — "droidtop plugins" (droidtop's own catalog, the screen
     below, opened straight from here so installing an official plugin is
     Add, the plugin, Install), "More catalogs" ("Added catalogs", "Known
