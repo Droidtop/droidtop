@@ -3487,8 +3487,8 @@ arrays under the manifest's own keys (`V2Declarations`).
     `exec {argv: [string], timeoutMs?} -> {exit, stdout, stderr}`,
     permission `priv.shell.adb` (critical). `argv` is executed directly, not
     through a shell, and each stream is capped at 64 KiB.
-  The other `priv.packages` op of §2.2, install, is designed on
-  Droidtop/tracker#130 and not built yet. Two more ops are specified
+  Install, the last `priv.packages` op of §2.2, is specified below
+  (Droidtop/tracker#130). Two more ops are specified
   and built (2026-10-09, Droidtop/tracker#248), for the
   Emulator setup helper, both under the `priv.packages` permission:
   - `set_appop {package, op, mode} -> {}`: `appops set <package> <op> <mode>`.
@@ -3499,6 +3499,11 @@ arrays under the manifest's own keys (`V2Declarations`).
   - `grant_permission {package, permission} -> {}`: `pm grant <package>
     <permission>`; Android itself refuses a permission the app does not declare
     or that is not a runtime permission.
+  droidtop calls them only for the person's own action: Settings > Risky actions
+  > "Give another app access" is on and that one use was confirmed with the app
+  and the exact permission or appop named (docs/SPEC.md "Risky actions"), and it
+  reads the result back from Android rather than trusting the reply. It offers
+  the rows only while the running provider exports the op (`HostApiCaller.hasOp`).
   Three more (2026-10-16, Droidtop/tracker#130; Shizuku plugin 1.5.0), also
   under `priv.packages`:
   - `revoke_permission {package, permission} -> {}`: `pm revoke`, the pair to
@@ -3516,11 +3521,36 @@ arrays under the manifest's own keys (`V2Declarations`).
   mode, a permission name) before it runs anything, and each value is one
   argument of the command, never shell text. No droidtop screen calls these
   three yet; they are for plugins that manage apps.
-  droidtop calls them only for the person's own action: Settings > Risky actions
-  > "Give another app access" is on and that one use was confirmed with the app
-  and the exact permission or appop named (docs/SPEC.md "Risky actions"), and it
-  reads the result back from Android rather than trusting the reply. It offers
-  the rows only while the running provider exports the op (`HostApiCaller.hasOp`).
+  And install (2026-10-16, Droidtop/tracker#130), a **job** under
+  `priv.packages`:
+  - The caller asks `install {name}`, `name` being an APK in its own `data`
+    folder (H1); a plugin holding the APK elsewhere copies it there first.
+  - droidtop's broker acts after the caller's grant and before the provider
+    sees anything (`PrivInstall`). Only a call the person started installs.
+    Android reads the APK (`getPackageArchiveInfo`); anything else is
+    `INVALID_ARGS`. droidtop itself, the app Android opens on Home now and an
+    installed system app are refused (`PERMISSION_DENIED`). The person
+    confirms each install on droidtop's confirm card, "Install <label>
+    <version>?", which names the app, its package, the calling plugin and the
+    provider (No is `CANCELLED`). The file is copied to droidtop's private
+    `cache/priv-install/` under a random name, and the provider is called
+    with `{staged: {path, size, sha256, package}}` only, written by droidtop:
+    a caller's own `staged` or `name` never reaches it. Staged copies older
+    than an hour are removed on the next install.
+  - The provider streams the staged file into `pm install -S <size>` on
+    stdin, after checking the size and digest and refusing its own app, and
+    deletes the staged copy when it ends. It replies `{installed: true,
+    package, versionName}`; Android's `Failure [INSTALL_FAILED_...]` is
+    `FAILED` with a plain sentence and the raw line in `detail`. Downgrades
+    and a different signer stay Android's own refusals.
+  - **Why stdin and not a staged path the shell user reads:** droidtop cannot
+    write anywhere the shell user may read that other apps may not (shared
+    storage is readable by any app with storage access, and `/data/local/tmp`
+    belongs to the shell user, not droidtop). Streaming from droidtop's
+    private cache means no copy of the APK is ever readable outside droidtop.
+    It also means the provider must run in droidtop's process to read that
+    cache: install is served only by a provider with full access, and the
+    broker answers `UNSUPPORTED` for any other.
 - **Ops for the emulator setup helper** (specified 2026-10-08,
   Droidtop/tracker#130, #248; droidtop's side is built, the Shizuku provider
   plugin is to add them). Both are `priv.shell@1` ops, permission

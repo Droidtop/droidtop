@@ -155,6 +155,27 @@ class FakeEnv(vararg records: PluginRecord) : BrokerEnvironment {
         return true
     }
 
-    override fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall) = jobId
+    /** The confirm card: every notice asked, and the answer given. */
+    val confirms = mutableListOf<dev.droidtop.library.settings.Notice>()
+    var confirmAnswer = false
+    override fun confirm(notice: dev.droidtop.library.settings.Notice, proceed: String, cancel: String): Boolean {
+        confirms += notice
+        return confirmAnswer
+    }
+
+    /** priv.packages install: what an APK reads as (null: not one), droidtop's refusal of its package, and the staging folder. */
+    var apk: ApkInfo? = null
+    var installRefusalText: String? = null
+    val stagingDir: java.io.File by lazy { kotlin.io.path.createTempDirectory("priv-install").toFile() }
+    override fun apkInfo(file: java.io.File) = apk
+    override fun installRefusal(packageName: String) = installRefusalText
+    override fun stageApk(file: java.io.File): java.io.File = PrivInstall.stage(file, stagingDir, now)
+
+    /** Every brokered job started, with the call the provider was given. */
+    val brokeredJobs = mutableListOf<Pair<String, PluginCall>>()
+    override fun startBrokeredJob(caller: PluginRecord, provider: PluginRecord, call: PluginCall): String? {
+        brokeredJobs += provider.manifest.id to call
+        return jobId
+    }
     override fun brokeredJobStatus(caller: PluginRecord, jobId: String) = PluginReply.error(PluginErrorCode.NOT_FOUND, "no such job")
 }
