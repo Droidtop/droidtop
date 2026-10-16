@@ -499,10 +499,11 @@ fun quickSectionGroups(
 }
 
 /**
- * The tile glyphs, drawn rather than shipped: droidtop has no icon
- * dependency, and a quick-settings grid without icons is a wall of text.
- * These are plain strokes on a 24-unit square -- small enough to read at
- * tile size, and no new artifact in the repo.
+ * The tile glyphs, drawn as plain strokes on a 24-unit square: small enough
+ * to read at tile size, and one hand-drawn style across every tile and the
+ * rail. A quick-settings grid without icons is a wall of text, so a tile
+ * this file has no glyph for draws [QuickGlyph.GENERIC], a placeholder that
+ * a known tile should never show (Droidtop/tracker#534).
  */
 @Composable
 fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier) {
@@ -659,6 +660,41 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
             QuickGlyph.GENERIC -> {
                 ring(12f, 12f, 8f)
                 dot(12f, 12f, 2.2f)
+            }
+            QuickGlyph.CAMERA -> {
+                drawRoundRect(tint, p(3f, 7f), Size(18f * u, 13f * u), androidx.compose.ui.geometry.CornerRadius(2.5f * u), style = stroke)
+                line(8.5f, 7f, 10f, 4.5f); line(10f, 4.5f, 14f, 4.5f); line(14f, 4.5f, 15.5f, 7f)
+                ring(12f, 13.5f, 3.8f)
+            }
+            QuickGlyph.STOP -> {
+                ring(12f, 12f, 9f)
+                drawRect(tint, p(8.5f, 8.5f), Size(7f * u, 7f * u))
+            }
+            QuickGlyph.SECOND_SCREEN -> {
+                // Two screens, the second drawn in front of the first: the device and its companion.
+                drawRoundRect(tint, p(2.5f, 4f), Size(13f * u, 9f * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u), style = stroke)
+                drawRoundRect(tint, p(8.5f, 11f), Size(13f * u, 9f * u), androidx.compose.ui.geometry.CornerRadius(1.5f * u), style = stroke)
+            }
+            QuickGlyph.LOCATION -> {
+                // A map pin: a round head narrowing to its point, and the hole through it.
+                arc(12f, 9.5f, 6.5f, 150f, 240f)
+                line(6.37f, 12.75f, 12f, 21f); line(17.63f, 12.75f, 12f, 21f)
+                ring(12f, 9.5f, 2.3f)
+            }
+            QuickGlyph.FLASHLIGHT -> {
+                // A torch, lit end up: the wide head, the handle and its switch, a ray each side.
+                line(7f, 7f, 17f, 7f); line(7f, 7f, 9.5f, 11f); line(17f, 7f, 14.5f, 11f)
+                drawRoundRect(tint, p(9.5f, 11f), Size(5f * u, 10f * u), androidx.compose.ui.geometry.CornerRadius(1f * u), style = stroke)
+                dot(12f, 14.5f, 1.1f)
+                line(12f, 2f, 12f, 4.5f); line(5.5f, 3.5f, 7f, 5f); line(18.5f, 3.5f, 17f, 5f)
+            }
+            QuickGlyph.PLUGIN -> {
+                // A puzzle piece, as the left menu's Plugins row: a square with a knob on its top and one on its right.
+                line(4f, 8f, 9.5f, 8f); line(14.5f, 8f, 18f, 8f)
+                arc(12f, 7f, 2.6f, 160f, 220f)
+                line(18f, 8f, 18f, 11.5f); line(18f, 16.5f, 18f, 20f)
+                arc(19f, 14f, 2.6f, 250f, 220f)
+                line(4f, 20f, 18f, 20f); line(4f, 8f, 4f, 20f)
             }
             QuickGlyph.APPS -> {
                 listOf(4f to 4f, 13f to 4f, 4f to 13f, 13f to 13f).forEach { (x, y) ->
