@@ -237,19 +237,24 @@ object PluginTiles {
     /** The last state seen for [tile], for drawing before the refresh answers. */
     fun cached(tile: Tile): TileState? = lastState[tile.key]
 
-    private fun args(tile: Tile) = JSONObject().apply { tile.entry.id?.let { put("tileId", it) } }
+    /** A tile call's args; off the Quick Menu they say where the tile is drawn (`context.surface`, `android.widget`). */
+    private fun args(tile: Tile, surface: String = QUICK_MENU_SURFACE) = JSONObject().apply {
+        tile.entry.id?.let { put("tileId", it) }
+        if (surface != QUICK_MENU_SURFACE) put("context", JSONObject().put("surface", surface))
+    }
 
     /** Asks every tile for its state in parallel; a tile that does not answer in time keeps its last value. */
-    suspend fun refresh(context: Context, tiles: List<Tile>): Map<String, TileState?> = coroutineScope {
+    suspend fun refresh(context: Context, tiles: List<Tile>, surface: String = QUICK_MENU_SURFACE, userInitiated: Boolean = true): Map<String, TileState?> = coroutineScope {
         tiles.map { tile ->
             async {
                 val policy = PluginCrashPolicy(context.applicationContext)
                 try {
                     val reply = policy.handle(
                         tile.record,
-                        newCall(tile.entry.point, "state", QUICK_MENU_SURFACE, args(tile), STATE_BUDGET_MS),
+                        newCall(tile.entry.point, "state", surface, args(tile, surface), STATE_BUDGET_MS),
                         timeoutMs = STATE_BUDGET_MS,
                         crashOnTimeout = false,
+                        userInitiated = userInitiated,
                     )
                     if (reply.ok) PluginTileProtocol.state(reply.data, tile.fallbackLabel).also { lastState[tile.key] = it } else lastState[tile.key]
                 } finally {
@@ -260,11 +265,11 @@ object PluginTiles {
     }
 
     /** Presses a quick tile: `toggle` when it has an on state, otherwise `action`. Returns the outcome. */
-    suspend fun press(context: Context, tile: Tile, state: TileState?): PluginOutcome? {
+    suspend fun press(context: Context, tile: Tile, state: TileState?, surface: String = QUICK_MENU_SURFACE): PluginOutcome? {
         if (!tile.quick) return null
         val policy = PluginCrashPolicy(context.applicationContext)
         return try {
-            val reply = policy.handle(tile.record, newCall(tile.entry.point, PluginTileProtocol.pressOp(state), QUICK_MENU_SURFACE, args(tile), 15_000L))
+            val reply = policy.handle(tile.record, newCall(tile.entry.point, PluginTileProtocol.pressOp(state), surface, args(tile, surface), 15_000L))
             if (!reply.ok) {
                 return PluginOutcome(
                     message = "${tile.fallbackLabel} failed: ${reply.message}",

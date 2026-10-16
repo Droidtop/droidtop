@@ -816,6 +816,10 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+        <!-- A press on a plugin's part of a droidtop widget (docs/plugin-api.md 3 C10, C2): reached only by droidtop's own PendingIntents. -->
+        <receiver
+            android:name="dev.droidtop.app.PluginWidgetActionReceiver"
+            android:exported="false" />
         <!-- PackageInstaller reports the verdict on every APK droidtop installs here (ApkInstaller). -->
         <receiver
             android:name="dev.droidtop.app.apps.ApkInstallStatusReceiver"

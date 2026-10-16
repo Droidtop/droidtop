@@ -1348,6 +1348,22 @@ providers, long-press app actions, drawer groups), are specified in
 (`PluginStatusWidgetProvider`) is built; the rest are on that document's
 roadmap.
 
+**Plugins on droidtop's widgets (decided 2026-10-16, Droidtop/tracker#563).**
+A plugin reaches another launcher's pages only through droidtop's own
+widgets, as data: a C10 `ui.widget` snapshot in one of five templates
+(value, list, gauge, media, image), or a C2/C3 tile's state, drawn by the
+one widget renderer. There are no free-form plugin views, and no plugin code
+runs in the launcher's process. Images arrive in the reply as checked bytes
+and are decoded once by droidtop; a widget never fetches a URL. droidtop
+decides when to ask (at most every 30 s), and a tap is a broadcast to
+droidtop's own receiver, which calls the plugin through the broker off the
+main thread and accepts only the action ids the last snapshot offered.
+Whether an entry may be on a widget is the tiles' existing `surfaces` filter
+(`android.widget`), not a second flag. The plugin side is in
+`PluginWidgetProtocol` (plugin-host), `PluginWidgets` (library-core) and
+`PluginWidgetActionReceiver` (`:app`); docs/plugin-api.md C10 is the
+contract.
+
 **Handheld constraint, restated for this work specifically:** every row above
 must work by controller AND touch, pointer and focus as one selection (§7j),
 same as the rest of droidtop's chrome — Murine's stock pages already satisfy
