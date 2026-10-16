@@ -116,6 +116,13 @@ class PluginReply private constructor(
      */
     val detail: String? = null,
 ) {
+    /**
+     * This failure as one about [permission] (Droidtop/tracker#518): a plugin passed droidtop's refusal of a declared
+     * permission on without naming it, and the page names it for the person.
+     */
+    fun aboutPermission(permission: String, title: String, subtitle: String?): PluginReply =
+        PluginReply(ok, data, code, message, title, subtitle, permission, action, detail)
+
     fun toJson(): JSONObject = if (ok) {
         JSONObject().put("ok", true).put("data", data)
     } else {

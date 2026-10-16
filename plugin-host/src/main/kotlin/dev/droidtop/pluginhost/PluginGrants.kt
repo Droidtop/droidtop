@@ -130,6 +130,8 @@ class PluginGrants(private val dir: File) {
      * now, so a refused network or folder is gone at once (docs/plugin-api.md 5.3).
      */
     fun set(pluginId: String, permission: String, state: GrantState) {
+        // A choice made on the Permissions page replaces a Not now from earlier in this run (Droidtop/tracker#518).
+        PluginRefusals.forgetNotNow(pluginId, permission)
         val changedHole = synchronized(LOCK) {
             val snap = readLocked(pluginId)
             writeLocked(

@@ -178,13 +178,21 @@ class BrokerCoreTest {
     }
 
     @Test
-    fun `Not now fails the call and keeps asking, Never turns it off`() {
+    fun `Not now fails the call and lasts this run, Never turns it off`() {
         val env = shellWorld()
         env.user = true
         env.answer = GrantAnswer.NOT_NOW
         val core = shellCaller(env)
-        assertEquals(PluginErrorCode.PERMISSION_DENIED, reply(core.call(request("priv.shell", "exec"))).code)
+        val first = reply(core.call(request("priv.shell", "exec")))
+        assertEquals(PluginErrorCode.PERMISSION_DENIED, first.code)
+        assertTrue("a whole sentence, not \"not now\"", first.message!!.startsWith("You chose Not now"))
         assertTrue(env.states["acme.caller"].isNullOrEmpty())
+        assertEquals(listOf("acme.caller" to "priv.shell.adb"), env.refused)
+        // Droidtop/tracker#518: the same call does not ask again in this run.
+        assertEquals(PluginErrorCode.PERMISSION_DENIED, reply(core.call(request("priv.shell", "exec"))).code)
+        assertEquals(1, env.prompts.size)
+        // A new run (or a choice on the Permissions page) asks again.
+        env.putOff.clear()
         env.answer = GrantAnswer.NEVER
         assertEquals(PluginErrorCode.PERMISSION_DENIED, reply(core.call(request("priv.shell", "exec"))).code)
         assertEquals(GrantState.DENIED, env.states["acme.caller"]!!["priv.shell.adb"])
