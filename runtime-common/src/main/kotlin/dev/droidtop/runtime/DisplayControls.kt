@@ -19,7 +19,8 @@ import kotlinx.coroutines.flow.StateFlow
  * - **The companion screen's brightness** is its window's own brightness ([companionLevel], 0..1), which the companion
  *   window applies; it never changes the main screen. It stops at [FLOOR]: only Off goes lower.
  * - **Off**: Android gives no app, and no shell command on Android 13, a way to power one panel of several off, so Off
- *   is the companion window black at the lowest backlight ([OFF_LEVEL]), touch still reaching it to wake.
+ *   is the companion window at the lowest backlight ([OFF_LEVEL]), its UI still drawn (a screenshot or a recording
+ *   shows it), touch still reaching it to wake.
  * - **Refresh rate** of a display: `cmd display set-user-preferred-display-mode W H RATE ID` through the helper app
  *   (Android 13 and later), a write to the system's display settings, so a Risky actions class gates it.
  */
@@ -83,30 +84,36 @@ object DisplayControls {
 }
 
 /**
- * The companion screen's idle timer (docs/SPEC.md "The companion's tabs", Companion screen off and idle): with no touch
- * it dims after two minutes and goes off after five, or later when Android's accessibility settings ask for longer
+ * The companion screen's idle timer (docs/SPEC.md "The companion's tabs", Companion screen off and idle): with no input
+ * it dims after the chosen time ([DIM_AFTER_MS] by default, never when the person chose Never) and goes off
+ * [OFF_GAP_MS] later, both later when Android's accessibility settings ask for longer
  * (`AccessibilityManager.getRecommendedTimeoutMillis`). It does not run while an exemption holds (Social shown, a
- * keep-on plugin panel, the companion keyboard open, a runner that asks). Pure.
+ * keep-on plugin panel, the companion keyboard open, a runner that asks). Dimming and off are the window's brightness
+ * only. Pure.
  */
 object CompanionIdle {
     enum class State { ON, DIM, OFF }
 
+    /** The default time to dim, and the choices offered for it (0 is Never). */
     const val DIM_AFTER_MS = 120_000L
-    const val OFF_AFTER_MS = 300_000L
+    val DIM_CHOICES_MS = listOf(0L, 60_000L, DIM_AFTER_MS, 300_000L, 600_000L)
+
+    /** How long after dimming the screen goes off. */
+    const val OFF_GAP_MS = 180_000L
 
     /** How long before dimming TalkBack hears "Companion screen will turn off soon". */
     const val WARN_BEFORE_MS = 10_000L
 
-    /** The dim and off times, each stretched to at least what Android's accessibility settings recommend. */
-    fun timeouts(recommendedMs: Long): Pair<Long, Long> {
-        val dim = maxOf(DIM_AFTER_MS, recommendedMs)
-        return dim to maxOf(OFF_AFTER_MS, dim + (OFF_AFTER_MS - DIM_AFTER_MS))
+    /** The dim and off times for [dimAfterMs], each stretched to at least what Android's accessibility settings recommend. */
+    fun timeouts(dimAfterMs: Long, recommendedMs: Long): Pair<Long, Long> {
+        val dim = maxOf(dimAfterMs, recommendedMs)
+        return dim to dim + OFF_GAP_MS
     }
 
-    /** The state [sinceTouchMs] after the last touch, or ON while the timer is off or an exemption holds. */
-    fun state(sinceTouchMs: Long, enabled: Boolean, exempt: Boolean, recommendedMs: Long = 0L): State {
-        if (!enabled || exempt) return State.ON
-        val (dim, off) = timeouts(recommendedMs)
+    /** The state [sinceTouchMs] after the last input, or ON while the timer is off ([dimAfterMs] 0) or an exemption holds. */
+    fun state(sinceTouchMs: Long, dimAfterMs: Long, exempt: Boolean, recommendedMs: Long = 0L): State {
+        if (dimAfterMs <= 0 || exempt) return State.ON
+        val (dim, off) = timeouts(dimAfterMs, recommendedMs)
         return when {
             sinceTouchMs >= off -> State.OFF
             sinceTouchMs >= dim -> State.DIM
@@ -115,9 +122,9 @@ object CompanionIdle {
     }
 
     /** How long until the state changes next, or null when it will not (off, or the timer not running). */
-    fun nextChangeInMs(sinceTouchMs: Long, enabled: Boolean, exempt: Boolean, recommendedMs: Long = 0L): Long? {
-        if (!enabled || exempt) return null
-        val (dim, off) = timeouts(recommendedMs)
+    fun nextChangeInMs(sinceTouchMs: Long, dimAfterMs: Long, exempt: Boolean, recommendedMs: Long = 0L): Long? {
+        if (dimAfterMs <= 0 || exempt) return null
+        val (dim, off) = timeouts(dimAfterMs, recommendedMs)
         return when {
             sinceTouchMs < dim - WARN_BEFORE_MS -> dim - WARN_BEFORE_MS - sinceTouchMs
             sinceTouchMs < dim -> dim - sinceTouchMs
@@ -127,9 +134,9 @@ object CompanionIdle {
     }
 
     /** Whether TalkBack should hear the warning now: in the last [WARN_BEFORE_MS] before dimming. */
-    fun warnNow(sinceTouchMs: Long, enabled: Boolean, exempt: Boolean, recommendedMs: Long = 0L): Boolean {
-        if (!enabled || exempt) return false
-        val dim = timeouts(recommendedMs).first
+    fun warnNow(sinceTouchMs: Long, dimAfterMs: Long, exempt: Boolean, recommendedMs: Long = 0L): Boolean {
+        if (dimAfterMs <= 0 || exempt) return false
+        val dim = timeouts(dimAfterMs, recommendedMs).first
         return sinceTouchMs in (dim - WARN_BEFORE_MS) until dim
     }
 
@@ -137,8 +144,16 @@ object CompanionIdle {
      * A new message notification brings an off or dimmed screen back to dimmed (not in Kid or Kiosk): the time since
      * the last touch to use from now, so it reads as DIM; null when nothing changes.
      */
-    fun afterMessage(state: State, restricted: Boolean, recommendedMs: Long = 0L): Long? =
-        if (restricted || state == State.ON) null else timeouts(recommendedMs).first
+    fun afterMessage(state: State, restricted: Boolean, dimAfterMs: Long, recommendedMs: Long = 0L): Long? =
+        if (restricted || state == State.ON) null else timeouts(dimAfterMs, recommendedMs).first
+
+    /** The words for a dim-after choice. Pure. */
+    fun dimLabel(ms: Long): String = when {
+        ms <= 0 -> "Never"
+        ms == DIM_AFTER_MS -> "After 2 minutes (default)"
+        ms % 60_000L == 0L -> if (ms == 60_000L) "After 1 minute" else "After ${ms / 60_000L} minutes"
+        else -> "After ${ms / 1000L} seconds"
+    }
 
     /** How a sleeping companion wakes (the Companion group's "Wake the companion screen"). */
     enum class Wake(val key: String, val label: String) {

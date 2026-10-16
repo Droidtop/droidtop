@@ -2,6 +2,9 @@ package dev.droidtop.display
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 
 /**
  * The one place droidtop decides what the secondary screen shows.
@@ -68,4 +71,15 @@ object SecondaryDisplayContent {
             dev.droidtop.library.settings.Mode.DESKTOP.id -> Mode.DESKTOP
             else -> Mode.STANDARD
         }
+
+    /**
+     * [currentMode], followed: a second screen stays up across a mode switch, so every host reads the mode here and
+     * redraws for the new one (rig, droidtop 0.2.0-dev.1931: after Desktop to Gaming the companion kept Desktop's
+     * keyboard pad and Input tab, read once when it came up).
+     */
+    @Composable
+    fun followedMode(context: Context): Mode {
+        val switched by dev.droidtop.library.settings.Modes.lastModeFlow.collectAsState()
+        return remember(switched) { currentMode(context) }
+    }
 }

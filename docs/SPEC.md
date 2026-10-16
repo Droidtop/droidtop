@@ -347,12 +347,10 @@ system dark/light setting through one shared Material theme
 (`app/.../ui/DroidtopTheme.kt`) — screens take colors from
 `MaterialTheme.colorScheme` tokens, never literals (the previous state:
 every screen hardcoded its palette, and no light mode existed at all).
-Two deliberate exceptions stay always-dark regardless of the system
-setting: surfaces living inside the Gaming shell's world (Console
-systems opens from Gaming's Settings tab and takes the Gaming theme,
-section 7k2) and ambient second-screen companion surfaces; ES-DE-themed
-Gaming views take every color from the active ES-DE theme (§7f) and
-are outside Material theming entirely.
+Redecided 2026-10-16 (Droidtop/tracker#559): light or dark is droidtop's
+own Appearance setting, not the system's alone and not always-dark for
+any root; see 7k "Light and dark". ES-DE-themed Gaming views still take
+every color from the active ES-DE theme (§7f).
 
 ## 2b. Desktop mode gets the library context, and Android apps as windows (directed 2026-09-01)
 
@@ -3594,6 +3592,11 @@ launcher-style surface used to stand in for them, so a Standard user's add-on di
 Performance, System or Keys, did not scroll and carried a prose line; its one unique piece, the quick-launch
 row of recent apps, became Home's Recent apps section for every mode.
 
+Every host reads the mode through `SecondaryDisplayContent.followedMode`, which watches `Modes.lastModeFlow`, so a
+companion that stays up across a mode switch redraws as the new mode's: its bar, its opening tab and its input
+surface. Read once when the host came up, it kept Desktop's keyboard pad and Input tab after Desktop to Gaming (rig,
+droidtop 0.2.0-dev.1931).
+
 - **Tabs (redesigned 2026-10-09, Droidtop/tracker#414, slice C2):** Home (the widgets and info surface,
   `CompanionSurface`, the host's own add/remove controls where it has them), Game (only while a game runs: the
   running game's card), System, Apps (the task manager, formerly Tasks), Performance, Input (the keyboard and
@@ -3881,16 +3884,25 @@ row of recent apps, became Home's Recent apps section for every mode.
   brightness write is gone. The main screen's brightness is Android's setting; the companion's is its own window's
   (`screenBrightness`, where the host is an Activity), never below 10%, so it never changes the main screen. **Off**:
   Android 13 gives the shell no command to power one panel of several off (`cmd display` has brightness, modes and
-  dock, not power), so Off is the companion window black at the lowest window brightness, still taking touch to
-  wake. **Idle** (`CompanionIdle`, Companion group "Dim and turn off the companion", on by default): untouched, the
-  companion dims after 2 minutes and goes off after 5, both stretched to what `AccessibilityManager
-  .getRecommendedTimeoutMillis` asks; TalkBack hears "Companion screen will turn off soon. Touch to keep it on." ten
-  seconds before. It does not run while Social shows, a plugin panel that declares keep-on shows, a running job is on
+  dock, not power), so Off is the companion window at the lowest window brightness, still taking touch to wake.
+  **Dim and Off are the backlight only (decided 2026-10-16, owner: "We can't capture the companion if it's always
+  black").** The companion's UI stays drawn in every state, so a screenshot or a screen recording shows the real
+  companion; a black layer used to cover it (55% dimmed, solid when off) and every capture of the RP5's companion was
+  black (rig, droidtop 0.2.0-dev.1931). Off lays a clear layer over a tab that takes the wake taps without passing them
+  on; the first-time "how to wake" line sits on a small plate. A host that is not an Activity (a Presentation) has no
+  window brightness of its own, so it does not dim. **Idle** (`CompanionIdle`, Companion group "Dim the companion
+  screen"): with no input the companion dims after the chosen time (Never, 1, 2 (the default), 5 or 10 minutes) and
+  goes off 3 minutes later, both stretched to what `AccessibilityManager.getRecommendedTimeoutMillis` asks; TalkBack
+  hears "Companion screen will dim soon. Touch to keep it on." ten seconds before. The old on/off switch's Off reads
+  as Never. **What wakes it**: a touch on it, input in droidtop's own windows on the main screen (the shell and the
+  Windows game screen; `CompanionPrefs.inputSeen`, at most one wake a second), a game ending, a launch alert, a new
+  message (below), and the Quick Menu's Companion screen row. Input to another app's game is not seen: droidtop does
+  not filter the system's keys. It does not run while Social shows, a plugin panel that declares keep-on shows, a running job is on
   Home (Downloads and updates), the companion keyboard is open, or a stream runs. Every touch is seen before the tab (never consumed), so a tap on a dimmed screen
   brightens it and does what was tapped. A new message notification brings an off or dimmed screen back to dimmed,
   except in Kid and Kiosk. **Wake** (Companion group): a double tap (default), a single tap, or only the Quick Menu's
   "Companion screen" row (System, while a second screen holds the companion); the off screen is one TalkBack element,
-  "Companion screen off, activate to turn on", and the first time it says how to wake it. On Input it is a dark
+  "Companion screen off, activate to turn on", and the first time it says how to wake it. On Input it is a dimmed
   trackpad: touches still move the pointer, and the Show tabs handle or the Tabs button wakes it. **Which screen**:
   "Show the companion on" (Companion group) lists every screen but the main one in plain words; the choice is
   remembered per set of screens (`CompanionScreens`, keyed by each screen's name, native size and built-in or
@@ -7223,8 +7235,8 @@ Onboarding is one scaffold, not a set of unrelated screens. The scaffold owns:
   in landscape. Nothing is vertically centred in a tall window.
 - One gutter, the shell's own (`ShellWindow.edgePadding`), one spacing scale, one type scale,
   one colour source (§7j). Touch targets meet `minTouchTarget` in every orientation.
-- Onboarding is dark, like the shell it hands over to; it does not follow the system
-  light/dark setting into a white first run.
+- Onboarding follows the Appearance setting like the shell it hands over to (7k, "Light and dark"), so a first
+  run and the shell after it are never one light and one dark.
 
 ### The one choice component
 
@@ -8181,7 +8193,10 @@ person is not asked: RetroArch itself replaces the game on a new launch, and dro
 
 **The launch watchdog** (`LaunchWatchdog`, `LaunchWatchPolicy`). `LaunchDisplay.dispatch`, the one point
 every launch passes, starts it for a game launch. It runs off the main thread, every 3 s for at most 90 s,
-and ends early when the launch ends (`clearRunning`, a quit, the shell coming back). A listed and live app
+and ends early when the launch ends (`clearRunning`, a quit, the shell coming back). The session watch ending a
+session does not end it (`clearRunning(stopWatching = false)`): a game gone that young failed to start, and the
+watchdog is what says so (rig, droidtop 0.2.0-dev.1931: Vita3K and Eden exited within a second on the second display,
+the session ended and nothing was shown, because the shell never left the front there). A listed and live app
 after 30 s is settled: the task list is no longer read, but the not-responding check goes on to 90 s,
 because an app that hangs with nobody touching it is only declared not responding once a key or focus
 change reaches it (console, build 1397: RetroArch's system dialog came 44 s after the launch). It uses:
@@ -8204,9 +8219,12 @@ change reaches it (console, build 1397: RetroArch's system dialog came 44 s afte
   nothing (the helper still starting) is tried again every 15 s until one returns; that one is judged.
 
 It reports four things, each in plain words naming the app: it is not responding; it closed straight
-after it started (the shell came back within 10 s and the app is not open); it is no longer running
-but its screen never handed back (the task list misses it after 9 s on two looks in a row, 3 s apart, and no
-process of the app that started after the launch is alive: `pidof`, then each process's start time, field 22 of
+after it started (the shell came back within 10 s and the app is not open, or the app was never seen in the task
+list and went missing as below, the only sign on two displays); it is no longer running
+but its screen never handed back (seen in the task list once, then missing after 9 s on two looks in a row, 3 s
+apart, with no process of the app that started after the launch alive, or on four looks in a row whatever process is
+alive, since a process with no window for 12 s is left over, not starting; rig, 1931: Eden's process stayed in the
+background with nothing open: `pidof`, then each process's start time, field 22 of
 `/proc/<pid>/stat`, against the launch on the boot clock; `LaunchWatchPolicy.startedSince`); an emulator launch has
 stalled (under
 1 s of processor time 15 s after the launch, `STALLED`). A black window of a live, responsive
@@ -8221,6 +8239,10 @@ almost nothing since, so its screen is probably black"), then say to close it an
 game file, any BIOS the system needs, and the emulator's file access; a RetroArch launch adds its core
 sentence and Get the core. Before this, a hang that nobody touched was reported only once a key reached it,
 or never.
+
+When a launch closed or went missing with a process of it still alive, the watchdog ends that process by the task
+manager's one close path, the one Kill uses, so the next launch starts clean, and the alert says droidtop closed what
+it left running. Enginehost is exempt (a cancel there is not a failure; `leftBeforePlaying`, below).
 
 "No longer running" needs both looks and the process check because one look reads two harmless moments as gone
 (rig, droidtop 0.2.0-dev.1923, Droidtop/tracker#271): RetroArch restarts itself for a new core (its singleInstance
@@ -14682,6 +14704,39 @@ else — onboarding, the shell's chrome and menus, the settings catalog, the Qui
 PC game's detail screen, the desktop panels — is **droidtop's own chrome**, and all of it obeys
 one system. A PC/engine gamelist is a themed view like any console system's (§7i, redecided
 2026-09-26) and is out of scope here too.
+
+**Light and dark (decided 2026-10-16, Droidtop/tracker#559).** One setting, Settings > Appearance > Light or dark
+(`AppearancePrefs`): Light, Dark, or Follow Android, the default (Android's night mode). It covers droidtop's whole
+UI through the one palette (`GamingPalette`) every token reads:
+- With a Gaming theme held, the theme's palette (7k2), in the colour scheme Settings > Appearance > Theme color scheme
+  names. Its default, Automatic, is the first scheme the theme declares whose ground is the appearance's
+  (`ThemeAssets.colorSchemeFor`: the theme parsed once per scheme, the answer cached per theme and appearance), so the
+  themed views and the chrome turn light together. A scheme the person names is drawn as the theme wrote it, whatever
+  the appearance. When no scheme matches (or the theme has one), the themed views keep the theme's colours and the
+  chrome's palette is derived for the appearance (`GamingThemeMapping.map(theme, light)`): the theme's accent and fonts
+  over droidtop's own ground, every text role derived again at 4.5:1, no texture.
+- With none held, droidtop's own palette in that appearance: `GamingThemeColors.DEFAULT` or its light twin
+  (`GamingThemeMapping.defaultFor`), built the way a theme's palette is, over a pale grey ground with a blue accent,
+  every text role at 4.5:1. `MenuTokens` read outside a Gaming surface give this palette, not a fixed dark one.
+- Every Compose root droidtop draws (`DroidtopTheme`) takes that palette's Material scheme and notice colours. The 17
+  roots that forced dark, the companion among them, and onboarding no longer do; there is no `darkTheme` parameter.
+- A change applies at once: `rememberLightAppearance` watches the setting and the configuration's night mode in every
+  root, and the Gaming palette is re-read when either changes.
+- Controls floating over art (the status cluster, the Start and R2 pills) sit on `MenuTokens.FloatingPlate`, the
+  overlay surface at 92%, so their text keeps 4.5:1 over any artwork. They were the ink at 58%, pale text on a pale
+  pill over light art (rig 1931). A theme's own clock or system status that names no colour is white, as in ES-DE,
+  unless its declared background is one white cannot be read on; then it is black.
+- Not yet covered, each its own issue: the Standard home screen's Launcher3 XML views (Droidtop/tracker#560), the
+  Windows runtime's views (#561) and droidtop's keyboard (#562).
+- **The role tokens** for UI droidtop does not draw itself (a plugin's own pages, #559): one set, read from the palette
+  in use (`GamingTheme.palette`, the theme's in Gaming, droidtop's own otherwise), never restated. `theme` is `light`
+  or `dark` (`colors.isLight`); `ground` is the page background (`ground`); `surface` is a sheet or panel
+  (`overlaySurface`); `surfaceVariant` is a raised or focused card (`cardFocused`); `onSurface` and `onSurfaceMuted`
+  are text (`onSurface`, `onSurfaceMuted`, both 4.5:1 on every surface above); `primary` and `onPrimary` are the
+  accent and the ink on it (`accent`, `onAccent`); `caution` and `danger` are the notice inks (`notice.colors
+  .cautionInk`, `.dangerInk`, readable and told apart under every colour-vision simulation); `focus` is the focus
+  ring's outer edge (`accent`) and `focusInner` its inner edge (`FocusRingInks.inner(accent)`). The plugin lane carries
+  them to plugins (`host.info.theme`, `ui.theme`, `host.theme_changed`; docs/plugin-api.md).
 
 **Spacing.** One responsive source, `ShellWindow`: the screen-edge gutter, the gap between
 top-level tabs, the minimum grid item, the minimum touch target and the maximum modal width

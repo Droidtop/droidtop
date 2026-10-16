@@ -159,6 +159,41 @@ class GamingThemeMappingTest {
     }
 
     @Test
+    fun `droidtop's own palette has a light twin that is light, undeclared and readable`() {
+        val light = GamingThemeMapping.defaultFor(light = true)
+        assertTrue(light.isLight)
+        assertFalse(light.declared)
+        assertAccessible(light)
+        assertSame(GamingThemeColors.DEFAULT, GamingThemeMapping.defaultFor(light = false))
+        // A theme that declares nothing draws droidtop's own palette in the appearance asked for.
+        assertSame(light, GamingThemeMapping.map(null, light = true))
+    }
+
+    @Test
+    fun `a theme drawn in the other appearance keeps its accent over droidtop's ground and stays readable`() {
+        // A dark theme with an orange accent and its own text colours, asked for light (no scheme of it was light).
+        val dark = theme(
+            system = listOf(
+                element("image", "background", "color" to color("101418")),
+                element("clock", "clock", "color" to color("F0F0F0")),
+                element("carousel", "systemcarousel", "textColor" to color("FF8800")),
+            ),
+        )
+        val asIs = GamingThemeMapping.map(dark)
+        assertFalse(asIs.isLight)
+        assertEquals(asIs, GamingThemeMapping.map(dark, light = false))
+
+        val light = GamingThemeMapping.map(dark, light = true)
+        assertTrue(light.isLight)
+        assertTrue(light.declared)
+        assertEquals(GamingThemeMapping.defaultFor(light = true).ground, light.ground)
+        assertNull(light.textureImagePath)
+        // The accent is the theme's hue, moved only as far as the light ground needs.
+        assertTrue(ColorMath.ratio(light.accent, light.ground) >= 4.5)
+        assertAccessible(light)
+    }
+
+    @Test
     fun `the first colour with chroma is the accent, and a neutral theme gets a neutral one`() {
         val coloured = theme(
             system = listOf(

@@ -52,7 +52,7 @@ class CompanionSheetActivity : AppCompatActivity() {
         val tray = intent?.getBooleanExtra(CompanionSheet.EXTRA_TRAY, false) == true
         val mode = if (tray) SecondaryDisplayContent.Mode.DESKTOP else SecondaryDisplayContent.Mode.STANDARD
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true, gamingThemed = false) {
+            dev.droidtop.app.ui.DroidtopTheme(gamingThemed = false) {
                 val context = LocalContext.current
                 LaunchedEffect(Unit) { withContext(Dispatchers.IO) { CompanionPrefs.load(context.applicationContext) } }
                 val settings by CompanionPrefs.settings.collectAsState()

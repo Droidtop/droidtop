@@ -74,7 +74,7 @@ class ScraperKeySetupActivity : AppCompatActivity() {
             return
         }
         setContent {
-            DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 Scaffold { padding ->
                     var page by remember { mutableStateOf<KeyPageSpec?>(null) }
                     var loaded by remember { mutableStateOf(false) }

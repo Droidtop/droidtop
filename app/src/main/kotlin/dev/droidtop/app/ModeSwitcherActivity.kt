@@ -30,7 +30,7 @@ class ModeSwitcherActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 // The question and the Home role request both outlive the first sheet's own dismissal: the sheet
                 // dismisses after every choice, and this activity must stay for the request's answer.
                 var asking by remember { mutableStateOf(false) }

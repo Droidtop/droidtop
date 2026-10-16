@@ -285,8 +285,8 @@ object LaunchDisplay {
      * Menu's Game tab naming a game that display-role orchestration has
      * already stopped treating as parked.
      */
-    fun clearRunning() {
-        LaunchWatchdog.cancel()
+    fun clearRunning(stopWatching: Boolean = true) {
+        if (stopWatching) LaunchWatchdog.cancel()
         parkedDisplayId = null
         runningGame = null
         runningPackageName = null

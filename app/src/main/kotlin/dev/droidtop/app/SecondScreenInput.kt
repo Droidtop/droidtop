@@ -30,7 +30,6 @@ import dev.droidtop.input.TrackpadOutput
 import dev.droidtop.input.TrackpadRoute
 import dev.droidtop.input.TrackpadView
 import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
-import dev.droidtop.shell.gamepad.ChromeColors
 import dev.droidtop.shell.gamepad.KeyboardTargets
 import org.pocketworkstation.pckeyboard.KeyboardPanel
 import org.pocketworkstation.pckeyboard.KeyboardSink
@@ -196,13 +195,13 @@ class SecondScreenInputView(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(ChromeColors.DarkBackground.toArgb())
+        setBackgroundColor(dev.droidtop.shell.gamepad.MenuTokens.Ground.toArgb())
 
         val header = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        target.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
+        target.setTextColor(dev.droidtop.shell.gamepad.MenuTokens.OnSurfaceMuted.toArgb())
         target.textSize = 14f
         header.addView(target, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         pin.setOnClickListener { togglePin() }
@@ -239,7 +238,7 @@ class SecondScreenInputView(
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
 
-        status.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
+        status.setTextColor(dev.droidtop.shell.gamepad.MenuTokens.OnSurfaceMuted.toArgb())
         status.textSize = 13f
         status.gravity = Gravity.CENTER
         addView(status, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
@@ -257,7 +256,7 @@ class SecondScreenInputView(
         pointerHelp.visibility = View.GONE
         addView(pointerHelp, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
-        controllers.setTextColor(ChromeColors.DarkOnSurfaceVariant.toArgb())
+        controllers.setTextColor(dev.droidtop.shell.gamepad.MenuTokens.OnSurfaceMuted.toArgb())
         controllers.textSize = 13f
         controllers.gravity = Gravity.CENTER
         addView(controllers, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))

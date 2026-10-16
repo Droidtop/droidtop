@@ -47,6 +47,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -2509,7 +2510,7 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // TextComponent::applyTheme (DateTimeComponent.cpp:341,
     // TextComponent.cpp:643-658: uppercase/lowercase/capitalize/none).
     val cased = esDeLetterCaseOf(element.strOrNull("letterCase")).applyTo(formatted)
-    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: inkOver(element)
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     // Same real scaling axis as EsDeThemedText/textlist rows, but a
     // different real default: DateTimeComponent.cpp's own real default is
@@ -2972,7 +2973,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     }
 
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
-    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color.White
+    val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: inkOver(element)
     // Real ES-DE property for this element specifically is "height" (a
     // single float, no "size" pair at all -- confirmed against its real
     // schema), unlike most other element types.
@@ -3876,6 +3877,17 @@ private fun backgroundMarginsBoxOf(
         padBottom = 0.dp,
         cornerRadius = (radius * viewWidth.value).dp,
     )
+}
+
+/**
+ * The colour of a clock or system status that names none: ES-DE's white, unless the element declares a background white
+ * is unreadable on, then black. A light theme's pale pill under a white Wi-Fi icon was invisible (rig, droidtop
+ * 0.2.0-dev.1931, Droidtop/tracker#559).
+ */
+private fun inkOver(element: EsDeThemeElement): Color {
+    val plate = element.valueOrNull<EsDeThemeValue.Color>("backgroundColor")?.let { colorOf(it) }
+        ?.takeIf { it.alpha > 0.4f } ?: return Color.White
+    return Color(dev.droidtop.notices.ColorMath.pickOn(plate.copy(alpha = 1f).toArgb()))
 }
 
 private fun backgroundBoxOf(

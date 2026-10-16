@@ -30,7 +30,6 @@ import dev.droidtop.runtime.keyboard.TypingRoute
 import dev.droidtop.runtime.tasks.Fidelity
 import dev.droidtop.runtime.tasks.LaunchLedger
 import dev.droidtop.runtime.tasks.TaskManager
-import dev.droidtop.shell.gamepad.ChromeColors
 import dev.droidtop.shell.gamepad.KeyboardTargets
 import dev.droidtop.shell.gamepad.INLINE_KEYBOARD_HEIGHT_PERCENT
 import kotlinx.coroutines.CoroutineScope
@@ -401,7 +400,7 @@ internal class OverlayKeyboard {
         val wm = context.getSystemService(WindowManager::class.java) ?: return false
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(ChromeColors.DarkBackground.toArgb())
+            setBackgroundColor(dev.droidtop.shell.gamepad.MenuTokens.Ground.toArgb())
             addView(
                 Button(context).apply {
                     text = "Hide"

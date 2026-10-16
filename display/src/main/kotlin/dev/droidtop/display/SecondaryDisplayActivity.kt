@@ -135,9 +135,8 @@ class SecondaryDisplayActivity : ComponentActivity() {
         }
 
     private fun render() {
-        val mode = SecondaryDisplayContent.currentMode(this)
-        val content = SecondaryDisplayContent.contentFor(mode)
         setContent {
+            val content = SecondaryDisplayContent.contentFor(SecondaryDisplayContent.followedMode(this))
             DisplayOrientationContent {
                 if (content != null) {
                     Box(Modifier.fillMaxSize().focusProperties { canFocus = false }) { content() }
