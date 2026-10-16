@@ -3,6 +3,8 @@ package dev.droidtop.app.settings
 import android.content.Context
 import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.update.AppSelfUpdate
+import dev.droidtop.app.update.UpdateChecks
+import dev.droidtop.app.update.UpdateKinds
 import dev.droidtop.app.update.UpdateDownload
 import dev.droidtop.app.update.UpdateNow
 import dev.droidtop.library.GameUpdates
@@ -11,8 +13,6 @@ import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.library.integrations.AppCatalogs
 import dev.droidtop.library.integrations.PluginCatalog
-import dev.droidtop.library.integrations.PluginCatalogSources
-import dev.droidtop.library.integrations.PluginRepoUpdates
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
@@ -39,9 +39,6 @@ import kotlinx.coroutines.withContext
  * reads only what checks already recorded; Check now is what asks.
  */
 object UpdatesPage {
-    private const val PREFS = "updates_page"
-    private const val KEY_LAST_CHECK = "last_check_ms"
-
     fun screen() = CatalogScreen(
         id = AppSettingsCatalogs.SCREEN_UPDATES,
         title = "Updates",
@@ -53,13 +50,10 @@ object UpdatesPage {
     /** One update: its row, and what Update all does for it (null where it opens a page instead of installing). */
     private class Update(val row: CatalogItem, val apply: (suspend (Context, (String) -> Unit) -> String)?)
 
-    private fun lastCheck(context: Context): Long? =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_LAST_CHECK, 0L).takeIf { it > 0 }
-
     private suspend fun rows(context: Context): List<CatalogItem> {
         val updates = droidtop(context) + plugins(context) + apps(context) + games(context)
         val failure = AppSelfUpdate.lastFailure(context)
-        val checked = lastCheck(context)
+        val checked = UpdateChecks.lastCheck(context)
         val lastLine = checked?.let { "Last checked " + ValueFormat.ago(System.currentTimeMillis(), it).replaceFirstChar { c -> c.lowercase() } }
         return buildList {
             add(
@@ -74,7 +68,7 @@ object UpdatesPage {
                         failure != null -> "Check failed"
                         else -> "Up to date"
                     },
-                    run = { ctx, onStatus -> checkAll(ctx, onStatus) },
+                    run = { ctx, onStatus -> UpdateChecks.checkAll(ctx, onStatus) },
                 ),
             )
             val installable = updates.mapNotNull { it.apply }
@@ -110,26 +104,6 @@ object UpdatesPage {
                 ),
             )
         }
-    }
-
-    /**
-     * Check now: every kind asks its source, then the list is read again. droidtop's own build is checked and recorded,
-     * never installed here (its row's Update installs). Blocking network calls, off the main thread.
-     */
-    suspend fun checkAll(context: Context, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
-        val app = context.applicationContext
-        val lines = mutableListOf<String>()
-        onStatus("Checking droidtop...")
-        lines += AppSelfUpdate.check(app)
-        onStatus("Checking the plugin catalogs...")
-        PluginCatalogSources.all(app).forEach { source -> runCatching { PluginCatalog.refresh(app, source) } }
-        // Plugins from trusted repositories install by themselves when that is on (Update settings).
-        runCatching { PluginRepoUpdates.runDue(app, metered = false) }
-        val providers = AppCatalogs.providers(app)
-        if (providers.isNotEmpty()) onStatus("Checking the app catalogs...")
-        providers.forEach { record -> runCatching { AppCatalogs.refresh(app, record, null) {} } }
-        app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
-        lines.joinToString(". ")
     }
 
     private fun available(version: String): String = "$version available"
@@ -276,6 +250,26 @@ object UpdatesPage {
             withContext(Dispatchers.IO) {
                 val update = AppSelfUpdate
                 listOf(
+                    // What each kind does once a check finds an update (Droidtop/tracker#570).
+                    CatalogGroup(
+                        id = "updates_settings_kinds",
+                        title = null,
+                        items = UpdateKinds.Kind.entries.map { kind ->
+                            ChoiceItem(
+                                id = "updates_policy_${kind.name.lowercase()}",
+                                title = kind.label,
+                                subtitle = when (kind) {
+                                    UpdateKinds.Kind.DROIDTOP -> "Installing droidtop always ends with Android asking you to confirm"
+                                    UpdateKinds.Kind.PLUGINS -> "An update that asks for more access still waits for your approval"
+                                    UpdateKinds.Kind.APPS -> "Android may still ask, unless updating apps without asking is on below"
+                                    UpdateKinds.Kind.GAMES -> "Follows Download rules: the network, the update window, and not while playing"
+                                },
+                                options = UpdateKinds.Policy.entries.map { ChoiceOption(it.name, it.label) },
+                                current = UpdateKinds.policy(context, kind).name,
+                                onSelect = { ctx, value -> UpdateKinds.setPolicy(ctx, kind, UpdateKinds.Policy.valueOf(value)) },
+                            )
+                        },
+                    ),
                     CatalogGroup(
                         id = "updates_settings_main",
                         title = null,
@@ -283,18 +277,24 @@ object UpdatesPage {
                             ChoiceItem(
                                 id = "updates_frequency",
                                 title = "Check for updates",
-                                subtitle = "Fetches one small file describing the latest build; nothing about this device or your " +
-                                    "library is sent. Picking Never stops the automatic checks; Check now still works",
+                                subtitle = "How often droidtop asks every source for updates: its own build, the plugin and app catalogs, the " +
+                                    "stores. Nothing about this device or your library is sent. Never stops the automatic checks; Check now still works",
                                 options = AppSelfUpdate.Frequency.entries.map { ChoiceOption(it.name, it.label) },
                                 current = update.frequency(context).name,
-                                onSelect = { ctx, value -> update.setFrequency(ctx, AppSelfUpdate.Frequency.valueOf(value)) },
+                                onSelect = { ctx, value ->
+                                    update.setFrequency(ctx, AppSelfUpdate.Frequency.valueOf(value))
+                                    UpdateChecks.schedule(ctx)
+                                },
                             ),
                             ToggleItem(
                                 id = "updates_unmetered_only",
                                 title = "Only on Wi-Fi and other unmetered networks",
                                 subtitle = "Skips the scheduled check while on mobile data or a metered connection",
                                 current = update.unmeteredOnly(context),
-                                onToggle = { ctx, value -> update.setUnmeteredOnly(ctx, value) },
+                                onToggle = { ctx, value ->
+                                    update.setUnmeteredOnly(ctx, value)
+                                    UpdateChecks.schedule(ctx)
+                                },
                             ),
                             ChoiceItem(
                                 id = "updates_channel",

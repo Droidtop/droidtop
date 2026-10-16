@@ -158,51 +158,7 @@ object AppSelfUpdate {
     }
 
     /**
-     * The scheduled background pass, called at process start (from
-     * SettingsCatalogInitProvider). When it is due, enabled and allowed on
-     * the current network it asks what the newest build is and brings the
-     * platform databases up to date; otherwise nothing. Never throws, never
-     * blocks the caller.
-     */
-    fun maybeCheck(context: Context) {
-        val application = context.applicationContext
-        val now = System.currentTimeMillis()
-        val allowed = mayCheck(
-            forced = false,
-            frequency = frequency(application),
-            lastAttemptMs = prefs(application).getLong(KEY_LAST_ATTEMPT, 0L),
-            nowMs = now,
-            unmeteredOnly = unmeteredOnly(application),
-            metered = isMetered(application),
-        )
-        if (!allowed) return
-        prefs(application).edit().putLong(KEY_LAST_ATTEMPT, now).apply()
-        Thread {
-            // The platform databases ride along on the same pass, the way
-            // enginehost's engine detection rules ride along on its plugin
-            // check: they are the part of droidtop that changes faster than
-            // the app, and a person whose new emulator or engine is missing
-            // has no way to know a fix was published. The index-driven
-            // refresh downloads one small document when nothing changed,
-            // and validate-before-replace means a bad download changes
-            // nothing. The manual button in Settings runs the same call.
-            runCatching { dev.droidtop.library.consoles.PlatformDatabases.refresh(application) }
-            // Plugins from repositories the person trusts ride along too (docs/SPEC.md 12a "Plugin
-            // repositories"): one cheap release listing per repository, bundles only on an
-            // unmetered connection, and a notification when something was updated.
-            runCatching {
-                dev.droidtop.library.integrations.PluginRepoUpdates.runDue(application, isMetered(application)) { repo, result ->
-                    PluginRepoUpdateNotification.show(application, repo, result)
-                }
-            }
-            runCatching { fetch(application) }
-                .onSuccess { info -> recordSeen(application, info) }
-                .onFailure { error -> recordFailure(application, error) }
-        }.start()
-    }
-
-    /**
-     * The one gate both update paths ask. The scheduled pass calls it with
+     * The one gate both update paths ask. The scheduled job ([UpdateChecks.scheduled]) calls it with
      * forced = false and obeys all three conditions the user set: the
      * frequency (OFF means no automatic traffic at all), the interval since
      * the last attempt, and the unmetered-only option. UpdateNow calls it
@@ -220,12 +176,10 @@ object AppSelfUpdate {
     ): Boolean {
         if (forced) return true
         if (frequency == Frequency.OFF) return false
-        if (nowMs - lastAttemptMs < frequency.intervalMs) return false
+        // A tenth early still counts: Android runs a periodic job anywhere in a window before its period ends.
+        if (nowMs - lastAttemptMs < frequency.intervalMs - frequency.intervalMs / 10) return false
         return !(unmeteredOnly && metered)
     }
-
-    private fun isMetered(context: Context): Boolean =
-        context.getSystemService(android.net.ConnectivityManager::class.java)?.isActiveNetworkMetered ?: false
 
     /**
      * After an install succeeded the new process finds the build it now is: its own APK and every older
