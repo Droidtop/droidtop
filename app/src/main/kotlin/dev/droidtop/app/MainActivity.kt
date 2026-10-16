@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MotionEvent
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.collectAsState
@@ -340,6 +341,12 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         displayOrchestrator = SecondScreenOrchestrator(applicationContext, this)
         observeSecondScreen()
         observeClipboardBridge()
+
+        // droidtop is a home surface in every mode: a Back nothing in the shell takes goes nowhere and never
+        // finishes this activity (rig 2026-10-16: Back on the Desktop screen closed the shell, which then had to be
+        // launched again). Registered before the content, so every shell's own BackHandler comes first; Gaming's
+        // outermost one, which returns to Home, still answers there.
+        onBackPressedDispatcher.addCallback(this) {}
 
         setContent {
             // DroidtopTheme provides Material tokens for droidtop's own
@@ -935,8 +942,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
 
     // Same long-press-of-back shell switcher as Launcher — see
     // BackButtonMenu's doc comment for why long-press rather than a plain
-    // back press (which keeps doing its normal job, here just finishing
-    // this Activity).
+    // back press (which goes to the shell, and never finishes this Activity).
     override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             BackButtonMenu.show(this)
