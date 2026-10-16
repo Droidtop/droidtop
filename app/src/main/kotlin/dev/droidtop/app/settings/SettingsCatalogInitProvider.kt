@@ -67,6 +67,10 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.app.DownloadsWidgetProvider.watch(appContext)
         dev.droidtop.app.DesktopWidgetProvider.watch(appContext)
         dev.droidtop.app.CompanionWidgetProvider.watch(appContext)
+        // A press on a Plugin widget redraws it with a fresh snapshot (PluginWidgetActionReceiver).
+        dev.droidtop.library.integrations.PluginWidgets.onActed = { context, id ->
+            dev.droidtop.app.PluginWidgetProvider.requestUpdate(context, id, force = true)
+        }
         dev.droidtop.library.theme.RoleTokens.attach(appContext)
         appearanceWatch = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == dev.droidtop.library.settings.AppearancePrefs.KEY_APPEARANCE) dev.droidtop.library.theme.RoleTokens.checkSoon()

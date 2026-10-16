@@ -19,6 +19,12 @@
     <string name="widget_continue_playing_empty">No games played yet</string>
     <string name="widget_plugin_status_title">Plugin status</string>
     <string name="widget_plugin_status_empty">No status-tile plugins yet</string>
+    <string name="widget_plugin_title">Plugin</string>
+    <string name="widget_plugin_pick">Choose what this widget shows</string>
+    <string name="widget_plugin_none">No plugin offers a widget yet. Plugins with a widget or a tile for widgets show here once approved and enabled.</string>
+    <string name="widget_plugin_unset">Tap to choose a plugin</string>
+    <string name="widget_plugin_gone">That plugin is no longer installed, approved or enabled. Tap to choose another.</string>
+    <string name="widget_plugin_waiting">Waiting for %1$s</string>
     <string name="widget_search_title">Library search</string>
     <string name="widget_search_hint">Search games and apps</string>
     <string name="widget_quick_launch_title">Quick launch</string>

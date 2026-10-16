@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Plugin widget (PluginWidgetProvider, Droidtop/tracker#563): widget_rows' title and four rows, the ids
+  DroidtopWidgets.rows fills, with an image under the title for a plugin's media or picture template. The image stays
+  gone until a snapshot carries one.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_surface_dark"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:textColor="#FFFFFFFF"
+        android:layout_marginBottom="6dp" />
+
+    <ImageView
+        android:id="@+id/widget_image"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:scaleType="fitCenter"
+        android:importantForAccessibility="no"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#CCFFFFFF"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row1"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="14sp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="14sp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="14sp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_row4"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="36dp"
+        android:gravity="center_vertical"
+        android:textSize="14sp"
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone" />
+</LinearLayout>
