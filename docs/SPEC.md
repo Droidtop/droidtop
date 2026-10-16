@@ -21631,13 +21631,27 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   as decided on 2026-10-07; the one separate section is the one that searches
   another kind of thing. The PC library and a console list do not offer Settings:
   they search their own games.
-- **Picking.** A device row opens the app or plays the game; a game that is not on the device yet (a store game
-  never installed, `needsInstall`) opens its page, where Install is, rather than failing to start (console rig,
-  2026-10-16: "This game's folder isn't on this device"; Standard's search goes through `GameLaunchActivity`, which
-  does the same) (the PC library's
-  opens the game's page). A source row always opens its detail
-  (`GameSourceProvider.detailScreen`); the destination is worked out when it is
-  picked, off the main thread (`SourceDestinations`), never while typing.
+- **Picking.** The owner, 2026-10-16: "Clicking on the game entry should give the game's page, or options if it's
+  available from multiple sources. When I clicked, it just gave an f95zone error". So:
+  - **A game row opens the game's page**, where Play or Install is, never a raw start (`LauncherSearchScreen.onOpen`):
+    Gaming's left-menu search and a system search open `nav.openDetail`; Standard opens the Games screen on the page
+    (`LauncherGamesActivity.pageIntent`) for a PC or engine game, the games Standard gives a page, and starts any
+    other as before; Desktop has no game page and plays it. An app row opens the app.
+  - **One game is one row.** The library's row and every source's row whose titles fold to one key
+    (`StoreIdentity.titleKey`, the fold matching uses: case, accents, "&" as "and", a leading "The" and edition labels)
+    are one row (`UnifiedSearch.merge`), the best-ranked in front, its detail naming every place ("Steam · Installed ·
+    F95zone"), its value "N places". Apps and the web row never merge.
+  - **Picking a merged row asks where from**: a short list under "<title>: where from", one row per place with its
+    state (a library game says Installed or Not installed), the source's own columns (version, size) and Get where it
+    can be fetched from there; picking one opens that one's page or gets it. B or Back returns to the results.
+  - A source row alone opens its detail (`GameSourceProvider.detailScreen`), or gets it when its row offers Get; the
+    destination is worked out when it is picked, off the main thread (`SourceDestinations`), never while typing.
+  - **A plugin's failure is a plain sentence that says what to do**, never its raw words: every error notice a plugin
+    page or action draws goes through `SourceFailures` (`PluginViewCall.errorNotice`; it moved to plugin-host for
+    this), so "f95zone answered HTTP 403" reads "This site needs a sign-in in the browser", with droidtop's Sign in
+    when the plugin has a `web.session` site; what it said stays under Technical details. A failed source page also
+    has "Open <source>'s page" under it (`AcquireContentSources.pluginPageRow`, the row a blocked source opens), and
+    a Get that failed says the same plain sentence on the status line.
   The pad reaches every row: Down leaves the field for the first row (the
   soft keyboard goes away), Up from the first row returns to the field, A
   opens the row, and typing puts the cursor back in the field. The cursor

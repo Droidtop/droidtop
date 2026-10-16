@@ -59,6 +59,7 @@ import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.SourceGets
 import dev.droidtop.library.integrations.PluginGameSource
 import dev.droidtop.library.integrations.LocalSearchRow
+import dev.droidtop.library.integrations.SearchRow
 import dev.droidtop.library.integrations.SearchRowKind
 import dev.droidtop.library.integrations.AcquireContentSources
 import dev.droidtop.library.integrations.SourceDestinations
@@ -507,6 +508,8 @@ internal fun LibrarySearchDialog(
     // search panel is not drawn under it, because two translucent windows put text on text (Droidtop/tracker#542).
     // What was typed and where the cursor was stay in this composition and are there when the page closes.
     var activeCatalog by remember { mutableStateOf<CatalogScreen?>(null) }
+    // The merged row whose places are being chosen from (its key), or null for the result list.
+    var choosing by remember { mutableStateOf<String?>(null) }
     var firstShow by remember { mutableStateOf(true) }
     // The sources' processes start from the plugins' app zygote: it is started as the search opens, while the person
     // types (docs/plugin-api.md 5.3, "The rigs").
@@ -559,7 +562,10 @@ internal fun LibrarySearchDialog(
     }
 
     // Typing puts the cursor back in the field.
-    LaunchedEffect(text) { focusKey = null }
+    LaunchedEffect(text) {
+        focusKey = null
+        choosing = null
+    }
 
     // JSON acquire_content integrations, read once off the main thread: each is one hand-off row, after every source's
     // (docs/SPEC.md 13, "There is no Get games sheet"; IntegrationHandoff), in the searches its template can fill.
@@ -639,26 +645,51 @@ internal fun LibrarySearchDialog(
                 )
             }
         }
-        if (text.isNotBlank()) {
+        // One row's own action: a device row opens (a game, its page), a source's row gets or opens its result.
+        fun pick(row: SearchRow) {
+            val hit = row.hit
+            val open = row.open
+            when {
+                open != null -> {
+                    open()
+                    onDismiss()
+                }
+                hit != null -> openHit(hit)
+            }
+        }
+        val choosingRow = choosing?.let { picked -> state.rows.firstOrNull { it.key == picked } }
+        if (choosingRow != null) {
+            // The same game from several places: where from, then that one's page (owner, 2026-10-16). B goes back.
+            add(SearchLine.Header("${choosingRow.title}: where from"))
+            choosingRow.choices.forEach { choice ->
+                add(
+                    SearchLine.Entry(
+                        "choice:${choice.kind}:${choice.key}",
+                        UnifiedSearch.placeOf(choice),
+                        subtitle = listOfNotNull(choice.title.takeIf { it != choosingRow.title }, choice.hit?.result?.columns?.joinToString(" · ")).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { null },
+                        value = choice.hit?.let { if (it.source.canGet(it.result)) "Get" else null },
+                    ) {
+                        choosing = null
+                        pick(choice)
+                    },
+                )
+            }
+        } else if (text.isNotBlank()) {
             state.rows.forEach { row ->
                 add(
                     SearchLine.Entry(
                         "row:${row.kind}:${row.key}",
                         row.title,
                         subtitle = row.detail,
-                        // A source's row says what pressing it does: Get when it can be fetched from here, else it opens.
-                        value = row.hit?.let { if (it.source.canGet(it.result)) "Get" else null },
+                        // A source's row says what pressing it does: Get when it can be fetched from here, else it opens;
+                        // a game from several places asks where from.
+                        value = when {
+                            row.others.isNotEmpty() -> "${row.choices.size} places"
+                            else -> row.hit?.let { if (it.source.canGet(it.result)) "Get" else null }
+                        },
                         icon = row.icon,
                     ) {
-                        val hit = row.hit
-                        val open = row.open
-                        when {
-                            open != null -> {
-                                open()
-                                onDismiss()
-                            }
-                            hit != null -> openHit(hit)
-                        }
+                        if (row.others.isNotEmpty()) choosing = row.key else pick(row)
                     },
                 )
             }
@@ -775,7 +806,8 @@ internal fun LibrarySearchDialog(
     val entries = lines.filterIsInstance<SearchLine.Entry>()
 
     if (activeCatalog == null) Dialog(
-        onDismissRequest = onDismiss,
+        // Back from the places of one game returns to the results, as B does.
+        onDismissRequest = { if (choosing != null) choosing = null else onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         GatePadInThisDialog()
@@ -792,7 +824,8 @@ internal fun LibrarySearchDialog(
                     val at = entries.indexOfFirst { it.key == focusKey }
                     when (press.action) {
                         GamepadAction.B -> {
-                            onDismiss()
+                            // From the places of one game, B goes back to the results; from the results it closes.
+                            if (choosing != null) choosing = null else onDismiss()
                             true
                         }
                         GamepadAction.DOWN -> if (entries.isEmpty()) {

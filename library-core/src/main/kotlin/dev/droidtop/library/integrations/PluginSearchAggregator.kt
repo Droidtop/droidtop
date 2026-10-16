@@ -5,6 +5,7 @@ import dev.droidtop.pluginhost.PluginErrorCode
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.RuntimeNeed
+import dev.droidtop.pluginhost.SourceFailures
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
