@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.launcherimport
 
+import dev.droidtop.runtime.HomeAction
+
 /**
  * The `favorites` table both launchers keep (the Launcher3 schema, Nova's with REAL cells and its own columns), read
  * into [Placement.Raw] items. Columns are read by presence and type, never by database version, so older and newer
@@ -26,7 +28,7 @@ internal object Favorites {
         fun dockColumn(row: Map<String, Any?>): Double?
         fun customTitle(row: Map<String, Any?>): String?
         fun customIcon(row: Map<String, Any?>): ByteArray?
-        fun swipe(row: Map<String, Any?>, up: Boolean): Pair<PlanAction?, String?>
+        fun swipe(row: Map<String, Any?>, up: Boolean): Pair<HomeAction?, String?>
         fun cover(row: Map<String, Any?>): Boolean
         /** A launcher's own action name in a type-1 shortcut, if it is one. */
         fun launcherAction(intent: IntentUri): String? = intent.launcherAction

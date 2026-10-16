@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.launcherimport
 
+import dev.droidtop.runtime.HomeAction
+
 /** Which launcher a backup came from. */
 enum class SourceLauncher(val label: String) { NOVA("Nova Launcher"), APEX("Apex Launcher") }
 
@@ -10,15 +12,6 @@ enum class SourceLauncher(val label: String) { NOVA("Nova Launcher"), APEX("Apex
  */
 class DbTables(val tables: Map<String, List<Map<String, Any?>>>, val userVersion: Int) {
     fun rows(table: String): List<Map<String, Any?>> = tables[table].orEmpty()
-}
-
-/**
- * What a home-screen action does, in droidtop's terms: one of Standard's gesture actions by its enum name
- * (`OPEN_DRAWER`, `LOCK_SCREEN`, ...), or launching an app ([component], flattened).
- */
-sealed class PlanAction {
-    data class Droidtop(val action: String) : PlanAction()
-    data class Launch(val component: String) : PlanAction()
 }
 
 /** Where an item sits: on a home page ([page], from 0 in order) or in the dock ([page] unused), at a cell. */
@@ -41,8 +34,8 @@ sealed class PlanItem {
         val customTitle: String? = null,
         /** A picture the person gave this one icon (PNG or similar bytes); null keeps the app's. */
         val customIcon: ByteArray? = null,
-        val swipeUp: PlanAction? = null,
-        val swipeDown: PlanAction? = null,
+        val swipeUp: HomeAction? = null,
+        val swipeDown: HomeAction? = null,
     ) : PlanItem()
 
     data class Folder(
@@ -104,7 +97,7 @@ data class ImportPlan(
     /** Standard's LabelVisibility by name; null keeps droidtop's. */
     val labels: String?,
     /** Standard's gesture slots by name (`DOUBLE_TAP`, `HOME_BUTTON`, ...). */
-    val gestures: Map<String, PlanAction>,
+    val gestures: Map<String, HomeAction>,
     /** Per-app titles from the drawer (Nova `allapps`), by flattened component. */
     val appTitles: Map<String, String>,
     val notes: List<ImportNote>,

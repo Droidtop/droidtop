@@ -1,5 +1,6 @@
 package dev.droidtop.runtime.launcherimport
 
+import dev.droidtop.runtime.HomeAction
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -98,8 +99,8 @@ class ApexImportTest {
 
     @Test fun `per-icon swipes from SwipeActions`() {
         val web = plan.items.filterIsInstance<PlanItem.App>().single { it.component == chrome }
-        assertEquals(PlanAction.Launch(maps), web.swipeUp)
-        assertEquals(PlanAction.Droidtop("OPEN_NOTIFICATIONS"), web.swipeDown)
+        assertEquals(HomeAction.Launch(maps), web.swipeUp)
+        assertEquals(HomeAction.Droidtop("OPEN_NOTIFICATIONS"), web.swipeDown)
         assertEquals("Web", web.customTitle)
         assertNull(web.customIcon)
         val dockCamera = plan.items.filterIsInstance<PlanItem.App>().single { it.container == PlanContainer.DOCK }
@@ -134,8 +135,8 @@ class ApexImportTest {
     @Test fun `gestures, hidden apps and drawer folders`() {
         assertEquals(
             mapOf(
-                ImportActions.DOUBLE_TAP to PlanAction.Droidtop("LOCK_SCREEN"),
-                ImportActions.TWO_FINGER_UP to PlanAction.Launch(camera),
+                ImportActions.DOUBLE_TAP to HomeAction.Droidtop("LOCK_SCREEN"),
+                ImportActions.TWO_FINGER_UP to HomeAction.Launch(camera),
             ),
             plan.gestures,
         )

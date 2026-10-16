@@ -206,7 +206,7 @@ public class WorkspaceTouchListener extends GestureDetector.SimpleOnGestureListe
     @Override
     public boolean onDoubleTap(MotionEvent event) {
         if (!mLauncher.isInState(NORMAL)) return false;
-        return LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION.get(mLauncher).perform(mLauncher);
+        return dev.droidtop.shell.standard.HomeActions.INSTANCE.runSlot(mLauncher, LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION);
     }
 
 

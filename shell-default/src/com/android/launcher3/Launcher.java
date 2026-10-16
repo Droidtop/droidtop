@@ -1883,9 +1883,10 @@ public class Launcher extends StatefulActivity<LauncherState>
                     // other page it still goes to the first page.
                     if (dev.droidtop.runtime.StandardGestures.INSTANCE.homeRunsSlot(
                             mWorkspace.getNextPage() == Workspace.DEFAULT_PAGE,
-                            LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this)
-                                    != com.android.launcher3.touch.GestureAction.NONE)) {
-                        mWorkspace.post(() -> LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this).perform(this));
+                            dev.droidtop.shell.standard.HomeActions.INSTANCE.isSet(this,
+                                    LauncherPrefs.GESTURE_HOME_BUTTON_ACTION))) {
+                        mWorkspace.post(() -> dev.droidtop.shell.standard.HomeActions.INSTANCE.runSlot(
+                                this, LauncherPrefs.GESTURE_HOME_BUTTON_ACTION));
                     } else {
                         mWorkspace.post(mWorkspace::moveToDefaultScreen);
                     }

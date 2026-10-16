@@ -20,6 +20,9 @@ import app.murinelauncher.widget.smartspace.SmartspaceMode
 import app.murinelauncher.service.MurineAccessibilityService
 import app.murinelauncher.settings.common.AbstractSettingsFragment
 import com.android.launcher3.touch.GestureAction
+import com.android.launcher3.ConstantItem
+import dev.droidtop.runtime.HomeAction
+import dev.droidtop.shell.standard.HomeActions
 import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherPrefs
@@ -166,37 +169,37 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
             }
             DOUBLE_TAP_ACTION -> {
                 preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION.defaultValue)
+                bindGestureAction(preference, LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION)
                 return true
             }
             SWIPE_DOWN_ACTION -> {
                 preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.defaultValue)
+                bindGestureAction(preference, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION)
                 return true
             }
             TWO_FINGER_DOWN_ACTION -> {
                 preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION.defaultValue)
+                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION)
                 return true
             }
             TWO_FINGER_UP_ACTION -> {
                 preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION.defaultValue)
+                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION)
                 return true
             }
             PINCH_IN_ACTION -> {
                 preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_IN_ACTION.defaultValue)
+                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_IN_ACTION)
                 return true
             }
             PINCH_OUT_ACTION -> {
                 preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_OUT_ACTION.defaultValue)
+                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_OUT_ACTION)
                 return true
             }
             HOME_BUTTON_ACTION -> {
                 preference as RadioGroupPreference
-                bindGestureAction(preference, LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.defaultValue)
+                bindGestureAction(preference, LauncherPrefs.GESTURE_HOME_BUTTON_ACTION)
                 return true
             }
             SMARTSPACE_MODE -> {
@@ -238,17 +241,28 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         }
     }
 
-    private fun bindGestureAction(preference: RadioGroupPreference, defaultAction: GestureAction) {
+    private fun bindGestureAction(preference: RadioGroupPreference, slot: ConstantItem<GestureAction>) {
         preference.asEnum(GestureAction::class.java).apply {
-            setDefaultValue(defaultAction)
+            setDefaultValue(slot.defaultValue)
             setTextProvider { c, action -> action.getDisplayName(c) }
-            setSummaryProvider { c, action -> action.getSummary(c) }
+            // A slot that opens an app names the app.
+            setSummaryProvider { c, action ->
+                if (action == GestureAction.LAUNCH_APP) HomeActions.label(c, HomeActions.slotAction(c, slot)) else action.getSummary(c)
+            }
             // Pre-P devices lock the screen through a device admin
             // (GestureAction.LOCK_SCREEN's own legacy path), which needs
             // requesting once, same as the old DOUBLE_TAP_TO_SLEEP switch
             // used to do on change; P+ (every real target device) uses the
             // accessibility service instead and needs nothing here.
             setOnPreferenceChangeListener { newValue ->
+                // "Open an app" asks which first; the slot changes only once one is picked.
+                if (newValue == GestureAction.LAUNCH_APP) {
+                    HomeActions.pickApp(requireContext(), getString(R.string.home_action_pick_app)) { app ->
+                        HomeActions.setSlot(preference.context, slot, HomeAction.Launch(app))
+                        updatePreferenceView()
+                    }
+                    return@setOnPreferenceChangeListener false
+                }
                 if (newValue == GestureAction.LOCK_SCREEN && !Utilities.ATLEAST_P) {
                     val dpm = requireContext().getSystemService(DevicePolicyManager::class.java)
                     val admin = ComponentName(requireContext(), ScreenOffAdminReceiver::class.java)

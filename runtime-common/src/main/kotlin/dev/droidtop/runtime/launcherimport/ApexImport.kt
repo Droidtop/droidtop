@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.launcherimport
 
+import dev.droidtop.runtime.HomeAction
+
 /**
  * An Apex Launcher backup as an [ImportPlan] (Droidtop/tracker#564; format in the tracker's
  * coordination/standard/launcher-import-formats.md, read from Apex 4.9.20): the Launcher3 database (pages from
@@ -39,7 +41,7 @@ object ApexImport {
         val raw = db?.let { Favorites.read(it.rows("favorites"), rules(pages, swipes), notes) }.orEmpty()
         val placed = Placement.place(raw, grid ?: (4 to 5), dockIcons)
         notes += placed.notes
-        val gestures = LinkedHashMap<String, PlanAction>()
+        val gestures = LinkedHashMap<String, HomeAction>()
         for ((key, slot) in GESTURES) {
             if (!prefs.has(key)) continue
             when (val action = gestureAction(prefs, key)) {
@@ -81,9 +83,9 @@ object ApexImport {
     }
 
     /** A gesture key's action name, or its app (`<key>_app`, `<key>_intent`) when it launches one. */
-    private fun gestureAction(prefs: Prefs, key: String): PlanAction? {
-        appTarget(prefs, key)?.let { return PlanAction.Launch(it) }
-        return ImportActions.droidtop(prefs.string(key))?.let { PlanAction.Droidtop(it) }
+    private fun gestureAction(prefs: Prefs, key: String): HomeAction? {
+        appTarget(prefs, key)?.let { return HomeAction.Launch(it) }
+        return ImportActions.droidtop(prefs.string(key))?.let { HomeAction.Droidtop(it) }
     }
 
     private fun appTarget(prefs: Prefs, key: String): String? =
@@ -110,17 +112,17 @@ object ApexImport {
         override fun customIcon(row: Map<String, Any?>) =
             if (Favorites.long(row, "itemType") == Favorites.TYPE_FOLDER) Favorites.blob(row, "icon") else null
         override fun cover(row: Map<String, Any?>) = false
-        override fun swipe(row: Map<String, Any?>, up: Boolean): Pair<PlanAction?, String?> {
+        override fun swipe(row: Map<String, Any?>, up: Boolean): Pair<HomeAction?, String?> {
             val id = Favorites.long(row, "_id") ?: return null to null
             val dir = if (up) "swipe_up" else "swipe_down"
             val app = listOf("${dir}_app_$id", "${dir}_intent_$id", "${dir}_shortcut_intent_$id").firstNotNullOfOrNull { k ->
                 IntentUri.parse(swipes.string(k))?.takeIf { it.isAppLaunch }?.component
             }
-            if (app != null) return PlanAction.Launch(app) to null
+            if (app != null) return HomeAction.Launch(app) to null
             val name = swipes.string("${dir}_$id") ?: return null to null
             if (name.equals("NONE", ignoreCase = true)) return null to null
             val action = ImportActions.droidtop(name)
-            return if (action != null) PlanAction.Droidtop(action) to null else null to "Apex's \"${ImportActions.describe(name)}\" has no equivalent in droidtop"
+            return if (action != null) HomeAction.Droidtop(action) to null else null to "Apex's \"${ImportActions.describe(name)}\" has no equivalent in droidtop"
         }
     }
 
