@@ -2438,8 +2438,16 @@ the `ContainerRuntime` interface that already exists (§3):
   default), and starts the image's own program as its page's Start it does, always detached (its output is the log;
   an image that names no program is made and left for `docker exec`); `rm [-f] CONTAINER...` deletes through the one
   removal path its page's Delete uses (`ContainerRemoval`: the tree, its exported apps and commands, its program),
-  never the desktop's own container, and a running one only with `-f`. A command after the image, `-e`, `-p`, `-v`,
-  `-w`, `--entrypoint`, `--restart`, `--rm` and `-u` answer "not built in droidtop yet", as does `compose`; what needs namespaces, a daemon or image building
+  never the desktop's own container, and a running one only with `-f`. **D6d (2026-10-16):** `run` also takes a
+  command after the image (it replaces the image's `Cmd`, never its entrypoint), `-e NAME=VALUE` (added after the
+  image's environment) and `-v FOLDER`: the name of a folder the person already mapped on some container's page (D3),
+  added to the new container at `ContainerLayout.EXTRA_MOUNTS_DIR/FOLDER` (`FOLDER:<that path>[:ro|:rw]` is accepted
+  too). A host path, another target or an unknown name is refused, so a path still never comes from the container.
+  The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
+  `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
+  "Its own program", and the start with the desktop. `-p`, `-w`, `--entrypoint`, `--restart`, `--rm` and `-u` answer
+  "not built in droidtop yet". A compose subset of droidtop's own is not built: the Docker Engine API daemon (D14)
+  serves the real `docker compose`; what needs namespaces, a daemon or image building
   (`build`, `network`, `volume`, `push`, ...) answers that droidtop's
   containers do not have it. Docker words stay in the command; droidtop's
   screens keep "app" and "program". Nothing the container wrote reaches

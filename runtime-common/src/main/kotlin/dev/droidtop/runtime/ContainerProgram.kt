@@ -33,6 +33,46 @@ object ContainerProgram {
 
     fun hostLogFile(appStorageDir: File, containerId: String): File = File(File(appStorageDir, LOG_DIR_NAME), "$containerId.log")
 
+    /**
+     * What `docker run` asked for beyond the image (Droidtop/tracker#555 D6d): [args] replace the image's `Cmd` (never
+     * its entrypoint, as Docker does) and [env] (`NAME=VALUE`) is added after the image's own, so it wins. Kept beside
+     * the container's log, so the page's Start it and the start with the desktop run the same program as the command.
+     */
+    data class RunOverrides(val args: List<String>? = null, val env: List<String> = emptyList()) {
+        /** [config] as this container runs it. Pure. */
+        fun applyTo(config: ImageRunConfig): ImageRunConfig = config.copy(cmd = args ?: config.cmd, env = config.env + env)
+
+        fun encode(): String = kotlinx.serialization.json.buildJsonObject {
+            args?.let { a -> put("args", kotlinx.serialization.json.JsonArray(a.map { kotlinx.serialization.json.JsonPrimitive(it) })) }
+            put("env", kotlinx.serialization.json.JsonArray(env.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+        }.toString()
+
+        companion object {
+            fun decode(text: String): RunOverrides? = runCatching {
+                val o = kotlinx.serialization.json.Json.parseToJsonElement(text) as kotlinx.serialization.json.JsonObject
+                fun list(key: String) = (o[key] as? kotlinx.serialization.json.JsonArray)
+                    ?.map { (it as kotlinx.serialization.json.JsonPrimitive).content }
+                RunOverrides(list("args"), list("env").orEmpty())
+            }.getOrNull()
+        }
+    }
+
+    fun overridesFile(appStorageDir: File, containerId: String): File = File(File(appStorageDir, LOG_DIR_NAME), "$containerId.run.json")
+
+    /** [containerId]'s overrides, or null when it has none (a container made on its page, or before `docker run` had them). */
+    fun overrides(appStorageDir: File, containerId: String): RunOverrides? =
+        overridesFile(appStorageDir, containerId).takeIf { it.isFile }?.let { runCatching { it.readText() }.getOrNull() }?.let(RunOverrides::decode)
+
+    fun saveOverrides(appStorageDir: File, containerId: String, overrides: RunOverrides) {
+        val file = overridesFile(appStorageDir, containerId)
+        file.parentFile?.mkdirs()
+        file.writeText(overrides.encode())
+    }
+
+    /** The program [containerId] runs: its image's config with what `docker run` asked for applied. */
+    fun effectiveConfig(appStorageDir: File, containerId: String, image: ImageRunConfig): ImageRunConfig =
+        overrides(appStorageDir, containerId)?.applyTo(image) ?: image
+
     fun containerLogPath(containerId: String): String = "${ContainerLayout.APP_STORAGE_DIR}/$LOG_DIR_NAME/$containerId.log"
 
     /**
