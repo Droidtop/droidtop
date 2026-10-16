@@ -57,6 +57,9 @@ object DockerApi {
         data class NetworkRemove(val id: String) : Call
         data class NetworkConnect(val id: String, val connect: Boolean) : Call
         data class ImageGet(val name: String) : Call
+        data class ExecCreate(val containerId: String) : Call
+        data class ExecStart(val execId: String) : Call
+        data class ExecGet(val execId: String) : Call
 
         /** A request Docker would take that droidtop refuses as asked: answered [status] with [message]. */
         data class Refused(val status: Int, val message: String) : Call
@@ -83,6 +86,9 @@ object DockerApi {
             segments.size == 3 && segments[0] == "containers" && segments[2] == "json" && read -> Call.Container(segments[1])
             p == "/images/json" && read -> Call.Images
             p == "/containers/create" && method == "POST" -> Call.Create(query["name"]?.takeIf { it.isNotEmpty() })
+            segments.size == 3 && segments[0] == "containers" && segments[2] == "exec" && method == "POST" -> Call.ExecCreate(segments[1])
+            segments.size == 3 && segments[0] == "exec" && segments[2] == "start" && method == "POST" -> Call.ExecStart(segments[1])
+            segments.size == 3 && segments[0] == "exec" && segments[2] == "json" && read -> Call.ExecGet(segments[1])
             segments.size == 3 && segments[0] == "containers" && method == "POST" && segments[2] in setOf("start", "stop", "restart", "kill", "wait") ->
                 containerAction(segments[1], segments[2], query)
             segments.size == 2 && segments[0] == "containers" && method == "DELETE" ->
@@ -379,6 +385,78 @@ object DockerApi {
             putJsonObject("ExposedPorts") { config?.ports?.forEach { put(it.toString(), JsonObject(emptyMap())) } }
         }
         putJsonObject("RootFS") { put("Type", "layers") }
+    }.toString() + "\n"
+
+    /** A command an exec runs: what `POST /containers/{id}/exec` asked for, after droidtop checked it. */
+    data class ExecSpec(val command: List<String>, val env: Map<String, String>, val workdir: String?)
+
+    private val ENV_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
+
+    /**
+     * An exec-create body read into what droidtop runs, or the answer when it asks for what droidtop does not do. The
+     * command runs on pipes and its output comes back when it ends, so input and a terminal (`docker exec -i`, `-t`)
+     * are not built; droidtop's own docker command's exec streams them. Pure.
+     */
+    fun execRequest(body: String): Pair<ExecSpec?, EngineHttp.Response?> {
+        val o = runCatching { Json.parseToJsonElement(body.ifBlank { "{}" }) as JsonObject }.getOrNull()
+            ?: return null to error(400, "the body is not a JSON object")
+        fun bool(key: String) = (o[key] as? JsonPrimitive)?.content == "true"
+        fun string(key: String) = (o[key] as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "null" }
+        val command = (o["Cmd"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
+        if (command.isEmpty()) return null to error(400, "an exec needs a Cmd")
+        if (bool("Privileged")) return null to error(400, "droidtop's containers never run privileged")
+        if (bool("AttachStdin") || bool("Tty")) {
+            return null to notBuilt("exec with input or a terminal over the Engine API (droidtop's own docker command, at the end of the PATH, streams them)")
+        }
+        string("User")?.takeIf { it.substringBefore(':') !in setOf("root", "0") }?.let { return null to notBuilt("exec as User $it") }
+        val env = linkedMapOf<String, String>()
+        (o["Env"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }?.forEach { kv ->
+            val name = kv.substringBefore('=')
+            if (!kv.contains('=') || !ENV_NAME.matches(name)) return null to error(400, "not NAME=VALUE: $kv")
+            env[name] = kv.substringAfter('=')
+        }
+        return ExecSpec(command, env, string("WorkingDir")) to null
+    }
+
+    /** `POST /containers/{id}/exec`'s answer. */
+    fun execCreated(id: String): String = buildJsonObject { put("Id", id) }.toString() + "\n"
+
+    /** Whether an exec-start body asks to run without waiting (`{"Detach": true}`). Pure. */
+    fun detached(body: String): Boolean =
+        runCatching { ((Json.parseToJsonElement(body) as JsonObject)["Detach"] as? JsonPrimitive)?.content == "true" }.getOrDefault(false)
+
+    /** A command's output as Docker's multiplexed frames: stdout on stream 1, stderr on stream 2. Pure. */
+    fun outputFrames(stdout: String, stderr: String): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        fun frame(stream: Int, text: String) {
+            if (text.isEmpty()) return
+            val payload = text.toByteArray(Charsets.UTF_8)
+            val n = payload.size
+            out.write(byteArrayOf(stream.toByte(), 0, 0, 0, (n ushr 24).toByte(), (n ushr 16).toByte(), (n ushr 8).toByte(), n.toByte()))
+            out.write(payload)
+        }
+        frame(1, stdout)
+        frame(2, stderr)
+        return out.toByteArray()
+    }
+
+    /** `GET /exec/{id}/json`: whether it runs, and its exit code once it has ended. */
+    fun execInspect(id: String, containerId: String, spec: ExecSpec, running: Boolean, exitCode: Int?): String = buildJsonObject {
+        put("ID", id)
+        put("Running", running)
+        put("ExitCode", exitCode ?: 0)
+        putJsonObject("ProcessConfig") {
+            put("entrypoint", spec.command.first())
+            putJsonArray("arguments") { spec.command.drop(1).forEach { add(JsonPrimitive(it)) } }
+            put("tty", false)
+            put("privileged", false)
+            put("user", "")
+        }
+        put("OpenStdin", false)
+        put("OpenStdout", true)
+        put("OpenStderr", true)
+        put("ContainerID", containerId)
+        put("Pid", 0)
     }.toString() + "\n"
 
     /** `/images/create`'s answer: the progress lines Docker's clients read, all at once after the pull. */

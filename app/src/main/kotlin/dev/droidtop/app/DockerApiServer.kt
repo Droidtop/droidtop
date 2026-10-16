@@ -129,7 +129,8 @@ internal object DockerApiServer {
                 runCatching {
                     EngineHttp.write(output, if (head) response.copy(body = ByteArray(0)) else response, DockerApi.headers)
                 }.onFailure { return }
-                if (request.closes) return
+                // A hijacked connection (101) carries one stream and then ends.
+                if (request.closes || response.status == 101) return
             }
         }
     }
@@ -308,11 +309,70 @@ internal object DockerApiServer {
                 withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, next) }
                 EngineHttp.Response(200, "text/plain", ByteArray(0))
             }
+            is DockerApi.Call.ExecCreate -> withContainer(runtime, call.containerId) { _, info ->
+                // Behind the same switch as droidtop's own docker exec: the container's "Run its commands from the
+                // desktop" (docs/SPEC.md 3d).
+                val allowed = withContext(Dispatchers.IO) { dev.droidtop.runtime.ContainerEnter.allowed(app.filesDir, info.container.id) }
+                if (!allowed) return@withContainer DockerApi.error(409, "${info.displayName} does not run commands from the desktop (its page in Containers)")
+                val (spec, refused) = DockerApi.execRequest(String(request.body, Charsets.UTF_8))
+                refused?.let { return@withContainer it }
+                if (execs.size >= MAX_EXECS) execs.keys.firstOrNull { execs[it]?.running == false }?.let { execs.remove(it) }
+                val id = dev.droidtop.runtime.ContainerNetworks.newId()
+                execs[id] = Exec(info.container.id, spec!!)
+                EngineHttp.Response.json(201, DockerApi.execCreated(id))
+            }
+            is DockerApi.Call.ExecStart -> {
+                val exec = execs[call.execId] ?: return DockerApi.error(404, "No such exec instance: ${call.execId}")
+                runtime ?: return DockerApi.error(500, "the desktop is not running")
+                val info = runtime.listContainers().firstOrNull { it.container.id == exec.containerId }
+                    ?: return DockerApi.error(404, "No such container: ${exec.containerId}")
+                if (exec.running || exec.exitCode != null) return DockerApi.error(409, "exec ${call.execId} has already run")
+                exec.running = true
+                val run: suspend () -> dev.droidtop.runtime.ContainerExecResult? = {
+                    try {
+                        if (runtime.siblingsNeedStart && !info.running) runtime.start(info.container)
+                        runCatching {
+                            runtime.exec(
+                                info.container,
+                                dev.droidtop.runtime.ContainerEnter.directCommand(exec.spec.command),
+                                exec.spec.env + dev.droidtop.runtime.ContainerEnter.execEnvironment(exec.spec.workdir),
+                            )
+                        }.getOrNull().also { exec.exitCode = it?.exitCode ?: 126 }
+                    } finally {
+                        exec.running = false
+                    }
+                }
+                if (DockerApi.detached(String(request.body, Charsets.UTF_8))) {
+                    execScope.launch { run() }
+                    return EngineHttp.Response(200, "text/plain", ByteArray(0))
+                }
+                val result = run()
+                val frames = DockerApi.outputFrames(result?.stdout.orEmpty(), result?.stderr ?: "the command could not be run\n")
+                // Docker's CLI asks to take the connection over (Upgrade: tcp); a client that does not gets the frames
+                // as an ordinary body.
+                val upgrade = request.headers["upgrade"]?.equals("tcp", ignoreCase = true) == true
+                EngineHttp.Response(if (upgrade) 101 else 200, "application/vnd.docker.multiplexed-stream", frames)
+            }
+            is DockerApi.Call.ExecGet -> {
+                val exec = execs[call.execId] ?: return DockerApi.error(404, "No such exec instance: ${call.execId}")
+                EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, exec.containerId, exec.spec, exec.running, exec.exitCode))
+            }
             is DockerApi.Call.Refused -> DockerApi.error(call.status, call.message)
             is DockerApi.Call.NotBuilt -> DockerApi.notBuilt(call.what)
             DockerApi.Call.NotFound -> DockerApi.error(404, "page not found")
         }
     }
+
+    /** An exec made by `POST /containers/{id}/exec`, until it is replaced: Docker's clients read its exit code after. */
+    private class Exec(val containerId: String, val spec: DockerApi.ExecSpec) {
+        @Volatile var running = false
+        @Volatile var exitCode: Int? = null
+    }
+
+    /** The execs this session made, the oldest finished one dropped past [MAX_EXECS]. */
+    private val execs = java.util.concurrent.ConcurrentHashMap<String, Exec>()
+    private const val MAX_EXECS = 256
+    private val execScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** One network change at a time: each reads, changes and writes networks.json whole. */
     private val networksLock = Mutex()
