@@ -208,6 +208,16 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!--
+          droidtop (Droidtop/tracker#564): "Stack a widget here" from a widget's resize frame
+          (WidgetStacks). Picks a widget, binds it to the launcher's host and runs its setup.
+        -->
+        <activity
+            android:name="com.android.launcher3.widget.WidgetStackActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity android:name="com.android.launcher3.widgetpicker.WidgetPickerActivity"
             android:theme="@style/WidgetPickerActivityTheme"
             android:excludeFromRecents="true"

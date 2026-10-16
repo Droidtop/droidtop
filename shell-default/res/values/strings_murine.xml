@@ -212,4 +212,7 @@
     <string name="droidtop_modes_option">droidtop modes</string>
     <string name="droidtop_games_option">droidtop games</string>
     <string name="pref_global_settings_desc">Modes, your home screen and setup</string>
+    <!-- droidtop: widget stacks (Droidtop/tracker#564). -->
+    <string name="widget_stack_here">Stack a widget here</string>
+    <string name="widget_stack_none">This device has no widgets to stack</string>
 </resources>

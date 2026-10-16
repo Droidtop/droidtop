@@ -328,9 +328,16 @@ public class DatabaseHelper extends NoLocaleSQLiteHelper implements
             final IntSet validWidgets = IntSet.wrap(LauncherDbUtils.queryIntArray(false, db,
                     Favorites.TABLE_NAME, Favorites.APPWIDGET_ID,
                     "itemType=" + Favorites.ITEM_TYPE_APPWIDGET, null, null));
+            // droidtop patch (Droidtop/tracker#564, shell-default/UPSTREAM.md): a widget stack's hidden
+            // members are bound to this host but in no table, by design (WidgetStacks); keep them while
+            // their stack is on the grid.
+            java.util.Set<Integer> inDatabase = new java.util.HashSet<>();
+            for (int id : validWidgets.getArray().toArray()) inDatabase.add(id);
+            java.util.Set<Integer> stacked = com.android.launcher3.widget.WidgetStacks.sparedFromCleanup(
+                    mContext, inDatabase);
             boolean isAnyWidgetRemoved = false;
             for (int widgetId : allWidgets) {
-                if (!validWidgets.contains(widgetId)) {
+                if (!validWidgets.contains(widgetId) && !stacked.contains(widgetId)) {
                     try {
                         FileLog.d(TAG, "Deleting widget not found in db: appWidgetId=" + widgetId);
                         holder.deleteAppWidgetId(widgetId);
