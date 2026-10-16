@@ -203,7 +203,7 @@ internal object EngineActions {
         pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }
 
     /** Starts every member's program as the person's start, as `podman start` does (restart policies included). */
-    fun startPod(app: Context, runtime: ContainerRuntime, pod: Pod, containers: List<ContainerInfo>) =
+    suspend fun startPod(app: Context, runtime: ContainerRuntime, pod: Pod, containers: List<ContainerInfo>) =
         members(pod, containers).forEach { ContainerPrograms.startedByPerson(app, runtime, it.container) }
 
     /** Stops every member's program as the person's stop, as `podman stop` does. */
