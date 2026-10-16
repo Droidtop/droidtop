@@ -53,6 +53,7 @@ object AppSelfUpdate {
     private const val KEY_LAST_ATTEMPT = "last_attempt_ms"
     private const val KEY_SEEN_CODE = "newest_seen_version_code"
     private const val KEY_SEEN_NAME = "newest_seen_version_name"
+    private const val KEY_LAST_FAILURE = "last_check_failure"
     private const val KEY_CHANNEL = "updates_channel"
     private const val KEY_DEBUG_BUILDS = "updates_debug_builds"
 
@@ -194,12 +195,9 @@ object AppSelfUpdate {
                     PluginRepoUpdateNotification.show(application, repo, result)
                 }
             }
-            runCatching { fetch(application) }.onSuccess { info ->
-                prefs(application).edit()
-                    .putLong(KEY_SEEN_CODE, info.versionCode)
-                    .putString(KEY_SEEN_NAME, info.versionName)
-                    .apply()
-            }
+            runCatching { fetch(application) }
+                .onSuccess { info -> recordSeen(application, info) }
+                .onFailure { error -> recordFailure(application, error) }
         }.start()
     }
 
@@ -235,6 +233,46 @@ object AppSelfUpdate {
      */
     fun cleanStaleDownloads(context: Context) {
         UpdateFiles.clean(context, installedVersionCode(context), target = null)
+    }
+
+    /**
+     * What a check saw, whichever check it was (the scheduled one, the Updates page's Check now, or Update now): the
+     * newest build, so the Updates page lists droidtop while it is newer than this one. Only the scheduled pass used to
+     * record it, and that runs when the process starts, which a launcher's seldom does, so the page said "Up to date"
+     * whatever Check now found (Droidtop/tracker#570).
+     */
+    fun recordSeen(context: Context, info: Info) {
+        prefs(context.applicationContext).edit()
+            .putLong(KEY_SEEN_CODE, info.versionCode)
+            .putString(KEY_SEEN_NAME, info.versionName)
+            .remove(KEY_LAST_FAILURE)
+            .apply()
+    }
+
+    /** A check that could not ask: kept so the Updates page says the last check failed instead of "up to date". */
+    fun recordFailure(context: Context, error: Throwable) {
+        prefs(context.applicationContext).edit()
+            .putString(KEY_LAST_FAILURE, error.message ?: error.javaClass.simpleName)
+            .apply()
+    }
+
+    /** Why the last check failed, or null when it succeeded (or none ran). */
+    fun lastFailure(context: Context): String? = prefs(context).getString(KEY_LAST_FAILURE, null)
+
+    /**
+     * Checks now and only records: no download, no install (the Updates page's Check now; Update on droidtop's row
+     * installs). Blocking: call off the main thread. Returns the line to show.
+     */
+    fun check(context: Context): String {
+        noteAttempt(context)
+        return try {
+            val info = fetch(context)
+            recordSeen(context, info)
+            if (info.versionCode > installedVersionCode(context)) "droidtop ${info.versionName} is available" else "droidtop is up to date"
+        } catch (error: Exception) {
+            recordFailure(context, error)
+            "droidtop could not check: " + (error.message ?: error.javaClass.simpleName)
+        }
     }
 
     /** Records that a check ran now; the manual check calls this so "last checked" stays truthful. */

@@ -48,6 +48,16 @@ object StoreAutoUpdates {
     /** Whether [now] is soon enough after [lastMs] that a sweep would only repeat it. Pure. */
     internal fun tooSoon(lastMs: Long, now: Long): Boolean = lastMs > 0 && now - lastMs < MIN_INTERVAL_MS
 
+    /**
+     * Starts updating an installed store game in place: the one starter, for this sweep and for an Update pressed on
+     * the Updates page (Droidtop/tracker#570). A store installs into "<its folder in a game folder>/<game>", so the
+     * folder above the game is the root. False when the job could not start (no such store in this build, no folder).
+     */
+    fun startUpdate(context: Context, key: String, title: String, installPath: String, sizeBytes: Long, automatic: Boolean = false): Boolean {
+        val root = File(installPath).parentFile ?: return false
+        return StoreInstallJob.start(context.applicationContext, key, title, root, sizeBytes = sizeBytes, automatic = automatic) != null
+    }
+
     /** Returns how many update jobs it started. */
     suspend fun sweep(context: Context, now: Long = System.currentTimeMillis()): Int = withContext(Dispatchers.IO) {
         val app = context.applicationContext
@@ -65,11 +75,7 @@ object StoreAutoUpdates {
                     if (StoreInstallJob.jobFor(game.key) != null) continue
                     val check = runCatching { store.checkUpdate(app, game.gameId) }.getOrNull() ?: continue
                     if (check.update != StoreUpdate.AVAILABLE) continue
-                    // A store installs into "<its folder in a game folder>/<game>": the folder above the game is the root.
-                    val root = File(installedAt).parentFile ?: continue
-                    if (StoreInstallJob.start(app, game.key, game.title, root, sizeBytes = game.sizeBytes, automatic = true) != null) {
-                        started++
-                    }
+                    if (startUpdate(app, game.key, game.title, installedAt, game.sizeBytes, automatic = true)) started++
                 }
             }
             prefs.edit().putLong(KEY_LAST, now).apply()

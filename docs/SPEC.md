@@ -15907,34 +15907,35 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   list ends with a **Download rules** row that opens that screen.
   The name stays the one the rest of the app already uses. Theme downloads
   and update installs are not yet jobs in that list; folding them in is open.
-- **Updates** (`updates`): the "Available" group lists what has a newer
-  version from data that exists today: droidtop's own newer build as the
-  last check saw it, installed plugins against the cached catalog (with
-  Update all), and games whose source names a version the library lacks
-  (a linked source, 7g "Where an update comes from"). It reads only what is
-  cached or published and never starts a network call or a walk. The
-  whole screen is built off the main thread (its preference and package
-  reads held a frame of the page as it opened). The
-  group below it is droidtop's own update settings and Check now, as
-  before. **Android apps** (Droidtop/tracker#261, 10b "Installing apps"):
-  installed apps against the app catalogs' cached offers, one row per update
-  ("<version> available", the one install path) and Update all apps; an offer
-  signed by another key than the installed app is listed as "Different key"
-  and not offered. Below them an "Android apps" group: Get apps (the app
-  catalogs' screen), Check app catalogs now (refreshes every source of every
-  catalog plugin, then the offers) and **Update apps without asking** (on by
-  default; the owner's setting of 2026-10-01: it only matters where Android or
-  a privilege allows a silent install, Android asks every time otherwise).
-  **One group per kind, the bulk action first (2026-10-16, Droidtop/tracker#506).**
-  What was one "Available" group is a group each for droidtop, Plugins, Apps and
-  Games, in that order, a group with nothing in it left out. "Update all
-  plugins" and "Update all apps" (with how many in the value column) lead the
-  group they cover, as a store's Downloads page puts its bulk action above the
-  list, instead of sitting between items; and an update's value is "<version>
-  available", one short line, where "Update to <version>" wrapped onto two.
+- **Updates** (`updates`) is **one list, never tabs** (decided 2026-10-16, Droidtop/tracker#570; the owner: "the
+  updates menu is fucky, it has a tab that just always shows up to date. WE don't have an option to ask the user if
+  they want to install an update (that's an issue), so it will never know about an update, taht tab is useless.
+  Updates should be a single tab"). It was a group per kind plus droidtop's settings and Android apps, at least
+  three groups and so three tabs in Gaming's category column; the "droidtop" tab read a version only the check at
+  process start recorded, which a launcher's process seldom runs, so it said "Up to date" whatever Check now found.
+  Now it is one group (`UpdatesPage`), in this order:
+  - **Check now**, saying when the last check ran and, when droidtop's own check failed, why; its value is how many
+    have an update, or "Up to date" only after a check that worked, "Check failed" or "Not checked". It asks every
+    kind: droidtop's build (recorded, never installed here), every plugin catalog, the trusted plugin repositories
+    (which install by themselves when that is on), and every app catalog. Every check of droidtop, the scheduled one,
+    Check now or Update, records what it saw (`AppSelfUpdate.recordSeen`) or that it failed (`recordFailure`).
+  - **Update all** when two or more can be installed from here, each the way its own Update does, one after another.
+  - **One row per update**, each with its version on offer ("<version> available") and Update: droidtop (Update
+    installs it, Android asks), each plugin with a newer catalog release (`PluginCatalog.installOutcome`), each Android
+    app, emulators among them, with a newer version in an app catalog (an offer signed by another key says why it is
+    not offered), each store game its store named an update for (`StoreAutoUpdates.startUpdate`, the one starter the
+    automatic updates use; it goes to Downloads), and each folder game whose linked source names a newer version
+    (Update opens its page, where the source's Get is: droidtop does not replace a folder's files by itself). With
+    nothing to update after a check that worked: "Everything is up to date", once.
+  - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
+    Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
+    privilege allows a silent install). Then **Get apps**.
+  It reads only what checks recorded and is built off the main thread. Not yet: checks on droidtop's own schedule for
+  every kind rather than at process start and on demand, and "Ask before installing" or "Install automatically" per
+  kind (#570, the next part); Enginehost's engines, which Enginehost updates itself.
   **One Updates screen, one list of ways in** (2026-10-03, Droidtop/tracker#273):
   the plugin updates status and "Update all" that the Plugins screen also
-  carried are gone (the Plugins screen lists plugins, approvals, repositories
+  carried are gone (its "N updates" row opens Updates, 2026-10-16) (the Plugins screen lists plugins, approvals, repositories
   and the catalog; what has a newer version is read in Updates). The ways in
   are links to this one screen: the left-menu place in Gaming, the Quick
   Menu's System tab tile (it closes the menu and opens the place; a link to
@@ -18620,9 +18621,9 @@ lasts three hours and is cleared when the update fails); an update that arrives 
 the screen from a game. Enginehost declares no Home filter (only `MAIN`/`LAUNCHER`, checked in its
 manifest on `origin/main`), so it is not a competing Home candidate.
 
-**Updates screen state (2026-10-14).** While "Check now" is checking, downloading or waiting for Android's
-installer, the droidtop row on the Available tab shows that state (`UpdateDownload.liveLine`: the pass's line, or the
-APK job's status and percent) instead of "Up to date".
+**Updates screen state (2026-10-14).** While droidtop's update is checking, downloading or waiting for Android's
+installer, its row in Updates shows that state (`UpdateDownload.liveLine`: the pass's line, or the APK job's status and
+percent) instead of the version on offer.
 
 **Update files.** The APK lands as `droidtop-<versionCode>.apk` in the downloads folder (droidtop's
 external files directory), written by the download runner with `.apk.part`/`.part.meta` beside it while it
