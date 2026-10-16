@@ -10608,6 +10608,16 @@ Gaming, where the owner's ask was sharpest:
   gear glyph (`QuickGlyph.SETTINGS`) distinct from the existing
   `ANDROID` glyph "Android settings" already used, so the two
   settings-shaped tiles read as different destinations.
+- **Every tile the Quick Menu draws has a glyph of its own (2026-10-16,
+  Droidtop/tracker#534).** Screenshot (a camera), Stop the app in front (a
+  stop button), Companion screen (two screens), Location (a map pin),
+  Flashlight (a torch) and the rail's Plugins entry (a puzzle piece, the
+  left menu's Plugins mark) drew `QuickGlyph.GENERIC`, the placeholder
+  ring with a dot; Social, the performance mode, Downloads, Controller and
+  the keyboard tiles now take the existing glyphs that fit them. They stay
+  hand-drawn strokes like the rest of the tile set (`QuickGlyphIcon`), and
+  `GENERIC` is left only for an item `QuickTiles.glyphFor` has never heard
+  of.
 - **A system's gamelist options menu gained "System settings"**
   (`GamelistOptionsMenu`, shown whenever the list has a real console
   system id), opening the SAME registered Console systems screen
