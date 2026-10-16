@@ -47,7 +47,6 @@ import com.android.launcher3.util.ItemInfoMatcher;
 import com.android.launcher3.util.LooperExecutor;
 import com.android.launcher3.widget.LauncherWidgetHolder;
 
-import app.lawnchair.icons.IconPreferencesKt;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -295,8 +294,8 @@ public class ModelWriter {
             for (ItemInfo item : items) {
                 mModel.getModelDbController().delete(itemIdMatch(item.id), null);
                 mBgDataModel.removeItem(mContext, item);
-                if (item.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT)
-                    IconPreferencesKt.setCustomInstanceLabelForId(item.id, null);
+                // droidtop patch: the item's own title, picture and swipes go with it.
+                dev.droidtop.shell.standard.HomeItemExtras.INSTANCE.forget(mContext, item.id);
                 verifier.verifyModel();
             }
         }));
@@ -312,8 +311,9 @@ public class ModelWriter {
         enqueueDeleteRunnable(newModelTask(() -> {
             mModel.getModelDbController().delete(
                     Favorites.CONTAINER + "=" + info.id, null);
-            for (ItemInfo child : info.getContents()) if (child.itemType == Favorites.ITEM_TYPE_DEEP_SHORTCUT)
-                IconPreferencesKt.setCustomInstanceLabelForId(child.id, null);
+            for (ItemInfo child : info.getContents())
+                dev.droidtop.shell.standard.HomeItemExtras.INSTANCE.forget(mContext, child.id);
+            dev.droidtop.shell.standard.HomeItemExtras.INSTANCE.forget(mContext, info.id);
             mBgDataModel.removeItem(mContext, info.getContents());
             info.getContents().clear();
 

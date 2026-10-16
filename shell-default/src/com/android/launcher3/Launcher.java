@@ -100,6 +100,7 @@ import static com.android.launcher3.logging.StatsLogManager.StatsLatencyLogger.L
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_ACTIVITY_PAUSED;
 import static com.android.launcher3.model.ItemInstallQueue.FLAG_DRAG_AND_DROP;
 import static com.android.launcher3.popup.SystemShortcut.APP_INFO;
+import static com.android.launcher3.popup.SystemShortcut.CUSTOMIZE;
 import static com.android.launcher3.popup.SystemShortcut.DRAWER_TABS;
 import static com.android.launcher3.popup.SystemShortcut.INSTALL;
 import static com.android.launcher3.popup.SystemShortcut.UNINSTALL_APP;
@@ -3308,7 +3309,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     public Stream<SystemShortcut.Factory> getSupportedShortcuts() {
-        return Stream.of(APP_INFO, WIDGETS, INSTALL, UNINSTALL_APP, DRAWER_TABS);
+        return Stream.of(APP_INFO, WIDGETS, INSTALL, UNINSTALL_APP, DRAWER_TABS, CUSTOMIZE);
     }
 
     /**

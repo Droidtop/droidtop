@@ -131,6 +131,17 @@
     <string name="home_action_open_app">Open %1$s</string>
     <string name="home_action_app_missing">That app is not installed any more</string>
     <string name="home_action_pick_app">Choose an app</string>
+    <string name="item_customize">Customize</string>
+    <string name="item_customize_title">Title: %1$s</string>
+    <string name="item_customize_title_ask">Title for this icon</string>
+    <string name="item_customize_picture">Choose a picture</string>
+    <string name="item_customize_picture_remove">Remove the picture</string>
+    <string name="item_customize_picture_failed">That picture could not be used</string>
+    <string name="item_customize_swipe_up">Swipe up: %1$s</string>
+    <string name="item_customize_swipe_down">Swipe down: %1$s</string>
+    <string name="item_customize_swipe_up_pick">Swipe up on this icon</string>
+    <string name="item_customize_swipe_down_pick">Swipe down on this icon</string>
+    <string name="folder_option_picture">Choose a picture</string>
     <string name="gesture_action_clear_all_apps_summary">Ends every open app except droidtop, after asking when there are several</string>
 
     <!-- Murine search bar -->
