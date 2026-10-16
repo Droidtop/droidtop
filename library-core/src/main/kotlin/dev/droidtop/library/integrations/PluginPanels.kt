@@ -74,9 +74,6 @@ object PluginPanels {
 
         /** What the panel declares it does on the companion ([CompanionAbilities]): rows on Game, recording, keep-on. */
         val abilities: Set<String> get() = CompanionAbilities.of(entry)
-
-        /** The companion's one line under the panel's name: its abilities and its pinnable tiles, in plain words. */
-        val abilitiesLine: String? get() = CompanionAbilities.line(abilities, tiles.size)
     }
 
     /**

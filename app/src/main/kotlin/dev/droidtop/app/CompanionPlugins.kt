@@ -155,8 +155,8 @@ internal fun CompanionPluginsTab(only: String?) {
                         .background(colors.surface)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
+                    // The plugin's name, as on the shell's list (Droidtop/tracker#515): no line of droidtop's internals under it.
                     Text(item.label, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
-                    item.abilitiesLine?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1) }
                 }
             }
         }
@@ -164,7 +164,7 @@ internal fun CompanionPluginsTab(only: String?) {
 }
 
 /**
- * One plugin's panel for touch: its abilities line, its tiles, the view it returns for the companion, and the ways
+ * One plugin's panel for touch, as the shell draws it: its tiles, the view it returns for the companion, and the ways
  * into its other pages; a page a tile or row answered with opens in its place. A panel that declares `keep_on` keeps
  * the companion screen on while it shows.
  */
@@ -194,7 +194,7 @@ private fun CompanionPluginPanel(panel: PluginPanels.Panel, onBack: (() -> Unit)
     val shown = screen
     when {
         answered != null -> CompanionNestedScreen(answered, onBack = { reply = null }, onChanged = {}, asks = asks)
-        shown != null -> CompanionNestedScreen(shown, onBack = onBack, onChanged = {}, asks = asks, lead = panel.abilitiesLine)
+        shown != null -> CompanionNestedScreen(shown, onBack = onBack, onChanged = {}, asks = asks)
         else -> CompanionNote("Reading…")
     }
 }
