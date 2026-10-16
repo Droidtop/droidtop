@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Process
-import android.widget.Toast
 import com.android.launcher3.Launcher
 import com.android.launcher3.R
 import java.util.concurrent.Executors
@@ -54,8 +53,12 @@ class WidgetStackActivity : Activity() {
     private fun choose(providers: List<Pair<AppWidgetProviderInfo, String>>) {
         if (isFinishing || isDestroyed) return
         if (providers.isEmpty()) {
-            Toast.makeText(this, R.string.widget_stack_none, Toast.LENGTH_SHORT).show()
-            finish()
+            AlertDialog.Builder(this, R.style.DroidtopDialog)
+                .setTitle(R.string.widget_stack_here)
+                .setMessage(R.string.widget_stack_none)
+                .setPositiveButton(android.R.string.ok, null)
+                .setOnDismissListener { finish() }
+                .show()
             return
         }
         AlertDialog.Builder(this, R.style.DroidtopDialog)
