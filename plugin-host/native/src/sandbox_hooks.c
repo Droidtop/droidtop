@@ -336,6 +336,37 @@ Java_dev_droidtop_pluginhost_SandboxFiles_nativeRegister(JNIEnv *env, jclass cla
     return ok;
 }
 
+/*
+ * A file droidtop opened for the plugin through the broker (`hostOpen`, docs/plugin-api.md 5.3), given a path the
+ * plugin's own code (Dart's dart:io, which opens paths only) can open: a local file of the sandbox library, read and
+ * written when [writable]. Takes fd. Returns 0 or a negative errno.
+ */
+JNIEXPORT jint JNICALL
+Java_dev_droidtop_pluginhost_SandboxFiles_nativeShare(JNIEnv *env, jclass clazz, jstring jPath, jint fd, jboolean writable) {
+    (void) clazz;
+    const char *path = (*env)->GetStringUTFChars(env, jPath, NULL);
+    int result = sbx_local_add_mode(path, fd, writable ? (SBX_READ | SBX_WRITE) : SBX_READ);
+    (*env)->ReleaseStringUTFChars(env, jPath, path);
+    return result;
+}
+
+/* Lets a shared file go: its path now names an empty file, read only (the library replaces, never removes, a local file). */
+JNIEXPORT jint JNICALL
+Java_dev_droidtop_pluginhost_SandboxFiles_nativeUnshare(JNIEnv *env, jclass clazz, jstring jPath) {
+    (void) clazz;
+#ifdef __NR_memfd_create
+    int empty = (int) syscall(__NR_memfd_create, "droidtop-closed", 1 /* MFD_CLOEXEC */);
+#else
+    int empty = -1;
+    errno = ENOSYS;
+#endif
+    if (empty < 0) return -errno;
+    const char *path = (*env)->GetStringUTFChars(env, jPath, NULL);
+    int result = sbx_local_add_mode(path, empty, SBX_READ);
+    (*env)->ReleaseStringUTFChars(env, jPath, path);
+    return result;
+}
+
 /* Rewrites the imports of every loaded library whose path ends in one of [suffixes]; returns "<suffix>=<libraries>/<slots>" lines. */
 JNIEXPORT jstring JNICALL
 Java_dev_droidtop_pluginhost_SandboxFiles_nativeHook(JNIEnv *env, jclass clazz, jobjectArray jSuffixes) {

@@ -31,11 +31,22 @@ internal object SandboxBroker {
     private const val READ = 1
     private const val WRITE = 2
 
+    /** The library's SBX_DECIDE: the broker's decider is asked about every call under the rule (here, the quota). */
+    private const val DECIDE = 0x20
+
     init {
         System.loadLibrary("droidtoppy")
     }
 
-    @JvmStatic private external fun nativeServe(plugin: String, paths: Array<String>, modes: IntArray, aliasFrom: Array<String>, aliasTo: Array<String>): Int
+    @JvmStatic private external fun nativeServe(
+        plugin: String,
+        paths: Array<String>,
+        modes: IntArray,
+        aliasFrom: Array<String>,
+        aliasTo: Array<String>,
+        quotaRoot: String?,
+        quotaBytes: Long,
+    ): Int
 
     /**
      * The names of droidtop's private folders as code in a plugin process may spell them, credential-encrypted first, then
@@ -64,8 +75,9 @@ internal object SandboxBroker {
     fun rules(context: Context, pluginId: String, tier: PluginTier, holes: Set<String> = emptySet()): Map<String, Int> {
         val rules = LinkedHashMap<String, Int>()
         val (credential, device) = appDataFor(context, pluginId)
-        rules[credential.path] = READ or WRITE
-        rules[device.path] = READ or WRITE
+        // The decider counts a new file or folder here against the data store's quota (docs/plugin-api.md 5.3).
+        rules[credential.path] = READ or WRITE or DECIDE
+        rules[device.path] = READ or WRITE or DECIDE
         if (tier == PluginTier.OPEN) {
             val info = context.applicationInfo
             listOf(
@@ -117,9 +129,11 @@ internal object SandboxBroker {
     fun serve(context: Context, pluginId: String, tier: PluginTier, holes: Set<String> = emptySet()): ParcelFileDescriptor? {
         val rules = rules(context, pluginId, tier, holes)
         val aliases = aliases(context, pluginId)
+        // One limit for the plugin's data folder, the data API's files and the app-data stand-in inside it alike.
         val fd = nativeServe(
             pluginId, rules.keys.toTypedArray(), rules.values.toIntArray(),
             aliases.map { it.first }.toTypedArray(), aliases.map { it.second }.toTypedArray(),
+            PluginStore.dataDirFor(context, pluginId).path, PluginDataStore.LIMIT_BYTES,
         )
         if (fd < 0) {
             android.util.Log.w("droidtop.sandbox", "$pluginId: the file broker did not start (errno ${-fd})")
