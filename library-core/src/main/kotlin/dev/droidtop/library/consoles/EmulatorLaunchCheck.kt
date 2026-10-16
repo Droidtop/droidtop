@@ -83,13 +83,15 @@ fun fileAccessAdvice(emulator: String, systemName: String, canGrant: Boolean): S
 }
 
 /**
- * The sentence a launch alert adds when [emulator]'s BIOS folder still lacks files of [systemName]'s BIOS after droidtop
- * copied in its own ([EmulatorSetup.syncBios]): which files, in which folder, and where droidtop takes them from. Null
- * when nothing is missing. Pure.
+ * The sentence a launch alert adds when [emulator]'s BIOS folder holds none of [systemName]'s BIOS files after droidtop
+ * copied in its own ([EmulatorSetup.syncBios]): which files would do, in which folder, and where droidtop takes them
+ * from. Null when the folder has any of them. Pure.
  */
 fun biosMissingSentence(emulator: String, systemName: String, sync: EmulatorSetup.BiosSync): String? {
-    if (sync.missing.isEmpty()) return null
-    return "$emulator has no $systemName BIOS: ${sync.missing.joinToString(", ")} is not in ${sync.folder}. Put it in your " +
+    // Only a folder with none of the system's files: the database lists alternatives and optional files.
+    if (!sync.none || sync.missing.isEmpty()) return null
+    val names = sync.missing.joinToString(" or ")
+    return "$emulator has no $systemName BIOS: $names is not in ${sync.folder}. Put it in your " +
         "games folder's bios folder and droidtop copies it in, or add it in Settings > Library > Emulators > $systemName."
 }
 

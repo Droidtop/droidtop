@@ -100,5 +100,8 @@ class EmulatorSetupTest {
         val line = biosMissingSentence("NetherSX2", "PlayStation 2", sync)!!
         assertEquals(true, line.contains("ps2-0230a-20080220.bin is not in /storage/emulated/0/Android/data/xyz.aethersx2.tturnip/files/bios"))
         assertNull(biosMissingSentence("NetherSX2", "PlayStation 2", sync.copy(missing = emptyList())))
+        // A folder that already holds one of the system's files is not "no BIOS", whatever optional files it lacks.
+        assertNull(biosMissingSentence("NooDS", "Nintendo DS", sync.copy(missing = listOf("dsi_bios7.bin"), present = 3)))
+        assertNull(biosMissingSentence("NooDS", "Nintendo DS", sync.copy(copied = listOf("bios7.bin"), missing = listOf("dsi_bios7.bin"))))
     }
 }

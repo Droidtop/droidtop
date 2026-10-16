@@ -290,8 +290,15 @@ object EmulatorSetup {
             .firstOrNull { runCatching { it.isFile && it.length() in 1..ElevatedFiles.MAX_WRITE_BYTES }.getOrDefault(false) }
     }
 
-    /** What [syncBios] did: the files it copied in and the files the emulator's folder still lacks. */
-    data class BiosSync(val folder: String, val copied: List<String>, val missing: List<String>)
+    /**
+     * What [syncBios] did: the files it copied in and the files the emulator's folder still lacks. [present] is how
+     * many of the system's files were already there; the database lists alternatives and optional files (several
+     * PlayStation BIOS revisions, DSi firmware beside the DS one), so a folder that has some of them is not "no BIOS".
+     */
+    data class BiosSync(val folder: String, val copied: List<String>, val missing: List<String>, val present: Int = 0) {
+        /** The emulator's folder holds none of the system's files, even after the copy. */
+        val none: Boolean get() = present == 0 && copied.isEmpty()
+    }
 
     /**
      * Copies into [spec]'s BIOS folder each file of [bios] it lacks that droidtop has in [roots], by the one write path
@@ -303,13 +310,14 @@ object EmulatorSetup {
         val present = listFolder(folder) ?: return null
         val copied = mutableListOf<String>()
         val missing = mutableListOf<String>()
-        for (want in missingBios(spec, bios, present)) {
+        val lacking = missingBios(spec, bios, present)
+        for (want in lacking) {
             val target = biosTarget(spec, want)
             val source = droidtopBios(roots, want)
             val bytes = source?.let { runCatching { it.readBytes() }.getOrNull() }
             if (bytes != null && write("$folder/$target", bytes)) copied += target else missing += target
         }
-        return BiosSync(folder, copied, missing)
+        return BiosSync(folder, copied, missing, present = bios.files.size - lacking.size)
     }
 
     /**
