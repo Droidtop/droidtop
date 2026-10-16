@@ -26,7 +26,6 @@ import app.murinelauncher.settings.SettingsGeneralFragment
 import app.murinelauncher.settings.SettingsHomeFragment
 import app.murinelauncher.settings.SettingsIconsFragment
 import app.murinelauncher.settings.SettingsQsbFragment
-import app.murinelauncher.theme.ThemeOverride
 import app.murinelauncher.widget.search.SearchProvider
 import app.murinelauncher.widget.smartspace.SmartspaceMode
 import com.android.launcher3.BuildConfig.WIDGET_ON_FIRST_SCREEN
@@ -440,8 +439,6 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         val PENDING_SMARTSPACE_WIDGET_ID = nonRestorableItem("pending_smartspace_widget_id", -1)
         @JvmField
         val FIXED_LANDSCAPE_MODE = backedUpItem(SettingsHomeFragment.FIXED_LANDSCAPE_MODE, false)
-        @JvmField
-        val THEME_DAY_NIGHT = backedUpItem(SettingsGeneralFragment.LAUNCHER_THEME_DAY_NIGHT, if (ThemeOverride.supportsSystemTheme) ThemeOverride.THEME_SYSTEM else ThemeOverride.THEME_DARK)
         @JvmField
         val BLUR_PREVIEW = backedUpItem(SettingsGeneralFragment.BLUR_PREVIEW, WorkspaceBlurUtils.isBlurSupported)
         @JvmField
