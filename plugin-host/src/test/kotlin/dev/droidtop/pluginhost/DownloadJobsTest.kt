@@ -209,14 +209,12 @@ class DownloadJobsTest {
         val games = File(dir, "games/dos")
         File(games, "Game").mkdirs()
         File(games, "Game/mine.txt").writeText("mine")
-        try {
-            DownloadJobs.unpackIntoFolder(archive, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
-            fail("an existing folder is never replaced")
-        } catch (e: IllegalArgumentException) {
-            assertEquals("a folder with that name already exists", e.message)
-        }
+        // #355 G5: the existing folder is untouched and the new game is unpacked beside it.
+        val unpacked = DownloadJobs.unpackIntoFolder(archive, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
+        assertEquals(File(games, "Game (2)"), unpacked)
+        assertEquals("a", File(unpacked, "a.txt").readText())
         assertEquals("mine", File(games, "Game/mine.txt").readText())
-        assertTrue(archive.exists())
+        assertFalse("the archive is gone once unpacked", archive.exists())
         assertNull(DownloadJobs.archiveStem("Game.exe"))
         assertEquals("My Game", DownloadJobs.archiveStem("My Game.RAR"))
     }
@@ -468,14 +466,13 @@ class DownloadJobsTest {
         assertTrue(target.isFile)
         assertFalse(downloaded.exists())
 
-        val again = File(dir, "downloads/acquire_2_Game.zip").also { it.writeText("zip") }
-        try {
-            DownloadJobs.placeInFolder(again, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
-            fail("an existing file is never replaced")
-        } catch (e: IllegalArgumentException) {
-            assertEquals("${File(games, "Game.zip").absolutePath} already exists", e.message)
-        }
-        assertTrue("the download stays for a retry", again.exists())
+        // #355 G5: an existing file is never replaced; the new one is kept beside it as "Game (2).zip".
+        val again = File(dir, "downloads/acquire_2_Game.zip").also { it.writeText("zip2") }
+        val second = DownloadJobs.placeInFolder(again, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
+        assertEquals(File(games, "Game (2).zip"), second)
+        assertEquals("zip", File(games, "Game.zip").readText())
+        assertEquals("zip2", second.readText())
+        assertEquals(File(games, "Game (3).zip"), DownloadJobs.freeName(games, "Game.zip"))
     }
 
     @Test
