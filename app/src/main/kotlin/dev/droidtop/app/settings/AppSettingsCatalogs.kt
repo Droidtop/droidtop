@@ -3302,6 +3302,14 @@ object AppSettingsCatalogs {
                                     ?.let { dev.droidtop.library.scraper.ScrapeOffer.set(ctx, it) }
                             },
                         ),
+                        // PC and engine games get their details by themselves (Droidtop/tracker#568), on by default.
+                        ToggleItem(
+                            id = "scrape_pc_auto",
+                            title = "Get details for PC games automatically",
+                            subtitle = "Soon after droidtop starts and after a store syncs, for PC and engine games missing art or details. No account needed",
+                            current = dev.droidtop.library.scraper.PcAutoScrape.enabled(context),
+                            onToggle = { ctx, on -> dev.droidtop.library.scraper.PcAutoScrape.setEnabled(ctx, on) },
+                        ),
                         ToggleItem(
                             id = "scrape_content_metadata",
                             title = "Fetch game details",
