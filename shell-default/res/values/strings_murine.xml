@@ -44,9 +44,6 @@
     <string name="backup_import_desc">Restore saved layout and settings</string>
     <string name="backup_import_confirm">This will restart the launcher and restore your configuration</string>
 
-    <string name="pref_label_ui_mode_system">System</string>
-    <string name="pref_label_ui_mode_day">Light</string>
-    <string name="pref_label_ui_mode_night">Dark</string>
     <string name="pref_label_grid_width">Grid width</string>
     <string name="pref_label_grid_height">Grid height</string>
     <string name="pref_label_icon_size">Icon size (%)</string>

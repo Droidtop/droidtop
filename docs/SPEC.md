@@ -1067,6 +1067,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer/open recent apps (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
 | Drawer search over apps, droidtop's own library and the download sources, in one ranked list | **built (Droidtop/tracker#12)** | the drawer's search field opens `LauncherSearchActivity` on the shared `LibrarySearchDialog`; see "Launcher search" below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
+| Light or dark from droidtop's one Appearance setting, not a launcher setting of its own (2026-10-16) | HAVE | `ThemeOverride` reads `AppearancePrefs`; see 7k "Light and dark" |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher: status tiles (**built this change**), search providers and app actions (still not buildable -- see below) | PARTIAL | `PluginStatusWidgetProvider.kt`; see below |
@@ -15011,8 +15012,15 @@ UI through the one palette (`GamingPalette`) every token reads:
   overlay surface at 92%, so their text keeps 4.5:1 over any artwork. They were the ink at 58%, pale text on a pale
   pill over light art (rig 1931). A theme's own clock or system status that names no colour is white, as in ES-DE,
   unless its declared background is one white cannot be read on; then it is black.
-- Not yet covered, each its own issue: the Standard home screen's Launcher3 XML views (Droidtop/tracker#560), the
-  Windows runtime's views (#561) and droidtop's keyboard (#562).
+- **Standard's home screen follows it too** (Droidtop/tracker#560, 2026-10-16). The Launcher3 fork's light or dark
+  came from Murine's own "UI theme" choice (System, Light, Dark on Settings > General); that choice is deleted and
+  `ThemeOverride.getThemePref` reads `AppearancePrefs`, so there is one setting for every mode. The launcher's
+  activities take it as their configuration's night mode (`ThemeOverride.applyTheme`), and an open one sees itself
+  stale on its next start and recreates. `ThemeOverride.watchAppearance` (from `LauncherApplication`) sets the night
+  mode again when the setting changes and, with an icon pack in use, reloads icons for the pack's day or night set.
+  droidtop's own pad dialogs in the launcher (`DroidtopDialog`, the radio list) and the large-screen taskbar keep their
+  dark plate in both appearances: light ink on a dark ground, readable over either.
+- Not yet covered, each its own issue: the Windows runtime's views (#561) and droidtop's keyboard (#562).
 - **The role tokens** for UI droidtop does not draw itself (a plugin's own pages, #559): one set, read from the palette
   in use (`GamingTheme.palette`, the theme's in Gaming, droidtop's own otherwise), never restated. `theme` is `light`
   or `dark` (`colors.isLight`); `ground` is the page background (`ground`); `surface` is a sheet or panel
