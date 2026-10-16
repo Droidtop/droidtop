@@ -13737,7 +13737,12 @@ own games, in droidtop's own treatment:
   short label, `PcSource.badgeLabel`: the folder's last path segment, and when
   that is longer than ten letters the initials of its words ("BstSharedFolder"
   is "PC · BSF"), else its first letters and an ellipsis, so the badge is never
-  cut mid-word (the whole name stays on the focus line). Ownership is never text on a capsule:
+  cut mid-word (the whole name stays on the focus line). A badge whose words
+  still do not fit its card (a long engine or system name on a narrow card:
+  "ENGINE · RPG MAK...", "RETRO · SONY PLAY...", Droidtop/tracker#434, rig
+  2026-10-14) is drawn in the longest form that fits, measured: the kind and
+  its detail, then the detail alone ("RPG MAKER MV", "SONY PLAYSTATION"), then
+  the kind alone (`KindBadge.forms`); the focus line keeps the whole text. Ownership is never text on a capsule:
   a game shared with you or gone from your library carries a small generic
   glyph in the bottom-right corner (no store logo). The focus line and the
   page's Source row carry the full text: "Steam · Shared with you", "GOG · via
