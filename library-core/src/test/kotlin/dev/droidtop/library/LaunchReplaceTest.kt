@@ -27,4 +27,14 @@ class LaunchReplaceTest {
         assertFalse(LaunchReplace.redeliver("com.retroarch.aarch64", ended = true))
         assertFalse(LaunchReplace.redeliver("xyz.aethersx2.tturnip", ended = false))
     }
+
+    @Test
+    fun `the running game launched again in the same app is resumed, not delivered again`() {
+        val running = LaunchReplace.Running("007", "xyz.aethersx2.tturnip")
+        assertTrue(LaunchReplace.resumes(running, "xyz.aethersx2.tturnip", "007"))
+        // Another game in the same app is a replacement, never a resume; another app is neither.
+        assertFalse(LaunchReplace.resumes(running, "xyz.aethersx2.tturnip", "glover"))
+        assertFalse(LaunchReplace.resumes(running, "com.retroarch.aarch64", "007"))
+        assertFalse(LaunchReplace.resumes(null, "xyz.aethersx2.tturnip", "007"))
+    }
 }

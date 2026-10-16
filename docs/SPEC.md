@@ -3228,10 +3228,13 @@ a close path of its own. Every call works off the main thread.
   #171). `LaunchDisplay.running` is the session; every surface (left menu Resume, Quick Menu Game section,
   companion Game tab and Now card, keep-awake) follows it and none polls for itself. `SessionMonitor` looks
   at the game's package while a session stands (every 3 s in the first minute after a start, where launches
-  die, then every 15 s) and ends it (`clearRunning`) when the force-stopped flag is set or the app is
-  uninstalled, or, with the privileged helper, when the system's task list has held no task of the package
-  on two looks in a row after the 9 s a launch is given to appear (the same data and grace as the launch
-  watchdog; the list is shared within 2 s, `TaskManager.snapshotWithin`). A game screen of droidtop's own
+  die, then every 15 s) and ends it (`clearRunning`) when the app looks gone on two looks in a row: the
+  force-stopped flag set or the app uninstalled while the task list does not hold it, or, with the privileged
+  helper, no task of the package in the system's task list after the 9 s a launch is given to appear. A listed task
+  outweighs the flag: an emulator relaunched into a process that outlived a force-stop runs with the flag still set,
+  and one look at the flag ended such a session at once (rig, droidtop 0.2.0-dev.1931: 007 relaunched into
+  NetherSX2's background process after Kill ran with no Game tab and no Kill). The task list is the same data, with the same grace, as the launch
+  watchdog's (shared within 2 s, `TaskManager.snapshotWithin`). A game screen of droidtop's own
   (Windows) is never judged by the task list and reports its own end. A launch whose dispatch throws never
   becomes a session (`LaunchDisplay.startOn` clears it). Enginehost's games need no helper: Enginehost
   answers its `state` call (Enginehost SPEC "Reporting whether anything is open") with the number of tasks it
@@ -8164,7 +8167,10 @@ is not listed beside an installed one of the same name (ARMSX2 is published as `
 **One launch replaces the running game** (`LaunchReplace`, Droidtop/tracker#413). A launch of a different game in
 the package that runs the game droidtop last started (`LaunchDisplay.runningGame` and the package it resolved)
 first ends that game through the task manager's one close path (`TaskManager.close`), then dispatches, so the
-emulator starts clean on the first press. Resuming the same game is not a replacement, and an app of another
+emulator starts clean on the first press. Resuming the same game is not a replacement: a launch of the running game
+in the same package brings that package's task to the front and is not delivered again (`LaunchReplace.resumes`),
+because a second delivery restarts or confuses the emulator (rig, droidtop 0.2.0-dev.1931: NetherSX2 handed the
+game it was running joined its folder with the whole content URI, read nothing and sat black). An app of another
 package is left as Android leaves it. Console, build 1649: launching a RetroArch game while another ran killed the
 running one and the new one never came; a second A worked. RetroArch's `RetroActivityFuture` is `singleInstance`
 and its `onNewIntent` restarts itself for a different ROM or core with `startActivity` followed at once by
