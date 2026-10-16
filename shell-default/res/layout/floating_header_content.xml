@@ -13,4 +13,12 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<merge />
+<!-- droidtop: the drawer's tabs (Droidtop/tracker#564), above Launcher3's personal and work tabs. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+    <com.android.launcher3.allapps.DrawerTabsRow
+        android:id="@+id/drawer_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/all_apps_header_pill_height"
+        android:layout_marginBottom="8dp"
+        android:clipToPadding="false" />
+</merge>

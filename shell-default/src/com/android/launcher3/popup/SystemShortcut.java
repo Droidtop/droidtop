@@ -28,6 +28,9 @@ import com.android.launcher3.AbstractFloatingView;
 import com.android.launcher3.AbstractFloatingViewHelper;
 import com.android.launcher3.Flags;
 import com.android.launcher3.LauncherPrefs;
+import app.murinelauncher.settings.prefs.DrawerTabs;
+import com.android.launcher3.Launcher;
+import com.android.launcher3.allapps.DrawerTabsRow;
 import com.android.launcher3.LauncherSettings;
 import com.android.launcher3.R;
 import com.android.launcher3.SecondaryDropTarget;
@@ -335,6 +338,59 @@ public abstract class SystemShortcut<T extends ActivityContext> extends ItemInfo
                 }
                 return new DontSuggestApp<>(activity, itemInfo, originalView);
             };
+
+    /**
+     * droidtop (Droidtop/tracker#564): an app in the drawer goes into or out of the drawer's tabs
+     * (DrawerTabs), or starts a new one. Only in the drawer, for an app.
+     */
+    public static final Factory<ActivityContext> DRAWER_TABS = (context, itemInfo, originalView) -> {
+        if (itemInfo.container != LauncherSettings.Favorites.CONTAINER_ALL_APPS
+                || itemInfo.itemType != LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
+                || itemInfo.getTargetComponent() == null) {
+            return null;
+        }
+        return new DrawerTabsShortcut(context, itemInfo, originalView);
+    };
+
+    private static class DrawerTabsShortcut<T extends ActivityContext> extends SystemShortcut<T> {
+        DrawerTabsShortcut(T target, ItemInfo itemInfo, View originalView) {
+            super(R.drawable.ic_drawer_tab, R.string.drawer_tabs_option, target, itemInfo, originalView);
+        }
+
+        @Override
+        public void onClick(View view) {
+            Context context = mOriginalView.getContext();
+            String component = mItemInfo.getTargetComponent().flattenToString();
+            android.widget.PopupMenu menu = new android.widget.PopupMenu(context, mOriginalView);
+            java.util.List<DrawerTabs.Tab> tabs = DrawerTabs.tabs(context);
+            for (int i = 0; i < tabs.size(); i++) {
+                menu.getMenu().add(0, i, i, tabs.get(i).getName()).setCheckable(true)
+                        .setChecked(tabs.get(i).getApps().contains(component));
+            }
+            menu.getMenu().add(0, tabs.size(), tabs.size(), R.string.drawer_tab_new);
+            menu.setOnMenuItemClickListener(item -> {
+                if (item.getItemId() < tabs.size()) {
+                    DrawerTabs.Tab tab = tabs.get(item.getItemId());
+                    DrawerTabs.setMember(context, tab.getName(), component, !item.isChecked());
+                    tabsChanged(context);
+                } else {
+                    DrawerTabsRow.askName(context, null, name -> {
+                        boolean added = DrawerTabs.add(context, name, component);
+                        if (added) tabsChanged(context);
+                        return added;
+                    });
+                }
+                return true;
+            });
+            dismissTaskMenuView();
+            menu.show();
+        }
+
+        private static void tabsChanged(Context context) {
+            DrawerTabsRow row = Launcher.getLauncher(context).getAppsView().getDrawerTabsRow();
+            if (row != null) row.onTabsChanged();
+        }
+    }
 
     private static class DontSuggestApp<T extends ActivityContext> extends SystemShortcut<T> {
         DontSuggestApp(T target, ItemInfo itemInfo, View originalView) {

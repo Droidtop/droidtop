@@ -59,6 +59,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+
+import app.murinelauncher.settings.prefs.DrawerTabs;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -271,6 +273,12 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
             //privateAppStream = privateAppStream.filter(notHidden);
         }
 
+        // droidtop patch (Droidtop/tracker#564): the drawer tab chosen in DrawerTabsRow; All filters nothing.
+        Set<String> tabApps = hasSearchResults() ? null : DrawerTabs.selectedApps(mActivityContext);
+        if (tabApps != null) {
+            appSteam = appSteam.filter(info -> tabApps.contains(info.componentName.flattenToString()));
+        }
+
         if (!hasSearchResults() && mItemFilter != null) {
             appSteam = appSteam.filter(mItemFilter);
             if (mPrivateProviderManager != null) {
@@ -351,10 +359,10 @@ public class AlphabeticalAppsList<T extends Context & ActivityContext> implement
                 // droidtop patch (not upstream Launcher3): the "Recent"
                 // row goes before the alphabetical list, same shape as
                 // the work-profile items above it.
-                position += addRecentAppItems();
+                if (DrawerTabs.getSelected() == null) position += addRecentAppItems();
                 position = addAppsWithSections(mApps, position);
             }
-            if (Flags.enablePrivateSpace()) {
+            if (Flags.enablePrivateSpace() && DrawerTabs.getSelected() == null) {
                 position = addPrivateSpaceItems(position);
             }
             if (!mFastScrollerSections.isEmpty()) {
