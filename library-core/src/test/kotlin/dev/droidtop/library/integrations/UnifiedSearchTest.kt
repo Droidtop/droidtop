@@ -83,10 +83,12 @@ class UnifiedSearchTest {
             emptyList(),
             listOf(s),
         )
+        // The library's Sonic and the source's Sonic are one game: one row, the device's in front (docs/SPEC.md 12a).
         assertEquals(
-            listOf("APP:Sonic", "GAME:Sonic", "SOURCE:Sonic", "SOURCE:Sonic Mania", "GAME:Ultrasonic"),
+            listOf("APP:Sonic", "GAME:Sonic", "SOURCE:Sonic Mania", "GAME:Ultrasonic"),
             rows.map { "${it.kind}:${it.title}" },
         )
+        assertEquals(listOf("GAME:Sonic", "SOURCE:Sonic"), rows[1].choices.map { "${it.kind}:${it.title}" })
     }
 
     @Test
@@ -99,7 +101,7 @@ class UnifiedSearchTest {
     }
 
     @Test
-    fun `two sources tie in the order they were asked`() {
+    fun `two sources tie in the order they were asked, as the places of one row`() {
         val a = source("a")
         val b = source("b")
         val rows = UnifiedSearch.rank(
@@ -107,7 +109,7 @@ class UnifiedSearchTest {
             listOf(SourceOutcome(b, listOf(result("b1", "X"))), SourceOutcome(a, listOf(result("a1", "X")))),
             emptyList(), listOf(a, b),
         )
-        assertEquals(listOf("a1", "b1"), rows.map { it.hit!!.result.id })
+        assertEquals(listOf("a1", "b1"), rows.single().choices.map { it.hit!!.result.id })
     }
 
     @Test
