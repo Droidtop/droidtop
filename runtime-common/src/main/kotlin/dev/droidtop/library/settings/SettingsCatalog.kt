@@ -123,6 +123,7 @@ class ChoiceItem(
     val options: List<ChoiceOption>,
     val current: String?,
     val onSelect: (Context, String) -> Unit,
+    override val chip: String? = null,
 ) : CatalogItem {
     fun currentLabel(): String? = options.firstOrNull { it.value == current }?.label ?: current
 

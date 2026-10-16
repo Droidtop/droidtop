@@ -5,6 +5,7 @@ import android.content.Context
 import com.android.launcher3.Launcher
 import com.android.launcher3.LauncherFiles
 import com.android.launcher3.model.data.LauncherAppWidgetInfo
+import com.android.launcher3.widget.util.WidgetSizes
 import dev.droidtop.runtime.StackMember
 import dev.droidtop.runtime.WidgetStack
 import dev.droidtop.runtime.WidgetStackTable
@@ -86,5 +87,9 @@ object WidgetStacks {
         info.providerName = provider
         launcher.modelWriter.updateItemInDatabase(info)
         launcher.bindAppWidget(info)
+        // A member is bound without size options and no add, drop or load path sizes it, so a provider that
+        // lays out from them (the system Digital clock) drew for 0x0: blank. Send the place's size on every
+        // show; this also repairs members stacked before. Off the main thread, and only when changed.
+        launcher.workspace.getWidgetForAppWidgetId(member.id)?.let { WidgetSizes.updateWidgetSizeRanges(it, launcher, info.spanX, info.spanY) }
     }
 }

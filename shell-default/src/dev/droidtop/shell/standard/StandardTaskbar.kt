@@ -40,6 +40,8 @@ import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherSettings
 import com.android.launcher3.model.data.WorkspaceItemInfo
 import com.android.launcher3.util.Executors
+import dev.droidtop.library.settings.Mode
+import dev.droidtop.library.settings.Modes
 import dev.droidtop.library.settings.TaskbarPolicy
 
 /**
@@ -81,6 +83,7 @@ class StandardTaskbar(private val service: AccessibilityService) {
     private var openKeys: List<String> = emptyList()
     private val openEntries = HashMap<String, Entry>()
     private var appInFront = false
+    private var desktopInFront = false
     private var collapsed = false
     private var focusedDisplay: Int? = null
 
@@ -136,6 +139,8 @@ class StandardTaskbar(private val service: AccessibilityService) {
         // Only an Activity coming to the front is an app switch; dialogs, popups,
         // the keyboard and our own overlay report window changes too.
         if (!isActivity(pkg, cls)) return
+        // droidtop's Desktop session owns the keyboard while it is in front: Meta is the session's Super (SPEC 6b).
+        desktopInFront = pkg == service.packageName && Modes.lastMode(service) == Mode.DESKTOP.id
         if (pkg == service.packageName || pkg in homePackages()) {
             appInFront = false
         } else if (pkg != SYSTEM_UI) {
@@ -150,12 +155,15 @@ class StandardTaskbar(private val service: AccessibilityService) {
         renderAll()
     }
 
-    /** The Meta key or the pad's Mode button toggles focus in the strip; nothing else is taken. */
+    /**
+     * The Meta key or the pad's Mode button toggles focus in the strip; nothing else is taken. Not Meta while
+     * droidtop's Desktop is in front: there it is the session's Super key, and taking it system-wide left foot without
+     * it (follow-up rig 2026-10-16, `input keycombination META_LEFT B`).
+     */
     fun onKey(event: KeyEvent): Boolean {
         if (!enabled) return false
-        val trigger = event.keyCode == KeyEvent.KEYCODE_META_LEFT ||
-            event.keyCode == KeyEvent.KEYCODE_META_RIGHT ||
-            event.keyCode == KeyEvent.KEYCODE_BUTTON_MODE
+        val meta = event.keyCode == KeyEvent.KEYCODE_META_LEFT || event.keyCode == KeyEvent.KEYCODE_META_RIGHT
+        val trigger = (meta && !desktopInFront) || event.keyCode == KeyEvent.KEYCODE_BUTTON_MODE
         if (!trigger) return false
         if (event.action == KeyEvent.ACTION_UP) {
             if (focusedDisplay != null) endFocus() else beginFocus()

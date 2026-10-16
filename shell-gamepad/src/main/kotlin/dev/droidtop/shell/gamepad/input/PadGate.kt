@@ -331,7 +331,11 @@ class PadGate(
     /** A key event for this window; returns whether it was handled (or dropped). */
     fun dispatchKey(event: KeyEvent): Boolean {
         val held = settle
-        if (held == null || (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP)) return dispatchKeyNow(event)
+        // With the gate off (Desktop) keys go straight to the surface in order: holding and replaying them let a
+        // pause or focus change drop a held Ctrl up, and the session kept Ctrl down (follow-up rig 2026-10-16).
+        if (held == null || !enabled() || (event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP)) {
+            return dispatchKeyNow(event)
+        }
         // The platform may reuse the event it hands over: what is held is a copy.
         return held.dispatch(KeyEvent(event))
     }
