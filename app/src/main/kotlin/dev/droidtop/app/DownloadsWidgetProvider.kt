@@ -79,6 +79,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
                 context.getString(R.string.widget_downloads_title),
                 shown,
                 context.getString(R.string.widget_downloads_empty),
+                emptyTap = open,
             )
         }
     }

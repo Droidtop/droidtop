@@ -63,6 +63,8 @@ internal object DroidtopWidgets {
     /**
      * A title and up to [MAX_ROWS] rows, or [empty] when there are none: an honest empty state, never placeholder
      * data. [layout] is `widget_rows`, or a larger layout that holds the same ids (the full page, `widget_page`).
+     * [emptyTap] is what a tap anywhere on the widget does while it has no rows (its place: Downloads for the
+     * downloads widget); an empty widget that did nothing read as broken (rig on 0.2.0-dev.2070).
      */
     fun rows(
         context: Context,
@@ -72,6 +74,7 @@ internal object DroidtopWidgets {
         empty: String,
         layout: Int = R.layout.widget_rows,
         textSp: Float? = null,
+        emptyTap: PendingIntent? = null,
     ): RemoteViews {
         val views = RemoteViews(context.packageName, layout)
         plate(views, look)
@@ -80,6 +83,7 @@ internal object DroidtopWidgets {
         views.setTextViewText(R.id.widget_empty, empty)
         views.setTextColor(R.id.widget_empty, look.muted)
         views.setViewVisibility(R.id.widget_empty, if (rows.isEmpty()) View.VISIBLE else View.GONE)
+        if (rows.isEmpty()) emptyTap?.let { views.setOnClickPendingIntent(R.id.widget_root, it) }
         for ((index, id) in ROW_IDS.withIndex()) {
             val row = rows.getOrNull(index)
             views.setViewVisibility(id, if (row == null) View.GONE else View.VISIBLE)
