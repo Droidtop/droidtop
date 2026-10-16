@@ -5,12 +5,9 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
-import android.hardware.display.DisplayManager
 import android.os.Build
-import android.provider.Settings
 import android.util.Log
 import android.util.TypedValue
-import android.view.Display
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.TextView
@@ -84,9 +81,7 @@ private class OverlayWindow {
             return
         }
         hide()
-        val (context, type) = AccessibilityTyping.overlayContext(displayId)?.let { it to WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY }
-            ?: appOverlayContext(app, displayId)?.let { it to WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY }
-            ?: return
+        val (context, type) = GameOverlay.windowContext(app, displayId) ?: return
         val wm = context.getSystemService(WindowManager::class.java) ?: return
         val label = TextView(context).apply {
             this.text = text
@@ -123,16 +118,5 @@ private class OverlayWindow {
         view = null
         windowManager = null
         shownOn = null
-    }
-
-    private fun appOverlayContext(app: Context, displayId: Int): Context? {
-        if (!Settings.canDrawOverlays(app)) return null
-        val display: Display = app.getSystemService(DisplayManager::class.java)?.getDisplay(displayId) ?: return null
-        val displayContext = app.createDisplayContext(display)
-        return if (Build.VERSION.SDK_INT >= 30) {
-            displayContext.createWindowContext(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null)
-        } else {
-            displayContext
-        }
     }
 }
