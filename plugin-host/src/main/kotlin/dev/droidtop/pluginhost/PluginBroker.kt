@@ -135,6 +135,10 @@ interface BrokerEnvironment {
     fun announceToDevices(pluginId: String, value: JSONObject?): Unit =
         throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop announces nothing to paired devices")
 
+    /** The role tokens in use (docs/SPEC.md 7k), for `ui.get_theme` and `host.get_info`'s `theme`. */
+    fun roleTokens(): dev.droidtop.library.theme.RoleTokens.Set =
+        dev.droidtop.library.theme.RoleTokens.of(dev.droidtop.library.theme.GamingThemeColors.DEFAULT)
+
     /** The addresses [host] resolves to; asked only once the plugin may reach [host]. */
     fun addressesOf(host: String): List<java.net.InetAddress> = emptyList()
 
@@ -327,7 +331,11 @@ object HostApis {
                 .put("points", points)
                 .put("apis", apis)
                 .put("installId", env.installId(record.manifest.id))
+                .put("theme", if (env.roleTokens().light) "light" else "dark")
         },
+        // Droidtop/tracker#559: the role tokens UI a plugin draws itself follows (docs/SPEC.md 7k, "Light and dark"),
+        // the same colours as droidtop's own pages; no permission, since they say nothing about the person.
+        HostOp("ui", "get_theme") { env, _, _ -> dev.droidtop.library.theme.RoleTokens.toJson(env.roleTokens()) },
         HostOp("plugins", "list_available") { env, record, args ->
             val api = args.optString("api").takeIf { it.isNotBlank() } ?: invalid("api is required")
             val minLevel = args.optString("minLevel").takeIf { it.isNotBlank() }

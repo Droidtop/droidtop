@@ -65,6 +65,12 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
      * the plugin reads `devices.list_paired` again. Only to a plugin holding `devices.paired`. No args.
      */
     DEVICES_CHANGED("devices.changed", 1, "Paired devices changed"),
+
+    /**
+     * The role tokens changed (docs/SPEC.md 7k "Light and dark", Droidtop/tracker#559): Light or dark, Android's night
+     * mode, or the Gaming theme. A plugin that draws its own UI reads `ui.get_theme` again. Args: `theme`.
+     */
+    THEME_CHANGED("host.theme_changed", 1, "Theme changed"),
     ;
 
     companion object {
