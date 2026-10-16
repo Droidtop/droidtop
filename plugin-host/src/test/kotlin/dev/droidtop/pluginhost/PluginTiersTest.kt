@@ -97,32 +97,23 @@ class PluginTiersTest {
     }
 
     @Test
-    fun `gpu render is one hole a granted permission opens, not full access`() {
+    fun `gpu render is retired, so granting it opens nothing and the plugin stays contained`() {
+        // The owner, 2026-10-16: "Plugins shouldn't be drawing stuff themselves anyway" (docs/plugin-api.md 5.6).
         val r = record(manifest { it.put("permissions", arr(gpu)) })
-        // Declared but not ticked: still the safe default, no badge, no refusal.
-        assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants()))
-        assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.DENIED)))
-        assertNull(PluginTiers.badge(r, grants()))
-        assertNull(PluginTiers.refusal(r, grants()))
-        // Ticked: it runs in an open process with that one hole, still not full access and still no badge the person must read.
-        assertEquals(PluginTier.OPEN, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+        assertEquals(PluginTier.CONTAINED, PluginTiers.of(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+        assertTrue(PluginTiers.holes(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)).isEmpty())
         assertNull(PluginTiers.badge(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
         assertNull(PluginTiers.refusal(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+        assertNull("no permission, so no warning", PluginTiers.caution(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED)))
     }
 
     @Test
-    fun `the plugin's page warns in plain words while the graphics chip is allowed`() {
-        val r = record(manifest { it.put("permissions", arr(gpu)) })
-        assertNull("not granted, no warning", PluginTiers.caution(r, grants()))
-        assertNull(PluginTiers.caution(r, grants(PluginTiers.GPU_RENDER to GrantState.ASK)))
-        val caution = PluginTiers.caution(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED))!!
-        assertTrue(caution.contains("reach past droidtop's checks"))
-        assertTrue(caution.contains("source you trust"))
-        // No tier names where a person reads (Droidtop/tracker#378, owner 2026-10-08).
-        listOf("tier", "contained", "isolated", "sandbox", "GPU").forEach { assertTrue(it, !caution.contains(it, ignoreCase = true)) }
-        // Full access already carries the stronger warning.
-        val both = record(manifest { it.put("permissions", arr(fullTrust, gpu)) })
-        assertNull(PluginTiers.caution(both, grants(PluginTiers.FULL_TRUST to GrantState.GRANTED, PluginTiers.GPU_RENDER to GrantState.GRANTED)))
+    fun `the network hole runs isolated from Android 11, its sockets the broker's`() {
+        assertTrue(PluginTiers.runsIsolated(setOf(PluginTiers.NET_SOCKETS), sdk = 30))
+        assertTrue(PluginTiers.runsIsolated(setOf(PluginTiers.NET_SOCKETS), sdk = 35))
+        // Below 30 an isolated process may not use a socket it was handed: it waits for the broker's byte relay.
+        assertTrue(!PluginTiers.runsIsolated(setOf(PluginTiers.NET_SOCKETS), sdk = 29))
+        assertTrue(!PluginTiers.runsIsolated(emptySet(), sdk = 34))
     }
 
     @Test
@@ -150,15 +141,15 @@ class PluginTiersTest {
         assertTrue(PluginTiers.holes(r, grants()).isEmpty())
         assertEquals(setOf(PluginTiers.NET_SOCKETS), PluginTiers.holes(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
         assertEquals(PluginTier.OPEN, PluginTiers.of(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
-        assertEquals(setOf(PluginTiers.GPU_RENDER), PluginTiers.holes(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.DENIED)))
+        assertTrue("the retired graphics hole opens nothing", PluginTiers.holes(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.DENIED)).isEmpty())
         assertEquals(
-            setOf(PluginTiers.GPU_RENDER, PluginTiers.NET_SOCKETS),
+            setOf(PluginTiers.NET_SOCKETS),
             PluginTiers.holes(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED)),
         )
         assertNull(PluginTiers.badge(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
         // A hole the plugin did not declare is never opened, whatever the store says.
         val undeclared = record(manifest { it.put("permissions", arr(gpu)) })
-        assertEquals(setOf(PluginTiers.GPU_RENDER), PluginTiers.holes(undeclared, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED)))
+        assertTrue(PluginTiers.holes(undeclared, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED)).isEmpty())
         // Full access, and a plugin that cannot run contained, get no holes.
         val full = record(manifest { it.put("permissions", arr(fullTrust, net)) })
         assertTrue(PluginTiers.holes(full, grants(PluginTiers.FULL_TRUST to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED)).isEmpty())
@@ -167,12 +158,12 @@ class PluginTiersTest {
     }
 
     @Test
-    fun `the network hole warns in plain words, and both holes warn together`() {
+    fun `the network hole warns in plain words, and the retired graphics hole adds nothing`() {
         val r = record(manifest { it.put("permissions", arr(gpu, net)) })
         val network = PluginTiers.caution(r, grants(PluginTiers.NET_SOCKETS to GrantState.GRANTED))!!
         assertTrue(network.contains("other apps on this device"))
         listOf("tier", "socket", "sandbox", "seccomp").forEach { assertTrue(it, !network.contains(it, ignoreCase = true)) }
         val both = PluginTiers.caution(r, grants(PluginTiers.GPU_RENDER to GrantState.GRANTED, PluginTiers.NET_SOCKETS to GrantState.GRANTED))!!
-        assertTrue(both.contains("reach past droidtop's checks") && both.contains("other apps on this device"))
+        assertTrue(!both.contains("reach past droidtop's checks") && both.contains("other apps on this device"))
     }
 }

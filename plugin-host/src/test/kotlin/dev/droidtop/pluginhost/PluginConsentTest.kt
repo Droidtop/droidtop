@@ -29,15 +29,11 @@ class PluginConsentTest {
     private fun arr(vararg o: JSONObject) = JSONArray(o.toList())
 
     @Test
-    fun `the graphics chip's approval line says it could reach past droidtop's checks`() {
+    fun `the retired graphics chip permission is not asked for, and a plugin declaring it still installs`() {
         val m = TestPlugins.manifest { it.put("permissions", arr(obj("id" to "gpu.render", "reason" to "Smooth animations"))) }
-        val ask = PluginConsent.of(m, listOf(record(m)), badgeFor = { "Added by you" }).asks.single()
-        assertEquals("Use the graphics chip to draw its screen", ask.line.title)
-        assertEquals(
-            "A plugin with this could reach past droidtop's checks, so only allow it for a plugin from a source you trust. Smooth animations.",
-            ask.line.detail,
-        )
-        assertFalse("asks first, never pre-ticked", ask.line.ticked)
+        val consent = PluginConsent.of(m, listOf(record(m)), badgeFor = { "Added by you" })
+        assertTrue("plugins never get the GPU (docs/plugin-api.md 5.6)", consent.asks.isEmpty())
+        assertTrue(consent.unsupported.isNotEmpty())
     }
 
     @Test

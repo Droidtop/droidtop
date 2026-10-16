@@ -18912,10 +18912,16 @@ switched off. The OS is a separate rule; the owner, verbatim: "Shizuku
 does need direct access to android APIs. We can allow for that, but our
 plugin sandbox needs to block it when full access isn't enabled. I said the
 only path into DROIDTOP is through teh API. I didn't say that about the
-OS". So a full-access plugin may use Android's APIs, system services and
-Shizuku directly, and without full access the sandbox blocks that (a
-contained or open plugin reaches the OS only through droidtop's API or a
-granted permission's one hole). `docs/plugin-api.md` "Everything goes over
+OS". Then, the same day, verbatim: "every plugin is isolated, regardless of
+access. We have to assume that plugins are untrusted third party code from
+our perspective, so full access does NOT mean they get to fuck with stuff
+not prescribed by the API". So every plugin, full access included, runs
+isolated under a UID of its own; full access reaches the OS and Shizuku
+only through the sandbox's binder relay, which forwards exactly the system
+services and transactions a declared full-access API point prescribes,
+under droidtop's identity, refuses anything addressed to droidtop's own
+components and logs every call. Plugins never get the GPU (verbatim:
+"Plugins shouldn't be drawing stuff themselves anyway"). `docs/plugin-api.md` "Everything goes over
 the API" holds both rules and §5.6 the audit, with the fix and the test
 that proves each path closed (Droidtop/tracker#53).
 
@@ -19018,7 +19024,15 @@ Advanced.
   no such rule. `power.get_state` (D7, under `power.state`) reports the
   battery level, charging and Battery Saver, so no plugin reads
   `/sys/class/power_supply` itself.
-- **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
+- **The graphics tier is retired (2026-10-16).** The owner, verbatim:
+  "Plugins shouldn't be drawing stuff themselves anyway". Plugins never get
+  the GPU: an isolated process may not open it on any Android version, and
+  plugins render through droidtop's views (a contained Flutter screen
+  through CPU frames droidtop composites). `gpu.render` is no permission
+  and no hole any more; the paragraph below is the history. An open
+  plugin's `net.sockets` now runs isolated from Android 11, its sockets made
+  by droidtop's broker (`docs/plugin-api.md` 5.6).
+- **The graphics tier, as it was** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process
   that is NOT `android:isolatedProcess` (slots `:plugin_open0..7`, the open
@@ -20143,6 +20157,7 @@ what the index says is display data, never a trust decision.
            "id": "<origin>.<name>, the plugin id>",
            "label": "<display name, from the signed manifest>",
            "description": "<one line, or null>",
+           "category": "<one id of the fixed list, docs/plugin-api.md 1.2; optional>",
            "releases": [
             {
              "version": "<the manifest's version string>",
@@ -20181,15 +20196,30 @@ what the index says is display data, never a trust decision.
   an unknown `schemaVersion` is refused whole (a newer format is not
   guessed at), the same validate-before-replace posture as the platform
   databases.
-- **What the catalog offers.** Only `stable`-stream releases: a plugin's
+- **Channels (decided 2026-10-16, Droidtop/tracker#179).** The owner,
+  verbatim: "Yeah, plugins are channeled, too. They should also have
+  categories". A plugin has three release lines, as Enginehost and droidtop
+  itself do: Stable, Testing and Unstable, the index's `stream`. Stable is
+  the default. Each added catalog has a channel (Settings, the catalog's
+  page), and each plugin may override it on its own page; the override
+  wins. A channel takes its own line and every steadier one: Testing is
+  offered the newest of its testing and stable releases, Unstable the
+  newest of all three; Stable only stable. "Newest" is the rule below,
+  applied to the releases the channel takes. Moving to a steadier channel
+  never installs an older release by itself: the installed plugin stays
+  until that channel offers a release newer than it (by `publishedAt`).
+  A row says which channel an offer came from when it is not Stable
+  ("Testing"). Nothing else changes: trust, signatures and the digest rule
+  are the same for every channel.
+- **What the catalog offers.** On the Stable channel, only
+  `stable`-stream releases (other channels: "Channels" above): a plugin's
   offer is its newest stable release, judged by BOTH its version string
   and `publishedAt` (owner, 2026-09-28): when one ties or a date is
   missing, the other decides; when both speak they must agree. A newer
   version published before an older one means the index was built wrong,
   so that plugin is offered nothing and its row says the catalog is
-  inconsistent, rather than droidtop guessing. droidtop never
-  offers a testing/unstable release for install or update (the index may
-  carry them; this build does not act on them). An installed plugin has
+  inconsistent, rather than droidtop guessing. A testing or unstable
+  release is offered only on a channel that takes it. An installed plugin has
   an UPDATE when the newest stable release's `manifestSha256` differs
   from the installed record's `archiveDigest` — version strings are
   deliberately not compared, the digest is the identity. An installed

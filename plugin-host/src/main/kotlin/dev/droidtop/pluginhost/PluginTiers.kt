@@ -30,11 +30,16 @@ enum class PluginTier {
  */
 object PluginTiers {
     const val FULL_TRUST = "host.full_trust"
+    /**
+     * Retired (2026-10-16, docs/plugin-api.md 5.6): the owner, "Plugins shouldn't be drawing stuff themselves anyway". It is
+     * no hole and no permission; a plugin that declares it runs contained and draws CPU frames. Kept as a name so the code
+     * that still reads it (a process that was given it before) compiles to "never".
+     */
     const val GPU_RENDER = "gpu.render"
     const val NET_SOCKETS = "net.sockets"
 
     /** The permissions that each open one hole in an open process ([PluginTier.OPEN]); nothing else does. */
-    val HOLES = listOf(GPU_RENDER, NET_SOCKETS)
+    val HOLES = listOf(NET_SOCKETS)
 
     /**
      * The manifest key droidtop writes when it hands an open process its plugin: the granted holes ([holes]), which the
@@ -57,6 +62,15 @@ object PluginTiers {
     }
 
     fun declaresGpu(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == GPU_RENDER }
+
+    /**
+     * True when an open plugin with [holes] runs in an isolated process under a UID of its own, its sockets made, connected
+     * and accepted by droidtop's broker (docs/plugin-api.md 5.6, "A UID of its own, as a sandbox feature"): the network
+     * hole, on Android 11 (API 30) or later, where an isolated process may use a socket it was handed. Below API 30 it
+     * waits for the broker's byte relay and stays in a process of droidtop's UID until then.
+     */
+    fun runsIsolated(holes: Set<String>, sdk: Int = android.os.Build.VERSION.SDK_INT): Boolean =
+        holes == setOf(NET_SOCKETS) && sdk >= 30
 
     /**
      * The holes [record] gets in its open process: the hole permissions it declared and the person granted ([HOLES]).

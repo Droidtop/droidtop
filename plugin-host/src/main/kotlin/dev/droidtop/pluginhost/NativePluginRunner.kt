@@ -99,7 +99,10 @@ class NativePluginRunner(
     suspend fun load(record: PluginRecord, installDir: String, tier: PluginTier): Boolean {
         val id = record.manifest.id
         loadFailures.remove(id)
-        val runtime = PluginProcesses.acquire(appContext, id, tier)
+        // An open plugin with only the network hole runs isolated, its sockets the broker's (docs/plugin-api.md 5.6).
+        val isolatedNet = tier == PluginTier.OPEN &&
+            PluginTiers.runsIsolated(withContext(Dispatchers.IO) { PluginTiers.holes(record, PluginGrants.forContext(appContext).read(id)) })
+        val runtime = PluginProcesses.acquire(appContext, id, if (isolatedNet) PluginTier.CONTAINED else tier, network = isolatedNet)
             ?: return failLoad(id, if (tier == PluginTier.CONTAINED) "its contained process could not be started" else "the plugin process could not be started")
         if (runtimes.put(id, runtime) != null) PluginProcesses.release(appContext, id)
         val binder = runtime.asBinder()

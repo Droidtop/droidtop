@@ -108,7 +108,7 @@ static void audit(void *context, const struct sbx_access *access, int result) {
 JNIEXPORT jint JNICALL
 Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz, jstring plugin, jobjectArray paths,
                                                       jintArray modes, jobjectArray alias_from, jobjectArray alias_to,
-                                                      jstring quota_root, jlong quota_bytes) {
+                                                      jstring quota_root, jlong quota_bytes, jint net_grants) {
     (void) clazz;
     jsize count = (*env)->GetArrayLength(env, paths);
     if (count != (*env)->GetArrayLength(env, modes)) return -EINVAL;
@@ -157,6 +157,16 @@ Java_dev_droidtop_pluginhost_SandboxBroker_nativeServe(JNIEnv *env, jclass clazz
     pthread_mutex_init(&context->lock, NULL);
     sbx_policy_set_decider(policy, decide, context);
     sbx_policy_set_audit(policy, audit, context);
+    if (net_grants != 0) {
+        /*
+         * The network hole of a plugin in an isolated process (docs/plugin-api.md 5.6): its sockets are made here, under
+         * droidtop's UID. bionic resolves names through netd's dnsproxyd and reports each connect and accept to fwmarkd,
+         * Unix sockets an isolated process may not reach, so the broker connects those too.
+         */
+        sbx_policy_set_net(policy, (unsigned) net_grants);
+        sbx_policy_add_system_socket(policy, "/dev/socket/dnsproxyd", SBX_NET_RESOLVE);
+        sbx_policy_add_system_socket(policy, "/dev/socket/fwmarkd", SBX_NET_CONNECT | SBX_NET_LISTEN);
+    }
 
     int pair[2];
     if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, pair) != 0) {
