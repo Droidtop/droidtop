@@ -100,7 +100,7 @@ class WineGameActivity : Activity() {
         override val padMouse: Boolean? get() = this@WineGameActivity.padMouse?.settings?.on
         override val pointer: OwnGameScreens.Pointer? get() = this@WineGameActivity.gamePointer
         override fun setPadMouse(on: Boolean) {
-            runOnUiThread { padMouse?.let { it.set(it.settings.copy(on = on)) } }
+            runOnUiThread { this@WineGameActivity.padMouse?.let { it.set(it.settings.copy(on = on)) } }
         }
         override fun stop() {
             // The guest's teardown is queued now (off the main thread), so a relaunch that follows
