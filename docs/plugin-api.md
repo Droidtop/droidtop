@@ -3143,19 +3143,14 @@ with it:
   its rig run says.
   Every plugin process paid it, and the processes restart after a minute
   idle, so the first search after a start ran out of its 10 s for several
-  sources at once (rig, release 0.2.0-dev.2070, Droidtop/tracker#218). From
-  Android 10 (API 29) the sandbox runs in droidtop's app zygote
-  (`android:useAppZygote`), whose preload (`PluginZygotePreload`) loads the
-  library once; each plugin process forked from it finds the library loaded.
-  The zygote's UID is in the isolated range too, so its own load is
-  expected to wait once, while it starts; droidtop starts it ahead of any
-  plugin (`PluginZygoteWarmup`), as the one search opens and 5 s after
-  droidtop's start goes idle, with one empty sandbox process that is
-  dropped once a plugin's own process runs or after 2 minutes. The
-  coordinator, 2026-10-16: "so no person ever sees the first search time
-  out". `PluginStartRigTest` (by hand)
-  holds a second contained plugin's start to 3 s. Needs a rig check on
-  BlueStacks.
+  sources at once (rig, release 0.2.0-dev.2070, Droidtop/tracker#218). An app
+  zygote that preloads the library (Android 10 and later) was tried and
+  turned off the same day: on BlueStacks the preload left libbinder's
+  ProcessState in the zygote, and every plugin process forked from it
+  aborted with "libbinder ProcessState can not be used after fork" (rig,
+  release 0.2.0-dev.2097, Droidtop/tracker#218). The wait per plugin
+  process stands until a start path that avoids it is found;
+  `PluginStartRigTest` (by hand) measures it.
 
 **ui.main in the sandbox (plugin-enforce-8, emulator-5560 and BlueStacks).**
 A contained plugin's own screen stayed black for two reasons, both rules of

@@ -29,8 +29,8 @@ import java.security.MessageDigest
 /**
  * How long a contained plugin takes to start (docs/plugin-api.md 5.3, "The rigs"): on the BlueStacks rig every plugin
  * process waited a constant 10 s at its first app library load, so the first search after a start ran out of time.
- * The app zygote now loads the library once ([dev.droidtop.pluginhost.PluginZygotePreload]). The first plugin may still
- * pay for the zygote's own start; a second, in a process of its own, must start within [BUDGET_MS]. Run by hand with
+ * A second plugin, in a process of its own, must start within [BUDGET_MS]; on BlueStacks it does not yet, and this
+ * says by how much. Run by hand with
  * `am instrument`, never in CI:
  *
  *     adb shell am instrument -w -e class dev.droidtop.app.PluginStartRigTest \

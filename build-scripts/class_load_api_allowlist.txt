@@ -103,8 +103,3 @@ com.android.wm.shell.shared.TransitionUtil
 # override is @RequiresApi(30) and the class is a service the platform instantiates, not code that calls it.
 org.pocketworkstation.pckeyboard.InlineAutofill
 org.pocketworkstation.pckeyboard.LatinIME
-
-# The plugins' app zygote preload implements android.app.ZygotePreload (API 29). Android instantiates it only
-# in an app zygote, which exists from Android 10 (the application's android:zygotePreloadName in plugin-host's
-# manifest); droidtop's own code never names the class.
-dev.droidtop.pluginhost.PluginZygotePreload
