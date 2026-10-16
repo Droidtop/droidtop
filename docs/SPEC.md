@@ -2573,7 +2573,17 @@ the `ContainerRuntime` interface that already exists (§3):
   finds a stored image by any of Docker's spellings (`nginx`, `nginx:latest`, `docker.io/library/nginx`), its digest
   or a start of it, and describes it from its config blob (`OciImageStore.runConfig`): RepoTags, Size, Architecture
   and Config (Env, Cmd, Entrypoint, WorkingDir, User, ExposedPorts); compose reads it to decide whether to pull.
-  Exec and attach, which take over the connection, are the next slice.
+  **Exec (built 2026-10-16, D14 fourth slice).** `POST /containers/{id}/exec` records a command, behind the same
+  switch as droidtop's own `docker exec`, the container's "Run its commands from the desktop" (409 when off);
+  `POST /exec/{id}/start` runs it once (starting the container first where the backend needs that) and answers its
+  stdout and stderr as Docker's multiplexed frames, taking the connection over with a 101 when the client asks
+  (`Upgrade: tcp`, as Docker's CLI does) and closing it after; `Detach` runs it without waiting; and
+  `GET /exec/{id}/json` gives its exit code, which Docker's CLI reads next. The command is argv entries, its working
+  folder and environment given the way the enter path gives them (`ContainerEnter.directCommand`, the same constant
+  script), never shell text. It runs on pipes and its output comes back when it ends, so input and a terminal
+  (`docker exec -i`, `-t`) answer not built: droidtop's own docker command, at the end of the PATH, streams them. A
+  non-root `User` is not built and `Privileged` is refused. The execs a session made are kept in memory, at most 256.
+  Attach (`docker run` without `-d`, `docker compose up` without `-d`) is the next slice.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept

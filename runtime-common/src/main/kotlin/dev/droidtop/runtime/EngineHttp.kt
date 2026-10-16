@@ -80,12 +80,20 @@ object EngineHttp {
         return Request(method, decode(path), query, headers, body)
     }
 
-    /** Writes [response] whole, with the headers Docker's clients read ([apiHeaders]) added. */
+    /**
+     * Writes [response] whole, with the headers Docker's clients read ([apiHeaders]) added. A 101 is Docker's
+     * connection hijack (exec and attach): no length, the body is the raw stream, and the connection closes after it.
+     */
     fun write(output: OutputStream, response: Response, apiHeaders: Map<String, String>) {
         val head = buildString {
             append("HTTP/1.1 ").append(response.status).append(' ').append(reason(response.status)).append("\r\n")
             append("Content-Type: ").append(response.contentType).append("\r\n")
-            append("Content-Length: ").append(response.body.size).append("\r\n")
+            if (response.status == 101) {
+                append("Connection: Upgrade\r\n")
+                append("Upgrade: tcp\r\n")
+            } else {
+                append("Content-Length: ").append(response.body.size).append("\r\n")
+            }
             (apiHeaders + response.extraHeaders).forEach { (k, v) -> append(k).append(": ").append(v).append("\r\n") }
             append("\r\n")
         }
@@ -95,6 +103,7 @@ object EngineHttp {
     }
 
     fun reason(status: Int): String = when (status) {
+        101 -> "UPGRADED"
         200 -> "OK"
         201 -> "Created"
         204 -> "No Content"

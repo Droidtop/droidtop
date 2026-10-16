@@ -265,4 +265,43 @@ class DockerApiTest {
         assertTrue(json.contains("\"Cmd\":[\"nginx\"]"))
         assertTrue(json.contains("\"ExposedPorts\":{\"80/tcp\":{}}"))
     }
+
+    @Test
+    fun `exec runs a command on pipes and hands back its output and exit code`() {
+        assertEquals(DockerApi.Call.ExecCreate("web"), DockerApi.route("POST", "/v1.43/containers/web/exec", emptyMap()))
+        assertEquals(DockerApi.Call.ExecStart("abc"), DockerApi.route("POST", "/exec/abc/start", emptyMap()))
+        assertEquals(DockerApi.Call.ExecGet("abc"), DockerApi.route("GET", "/exec/abc/json", emptyMap()))
+        assertTrue(DockerApi.route("POST", "/exec/abc/resize", emptyMap()) is DockerApi.Call.NotBuilt)
+
+        val (spec, refused) = DockerApi.execRequest("""{"AttachStdout":true,"AttachStderr":true,"Cmd":["ls","-la"],"Env":["A=1"],"WorkingDir":"/srv","Tty":false}""")
+        assertNull(refused)
+        assertEquals(DockerApi.ExecSpec(listOf("ls", "-la"), mapOf("A" to "1"), "/srv"), spec)
+        assertEquals(501, DockerApi.execRequest("""{"Cmd":["sh"],"AttachStdin":true,"Tty":true}""").second!!.status)
+        assertEquals(400, DockerApi.execRequest("""{"Cmd":[]}""").second!!.status)
+        assertEquals(400, DockerApi.execRequest("""{"Cmd":["ls"],"Env":["1A=x"]}""").second!!.status)
+        assertEquals(400, DockerApi.execRequest("""{"Cmd":["ls"],"Privileged":true}""").second!!.status)
+        assertEquals(501, DockerApi.execRequest("""{"Cmd":["ls"],"User":"1000"}""").second!!.status)
+
+        val frames = DockerApi.outputFrames("out\n", "err\n")
+        assertEquals(listOf<Byte>(1, 0, 0, 0, 0, 0, 0, 4), frames.take(8))
+        assertEquals(listOf<Byte>(2, 0, 0, 0, 0, 0, 0, 4), frames.drop(12).take(8))
+        assertEquals(0, DockerApi.outputFrames("", "").size)
+        assertTrue(DockerApi.detached("""{"Detach":true,"Tty":false}"""))
+        assertTrue(!DockerApi.detached("{}"))
+        val inspect = DockerApi.execInspect("abc", "droidtop-sibling-1", spec!!, running = false, exitCode = 3)
+        assertTrue(inspect.contains("\"ExitCode\":3"))
+        assertTrue(inspect.contains("\"entrypoint\":\"ls\""))
+
+        val out = ByteArrayOutputStream()
+        EngineHttp.write(out, EngineHttp.Response(101, "application/vnd.docker.multiplexed-stream", frames), DockerApi.headers)
+        val text = out.toString(Charsets.ISO_8859_1.name())
+        assertTrue(text.startsWith("HTTP/1.1 101 UPGRADED\r\n"))
+        assertTrue(text.contains("Upgrade: tcp\r\n"))
+        assertTrue(!text.contains("Content-Length"))
+
+        val argv = ContainerEnter.directCommand(listOf("ls", "-la"))
+        assertEquals(listOf("/bin/sh", "-c"), argv.take(2))
+        assertEquals(listOf("sh", "ls", "-la"), argv.drop(3))
+        assertEquals(mapOf("DROIDTOP_CWD" to "/srv"), ContainerEnter.execEnvironment("/srv"))
+    }
 }

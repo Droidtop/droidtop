@@ -76,6 +76,14 @@ object ContainerEnter {
             command,
         ) + args
 
+    /**
+     * [command] run directly, its output collected by the runtime rather than sent to a request's FIFOs: the Engine
+     * API's exec (docs/SPEC.md 3d, D14). The working folder comes from [execEnvironment] as for [execCommand], so the
+     * script is the same constant text and the command is argv entries, never shell text.
+     */
+    fun directCommand(command: List<String>): List<String> =
+        listOf("/bin/sh", "-c", "[ -n \"\$DROIDTOP_CWD\" ] && cd \"\$DROIDTOP_CWD\" 2>/dev/null; exec \"\$@\"", "sh") + command
+
     /** The environment [execCommand] reads its working folder from. */
     fun execEnvironment(cwd: String?): Map<String, String> = if (cwd.isNullOrBlank()) emptyMap() else mapOf("DROIDTOP_CWD" to cwd)
 
