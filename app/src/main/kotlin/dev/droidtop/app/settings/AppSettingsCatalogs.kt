@@ -1721,6 +1721,7 @@ object AppSettingsCatalogs {
                     ),
                 )
             },
+            getPluginsGroup(catalogsSummary),
             CatalogGroup(
                 id = "plugins_installed",
                 title = if (installed.isEmpty()) null else "Installed",
@@ -1730,54 +1731,52 @@ object AppSettingsCatalogs {
                             ActionItem(
                                 id = "plugins_none",
                                 title = "No plugins installed",
-                                subtitle = "Approve a plugin on its own page",
+                                subtitle = "Get one above; each waits for your approval before it runs",
                                 run = {},
                             ),
                         )
+                        return@buildList
                     }
-                    installed.forEach { record ->
+                    val cards = installed.map { record ->
                         val grants = grantStore.read(record.manifest.id)
+                        val update = PluginCatalog.offerFor(listings, record, userKeys) != null
+                        val runtimeNeed = PluginRuntimeNeeds.missing(context, record.manifest)
+                        val waiting = resolution.waiting[record.manifest.id]
+                        Triple(record, pluginState(record, grants, runtimeNeed, update, waiting), pluginCard(record, userKeys, catalogNames, waiting, grants, runtimeNeed, updateAvailable = update))
+                    }
+                    val updates = cards.count { (_, state, _) -> state == "Update available" || state == "Needs an update" }
+                    // Droidtop/tracker#513: what needs the person first, and the list narrowed to it.
+                    if (updates > 0) {
                         add(
-                            pluginCard(
-                                record,
-                                userKeys,
-                                catalogNames,
-                                resolution.waiting[record.manifest.id],
-                                grants,
-                                PluginRuntimeNeeds.missing(context, record.manifest),
-                                updateAvailable = PluginCatalog.offerFor(listings, record, userKeys) != null,
+                            AsyncActionItem(
+                                id = "plugins_update_all",
+                                title = "Update all ($updates)",
+                                subtitle = "Each update that asks for more waits for you before it gets it",
+                                run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus) },
                             ),
                         )
                     }
+                    add(
+                        ChoiceItem(
+                            id = "plugins_filter",
+                            title = "Show",
+                            options = PluginListFilter.entries.map { ChoiceOption(it.name, it.label) },
+                            current = pluginFilter.name,
+                            onSelect = { _, value -> pluginFilter = PluginListFilter.entries.firstOrNull { it.name == value } ?: PluginListFilter.ALL },
+                        ),
+                    )
+                    val shown = cards.filter { (_, state, _) -> pluginFilter.keeps(state) }
+                    if (shown.isEmpty()) {
+                        add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}", run = {}))
+                    }
+                    shown.forEach { (_, _, card) -> add(card) }
                 },
             ),
         ) + providedByGroups(resolution, providerChoices) + listOf(
             CatalogGroup(
-                id = "plugins_add",
-                title = "Add",
+                id = "plugins_more",
+                title = null,
                 items = listOf(
-                    NestedScreenItem(
-                        id = "plugins_add_official",
-                        title = "droidtop plugins",
-                        subtitle = "Made by droidtop. Install one with a press, or all of them",
-                        inline = PluginCatalogScreen.officialScreen(),
-                    ),
-                    NestedScreenItem(
-                        id = "plugins_add_catalog",
-                        title = "More catalogs",
-                        subtitle = "From other people: switch one on, or add one by address, QR code or link",
-                        inline = PluginCatalogScreen.screen(),
-                        valueLabel = { catalogsSummary },
-                    ),
-                    DocumentPickItem(
-                        id = "plugins_add_file",
-                        title = "Install plugin file",
-                        subtitle = "A signed .droidplugin.tar.xz bundle",
-                        mimeType = "*/*",
-                        // A downloaded bundle is in Downloads; the picker otherwise opened on an empty Documents (rig, build 1535).
-                        startIn = "Download",
-                        onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
-                    ),
                     // Which plugin or app opens which kind of link (docs/SPEC.md 12a "Links").
                     NestedScreenItem(
                         id = "plugins_link_handlers",
@@ -1785,30 +1784,101 @@ object AppSettingsCatalogs {
                         subtitle = "Which plugin or app opens which kind of link, and sending a kind of link to an app",
                         registryId = dev.droidtop.library.integrations.LinkRouter.HANDLERS_ID,
                     ),
-                ),
-            ),
-            CatalogGroup(
-                id = "plugins_repositories",
-                title = null,
-                items = listOf(GitHubAccountCatalog.reposRow(userKeys.values.count { it.repo != null })),
-            ),
-            CatalogGroup(
-                id = "plugins_advanced",
-                title = "Advanced",
-                items = listOf(
+                    // One place for where plugins come from (#513): catalogs, repositories and keys, side by side.
                     NestedScreenItem(
-                        id = "plugins_keys_you_trust",
-                        title = "Keys you trust",
-                        subtitle = "Origins whose signatures are accepted",
-                        registryId = SCREEN_PLUGIN_KEYS,
-                        valueLabel = {
-                            if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} added by you"
-                        },
+                        id = "plugins_sources",
+                        title = "Where plugins come from",
+                        subtitle = "Catalogs, plugin repositories and the keys droidtop trusts",
+                        inline = pluginSourcesScreen(),
+                        valueLabel = { if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} more" },
                     ),
                 ),
             ),
         )
     }
+
+    /** The Plugins place's first group (Droidtop/tracker#513): getting plugins, above the installed list. */
+    private fun getPluginsGroup(catalogsSummary: String?) = CatalogGroup(
+        id = "plugins_add",
+        title = "Get plugins",
+        items = listOf(
+            NestedScreenItem(
+                id = "plugins_add_official",
+                title = "droidtop plugins",
+                subtitle = "Made by droidtop. Install one with a press, or all of them",
+                inline = PluginCatalogScreen.officialScreen(),
+            ),
+            NestedScreenItem(
+                id = "plugins_add_catalog",
+                title = "More catalogs",
+                subtitle = "From other people: switch one on, or add one by address, QR code or link",
+                inline = PluginCatalogScreen.screen(),
+                valueLabel = { catalogsSummary },
+            ),
+            DocumentPickItem(
+                id = "plugins_add_file",
+                title = "Install plugin file",
+                subtitle = "A signed .droidplugin.tar.xz bundle",
+                mimeType = "*/*",
+                // A downloaded bundle is in Downloads; the picker otherwise opened on an empty Documents (rig, build 1535).
+                startIn = "Download",
+                onPicked = { ctx, uri -> PluginStore.importFromPicker(ctx, uri) },
+            ),
+        ),
+    )
+
+    /**
+     * Where plugins come from, on one page (Droidtop/tracker#513): the catalogs, the plugin repositories and the keys
+     * droidtop trusts were three entries whose counts contradicted each other ("None added" beside a trusted key).
+     */
+    private fun pluginSourcesScreen() = CatalogScreen(
+        id = "plugins_sources_screen",
+        title = "Where plugins come from",
+        groups = { context ->
+            val userKeys = withContext(Dispatchers.IO) { UserOriginKeys.load(UserOriginKeys.storeFile(context)) }
+            val summary = withContext(Dispatchers.IO) { PluginCatalogScreen.summary(context) }
+            listOf(
+                CatalogGroup(
+                    id = "plugins_sources_list",
+                    title = null,
+                    items = listOf(
+                        NestedScreenItem(
+                            id = "plugins_sources_catalogs",
+                            title = "Catalogs",
+                            subtitle = "droidtop's, and any you added",
+                            inline = PluginCatalogScreen.screen(),
+                            valueLabel = { summary },
+                        ),
+                        GitHubAccountCatalog.reposRow(userKeys.values.count { it.repo != null }),
+                        NestedScreenItem(
+                            id = "plugins_keys_you_trust",
+                            title = "Keys you trust",
+                            subtitle = "Every origin whose plugins droidtop accepts: from a catalog, a repository or added by hand",
+                            registryId = SCREEN_PLUGIN_KEYS,
+                            valueLabel = { if (userKeys.isEmpty()) "Official only" else "Official + ${userKeys.size} more" },
+                        ),
+                    ),
+                ),
+            )
+        },
+    )
+
+    /** What the Plugins list shows (Droidtop/tracker#513), kept while droidtop runs. */
+    private enum class PluginListFilter(val label: String, val none: String) {
+        ALL("All", "is installed"),
+        NEEDS_APPROVAL("Needs approval", "waits for approval"),
+        UPDATES("Updates", "has an update"),
+        OFF("Off", "is off");
+
+        fun keeps(state: String): Boolean = when (this) {
+            ALL -> true
+            NEEDS_APPROVAL -> state == "Needs approval" || state == "Wants new access"
+            UPDATES -> state == "Update available" || state == "Needs an update"
+            OFF -> state == "Off" || state == "Stopped" || state == "Denied"
+        }
+    }
+
+    @Volatile private var pluginFilter = PluginListFilter.ALL
 
     /**
      * A plugin's trust badge, the same words in the list, on its page and on the approval screen
@@ -1884,7 +1954,7 @@ object AppSettingsCatalogs {
             title = m.label,
             subtitle = listOfNotNull(m.presentation.summary ?: pluginSummary(m, enabledPoints), trustBadge, PluginTiers.badge(record, grants)).joinToString(" - "),
             inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
-            valueLabel = { state },
+            valueLabel = { "$state · v${m.version}" },
             chip = if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
         )
     }
