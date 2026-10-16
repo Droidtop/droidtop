@@ -1,17 +1,14 @@
 package app.murinelauncher.settings
 
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceScreen
 import androidx.preference.TwoStatePreference
-import app.murinelauncher.graphics.WorkspaceBlurUtils
 import app.murinelauncher.settings.common.AbstractSettingsFragment
 import app.murinelauncher.widget.CustomSeekBarPreference
 import app.murinelauncher.widget.radio.RadioGroupPreference
-import app.murinelauncher.widget.search.MurineSearchBoxView
 import app.murinelauncher.widget.search.SearchProvider
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.R
@@ -26,12 +23,7 @@ public final class SettingsQsbFragment: AbstractSettingsFragment() {
         const val SHOW_LENS: String = "qsb_enable_lens"
         const val SEARCH_PROVIDER: String = "qsb_search_provider"
         const val SEARCH_PROVIDER_CUSTOM: String = "qsb_search_provider_custom"
-        const val SEARCH_BUBBLE_BLUR: String = "qsb_box_blur"
         const val SEARCH_BAR_ALPHA: String = "qsb_bar_alpha"
-        const val SEARCH_BUBBLE_ALPHA: String = "qsb_box_alpha"
-        const val SEARCH_HISTORY_SIZE: String = "qsb_history_size"
-        const val CLEAR_HISTORY: String = "qsb_clear_history"
-        const val BLUR_WARNING: String = "pref_blur_warning"
 
         const val CUSTOM_SEARCH_EXAMPLE = "https://test.com?q=%s"
     }
@@ -44,13 +36,7 @@ public final class SettingsQsbFragment: AbstractSettingsFragment() {
 
     val MASTER_DISABLED_PREFS = ArrayDeque<Preference>()
 
-    var searchBubbleAlpha: CustomSeekBarPreference? = null
     var customProviderPref: EditTextPreference? = null
-
-    private fun updateBlurWarningVisibility(value: Boolean) {
-        findPreference<Preference>(BLUR_WARNING)?.isVisible =
-            value && !WorkspaceBlurUtils.isBlurSupported
-    }
 
     fun initPreferenceImpl(preference: Preference, info: DisplayController.Info, masterSwitch: Boolean): Boolean {
         // The master switch switches off QSB and the rest of the preferences in this page
@@ -97,51 +83,9 @@ public final class SettingsQsbFragment: AbstractSettingsFragment() {
                 }
                 return true
             }
-            SEARCH_BUBBLE_BLUR -> {
-                preference as TwoStatePreference
-                preference.setDefaultValue(LauncherPrefs.QSB_BUBBLE_BLUR.defaultValue)
-                preference.isChecked = LauncherPrefs.QSB_BUBBLE_BLUR.get(requireContext())
-                val isVisible = WorkspaceBlurUtils.isBlurSupportedSDK
-                preference.isVisible = isVisible
-                updateBlurWarningVisibility(if (isVisible) preference.isChecked else false)
-                preference.setOnPreferenceChangeListener {
-                    _, newValue ->
-                    val enabled = newValue as Boolean
-                    searchBubbleAlpha?.isEnabled = !enabled
-                    updateBlurWarningVisibility(enabled)
-                    true
-                }
-                return true
-            }
             SEARCH_BAR_ALPHA -> {
                 preference as CustomSeekBarPreference
                 preference.setDefaultValue(LauncherPrefs.QSB_ALPHA.defaultValue)
-                return true
-            }
-            SEARCH_BUBBLE_ALPHA -> {
-                searchBubbleAlpha = preference as CustomSeekBarPreference
-                preference.setDefaultValue(LauncherPrefs.QSB_BUBBLE_ALPHA.defaultValue)
-                preference.isEnabled = !LauncherPrefs.QSB_BUBBLE_BLUR.get(requireContext())
-                return true
-            }
-            SEARCH_HISTORY_SIZE -> {
-                preference as CustomSeekBarPreference
-                preference.setDefaultValue(LauncherPrefs.QSB_HISTORY_SIZE.defaultValue)
-                return true
-            }
-            CLEAR_HISTORY -> {
-                preference.setOnPreferenceClickListener {
-                    AlertDialog.Builder(requireContext())
-                        .setTitle(R.string.pref_qsb_clear_history_confirm_title)
-                        .setMessage(R.string.pref_qsb_clear_history_confirm_message)
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            MurineSearchBoxView.clearHistory(requireContext())
-                            dev.droidtop.library.settings.Notices.flash(requireContext().getString(R.string.pref_qsb_clear_history_toast), context = requireContext())
-                        }
-                        .setNegativeButton(android.R.string.cancel, null)
-                        .show()
-                    true
-                }
                 return true
             }
             else -> return true

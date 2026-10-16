@@ -61,6 +61,8 @@ class LauncherSearchActivity : ComponentActivity() {
                     onPlay = { GameLaunchActivity.dispatch(this@LauncherSearchActivity, it) },
                     // Standard's own settings (the Global settings screen) are searched with the rest.
                     settingsRoot = remember { dev.droidtop.library.settings.SettingsScreenRegistry.get(dev.droidtop.app.settings.DroidtopWideSettings.SCREEN_GLOBAL) },
+                    // The web, with the search bar's provider, as one row (Droidtop/tracker#564).
+                    webSearch = { query -> app.murinelauncher.widget.search.WebSearch.open(this@LauncherSearchActivity, query) },
                     onDismiss = { finish() },
                 )
             }

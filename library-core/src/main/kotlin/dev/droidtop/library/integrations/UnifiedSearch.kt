@@ -17,9 +17,10 @@ import kotlinx.coroutines.withContext
 /**
  * What a row of the one search list is. The order is the tie-break between
  * two rows that match equally well: what is on the device comes before what
- * could be fetched (docs/SPEC.md 12a "One search").
+ * could be fetched (docs/SPEC.md 12a "One search"), and a web search, where a
+ * surface offers one, last.
  */
-enum class SearchRowKind { APP, GAME, SOURCE }
+enum class SearchRowKind { APP, GAME, SOURCE, WEB }
 
 /**
  * A row the caller found on the device (an installed app, a library game).
