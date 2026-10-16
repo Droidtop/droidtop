@@ -197,7 +197,9 @@ internal fun LeftMenu(
         // A tap moves the cursor and sends the real press, so the one key
         // handler below is the only place that says what a row does.
         val press = rememberGamepadTouch()
-        var focusIndex by remember { mutableIntStateOf(leftMenuStartIndex(entries, current, atHome, rowsAbove)) }
+        // Keyed on where the person is: the cursor starts on the row the "you are here" pill marks, even when the
+        // place changes while the menu is composed (Droidtop/tracker#493: the pill on Apps, the cursor on Plugins).
+        var focusIndex by remember(current, atHome, rowsAbove) { mutableIntStateOf(leftMenuStartIndex(entries, current, atHome, rowsAbove)) }
         var heldStep by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
         val focusRequester = remember { FocusRequester() }
