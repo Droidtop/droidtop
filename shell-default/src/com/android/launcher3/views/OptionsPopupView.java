@@ -223,10 +223,17 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                 R.drawable.ic_widget,
                 IGNORE,
                 v -> {
-                    Intent games = new Intent("dev.droidtop.app.action.SHOW_GAMES")
-                            .setClassName(v.getContext().getPackageName(), "dev.droidtop.app.LauncherGamesActivity")
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    v.getContext().startActivity(games);
+                    dev.droidtop.shell.standard.DroidtopScreens.openGames(v.getContext());
+                    return true;
+                }));
+        // droidtop patch: the Quick Menu, the same sheet Gaming's R2 opens (docs/SPEC.md,
+        // Launcher mode "Gestures"); a gesture can open it too.
+        options.add(new OptionItem(launcher,
+                R.string.gesture_action_open_quick_menu,
+                R.drawable.ic_setting,
+                IGNORE,
+                v -> {
+                    dev.droidtop.shell.standard.DroidtopScreens.openQuickMenu(v.getContext());
                     return true;
                 }));
         // droidtop patch: the companion as a pull-down sheet, while the device has no second

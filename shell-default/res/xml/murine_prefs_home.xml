@@ -92,5 +92,30 @@
             android:title="@string/pref_swipe_down_action_title"
             android:persistent="true"
             app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_two_finger_down_action"
+            android:title="@string/pref_two_finger_down_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_two_finger_up_action"
+            android:title="@string/pref_two_finger_up_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_pinch_in_action"
+            android:title="@string/pref_pinch_in_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_pinch_out_action"
+            android:title="@string/pref_pinch_out_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_home_button_action"
+            android:title="@string/pref_home_button_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
     </PreferenceCategory>
 </androidx.preference.PreferenceScreen>

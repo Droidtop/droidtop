@@ -39,6 +39,11 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val SWIPE_DOWN_NOTIFICATIONS: String = "pref_swipe_down_notifications"
         const val DOUBLE_TAP_ACTION: String = "pref_gesture_double_tap_action"
         const val SWIPE_DOWN_ACTION: String = "pref_gesture_swipe_down_action"
+        const val TWO_FINGER_DOWN_ACTION: String = "pref_gesture_two_finger_down_action"
+        const val TWO_FINGER_UP_ACTION: String = "pref_gesture_two_finger_up_action"
+        const val PINCH_IN_ACTION: String = "pref_gesture_pinch_in_action"
+        const val PINCH_OUT_ACTION: String = "pref_gesture_pinch_out_action"
+        const val HOME_BUTTON_ACTION: String = "pref_gesture_home_button_action"
         const val SMARTSPACE_MODE: String = "pref_smartspace_mode"
         const val TASKBAR: String = "pref_taskbar"
         private const val REQUEST_DEVICE_ADMIN = 1001
@@ -129,6 +134,31 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
             SWIPE_DOWN_ACTION -> {
                 preference as RadioGroupPreference
                 bindGestureAction(preference, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.defaultValue)
+                return true
+            }
+            TWO_FINGER_DOWN_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION.defaultValue)
+                return true
+            }
+            TWO_FINGER_UP_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION.defaultValue)
+                return true
+            }
+            PINCH_IN_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_IN_ACTION.defaultValue)
+                return true
+            }
+            PINCH_OUT_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_OUT_ACTION.defaultValue)
+                return true
+            }
+            HOME_BUTTON_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.defaultValue)
                 return true
             }
             SMARTSPACE_MODE -> {
