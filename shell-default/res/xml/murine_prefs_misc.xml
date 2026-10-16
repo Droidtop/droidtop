@@ -56,6 +56,11 @@
             android:title="@string/backup_import_title"
             android:summary="@string/backup_import_desc"
             android:persistent="false" />
+        <Preference
+            android:key="pref_launcher_import"
+            android:title="@string/launcher_import_title"
+            android:summary="@string/launcher_import_desc"
+            android:persistent="false" />
     </PreferenceCategory>
 
 </androidx.preference.PreferenceScreen>
