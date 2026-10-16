@@ -65,6 +65,16 @@ class PadGateTest {
         assertTrue("a real second press gets through", gate.onKey(a, down = true, repeatCount = 0, deviceId = pad, fallback = false, now = 300))
     }
 
+    @Test
+    fun `a keyboard's doubled letter typed fast is two presses, never a bounce`() {
+        // Droidtop/tracker#569: "Goodbye" typed by adb arrived as "Godbye" in the search field.
+        val o = KeyEvent.KEYCODE_O
+        assertTrue(gate.onKey(o, down = true, repeatCount = 0, deviceId = 7, fallback = false, now = 0, fromPad = false))
+        assertTrue(gate.onKey(o, down = false, repeatCount = 0, deviceId = 7, fallback = false, now = 2, fromPad = false))
+        assertTrue("the second o", gate.onKey(o, down = true, repeatCount = 0, deviceId = 7, fallback = false, now = 4, fromPad = false))
+        assertTrue(gate.onKey(o, down = false, repeatCount = 0, deviceId = 7, fallback = false, now = 6, fromPad = false))
+    }
+
     // ---- the stick ----
 
     @Test
