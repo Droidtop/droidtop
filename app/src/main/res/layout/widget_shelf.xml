@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Shelf widget in its grid layout (ShelfWidgetProvider): a title and the shelf's games as a scrolling grid, each
+  cell filled by ShelfWidgetService. Colours are set by the renderer from the role tokens.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_surface_dark"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:textColor="#FFFFFFFF"
+        android:layout_marginBottom="6dp" />
+
+    <GridView
+        android:id="@+id/widget_grid"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:columnWidth="72dp"
+        android:numColumns="auto_fit"
+        android:verticalSpacing="6dp"
+        android:horizontalSpacing="6dp"
+        android:stretchMode="columnWidth" />
+
+    <TextView
+        android:id="@+id/widget_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize="13sp"
+        android:textColor="#CCFFFFFF"
+        android:visibility="gone" />
+</LinearLayout>
