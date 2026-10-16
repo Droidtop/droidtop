@@ -64,6 +64,13 @@ internal data class WatchObservation(
      * look, and without a helper.
      */
     val cpuMs: Long? = null,
+    /**
+     * Whether a process of the app that started after this launch is alive (read through the privileged helper, from
+     * each process's start time); null when droidtop cannot tell. An older process ending is not this launch going.
+     */
+    val freshProcess: Boolean? = null,
+    /** The look before this one also found the app missing from the task list. */
+    val missedBefore: Boolean = false,
 )
 
 internal sealed interface WatchVerdict {
@@ -136,7 +143,11 @@ internal object LaunchWatchPolicy {
             if (o.taskListed != true && o.elapsedMs <= EXIT_WINDOW_MS) WatchVerdict.Trouble(LaunchTrouble.EXITED_AT_ONCE)
             else WatchVerdict.Stop
         o.elapsedMs >= WATCH_MS -> WatchVerdict.Stop
-        o.taskListed == false && o.elapsedMs >= APPEAR_GRACE_MS -> WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY)
+        // Gone only when it stays gone: two looks in a row miss it and no process of it started after the launch is
+        // alive. RetroArch restarts itself for a new core (exit, then a new process), and a process from before the
+        // launch (a sideload's RetroArch) may end just after it; either read once as gone (rig, droidtop 0.2.0-dev.1923).
+        o.taskListed == false && o.elapsedMs >= APPEAR_GRACE_MS && o.missedBefore && o.freshProcess != true ->
+            WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY)
         o.taskListed == true && o.elapsedMs >= SETTLED_MS -> WatchVerdict.Settled
         else -> WatchVerdict.Keep
     }
@@ -147,6 +158,20 @@ internal object LaunchWatchPolicy {
      * (AOSP android13-release). Pure, for tests.
      */
     fun dumpShowsNotResponding(dump: String): Boolean = "mNotResponding=true" in dump
+
+    /**
+     * Whether any process in [stats] (one `/proc/<pid>/stat` line each) started at or after [sinceBootMs], from field 22,
+     * its start time in clock ticks since boot; null when no line can be read. Pure, for tests.
+     */
+    fun startedSince(stats: String, sinceBootMs: Long, ticksPerSecond: Long = 100): Boolean? {
+        val starts = stats.lineSequence().mapNotNull { line ->
+            // The command name (field 2) is in parentheses and may hold spaces; the fields after it are plain.
+            val after = line.substringAfterLast(") ", "").takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            after.split(' ').getOrNull(19)?.toLongOrNull()
+        }.toList()
+        if (starts.isEmpty()) return null
+        return starts.any { it * 1000 / ticksPerSecond >= sinceBootMs }
+    }
 
     /**
      * The processor time in [stats], one `/proc/<pid>/stat` line per process: utime plus stime (fields 14 and 15,
@@ -254,6 +279,9 @@ object LaunchWatchdog {
             // helper not ready) is tried again a check later.
             var stallChecked = !checkStall
             var nextStallCheckMs = LaunchWatchPolicy.STALL_CHECK_MS
+            var missedBefore = false
+            // The launch on the boot clock, which a process's start time is counted on.
+            val launchSinceBootMs = launchedAtMs - (System.currentTimeMillis() - android.os.SystemClock.elapsedRealtime())
             while (isActive) {
                 delay(LaunchWatchPolicy.POLL_MS)
                 val elapsed = System.currentTimeMillis() - started
@@ -265,17 +293,21 @@ object LaunchWatchdog {
                 } else {
                     null
                 }
+                val listed = if (!settled && (shellCameBack || elapsed >= LaunchWatchPolicy.APPEAR_GRACE_MS)) {
+                    taskListed(appContext, packageName)
+                } else {
+                    null
+                }
                 val observation = WatchObservation(
                     elapsedMs = elapsed,
                     shellCameBack = shellCameBack,
                     notResponding = isNotResponding(packageName),
-                    taskListed = if (!settled && (shellCameBack || elapsed >= LaunchWatchPolicy.APPEAR_GRACE_MS)) {
-                        taskListed(appContext, packageName)
-                    } else {
-                        null
-                    },
+                    taskListed = listed,
                     cpuMs = cpuMs,
+                    freshProcess = if (listed == false) freshProcess(packageName, launchSinceBootMs) else null,
+                    missedBefore = missedBefore,
                 )
+                missedBefore = listed == false
                 when (val verdict = LaunchWatchPolicy.judge(observation)) {
                     WatchVerdict.Keep -> Unit
                     WatchVerdict.Settled -> settled = true
@@ -370,6 +402,18 @@ object LaunchWatchdog {
             ?.takeIf { it.isNotEmpty() } ?: return null
         val stats = runCatching { shell.exec(listOf("cat") + pids.map { "/proc/$it/stat" }) }.getOrNull() ?: return null
         return LaunchWatchPolicy.cpuMsFromStat(stats.stdout)
+    }
+
+    /** Whether a process of [packageName] that started at or after [sinceBootMs] is alive; null without a helper. */
+    private fun freshProcess(packageName: String, sinceBootMs: Long): Boolean? {
+        val shell = TaskManager.shell
+        if (!shell.capabilities().shell) return null
+        val out = runCatching { shell.exec(listOf("pidof", packageName)) }.getOrNull() ?: return null
+        // pidof exits 1 when no process has the name: nothing of the app is alive, fresh or not.
+        val pids = out.stdout.split(' ', '\n').filter { it.isNotBlank() && it.all(Char::isDigit) }
+        if (out.exit != 0 || pids.isEmpty()) return false
+        val stats = runCatching { shell.exec(listOf("cat") + pids.map { "/proc/$it/stat" }) }.getOrNull() ?: return null
+        return LaunchWatchPolicy.startedSince(stats.stdout, sinceBootMs)
     }
 
     /** Whether the task list holds the package; null when it cannot be read exactly (no privileged helper running). */

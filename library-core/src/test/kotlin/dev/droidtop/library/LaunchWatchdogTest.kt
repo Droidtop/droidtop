@@ -12,7 +12,11 @@ class LaunchWatchdogTest {
         shellCameBack: Boolean = false,
         notResponding: Boolean = false,
         taskListed: Boolean? = null,
-    ) = LaunchWatchPolicy.judge(WatchObservation(elapsedMs, shellCameBack, notResponding, taskListed))
+        freshProcess: Boolean? = null,
+        missedBefore: Boolean = false,
+    ) = LaunchWatchPolicy.judge(
+        WatchObservation(elapsedMs, shellCameBack, notResponding, taskListed, freshProcess = freshProcess, missedBefore = missedBefore),
+    )
 
     @Test
     fun aQuietLaunchIsJustKeptUnderWatch() {
@@ -44,11 +48,33 @@ class LaunchWatchdogTest {
 
     @Test
     fun anAppMissingFromTheTaskListIsGivenTimeToAppearBeforeItCounts() {
-        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS - 1, taskListed = false))
+        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS - 1, taskListed = false, missedBefore = true))
         assertEquals(
             WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY),
-            look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false),
+            look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = true),
         )
+    }
+
+    @Test
+    fun anAppIsGoneOnlyWhenItStaysGoneAndNoProcessOfThisLaunchIsAlive() {
+        // One miss is not enough: RetroArch restarts itself for a new core, an exit then a new process (rig, 1923).
+        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false))
+        // A process that started after the launch is alive: the app is there, whatever the task list says this moment.
+        assertEquals(WatchVerdict.Keep, look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = true, freshProcess = true))
+        // Only processes from before the launch (a sideload's RetroArch) or none at all: gone.
+        assertEquals(
+            WatchVerdict.Trouble(LaunchTrouble.GONE_WHILE_AWAY),
+            look(LaunchWatchPolicy.APPEAR_GRACE_MS, taskListed = false, missedBefore = true, freshProcess = false),
+        )
+    }
+
+    @Test
+    fun aProcessStartTimeIsReadFromItsStatLine() {
+        // Field 22 (starttime) is 5000 ticks: 50 s after boot at 100 ticks a second. The name holds a space and a parenthesis.
+        val stat = "4242 (Retro (Arch) x) S 1 4242 0 0 -1 4194624 100 0 0 0 7 3 0 0 20 0 30 0 5000 123456 789"
+        assertEquals(true, LaunchWatchPolicy.startedSince(stat, sinceBootMs = 49_000))
+        assertEquals(false, LaunchWatchPolicy.startedSince(stat, sinceBootMs = 51_000))
+        assertEquals(null, LaunchWatchPolicy.startedSince("", sinceBootMs = 0))
     }
 
     @Test

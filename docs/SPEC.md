@@ -8185,7 +8185,10 @@ change reaches it (console, build 1397: RetroArch's system dialog came 44 s afte
 
 It reports four things, each in plain words naming the app: it is not responding; it closed straight
 after it started (the shell came back within 10 s and the app is not open); it is no longer running
-but its screen never handed back (task list says gone after 9 s); an emulator launch has stalled (under
+but its screen never handed back (the task list misses it after 9 s on two looks in a row, 3 s apart, and no
+process of the app that started after the launch is alive: `pidof`, then each process's start time, field 22 of
+`/proc/<pid>/stat`, against the launch on the boot clock; `LaunchWatchPolicy.startedSince`); an emulator launch has
+stalled (under
 1 s of processor time 15 s after the launch, `STALLED`). A black window of a live, responsive
 app is in general indistinguishable from a game that is running and is never claimed, and a person returning to
 the shell on purpose while the app is open or after 10 s is not a problem. The stall is the one black
