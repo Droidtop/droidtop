@@ -142,11 +142,39 @@ object DownloadJobs {
     /** Moves [file] to `targetName` in `destinationPath`; the one place a download is placed in a game folder. Returns where it went. */
     internal fun placeInFolder(file: File, args: Map<String, String>): File {
         val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
-        require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
+        require(destination.isDirectory || destination.mkdirs()) { "the game folder ${destination.absolutePath} is not available" }
         val target = File(destination, requireNotNull(args["targetName"]) { "the file name is missing" })
-        require(!target.exists()) { "a file with that name already exists" }
-        require(file.renameTo(target)) { "the download could not be placed in the game folder" }
+        require(!target.exists()) { "${target.absolutePath} already exists" }
+        moveFile(file, target)
         return target
+    }
+
+    /**
+     * Moves [from] to [to], also onto another volume: droidtop's downloads area is on the device's shared storage and a
+     * game folder is often on an SD card, where a rename cannot go (EXDEV), so a download placed there failed with "could
+     * not be placed in the game folder" (RP5, exFAT SD card, a BIOS file, Droidtop/tracker#558). When the rename is
+     * refused, the bytes are copied under a hidden name in [to]'s folder, synced, renamed into place on that volume and
+     * only then is [from] deleted, so a failure leaves the download where it was and no half file under [to]'s name.
+     * Throws with [to]'s path when it cannot be done. [rename] is [File.renameTo] (a test refuses it).
+     */
+    internal fun moveFile(from: File, to: File, rename: (File, File) -> Boolean = { a, b -> a.renameTo(b) }) {
+        if (rename(from, to)) return
+        val folder = to.parentFile ?: throw IllegalStateException("${to.absolutePath} has no folder")
+        val staged = File(folder, ".${to.name}.placing")
+        try {
+            from.inputStream().use { input ->
+                java.io.FileOutputStream(staged).use { output ->
+                    input.copyTo(output, 1 shl 16)
+                    output.fd.sync()
+                }
+            }
+            check(staged.length() == from.length()) { "only ${staged.length()} of ${from.length()} bytes were written" }
+            check(rename(staged, to)) { "the copy could not be renamed into place" }
+        } catch (e: Exception) {
+            staged.delete()
+            throw IllegalStateException("the download could not be placed at ${to.absolutePath}: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+        from.delete()
     }
 
     /**
@@ -155,18 +183,18 @@ object DownloadJobs {
      */
     internal fun placeAllInFolder(files: List<File>, parts: List<Map<String, String>>): List<File> {
         val destination = File(requireNotNull(parts.first()["destinationPath"]) { "the game folder is missing" })
-        require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
+        require(destination.isDirectory || destination.mkdirs()) { "the game folder ${destination.absolutePath} is not available" }
         val targets = parts.map { File(destination, requireNotNull(it[ARG_TARGET]) { "the file name is missing" }) }
         require(targets.map { it.name }.distinct().size == targets.size) { "two of the files have the same name" }
-        require(targets.none { it.exists() }) { "a file with that name already exists" }
+        targets.firstOrNull { it.exists() }?.let { throw IllegalArgumentException("${it.absolutePath} already exists") }
         val moved = mutableListOf<Pair<File, File>>()
         try {
             for ((file, target) in files.zip(targets)) {
-                require(file.renameTo(target)) { "the download could not be placed in the game folder" }
+                moveFile(file, target)
                 moved += file to target
             }
         } catch (e: Exception) {
-            moved.forEach { (file, target) -> target.renameTo(file) }
+            moved.forEach { (file, target) -> runCatching { moveFile(target, file) } }
             throw e
         }
         return targets

@@ -268,7 +268,7 @@ class DownloadJobsTest {
             DownloadJobs.placeAllInFolder(listOf(a, b), parts)
             fail("an existing name stops them all")
         } catch (e: IllegalArgumentException) {
-            assertEquals("a file with that name already exists", e.message)
+            assertEquals("${File(games, "Disc.cue").absolutePath} already exists", e.message)
         }
         assertTrue(a.exists() && b.exists())
         assertFalse(File(games, "Disc (Track 1).bin").exists())
@@ -473,9 +473,36 @@ class DownloadJobsTest {
             DownloadJobs.placeInFolder(again, mapOf("destinationPath" to games.path, "targetName" to "Game.zip"))
             fail("an existing file is never replaced")
         } catch (e: IllegalArgumentException) {
-            assertEquals("a file with that name already exists", e.message)
+            assertEquals("${File(games, "Game.zip").absolutePath} already exists", e.message)
         }
         assertTrue("the download stays for a retry", again.exists())
+    }
+
+    @Test
+    fun aMoveTheVolumeRefusesIsACopyThatLandsWholeAndOnlyThenDropsTheDownload() {
+        // The downloads area and an SD card game folder are two volumes, where a rename fails (Droidtop/tracker#558).
+        val downloaded = File(dir, "downloads/acquire_1_bios.bin").also { it.parentFile.mkdirs(); it.writeBytes(data) }
+        val target = File(dir, "sd/bios/ps2-0230a-20080220.bin").also { it.parentFile.mkdirs() }
+        var renames = 0
+        DownloadJobs.moveFile(downloaded, target) { from, to -> if (renames++ == 0) false else from.renameTo(to) }
+        assertArrayEquals(data, target.readBytes())
+        assertFalse("the download goes once the copy is in place", downloaded.exists())
+        assertFalse("no staged copy is left", File(target.parentFile, ".${target.name}.placing").exists())
+    }
+
+    @Test
+    fun aMoveThatCannotBeDoneKeepsTheDownloadAndNamesTheTarget() {
+        val downloaded = File(dir, "downloads/acquire_2_bios.bin").also { it.parentFile.mkdirs(); it.writeBytes(data) }
+        val target = File(dir, "sd/bios/scph.bin").also { it.parentFile.mkdirs() }
+        try {
+            DownloadJobs.moveFile(downloaded, target) { _, _ -> false }
+            fail("a move with no way in place fails")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message!!.startsWith("the download could not be placed at ${target.absolutePath}"))
+        }
+        assertTrue("the download stays for a retry", downloaded.exists())
+        assertFalse(target.exists())
+        assertFalse(File(target.parentFile, ".${target.name}.placing").exists())
     }
 
     @Test
