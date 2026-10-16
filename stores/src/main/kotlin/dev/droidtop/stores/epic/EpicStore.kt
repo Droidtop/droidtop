@@ -41,6 +41,7 @@ import timber.log.Timber
  */
 class EpicStore : StoreLibrary {
     override val id = "epic"
+    override val siteUrl = "https://store.epicgames.com/"
     override val label = "Epic"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(

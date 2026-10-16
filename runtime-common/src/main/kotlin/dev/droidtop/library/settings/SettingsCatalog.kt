@@ -66,6 +66,12 @@ sealed interface CatalogItem {
     val icon: CatalogIcon? get() = null
 
     /**
+     * A picture drawn in place of [icon] when it is there: a file in droidtop's own storage (a store's cached mark,
+     * Droidtop/tracker#503). [icon] stays the fallback while the file is missing. Renderers load it off the main thread.
+     */
+    val iconFile: String? get() = null
+
+    /**
      * What this setting is SET TO, for the value column every surface
      * draws (a settings row's right-hand column, a Quick Menu tile's
      * second line). A choice, a toggle and a slider each derive it from
@@ -359,6 +365,7 @@ class NestedScreenItem(
     override val icon: CatalogIcon? = null,
     override val progress: Float? = null,
     override val chip: String? = null,
+    override val iconFile: String? = null,
 ) : CatalogItem {
     init {
         require((inline != null) != (registryId != null)) { "Exactly one of inline/registryId must be set" }

@@ -48,6 +48,7 @@ import timber.log.Timber
  */
 class SteamStore : StoreLibrary {
     override val id = "steam"
+    override val siteUrl = "https://store.steampowered.com/"
     override val label = "Steam"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(

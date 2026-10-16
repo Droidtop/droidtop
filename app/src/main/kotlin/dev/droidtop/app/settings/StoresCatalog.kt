@@ -237,6 +237,8 @@ internal object StoresCatalog {
 
     private suspend fun rootGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val signedInByStore = PcStore.entries.associateWith { it.signedIn(context) }
+        // A store signed in before marks were cached gets its mark now, in the background (#503).
+        signedInByStore.filterValues { it }.keys.forEach { store -> store.own?.let { dev.droidtop.library.stores.StoreMarks.ensureLater(context, it) } }
         val installing = PcStore.entries.sumOf { store -> storeJobs(store).count { !it.paused } }
         val anySignedIn = signedInByStore.values.any { it }
         val storeGames = runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList())
@@ -256,6 +258,8 @@ internal object StoresCatalog {
                 inline = storePage(store),
                 valueLabel = { sourceValue(signedIn, games) },
                 icon = CatalogIcon.GLOBAL,
+                // The store's own mark once it was cached at sign-in (#503); the globe until then.
+                iconFile = store.own?.let { dev.droidtop.library.stores.StoreMarks.cached(context, it.id)?.path },
                 progress = busyProgress(storeJobs(store)),
             )
         }
@@ -705,6 +709,7 @@ internal object StoresCatalog {
                             onSuccess = {
                                 keyFailures.remove(store.key)
                                 StoreChanges.announce(ctx)
+                                dev.droidtop.library.stores.StoreMarks.ensureLater(ctx, own)
                             },
                             onFailure = { keyFailures[store.key] = userFacingErrorMessage(it) },
                         )

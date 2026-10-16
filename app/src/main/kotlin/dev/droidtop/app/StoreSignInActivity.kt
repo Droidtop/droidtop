@@ -227,6 +227,8 @@ class StoreSignInActivity : AppCompatActivity() {
             withContext(Dispatchers.IO) { store.completeSignIn(applicationContext, code) }.fold(
                 onSuccess = {
                     StoreChanges.announce(this@StoreSignInActivity)
+                    // The store's own mark is cached on sign-in (Droidtop/tracker#503).
+                    dev.droidtop.library.stores.StoreMarks.ensureLater(applicationContext, store)
                     finish()
                 },
                 onFailure = { exc ->
