@@ -46,6 +46,7 @@ import com.android.launcher3.model.data.LauncherAppWidgetInfo;
 import com.android.launcher3.util.PendingRequestArgs;
 import com.android.launcher3.views.ArrowTipView;
 import com.android.launcher3.widget.LauncherAppWidgetHostView;
+import com.android.launcher3.widget.WidgetStackActivity;
 import com.android.launcher3.widget.LauncherAppWidgetProviderInfo;
 import com.android.launcher3.widget.PendingAppWidgetHostView;
 import com.android.launcher3.widget.util.WidgetSizes;
@@ -82,6 +83,7 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
     private CellLayout mCellLayout;
     private DragLayer mDragLayer;
     private ImageButton mReconfigureButton;
+    private View mStackButton;
 
     private final int mBackgroundPadding;
     private final int mTouchTargetWidth;
@@ -295,6 +297,14 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
             mDragHandles[INDEX_LEFT].setVisibility(GONE);
             mDragHandles[INDEX_RIGHT].setVisibility(GONE);
         }
+
+        // droidtop (Droidtop/tracker#564): stack another widget on this one.
+        mStackButton = findViewById(R.id.widget_stack_button);
+        mStackButton.setOnClickListener(view -> {
+            int shown = mWidgetView.getAppWidgetId();
+            close(false);
+            WidgetStackActivity.start(mLauncher, shown);
+        });
 
         mReconfigureButton = (ImageButton) findViewById(R.id.widget_reconfigure_button);
         if (info.isReconfigurable()) {
@@ -723,6 +733,9 @@ public class AppWidgetResizeFrame extends AbstractFloatingView implements View.O
         int xFrame = (int) ev.getX() - getLeft();
         int yFrame = (int) ev.getY() - getTop();
         mReconfigureButton.getHitRect(sTmpRect);
+        if (sTmpRect.contains(xFrame, yFrame)) return true;
+        // droidtop: the stack button falls through the same way.
+        mStackButton.getHitRect(sTmpRect);
         return sTmpRect.contains(xFrame, yFrame);
     }
 

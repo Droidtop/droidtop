@@ -86,5 +86,18 @@
             android:visibility="gone"
             android:contentDescription="@string/widget_reconfigure_button_content_description" />
 
+        <!-- droidtop: stack another widget on this one (Droidtop/tracker#564, WidgetStackActivity). -->
+        <ImageButton
+            android:id="@+id/widget_stack_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/widget_reconfigure_button_padding"
+            android:layout_gravity="bottom|start"
+            android:layout_marginBottom="@dimen/widget_reconfigure_button_margin"
+            android:layout_marginStart="@dimen/widget_reconfigure_button_margin"
+            android:src="@drawable/widget_stack_button_frame"
+            android:background="?android:attr/selectableItemBackground"
+            android:contentDescription="@string/widget_stack_here" />
+
     </FrameLayout>
 </com.android.launcher3.AppWidgetResizeFrame>
