@@ -7152,9 +7152,12 @@ same file): without it, Android's grey status bar paints over the top of
 every dialog-hosted menu (Quick Menu, L2 menu, game page, filter/search),
 leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
 
-- **Bounce.** A fresh press of a key less than 25 ms after that key's own
-  release is a worn or noisy switch: the press, its repeats and its
-  release are dropped.
+- **Bounce.** A fresh press of a pad's key less than 25 ms after that key's
+  own release is a worn or noisy switch: the press, its repeats and its
+  release are dropped. A keyboard's keys are never debounced: a doubled
+  letter typed quickly, or by `adb shell input text`, is two presses of one
+  key inside the window, and the second was dropped ("Goodbye" arrived as
+  "Godbye" in the search field on BlueStacks, Droidtop/tracker#569).
 - **The stick and the hat are a D-pad.** Past half travel a direction is
   pressed, back under 0.3 it is released (the band between is hysteresis,
   inside it is the deadzone); the hat wins over the stick. A held stick is
