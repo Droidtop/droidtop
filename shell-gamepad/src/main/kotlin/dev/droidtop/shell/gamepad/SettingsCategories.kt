@@ -27,6 +27,8 @@ internal data class SettingsCategory(
     val sectionAbove: String?,
     val groupIds: List<String>,
     val link: NestedScreenItem?,
+    /** A picture in place of [icon] (a store's mark, [dev.droidtop.library.settings.CatalogItem.iconFile]). */
+    val iconFile: String? = null,
 )
 
 /**
@@ -89,6 +91,7 @@ internal fun settingsCategories(
                         sectionAbove = if (index == 0) group.title else null,
                         groupIds = emptyList(),
                         link = item as NestedScreenItem,
+                        iconFile = item.iconFile,
                     ),
                 )
             }

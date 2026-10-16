@@ -216,10 +216,15 @@ internal enum class BadgeKind(val word: String) { PC("PC"), ENGINE("Engine"), RE
  * The kind badge every card and result row of a mixed list carries
  * (docs/SPEC.md 7i, "Kind badges"; Droidtop/tracker#362): [kind] in one word,
  * then [detail], the store of a PC or engine game or the system of a Retro
- * game. [text] is the same line for a row of words.
+ * game. [text] is the same line for a row of words. [showKind] is false where the
+ * view's cards are all of one kind ([ViewBadges]).
  */
-internal data class KindBadge(val kind: BadgeKind, val detail: String?) {
-    val text: String get() = if (detail == null) kind.word else "${kind.word} · $detail"
+internal data class KindBadge(val kind: BadgeKind, val detail: String?, val showKind: Boolean = true) {
+    val text: String get() = when {
+        !showKind && detail != null -> detail
+        detail == null -> kind.word
+        else -> "${kind.word} · $detail"
+    }
 
     /**
      * The forms a capsule's badge may take, longest first: the kind and its detail, the detail alone (it says more
@@ -228,7 +233,33 @@ internal data class KindBadge(val kind: BadgeKind, val detail: String?) {
      * MAK...", "RETRO · SONY PLAY..."). Each is the kind's part and the detail's part, either null.
      */
     val forms: List<Pair<String?, String?>>
-        get() = if (detail == null) listOf(kind.word to null) else listOf(kind.word to detail, null to detail, kind.word to null)
+        get() = when {
+            !showKind && detail != null -> listOf(null to detail)
+            detail == null -> listOf(kind.word to null)
+            else -> listOf(kind.word to detail, null to detail, kind.word to null)
+        }
+}
+
+/**
+ * The badges of one view's cards (a page of shelves, or a grid), by the owner's rule (2026-10-14,
+ * Droidtop/tracker#496: "We need to show info when useful, not when it's extraneous"): a part of a badge that is the
+ * same on every card of the view says nothing, so it is dropped. Every card PC: no "PC"; every Retro card one system:
+ * no system. A badge left with nothing is not drawn. A view of one card keeps its badge. Pure.
+ */
+internal class ViewBadges(badges: Collection<KindBadge?>) {
+    private val present = badges.filterNotNull()
+    private val sameKind = present.size >= 2 && present.all { it.kind == present.first().kind }
+    private val sameDetail = present.size >= 2 && present.all { it.detail == present.first().detail }
+
+    fun of(badge: KindBadge?): KindBadge? {
+        badge ?: return null
+        val detail = badge.detail.takeUnless { sameDetail }
+        return when {
+            !sameKind -> badge.copy(detail = detail)
+            detail != null -> badge.copy(detail = detail, showKind = false)
+            else -> null
+        }
+    }
 }
 
 /** The kinds that are no engine (a Windows or Linux program, a remote PC, an app, a console ROM): the one rule, [engineFamily]. */

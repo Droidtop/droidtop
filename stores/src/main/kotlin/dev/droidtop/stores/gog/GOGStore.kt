@@ -37,6 +37,7 @@ import timber.log.Timber
  */
 class GOGStore : StoreLibrary {
     override val id = "gog"
+    override val siteUrl = "https://www.gog.com/"
     override val label = "GOG"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(

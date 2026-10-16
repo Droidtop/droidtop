@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.gestures.animateScrollBy
+import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
 import dev.droidtop.shell.gamepad.input.GamepadAction
@@ -375,6 +377,8 @@ internal fun MenuRow(
     // list does, rather than every row reading identically (settings
     // polish pass, 2026-09-25).
     icon: CatalogIcon? = null,
+    // A picture in place of [icon] (a store's cached mark, Droidtop/tracker#503).
+    iconFile: String? = null,
     onClick: (() -> Unit)? = null,
     // Long-press is the touch route to Y on a row (the same convention
     // the shell's cards use for their detail).
@@ -497,10 +501,10 @@ internal fun MenuRow(
                     .background(accent),
             )
             Spacer(Modifier.width(12.dp))
-        } else if (icon != null) {
-            Icon(
-                icon.glyph(),
-                contentDescription = null,
+        } else if (icon != null || iconFile != null) {
+            CatalogGlyph(
+                icon,
+                iconFile,
                 tint = if (selected) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                 modifier = Modifier.size(24.dp),
             )
@@ -813,6 +817,9 @@ internal fun MenuPanel(
     val shown = remember { androidx.compose.animation.core.Animatable(if (Motion.enabled) 0f else 1f) }
     LaunchedEffect(Unit) { shown.animateTo(1f, Motion.panelIn()) }
     val scroll = androidx.compose.foundation.rememberScrollState()
+    // A D-pad press past the rows scrolls the panel by about two rows (#381).
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val scrollStepPx = with(androidx.compose.ui.platform.LocalDensity.current) { PANEL_SCROLL_STEP.toPx() }
     // A dialog window does not bound its content to the screen: without
     // an explicit cap a long menu is centred and clipped at both edges
     // (title and last row cut, Droidtop/tracker#295) and its scroll never
@@ -836,7 +843,17 @@ internal fun MenuPanel(
                 modifier = Modifier
                     .focusRequester(focus)
                     .focusable()
-                    .onPad(preview = true, handler = onPad)
+                    .onPad(preview = true) { press ->
+                        MenuRowEnd.atEdge = false
+                        val handled = onPad(press)
+                        val direction = panelScrollDirection(press.action, MenuRowEnd.atEdge, scroll.canScrollForward, scroll.canScrollBackward)
+                        if (direction != 0) {
+                            scope.launch { scroll.animateScrollBy(direction * scrollStepPx) }
+                            true
+                        } else {
+                            handled
+                        }
+                    }
                     .fadeWhileMoreBelow(scroll)
                     // A panel whose content can outgrow the screen must scroll:
                     // the jump-to-letter list reaches 27 rows on a library that
@@ -852,6 +869,9 @@ internal fun MenuPanel(
         }
     }
 }
+
+/** How far one D-pad press past the rows scrolls a panel. */
+private val PANEL_SCROLL_STEP = 96.dp
 
 /** How small a sheet starts as it glides in: 96 percent of its size. */
 private const val PANEL_OPEN_SCALE = 0.96f
@@ -990,7 +1010,29 @@ private fun MoreBelowArrow(modifier: Modifier = Modifier) {
 internal fun menuMove(index: Int, count: Int, press: PadPress): Int {
     val next = menuStep(index, count, if (press.action == GamepadAction.UP) -1 else 1)
     moveCue(next != index, press.repeat)
+    // The panel this menu is in scrolls on a press that went nowhere (MenuPanel, Droidtop/tracker#381).
+    MenuRowEnd.atEdge = next == index
     return next
+}
+
+/**
+ * Whether the last cursor step ([menuMove]) went nowhere: the rows ended. [MenuPanel] reads it after its menu's
+ * handler, to scroll content past the rows (an action's result) with the D-pad. Main thread only, like the pad.
+ */
+internal object MenuRowEnd {
+    var atEdge: Boolean = false
+}
+
+/**
+ * Which way a panel scrolls for a press (Droidtop/tracker#381): +1 down, -1 up, 0 not at all. Only Up or Down that
+ * went nowhere among the rows ([atEdge]) scrolls, and only where there is more that way, so a menu whose rows all
+ * fit keeps its bump and a long result below the rows is reached with the D-pad, not only a touch swipe.
+ */
+internal fun panelScrollDirection(action: GamepadAction, atEdge: Boolean, canForward: Boolean, canBackward: Boolean): Int = when {
+    !atEdge -> 0
+    action == GamepadAction.DOWN && canForward -> 1
+    action == GamepadAction.UP && canBackward -> -1
+    else -> 0
 }
 
 /**

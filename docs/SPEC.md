@@ -13890,18 +13890,17 @@ own games, in droidtop's own treatment:
   "Retro · Super Nintendo" (an emulated game, its system), "App" (an Android
   app). A PC or engine game's badge is `originLabel`'s (`:library-core`, one
   function with a table test, Droidtop/tracker#397 slice G): an engine game
-  reads "ENGINE · <engine>" ("ENGINE · REN'PY", "ENGINE · RPG MAKER MZ",
-  `LibraryEntryKind.engineFamily`, the one rule the Kind facet's Engine value
-  reads too), a PC game "PC", plus " · <source>" only when the library has rows
-  from more than one source ("PC · GOG"); a folder source is named by its
-  short label, `PcSource.badgeLabel`: the folder's last path segment, and when
-  that is longer than ten letters the initials of its words ("BstSharedFolder"
-  is "PC · BSF"), else its first letters and an ellipsis, so the badge is never
-  cut mid-word (the whole name stays on the focus line). A badge whose words
-  still do not fit its card (a long engine or system name on a narrow card:
+  reads "ENGINE" and a PC game "PC", plus " · <store>" (or the computer a game
+  is on) only when the library has rows from more than one source ("PC · GOG").
+  A folder's name and the engine a game is built on are never on a badge
+  (#496, the rule below): they are folder names and implementation
+  categories, and the focus line and the page carry them. Within one view (a
+  page of shelves, or a grid; `ViewBadges`) a part every card shares is
+  dropped: all PC, no "PC"; all one system, no system; nothing left, no badge. A badge whose words
+  still do not fit its card (a long system name on a narrow card:
   "ENGINE · RPG MAK...", "RETRO · SONY PLAY...", Droidtop/tracker#434, rig
   2026-10-14) is drawn in the longest form that fits, measured: the kind and
-  its detail, then the detail alone ("RPG MAKER MV", "SONY PLAYSTATION"), then
+  its detail, then the detail alone ("SONY PLAYSTATION"), then
   the kind alone (`KindBadge.forms`); the focus line keeps the whole text. Ownership is never text on a capsule:
   a game shared with you or gone from your library carries a small generic
   glyph in the bottom-right corner (no store logo). The focus line and the
@@ -15567,7 +15566,7 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
   "Not signed in", Folders "3 folders · 412 games". The column can be scanned by glyph: the
   stores keep the globe, Folders the folder, Add a game and Imported the game controller, Storage the
-  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. Under the heading **Get games** the place lists every installed
+  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. Built (`StoreMarks`, `:library-core`): each store names its own site (`StoreLibrary.siteUrl`). Right after a sign-in, and in the background when Game sources lists a store already signed in without a mark, droidtop reads the site's home page for the icon it declares (a touch icon first, then icons by declared size, then `/favicon.ico`; `StoreMarks.iconCandidates`, tested), keeps it as a 96 px PNG in its own files (`store-marks/<store>.png`), and draws it in the store's row and category entry (`CatalogItem.iconFile`, drawn by both surfaces off the main thread). A fetch is tried once per process. Under the heading **Get games** the place lists every installed
   source plugin (`AcquireContentSources.listings`), ready or not, with its state as the row's value
   (Ready, Waiting for your approval, Denied, Turned off, Disabled), so a newcomer with no folders and an
   empty library reaches a search from the first minute, which is the one route PC Games takes with no game

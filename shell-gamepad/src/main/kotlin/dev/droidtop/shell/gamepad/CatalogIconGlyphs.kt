@@ -86,3 +86,20 @@ internal fun LeftMenuEntry.glyph(): ImageVector = when {
         GamingSection.SETTINGS -> Icons.Outlined.Settings
     }
 }
+
+/**
+ * A catalog row's leading picture: [iconFile] (a store's cached mark, Droidtop/tracker#503) when there is one, drawn
+ * by the image loader off the main thread and in its own colours; else [icon]'s glyph, tinted. Nothing for neither.
+ */
+@androidx.compose.runtime.Composable
+internal fun CatalogGlyph(icon: CatalogIcon?, iconFile: String?, tint: androidx.compose.ui.graphics.Color, modifier: androidx.compose.ui.Modifier) {
+    when {
+        iconFile != null -> coil3.compose.AsyncImage(
+            model = java.io.File(iconFile),
+            contentDescription = null,
+            contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+            modifier = modifier,
+        )
+        icon != null -> androidx.compose.material3.Icon(icon.glyph(), contentDescription = null, tint = tint, modifier = modifier)
+    }
+}

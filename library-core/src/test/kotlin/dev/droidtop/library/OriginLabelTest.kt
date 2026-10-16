@@ -34,19 +34,18 @@ class OriginLabelTest {
         Row(store("steam:440"), 1, "PC", steam, null),
         // Once another origin has rows, the PC badge names its source.
         Row(store("gog:1"), 2, "PC · $gog", gog, null),
-        // An engine game names its engine, whatever the source and however many there are.
-        Row(store("steam:9", kind = LibraryEntryKind.RENPY), 1, "Engine · Ren'Py", steam, null),
-        Row(folder("/sd/Games/Some VN", LibraryEntryKind.RPG_MAKER_MZ), 3, "Engine · RPG Maker MZ", "Folder: Games", null),
+        // An engine game is "Engine": the engine it is built on is an implementation category, not a badge (#496).
+        Row(store("steam:9", kind = LibraryEntryKind.RENPY), 1, "Engine", steam, null),
+        Row(store("steam:8", kind = LibraryEntryKind.RENPY), 2, "Engine · $steam", steam, null),
+        Row(folder("/sd/Games/Some VN", LibraryEntryKind.RPG_MAKER_MZ), 3, "Engine", "Folder: Games", null),
         // Ownership is never text on the capsule: a glyph, and the words on the focus line.
         Row(store("steam:10", StoreHolding.FAMILY), 1, "PC", "$steam · Shared with you", OwnershipMark.SHARED),
         Row(store("steam:11", StoreHolding.NOT_OWNED), 2, "PC · $steam", "$steam · No longer in your library", OwnershipMark.LEFT),
         Row(store("steam:12", StoreHolding.FREE), 1, "PC", "$steam · Free to play (not in your library)", null),
-        // A folder game, and one that came through a launcher.
-        Row(folder("/sd/Games/Portable"), 2, "PC · Games", "Folder: Games", null),
-        // A long folder name is cut for the badge (initials of its words, else its first letters); the focus line keeps it whole.
-        Row(folder("/sd/BstSharedFolder/Portable"), 2, "PC · BSF", "Folder: BstSharedFolder", null),
-        Row(folder("/sd/Retro-Games-Collection/x"), 2, "PC · RGC", "Folder: Retro-Games-Collection", null),
-        Row(folder("/sd/Longfoldername/x"), 2, "PC · Longfolde…", "Folder: Longfoldername", null),
+        // A folder's name is never on a badge, however many origins (#496); the focus line names it.
+        Row(folder("/sd/Games/Portable"), 2, "PC", "Folder: Games", null),
+        Row(folder("/sd/BstSharedFolder/Portable"), 2, "PC", "Folder: BstSharedFolder", null),
+        // One that came through a launcher.
         Row(store("gog:2"), 2, "PC · $gog", "$gog · via Heroic", null, via = "heroic"),
     )
 

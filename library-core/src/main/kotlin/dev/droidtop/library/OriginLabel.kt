@@ -42,14 +42,14 @@ enum class OwnershipMark { SHARED, LEFT }
 /**
  * What a PC or engine game's origin reads, at each length it is drawn
  * (docs/SPEC.md 7i, "Badges", Droidtop/tracker#397 slice G):
- * [badge] on the capsule ("PC", "PC · GOG", "Engine · Ren'Py"; null when the
+ * [badge] on the capsule ("PC", "PC · GOG", "Engine"; null when the
  * Capsule badge option is Off), [full] on the focus line and the page's
  * Source row ("Steam · Shared with you", "GOG · via Heroic", "Folder:
  * Games"), and [mark] for a holding a capsule shows as a glyph.
  */
 data class OriginLabel(
     val kind: String,
-    /** What follows the kind on the capsule (the engine, or the source when there are several); null for none. */
+    /** What follows the kind on the capsule (the store or computer, when there are several origins); null for none. */
     val detail: String?,
     val full: String,
     val mark: OwnershipMark?,
@@ -64,8 +64,10 @@ data class OriginLabel(
  * The one function that names where a PC game came from (docs/SPEC.md 7i).
  * [origins] is how many sources the library has rows from (the Source
  * facet's values): a PC capsule names its source only when there is more
- * than one, so a Steam-only library reads "PC". An engine game names its
- * engine instead. [via] is the launcher it was imported through. Ownership is
+ * than one, so a Steam-only library reads "PC". A badge is a plain fact, shown only when it is useful (owner,
+ * 2026-10-14, Droidtop/tracker#496): the store or computer a game is on, never a folder's name, and never the engine
+ * an engine game is built on (an implementation category: "Engine" is the fact). The focus line keeps all of it.
+ * [via] is the launcher it was imported through. Ownership is
  * never text on a capsule: Shared and No longer in your library are a [mark].
  * Pure: fields the entry carries and the caller's counts, never a lookup.
  */
@@ -80,9 +82,9 @@ fun originLabel(
     val kind = if (family != null) "Engine" else "PC"
     val source = PcSource.of(entry, roots)
     val detail = when {
-        style != CapsuleBadgeStyle.FULL -> null
-        family != null -> family
-        source != null && origins > 1 -> source.badgeLabel()
+        style != CapsuleBadgeStyle.FULL || origins <= 1 -> null
+        source is PcSource.Store || source is PcSource.Computer -> source.label()
+        // A folder's name and a Wine shortcut are not facts a player chooses by (#496).
         else -> null
     }
     val holding = entry.pcInfo?.takeIf { PcSource.storeIdOf(it.storeId) != null }?.holding
