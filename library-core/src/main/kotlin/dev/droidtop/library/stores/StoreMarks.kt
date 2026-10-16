@@ -20,6 +20,8 @@ object StoreMarks {
     /** The size a mark is kept at: more than any row's glyph shows, small enough to decode per row. */
     const val SIZE_PX = 96
 
+    private const val TAG = "droidtop.StoreMarks"
+
     /** An icon larger than this is not a mark. */
     private const val MAX_BYTES = 512L * 1024
 
@@ -43,10 +45,10 @@ object StoreMarks {
         for (url in candidates) {
             val bitmap = runCatching { decode(Http.get(url, maxBytes = MAX_BYTES).body) }.getOrNull() ?: continue
             save(context, store.id, bitmap)
-            timber.log.Timber.i("Store mark: %s from %s", store.id, url)
+            android.util.Log.i(TAG, "Store mark: ${store.id} from $url")
             return true
         }
-        timber.log.Timber.w("Store mark: none for %s (page %s, %d candidates)", store.id, if (page == null) "unreadable" else "read", candidates.size)
+        android.util.Log.w(TAG, "Store mark: none for ${store.id} (page ${if (page == null) "unreadable" else "read"}, ${candidates.size} candidates)")
         return false
     }
 
