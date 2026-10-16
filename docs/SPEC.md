@@ -8185,7 +8185,10 @@ change reaches it (console, build 1397: RetroArch's system dialog came 44 s afte
 
 It reports four things, each in plain words naming the app: it is not responding; it closed straight
 after it started (the shell came back within 10 s and the app is not open); it is no longer running
-but its screen never handed back (task list says gone after 9 s); an emulator launch has stalled (under
+but its screen never handed back (the task list misses it after 9 s on two looks in a row, 3 s apart, and no
+process of the app that started after the launch is alive: `pidof`, then each process's start time, field 22 of
+`/proc/<pid>/stat`, against the launch on the boot clock; `LaunchWatchPolicy.startedSince`); an emulator launch has
+stalled (under
 1 s of processor time 15 s after the launch, `STALLED`). A black window of a live, responsive
 app is in general indistinguishable from a game that is running and is never claimed, and a person returning to
 the shell on purpose while the app is open or after 10 s is not a problem. The stall is the one black
@@ -8198,6 +8201,20 @@ almost nothing since, so its screen is probably black"), then say to close it an
 game file, any BIOS the system needs, and the emulator's file access; a RetroArch launch adds its core
 sentence and Get the core. Before this, a hang that nobody touched was reported only once a key reached it,
 or never.
+
+"No longer running" needs both looks and the process check because one look reads two harmless moments as gone
+(rig, droidtop 0.2.0-dev.1923, Droidtop/tracker#271): RetroArch restarts itself for a new core (its singleInstance
+activity exits and starts again), and a process from before the launch, the RetroArch a core sideload opened, ended
+75 ms after the retry started and raised a stale alert. An app process that started before the launch is not this
+launch.
+
+**Where the alert is seen** (rig, 1923: the alert sat behind RetroArch and no notification appeared). Three surfaces
+follow `LaunchWatchdog.alert`: the shell's dialog (Close it, Get the core), which is behind the game; the
+notification, which needs droidtop's notification permission; and a card above the game on the game's own display
+(`LaunchAlertOverlay`), drawn the one way droidtop draws over a game (`GameOverlay`: droidtop's accessibility
+overlay, else "Display over other apps", as the performance overlay). The card is focusable so the pad reaches it,
+not the stuck game: A or Back to droidtop brings the shell forward on its screen, where the dialog is; B, Back or
+Dismiss clears the alert. Without either overlay route the notification is the only sign.
 
 **Without a privileged helper the watchdog sees nothing, by design.** Every signal above except the shell
 coming back needs the `priv.shell` provider (Shizuku with droidtop's full access, Sui, or the root helper).
