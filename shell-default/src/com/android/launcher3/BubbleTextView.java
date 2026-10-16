@@ -211,6 +211,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     protected int mDisplay;
 
     private final CheckLongPressHelper mLongPressHelper;
+    /** droidtop: this icon's own swipes on the home screen (HomeItemExtras, IconSwipe). */
+    private final dev.droidtop.shell.standard.IconSwipe mIconSwipe;
 
     private boolean mLayoutHorizontal;
     private final boolean mIsRtl;
@@ -350,6 +352,13 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 R.color.taskbar_minimized_app_indicator_color, context.getTheme());
 
         mLongPressHelper = new CheckLongPressHelper(this);
+        mIconSwipe = new dev.droidtop.shell.standard.IconSwipe(this,
+                up -> swipeAction(up) != null,
+                up -> {
+                    dev.droidtop.shell.standard.HomeActions.INSTANCE.run(
+                            Launcher.getLauncher(getContext()), swipeAction(up));
+                    return kotlin.Unit.INSTANCE;
+                });
 
         mDotParams = new DotRenderer.DrawParams();
 
@@ -602,7 +611,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         if (mSkipUserBadge) {
             flags |= FLAG_SKIP_USER_BADGE;
         }
-        FastBitmapDrawable iconDrawable = info.newIcon(getContext(), flags);
+        // droidtop patch: the person's own picture for this item, if any (HomeItemExtras).
+        FastBitmapDrawable iconDrawable =
+                dev.droidtop.shell.standard.HomeItemExtras.newIcon(getContext(), info, flags);
         mDotParams.appColor = iconDrawable.getIconColor();
         mDotParams.dotColor = Themes.getAttrColor(getContext(), R.attr.notificationDotColor);
         setIcon(iconDrawable);
@@ -625,7 +636,9 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @UiThread
     public void applyLabel(ItemInfo info) {
-        CharSequence label = info.title;
+        // droidtop patch: the title the person gave this one icon, if any (HomeItemExtras).
+        CharSequence label = dev.droidtop.shell.standard.HomeItemExtras.INSTANCE.title(info);
+        if (label == null) label = info.title;
         if (label != null) {
             mLastOriginalText = label;
             mLastModifiedText = mLastOriginalText;
@@ -690,6 +703,20 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         return mIcon;
     }
 
+    /**
+     * droidtop: what a swipe up or down on this icon does, set by the person for this one app icon on the home
+     * screen, in the dock or in a folder; null when nothing, or anywhere else.
+     */
+    private dev.droidtop.runtime.HomeAction swipeAction(boolean up) {
+        if ((mDisplay != DISPLAY_WORKSPACE && mDisplay != DISPLAY_FOLDER)
+                || !(getTag() instanceof ItemInfo info) || info.id < 0
+                || info.itemType != LauncherSettings.Favorites.ITEM_TYPE_APPLICATION
+                || !(ActivityContext.lookupContext(getContext()) instanceof Launcher)) {
+            return null;
+        }
+        return dev.droidtop.shell.standard.HomeItemExtras.INSTANCE.swipe(getContext(), info.id, up);
+    }
+
     @Override
     public boolean onTouchEvent(MotionEvent event) {
         // ignore events if they happen in padding area
@@ -697,6 +724,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
                 && shouldIgnoreTouchDown(event.getX(), event.getY())) {
             return false;
         }
+        if (mIconSwipe.onTouchEvent(event)) return true;
         if (isLongClickable()) {
             super.onTouchEvent(event);
             mLongPressHelper.onTouchEvent(event);

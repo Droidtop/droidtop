@@ -494,7 +494,23 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
             menu.getMenu().add(0, i, i, labels[i]).setCheckable(true)
                     .setChecked(mInfo.hasOption(flags[i])).setEnabled(editable);
         }
+        // The folder's own picture, drawn in place of its preview (HomeItemExtras).
+        int pictureItem = flags.length;
+        int removePictureItem = flags.length + 1;
+        menu.getMenu().add(0, pictureItem, pictureItem, R.string.folder_option_picture).setEnabled(editable);
+        if (dev.droidtop.shell.standard.HomeItemExtras.INSTANCE.picture(mInfo) != null) {
+            menu.getMenu().add(0, removePictureItem, removePictureItem, R.string.item_customize_picture_remove)
+                    .setEnabled(editable);
+        }
         menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == pictureItem) {
+                dev.droidtop.shell.standard.ItemCustomize.choosePicture(getContext(), mInfo.id);
+                return true;
+            }
+            if (item.getItemId() == removePictureItem) {
+                dev.droidtop.shell.standard.ItemCustomize.removePicture(getContext(), mInfo.id);
+                return true;
+            }
             int flag = flags[item.getItemId()];
             mInfo.setOption(flag, !mInfo.hasOption(flag), mLauncherDelegate.getModelWriter());
             mFolderIcon.onOptionsChanged();

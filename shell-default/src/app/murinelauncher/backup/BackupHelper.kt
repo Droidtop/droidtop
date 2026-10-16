@@ -12,6 +12,7 @@ import com.android.launcher3.LauncherFiles
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.LauncherSettings
 import com.android.launcher3.provider.RestoreDbTask
+import dev.droidtop.shell.standard.HomeItemExtras
 import io.airlift.compress.tar.TarEntry
 import io.airlift.compress.tar.TarInputStream
 import io.airlift.compress.tar.TarOutputStream
@@ -80,6 +81,8 @@ object BackupHelper {
             }
             File(context.filesDir, DOWNGRADE_JSON).takeIf(File::exists)
                 ?.let { tar.add(DOWNGRADE_JSON, it) }
+            // droidtop patch: the pictures people gave home items (HomeItemExtras).
+            HomeItemExtras.pictureFilesForBackup(context).forEach { (name, file) -> tar.add(name, file) }
         }
         snap.deleteRecursively()
         context.deleteSharedPreferences(TMP_PREFS)
@@ -101,7 +104,8 @@ object BackupHelper {
         val input = BufferedInputStream(src.decompressed())
         // Whitelist of exact file names for content validation
         fun stage(name: String, content: java.io.InputStream) {
-            if (name in LauncherFiles.GRID_DB_FILES || name.removeSuffix(".xml") in PREF_FILES || name == DOWNGRADE_JSON)
+            if (name in LauncherFiles.GRID_DB_FILES || name.removeSuffix(".xml") in PREF_FILES || name == DOWNGRADE_JSON ||
+                HomeItemExtras.isBackupEntry(name))
                 File(tmp, name).outputStream().use(content::copyTo)
         }
         // The container also needs sniffing: current backups are tar, older ones are zip
@@ -132,11 +136,13 @@ object BackupHelper {
                 listOf("", "-wal", "-shm", "-journal").forEach { File(db.path + it).delete() }
             }
             val stagedFiles = staging.list()!!.toSet()
+            HomeItemExtras.clearPictureFiles(context)
             staging.listFiles()!!.forEach { f ->
                 when {
                     f.name.endsWith(".db") -> context.getDatabasePath(f.name)
                         .also { it.parentFile?.mkdirs() }.let(f::renameTo)
                     f.name == DOWNGRADE_JSON -> f.renameTo(File(context.filesDir, DOWNGRADE_JSON))
+                    HomeItemExtras.isBackupEntry(f.name) -> HomeItemExtras.restorePictureFile(context, f)
                     f.name.endsWith(".xml") -> {
                         // Read the xml as a temp SharedPreferences then commit to target prefs.
                         context.deleteSharedPreferences(TMP_PREFS)

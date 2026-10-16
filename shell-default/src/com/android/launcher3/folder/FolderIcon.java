@@ -109,9 +109,7 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
     // Swipe to open (FolderInfo.FLAG_SWIPE_TO_OPEN, Droidtop/tracker#564): where the touch went down, whether this
     // icon took the gesture from the workspace, and whether it opened the folder (the rest of the touch is then
     // swallowed so the tap does not also start the first app).
-    private float mSwipeDownX, mSwipeDownY;
-    private boolean mSwipeClaimed, mSwipeOpened;
-    private int mTouchSlop;
+    private dev.droidtop.shell.standard.IconSwipe mSwipe;
     // The cover (FolderInfo.FLAG_COVER): the first app's icon, made again when the folder's contents change.
     private Drawable mCover;
 
@@ -178,7 +176,13 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
 
     private void init() {
         mLongPressHelper = new CheckLongPressHelper(this);
-        mTouchSlop = ViewConfiguration.get(getContext()).getScaledTouchSlop();
+        mSwipe = new dev.droidtop.shell.standard.IconSwipe(this,
+                up -> up && mInfo != null && mInfo.hasOption(FolderInfo.FLAG_SWIPE_TO_OPEN),
+                up -> {
+                    Folder folder = getFolder();
+                    if (!folder.isOpen() && !folder.isDestroyed()) folder.animateOpen();
+                    return kotlin.Unit.INSTANCE;
+                });
         mPreviewLayoutRule = new ClippedFolderIconLayoutRule();
         mPreviewItemManager = new PreviewItemManager(this);
         mDotParams = new DotRenderer.DrawParams();
@@ -644,13 +648,22 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         drawDot(canvas);
     }
 
-    /** Draws the first app's icon where the preview goes, for a folder with a cover; false when it has none. */
+    /**
+     * Draws where the preview goes: the folder's own picture if the person gave it one, else the first app's icon for
+     * a folder with a cover. False when it has neither.
+     */
     private boolean drawCover(Canvas canvas) {
-        if (mInfo == null || !mInfo.hasOption(FolderInfo.FLAG_COVER) || mAnimating) return false;
+        if (mInfo == null || mAnimating) return false;
         if (mCover == null) {
-            WorkspaceItemInfo first = mInfo.firstApp();
-            if (first == null) return false;
-            mCover = first.newIcon(getContext());
+            android.graphics.Bitmap picture = dev.droidtop.shell.standard.HomeItemExtras.INSTANCE.picture(mInfo);
+            if (picture != null) {
+                mCover = com.android.launcher3.icons.BitmapInfo.fromBitmap(picture).newIcon(getContext());
+            } else {
+                if (!mInfo.hasOption(FolderInfo.FLAG_COVER)) return false;
+                WorkspaceItemInfo first = mInfo.firstApp();
+                if (first == null) return false;
+                mCover = dev.droidtop.shell.standard.HomeItemExtras.newIcon(getContext(), first, 0);
+            }
         }
         int iconSize = mActivity.getDeviceProfile().iconSizePx;
         int left = (getWidth() - iconSize) / 2;
@@ -779,48 +792,9 @@ public class FolderIcon extends FrameLayout implements FloatingIconViewCompanion
         return true;
     }
 
-    /**
-     * Swipe to open: an upward swipe that starts on the icon opens the folder. It is claimed from the workspace
-     * (whose own swipe up opens the drawer) at half a touch slop, before the workspace's controllers take it at
-     * one, and only when it goes more up than sideways, so a page swipe still pages. True when this touch is used up.
-     */
+    /** Swipe to open: an upward swipe that starts on the icon opens the folder (IconSwipe). */
     private boolean handleSwipeToOpen(MotionEvent event) {
-        if (mInfo == null || !mInfo.hasOption(FolderInfo.FLAG_SWIPE_TO_OPEN)) return false;
-        switch (event.getActionMasked()) {
-            case MotionEvent.ACTION_DOWN:
-                mSwipeDownX = event.getX();
-                mSwipeDownY = event.getY();
-                mSwipeClaimed = false;
-                mSwipeOpened = false;
-                return false;
-            case MotionEvent.ACTION_MOVE: {
-                if (mSwipeOpened) return true;
-                float up = mSwipeDownY - event.getY();
-                float side = Math.abs(event.getX() - mSwipeDownX);
-                if (!mSwipeClaimed && up > mTouchSlop / 2f && up > side) {
-                    mSwipeClaimed = true;
-                    getParent().requestDisallowInterceptTouchEvent(true);
-                }
-                if (mSwipeClaimed && up > mTouchSlop) {
-                    mSwipeOpened = true;
-                    cancelLongPress();
-                    setPressed(false);
-                    Folder folder = getFolder();
-                    if (!folder.isOpen() && !folder.isDestroyed()) folder.animateOpen();
-                    return true;
-                }
-                return false;
-            }
-            case MotionEvent.ACTION_UP:
-            case MotionEvent.ACTION_CANCEL:
-                if (mSwipeOpened) {
-                    mSwipeOpened = false;
-                    return true;
-                }
-                return false;
-            default:
-                return mSwipeOpened;
-        }
+        return mSwipe != null && mSwipe.onTouchEvent(event);
     }
 
     /**
