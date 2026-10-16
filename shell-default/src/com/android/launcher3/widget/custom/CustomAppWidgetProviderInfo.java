@@ -58,8 +58,10 @@ public class CustomAppWidgetProviderInfo extends LauncherAppWidgetProviderInfo
 
     @Override
     public void initSpans(Context context, InvariantDeviceProfile idp) {
-        mIsMinSizeFulfilled = Math.min(spanX, minSpanX) <= idp.numColumns
-                && Math.min(spanY, minSpanY) <= idp.numRows;
+        // droidtop: the one fit rule (WidgetFit, Droidtop/tracker#563). A custom widget whose plugin has not set its
+        // size has 0 spans, and 0 passed the old "<= grid" test: the placeholder showed in the picker as "0 x 0".
+        mIsMinSizeFulfilled = dev.droidtop.runtime.WidgetFit.INSTANCE.fits(
+                Math.min(spanX, minSpanX), Math.min(spanY, minSpanY), idp.numColumns, idp.numRows);
     }
 
     @Override
