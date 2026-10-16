@@ -18,8 +18,8 @@ import dev.droidtop.runtime.RootfsImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
@@ -112,22 +112,46 @@ internal object EngineActions {
     private fun removeWhenOver(app: Context, runtime: ContainerRuntime, container: Container) {
         watchers.launch {
             val id = container.id
-            val before = ContainerPrograms.state(id)
-            // Started is the job seen running, or the state turned to over since: a quick program can do both between
-            // two looks.
-            fun ranSince(): Boolean = ContainerPrograms.state(id).let {
-                it !== before && (it is ContainerPrograms.State.Ended || it is ContainerPrograms.State.Failed)
-            }
-            val waitUntil = System.currentTimeMillis() + START_WAIT_MS
-            while (!ContainerPrograms.isRunning(id) && !ranSince() && System.currentTimeMillis() < waitUntil) delay(LOOK_MS)
-            if (!ContainerPrograms.isRunning(id) && !ranSince()) return@launch
-            while (ContainerPrograms.isRunning(id)) delay(LOOK_MS)
+            if (!ContainerPrograms.awaitRun(id, ContainerPrograms.state(id), START_WAIT_MS)) return@launch
             val info = runCatching { runtime.listContainers() }.getOrNull()?.firstOrNull { it.container.id == id } ?: return@launch
             remove(app, runtime, info, force = true)
         }
     }
 
-    private const val LOOK_MS = 250L
+    /** One network change at a time, from the engine API or a front: each reads, changes and writes networks.json whole. */
+    val networksLock = kotlinx.coroutines.sync.Mutex()
+
+    /** The networks there are: droidtop's own three, then the ones made. */
+    suspend fun networks(app: Context): List<dev.droidtop.runtime.Network> =
+        ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+
+    /** A front's `network create NAME`: the API's own rule for a name, with nothing else to set. */
+    suspend fun createNetwork(app: Context, name: String): Result<dev.droidtop.runtime.Network> = networksLock.withLock {
+        val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+        ContainerNetworks.problemWith(existing, name)?.let { return@withLock Result.failure(Refused(it)) }
+        val network = dev.droidtop.runtime.Network(ContainerNetworks.newId(), name, System.currentTimeMillis())
+        withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.with(existing, network)) }
+        Result.success(network)
+    }
+
+    /** What removing a network came to; the API and the fronts each word it in their own way. */
+    sealed interface NetworkRemoval {
+        data class Removed(val network: dev.droidtop.runtime.Network) : NetworkRemoval
+        data object Predefined : NetworkRemoval
+        data object Missing : NetworkRemoval
+        data class InUse(val network: dev.droidtop.runtime.Network) : NetworkRemoval
+    }
+
+    /** The one way a network is removed: never a predefined one, never one a running container is on. */
+    suspend fun removeNetwork(app: Context, runtime: ContainerRuntime?, ref: String): NetworkRemoval = networksLock.withLock {
+        if (ContainerNetworks.PREDEFINED.any { it == ref || ContainerNetworks.predefinedId(it) == ref }) return@withLock NetworkRemoval.Predefined
+        val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+        val network = ContainerNetworks.find(existing, ref) ?: return@withLock NetworkRemoval.Missing
+        val live = runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty().map { it.container.id }.toSet()
+        if (network.members.any { it in live }) return@withLock NetworkRemoval.InUse(network)
+        withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.without(existing, network.id)) }
+        NetworkRemoval.Removed(network)
+    }
 
     /** A reason a request was not done, worded for a person; the front adds its own name before it. */
     class Refused(message: String) : Exception(message)

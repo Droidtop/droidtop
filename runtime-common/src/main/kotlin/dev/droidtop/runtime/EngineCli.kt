@@ -46,6 +46,7 @@ class EngineCli private constructor(val front: Front) {
         add("  rm [-f] CONTAINER...         Delete a container (-f stops its program first)")
         add("  info                         The engine, and the kernel features this device gives it")
         if (front == Front.PODMAN) add("  pod create|ps|rm|start|stop  Pods: a named group of containers started and stopped together")
+        add("  network create|ls|rm         Networks: names containers on one can reach each other by")
         add("")
         add("run also takes [-e NAME=VALUE] [-v FOLDER] IMAGE [COMMAND...]; FOLDER is a folder you mapped in Containers.")
         add("run takes --restart no|on-failure[:N]|always|unless-stopped (no by default).")
@@ -86,6 +87,7 @@ class EngineCli private constructor(val front: Front) {
             }
             "inspect" -> inspect(rest)
             "pod" -> if (front == Front.PODMAN) pod(rest) else EngineRequest.Answer("docker: 'pod' is not a docker command. See 'docker --help'\n", 1)
+            "network" -> network(rest)
             "info" -> flags(rest, emptySet())?.let { bad -> error("info", bad) } ?: EngineRequest.Info
             "rm" -> remove(rest)
             in later -> EngineRequest.Answer("${front.command} $sub: not built in droidtop yet\n", 1)
@@ -380,6 +382,58 @@ class EngineCli private constructor(val front: Front) {
                 if (sub == "start") EngineRequest.PodStart(rest) else EngineRequest.PodStop(rest)
             }
             else -> EngineRequest.Answer("podman pod $sub: not built in droidtop yet\n", 1)
+        }
+    }
+
+    /**
+     * `network create NAME`, `network ls|list [-q]`, `network rm NAME...`: the same networks the engine API keeps
+     * (Droidtop/tracker#555, rig 2011: the fronts refused `network` though the API had it). `create` takes
+     * `--driver bridge`, the one kind droidtop has; anything else is said as not built.
+     */
+    private fun network(args: List<String>): EngineRequest {
+        val cmd = "${front.command} network"
+        val sub = args.firstOrNull() ?: return EngineRequest.Answer("$cmd: name a subcommand: create, ls, rm\n", 1)
+        val rest = args.drop(1)
+        return when (sub) {
+            "create" -> {
+                var name: String? = null
+                var i = 0
+                while (i < rest.size) {
+                    val a = rest[i]
+                    when {
+                        a == "-d" || a == "--driver" -> {
+                            val driver = rest.getOrNull(++i) ?: return EngineRequest.Answer("$cmd create: $a needs a driver\n", 1)
+                            if (driver != "bridge") return EngineRequest.Answer("$cmd create: the $driver driver is not built in droidtop yet\n", 1)
+                        }
+                        a.startsWith("--driver=") -> if (a.substringAfter('=') != "bridge") {
+                            return EngineRequest.Answer("$cmd create: the ${a.substringAfter('=')} driver is not built in droidtop yet\n", 1)
+                        }
+                        a.startsWith("-") -> return EngineRequest.Answer("$cmd create: $a is not built in droidtop yet\n", 1)
+                        name == null -> name = a
+                        else -> return error("network create", a)
+                    }
+                    i++
+                }
+                name?.let { EngineRequest.NetworkCreate(it) } ?: EngineRequest.Answer("$cmd create: name the network\n", 1)
+            }
+            "ls", "list" -> flags(rest, setOf("-q", "--quiet"))?.let { bad -> error("network ls", bad) }
+                ?: EngineRequest.NetworkList(quiet = rest.isNotEmpty())
+            "rm", "remove" -> {
+                rest.firstOrNull { it.startsWith("-") }?.let { return error("network rm", it) }
+                if (rest.isEmpty()) EngineRequest.Answer("$cmd rm: name at least one network\n", 1) else EngineRequest.NetworkRemove(rest)
+            }
+            else -> EngineRequest.Answer("$cmd $sub: not built in droidtop yet\n", 1)
+        }
+    }
+
+    /** Networks as each tool lists them: Docker with its scope, Podman without. */
+    fun formatNetworks(networks: List<Network>, quiet: Boolean): String {
+        if (quiet) return networks.joinToString("") { it.id.take(12) + "\n" }
+        fun driver(n: Network) = when (n.name) { "host" -> "host"; "none" -> "null"; else -> "bridge" }
+        return if (front == Front.DOCKER) {
+            table(listOf("NETWORK ID", "NAME", "DRIVER", "SCOPE"), networks.map { listOf(it.id.take(12), it.name, driver(it), "local") })
+        } else {
+            table(listOf("NETWORK ID", "NAME", "DRIVER"), networks.map { listOf(it.id.take(12), it.name, driver(it)) })
         }
     }
 
@@ -681,7 +735,7 @@ class EngineCli private constructor(val front: Front) {
         private val LATER = setOf("rmi", "compose")
 
         /** Subcommands droidtop will not have: they need a daemon or image building it does not have. */
-        private val NEVER = setOf("build", "buildx", "push", "login", "network", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "version", "search", "logout", "rename", "machine")
+        private val NEVER = setOf("build", "buildx", "push", "login", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "version", "search", "logout", "rename", "machine")
 
         val DOCKER = EngineCli(Front.DOCKER)
         val PODMAN = EngineCli(Front.PODMAN)

@@ -268,6 +268,25 @@ internal object ContainerEnterRequests {
                 // Docker prints what it found and the errors for the rest, failing if any was missing.
                 answer(dir, if (facts.isEmpty()) "[]\n" else EngineInspect.format(facts, cli.front), err.toString(), if (err.isEmpty()) 0 else 1)
             }
+            is EngineRequest.NetworkCreate -> EngineActions.createNetwork(app, command.name).fold(
+                // Docker prints the new network's id, Podman its name.
+                onSuccess = { answer(dir, (if (cli.front == EngineCli.Front.DOCKER) it.id else it.name) + "\n", "", 0) },
+                onFailure = { refuse(dir, "Error response from daemon: ${it.message}", 1) },
+            )
+            is EngineRequest.NetworkList -> answer(dir, cli.formatNetworks(EngineActions.networks(app), command.quiet), "", 0)
+            is EngineRequest.NetworkRemove -> {
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (ref in command.networks) {
+                    when (val removal = EngineActions.removeNetwork(app, runtime, ref)) {
+                        is EngineActions.NetworkRemoval.Removed -> out.append(ref).append('\n')
+                        EngineActions.NetworkRemoval.Predefined -> err.append("Error response from daemon: $ref is a pre-defined network and cannot be removed\n")
+                        EngineActions.NetworkRemoval.Missing -> err.append("Error: No such network: $ref\n")
+                        is EngineActions.NetworkRemoval.InUse -> err.append("Error response from daemon: network ${removal.network.name} has active endpoints\n")
+                    }
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
+            }
             is EngineRequest.PodCreate -> {
                 EngineActions.makePod(app, command.name).fold(
                     onSuccess = { answer(dir, it.id + "\n", "", 0) },

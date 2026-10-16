@@ -573,6 +573,20 @@ object DockerApi {
         else -> osArch
     }
 
+    /**
+     * How a container wait is answered (docs/SPEC.md 3d, "Wait"): at once ([WaitPlan.NOW]), when the running program
+     * ends ([WaitPlan.OVER]), or once a program that has not started yet has started and ended ([WaitPlan.RUN]).
+     * Docker's CLI asks `next-exit` (or `removed`, with `--rm`) before it starts the container, so those wait for the
+     * start; `not-running` on a program that is not running is answered at once, as Docker does.
+     */
+    enum class WaitPlan { NOW, OVER, RUN }
+
+    fun waitPlan(condition: String, running: Boolean): WaitPlan = when {
+        running -> WaitPlan.OVER
+        condition == "not-running" -> WaitPlan.NOW
+        else -> WaitPlan.RUN
+    }
+
     fun version(arch: String, kernel: String): String = buildJsonObject {
         putJsonObject("Platform") { put("Name", "droidtop's container engine") }
         putJsonArray("Components") {
@@ -580,23 +594,35 @@ object DockerApi {
                 buildJsonObject {
                     put("Name", "Engine")
                     put("Version", ENGINE_VERSION)
+                    // Docker's Details are all strings; its CLI reads them into a map of strings.
                     putJsonObject("Details") {
                         put("ApiVersion", API_VERSION)
                         put("MinAPIVersion", MIN_API_VERSION)
+                        put("GitCommit", GIT_COMMIT)
+                        put("GoVersion", GO_VERSION)
                         put("Os", "linux")
                         put("Arch", arch)
                         put("KernelVersion", kernel)
+                        put("Experimental", "false")
                     }
                 },
             )
         }
+        // Every field of Docker's own reply, so `docker version` has all its Server block needs (rig, build 2011).
         put("Version", ENGINE_VERSION)
         put("ApiVersion", API_VERSION)
         put("MinAPIVersion", MIN_API_VERSION)
+        put("GitCommit", GIT_COMMIT)
+        put("GoVersion", GO_VERSION)
         put("Os", "linux")
         put("Arch", arch)
         put("KernelVersion", kernel)
+        put("Experimental", false)
     }.toString() + "\n"
+
+    /** No Go and no commit of Docker's: these name droidtop's engine, as Docker's fields must say something. */
+    private const val GIT_COMMIT = "droidtop"
+    private const val GO_VERSION = "none (droidtop's engine is not written in Go)"
 
     /** What `info` reports, gathered by the handler. */
     data class InfoFacts(

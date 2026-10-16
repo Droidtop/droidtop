@@ -2673,7 +2673,10 @@ the `ContainerRuntime` interface that already exists (§3):
   `DELETE /containers/{id}` (409 for a running one without `force`, and for the desktop's own), `images/create`
   (a pull; its progress lines all at once after it), `containers/{id}/logs` (Docker's multiplexed frames, the
   program's log as stdout; `follow`, `timestamps`, `since` and `until` not built) and `containers/{id}/wait`
-  (until the program is over; its exit code, 125 when it could not start). `containers/json` takes Docker's
+  (until the program is over, or for a program not started yet its start and end: "Wait before a start", below; its
+  exit code, 125 when it could not start). `version` gives every field of Docker's own reply (GitCommit and GoVersion
+  name droidtop's engine, which has neither), the Engine component's Details all strings, as Docker's CLI reads them
+  (rig, build 2011: `docker version` printed only its Client block). `containers/json` takes Docker's
   `filters` for label, name, id and status; any other filter is answered as not built, never ignored. Every action
   is `EngineActions`, the same code the command fronts run, so `docker run` and `POST /containers/create` make
   the same container. A create body (`DockerApi.createRequest`) becomes the one request model, and nothing in it is
@@ -2728,7 +2731,14 @@ the `ContainerRuntime` interface that already exists (§3):
   removal path once its program has run and ended (`EngineActions`, watching from the creation; a program never
   started within ten minutes leaves the container be); with a restart policy it is refused, as Docker refuses it.
   `wait?condition=removed`, which Docker's CLI uses for `--rm`, answers the exit code once the container is gone, or
-  after half a minute.
+  after half a minute. **Wait before a start (rig, build 2011, 2026-10-16; coordinator: "Implement next-exit
+  waits on a stopped container").** Docker's CLI asks `next-exit` (or `removed`) before it starts the container, so
+  a wait on a program that is not running waits for it to start (up to five minutes) and then to end; `not-running`
+  on one that is not running is answered at once, as Docker does (`DockerApi.waitPlan`, tested). The start is seen as
+  attach and `--rm` see it, one rule (`ContainerPrograms.awaitRun`: the program seen running, or its state turned to
+  over since the wait began). A stream (attach) shuts its writing half when it ends, before the connection closes,
+  so a relay into the container passes the end on (`docker run --rm` printed its output and hung, rig, build 2011),
+  and the engine logs each wait's answer and each stream's end under `droidtop.EngineApi`.
   **The libpod API (built 2026-10-16, Droidtop/tracker#555 D15, first slice: reads).** Podman's clients talk to
   Podman's own API, libpod, so droidtop serves it too: on `podman.sock` beside `docker.sock`, which every container
   sees as `/run/droidtop-app-storage/podman.sock` and `CONTAINER_HOST` names in its environment. A podman a container
@@ -2812,7 +2822,10 @@ the `ContainerRuntime` interface that already exists (§3):
   Podman's own remote clients, 5.2.5 and 4.9.5: `pod create` (with `--name`, `--label`, `-p 8080:8080`), `pod start`,
   `stop`, `restart`, `kill`, `rm -f`, `network create`, `network rm`, `network connect --alias`, `network
   disconnect`, and the refusals for `pod create -p 8080:80`, `pod create --memory`, `pod kill -s HUP`, `network
-  create --internal`, `--subnet` and `-d macvlan`. Podman 5's `pod start` and `pod stop` print an empty line where
+  create --internal`, `--subnet` and `-d macvlan`. droidtop's own `docker` and `podman` fronts have `network create
+  NAME`, `network ls [-q]` and `network rm NAME...` too (built 2026-10-16, rig, build 2011: they refused `network`
+  as having "no Podman service" while the API had it), on the same networks through the same actions and lock as the
+  API (`EngineActions.createNetwork`, `removeNetwork`): one mechanism. Podman 5's `pod start` and `pod stop` print an empty line where
   Podman 4 prints the pod's id: the 5.x client prints a field its own service never sends either.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the

@@ -74,12 +74,29 @@ class DockerApiTest {
     }
 
     @Test
+    fun `a wait before the start waits for the run, as docker run asks`() {
+        assertEquals(DockerApi.WaitPlan.OVER, DockerApi.waitPlan("not-running", running = true))
+        assertEquals(DockerApi.WaitPlan.OVER, DockerApi.waitPlan("next-exit", running = true))
+        assertEquals(DockerApi.WaitPlan.NOW, DockerApi.waitPlan("not-running", running = false))
+        // The CLI asks next-exit (removed with --rm) before it starts the container: that waits for the start.
+        assertEquals(DockerApi.WaitPlan.RUN, DockerApi.waitPlan("next-exit", running = false))
+        assertEquals(DockerApi.WaitPlan.RUN, DockerApi.waitPlan("removed", running = false))
+    }
+
+    @Test
     fun `version, info, containers and images are in Docker's shape`() {
         assertEquals("arm64", DockerApi.arch("aarch64"))
         assertEquals("amd64", DockerApi.arch("x86_64"))
         val version = DockerApi.version("arm64", "5.10.0")
         assertTrue(version.contains("\"ApiVersion\":\"1.43\""))
         assertTrue(version.contains("\"Arch\":\"arm64\""))
+        // Every field Docker's own reply has, top level and in the Engine component (whose Details are all strings).
+        val parsed = kotlinx.serialization.json.Json.parseToJsonElement(version) as kotlinx.serialization.json.JsonObject
+        for (key in listOf("Platform", "Components", "Version", "ApiVersion", "MinAPIVersion", "GitCommit", "GoVersion", "Os", "Arch", "KernelVersion", "Experimental")) {
+            assertTrue("version has $key", key in parsed)
+        }
+        val details = ((parsed["Components"] as kotlinx.serialization.json.JsonArray)[0] as kotlinx.serialization.json.JsonObject)["Details"] as kotlinx.serialization.json.JsonObject
+        assertTrue(details.values.all { (it as kotlinx.serialization.json.JsonPrimitive).isString })
         val none = EngineFeatures("b", EngineFeature.entries.associateWith { FeatureState(kernel = false) })
         val info = DockerApi.info(DockerApi.InfoFacts(3, 1, 2, "arm64", "5.10.0", 8, 8_000_000_000, none))
         assertTrue(info.contains("\"ContainersStopped\":2"))

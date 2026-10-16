@@ -62,6 +62,36 @@ internal object ContainerPrograms {
 
     fun isRunning(containerId: String): Boolean = jobs[containerId]?.isActive == true
 
+    /** Running, or about to run again (a restart waiting): not over yet. */
+    fun busy(containerId: String): Boolean =
+        isRunning(containerId) || state(containerId).let { it is State.Running || it is State.Waiting }
+
+    /**
+     * Whether [containerId]'s program has run since [before] (its state then) was read: seen running, or its state
+     * turned to over since. A quick program can do both between two looks, so the state's change is what tells.
+     */
+    fun ranSince(containerId: String, before: State): Boolean =
+        isRunning(containerId) || state(containerId).let { it !== before && (it is State.Ended || it is State.Failed) }
+
+    /** Waits while [containerId]'s program is [busy]. */
+    suspend fun awaitOver(containerId: String) {
+        while (busy(containerId)) delay(LOOK_MS)
+    }
+
+    /**
+     * Waits for a program that has not started yet to start, within [startWithinMs], and then to end: the one rule for
+     * `wait` before a start, attach's `--rm` removal, and `--rm`. False when it never started in that time.
+     */
+    suspend fun awaitRun(containerId: String, before: State, startWithinMs: Long): Boolean {
+        val until = System.currentTimeMillis() + startWithinMs
+        while (!ranSince(containerId, before) && System.currentTimeMillis() < until) delay(LOOK_MS)
+        if (!ranSince(containerId, before)) return false
+        awaitOver(containerId)
+        return true
+    }
+
+    private const val LOOK_MS = 250L
+
     /**
      * Starts [container]'s program from its kept image config, unless it is running. Does nothing for a container
      * whose image names no program. Restarts after a failure when the container's setting says so, waiting longer

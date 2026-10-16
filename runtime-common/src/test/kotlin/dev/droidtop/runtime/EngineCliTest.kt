@@ -380,4 +380,29 @@ class EngineCliTest {
         assertTrue(bare.contains("\"Cmd\":null"))
         assertTrue(EngineInspect.format(listOf(facts), EngineCli.Front.DOCKER).startsWith("[\n"))
     }
+
+    @Test
+    fun `network create, ls and rm are the engine's own networks on both fronts`() {
+        for (cli in listOf(EngineCli.DOCKER, EngineCli.PODMAN)) {
+            assertEquals(EngineRequest.NetworkCreate("n1"), cli.parse(listOf("network", "create", "n1")))
+            assertEquals(EngineRequest.NetworkCreate("n1"), cli.parse(listOf("network", "create", "--driver", "bridge", "n1")))
+            assertTrue((cli.parse(listOf("network", "create", "-d", "macvlan", "n1")) as EngineRequest.Answer).text.contains("not built"))
+            assertTrue((cli.parse(listOf("network", "create")) as EngineRequest.Answer).text.contains("name the network"))
+            assertEquals(EngineRequest.NetworkList(quiet = false), cli.parse(listOf("network", "ls")))
+            assertEquals(EngineRequest.NetworkList(quiet = true), cli.parse(listOf("network", "list", "-q")))
+            assertEquals(EngineRequest.NetworkRemove(listOf("n1", "n2")), cli.parse(listOf("network", "rm", "n1", "n2")))
+            assertEquals(1, (cli.parse(listOf("network", "rm")) as EngineRequest.Answer).code)
+        }
+    }
+
+    @Test
+    fun `networks are listed as each tool lists them`() {
+        val nets = listOf(Network("0123456789abcdef", "bridge", 0L), Network("fedcba9876543210", "n1", 1L))
+        val docker = EngineCli.DOCKER.formatNetworks(nets, quiet = false)
+        assertTrue(docker.lines().first().startsWith("NETWORK ID"))
+        assertTrue(docker.lines().first().contains("SCOPE"))
+        assertTrue(docker.contains("fedcba987654"))
+        assertTrue(!EngineCli.PODMAN.formatNetworks(nets, quiet = false).lines().first().contains("SCOPE"))
+        assertEquals("0123456789ab\nfedcba987654\n", EngineCli.PODMAN.formatNetworks(nets, quiet = true))
+    }
 }
