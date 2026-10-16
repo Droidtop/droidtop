@@ -2,33 +2,47 @@ package app.murinelauncher.theme
 
 import android.content.Context
 import android.content.res.Configuration
+import android.content.SharedPreferences
 import android.content.res.Resources
-import app.murinelauncher.settings.SettingsGeneralFragment
+import app.murinelauncher.icons.IconPackManager
 import androidx.appcompat.app.AppCompatDelegate
-import com.android.launcher3.LauncherFiles
-import com.android.launcher3.Utilities
+import com.android.launcher3.LauncherAppState
+import dev.droidtop.library.settings.AppearancePrefs
+import dev.droidtop.library.settings.CatalogPrefs
 
+/**
+ * Light or dark for the launcher. droidtop patch: the choice is droidtop's one Appearance setting
+ * ([AppearancePrefs], Settings > Appearance; docs/SPEC.md 7k, Droidtop/tracker#560), not Murine's own "UI theme"
+ * preference, which is gone: two settings for one job let the home screen disagree with every other droidtop screen.
+ */
 object ThemeOverride {
     const val THEME_SYSTEM = 0
     const val THEME_LIGHT = 1
     const val THEME_DARK = 2
 
+    @JvmStatic
+    fun getThemePref(context: Context): Int = when (AppearancePrefs.choice(context)) {
+        AppearancePrefs.LIGHT -> THEME_LIGHT
+        AppearancePrefs.DARK -> THEME_DARK
+        else -> THEME_SYSTEM
+    }
+
+    /** Held so the registration lives as long as the process (SharedPreferences keeps listeners weakly). */
+    private var appearanceWatch: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     /**
-     * The default theme used for older SDKs that do not support system-wide dark theme.
+     * Follows a change of Appearance from any droidtop screen: the night mode is set again and, with an icon pack
+     * in use, icons are reloaded so the pack's day or night set shows. Open launcher activities see themselves
+     * stale on their next start and recreate ([isThemeStale]).
      */
-    const val DEFAULT_THEME_LEGACY = THEME_DARK
-
     @JvmStatic
-    val supportsSystemTheme: Boolean get() = Utilities.ATLEAST_Q
-
-    @JvmStatic
-    val defaultTheme: Int get() = if (supportsSystemTheme) THEME_SYSTEM else DEFAULT_THEME_LEGACY
-
-    @JvmStatic
-    fun getThemePref(context: Context): Int {
-        val prefs = context.getSharedPreferences(LauncherFiles.SHARED_PREFERENCES_KEY, Context.MODE_PRIVATE)
-        return prefs.getInt(SettingsGeneralFragment.LAUNCHER_THEME_DAY_NIGHT, defaultTheme)
+    fun watchAppearance(context: Context) {
+        val app = context.applicationContext
+        appearanceWatch = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key != AppearancePrefs.KEY_APPEARANCE) return@OnSharedPreferenceChangeListener
+            syncNightMode(app)
+            if (IconPackManager.isAnyPackActive(app)) LauncherAppState.getInstance(app).model.forceReload()
+        }.also { CatalogPrefs.prefs(app).registerOnSharedPreferenceChangeListener(it) }
     }
 
     @JvmStatic

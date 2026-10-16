@@ -687,6 +687,21 @@ internal fun PcGamesSection(
     fun openPage(entry: LibraryEntry) {
         if (entry.inPcFold) state.pageId = entry.id else otherMenu = entry
     }
+    // Home's destination row: a library's menu, or Random game, which opens a game's page (a PC game) or its
+    // options (a Retro game or a game app), so Play is one press from there. The pick is from every game Home
+    // holds, PC, Retro and game apps, hidden ones left out (Droidtop/tracker#507).
+    fun openDestination(index: Int) {
+        state.destIndex = index
+        val destination = HOME_DESTINATIONS.getOrNull(index) ?: return
+        destination.section?.let { onOpenSection(it); return }
+        val pick = HomeModel.randomGame(games.orEmpty() + retro + others)
+        if (pick == null) {
+            EsDeNavigationSounds.play(UiSound.BUMP)
+        } else {
+            EsDeNavigationSounds.play(UiSound.CONFIRM)
+            openPage(pick)
+        }
+    }
 
     // A strip card's one verb (docs/SPEC.md 7i, "Home"): a game update opens the game's page, an addition the
     // place it went to, plugin updates Plugins, the attention card its page, a friend the chat, a download
@@ -764,7 +779,7 @@ internal fun PcGamesSection(
     // Home is the root: B does nothing there (Overview goes back to it).
     val storesScreen = remember { SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
     val knownEmpty = games?.isEmpty() == true
-    val showingSetup = (state.setupOpen || knownEmpty) && storesScreen != null
+    val showingSetup = state.setupOpen && storesScreen != null
     val canGoBack = state.setupOpen || state.view != PcView.HOME
     LaunchedEffect(canGoBack) {
         // The shell's one footer draws this tab's hints too: the focused
@@ -786,6 +801,17 @@ internal fun PcGamesSection(
         // on instead of nothing (docs/SPEC.md 7i). CatalogNavigator owns
         // its own B; at its root that leaves the level.
         CatalogNavigator(root = storesScreen!!, onExit = { state.setupOpen = false })
+        return
+    }
+    // Home also shows the Retro library and the launcher apps: it is empty only when they are too.
+    if (knownEmpty && (!state.home || (retro.isEmpty() && apps.isEmpty()))) {
+        // An empty library is its own place's empty state, with PC setup ("Game sources") as its button, rather than
+        // opening on PC setup as if the person had chosen it (Droidtop/tracker#533).
+        dev.droidtop.shell.gamepad.EmptyLibrary(
+            line = if (state.home) "No games yet" else "No PC games yet",
+            actionLabel = "Game sources",
+            onAction = { state.setupOpen = true },
+        )
         return
     }
 
@@ -1026,7 +1052,7 @@ internal fun PcGamesSection(
                         GamepadAction.A -> {
                             if (onHomeStrip) homeTab?.cards?.getOrNull(state.homeCard)?.let(::openCard)
                             else if (state.onShelves && state.headingFocused) currentShelf?.let(::openShelf)
-                            else if (onDest) HOME_DESTINATIONS.getOrNull(state.destIndex)?.let { onOpenSection(it.section) }
+                            else if (onDest) openDestination(state.destIndex)
                             else if (state.stripFocused) activateChip(state.stripIndex)
                             else if (onFreeRow) toggleFree()
                             else if (focusedTile != null) state.showGrid(focusedTile.query)
@@ -1118,10 +1144,7 @@ internal fun PcGamesSection(
                     } else {
                         null
                     },
-                    onOpenSection = { index ->
-                        state.destIndex = index
-                        onOpenSection(HOME_DESTINATIONS[index].section)
-                    },
+                    onOpenSection = ::openDestination,
                     columnState = columnState,
                     rowState = ::rowState,
                     onTapCapsule = { shelf, item, entry ->
@@ -1773,13 +1796,17 @@ internal fun needsAttentionScreen(items: List<AttentionItem>): dev.droidtop.libr
         },
     )
 
-/** A tile on Home's destination row: where it goes and what it is called. */
-internal class HomeDestination(val section: GamingSection, val label: String)
+/** A tile on Home's destination row: where it goes ([section]; null for Random game) and what it is called. */
+internal class HomeDestination(val section: GamingSection?, val label: String)
 
-/** Home's destination row: the Retro and PC game menus, in the left menu's order. */
+/**
+ * Home's destination row: the Retro and PC game menus, in the left menu's order, then Random game
+ * (Droidtop/tracker#507), which opens one game picked at random from everything Home holds.
+ */
 internal val HOME_DESTINATIONS = listOf(
     HomeDestination(GamingSection.GAMES, "Retro Games"),
     HomeDestination(GamingSection.PC_GAMES, "PC Games"),
+    HomeDestination(null, "Random game"),
 )
 
 /**

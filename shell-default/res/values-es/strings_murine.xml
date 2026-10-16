@@ -24,7 +24,6 @@
     <string name="pref_subcategory_day_night">Tema de la interfaz</string>
     <string name="pref_subcategory_layout">Diseño</string>
     <string name="pref_subcategory_appearance">Apariencia</string>
-    <string name="pref_subcategory_persistency">Persistencia</string>
     <string name="pref_subcategory_gestures">Gestos</string>
     <string name="pref_subcategory_options">Opciones</string>
     <string name="pref_subcategory_backup">Copia de seguridad</string>
@@ -36,9 +35,6 @@
     <string name="backup_import_desc">Restaurar diseño y ajustes guardados</string>
     <string name="backup_import_confirm">Esto reiniciará el launcher y restaurará tu configuración</string>
 
-    <string name="pref_label_ui_mode_system">Sistema</string>
-    <string name="pref_label_ui_mode_day">Claro</string>
-    <string name="pref_label_ui_mode_night">Oscuro</string>
     <string name="pref_label_grid_width">Ancho de la cuadrícula</string>
     <string name="pref_label_grid_height">Alto de la cuadrícula</string>
     <string name="pref_label_icon_size">Tamaño del icono (%)</string>
@@ -46,7 +42,16 @@
 
     <string name="pref_label_visibility_title">Visibilidad de etiquetas</string>
     <string name="label_visibility_never">Nunca</string>
+    <string name="label_visibility_drawer_only">Solo cajón</string>
+    <string name="label_visibility_home_only">Solo inicio</string>
     <string name="label_visibility_auto">Automático</string>
+    <string name="pref_adaptive_icons_title">Iconos adaptativos</string>
+    <string name="pref_adaptive_icons_summary">Remodela los iconos que no son adaptativos</string>
+    <string name="pref_adaptive_icons_except_system">Excepto aplicaciones del sistema</string>
+    <string name="pref_adaptive_icons_force_legacy">Forzar iconos legacy</string>
+    <string name="pref_adaptive_icons_never">No remodelar</string>
+    <string name="pref_themed_icons_title">Iconos monocromos</string>
+    <string name="pref_themed_icons_summary">Recolorea los iconos según el tema del sistema</string>
     <string name="label_visibility_always">Siempre</string>
 
     <string name="pref_icon_shape_title">Forma del icono</string>
@@ -65,9 +70,13 @@
 
     <string name="pref_drawer_grid_width_override_title">Ancho de cuadrícula personalizado</string>
     <string name="pref_drawer_grid_width_override_summary">Usar un número personalizado de columnas en el cajón de aplicaciones</string>
+    <string name="pref_drawer_padding_title">Espaciado lateral</string>
 
     <string name="pref_blur_preview_title">Vista previa del modo desenfoque</string>
     <string name="pref_blur_preview_desc">Desenfocar el fondo mientras se arrastran iconos y widgets</string>
+
+    <string name="pref_lock_home_screen_title">Bloquear pantalla de inicio</string>
+    <string name="pref_lock_home_screen_summary">Impide mover iconos y widgets</string>
 
     <!-- Murine search bar -->
     <string name="murine_search_hint">Buscar…</string>
@@ -83,18 +92,8 @@
     <string name="pref_qsb_search_provider_title">Proveedor de búsqueda</string>
     <string name="pref_qsb_enable_lens_title">Activar Lens</string>
     <string name="pref_qsb_enable_lens_summary">Mostrar el botón de Google Lens en la búsqueda rápida</string>
-    <string name="pref_qsb_box_blur">Desenfoque de la burbuja de búsqueda</string>
-    <string name="pref_qsb_box_blur_desc">Mostrar efecto MICA en la burbuja de búsqueda</string>
     <string name="pref_qsb_bar_alpha">Transparencia de la barra de búsqueda</string>
-    <string name="pref_qsb_box_alpha">Transparencia de la burbuja de búsqueda</string>
     <string name="pref_qsb_custom_provider_title">URL de búsqueda personalizada</string>
-    <string name="pref_qsb_history_size_title">Tamaño del historial de búsqueda</string>
-    <string name="pref_qsb_history_size_summary">Número máximo de entradas</string>
-    <string name="pref_qsb_clear_history_title">Borrar historial de búsqueda</string>
-    <string name="pref_qsb_clear_history_summary">Eliminar todas las búsquedas guardadas</string>
-    <string name="pref_qsb_clear_history_confirm_title">¿Borrar historial de búsqueda?</string>
-    <string name="pref_qsb_clear_history_confirm_message">Esto eliminará permanentemente todas las búsquedas guardadas.</string>
-    <string name="pref_qsb_clear_history_toast">Historial de búsqueda borrado</string>
 
     <!-- Murine smartspace / clock widget -->
     <string name="smartspace_mode_clock">Reloj</string>

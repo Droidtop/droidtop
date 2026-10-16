@@ -27,9 +27,69 @@ object ContainerProgram {
     /** After this many failures in a row, each sooner than [RAN_LONG_ENOUGH_MS], it is left stopped and says so. */
     const val MAX_FAILURES_IN_A_ROW = 5
 
-    /** Whether to start the program again after it ended with [exitCode], [failuresInARow] quick failures so far. */
-    fun restarts(restartOnFailure: Boolean, exitCode: Int, failuresInARow: Int): Boolean =
-        restartOnFailure && exitCode != 0 && failuresInARow < MAX_FAILURES_IN_A_ROW
+    /**
+     * Whether to start the program again after it ended with [exitCode], [failuresInARow] quick failures so far, under
+     * [policy]. Every policy gives up after [MAX_FAILURES_IN_A_ROW] quick exits in a row (or the count `on-failure:N`
+     * names), clean ones too for `always`: a program that exits at once would otherwise restart for ever.
+     */
+    fun restarts(policy: RestartPolicy, exitCode: Int, failuresInARow: Int): Boolean = when (policy) {
+        RestartPolicy.No -> false
+        is RestartPolicy.OnFailure -> exitCode != 0 && failuresInARow < (policy.maxRetries ?: MAX_FAILURES_IN_A_ROW)
+        RestartPolicy.Always, RestartPolicy.UnlessStopped -> failuresInARow < MAX_FAILURES_IN_A_ROW
+    }
+
+    /**
+     * When a container's own program is started again (docs/SPEC.md 3d, "Restart policies"; Droidtop/tracker#555 D12):
+     * Docker's and Podman's `--restart` words, and the page's "Restart when it fails" ([OnFailure] on, [No] off). The
+     * one setting the program runner reads.
+     */
+    sealed interface RestartPolicy {
+        /** Never started again. `docker run`'s and `podman run`'s default. */
+        data object No : RestartPolicy
+
+        /** Started again after a failing exit, up to [maxRetries] quick failures in a row (droidtop's cap when null). */
+        data class OnFailure(val maxRetries: Int? = null) : RestartPolicy
+
+        /** Started again after any exit, and with the desktop. */
+        data object Always : RestartPolicy
+
+        /** As [Always], except that a program the person stopped stays stopped when the desktop starts again. */
+        data object UnlessStopped : RestartPolicy
+
+        /** The policy in Docker's words: `no`, `on-failure`, `on-failure:3`, `always`, `unless-stopped`. */
+        fun words(): String = when (this) {
+            No -> "no"
+            is OnFailure -> if (maxRetries == null) "on-failure" else "on-failure:$maxRetries"
+            Always -> "always"
+            UnlessStopped -> "unless-stopped"
+        }
+
+        /** Whether the program starts with the desktop under this policy. */
+        val withDesktop: Boolean get() = this == Always || this == UnlessStopped
+
+        companion object {
+            /** droidtop's own default for a container made on its page: a server is expected to stay up. */
+            val PAGE_DEFAULT: RestartPolicy = OnFailure()
+
+            /** [words] read back, or null for anything else. Pure. */
+            fun parse(words: String): RestartPolicy? = when {
+                words == "no" -> No
+                words == "always" -> Always
+                words == "unless-stopped" -> UnlessStopped
+                words == "on-failure" -> OnFailure()
+                words.startsWith("on-failure:") -> words.substringAfter(':').toIntOrNull()?.takeIf { it in 0..1000 }?.let { OnFailure(it) }
+                else -> null
+            }
+
+            /** What is stored for a container: these words, or the page's old true and false. Pure. */
+            fun stored(value: String?): RestartPolicy = when (value) {
+                null -> PAGE_DEFAULT
+                "true" -> OnFailure()
+                "false" -> No
+                else -> parse(value) ?: PAGE_DEFAULT
+            }
+        }
+    }
 
     fun hostLogFile(appStorageDir: File, containerId: String): File = File(File(appStorageDir, LOG_DIR_NAME), "$containerId.log")
 
@@ -38,13 +98,19 @@ object ContainerProgram {
      * its entrypoint, as Docker does) and [env] (`NAME=VALUE`) is added after the image's own, so it wins. Kept beside
      * the container's log, so the page's Start it and the start with the desktop run the same program as the command.
      */
-    data class RunOverrides(val args: List<String>? = null, val env: List<String> = emptyList()) {
+    data class RunOverrides(
+        val args: List<String>? = null,
+        val env: List<String> = emptyList(),
+        /** The labels it was made with (`--label`, the Engine API's `Labels`): what `docker compose` finds it by. */
+        val labels: Map<String, String> = emptyMap(),
+    ) {
         /** [config] as this container runs it. Pure. */
         fun applyTo(config: ImageRunConfig): ImageRunConfig = config.copy(cmd = args ?: config.cmd, env = config.env + env)
 
         fun encode(): String = kotlinx.serialization.json.buildJsonObject {
             args?.let { a -> put("args", kotlinx.serialization.json.JsonArray(a.map { kotlinx.serialization.json.JsonPrimitive(it) })) }
             put("env", kotlinx.serialization.json.JsonArray(env.map { kotlinx.serialization.json.JsonPrimitive(it) }))
+            if (labels.isNotEmpty()) put("labels", kotlinx.serialization.json.JsonObject(labels.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
         }.toString()
 
         companion object {
@@ -52,7 +118,9 @@ object ContainerProgram {
                 val o = kotlinx.serialization.json.Json.parseToJsonElement(text) as kotlinx.serialization.json.JsonObject
                 fun list(key: String) = (o[key] as? kotlinx.serialization.json.JsonArray)
                     ?.map { (it as kotlinx.serialization.json.JsonPrimitive).content }
-                RunOverrides(list("args"), list("env").orEmpty())
+                val labels = (o["labels"] as? kotlinx.serialization.json.JsonObject)
+                    ?.mapValues { (it.value as kotlinx.serialization.json.JsonPrimitive).content }.orEmpty()
+                RunOverrides(list("args"), list("env").orEmpty(), labels)
             }.getOrNull()
         }
     }

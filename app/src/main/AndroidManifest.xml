@@ -225,6 +225,41 @@
           app's widget. Not exported beyond the widget-host contract,
           same shape as ContinuePlayingWidgetProvider above.
         -->
+        <!--
+          The Library search and Quick launch widgets (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563),
+          drawn by DroidtopWidgets like the two above. Quick launch's configure activity picks its game; a launcher
+          starts it for the widget it is placing, so it is exported with the configure action only.
+        -->
+        <receiver
+            android:name="dev.droidtop.app.LibrarySearchWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_search_info" />
+        </receiver>
+        <receiver
+            android:name="dev.droidtop.app.QuickLaunchWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_launch_info" />
+        </receiver>
+        <activity
+            android:name="dev.droidtop.app.QuickLaunchConfigureActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name="dev.droidtop.app.PluginStatusWidgetProvider"
             android:exported="false">
@@ -403,6 +438,17 @@
           by the action below (the launcher module cannot name this class).
           Translucent, so the drawer shows behind it. Not exported.
         -->
+        <!--
+          The Quick Menu over Standard's home screen, opened by a home-screen gesture
+          (QuickMenuActivity; docs/SPEC.md, Launcher mode "Gestures").
+        -->
+        <activity
+            android:name="dev.droidtop.app.QuickMenuActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name="dev.droidtop.app.LauncherSearchActivity"
             android:exported="false"

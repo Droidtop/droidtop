@@ -491,10 +491,10 @@ object ContainersCatalog {
                 confirmTitle = if (running) "Stop ${info.displayName}'s program?" else null,
                 run = { ctx, _ ->
                     if (running) {
-                        ContainerPrograms.stop(container.id)
+                        ContainerPrograms.stoppedByPerson(ctx, container.id)
                         "Stopped."
                     } else {
-                        ContainerPrograms.start(ctx, runtime, container)
+                        ContainerPrograms.startedByPerson(ctx, runtime, container)
                         "Started; its output is in the log below."
                     }
                 },
@@ -505,8 +505,12 @@ object ContainersCatalog {
                 id = "container_program_restart",
                 title = "Restart when it fails",
                 subtitle = "Waits longer after each quick failure, and stops trying after ${ContainerProgram.MAX_FAILURES_IN_A_ROW}",
-                current = withContext(Dispatchers.IO) { ContainerPrograms.restartOnFailure(app, container.id) },
-                onToggle = { _, on -> withContext(Dispatchers.IO) { ContainerPrograms.setRestartOnFailure(app, container.id, on) } },
+                current = withContext(Dispatchers.IO) { ContainerPrograms.restartPolicy(app, container.id) != ContainerProgram.RestartPolicy.No },
+                onToggle = { _, on ->
+                    withContext(Dispatchers.IO) {
+                        ContainerPrograms.setRestartPolicy(app, container.id, if (on) ContainerProgram.RestartPolicy.OnFailure() else ContainerProgram.RestartPolicy.No)
+                    }
+                },
             ),
         )
         add(
@@ -1126,7 +1130,8 @@ object ContainersCatalog {
                                 run = { ctx, onStatus ->
                                     onStatus("Downloading ${repo.repository.substringAfterLast('/')}:$tag...")
                                     val image = CraneImageCatalogResolver(ctx).resolve(repo, tag).toRootfsImage()
-                                    runtime.createSibling(image, name)
+                                    val created = runtime.createSibling(image, name)
+                                    ContainerPrograms.recordCreated(ctx, created.id)
                                     "Created \"$name\". It is in Containers."
                                 },
                             ),
@@ -1174,9 +1179,10 @@ object ContainersCatalog {
                                 id = "create_go",
                                 title = "Create",
                                 subtitle = "Downloads $reference and makes \"$name\"",
-                                run = { _, onStatus ->
+                                run = { ctx, onStatus ->
                                     onStatus("Downloading $reference...")
-                                    runtime.createSibling(RootfsImage(reference = reference), name)
+                                    val created = runtime.createSibling(RootfsImage(reference = reference), name)
+                                    ContainerPrograms.recordCreated(ctx, created.id)
                                     "Created \"$name\". It is in Containers."
                                 },
                             ),

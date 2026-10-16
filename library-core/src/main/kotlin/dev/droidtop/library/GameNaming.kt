@@ -50,6 +50,16 @@ object GameNaming {
      */
     private val GLUED_VERSION = Regex("""^(.*[a-z])V(\d+(?:\.\d+)+[a-zA-Z]?)$""")
 
+    /**
+     * A version written straight after a character no English word goes on through: punctuation or a letter of
+     * another script, `新生活は妹ちゃんと!ver1.8`, `タイトルv1.02` (Droidtop/tracker#174, rig 2026-10-14). `ver` or
+     * `version` takes any number; a bare `v` only a dotted one. After a Latin letter it stays the title's
+     * (`Forever1.0`): there `ver` may be the end of a word.
+     */
+    private val VERSION_AFTER_SYMBOL = Regex(
+        """^(.*[^A-Za-z0-9\s\-_.])(?:(?i:ver(?:sion)?)\.?(\d+(?:[._]\d+)*[a-zA-Z]?)|[vV](\d+(?:[._]\d+)+[a-zA-Z]?))$""",
+    )
+
     /** A leaf that is a dotted version and nothing else: `10.0-sancho`. */
     private val BARE_VERSION_LEAF = Regex("""^\d+\.\d""")
 
@@ -291,6 +301,9 @@ object GameNaming {
         val match = NAME_VERSION.find(leaf)
             ?: return trailingSegment(
                 GLUED_VERSION.find(leaf)?.let { Derived(it.groupValues[1], it.groupValues[2], emptyList(), null) }
+                    ?: VERSION_AFTER_SYMBOL.find(leaf)?.let {
+                        Derived(it.groupValues[1], it.groupValues[2].ifEmpty { it.groupValues[3] }.replace('_', '.'), emptyList(), null)
+                    }
                     ?: Derived(leaf, "", emptyList(), null),
             )
         val name = match.groupValues[1].trim(' ', '-', '_').ifEmpty { leaf }

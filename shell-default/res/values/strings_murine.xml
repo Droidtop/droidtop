@@ -32,7 +32,6 @@
     <string name="pref_subcategory_day_night">UI theme</string>
     <string name="pref_subcategory_layout">Layout</string>
     <string name="pref_subcategory_appearance">Appearance</string>
-    <string name="pref_subcategory_persistency">Persistency</string>
     <string name="pref_subcategory_gestures">Gestures</string>
     <string name="pref_subcategory_options">Options</string>
     <string name="pref_subcategory_backup">Backup</string>
@@ -44,9 +43,6 @@
     <string name="backup_import_desc">Restore saved layout and settings</string>
     <string name="backup_import_confirm">This will restart the launcher and restore your configuration</string>
 
-    <string name="pref_label_ui_mode_system">System</string>
-    <string name="pref_label_ui_mode_day">Light</string>
-    <string name="pref_label_ui_mode_night">Dark</string>
     <string name="pref_label_grid_width">Grid width</string>
     <string name="pref_label_grid_height">Grid height</string>
     <string name="pref_label_icon_size">Icon size (%)</string>
@@ -54,7 +50,16 @@
 
     <string name="pref_label_visibility_title">Labels visibility</string>
     <string name="label_visibility_never">Never</string>
+    <string name="label_visibility_drawer_only">Drawer only</string>
+    <string name="label_visibility_home_only">Home only</string>
     <string name="label_visibility_auto">Auto</string>
+    <string name="pref_adaptive_icons_title">Adaptive icons</string>
+    <string name="pref_adaptive_icons_summary">Reshape icons that are not adaptive</string>
+    <string name="pref_adaptive_icons_except_system">Except system apps</string>
+    <string name="pref_adaptive_icons_force_legacy">Force legacy icons</string>
+    <string name="pref_adaptive_icons_never">Never reshape</string>
+    <string name="pref_themed_icons_title">Monochrome icons</string>
+    <string name="pref_themed_icons_summary">Recolor icons to match the system theme</string>
     <string name="label_visibility_always">Always</string>
 
     <string name="pref_icon_shape_title">Icon shape</string>
@@ -73,12 +78,27 @@
 
     <string name="pref_drawer_grid_width_override_title">Override grid width</string>
     <string name="pref_drawer_grid_width_override_summary">Use a custom number of columns in the app drawer</string>
+    <string name="pref_drawer_padding_title">Side padding</string>
+    <string name="pref_dock_icons_override_title">Dock size of its own</string>
+    <string name="pref_dock_icons_override_summary">How many icons the dock holds, apart from the grid\'s width</string>
+    <string name="pref_label_dock_icons">Dock icons</string>
+    <string name="pref_drawer_sort_title">Order</string>
+    <string name="drawer_sort_alphabetical">Alphabetical</string>
+    <string name="drawer_sort_most_used">Most used first</string>
 
     <string name="pref_blur_preview_title">Blur preview mode</string>
     <string name="pref_blur_preview_desc">Blur wallpaper while dragging icons and widgets</string>
 
+    <string name="pref_lock_home_screen_title">Lock home screen</string>
+    <string name="pref_lock_home_screen_summary">Prevent moving icons and widgets</string>
+
     <string name="pref_double_tap_action_title">Double tap</string>
     <string name="pref_swipe_down_action_title">Swipe down</string>
+    <string name="pref_two_finger_down_action_title">Two-finger swipe down</string>
+    <string name="pref_two_finger_up_action_title">Two-finger swipe up</string>
+    <string name="pref_pinch_in_action_title">Pinch in</string>
+    <string name="pref_pinch_out_action_title">Pinch out</string>
+    <string name="pref_home_button_action_title">Home button on the first page</string>
 
     <string name="pref_accessibility_disclosure_desc">droidtop needs accessibility access to lock the screen and open recent apps from gestures, and, on tablet-sized and external displays, to draw the taskbar.\n\nFor the taskbar it sees only the name of the app that comes to the front, never what is on screen, and it looks at key presses only to notice the Meta key or the Mode button, which move focus into the taskbar.\n\nNo data is collected, shared, or transmitted.</string>
     <string name="pref_taskbar_title">Taskbar on large screens</string>
@@ -98,6 +118,14 @@
     <string name="gesture_action_open_companion">Companion</string>
     <string name="gesture_action_open_companion_summary">Pulls down droidtop\'s companion: pinned controls, notifications, apps and more</string>
     <string name="droidtop_companion_option">Companion</string>
+    <string name="gesture_action_open_search">Search</string>
+    <string name="gesture_action_open_search_summary">Searches apps, your games and the download sources</string>
+    <string name="gesture_action_open_quick_menu">Quick Menu</string>
+    <string name="gesture_action_open_quick_menu_summary">Running apps, notifications, system, audio, display, downloads and plugins</string>
+    <string name="gesture_action_switch_mode">Switch mode</string>
+    <string name="gesture_action_switch_mode_summary">Opens the mode switcher</string>
+    <string name="gesture_action_open_games">Games</string>
+    <string name="gesture_action_open_games_summary">Opens your games</string>
     <string name="gesture_action_clear_all_apps_summary">Ends every open app except droidtop, after asking when there are several</string>
 
     <!-- Murine search bar -->
@@ -113,18 +141,8 @@
     <string name="pref_qsb_search_provider_title">Search provider</string>
     <string name="pref_qsb_enable_lens_title">Enable Lens</string>
     <string name="pref_qsb_enable_lens_summary">Show Google Lens button in quick search</string>
-    <string name="pref_qsb_box_blur">Blur search bubble</string>
-    <string name="pref_qsb_box_blur_desc">Show MICA effect for search bubble</string>
     <string name="pref_qsb_bar_alpha">Search bar alpha</string>
-    <string name="pref_qsb_box_alpha">Search bubble alpha</string>
     <string name="pref_qsb_custom_provider_title">Custom search URL</string>
-    <string name="pref_qsb_history_size_title">Search history size</string>
-    <string name="pref_qsb_history_size_summary">Maximum entries</string>
-    <string name="pref_qsb_clear_history_title">Clear search history</string>
-    <string name="pref_qsb_clear_history_summary">Remove all saved search queries</string>
-    <string name="pref_qsb_clear_history_confirm_title">Clear search history?</string>
-    <string name="pref_qsb_clear_history_confirm_message">This will permanently remove all saved search queries.</string>
-    <string name="pref_qsb_clear_history_toast">Search history cleared</string>
 
     <!-- Murine smartspace / clock widget -->
     <string name="smartspace_mode_clock">Clock</string>

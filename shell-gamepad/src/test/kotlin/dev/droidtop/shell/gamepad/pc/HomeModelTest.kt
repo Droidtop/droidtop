@@ -22,6 +22,15 @@ class HomeModelTest {
         HomeModel.added(entries, now, placeOf = { e -> e.systemId?.let { names[it] } ?: "PC Games" }, systemOf = { it.systemId })
 
     @Test
+    fun `random game picks from every game Home holds, never a hidden one, and nothing from none`() {
+        val pool = listOf(rom("/snes/a"), pc("/pc/b"), rom("/hidden", hidden = true), rom("/snes/a"))
+        val picked = (0 until 200).map { HomeModel.randomGame(pool, kotlin.random.Random(it))!!.id }.toSet()
+        assertEquals(setOf("/snes/a", "/pc/b"), picked)
+        assertEquals(null, HomeModel.randomGame(listOf(rom("/hidden", hidden = true))))
+        assertEquals(null, HomeModel.randomGame(emptyList()))
+    }
+
+    @Test
     fun `additions are grouped by place and scan and counted as the library counts`() {
         val cards = added(List(212) { rom("/snes/$it") } + rom("/hidden", hidden = true) + rom("/psx/one", system = "psx", added = now - 2 * day))
         val snes = cards.single { it.systemId == "snes" }

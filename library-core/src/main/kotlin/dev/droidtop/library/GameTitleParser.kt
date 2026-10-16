@@ -175,7 +175,7 @@ object GameTitleParser {
      * fix reached only folders that changed on disk (rig, build 1715: a run-together name stayed unsplit after
      * the run-together rule landed, Droidtop/tracker#282).
      */
-    const val RULES_VERSION = 2L
+    const val RULES_VERSION = 3L
 
     private val BRACKET = Regex("""[\[({]([^\[\]{}()]*)[\])}]""")
     private val SHORT_NUMBER = Regex("""\d{1,3}""")

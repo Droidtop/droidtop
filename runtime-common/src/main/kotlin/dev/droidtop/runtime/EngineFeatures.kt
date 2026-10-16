@@ -54,7 +54,7 @@ data class EngineFeatures(
 
 /**
  * The container options that need a kernel feature, and the one sentence each gets when droidtop cannot give it. One
- * table for every front (`docker`, later `podman` and the API daemons), so no option is refused differently in two
+ * table for every front (`docker` and `podman`, later the API daemons), so no option is refused differently in two
  * places and none is accepted and silently ignored. Pure.
  */
 object EngineOptions {
@@ -69,6 +69,9 @@ object EngineOptions {
         "--cpu-shares" to EngineFeature.CGROUPS,
         "--cpuset-cpus" to EngineFeature.CGROUPS,
         "--pids-limit" to EngineFeature.CGROUPS,
+        // -p on another number than the container's: remapping needs a network of the container's own (D13).
+        "-p" to EngineFeature.NETWORK_NAMESPACES,
+        "--publish" to EngineFeature.NETWORK_NAMESPACES,
         "--network" to EngineFeature.NETWORK_NAMESPACES,
         "--net" to EngineFeature.NETWORK_NAMESPACES,
         "--pid" to EngineFeature.PID_NAMESPACES,

@@ -6,17 +6,16 @@ import android.util.Log
 import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLauncher
-import dev.droidtop.runtime.ContainerNames
+import dev.droidtop.runtime.ContainerPods
 import dev.droidtop.runtime.ContainerProgram
-import dev.droidtop.runtime.ContainerRole
-import dev.droidtop.runtime.DockerCli
-import dev.droidtop.runtime.DockerCommand
+import dev.droidtop.runtime.EngineCli
+import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineFeatures
+import dev.droidtop.runtime.EngineIds
+import dev.droidtop.runtime.EngineInspect
 import dev.droidtop.runtime.EngineOptions
-import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.OciImageStore
-import dev.droidtop.runtime.RootfsImage
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -58,14 +57,14 @@ internal object ContainerEnterRequests {
             return
         }
         val cwd = runCatching { File(dir, "cwd").readText().trim() }.getOrNull()
-        if (token == DockerCli.TOKEN) {
+        EngineCli.forToken(token)?.let { cli ->
             // The device's kernel features (D10) only when the request needs them: probed once a boot, kept after.
             val features = if (args.firstOrNull() == "info" || (args.firstOrNull() == "run" && EngineOptions.mentioned(args))) {
                 EngineFeatureProbe.current(app)
             } else {
                 null
             }
-            docker(app, dir, DockerCli.parse(args, features), cwd, seenAt, writtenAt, features)
+            engine(app, dir, cli, cli.parse(args, features), cwd, seenAt, writtenAt, features)
             return
         }
         val command = ContainerEnter.forToken(ContainerEnter.read(app.filesDir), token)
@@ -122,168 +121,294 @@ internal object ContainerEnterRequests {
     }
 
     /**
-     * Answers a `docker` request (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c) from droidtop's own
+     * Answers a `docker` or `podman` request (docs/SPEC.md 3d "The docker command", Droidtop/tracker#555 D6c, D11) from droidtop's own
      * state: the containers, their programs and the image store. Containers are named by their name or their id.
      */
-    private suspend fun docker(
+    private suspend fun engine(
         app: Context,
         dir: File,
-        command: DockerCommand,
+        cli: EngineCli,
+        command: EngineRequest,
         cwd: String?,
         seenAt: Long,
         writtenAt: Long?,
         features: EngineFeatures?,
     ) {
-        if (command is DockerCommand.Answer) {
+        if (command is EngineRequest.Answer) {
             if (command.code == 0) answer(dir, command.text, "", 0) else answer(dir, "", command.text, command.code)
             return
         }
-        if (command is DockerCommand.Info) {
+        if (command is EngineRequest.Info) {
             val backend = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime?.backend
-            answer(dir, DockerCli.formatInfo(features ?: EngineFeatureProbe.current(app), backend), "", 0)
+            answer(dir, cli.formatInfo(features ?: EngineFeatureProbe.current(app), backend), "", 0)
             return
         }
         val runtime = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime ?: run {
-            refuse(dir, "docker: the desktop is not running", 125)
+            refuse(dir, "${cli.name}: the desktop is not running", 125)
             return
         }
         val containers = runCatching { runtime.listContainers() }.getOrElse {
-            refuse(dir, "docker: ${it.message ?: it.javaClass.simpleName}", 1)
+            refuse(dir, "${cli.name}: ${it.message ?: it.javaClass.simpleName}", 1)
             return
         }
-        fun find(name: String): ContainerInfo? = containers.firstOrNull { it.displayName == name } ?: containers.firstOrNull { it.container.id == name }
+        fun find(name: String): ContainerInfo? = EngineIds.find(containers, name)
         when (command) {
-            is DockerCommand.Ps -> {
+            is EngineRequest.Ps -> {
                 val rows = containers.map { info ->
                     val state = ContainerPrograms.state(info.container.id)
                     val programUp = ContainerPrograms.isRunning(info.container.id)
-                    DockerCli.PsRow(
+                    val config = runCatching { runtime.imageRunConfig(info.container) }.getOrNull()
+                        ?.let { ContainerProgram.effectiveConfig(app.filesDir, info.container.id, it) }
+                    EngineCli.PsRow(
+                        // The engine id's first twelve, as both tools print (docs/SPEC.md 3d, "Container ids").
+                        id = EngineIds.of(info.container.id).take(12),
                         name = info.displayName,
                         image = info.image ?: "",
-                        status = dockerStatus(state, programUp, info.running),
+                        status = EngineFacts.statusText(state, programUp, info.running),
                         up = programUp || (info.running && runtime.siblingsNeedStart),
-                        ports = runCatching { runtime.imageRunConfig(info.container)?.ports }.getOrNull().orEmpty(),
+                        ports = config?.ports.orEmpty(),
+                        command = config?.program().orEmpty(),
+                        createdMs = withContext(Dispatchers.IO) { ContainerPrograms.created(app, info.container.id) },
                     )
                 }
-                answer(dir, DockerCli.formatPs(rows, command), "", 0)
+                answer(dir, cli.formatPs(rows, command), "", 0)
             }
-            is DockerCommand.Images -> {
+            is EngineRequest.Images -> {
                 val images = runCatching { OciImageStore.of(app).entries() }.getOrElse {
-                    refuse(dir, "docker images: ${it.message ?: it.javaClass.simpleName}", 1)
+                    refuse(dir, "${cli.name} images: ${it.message ?: it.javaClass.simpleName}", 1)
                     return
                 }
-                answer(dir, DockerCli.formatImages(images, command), "", 0)
+                answer(dir, cli.formatImages(images, command), "", 0)
             }
-            is DockerCommand.Logs -> {
+            is EngineRequest.Logs -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
-                val lines = ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, info.container.id), command.tail)
-                answer(dir, lines.joinToString("") { it + "\n" }, "", 0)
+                answer(dir, EngineActions.logs(app, info, command.tail).joinToString("") { it + "\n" }, "", 0)
             }
-            is DockerCommand.Start, is DockerCommand.Stop -> {
-                val names = if (command is DockerCommand.Start) command.containers else (command as DockerCommand.Stop).containers
+            is EngineRequest.Start, is EngineRequest.Stop -> {
+                val names = if (command is EngineRequest.Start) command.containers else (command as EngineRequest.Stop).containers
                 val out = StringBuilder()
                 val err = StringBuilder()
                 for (name in names) {
                     val info = find(name)
                     when {
                         info == null -> err.append("Error: No such container: $name\n")
-                        command is DockerCommand.Stop -> {
-                            ContainerPrograms.stop(info.container.id)
+                        command is EngineRequest.Stop -> {
+                            EngineActions.stop(app, info)
                             out.append(name).append('\n')
                         }
-                        runCatching { runtime.imageRunConfig(info.container) }.getOrNull()?.program().isNullOrEmpty() ->
+                        !EngineActions.start(app, runtime, info) ->
                             err.append("Error: $name has no program of its own to start (its image names none)\n")
-                        else -> {
-                            ContainerPrograms.start(app, runtime, info.container)
-                            out.append(name).append('\n')
-                        }
+                        else -> out.append(name).append('\n')
                     }
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
             }
-            is DockerCommand.Exec -> {
+            is EngineRequest.Exec -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
-                enter(app, dir, Target(info.container.id, info.displayName, "docker exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
+                enter(app, dir, Target(info.container.id, info.displayName, "${cli.name} exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
             }
-            is DockerCommand.Pull -> {
-                val pulled = runCatching { OciImageStore.of(app).pull(RootfsImage(reference = command.image)) }
-                pulled.fold(
-                    onSuccess = { answer(dir, "${command.image}\nDigest: ${it.digest}\n", "", 0) },
-                    onFailure = { refuse(dir, "docker pull: ${it.message ?: it.javaClass.simpleName}", 1) },
+            is EngineRequest.Pull -> {
+                EngineActions.pull(app, command.image).fold(
+                    onSuccess = { answer(dir, "${command.image}\nDigest: $it\n", "", 0) },
+                    onFailure = { refuse(dir, "${cli.name} pull: ${it.message ?: it.javaClass.simpleName}", 1) },
                 )
             }
-            is DockerCommand.Run -> {
-                val names = containers.map { it.displayName }
-                val name = command.name ?: ContainerNames.defaultName(ContainerRole.SIBLING, command.image, names)
-                ContainerNames.problemWith(name, names)?.let { return refuse(dir, "docker run: $it", 1) }
-                // A volume is a folder the person already mapped in some container (D3), found by its name: never a
-                // path the container chose (the review's bound for the docker request kind).
-                val mapped = containers.flatMap { runCatching { runtime.mounts(it.container).folders }.getOrDefault(emptyList()) }
-                val folders = command.volumes.map { wanted ->
-                    mapped.firstOrNull { it.name == wanted }
-                        ?: return refuse(dir, "docker run: no mapped folder is called $wanted; map it on a container's page in Containers first", 1)
+            is EngineRequest.Run -> {
+                val verb = if (command.start) "run" else "create"
+                val made = EngineActions.make(app, runtime, containers, command).getOrElse {
+                    return refuse(dir, "${cli.name} $verb: ${it.message}", 1)
                 }
-                val created = runCatching { runtime.createSibling(RootfsImage(reference = command.image), name) }.getOrElse {
-                    return refuse(dir, "docker run: ${it.message ?: it.javaClass.simpleName}", 1)
+                // Both tools print the new container's id (D13); -p on a port's own number is what happens anyway.
+                val notes = made.notes.toMutableList()
+                if (command.start && !made.hasProgram) {
+                    notes += "${made.name}'s image names no program to run, so nothing was started; use ${cli.name} exec ${made.name} sh"
                 }
-                // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
-                runCatching {
-                    val current = runtime.mounts(created)
-                    runtime.setMounts(created, current.copy(home = HomeChoice.Private, folders = (current.folders + folders).distinctBy { it.name }))
-                }
-                if (command.args != null || command.env.isNotEmpty()) {
-                    withContext(Dispatchers.IO) {
-                        ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(command.args, command.env))
-                    }
-                }
-                val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()
-                    ?.let { ContainerProgram.effectiveConfig(app.filesDir, created.id, it) }?.program().orEmpty()
-                if (program.isEmpty()) {
-                    answer(dir, "$name\n", "$name's image names no program to run, so nothing was started; use docker exec $name sh\n", 0)
+                if (made.started && !command.detach) {
+                    attached(app, runtime, dir, made, notes, command.autoRemove)
                 } else {
-                    ContainerPrograms.start(app, runtime, created)
-                    answer(dir, "$name\n", "", 0)
+                    answer(dir, "${EngineIds.of(made.container.id)}\n", notes.joinToString("") { it + "\n" }, 0)
                 }
             }
-            is DockerCommand.Remove -> {
+            is EngineRequest.Remove -> {
                 val out = StringBuilder()
                 val err = StringBuilder()
                 for (target in command.containers) {
-                    val info = find(target)
-                    val running = info != null && (ContainerPrograms.isRunning(info.container.id) || (info.running && runtime.siblingsNeedStart))
-                    when {
-                        info == null -> err.append("Error: No such container: $target\n")
-                        info.container.role == ContainerRole.PRIMARY -> err.append("Error: $target is the desktop's own container; droidtop does not remove it\n")
-                        running && !command.force -> err.append("Error: $target is running; stop it first or use docker rm -f\n")
-                        else -> runCatching {
-                            if (info.running && runtime.siblingsNeedStart) runtime.stop(info.container)
-                            ContainerRemoval.remove(app, runtime, info)
-                        }.fold(
-                            onSuccess = { out.append(target).append('\n') },
-                            onFailure = { err.append("Error: $target: ${it.message ?: it.javaClass.simpleName}\n") },
-                        )
+                    val info = find(target) ?: run { err.append("Error: No such container: $target\n"); null } ?: continue
+                    when (val removal = EngineActions.remove(app, runtime, info, command.force)) {
+                        EngineActions.Removal.Removed -> out.append(target).append('\n')
+                        EngineActions.Removal.Primary -> err.append("Error: $target is the desktop's own container; droidtop does not remove it\n")
+                        EngineActions.Removal.Running -> err.append("Error: $target is running; stop it first or use ${cli.name} rm -f\n")
+                        is EngineActions.Removal.Failed -> err.append("Error: $target: ${removal.message}\n")
                     }
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
             }
-            is DockerCommand.Answer, DockerCommand.Info -> Unit
+            is EngineRequest.Restart -> {
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (name in command.containers) {
+                    val info = find(name)
+                    when {
+                        info == null -> err.append("Error: No such container: $name\n")
+                        !EngineActions.restart(app, runtime, info) ->
+                            err.append("Error: $name has no program of its own to restart (its image names none)\n")
+                        else -> out.append(name).append('\n')
+                    }
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 1)
+            }
+            is EngineRequest.Inspect -> {
+                val pods = EngineFacts.pods(app)
+                val facts = mutableListOf<EngineInspect.Facts>()
+                val err = StringBuilder()
+                for (name in command.containers) {
+                    val info = find(name) ?: run { err.append("Error: No such object: $name\n"); null } ?: continue
+                    facts += EngineFacts.of(app, runtime, info, pods)
+                }
+                // Docker prints what it found and the errors for the rest, failing if any was missing.
+                answer(dir, if (facts.isEmpty()) "[]\n" else EngineInspect.format(facts, cli.front), err.toString(), if (err.isEmpty()) 0 else 1)
+            }
+            is EngineRequest.PodCreate -> {
+                EngineActions.makePod(app, command.name).fold(
+                    onSuccess = { answer(dir, it.id + "\n", "", 0) },
+                    onFailure = { refuse(dir, "${cli.name} pod create: ${it.message}", 1) },
+                )
+            }
+            is EngineRequest.PodList -> {
+                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                val rows = pods.map { pod ->
+                    val members = pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }
+                    val up = members.count { ContainerPrograms.isRunning(it.container.id) }
+                    EngineCli.PodRow(pod, members.size, up)
+                }
+                answer(dir, cli.formatPods(rows, command.quiet), "", 0)
+            }
+            is EngineRequest.PodStart, is EngineRequest.PodStop -> {
+                val starting = command is EngineRequest.PodStart
+                val names = if (command is EngineRequest.PodStart) command.pods else (command as EngineRequest.PodStop).pods
+                val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (wanted in names) {
+                    val pod = ContainerPods.find(pods, wanted) ?: run { err.append("Error: no pod with name or ID $wanted found\n"); null } ?: continue
+                    if (starting) EngineActions.startPod(app, runtime, pod, containers) else EngineActions.stopPod(app, pod, containers)
+                    out.append(pod.id).append('\n')
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 125)
+            }
+            is EngineRequest.PodRemove -> {
+                val out = StringBuilder()
+                val err = StringBuilder()
+                for (wanted in command.pods) {
+                    val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
+                    val pod = ContainerPods.find(pods, wanted) ?: run { err.append("Error: no pod with name or ID $wanted found\n"); null } ?: continue
+                    // Its containers go with it, as Podman's pod rm removes them.
+                    when (val removal = EngineActions.removePod(app, runtime, pod, containers, command.force)) {
+                        is EngineActions.PodRemoval.Removed -> out.append(pod.id).append('\n')
+                        is EngineActions.PodRemoval.Running -> err.append(
+                            "Error: pod ${pod.name} has running containers (${removal.names.joinToString(", ")}); stop it first or use podman pod rm -f\n",
+                        )
+                        is EngineActions.PodRemoval.Failed -> err.append("Error: pod ${pod.name}: ${removal.messages.joinToString("; ")}\n")
+                    }
+                }
+                answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 125)
+            }
+            is EngineRequest.Answer, EngineRequest.Info -> Unit
         }
-    }
-
-    /** What `docker ps` says a container is doing, from its program first: that is what Docker's STATUS describes. */
-    private fun dockerStatus(state: ContainerPrograms.State, programUp: Boolean, running: Boolean): String = when {
-        programUp && state is ContainerPrograms.State.Waiting -> "Restarting (${state.lastExit})"
-        programUp -> "Up"
-        state is ContainerPrograms.State.Ended -> "Exited (${state.exitCode})"
-        state is ContainerPrograms.State.Failed -> "Exited (couldn't start)"
-        running -> "Running (no program)"
-        else -> "Created"
     }
 
     /**
      * Ends a request that will not run: the reason on its stderr, its stdout closed, and [code] as its status. Opening
      * a FIFO for writing waits for the helper's reader, which the helper opens before it waits.
      */
+    /**
+     * A `run` without `-d` (rig 2026-10-16: it printed only the id): the program's output as it comes, then its exit
+     * code, as Docker and Podman end an attached run. The program writes stdout and stderr together to its log
+     * ([ContainerProgram.command]), so both arrive on stdout here; stdin is not attached. With `--rm` the container is
+     * removed after the last of its output is read.
+     */
+    private suspend fun attached(
+        app: Context,
+        runtime: dev.droidtop.runtime.ContainerRuntime,
+        dir: File,
+        made: EngineActions.Made,
+        notes: List<String>,
+        autoRemove: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        val id = made.container.id
+        val log = ContainerProgram.hostLogFile(app.filesDir, id)
+        runCatching { FileOutputStream(File(dir, "err")).use { it.write(notes.joinToString("") { n -> n + "\n" }.toByteArray()) } }
+        runCatching {
+            FileOutputStream(File(dir, "out")).use { out ->
+                val follow = LogFollower(log)
+                while (ContainerPrograms.isRunning(id)) {
+                    follow.copyTo(out)
+                    kotlinx.coroutines.delay(FOLLOW_MS)
+                }
+                follow.copyTo(out)
+                follow.finish(out)
+            }
+        }
+        val code = when (val state = ContainerPrograms.state(id)) {
+            is ContainerPrograms.State.Ended -> state.exitCode
+            is ContainerPrograms.State.Waiting -> state.lastExit
+            else -> 125
+        }
+        if (autoRemove) {
+            runCatching { runtime.listContainers() }.getOrNull()?.firstOrNull { it.container.id == id }
+                ?.let { EngineActions.remove(app, runtime, it, force = true) }
+        }
+        writeStatus(dir, code)
+    }
+
+    /** How often an attached run looks for more output. */
+    private const val FOLLOW_MS = 100L
+
+    /**
+     * Reads what a program's log gained since the last look, leaving out the line the program's wrapper writes before
+     * each start. Should the log be trimmed meanwhile ([ContainerProgram.trim]), reading goes on from its new end.
+     */
+    private class LogFollower(private val log: File) {
+        private var offset = 0L
+        private var pending = ByteArray(0)
+
+        fun copyTo(out: java.io.OutputStream) {
+            val length = log.length()
+            if (length < offset) offset = length
+            if (length == offset) return
+            val bytes = java.io.RandomAccessFile(log, "r").use { file ->
+                file.seek(offset)
+                ByteArray((length - offset).coerceAtMost(MAX_READ.toLong()).toInt()).also { file.readFully(it) }
+            }
+            offset += bytes.size
+            // Whole lines only, so the start marker is recognised wherever a read ends.
+            val text = pending + bytes
+            val cut = text.lastIndexOf('\n'.code.toByte()) + 1
+            pending = text.copyOfRange(cut, text.size)
+            write(out, String(text, 0, cut, Charsets.UTF_8).split('\n').dropLast(1))
+        }
+
+        /** The last line, when the program ended without a newline after it. */
+        fun finish(out: java.io.OutputStream) {
+            if (pending.isEmpty()) return
+            out.write(pending)
+            out.flush()
+            pending = ByteArray(0)
+        }
+
+        private fun write(out: java.io.OutputStream, lines: List<String>) {
+            val shown = lines.filterNot { it.startsWith(START_MARKER) }
+            if (shown.isEmpty()) return
+            out.write(shown.joinToString("") { it + "\n" }.toByteArray(Charsets.UTF_8))
+            out.flush()
+        }
+
+        companion object {
+            private const val MAX_READ = 1 shl 20
+            private const val START_MARKER = "--- started "
+        }
+    }
+
     private fun refuse(dir: File, message: String, code: Int) {
         Log.w(TAG, message)
         answer(dir, "", message + "\n", code)

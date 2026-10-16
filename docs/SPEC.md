@@ -870,7 +870,14 @@ in the Gaming theme when Gaming was the last mode and droidtop's own look
 otherwise. The rows and what each does stay in `:shell-default`
 (`BackButtonMenu.choices`), in `ModeGate.switcherModes` order (unit-tested in
 `ModesTest`): Android always, Desktop and Gaming only while enabled, then Modes
-and settings, Reinitialize displays and Close all apps. The first row holds the
+and settings, Reinitialize displays and Close all apps. Each mode's row carries
+its glyph (Standard's apps grid, Gaming's controller, Desktop's window) and the
+mode in use says "Current" in the value column; the three rows that are not
+modes sit below them under a quiet "Also here" heading, so a press meant for a
+mode does not land on Close all apps (2026-10-16, Droidtop/tracker#530). They
+stay in this sheet rather than moving to Gaming's System tab: this is the one
+menu every mode reaches, and the recovery route from Standard and Desktop.
+The first row holds the
 cursor from the start, so one A chooses it; B closes; the sheet draws its own
 hint row (A Select, B Cancel), the touch route to those presses, because the
 window has no shell footer.
@@ -1034,6 +1041,34 @@ service's `GLOBAL_ACTION_RECENTS`, the same single path the lock-screen action a
   carries weather or calendar data of droidtop's own, and droidtop fabricates none; a weather
   or calendar card would arrive as a plugin data source, not as placeholder text.
 
+### Widgets on any launcher (Droidtop/tracker#563, decided 2026-10-16)
+
+droidtop's own surfaces as Android app widgets and shortcuts, so they live on any launcher's pages (Niagara, Lawnchair,
+a stock launcher, Standard's own) through the standard AppWidget and ShortcutManager surfaces. The full plan, the
+widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a widget) are on #563.
+
+- **One renderer** (`DroidtopWidgets`, `:app`). Every widget is built off the main thread from what droidtop already
+  holds in memory (the library's in-RAM index, the plugin store), never a folder walk. It is drawn in the role tokens
+  (`RoleTokens`, #559): the plate is the tokens' surface colour (tinted on Android 12 and later; before that a light
+  or dark plate by the appearance), the text their ink. Every placed widget is drawn again when the tokens change
+  (`RoleTokens.onChanged`, so Light or dark, Android's night mode and the Gaming theme all reach it). Empty states are
+  honest ("No games played yet"). Taps go through droidtop's own entry points: a game through `GameLaunchActivity`,
+  so sessions, Kill and the watchdog hold.
+- **Built:**
+  - Continue playing and Plugin status, moved onto the renderer (`widget_rows`: a title and up to four rows);
+  - **Library search**, a bar that opens the one search (`LauncherSearchActivity`);
+  - **Quick launch**, one game's art and title. Placing it opens `QuickLaunchConfigureActivity`, which lists the
+    playable games (one card per game, as the Games grid groups them) to pick from. The pick is kept by the widget's
+    id (`WidgetConfigs`) and forgotten when the widget is removed. A game that left the library says so, and a tap
+    picks again.
+- None of these is gated by a mode: the library is never mode-gated (2c).
+- **Dynamic app shortcuts** (`DroidtopShortcuts`), beside the static four (Games, Social, Downloads, Updates, 7j): the
+  last three games played (each plays through `GameLaunchActivity`, with its art), then Search, the Quick Menu and
+  Switch mode, then Gaming and Desktop, each only while that mode is on. Rebuilt whole at start, whenever a mode is
+  switched on or off (`ModeStartup`) and after each game launch, off the main thread; the static shortcuts count
+  against the same per-activity cap. A launcher that shows only four (Launcher3, so Standard) shows the static ones;
+  one that shows more (Nova, Niagara) shows these after them, in this order.
+
 ### "Full computer", and where Launcher mode stands against Nova/Apex (survey + decided 2026-09-25)
 
 The owner's direction: droidtop on the console "needs to make the android
@@ -1056,14 +1091,28 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Hidden apps / app lock | HAVE | `settings/hiddenapps/{AppLock,HiddenAppsRepository}.kt` |
 | Backup/restore | HAVE, wired to Settings | `backup/BackupHelper.kt`, `SettingsMiscFragment.BACKUP_EXPORT`/`BACKUP_IMPORT` |
 | Smartspace/clock widget | HAVE | `widget/smartspace/{MurineClockView,SmartspaceMode}.kt` |
-| Configurable QSB with web search providers | HAVE | `widget/search/{SearchProvider,MurineSearchBarView}.kt` (8 providers + custom) |
-| Gestures: double-tap and swipe-down, each assignable to any of nothing/lock screen/open notifications/open app drawer/open recent apps (**built 2026-09-26**, was two fixed on/off gestures) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), `LauncherPrefs.GESTURE_DOUBLE_TAP_ACTION`/`GESTURE_SWIPE_DOWN_ACTION`, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows (`DOUBLE_TAP_ACTION`, `SWIPE_DOWN_ACTION`), applied in `WorkspaceTouchListener.java`/`NotificationSwipeController.kt`; an existing install's old two-boolean prefs are carried over once by `GestureActionMigration` |
+| Configurable QSB with web search providers | HAVE; the bar opens the one search (2026-10-16, Droidtop/tracker#564) | `widget/search/{SearchProvider,MurineSearchBarView,WebSearch}.kt` (8 providers + custom). Decided by the coordinator: one search. A tap on the home search bar, or what its mic heard, opens `LauncherSearchActivity`; the web is one row there, "Search the web" with the query as its detail, last in the list (`SearchRowKind.WEB`), searching with the bar's provider (`WebSearch`). Murine's own search box, its history and its bubble settings are deleted; upstream's search-bar app search (`e4e124c`) is skipped on purpose |
+| Gestures: double-tap, swipe down, two-finger swipe down and up, pinch in and out, and the Home button pressed on the first page, each assignable to nothing/lock screen/notifications/app drawer/recent apps/close all apps/companion, or droidtop's Search, Quick Menu, Switch mode and Games (**slots and droidtop targets added 2026-10-16**, Droidtop/tracker#564; double-tap and swipe down built 2026-09-26) | HAVE, exposed in Settings | `GestureAction` enum + `perform(Launcher)` (`com.android.launcher3.touch`), one `LauncherPrefs.GESTURE_*_ACTION` per slot, picked from `SettingsHomeFragment`'s `RadioGroupPreference` rows; double-tap in `WorkspaceTouchListener.java`, swipe down in `NotificationSwipeController.kt`, the two-finger slots in `MultiFingerGestureController.kt` (whichever of the swipe or the pinch crosses three touch slops first wins), Home in `Launcher.onNewIntent` (on any other page Home still goes to the first page). Two-finger swipe down opens the Quick Menu out of the box, and the home screen's long-press menu has a Quick Menu row: before, Standard had no way into it. The Quick Menu is `QuickMenuActivity` (`:app`), a translucent window over the home screen holding `QuickMenuStandalone`, the sheet Desktop's tray opens; Start closes it, Standard having no Start menu. `:shell-default` opens it and the Games grid by class name (`DroidtopScreens`). An existing install's old two-boolean prefs are carried over once by `GestureActionMigration`. Swipe up stays Launcher3's own drawer swipe. |
 | Drawer search over apps, droidtop's own library and the download sources, in one ranked list | **built (Droidtop/tracker#12)** | the drawer's search field opens `LauncherSearchActivity` on the shared `LibrarySearchDialog`; see "Launcher search" below |
 | A home-screen widget of droidtop's own (a "full computer" feature neither Nova nor Apex can offer, since they have no game library) | **built this change** | `ContinuePlayingWidgetProvider.kt` (see below) |
+| Light or dark from droidtop's one Appearance setting, not a launcher setting of its own (2026-10-16) | HAVE | `ThemeOverride` reads `AppearancePrefs`; see 7k "Light and dark" |
+| Dock size of its own: 3 to 10 icons apart from the grid's width, off by default (as the grid's width) (built 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.DOCK_ICONS` (0 is the grid's width), read into `InvariantDeviceProfile.numShownHotseatIcons` and `numDatabaseHotseatIcons`; a change goes through Launcher3's grid migration, the database hotseat size being part of the model state; Settings > Home > Grid size, a switch and a slider as the drawer's own width is set. Dock pages and a scrolling dock are not built |
+| Icon options: wrapping legacy icons as adaptive always, except for system apps, or never, or forcing the legacy icon even where the app ships an adaptive one (Android 8-12, through the resource resolver; greyed out where the platform's method has moved), themed (monochrome) icons on Android 13+ (Murine upstream's, taken 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.ADAPTIVE_ICONS` (`AdaptiveIcons`), `LauncherIconProvider`, `util/ResourceUtils.kt`; shell-default/UPSTREAM.md lists the commits |
+| Drawer order: Alphabetical or Most used first (built 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.DRAWER_SORT` (`DrawerSort`), Settings > App drawer > Order. Most used counts launches made from the launcher (`RecentAppsStore.launchCounts`, kept beside the Recent row's list, the 300 most launched), from the first launch after this was built; ties and never-launched apps follow alphabetically. In that order the list is one section, so the fast scroller shows no letter, and it is sorted again each time the drawer opens (`AlphabeticalAppsList.refreshOnOpen`). Drawer tabs, drawer folders and horizontal or list styles are not built |
+| Home screen lock (no moving, adding or removing icons and widgets), labels hidden everywhere or shown on Home only, drawer side padding (Murine upstream's, taken 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.LOCK_HOME_SCREEN` (`Launcher.isDraggingEnabled`), `LabelVisibility.NEVER_FULL`/`NEVER_DRAWER`, `LauncherPrefs.DRAWER_PADDING`; shell-default/UPSTREAM.md lists the commits |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher: status tiles (**built this change**), search providers and app actions (still not buildable -- see below) | PARTIAL | `PluginStatusWidgetProvider.kt`; see below |
 | Recent/frequently-used apps row in the app drawer | **built this change** | `RecentAppsStore`, `AlphabeticalAppsList.addRecentAppItems`; see below |
+
+**Following Murine upstream (2026-10-16).** The fork's upstream base is
+Murine `081e840` (v1.1.2, 2026-07-18), found by comparing contents since the
+import named none; `shell-default/UPSTREAM.md` records it and every upstream
+commit droidtop has decided (taken, already done here, or not for this tree),
+and `scripts/murine-upstream.sh` lists the upstream commits not decided yet.
+Upstream's fixes are taken as they come, its features as Standard's own work
+reaches them; its website, version bumps and build moves (droidtop's build is
+its own) are not.
 
 **A real plugin-fed launcher surface: the status-tile home-screen widget
 (built this change).** §12a's `PluginCapability.STATUS_TILE` and
@@ -2041,8 +2090,8 @@ stays mounted, and its four folders in droidtop's cache are removed one by one, 
 root helper the root column is "not tried", and the sentence says root would be needed rather than that the device
 lacks it.
 
-**Options that need a feature** (`EngineOptions`, one table for every front: `docker` now, `podman` and the API
-daemons with D11 to D15): `-m`/`--memory`, `--memory-swap`, `--memory-reservation`, `--cpus`, `-c`/`--cpu-shares`,
+**Options that need a feature** (`EngineOptions`, one table for every front: `docker` and `podman` (D11), the API daemons with
+D14 and D15): `-m`/`--memory`, `--memory-swap`, `--memory-reservation`, `--cpus`, `-c`/`--cpu-shares`,
 `--cpuset-cpus` and `--pids-limit` need cgroups; `--network`/`--net` network namespaces; `--pid` PID namespaces;
 `-h`/`--hostname` hostname namespaces; `--tmpfs` and `--read-only` mount namespaces. An option is never taken and
 silently ignored. Its answer names the feature and why it is not here: "`--memory` needs cgroups, which this device's
@@ -2472,7 +2521,7 @@ the `ContainerRuntime` interface that already exists (§3):
   too). A host path, another target or an unknown name is refused, so a path still never comes from the container.
   The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
   `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
-  "Its own program", and the start with the desktop. `-p`, `-w`, `--entrypoint`, `--restart`, `--rm` and `-u` answer
+  "Its own program", and the start with the desktop. `-w`, `--entrypoint` and `-u` answer
   "not built in droidtop yet". Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
   `--tmpfs`, `--read-only`, ...) answer from the one table in "Kernel features, detected at runtime" (section 3);
   `--network host` and `--pid host` are taken, being what the containers already are. `docker info` (D10) says the
@@ -2483,6 +2532,245 @@ the `ContainerRuntime` interface that already exists (§3):
   containers do not have it. Docker words stay in the command; droidtop's
   screens keep "app" and "program". Nothing the container wrote reaches
   Android as a command, a path or an argv.
+  **Restart policies (built 2026-10-16, Droidtop/tracker#555 D12).** One setting per container's program
+  (`ContainerProgram.RestartPolicy`), in Docker's and Podman's words: `no`, `on-failure[:N]`, `always`,
+  `unless-stopped`. `docker run` and `podman run` take `--restart` (`no` when not given, both tools' own default:
+  the D12 "each path its own defaults"); a container made on its page keeps droidtop's default, restart when it
+  fails, and its page's "Restart when it fails" switch is the same setting (on is `on-failure`, off is `no`; the
+  stored true and false of before read that way). `on-failure` restarts after a failing exit; `always` and
+  `unless-stopped` after any exit, and turn on "Start with the desktop", as Docker's daemon starts them with itself;
+  `unless-stopped` turns it off again when the person stops the program (its page's Stop it, `docker stop`) and on
+  when they start it. Every policy waits longer after each quick exit and gives up after five in a row (or the N of
+  `on-failure:N`), a clean exit counting for `always`: a program that exits at once would otherwise restart for ever.
+  **Each tool's output (built 2026-10-16, Droidtop/tracker#555 D12).** `ps` prints the columns both tools print:
+  CONTAINER ID (the first twelve of its engine id, below), IMAGE, COMMAND (the program the container runs, with `run`'s command
+  applied), CREATED, STATUS, PORTS and NAMES. The docker front shortens Docker Hub's images (`gitea/gitea:1.22`) and
+  quotes the command, cut at 20 characters with an ellipsis; the podman front keeps the full image
+  (`docker.io/gitea/gitea:1.22`) and leaves the command bare, cut with three dots. `ps -q` prints ids, as both tools
+  do (it printed names). `images` keeps Docker's short repository names on the docker front and Podman's full ones
+  (`docker.io/library/nginx`, sizes as "21.4 MB") on the podman front, and both print CREATED, when the image was
+  built (its config's `created`, kept on the store's entry; empty when the config does not say), which the Engine
+  API's and libpod's image lists and inspects give too. A container's CREATED is the time droidtop made the
+  container (`ContainerPrograms.recordCreated`, from every place droidtop creates one: `run` and the two Create rows
+  in Containers); a container made before this has an empty CREATED rather than a guessed one.
+  **`ps --format` (built 2026-10-16; the rig's first run found it missing).** Go template fields as both tools name
+  them (`{{.ID}}`, `.Image`, `.Command`, `.CreatedAt`, `.RunningFor`, `.Ports`, `.State`, `.Status`, `.Names`;
+  `.Labels`, `.Mounts`, `.Networks` and `.Size` are empty, droidtop not keeping them), `\t` and `\n` as a tab and a new
+  line, `table` before a template for a header row and aligned columns, `table` alone for the usual table, and
+  `json` for one object a line. A template naming another field, or a function (`{{json .Labels}}`), is refused when
+  read, not printed half (`EngineCli.psTemplateProblem`). `-q` wins over `--format`, as in Docker.
+  **An attached `run` (built 2026-10-16; the rig's first run printed only the id).** `run` without `-d` stays
+  attached, as both tools do: it prints the program's output as it comes and ends with the program's exit code
+  (`ContainerEnterRequests.attached`, following the program's log). The program writes stdout and stderr together to
+  its log, so both arrive on stdout; stdin is not attached (`-i` and `-t` are accepted and change nothing). With
+  `--rm` the front removes the container after the last of its output is read; a detached `run --rm` is removed when
+  its program ends, as before. `-d` prints the id as before; the APIs' clients attach on their own.
+  **inspect, create, restart and -p (built 2026-10-16, Droidtop/tracker#555 D13), on both fronts.** `create` reads
+  what `run` reads and makes the container without starting its program. `run` and `create` print the new
+  container's id, as both tools do (`run` printed its name). `restart` stops a container's program and starts it
+  again (as a start by the person, so `unless-stopped` holds). `inspect` prints each container's details as JSON in
+  Docker's shape (`EngineInspect`): Id, Created (droidtop's record, else Docker's zero time), Path and Args (the
+  program with `run`'s command applied), State (Status created, running, restarting or exited, ExitCode, Error),
+  Image (the digest), Name (`/name` on the docker front), HostConfig (RestartPolicy, and NetworkMode and PidMode
+  `host`, which is what every container here has), Mounts (each folder the person mapped, by its name and where it
+  appears; never a host path) and Config (Image, Env, Cmd, Entrypoint, WorkingDir, ExposedPorts). The podman front
+  adds ImageName and Pod. Nothing droidtop does not know is given a value: no Pid, no network of the container's own.
+  `--format` (Go templates) and `--type image` answer "not built in droidtop yet". `-p` (`run`, `create`): a port
+  published on its own number (`-p 80:80`, `0.0.0.0:80:80`, `/udp`) is what happens anyway and is taken, with a note
+  saying so; another number, or a host port Docker would choose (`-p 80`), needs network namespaces to remap and is
+  answered from the feature table ("-p needs network namespaces, which this device's kernel does not have (here a
+  port is the device's own: -p 80:80 is what happens)"); one address other than all of them is not built yet.
+  **The Docker Engine API (built 2026-10-16, Droidtop/tracker#555 D14, first slice).** For clients that talk to a
+  daemon rather than run droidtop's `docker` wrapper (a docker CLI a container installed, `docker compose`,
+  lazydocker, an IDE), droidtop serves a subset of Engine API v1.43 on a Unix socket, `docker.sock` in its app
+  storage, which every container sees as `/run/droidtop-app-storage/docker.sock`; `DOCKER_HOST` names it in every
+  container's environment (`ContainerLayout.clientEnvironment`). A distro's own docker binary comes before
+  droidtop's wrapper on the `PATH`, so installing one is all it takes. It is on demand: droidtop holds only the
+  listening socket while the desktop runs (`EngineApiServer`, started and stopped with the desktop session) and
+  serves each connection off the main thread; nothing runs inside a container for it, and with the desktop down
+  nothing listens, which to a client is the same as no daemon. The listening socket is bound through a `LocalSocket`
+  that is held for as long as the server: left unreferenced it was finalized, which closed the descriptor the
+  `LocalServerSocket` shares, so the API answered one ping and then refused every connection (rig 2026-10-16, RP5).
+  Should accepting fail anyway, the socket is bound again a second later. The HTTP is `EngineHttp`: one request at a time on a
+  kept-alive connection, bodies by Content-Length or chunks, at most 64 KB of headers and 1 MB of body (413
+  beyond), a connection idle for a minute closed, at most 16 served at once. Routes (`DockerApi.route`, with or
+  without the `/vX.Y` prefix): `_ping`, `version` (Docker 24.0, the release whose API is v1.43, on a platform
+  named droidtop's container engine), `info` (counts, architecture, kernel, CPUs, memory, and each kernel feature
+  from D10 as a warning line), `containers/json` (running, or all with `all=1`), `containers/{id}/json` (the same
+  JSON as the docker front's `inspect`) and `images/json`. They are answered from the same facts as the command
+  fronts (`EngineFacts`), so a client never sees two answers for one container. Every other route Docker has
+  answers 501 with "not built in droidtop's engine yet"; an unknown one 404. Containers report NetworkMode `host`
+  and no published ports, which is what they have. **Writes (built 2026-10-16, D14 second slice):**
+  `containers/create` (201 with the id and the notes), `start` (304 when running), `stop` (304 when stopped),
+  `restart`, `kill` (TERM, KILL or INT: a program is ended, not signalled; another signal is not built),
+  `DELETE /containers/{id}` (409 for a running one without `force`, and for the desktop's own), `images/create`
+  (a pull; its progress lines all at once after it), `containers/{id}/logs` (Docker's multiplexed frames, the
+  program's log as stdout; `follow`, `timestamps`, `since` and `until` not built) and `containers/{id}/wait`
+  (until the program is over; its exit code, 125 when it could not start). `containers/json` takes Docker's
+  `filters` for label, name, id and status; any other filter is answered as not built, never ignored. Every action
+  is `EngineActions`, the same code the command fronts run, so `docker run` and `POST /containers/create` make
+  the same container. A create body (`DockerApi.createRequest`) becomes the one request model, and nothing in it is
+  dropped:
+  - Taken: `Image`, `Cmd`, `Env`, `Labels`, `HostConfig.Binds` (a folder the person mapped, as `-v` takes it),
+    `RestartPolicy`, `NetworkMode` default, bridge or host (every container is on the device's network), and
+    `PortBindings` on a port's own number.
+  - Answered from the D10 feature table: resource limits (`Memory`, `NanoCpus`, `CpuShares`, `PidsLimit`, ...),
+    `Hostname`, and port bindings on another number.
+  - Answered 501, not built: `Entrypoint`, `WorkingDir`, a `User` other than root, `Volumes`, `Mounts`, a network
+    of the container's own other than a network droidtop has (below), `CapAdd`,
+    `Devices`, `SecurityOpt`.
+  - Refused 400: `Privileged`, which droidtop's containers never are.
+  Labels (`--label` on both command fronts too) are kept with the container's run settings
+  (`ContainerProgram.RunOverrides.labels`) and reported in `inspect`, `containers/json` and its filters, which is
+  how `docker compose` finds its containers. `docker pull` and `podman pull` resolve the tag to its digest
+  (`crane digest`) before the store pulls, as a container's creation does; they passed the bare reference, which
+  the store refused. **Networks and image inspect (built 2026-10-16, D14 third slice).** Every container is on the
+  device's network, so a network of droidtop's engine is a named group (`ContainerNetworks`, `networks.json` beside
+  the pods), which is what `docker compose` asks for: it lists networks by its project label, creates
+  `<project>_default` and creates each service's container on it. `GET /networks` (filters name, id and label;
+  others not built), `GET /networks/{id}`, `POST /networks/create` (409 for a name taken or Docker's own; an
+  internal network answers from the feature table, as it needs network namespaces; another driver, IPv6, subnets
+  of its own and Options answer not built), `DELETE /networks/{id}` (403 for bridge, host and none, and while a
+  container is on it) and `connect` and `disconnect`. bridge, host and none are always listed, with ids the same on
+  every device. A create joins a network named in NetworkMode or EndpointsConfig by its name or id; an unknown one
+  answers 404 "network ... not found", as Docker does, and none answers from the feature table. Aliases are kept,
+  but they do not resolve: the create's warnings say so and to reach another container by localhost, which works
+  because they share the device's network. Removing a container takes it off its networks. `GET /images/{name}/json`
+  finds a stored image by any of Docker's spellings (`nginx`, `nginx:latest`, `docker.io/library/nginx`), its digest
+  or a start of it, and describes it from its config blob (`OciImageStore.runConfig`): RepoTags, Size, Architecture
+  and Config (Env, Cmd, Entrypoint, WorkingDir, User, ExposedPorts); compose reads it to decide whether to pull.
+  **Exec (built 2026-10-16, D14 fourth slice).** `POST /containers/{id}/exec` records a command, behind the same
+  switch as droidtop's own `docker exec`, the container's "Run its commands from the desktop" (409 when off);
+  `POST /exec/{id}/start` runs it once (starting the container first where the backend needs that) and answers its
+  stdout and stderr as Docker's multiplexed frames, taking the connection over with a 101 when the client asks
+  (`Upgrade: tcp`, as Docker's CLI does) and closing it after; `Detach` runs it without waiting; and
+  `GET /exec/{id}/json` gives its exit code, which Docker's CLI reads next. The command is argv entries, its working
+  folder and environment given the way the enter path gives them (`ContainerEnter.directCommand`, the same constant
+  script), never shell text. It runs on pipes and its output comes back when it ends, so input and a terminal
+  (`docker exec -i`, `-t`) answer not built: droidtop's own docker command, at the end of the PATH, streams them. A
+  non-root `User` is not built and `Privileged` is refused. The execs a session made are kept in memory, at most 256.
+  **Attach and --rm (built 2026-10-16, D14 fifth slice).** `POST /containers/{id}/attach` is how `docker run` and
+  `docker compose up` without `-d` show a program's output: a program's output goes to its log, so attach follows
+  that file (`EngineApiServer.followLog`) and sends what is added as stdout frames, from where it ends now, or from
+  the top with `logs=1`, taking the connection over with a 101 when asked. With `stream=1` it goes on until the
+  program has run and ended; attach comes before start, so it waits for the start (five minutes at most), and a
+  program that starts and ends between two looks is seen by its state turning to over since the attach. A log
+  trimmed under it is followed from its top. Input (`stdin=1`, `docker run -i`) answers not built, and a create
+  asking for a terminal or open input (`Tty`, `OpenStdin`, `docker run -t`, `-i`) answers not built at once rather
+  than at attach. `--rm` (the wrapper's `run`, the API's `AutoRemove`) removes the container through the one
+  removal path once its program has run and ended (`EngineActions`, watching from the creation; a program never
+  started within ten minutes leaves the container be); with a restart policy it is refused, as Docker refuses it.
+  `wait?condition=removed`, which Docker's CLI uses for `--rm`, answers the exit code once the container is gone, or
+  after half a minute.
+  **The libpod API (built 2026-10-16, Droidtop/tracker#555 D15, first slice: reads).** Podman's clients talk to
+  Podman's own API, libpod, so droidtop serves it too: on `podman.sock` beside `docker.sock`, which every container
+  sees as `/run/droidtop-app-storage/podman.sock` and `CONTAINER_HOST` names in its environment. A podman a container
+  installed is remote whenever CONTAINER_HOST is set (Podman's own rule), and comes before droidtop's wrapper on the
+  `PATH`, so installing one is all it takes, as with docker. One server listens on both sockets
+  (`EngineApiServer`), under the same bounds (at most 16 connections across both); both sockets answer both APIs,
+  as Podman's service does: a path under `/v{X.Y.Z}/libpod/` is libpod's (`LibpodApi.route`), any other Docker's.
+  A libpod request is read into the same calls as a Docker one and answered from the same facts and actions; only
+  the JSON is Podman's. A client names its version in every path and reads the answers in that version's shapes, so
+  droidtop answers in the version asked, from 4.0 (the oldest Podman's clients take) to 5.0: Podman 5 made an
+  inspect's `Config.Entrypoint` a list, Podman 4 reads one string. The answers carry `Libpod-Api-Version`, which
+  Podman's client requires on its first ping. Routes: `_ping`, `version` (a Podman Engine component, whose
+  APIVersion `podman version` prints), `info` (the host, the counts, and each kernel feature from D10 as a line
+  under the host's runtime info, the one place Podman's info carries free text), `containers/json` (the same
+  filters as Docker's), `containers/{id}/json`, `images/json`, `images/{name}/json` (a name may hold slashes),
+  `pods/json` (filters name and id; others not built), `pods/{id}/json`, `networks/json`, `networks/{id}/json`,
+  and `exists` for each of containers, images, pods and networks (204, or 404). Podman's `ps` writes STATUS itself
+  from State, StartedAt, ExitedAt and ExitCode, so droidtop now records when each program last started and ended
+  (`ContainerPrograms.times`, for this run of droidtop); inspect gives them as State.StartedAt and FinishedAt on
+  every front. Image ids are the digest's hex without `sha256:`, as Podman writes them. Checked against Podman's own
+  remote clients, 5.2.5 and 4.9.5 built from source, over these shapes: `version`, `info`, `ps` (`-a`, `--pod`,
+  `--filter label=`), `inspect`, `images`, `image inspect`, `pod ps`, `pod inspect`, `network ls`, `network
+  inspect` and each `exists`.
+  **Container ids (decided 2026-10-16).** Both tools show a container's id cut to twelve characters, and droidtop's
+  own ids (`droidtop-sibling-1a2b3c4d`) share theirs, so every container read `droidtop-sib` in `ps`. The engine,
+  on every front and API, now calls a container by its engine id (`EngineIds.of`): 64 hex digits, a digest of
+  droidtop's id, the same on every boot and never stored. It is the Id of `inspect`, `containers/json` and a
+  network's members, what `run` and `create` print and the create answers, and the start of it is CONTAINER ID in
+  both fronts' `ps`. Everywhere a container is named (`EngineIds.find`, one lookup for the fronts and both APIs) it
+  is found by its name (with or without Docker's leading `/`), its engine id or droidtop's own id, or a unique start
+  of either, three characters or more; `droidtop-sib`, which starts every droidtop id, names none. droidtop's own
+  screens keep the person's names for containers, never an id.
+  **libpod writes (built 2026-10-16, D15 second slice).** `podman run`, `create`, `start`, `stop`, `restart`,
+  `kill`, `wait`, `rm`, `pull`, `logs` and `exec` work against the libpod API, through the same `EngineActions` as
+  every other front. The routes whose paths and answers are the same in both APIs (start, stop, restart, kill,
+  attach, logs, exec create, start and inspect) are read by Docker's router; the rest answer in Podman's shapes:
+  - Create takes Podman's own body (`LibpodApi.createRequest`, its SpecGenerator), read into the one request
+    model as Docker's create is, nothing that changes a container dropped. Taken: `name`, `image`, `command`,
+    `env`, `labels`, `restart_policy` and `restart_tries`, `remove` (`--rm`), `volumes` (a folder the person
+    mapped, where `-v` puts it), `portmappings` on a port's own number, `pod`, and `Networks` (a network of
+    droidtop's own; `podman`, Podman's default network, is the device's, as bridge and host are). Answered from
+    the D10 feature table: `resource_limits` (`--memory`, `--cpus`, `--pids-limit`), `hostname`, a read-only
+    root, `--network none` and a port on another number. Answered not built: `entrypoint`, `work_dir`, a non-root
+    `user`, a terminal or open input, `mounts` (a bind mount by path, tmpfs), devices, capabilities, secrets, DNS
+    settings, extra hosts, sysctls, health checks. Refused: `privileged`, and `--rm` with a restart policy (409).
+    The fields Podman's client always sends with what droidtop does anyway (its id mappings, umask, stop timeout,
+    systemd mode) are left alone.
+  - `wait` (conditions stopped and exited, or none: until the program is over) answers the exit code alone.
+    `DELETE /containers/{id}` answers a report per container removed, and with `ignore` a container that is not
+    there is no error. `images/pull` takes Podman's policies: `missing` and `never` take a stored image as it is,
+    `never` pulls nothing, `always` and `newer` pull; its 200 is followed by a progress line and the image's id,
+    or by the error, as Podman's service streams them. A pull for another platform or of all tags is not built.
+  - `logs`: Podman's client sends Go's zero time for no since or until, and -1 for every line, which are read as
+    such; `-f` is not built, as on the Docker API.
+  - Exec: Podman's client reads the output from the socket itself once it has read the head, so a byte sent with
+    the head would be lost in its read-ahead. The head goes first, the frames once the command has run, and the
+    connection closes, as on Podman's own service. `POST /exec/{id}/remove`, which the client sends after reading
+    the exit code, forgets a finished exec.
+  - A thing that is not there answers 404 in Podman's words (`no container with name or ID "x" found: no such
+    container`): Podman's client tells a missing container from another failure by that text, so
+    `podman rm --ignore` passes over one.
+  Checked against Podman's own remote clients, 5.2.5 and 4.9.5, over a harness serving `LibpodApi`: `run -d` with
+  `-e`, `-l`, `--restart`, `-v`, `-p`, `--pod` and `--network` (each read into the request), `run` and `run --rm`
+  (attach, start and wait: the program's output and its exit code), `rm -f`, `rm --ignore`, `stop`, `start`,
+  `restart`, `kill`, `wait`, `logs`, `logs --tail`, `pull`, `exec` with `-e` and `-w` (output and exit code) and
+  `exec -d`, and the refusals (`-w`, `--memory`, `-v /etc:/x`, `-p 8080:80`, `--network none`, an unknown
+  network, `--rm --restart always`).
+  **libpod pods and networks (built 2026-10-16, D15 third slice).** `pods/create` (Podman's PodSpecGenerator:
+  its name and labels; the namespaces a pod shares are what its containers have anyway, a port is taken on its own
+  number, and limits, a hostname, `--network none` and a port on another number answer from the feature table),
+  `pods/{id}/start`, `stop`, `restart` and `kill` (KILL, TERM or INT end the programs, as stop does; another signal
+  is not built), and `DELETE /pods/{id}` (its containers go with it; with one running only with `force`). These are
+  the podman front's own pod actions, now `EngineActions.makePod`, `startPod`, `stopPod` and `removePod`, which
+  `podman pod ...` in a container's terminal runs too: one mechanism. A pod keeps labels (`pod create --label`),
+  reported in `pods/json` and `pods/{id}/json` and taken by the label filter. `networks/create` (netavark's body,
+  under the same rules as Docker's create; with `ignoreIfExists` a network of that name already there is the
+  answer), `DELETE /networks/{id}` (a report for the network; `force`, which would take its containers with it, is
+  not built), and `connect` and `disconnect` (libpod writes the container `container`; `podman`, Podman's name for
+  its default network, is the device's, as bridge and host are). A connect's aliases, libpod's `aliases` and
+  Docker's EndpointConfig.Aliases, are now kept on both APIs, and as at create they do not resolve. Checked with
+  Podman's own remote clients, 5.2.5 and 4.9.5: `pod create` (with `--name`, `--label`, `-p 8080:8080`), `pod start`,
+  `stop`, `restart`, `kill`, `rm -f`, `network create`, `network rm`, `network connect --alias`, `network
+  disconnect`, and the refusals for `pod create -p 8080:80`, `pod create --memory`, `pod kill -s HUP`, `network
+  create --internal`, `--subnet` and `-d macvlan`. Podman 5's `pod start` and `pod stop` print an empty line where
+  Podman 4 prints the pod's id: the 5.x client prints a field its own service never sends either.
+  **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
+  none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
+  device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept
+  in `pods.json` beside the containers' program settings; members by container id). `podman pod create [--name
+  NAME]` (`-p` answers "not built yet"; a pod made without a name is `pod_` and the start of its id) prints the pod's
+  id, 64 hex digits as Podman's are. `pod ps` prints POD ID (its first 12), NAME, STATUS (Created with no
+  containers, Running with every program up, Degraded with some, Exited with none), CREATED and # OF CONTAINERS.
+  `pod start` and `pod stop` start and stop every member's program as `podman start` and `podman stop` do (restart
+  policies included). `pod rm` removes the pod and its containers, through the one removal path; with any member
+  running it refuses unless `-f`, which stops them first. `podman run --pod POD` puts the new container in a pod and
+  `--pod new:NAME` makes the pod with it. A pod is named by its name, its id or a unique start of the id (three
+  characters or more). Removing a container, from anywhere, takes it out of its pod. The other `pod` subcommands,
+  `generate`, `play` and `kube` answer "not built in droidtop yet".
+  **The podman command (built 2026-10-16, Droidtop/tracker#555 D11).** Every container also has `podman` on its
+  `PATH`: a second command front over the same engine, not a second runtime (the owner's decision on #555: one
+  engine, docker and podman fronts). Both fronts are `EngineCli` (`EngineCli.DOCKER`, `EngineCli.PODMAN`), each
+  with its own command name, its own token (`droidtop:podman`) and its own wrapper in `desktop-launcher/commands`,
+  so a request says which front sent it. Each reads its tool's syntax into the one request model (`EngineRequest`:
+  ps, images, logs, start, stop, exec, pull, run, rm, info), which droidtop answers one way
+  (`ContainerEnterRequests`); a front's answers and refusals carry its own name ("podman run: --memory needs
+  cgroups, ..."). For this subset the two tools' syntax is the same. `podman generate`, `play` and `kube`
+  answer "not built in droidtop yet"; pods came with D12 (above). Their own defaults and output (Docker's daemon-style
+  defaults and field names, Podman's rootless defaults and output) are D12. Neither name can be exported by a
+  container.
   **Restart, Recreate from the image, storage used, Sockets and Mounts
   (built 2026-09-27).** `ContainerRuntime` gained `restart` (stop then
   start; a default every backend shares), `recreateFromImage` (destroy
@@ -5298,7 +5586,7 @@ one:
 
 - **Now playing** (Spotify/Discord ambient presence, §7e) -- that section is scoped, not
   built; there is no now-playing store this screen could read.
-- **Running jobs and downloads** -- no second mechanism; the visible download/install queue uses `PluginJobsCenter` / the Jobs screen (`plugin_jobs`) directly (`GamingSettingsCatalog` exposes it as "Downloads and installs", `Droidtop/tracker#85`; it is the only entry, the screen carries that title). No `ScanProgress`/download-queue store is invented -- the existing registry (`entries(): StateFlow<List<Entry>>`) is the one surface every caller reads, controller-first (`CatalogNavigator`'s own `LazyColumn` focus and touch dispatch), with end-user wording ("Downloading…" / "Done" / "Failed", progress % and status line, cancel best-effort). No main-thread file/database work: all reads go through the flow, writes stay in the plugin runtime.
+- **Running jobs and downloads** -- no second mechanism; the visible download/install queue uses `PluginJobsCenter` / the Jobs screen (`plugin_jobs`) directly (`GamingSettingsCatalog` exposes it as "Downloads and installs", `Droidtop/tracker#85`; it is the only entry, the screen carries that title). No `ScanProgress`/download-queue store is invented -- the existing registry (`entries(): StateFlow<List<Entry>>`) is the one surface every caller reads, controller-first (`CatalogNavigator`'s own `LazyColumn` focus and touch dispatch), with end-user wording ("Downloading…" / "Done" / "Failed", progress % and status line, cancel best-effort). A row's title is the job's own name and its second line who runs it (the plugin, "via" its launcher); the job's page keeps "<plugin>: <name>". Led by the plugin's name, a list from one plugin was ten rows reading "Downloads: ..." once cut to the row (Droidtop/tracker#85, rig 2026-10-14). The value column says how far, then the status line, said once: a paused job whose status is "Paused" read "Paused Paused". No main-thread file/database work: all reads go through the flow, writes stay in the plugin runtime.
 
   **Pausable jobs (Droidtop/tracker#174):** a runner opts into checkpoint resume, and only jobs that declare resumability and have reported a checkpoint expose Pause. `PluginJobProgress.checkpoint` reports progress plus a bounded opaque payload; Pause asks the runner to cancel at its cooperative boundary and retains the last payload. Resume starts the same job again with that payload under `droidtop.resume_payload` in its arguments. DataStore persists resumable job identity, arguments and checkpoint off the main thread; restored work is paused and can be restarted if its plugin and capability are still available. Jobs without runner support or a checkpoint remain non-pausable.
 
@@ -6341,6 +6629,14 @@ Shift's own events are exempt because they carry `META_SHIFT_ON` too. Caps
 lock is deliberately not read as shift: the Caps Lock key is forwarded like
 any other and toggles the container's own caps state, which a synthesized
 Shift on top of it would cancel.
+
+Ctrl, Alt and Meta are read from the meta state the same way (2026-10-16, the
+rig's first container run): `adb shell input keycombination CTRL_LEFT MINUS`
+and many IMEs send Ctrl only as `META_CTRL_ON` on the key, so foot's
+Control+minus saw a bare minus. Each modifier the meta state carries and the
+container does not already see held is pressed before the key (Shift, Ctrl,
+Alt, Meta, in that order, each by its left key) and released once every key it
+was pressed for is up (`DesktopInputRouter.synthesizeModifiersDown`).
 
 **Modifiers (decided 2026-10-14, Droidtop/tracker#147, #555 D1).** A key event
 alone never changed a modifier in the container. wlroots handles
@@ -10394,6 +10690,16 @@ Gaming, where the owner's ask was sharpest:
   gear glyph (`QuickGlyph.SETTINGS`) distinct from the existing
   `ANDROID` glyph "Android settings" already used, so the two
   settings-shaped tiles read as different destinations.
+- **Every tile the Quick Menu draws has a glyph of its own (2026-10-16,
+  Droidtop/tracker#534).** Screenshot (a camera), Stop the app in front (a
+  stop button), Companion screen (two screens), Location (a map pin),
+  Flashlight (a torch) and the rail's Plugins entry (a puzzle piece, the
+  left menu's Plugins mark) drew `QuickGlyph.GENERIC`, the placeholder
+  ring with a dot; Social, the performance mode, Downloads, Controller and
+  the keyboard tiles now take the existing glyphs that fit them. They stay
+  hand-drawn strokes like the rest of the tile set (`QuickGlyphIcon`), and
+  `GENERIC` is left only for an item `QuickTiles.glyphFor` has never heard
+  of.
 - **A system's gamelist options menu gained "System settings"**
   (`GamelistOptionsMenu`, shown whenever the list has a real console
   system id), opening the SAME registered Console systems screen
@@ -13441,11 +13747,16 @@ What I was playing, what changed, who is around, and the way into my library. Ho
   - **What's new** (`HomeModel.whatsNew`): at most 12 cards, newest first: a game update ("v0.9.6", opens the game's page), games one scan added to one place ("212 games added to SNES", counted as the library counts, hidden games left out; one game reads by its name, "Added 2 days ago"; opens that library), one card for plugin updates, "+N more" past the cap (opens Updates), and **last, at most one Needs attention card** ("3 things need attention"). Chores are never news.
   - **Friends**: in game first, then unread, then online ("Playing Hades"); A opens Social.
   - **Downloads**: name, progress and state ("45% · Paused"); A opens Downloads.
-- **Shelves** a plugin asks for (plugin-api C11), then **Your library** (the Retro Games and PC Games tiles) as the last stop.
+- **Shelves** a plugin asks for (plugin-api C11), then **Your library** (the Retro Games and PC Games tiles, then
+  **Random game**) as the last stop. Random game (Droidtop/tracker#507, decided 2026-10-16) picks one game at random
+  from everything Home holds, PC games, Retro games and game apps, never a hidden one (`HomeModel.randomGame`), and
+  opens its page (a PC game) or its options (a Retro game or a game app), so Play is one press from there. Home has no
+  filter or system of its own, so the pick is from the whole library; a list's own Random game (List options) keeps to
+  that list.
 
 **Needs attention** (`needsAttentionScreen`): one row per item, each with one verb as its value. A system that has games in the library and is missing a BIOS file ("PlayStation needs a BIOS") or has one that matches no known good dump ("PlayStation BIOS doesn't match") are separate items with **Set up PlayStation**, which opens that system's settings (its BIOS files); the check reads every game folder's `bios` files against `BiosDatabase`, off the main thread, once per change in the set of systems with games. Games with no artwork are one item, **Find artwork**, which starts the scrape job. A seen item is meant to stay quiet until its state changes (`HomeModel.unseen`, keyed by the item's state).
 
-Not built yet (tracked on tracker#485): the unrecognised-files item (the scan does not keep its unmatched files), plugin update counts on the card, the hero following focus and the art order (F7b), Your library's systems and Random game (F7b), the Shelves page and the shelf cap (F7b), and sending the items to Notifications (needs S1's Recent list on main).
+Not built yet (tracked on tracker#485): the unrecognised-files item (the scan does not keep its unmatched files), plugin update counts on the card, the hero following focus and the art order (F7b), Your library's systems (F7b), the Shelves page and the shelf cap (F7b), and sending the items to Notifications (needs S1's Recent list on main).
 
 ### Home art
 
@@ -13513,7 +13824,12 @@ own games, in droidtop's own treatment:
   short label, `PcSource.badgeLabel`: the folder's last path segment, and when
   that is longer than ten letters the initials of its words ("BstSharedFolder"
   is "PC · BSF"), else its first letters and an ellipsis, so the badge is never
-  cut mid-word (the whole name stays on the focus line). Ownership is never text on a capsule:
+  cut mid-word (the whole name stays on the focus line). A badge whose words
+  still do not fit its card (a long engine or system name on a narrow card:
+  "ENGINE · RPG MAK...", "RETRO · SONY PLAY...", Droidtop/tracker#434, rig
+  2026-10-14) is drawn in the longest form that fits, measured: the kind and
+  its detail, then the detail alone ("RPG MAKER MV", "SONY PLAYSTATION"), then
+  the kind alone (`KindBadge.forms`); the focus line keeps the whole text. Ownership is never text on a capsule:
   a game shared with you or gone from your library carries a small generic
   glyph in the bottom-right corner (no store logo). The focus line and the
   page's Source row carry the full text: "Steam · Shared with you", "GOG · via
@@ -13756,11 +14072,17 @@ folder name when the name contains one under §7m's naming rules.
 
 ### Empty, and setup
 
-An empty PC library opens on **PC setup** (`pc_stores`, the one
-settings-catalog screen for game folders, the Windows system files and
-Downloads -- store sign-ins are under Accounts and sources, §7f), drawn
-in place, instead of empty shelves; the same screen is the options
-menu's "PC setup" row and B leaves it. Known empty, not merely unfolded:
+An empty library shows **one empty state** (`EmptyLibrary`, Droidtop/tracker#533), the same on
+Retro Games, PC Games and Home: a glyph, one line ("No games yet"; PC Games says "No PC games yet"), and
+two buttons side by side in the middle of the page, the place's own action first and **Get games**
+beside it. Retro Games' action is **Add a folder** (the Game folders page drawn in place); PC Games'
+and Home's is **Game sources**, which opens **PC setup** (`pc_stores`, the one settings-catalog screen
+for game folders, the Windows system files and Downloads -- store sign-ins are under Accounts and
+sources, §7f) in place; B leaves it, and the options menu's "PC setup" row opens the same screen.
+Neither button is drawn filled, so the focus ring is the only highlight (a filled first button beside
+a ringed second read as two chosen at once). PC Games and Home used to open on PC setup by
+themselves, which read as a redirect into Game sources. Home counts its Retro games and launcher apps
+too: it is empty only when all three are. Known empty, not merely unfolded:
 the fold runs off the main thread and the tab shows a spinner, never a
 false "you have nothing", while it runs.
 
@@ -14759,8 +15081,22 @@ UI through the one palette (`GamingPalette`) every token reads:
   overlay surface at 92%, so their text keeps 4.5:1 over any artwork. They were the ink at 58%, pale text on a pale
   pill over light art (rig 1931). A theme's own clock or system status that names no colour is white, as in ES-DE,
   unless its declared background is one white cannot be read on; then it is black.
-- Not yet covered, each its own issue: the Standard home screen's Launcher3 XML views (Droidtop/tracker#560), the
-  Windows runtime's views (#561) and droidtop's keyboard (#562).
+- **Standard's home screen follows it too** (Droidtop/tracker#560, 2026-10-16). The Launcher3 fork's light or dark
+  came from Murine's own "UI theme" choice (System, Light, Dark on Settings > General); that choice is deleted and
+  `ThemeOverride.getThemePref` reads `AppearancePrefs`, so there is one setting for every mode. The launcher's
+  activities take it as their configuration's night mode (`ThemeOverride.applyTheme`), and an open one sees itself
+  stale on its next start and recreates. `ThemeOverride.watchAppearance` (from `LauncherApplication`) sets the night
+  mode again when the setting changes and, with an icon pack in use, reloads icons for the pack's day or night set.
+  droidtop's own pad dialogs in the launcher (`DroidtopDialog`, the radio list) and the large-screen taskbar keep their
+  dark plate in both appearances: light ink on a dark ground, readable over either.
+- **From the first rig run in Light (2026-10-16).** A switch's knob when on is the ink that reads on the affirmative
+  fill (`MenuTokens.OnAffirmative`, black or white by the fill's luminance); it was the text ink, near black on a dark
+  green track. A side panel (the left menu, the Quick Menu) sets the page back with `MenuTokens.Veil` and `PanelVeil`:
+  the theme's scrim in a dark appearance, black at 45 and 32 percent in a light one, where the scrim, the pale ground
+  at 80 percent, washed the page out. A dialog's own dim was already black. When the Gaming theme has a colour scheme
+  of its own chosen, it wins over Light or dark on every Gaming-themed screen, settings included, so the Light or
+  dark row says so and that Theme color scheme > Automatic makes them follow it.
+- Not yet covered, each its own issue: the Windows runtime's views (#561) and droidtop's keyboard (#562).
 - **The role tokens** for UI droidtop does not draw itself (a plugin's own pages, #559): one set, read from the palette
   in use (`GamingTheme.palette`, the theme's in Gaming, droidtop's own otherwise), never restated. `theme` is `light`
   or `dark` (`colors.isLight`); `ground` is the page background (`ground`); `surface` is a sheet or panel
@@ -15312,13 +15648,20 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   group below it is droidtop's own update settings and Check now, as
   before. **Android apps** (Droidtop/tracker#261, 10b "Installing apps"):
   installed apps against the app catalogs' cached offers, one row per update
-  ("Update to <version>", the one install path) and Update all apps; an offer
+  ("<version> available", the one install path) and Update all apps; an offer
   signed by another key than the installed app is listed as "Different key"
   and not offered. Below them an "Android apps" group: Get apps (the app
   catalogs' screen), Check app catalogs now (refreshes every source of every
   catalog plugin, then the offers) and **Update apps without asking** (on by
   default; the owner's setting of 2026-10-01: it only matters where Android or
   a privilege allows a silent install, Android asks every time otherwise).
+  **One group per kind, the bulk action first (2026-10-16, Droidtop/tracker#506).**
+  What was one "Available" group is a group each for droidtop, Plugins, Apps and
+  Games, in that order, a group with nothing in it left out. "Update all
+  plugins" and "Update all apps" (with how many in the value column) lead the
+  group they cover, as a store's Downloads page puts its bulk action above the
+  list, instead of sitting between items; and an update's value is "<version>
+  available", one short line, where "Update to <version>" wrapped onto two.
   **One Updates screen, one list of ways in** (2026-10-03, Droidtop/tracker#273):
   the plugin updates status and "Update all" that the Plugins screen also
   carried are gone (the Plugins screen lists plugins, approvals, repositories
@@ -16429,7 +16772,12 @@ starts a word (`PrincessEvangileFull` is `Princess Evangile Full`,
 `BeingADik` is `Being A Dik`); a name with no lower-case letter (`GTA`) or
 with a space is left as written. A dotted version written straight onto the
 title with a capital V (`SomeGameV0.80`) is the version, not part of the
-title. The console's PC cards that read `REC` and `RTS` are not a parser
+title. So is a version written straight after punctuation or a letter of
+another script, which no English word goes on through
+(`新生活は妹ちゃんと!ver1.8` is `新生活は妹ちゃんと!`, version 1.8; `ver` or
+`version` with any number, a bare `v` with a dotted one;
+Droidtop/tracker#174, rig 2026-10-14); after a Latin letter `ver` may end a
+word (`Forever1.0`) and stays the title's. The console's PC cards that read `REC` and `RTS` are not a parser
 miss: their folders are `REC_v0.4.3.5` and `RTS_0.032_WIN2`, whose titles
 are `REC` and `RTS` (a build-stage folder under a titled game still takes
 the game's title, `isReleaseTagFolder`). The grid's name line under the
@@ -19616,7 +19964,7 @@ what the index says is display data, never a trust decision.
   - **Updates** moved out (2026-10-03): the status ("N updates
     available", "Up to date", never "Up to date" on a catalog that was
     never read) and "Update all" (`PluginCatalog.updateAll`) are the
-    Updates screen's "Available" group, see "Places".
+    Updates screen's Plugins group, see "Places".
   - **Add** — "droidtop plugins" (droidtop's own catalog, the screen
     below, opened straight from here so installing an official plugin is
     Add, the plugin, Install), "More catalogs" ("Added catalogs", "Known

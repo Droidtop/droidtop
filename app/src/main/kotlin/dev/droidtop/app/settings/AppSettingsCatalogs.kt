@@ -1049,29 +1049,43 @@ object AppSettingsCatalogs {
             appCatalogs.updates(cachedOffers, dev.droidtop.library.integrations.AppPackages.allInstalledFacts(context), context.packageName)
         }
 
-        val shown = buildList<dev.droidtop.library.settings.CatalogItem> {
-            add(
-                ActionItem(
-                    id = "updates_droidtop_status",
-                    title = "droidtop",
-                    subtitle = if (updating != null) {
-                        "Installed ${selfUpdate.installedVersionName(context)}. Updating now; reopen this list to see the latest state"
-                    } else if (newerBuild != null) {
-                        "Installed ${selfUpdate.installedVersionName(context)}. Check now, below, installs it"
-                    } else {
-                        "Installed ${selfUpdate.installedVersionName(context)}. No newer build seen by the last check"
-                    },
-                    value = updating ?: newerBuild?.let { "Update to $it" } ?: "Up to date",
-                    run = {},
-                ),
-            )
+        // One group per kind, each with its "Update all" first, like a store's Downloads page: the bulk action above
+        // the items it covers, never a row between them, and a value that fits one line ("0.2.1-3 available")
+        // (Droidtop/tracker#506).
+        val droidtopRows = listOf<dev.droidtop.library.settings.CatalogItem>(
+            ActionItem(
+                id = "updates_droidtop_status",
+                title = "droidtop",
+                subtitle = if (updating != null) {
+                    "Installed ${selfUpdate.installedVersionName(context)}. Updating now; reopen this list to see the latest state"
+                } else if (newerBuild != null) {
+                    "Installed ${selfUpdate.installedVersionName(context)}. Check now, below, installs it"
+                } else {
+                    "Installed ${selfUpdate.installedVersionName(context)}. No newer build seen by the last check"
+                },
+                value = updating ?: newerBuild?.let { available(it) } ?: "Up to date",
+                run = {},
+            ),
+        )
+        val pluginRows = buildList<dev.droidtop.library.settings.CatalogItem> {
+            if (pluginUpdates.isNotEmpty()) {
+                add(
+                    AsyncActionItem(
+                        id = "updates_plugins_update_all",
+                        title = "Update all plugins",
+                        subtitle = "Downloads and verifies each update, then installs it the way a single update installs",
+                        value = pluginUpdates.size.toString(),
+                        run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus) },
+                    ),
+                )
+            }
             pluginUpdates.forEach { (record, offer) ->
                 add(
                     ActionItem(
                         id = "updates_plugin_${record.manifest.id}",
                         title = record.manifest.label,
                         subtitle = "Plugin, installed ${record.manifest.version}" + if (offer.source.official) "" else " - Unofficial, from ${offer.source.name}",
-                        value = "Update to ${offer.release.version}",
+                        value = available(offer.release.version),
                         run = {},
                     ),
                 )
@@ -1087,13 +1101,17 @@ object AppSettingsCatalogs {
                     ),
                 )
             }
-            if (pluginUpdates.isNotEmpty()) {
+        }
+        val availableApps = appUpdates.filterIsInstance<dev.droidtop.library.integrations.AppCatalogs.UpdateState.Available>()
+        val appRows = buildList<dev.droidtop.library.settings.CatalogItem> {
+            if (availableApps.size > 1) {
                 add(
                     AsyncActionItem(
-                        id = "updates_plugins_update_all",
-                        title = "Update all plugins",
-                        subtitle = "Downloads and verifies each update, then installs it the way a single update installs",
-                        run = { ctx, onStatus -> PluginCatalog.updateAll(ctx, onStatus) },
+                        id = "updates_apps_update_all",
+                        title = "Update all apps",
+                        subtitle = "Downloads each update, checks its package and signing key, then hands it to Android one after another",
+                        value = availableApps.size.toString(),
+                        run = { ctx, onStatus -> availableApps.map { state -> updateApp(ctx, state, onStatus) }.joinToString(". ") },
                     ),
                 )
             }
@@ -1105,7 +1123,7 @@ object AppSettingsCatalogs {
                             title = state.offer.name,
                             subtitle = "App, installed ${state.installed.versionName ?: state.installed.versionCode} - from " +
                                 (state.offer.source ?: state.pluginLabel),
-                            value = "Update to ${state.offer.version}",
+                            value = available(state.offer.version),
                             run = { ctx, onStatus -> updateApp(ctx, state, onStatus) },
                         ),
                     )
@@ -1121,18 +1139,8 @@ object AppSettingsCatalogs {
                     )
                 }
             }
-            val availableApps = appUpdates.filterIsInstance<dev.droidtop.library.integrations.AppCatalogs.UpdateState.Available>()
-            if (availableApps.size > 1) {
-                add(
-                    AsyncActionItem(
-                        id = "updates_apps_update_all",
-                        title = "Update all apps",
-                        subtitle = "Downloads each update, checks its package and signing key, then hands it to Android one after another",
-                        value = availableApps.size.toString(),
-                        run = { ctx, onStatus -> availableApps.map { state -> updateApp(ctx, state, onStatus) }.joinToString(". ") },
-                    ),
-                )
-            }
+        }
+        val gameRows = buildList<dev.droidtop.library.settings.CatalogItem> {
             gameUpdates.take(MAX_GAME_UPDATE_ROWS).forEach { (name, version) ->
                 add(
                     ActionItem(
@@ -1155,8 +1163,17 @@ object AppSettingsCatalogs {
                 )
             }
         }
-        listOf(CatalogGroup(id = "updates_available", title = "Available", items = shown), androidAppsGroup(context, cachedOffers))
+        listOfNotNull(
+            CatalogGroup(id = "updates_available", title = "droidtop", items = droidtopRows),
+            pluginRows.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "updates_plugins", title = "Plugins", items = it) },
+            appRows.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "updates_apps", title = "Apps", items = it) },
+            gameRows.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "updates_games", title = "Games", items = it) },
+            androidAppsGroup(context, cachedOffers),
+        )
     }
+
+    /** An update's value: the version on offer, said in one short line ("0.2.1-3 available"). */
+    private fun available(version: String): String = "$version available"
 
     /** One app's update from its catalog, through the one install path; the line to show. */
     private suspend fun updateApp(

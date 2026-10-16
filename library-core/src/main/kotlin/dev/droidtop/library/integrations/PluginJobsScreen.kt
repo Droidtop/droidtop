@@ -94,6 +94,13 @@ object PluginJobsScreen {
     private fun jobTitle(entry: PluginJobsCenter.Entry): String =
         "${entry.pluginLabel}: ${entry.title}" + (entry.via?.let { " (via $it)" } ?: "")
 
+    /**
+     * Who runs a job, for a row's second line: the plugin and the launcher it came through. A row's title is the job's
+     * own name, so a list of jobs from one plugin is not ten rows that all read "Downloads: ..." once cut to the
+     * row's width (Droidtop/tracker#85, rig 2026-10-14).
+     */
+    private fun jobSource(entry: PluginJobsCenter.Entry): String = entry.pluginLabel + (entry.via?.let { " (via $it)" } ?: "")
+
     private fun outcome(entry: PluginJobsCenter.Entry): String =
         if (entry.result?.ok == true) entry.result?.values?.get("summary") ?: "Done" else (entry.result?.error ?: "Failed")
 
@@ -109,7 +116,9 @@ object PluginJobsScreen {
             entry.percent >= 0 -> listOfNotNull("${entry.percent}%", timeLeft).joinToString(" · ")
             else -> entry.statusLine
         }
-        return if (entry.percent >= 0 || entry.paused) "$first\n${entry.statusLine}" else first
+        // The status line is said once: a paused job whose status is "Paused" read "Paused Paused" (tracker#85).
+        val second = entry.statusLine.takeIf { it.isNotBlank() && !it.equals(first, ignoreCase = true) }
+        return if ((entry.percent >= 0 || entry.paused) && second != null) "$first\n$second" else first
     }
 
     /**
@@ -121,8 +130,8 @@ object PluginJobsScreen {
         if (entry.done) {
             return ActionItem(
                 id = "plugin_job_${entry.jobId}",
-                title = jobTitle(entry),
-                subtitle = outcome(entry),
+                title = entry.title,
+                subtitle = "${jobSource(entry)} · ${outcome(entry)}",
                 value = if (entry.result?.ok == true) "Done" else "Failed",
                 run = {},
             )
@@ -130,8 +139,8 @@ object PluginJobsScreen {
         val line = progressLine(entry, JobEta.line(entry, nowMs))
         return NestedScreenItem(
             id = "plugin_job_${entry.jobId}",
-            title = jobTitle(entry),
-            subtitle = entry.statusLine,
+            title = entry.title,
+            subtitle = jobSource(entry),
             inline = jobPage(entry.jobId, jobTitle(entry)),
             valueLabel = { line },
             progress = if (entry.percent >= 0) entry.percent / 100f else -1f,

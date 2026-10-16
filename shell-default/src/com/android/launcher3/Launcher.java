@@ -299,7 +299,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import app.murinelauncher.graphics.WorkspaceBlurUtils;
-import app.murinelauncher.widget.search.MurineSearchBoxView;
 import app.murinelauncher.widget.smartspace.SmartspaceMode;
 
 /**
@@ -997,7 +996,8 @@ public class Launcher extends StatefulActivity<LauncherState>
                 if (results != null && !results.isEmpty()) {
                     // Result with highest confidence
                     String query = results.get(0);
-                    MurineSearchBoxView.performDetachedWebSearch(this, query);
+                    // droidtop patch: what was said goes to the one search, as typed text would.
+                    dev.droidtop.shell.standard.LauncherSearch.open(this, query);
                 }
             }
             return;
@@ -1707,14 +1707,16 @@ public class Launcher extends StatefulActivity<LauncherState>
             // Show resize frame on the newly inflated LauncherAppWidgetHostView.
             LauncherAppWidgetHostView reInflatedHostView =
                     getWorkspace().getWidgetForAppWidgetId(appWidgetId);
-            showWidgetResizeFrame(
-                    reInflatedHostView,
-                    (LauncherAppWidgetInfo) reInflatedHostView.getTag(),
-                    presenterPos);
-            // We always update widget size after re-inflating PendingAppWidgetHostView
-            WidgetSizes.updateWidgetSizeRanges(
-                    reInflatedHostView, this, itemInfo.spanX, itemInfo.spanY);
-            return;
+            if (reInflatedHostView != null) {
+                showWidgetResizeFrame(
+                        reInflatedHostView,
+                        (LauncherAppWidgetInfo) reInflatedHostView.getTag(),
+                        presenterPos);
+                // We always update widget size after re-inflating PendingAppWidgetHostView
+                WidgetSizes.updateWidgetSizeRanges(
+                        reInflatedHostView, this, itemInfo.spanX, itemInfo.spanY);
+                return;
+            }
         }
         if (updateWidgetSize) {
             WidgetSizes.updateWidgetSizeRanges(hostView, this, itemInfo.spanX, itemInfo.spanY);
@@ -1875,7 +1877,16 @@ public class Launcher extends StatefulActivity<LauncherState>
                 }
 
                 if (shouldMoveToDefaultScreen && !mWorkspace.isHandlingTouch()) {
-                    mWorkspace.post(mWorkspace::moveToDefaultScreen);
+                    // droidtop patch (Droidtop/tracker#564): Home pressed while already on the
+                    // first page runs the Home button's gesture slot, as in Nova and Apex; on any
+                    // other page it still goes to the first page.
+                    if (mWorkspace.getNextPage() == Workspace.DEFAULT_PAGE
+                            && LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this)
+                                    != com.android.launcher3.touch.GestureAction.NONE) {
+                        mWorkspace.post(() -> LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.get(this).perform(this));
+                    } else {
+                        mWorkspace.post(mWorkspace::moveToDefaultScreen);
+                    }
                 }
             }
 
@@ -2968,7 +2979,7 @@ public class Launcher extends StatefulActivity<LauncherState>
     }
 
     public TouchController[] createTouchControllers() {
-        return new TouchController[] {getDragController(), new NotificationSwipeController(this), new AllAppsSwipeController(this)};
+        return new TouchController[] {getDragController(), new com.android.launcher3.touch.MultiFingerGestureController(this), new NotificationSwipeController(this), new AllAppsSwipeController(this)};
     }
 
     public void onDragLayerHierarchyChanged() {
@@ -3131,8 +3142,9 @@ public class Launcher extends StatefulActivity<LauncherState>
 
     public boolean isDraggingEnabled() {
         // We prevent dragging when we are loading the workspace as it is possible to pick up a view
-        // that is subsequently removed from the workspace in startBinding().
-        return !isWorkspaceLoading();
+        // that is subsequently removed from the workspace in startBinding();
+        // Dragging is also disabled while the home screen is locked.
+        return !isWorkspaceLoading() && !LauncherPrefs.LOCK_HOME_SCREEN.get(this);
     }
 
     public boolean isNaturalScrollingEnabled() {

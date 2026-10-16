@@ -12,7 +12,9 @@ import android.text.TextUtils
 import androidx.annotation.RequiresApi
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.Preference
+import androidx.preference.SwitchPreferenceCompat
 import app.murinelauncher.receiver.ScreenOffAdminReceiver
+import app.murinelauncher.widget.CustomSeekBarPreference
 import app.murinelauncher.widget.radio.RadioGroupPreference
 import app.murinelauncher.widget.smartspace.SmartspaceMode
 import app.murinelauncher.service.MurineAccessibilityService
@@ -22,6 +24,7 @@ import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.R
+import com.android.launcher3.SessionCommitReceiver
 import com.android.launcher3.Utilities
 import com.android.launcher3.states.RotationHelper
 import com.android.launcher3.util.DisplayController
@@ -32,6 +35,9 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val FIXED_LANDSCAPE_MODE: String = "pref_fixed_landscape_mode"
         const val GRID_SIZE_WIDTH: String = "pref_grid_size_width"
         const val GRID_SIZE_HEIGHT: String = "pref_grid_size_height"
+        const val LOCK_HOME_SCREEN: String = "pref_lock_home_screen"
+        const val DOCK_ICONS_OVERRIDE_SWITCH: String = "pref_dock_icons_override_switch"
+        const val DOCK_ICONS: String = "pref_dock_icons"
         // droidtop patch: superseded by DOUBLE_TAP_ACTION/SWIPE_DOWN_ACTION
         // below -- kept only as the migration source key
         // (GestureActionMigration), never bound to a preference row itself.
@@ -39,6 +45,11 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val SWIPE_DOWN_NOTIFICATIONS: String = "pref_swipe_down_notifications"
         const val DOUBLE_TAP_ACTION: String = "pref_gesture_double_tap_action"
         const val SWIPE_DOWN_ACTION: String = "pref_gesture_swipe_down_action"
+        const val TWO_FINGER_DOWN_ACTION: String = "pref_gesture_two_finger_down_action"
+        const val TWO_FINGER_UP_ACTION: String = "pref_gesture_two_finger_up_action"
+        const val PINCH_IN_ACTION: String = "pref_gesture_pinch_in_action"
+        const val PINCH_OUT_ACTION: String = "pref_gesture_pinch_out_action"
+        const val HOME_BUTTON_ACTION: String = "pref_gesture_home_button_action"
         const val SMARTSPACE_MODE: String = "pref_smartspace_mode"
         const val TASKBAR: String = "pref_taskbar"
         private const val REQUEST_DEVICE_ADMIN = 1001
@@ -113,10 +124,42 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                 preference.setDefaultValue(LauncherPrefs.defaultGridHeight(isTablet))
                 return true
             }
+            // The dock's own size, as the drawer's own width is set (SettingsDrawerFragment): off is 0, the grid's
+            // width; on starts at the grid's width.
+            DOCK_ICONS_OVERRIDE_SWITCH -> {
+                val launcherPrefs = LauncherPrefs.get(preference.context)
+                val current = launcherPrefs.get(LauncherPrefs.DOCK_ICONS)
+                preference as SwitchPreferenceCompat
+                preference.isChecked = current != 0
+                updateDockIconsVisibility(current != 0)
+                preference.setOnPreferenceChangeListener { _, newValue ->
+                    val enabled = newValue as Boolean
+                    val value = if (enabled) launcherPrefs.get(LauncherPrefs.GRID_WIDTH) else 0
+                    launcherPrefs.put(LauncherPrefs.DOCK_ICONS, value)
+                    if (enabled) findPreference<CustomSeekBarPreference>(DOCK_ICONS)?.setValue(value)
+                    updateDockIconsVisibility(enabled)
+                    true
+                }
+                return true
+            }
+            DOCK_ICONS -> {
+                preference as CustomSeekBarPreference
+                preference.min = if (LauncherPrefs.DOCK_ICONS.get(requireContext()) == 0) 0 else 3
+                return true
+            }
             TASKBAR -> {
                 // Turning it on asks for the accessibility access its window needs.
                 preference.setOnPreferenceChangeListener { _, newValue ->
                     if (newValue == true && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) requestAccessibilityPermission(requireContext())
+                    true
+                }
+                return true
+            }
+            LOCK_HOME_SCREEN -> {
+                val addIcon = findPreference<Preference>(SessionCommitReceiver.ADD_ICON_PREFERENCE_KEY)
+                addIcon?.isEnabled = !(preference as SwitchPreferenceCompat).isChecked
+                preference.setOnPreferenceChangeListener { _, newValue ->
+                    addIcon?.isEnabled = !(newValue as Boolean)
                     true
                 }
                 return true
@@ -129,6 +172,31 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
             SWIPE_DOWN_ACTION -> {
                 preference as RadioGroupPreference
                 bindGestureAction(preference, LauncherPrefs.GESTURE_SWIPE_DOWN_ACTION.defaultValue)
+                return true
+            }
+            TWO_FINGER_DOWN_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_DOWN_ACTION.defaultValue)
+                return true
+            }
+            TWO_FINGER_UP_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_TWO_FINGER_UP_ACTION.defaultValue)
+                return true
+            }
+            PINCH_IN_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_IN_ACTION.defaultValue)
+                return true
+            }
+            PINCH_OUT_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_PINCH_OUT_ACTION.defaultValue)
+                return true
+            }
+            HOME_BUTTON_ACTION -> {
+                preference as RadioGroupPreference
+                bindGestureAction(preference, LauncherPrefs.GESTURE_HOME_BUTTON_ACTION.defaultValue)
                 return true
             }
             SMARTSPACE_MODE -> {
@@ -162,6 +230,14 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
      * function since both gesture slots (double-tap, swipe-down) offer
      * the same GestureAction choices.
      */
+    private fun updateDockIconsVisibility(enabled: Boolean) {
+        findPreference<CustomSeekBarPreference>(DOCK_ICONS)?.apply {
+            isEnabled = enabled
+            isVisible = enabled
+            min = if (enabled) 3 else 0
+        }
+    }
+
     private fun bindGestureAction(preference: RadioGroupPreference, defaultAction: GestureAction) {
         preference.asEnum(GestureAction::class.java).apply {
             setDefaultValue(defaultAction)

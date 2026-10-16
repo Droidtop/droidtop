@@ -223,10 +223,17 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                 R.drawable.ic_widget,
                 IGNORE,
                 v -> {
-                    Intent games = new Intent("dev.droidtop.app.action.SHOW_GAMES")
-                            .setClassName(v.getContext().getPackageName(), "dev.droidtop.app.LauncherGamesActivity")
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    v.getContext().startActivity(games);
+                    dev.droidtop.shell.standard.DroidtopScreens.openGames(v.getContext());
+                    return true;
+                }));
+        // droidtop patch: the Quick Menu, the same sheet Gaming's R2 opens (docs/SPEC.md,
+        // Launcher mode "Gestures"); a gesture can open it too.
+        options.add(new OptionItem(launcher,
+                R.string.gesture_action_open_quick_menu,
+                R.drawable.ic_setting,
+                IGNORE,
+                v -> {
+                    dev.droidtop.shell.standard.DroidtopScreens.openQuickMenu(v.getContext());
                     return true;
                 }));
         // droidtop patch: the companion as a pull-down sheet, while the device has no second
@@ -262,14 +269,15 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
                     IGNORE,
                     OptionsPopupView::startWallpaperPicker));
         }
-        if (WIDGETS_ENABLED) {
+        boolean editAllowed = launcher.isDraggingEnabled();
+        if (WIDGETS_ENABLED && editAllowed) {
             options.add(new OptionItem(launcher,
                     R.string.widget_button_text,
                     R.drawable.ic_widget,
                     LAUNCHER_WIDGETSTRAY_BUTTON_TAP_OR_LONGPRESS,
                     OptionsPopupView::onWidgetsClicked));
         }
-        if (MULTI_SELECT_EDIT_MODE.get()) {
+        if (MULTI_SELECT_EDIT_MODE.get() && editAllowed) {
             options.add(new OptionItem(launcher,
                     R.string.edit_home_screen,
                     R.drawable.enter_home_gardening_icon,
@@ -316,6 +324,10 @@ public class OptionsPopupView<T extends Context & ActivityContext> extends Arrow
     /** Returns WidgetsFullSheet that was opened, or null if nothing was opened. */
     @Nullable
     public static WidgetsFullSheet openWidgets(Launcher launcher) {
+        // Locked home screen: no widget picker. Also covers the ctrl+W keyboard shortcut.
+        if (!launcher.isDraggingEnabled()) {
+            return null;
+        }
         if (launcher.getPackageManager().isSafeMode()) {
             Toast.makeText(launcher, R.string.safemode_widget_error, Toast.LENGTH_SHORT).show();
             return null;

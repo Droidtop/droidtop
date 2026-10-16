@@ -23,7 +23,6 @@
     <string name="pref_subcategory_day_night">Tema interfaccia</string>
     <string name="pref_subcategory_layout">Disposizione</string>
     <string name="pref_subcategory_appearance">Aspetto</string>
-    <string name="pref_subcategory_persistency">Persistenza</string>
     <string name="pref_subcategory_gestures">Gesti</string>
     <string name="pref_subcategory_options">Opzioni</string>
     <string name="pref_subcategory_backup">Backup</string>
@@ -35,9 +34,6 @@
     <string name="backup_import_desc">Ripristina layout e impostazioni salvati</string>
     <string name="backup_import_confirm">Il launcher verrà riavviato e la configurazione ripristinata</string>
 
-    <string name="pref_label_ui_mode_system">Sistema</string>
-    <string name="pref_label_ui_mode_day">Chiaro</string>
-    <string name="pref_label_ui_mode_night">Scuro</string>
     <string name="pref_label_grid_width">Larghezza griglia</string>
     <string name="pref_label_grid_height">Altezza griglia</string>
     <string name="pref_label_icon_size">Dimensione icone (%)</string>
@@ -45,7 +41,16 @@
 
     <string name="pref_label_visibility_title">Visibilità etichette</string>
     <string name="label_visibility_never">Mai</string>
+    <string name="label_visibility_drawer_only">Solo cassetto</string>
+    <string name="label_visibility_home_only">Solo home</string>
     <string name="label_visibility_auto">Auto</string>
+    <string name="pref_adaptive_icons_title">Icone adattive</string>
+    <string name="pref_adaptive_icons_summary">Rimodella le icone che non sono adattive</string>
+    <string name="pref_adaptive_icons_except_system">Tranne le app di sistema</string>
+    <string name="pref_adaptive_icons_force_legacy">Forza icone legacy</string>
+    <string name="pref_adaptive_icons_never">Non rimodellare</string>
+    <string name="pref_themed_icons_title">Icone monocromatiche</string>
+    <string name="pref_themed_icons_summary">Ricolora le icone in base al tema di sistema</string>
     <string name="label_visibility_always">Sempre</string>
 
     <string name="pref_icon_shape_title">Forma icone</string>
@@ -64,9 +69,13 @@
 
     <string name="pref_drawer_grid_width_override_title">Larghezza griglia personalizzata</string>
     <string name="pref_drawer_grid_width_override_summary">Usa un numero personalizzato di colonne nel cassetto app</string>
+    <string name="pref_drawer_padding_title">Spaziatura laterale</string>
 
     <string name="pref_blur_preview_title">Sfocatura modalità anteprima</string>
     <string name="pref_blur_preview_desc">Sfoca lo sfondo durante il trascinamento di icone e widget</string>
+
+    <string name="pref_lock_home_screen_title">Blocco schermata home</string>
+    <string name="pref_lock_home_screen_summary">Impedisce di spostare icone e widget</string>
 
     <!-- Murine search bar -->
     <string name="murine_search_hint">Cerca…</string>
@@ -81,18 +90,8 @@
     <string name="pref_qsb_search_provider_title">Motore di ricerca</string>
     <string name="pref_qsb_enable_lens_title">Attiva Lens</string>
     <string name="pref_qsb_enable_lens_summary">Mostra il pulsante Google Lens nella ricerca rapida</string>
-    <string name="pref_qsb_box_blur">Sfocatura pannello di ricerca</string>
-    <string name="pref_qsb_box_blur_desc">Mostra effetto MICA nel pannello di ricerca</string>
     <string name="pref_qsb_bar_alpha">Opacità barra di ricerca</string>
-    <string name="pref_qsb_box_alpha">Opacità pannello di ricerca</string>
     <string name="pref_qsb_custom_provider_title">URL di ricerca personalizzato</string>
-    <string name="pref_qsb_history_size_title">Dimensione cronologia ricerche</string>
-    <string name="pref_qsb_history_size_summary">Voci massime</string>
-    <string name="pref_qsb_clear_history_title">Cancella cronologia ricerche</string>
-    <string name="pref_qsb_clear_history_summary">Elimina tutte le ricerche salvate</string>
-    <string name="pref_qsb_clear_history_confirm_title">Cancellare la cronologia?</string>
-    <string name="pref_qsb_clear_history_confirm_message">Verranno eliminate definitivamente tutte le ricerche salvate.</string>
-    <string name="pref_qsb_clear_history_toast">Cronologia cancellata</string>
 
     <!-- Murine smartspace / clock widget -->
     <string name="smartspace_mode_clock">Orologio</string>

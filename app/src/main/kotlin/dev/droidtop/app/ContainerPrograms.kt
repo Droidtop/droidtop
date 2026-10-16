@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * The app containers' own programs that droidtop runs (docs/SPEC.md 3 "The image's own program", Droidtop/tracker#555
@@ -47,6 +48,13 @@ internal object ContainerPrograms {
     val all: StateFlow<Map<String, State>> = states
 
     fun state(containerId: String): State = states.value[containerId] ?: State.Stopped
+
+    /** When a program last started and last ended, in this run of droidtop: what the engine APIs give as its times. */
+    data class Times(val startedMs: Long?, val endedMs: Long?)
+
+    private val times = java.util.concurrent.ConcurrentHashMap<String, Times>()
+
+    fun times(containerId: String): Times = times[containerId] ?: Times(null, null)
 
     private fun set(containerId: String, state: State) {
         states.value = states.value + (containerId to state)
@@ -91,7 +99,9 @@ internal object ContainerPrograms {
                 while (isActive) {
                     if (runtime.siblingsNeedStart) runCatching { runtime.start(container) }
                     val startedAt = SystemClock.elapsedRealtime()
-                    set(container.id, State.Running(System.currentTimeMillis()))
+                    val now = System.currentTimeMillis()
+                    times[container.id] = Times(now, null)
+                    set(container.id, State.Running(now))
                     Log.i(TAG, "${container.id}: starting ${config.program().joinToString(" ")}")
                     val result = runCatching {
                         runtime.exec(container, ContainerProgram.command(config, container.id), ContainerProgram.environment(config))
@@ -101,8 +111,9 @@ internal object ContainerPrograms {
                     val ranMs = SystemClock.elapsedRealtime() - startedAt
                     failures = if (ranMs >= ContainerProgram.RAN_LONG_ENOUGH_MS) 0 else failures + 1
                     Log.i(TAG, "${container.id}: ended with $exit after $ranMs ms")
-                    if (!ContainerProgram.restarts(restartOnFailure(app, container.id), exit, failures)) {
-                        val gaveUp = exit != 0 && restartOnFailure(app, container.id)
+                    val policy = restartPolicy(app, container.id)
+                    if (!ContainerProgram.restarts(policy, exit, failures)) {
+                        val gaveUp = policy != ContainerProgram.RestartPolicy.No && (exit != 0 || policy.withDesktop)
                         set(container.id, result.exceptionOrNull()?.let { State.Failed(it.message ?: it.javaClass.simpleName) } ?: State.Ended(exit, gaveUp))
                         break
                     }
@@ -111,6 +122,7 @@ internal object ContainerPrograms {
                     delay(wait)
                 }
             } finally {
+                times[container.id]?.let { times[container.id] = it.copy(endedMs = System.currentTimeMillis()) }
                 trimmer.cancel()
                 synchronized(listening) { listening.remove(container.id) }
                 jobs.remove(container.id)
@@ -137,6 +149,7 @@ internal object ContainerPrograms {
 
     private const val KEY_RESTART = ".restart"
     private const val KEY_AUTOSTART = ".autostart"
+    private const val KEY_CREATED = ".created"
     private const val TRIM_EVERY_MS = 30_000L
 
     private fun settingsFile(context: Context) = File(File(context.filesDir, ContainerProgram.LOG_DIR_NAME), "programs.properties")
@@ -147,15 +160,48 @@ internal object ContainerPrograms {
     private fun saveSetting(context: Context, key: String, on: Boolean) {
         val props = settings(context)
         props[key] = on.toString()
+        store(context, props)
+    }
+
+    private fun store(context: Context, props: Properties) {
         val file = settingsFile(context).apply { parentFile?.mkdirs() }
         file.outputStream().use { props.store(it, "droidtop app container programs") }
     }
 
-    /** Restart when it fails: on by default, as a server is expected to stay up. */
-    fun restartOnFailure(context: Context, containerId: String): Boolean =
-        settings(context).getProperty(containerId + KEY_RESTART)?.toBooleanStrictOrNull() ?: true
+    /**
+     * When the program is started again (docs/SPEC.md 3d, "Restart policies"): droidtop's default, restart when it
+     * fails, for a container made on its page; the one `--restart` gave (`no` by default) for one `docker run` or
+     * `podman run` made. The page's old true and false read as on-failure and no.
+     */
+    fun restartPolicy(context: Context, containerId: String): ContainerProgram.RestartPolicy =
+        ContainerProgram.RestartPolicy.stored(settings(context).getProperty(containerId + KEY_RESTART))
 
-    fun setRestartOnFailure(context: Context, containerId: String, on: Boolean) = saveSetting(context, containerId + KEY_RESTART, on)
+    /** Sets the policy; `always` and `unless-stopped` start the program with the desktop, as Docker's daemon does. */
+    fun setRestartPolicy(context: Context, containerId: String, policy: ContainerProgram.RestartPolicy) {
+        val props = settings(context)
+        props[containerId + KEY_RESTART] = policy.words()
+        if (policy.withDesktop) props[containerId + KEY_AUTOSTART] = "true"
+        store(context, props)
+    }
+
+    /**
+     * The person stopped the program (its page's Stop it, `docker stop`): under `unless-stopped` it then stays stopped
+     * when the desktop starts again, until it is started.
+     */
+    suspend fun stoppedByPerson(context: Context, containerId: String) {
+        stop(containerId)
+        withContext(Dispatchers.IO) {
+            if (restartPolicy(context, containerId) == ContainerProgram.RestartPolicy.UnlessStopped) setAutostart(context, containerId, false)
+        }
+    }
+
+    /** The person started the program: under `unless-stopped` it starts with the desktop again. */
+    suspend fun startedByPerson(context: Context, runtime: ContainerRuntime, container: Container) {
+        withContext(Dispatchers.IO) {
+            if (restartPolicy(context, container.id) == ContainerProgram.RestartPolicy.UnlessStopped) setAutostart(context, container.id, true)
+        }
+        start(context, runtime, container)
+    }
 
     /** Start with the desktop: off by default; a program runs because the person started it or asked for this. */
     fun autostart(context: Context, containerId: String): Boolean =
@@ -163,12 +209,26 @@ internal object ContainerPrograms {
 
     fun setAutostart(context: Context, containerId: String, on: Boolean) = saveSetting(context, containerId + KEY_AUTOSTART, on)
 
+    /**
+     * Notes that droidtop made [containerId] now, for `ps`'s CREATED (docs/SPEC.md 3d, "Each tool's output"): every
+     * place droidtop creates a container calls it. A container made before has none.
+     */
+    suspend fun recordCreated(context: Context, containerId: String) = withContext(Dispatchers.IO) {
+        val props = settings(context)
+        props[containerId + KEY_CREATED] = System.currentTimeMillis().toString()
+        store(context, props)
+    }
+
+    /** When droidtop made [containerId] (epoch ms), or null when it did not note it. */
+    fun created(context: Context, containerId: String): Long? = settings(context).getProperty(containerId + KEY_CREATED)?.toLongOrNull()
+
     /** Forgets [containerId]: its program stopped, its settings and its log gone (the container was deleted). */
     fun forget(context: Context, containerId: String) {
         stop(containerId)
         val props = settings(context)
         props.remove(containerId + KEY_RESTART)
         props.remove(containerId + KEY_AUTOSTART)
+        props.remove(containerId + KEY_CREATED)
         runCatching { settingsFile(context).outputStream().use { props.store(it, "droidtop app container programs") } }
         ContainerProgram.hostLogFile(context.filesDir, containerId).delete()
         ContainerProgram.overridesFile(context.filesDir, containerId).delete()

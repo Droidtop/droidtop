@@ -73,6 +73,13 @@ class GameTitleParserTest {
         Row("Love Of MagicBook", "Love Of MagicBook"),
         // A version written onto the title with no separator is still the version.
         Row("SevenDayWYandereGirlV0.80", "Seven Day W Yandere Girl", version = "0.80"),
+        // A version straight after punctuation or another script (tracker#174, rig 2026-10-14).
+        Row("新生活は妹ちゃんと!ver1.8", "新生活は妹ちゃんと!", version = "1.8"),
+        Row("タイトルv1.02", "タイトル", version = "1.02"),
+        Row("タイトルver2", "タイトル", version = "2"),
+        // After a Latin letter `ver` may end a word, and a bare v needs a dotted number after a symbol.
+        Row("Forever1.0", "Forever1.0"),
+        Row("Game!v2", "Game!v2"),
         // A single capital that starts a word stays its own word: the capital run ends one letter early.
         Row("SomeDayWThingGirl", "Some Day W Thing Girl"),
         Row("AWonderfulDay", "A Wonderful Day"),

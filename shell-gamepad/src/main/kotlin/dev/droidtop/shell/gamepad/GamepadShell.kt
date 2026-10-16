@@ -2886,23 +2886,13 @@ private fun GamesSection(
                             CatalogNavigator(root = foldersScreen, onExit = { addingFolders = false })
                         }
                     } else {
-                        val emptyAction = remember { androidx.compose.ui.focus.FocusRequester() }
-                        Column(
-                            modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding, vertical = Space.Xl),
-                            verticalArrangement = Arrangement.spacedBy(Space.Lg),
-                        ) {
-                            Text("No games yet.", color = MenuTokens.OnSurface, style = TypeRole.body)
-                            if (foldersScreen != null) {
-                                ShellChip(
-                                    "Add a folder",
-                                    primary = true,
-                                    modifier = Modifier.focusRequester(emptyAction),
-                                    onClick = { addingFolders = true },
-                                )
-                                LaunchedEffect(Unit) { requestFocusWhenAttached(emptyAction, "Games empty") }
-                            }
-                            GetGamesChip(dev.droidtop.library.integrations.GetGamesContext.EMPTY_STATE, onChanged = onRequestRescan)
-                        }
+                        // The one empty state of a games place (Droidtop/tracker#533).
+                        EmptyLibrary(
+                            line = "No games yet",
+                            actionLabel = "Add a folder",
+                            onAction = { if (foldersScreen != null) addingFolders = true },
+                            onChanged = onRequestRescan,
+                        )
                     }
                 } else {
                     // Box, not Column: EsDeThemedView needs to genuinely fill

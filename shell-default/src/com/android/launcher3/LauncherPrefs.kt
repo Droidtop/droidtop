@@ -20,13 +20,13 @@ import android.content.Context.MODE_PRIVATE
 import android.content.SharedPreferences
 import androidx.annotation.VisibleForTesting
 import app.murinelauncher.graphics.WorkspaceBlurUtils
+import app.murinelauncher.settings.prefs.AdaptiveIcons
 import app.murinelauncher.settings.prefs.LabelVisibility
 import app.murinelauncher.settings.SettingsDrawerFragment
 import app.murinelauncher.settings.SettingsGeneralFragment
 import app.murinelauncher.settings.SettingsHomeFragment
 import app.murinelauncher.settings.SettingsIconsFragment
 import app.murinelauncher.settings.SettingsQsbFragment
-import app.murinelauncher.theme.ThemeOverride
 import app.murinelauncher.widget.search.SearchProvider
 import app.murinelauncher.widget.smartspace.SmartspaceMode
 import com.android.launcher3.BuildConfig.WIDGET_ON_FIRST_SCREEN
@@ -311,6 +311,14 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         }
         @JvmField
         val DRAWER_GRID_WIDTH_OVERRIDE = backedUpItem(SettingsDrawerFragment.GRID_SIZE_WIDTH_DRAWER_OVERRIDE, 0)
+        // droidtop patch (Droidtop/tracker#564): the dock's own icon count, Nova/Apex-style; 0 is the grid's width.
+        @JvmField
+        val DOCK_ICONS = backedUpItem(SettingsHomeFragment.DOCK_ICONS, 0)
+        @JvmField
+        val DRAWER_PADDING = backedUpItem(SettingsDrawerFragment.DRAWER_PADDING, 100)
+        // droidtop patch (Droidtop/tracker#564): the drawer's order.
+        @JvmField
+        val DRAWER_SORT = backedUpItem(SettingsDrawerFragment.DRAWER_SORT, app.murinelauncher.settings.prefs.DrawerSort.ALPHABETICAL)
         @JvmField
         val ICON_SIZE = backedUpItem(SettingsIconsFragment.ICON_SIZE_KEY, 100)
         @JvmField
@@ -319,6 +327,8 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         val NOTIFICATION_BADGE_COUNT = backedUpItem(SettingsIconsFragment.NOTIFICATION_BADGE_COUNT_KEY, true)
         @JvmField
         val LABEL_VISIBILITY = backedUpItem(SettingsIconsFragment.LABEL_VISIBILITY_KEY, LabelVisibility.AUTO)
+        @JvmField
+        val ADAPTIVE_ICONS = backedUpItem(SettingsIconsFragment.ADAPTIVE_ICONS_KEY, AdaptiveIcons.ALWAYS)
 
         @JvmField
         val ENABLE_TWOLINE_ALLAPPS_TOGGLE = backedUpItem("pref_enable_two_line_toggle", false)
@@ -336,6 +346,8 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val TASKBAR_PINNING_IN_DESKTOP_MODE =
             backedUpItem(TASKBAR_PINNING_DESKTOP_MODE_KEY, true, EncryptionType.DEVICE_PROTECTED)
+        @JvmField
+        val LOCK_HOME_SCREEN = backedUpItem(SettingsHomeFragment.LOCK_HOME_SCREEN, false)
         // droidtop patch: one action per gesture slot instead of one
         // hardcoded action toggled on/off (docs/SPEC.md, Launcher mode
         // survey, "Assignable gesture actions"). Defaults match the old
@@ -352,6 +364,25 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
                 SettingsHomeFragment.SWIPE_DOWN_ACTION,
                 com.android.launcher3.touch.GestureAction.OPEN_NOTIFICATIONS,
             )
+        // More slots, Nova/Apex-style (Droidtop/tracker#564): two-finger swipes and pinches
+        // (MultiFingerGestureController) and the Home button pressed on the first page
+        // (Launcher.onNewIntent). Two-finger swipe down opens the Quick Menu out of the box, so
+        // Standard has a gesture into it; the rest start as nothing.
+        @JvmField
+        val GESTURE_TWO_FINGER_DOWN_ACTION =
+            backedUpItem(SettingsHomeFragment.TWO_FINGER_DOWN_ACTION, com.android.launcher3.touch.GestureAction.OPEN_QUICK_MENU)
+        @JvmField
+        val GESTURE_TWO_FINGER_UP_ACTION =
+            backedUpItem(SettingsHomeFragment.TWO_FINGER_UP_ACTION, com.android.launcher3.touch.GestureAction.NONE)
+        @JvmField
+        val GESTURE_PINCH_IN_ACTION =
+            backedUpItem(SettingsHomeFragment.PINCH_IN_ACTION, com.android.launcher3.touch.GestureAction.NONE)
+        @JvmField
+        val GESTURE_PINCH_OUT_ACTION =
+            backedUpItem(SettingsHomeFragment.PINCH_OUT_ACTION, com.android.launcher3.touch.GestureAction.NONE)
+        @JvmField
+        val GESTURE_HOME_BUTTON_ACTION =
+            backedUpItem(SettingsHomeFragment.HOME_BUTTON_ACTION, com.android.launcher3.touch.GestureAction.NONE)
         // Standard mode's taskbar on tablet-sized and larger displays (docs/SPEC.md 2c,
         // "Taskbar on large screens"). On by default; it draws only once the accessibility
         // service, which owns its window, is enabled.
@@ -423,15 +454,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val QSB_SEARCH_PROVIDER_CUSTOM = backedUpItem(SettingsQsbFragment.SEARCH_PROVIDER_CUSTOM, "", EncryptionType.ENCRYPTED)
         @JvmField
-        val QSB_SEARCH_HISTORY = backedUpItem("qsb_search_history", "[]", EncryptionType.ENCRYPTED)
-        @JvmField
-        val QSB_HISTORY_SIZE = backedUpItem(SettingsQsbFragment.SEARCH_HISTORY_SIZE, 50)
-        @JvmField
-        val QSB_BUBBLE_BLUR = backedUpItem(SettingsQsbFragment.SEARCH_BUBBLE_BLUR, WorkspaceBlurUtils.isBlurSupported)
-        @JvmField
         val QSB_ALPHA = backedUpItem(SettingsQsbFragment.SEARCH_BAR_ALPHA, 100)
-        @JvmField
-        val QSB_BUBBLE_ALPHA = backedUpItem(SettingsQsbFragment.SEARCH_BUBBLE_ALPHA, 90)
         @JvmField
         val SMARTSPACE_MODE = backedUpItem("pref_smartspace_mode", SmartspaceMode.MURINE_CLOCK, EncryptionType.ENCRYPTED)
         @JvmField
@@ -440,8 +463,6 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         val PENDING_SMARTSPACE_WIDGET_ID = nonRestorableItem("pending_smartspace_widget_id", -1)
         @JvmField
         val FIXED_LANDSCAPE_MODE = backedUpItem(SettingsHomeFragment.FIXED_LANDSCAPE_MODE, false)
-        @JvmField
-        val THEME_DAY_NIGHT = backedUpItem(SettingsGeneralFragment.LAUNCHER_THEME_DAY_NIGHT, if (ThemeOverride.supportsSystemTheme) ThemeOverride.THEME_SYSTEM else ThemeOverride.THEME_DARK)
         @JvmField
         val BLUR_PREVIEW = backedUpItem(SettingsGeneralFragment.BLUR_PREVIEW, WorkspaceBlurUtils.isBlurSupported)
         @JvmField

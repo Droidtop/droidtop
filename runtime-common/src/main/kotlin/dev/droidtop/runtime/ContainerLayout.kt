@@ -185,6 +185,11 @@ object ContainerLayout {
         // listens there, which to a program is the same as no CUPS.
         put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")
         waylandSocketName?.let { put("WAYLAND_DISPLAY", it) }
+        // droidtop's Docker Engine API (docs/SPEC.md 3d, D14): a docker client a container installed talks to
+        // droidtop's engine. With the desktop down nothing listens, which to a client is the same as no daemon.
+        put("DOCKER_HOST", DockerApi.DOCKER_HOST)
+        // Its libpod API (D15): a podman a container installed is remote whenever CONTAINER_HOST is set.
+        put("CONTAINER_HOST", LibpodApi.CONTAINER_HOST)
         // With audio sharing off, or no bridge running, nothing listens
         // there either -- to a program that is the same as no PulseAudio.
         if (audioShared) put("PULSE_SERVER", "$SOCKET_DIR/$AUDIO_SOCKET")

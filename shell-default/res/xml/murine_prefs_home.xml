@@ -26,6 +26,12 @@
         android:persistent="true"
         launcher:logIdOn="613"
         launcher:logIdOff="614" />
+    <SwitchPreferenceCompat
+        android:key="pref_lock_home_screen"
+        android:title="@string/pref_lock_home_screen_title"
+        android:summary="@string/pref_lock_home_screen_summary"
+        android:defaultValue="false"
+        android:persistent="true" />
     <!--
       LAUNCHER_HOME_SCREEN_ROTATION_ENABLED(615)
       LAUNCHER_HOME_SCREEN_ROTATION_DISABLED(616)
@@ -78,6 +84,22 @@
                 app:showIncrementButtons="false"
                 app:showTicks="true">
             </app.murinelauncher.widget.CustomSeekBarPreference>
+
+            <SwitchPreferenceCompat
+                android:key="pref_dock_icons_override_switch"
+                android:title="@string/pref_dock_icons_override_title"
+                android:summary="@string/pref_dock_icons_override_summary"
+                android:persistent="false" />
+
+            <!-- Min value set to 3 in code once the switch is on: 0 is "as the grid's width". -->
+            <app.murinelauncher.widget.CustomSeekBarPreference
+                android:title="@string/pref_label_dock_icons"
+                android:key="pref_dock_icons"
+                android:min="0"
+                android:max="10"
+                app:showIncrementButtons="false"
+                app:showTicks="true">
+            </app.murinelauncher.widget.CustomSeekBarPreference>
         </com.android.settingslib.widget.ExpandablePreference>
     </PreferenceCategory>
 
@@ -90,6 +112,31 @@
         <app.murinelauncher.widget.radio.RadioGroupPreference
             android:key="pref_gesture_swipe_down_action"
             android:title="@string/pref_swipe_down_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_two_finger_down_action"
+            android:title="@string/pref_two_finger_down_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_two_finger_up_action"
+            android:title="@string/pref_two_finger_up_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_pinch_in_action"
+            android:title="@string/pref_pinch_in_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_pinch_out_action"
+            android:title="@string/pref_pinch_out_action_title"
+            android:persistent="true"
+            app:showPreviewIcon="false"/>
+        <app.murinelauncher.widget.radio.RadioGroupPreference
+            android:key="pref_gesture_home_button_action"
+            android:title="@string/pref_home_button_action_title"
             android:persistent="true"
             app:showPreviewIcon="false"/>
     </PreferenceCategory>

@@ -4,6 +4,8 @@ import android.content.Context
 import dev.droidtop.runtime.ContainerEnter
 import dev.droidtop.runtime.ContainerExports
 import dev.droidtop.runtime.ContainerInfo
+import dev.droidtop.runtime.ContainerNetworks
+import dev.droidtop.runtime.ContainerPods
 import dev.droidtop.runtime.ContainerRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -21,6 +23,8 @@ internal object ContainerRemoval {
             ContainerExports.save(files, ContainerExports.without(ContainerExports.read(files), info.container.id))
             ContainerEnter.save(files, ContainerEnter.without(ContainerEnter.read(files), info.container.id))
             ContainerPrograms.forget(context.applicationContext, info.container.id)
+            ContainerPods.save(files, ContainerPods.withoutMember(ContainerPods.read(files), info.container.id))
+            ContainerNetworks.save(files, ContainerNetworks.withoutMember(ContainerNetworks.read(files), info.container.id))
         }
     }
 }

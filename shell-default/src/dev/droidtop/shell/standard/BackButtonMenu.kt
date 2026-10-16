@@ -107,24 +107,30 @@ object BackButtonMenu {
         droidtopIsHome = HomeRolePrefs.isDroidtopHome(context),
     )
 
+    /**
+     * One row of the switcher: [mode] for a mode's own row, null for the three that are not modes ("Modes and
+     * settings", "Reinitialize displays", "Close all apps"), which the sheet sets apart below the modes.
+     */
+    class Choice(val label: String, val mode: Mode?, val choose: () -> Unit)
+
     /** [askForHome], when given, runs instead of "Android" while [androidAsksForHome] says it must ask first. */
-    fun choices(context: Context, askForHome: (() -> Unit)? = null): List<Pair<String, () -> Unit>> {
+    fun choices(context: Context, askForHome: (() -> Unit)? = null): List<Choice> {
         val homeImplementation = HomeRolePrefs.activeHomeImplementation(context)
         return buildList {
             for (mode in ModeGate.switcherModes(Modes.enabled)) {
                 when (mode) {
                     Mode.LAUNCHER -> add(
-                        Mode.LAUNCHER.label to {
+                        Choice(Mode.LAUNCHER.label, mode) {
                             if (askForHome != null && androidAsksForHome(context)) askForHome() else openHome(context, homeImplementation)
                         },
                     )
-                    Mode.DESKTOP -> add(Mode.DESKTOP.label to { launchAppMode(context, Mode.DESKTOP) })
-                    Mode.GAMING -> add(Mode.GAMING.label to { launchAppMode(context, Mode.GAMING) })
+                    Mode.DESKTOP -> add(Choice(Mode.DESKTOP.label, mode) { launchAppMode(context, Mode.DESKTOP) })
+                    Mode.GAMING -> add(Choice(Mode.GAMING.label, mode) { launchAppMode(context, Mode.GAMING) })
                 }
             }
-            add(SETTINGS_ITEM to { openGlobalSettings(context) })
-            add(REINIT_DISPLAYS_ITEM to { reinitializeDisplays(context) })
-            add(CLEAR_ALL_APPS_ITEM to { ClearAllApps.open(context) })
+            add(Choice(SETTINGS_ITEM, null) { openGlobalSettings(context) })
+            add(Choice(REINIT_DISPLAYS_ITEM, null) { reinitializeDisplays(context) })
+            add(Choice(CLEAR_ALL_APPS_ITEM, null) { ClearAllApps.open(context) })
         }
     }
 
@@ -250,6 +256,34 @@ object ModeSwitcher {
                 component = ComponentName(context.packageName, ACTIVITY)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             },
+        )
+    }
+}
+
+/**
+ * droidtop's own screens the launcher opens, by class name since `:shell-default` cannot depend on `:app`:
+ * the Games grid (the home screen's menu) and the Quick Menu (the home screen's menu and gestures;
+ * docs/SPEC.md, Launcher mode "Gestures").
+ */
+object DroidtopScreens {
+    const val GAMES_ACTIVITY = "dev.droidtop.app.LauncherGamesActivity"
+    const val QUICK_MENU_ACTIVITY = "dev.droidtop.app.QuickMenuActivity"
+
+    @JvmStatic
+    fun openGames(context: Context) {
+        context.startActivity(
+            Intent("dev.droidtop.app.action.SHOW_GAMES")
+                .setClassName(context.packageName, GAMES_ACTIVITY)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }
+
+    @JvmStatic
+    fun openQuickMenu(context: Context) {
+        context.startActivity(
+            Intent(Intent.ACTION_MAIN)
+                .setClassName(context.packageName, QUICK_MENU_ACTIVITY)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 }
