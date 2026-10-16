@@ -1302,7 +1302,10 @@ activity that draws the shared `LibrarySearchDialog` (`shell-gamepad`
 open, see 12a "Search surfaces wired") through `LauncherSearchScreen`. Its
 local results are the installed apps that match, then the library's games
 (`matchesSearchText`, the one text rule of every list, over the library's
-already-scanned in-RAM list: no per-game disk lookups while typing), all ranked
+already-scanned in-RAM list: no per-game disk lookups while typing; every word typed must be in the stored title, the
+shown name, the genre or the developer, folded as titles are compared, `StoreIdentity.fold`, so "&" is "and" and
+punctuation and accents do not count; owner, 2026-10-16: "Love & Sex: Second Base ... can't be found using
+search"), all ranked
 together with the source plugins' answers in the one list (12a "One search")
 and, while the field is empty, droidtop's Recommendations. A tap on an app opens
 it, a tap on a game plays it through `GameLaunchActivity.dispatch`, a tap on a
@@ -4275,15 +4278,21 @@ droidtop 0.2.0-dev.1931).
   never the companion's own, so touching the companion never moves the target. Pin keeps typing to that screen
   while it is connected (stored by its unique id). Chord keys above the keyboard (Esc, Tab, Alt+Tab, Super, Ctrl+C,
   Ctrl+V, Ctrl+Z) are played by the vendored keyboard's `MacroPlayer` into the same keyboard destination as typed
-  keys, which keeps its own sticky modifiers and macro keys. **The keyboard is the whole Hacker's Keyboard layout
-  (Droidtop/tracker#486 item 2)**, the one view droidtop's input method draws (`KeyboardPanel`, no second keyboard):
-  its five rows (digits, Tab, Ctrl, Shift, then Esc, Alt, Super, space, Fn and the arrows) with its sixth row, F1 to
-  F12, Home and End, above them (`KeyboardPanel(functionRow = true)`, the layout's own "extension" row, which only the
-  input method ever turned on and so the panel never showed), and the Fn layer's Insert, Delete, Page Up and Down. Only
-  Input asks for the sixth row; the small drafts and overlays keep five. Ctrl, Alt, Shift and Super latch (a tap holds
-  one at the far side until the next key or a second tap) and Backspace, Delete, the arrows and Page Up and Down repeat
-  while held (400 ms, then 50 ms): the panel repeats for a destination that sees one key-down per press (an input
-  connection, a window, a draft, the accessibility field) and a sink whose far side repeats itself says so
+  keys, which keeps its own sticky modifiers and macro keys. **The keyboard is the S7 slab with a whole keyboard's keys**
+  (`SlabView(extras = true)`, Droidtop/tracker#567; it was the Hacker's Keyboard grid, #486 item 2, until the owner,
+  2026-10-16: "The keyboard in the keys menu moves things around, doesn't scale properly, and gets cut off in various
+  ways"). Above the letters: Esc, Tab, Ctrl, Alt and Super; above the symbols: F1 to F12; the bottom row is the layer
+  key, space and the four arrows, with no Clipboard, globe or Done, as nothing on the tab closes. It lays out from its
+  container's real size: the tab gives it three fifths of what is left under the header and the fact lines and never
+  less than `SlabView.minimumHeight` (every row of every layer at least 28 dp), so on a short screen the trackpad
+  gets what is left, down to nothing, and the keys are never cut off; rows are sized for the tallest layer, so switching
+  to the symbols never resizes a key; keys, gaps and labels scale together, labels never under 10 sp. The fact lines
+  (the target, Pin, the status, the input method and accessibility buttons, the controllers) keep their place when
+  hidden and have fixed heights, so a fact changing never moves the keys. A key that is a key press goes down on touch
+  and up on release with what is latched held under it (`Slab.held`), so a PC game sees an arrow or a letter held for
+  as long as the finger is on it; Ctrl, Alt and Super latch for the next key, Shift once or (twice) Caps; a held
+  character, space, Backspace or arrow repeats (400 ms, then 50 ms) for a destination that sees one key-down per press
+  (an input connection, a window, a draft, the accessibility field), and not where the far side repeats itself
   (`KeyboardSink.repeatsAtSource` false: Desktop's seat, the compositor's own repeat; the elevated `input` route, which
   starts a process per key). The trackpad's settings (Companion group > Trackpad,
   `TrackpadSettings`) are libinput's options with libinput's defaults: pointer speed, tap to click, tap time, hold
@@ -4294,7 +4303,8 @@ droidtop 0.2.0-dev.1931).
   screen (above), by `TrackpadRoute` chosen as each gesture starts and kept until its left button is let go: while
   droidtop's shell is what that screen shows it moves the shell's selection (focus steps, confirm, back:
   `FocusNavTrackpadSink`; pointer and focus are one selection in the shell, and a hover is how a mouse moves focus there,
-  so a cursor over droidtop's own chrome would only be a second selection), and in any other app it is a pointer.
+  so a cursor over droidtop's own chrome would only be a second selection), on droidtop's own Windows game screen it is
+  that game's mouse (5b, "Controller mouse mode", Droidtop/tracker#565), and in any other app it is a pointer.
   Android lets an ordinary app no system cursor (`INJECT_EVENTS` is a signature permission), so the pointer is built from
   what an accessibility service has, with no root: a cursor drawn in an accessibility overlay on that screen (never
   touchable, gone after five seconds without moving, `PointerCursor`) shows where the next touch lands, and a click, a
@@ -4960,11 +4970,18 @@ rig check in the commit message.
 - **One keyboard component.** `KeyboardPanel` (`:input-keyboard`) is the embedded Hacker's Keyboard
   grid (`SecondScreenKeyboard.createView`, the same view, layouts and themes droidtop's input method
   draws) wired to a `KeyboardSink`; `DroidtopKeyboard` (`:shell-gamepad`) is its one Compose adapter.
-  Every keyboard droidtop draws is that view, only the sink differs: the companion's Input tab
-  (`ImeConnectionSink`, or the container), its Keys button (`RoutedKeyboardSink`), the Social draft
+  Every keyboard droidtop draws is that view or the S7 slab, only the sink differs: the companion's Input tab
+  (the slab with a whole keyboard's keys, Droidtop/tracker#567; `ImeConnectionSink`, or the container), its Keys
+  button (`RoutedKeyboardSink`), the Social draft
   (the draft itself; its own keyboard composable is gone), droidtop's own fields and windows
   (`WindowKeySink`) and the keyboard over another app (`ImeConnectionSink`, or the accessibility
   service's `AccessibilityTyping.FieldSink`). `KeyMeta` is the one meta-state rule.
+- **No full-screen input method over droidtop's fields (rig on the console, 2026-10-16, Droidtop/tracker#485 comment
+  6224857113).** On a landscape screen Gboard replaced the whole window with its own editor, covering the search's
+  results, and its Search and Enter did not close it. Every droidtop Compose field asks for no full screen and no
+  extract editor (`IME_FLAG_NO_FULLSCREEN | IME_FLAG_NO_EXTRACT_UI`): the themes' roots (`DroidtopTheme`,
+  `GamingTheme`) wrap their content in `NoFullscreenTextInput` (`:ui-shared`), so it reaches every field below them,
+  dialogs and `TextEntry` included; a View field sets the same flags (`noFullscreen`).
 - **droidtop's own text fields always type.** On a display Android draws no keyboard on
   (`AddonKeyboardRules.ownFieldNeedsKeyboard`), the shell's text fields (library search, the text
   dialog, the metadata editor, a new collection's name) draw `OwnFieldKeyboard` under the field. Its
@@ -5117,7 +5134,13 @@ companion trackpad's pointer, `canPerformGestures`, see "Input (slice C12)"), wh
     the slab's Done is pressed, or the request ends any other way. The tab the person chose is never
     overwritten or switched (Droidtop/tracker#369); changing tab keeps the keyboard, and on the Input
     tab, which types into the request itself, no second keyboard docks. It used to switch the strip to
-    the Input tab for the request (until 2026-10-16). A Hide holds only
+    the Input tab for the request (until 2026-10-16).
+    The pad on the screen with the field drives the docked slab while it shows: every droidtop window's
+    pad keys pass `PadGate`, which hands a gamepad button or a pad's D-pad to the slab first
+    (`KeyboardTargets.routePad`, the slab registered as `companionPad`), so the cursor moves on the
+    companion's slab and A, X, Y, L1, R1, R2 and B do their keycaps' jobs there; a hardware keyboard's
+    keys still go to the field. A field in another app's window (droidtop as the system keyboard) is
+    typed on the slab by touch; its pad keys go to that app. A Hide holds only
     until the field is asked for again: another field taking focus, a tap on the focused field
     (`InWindowKeyboard`), or the app asking the input method for the keyboard again
     (`LatinIME.onShowInputRequested`, `ShowRequests.reasked`) brings the keyboard back. It hosts only while a companion host is started on another
@@ -6418,6 +6441,31 @@ the controller themselves. A gesture or radial slot a prefix binds to "show
 keyboard" still toggles it. Back with it up closes the keyboard, not the game
 (`WineGameActivity.dispatchKeyEvent`); when the IME took Back itself and went
 away, the window insets say so and the next Back is the game's again.
+
+**Controller mouse mode** (decided 2026-10-16, Droidtop/tracker#565; owner: "For PC games, we need to somehow
+simulate mouse input. ... Perhaps something like GPD's solution, where they can set the controller into mouse mode?",
+and "The screen maps to a trackpad, which is standard for wine on android. I'm just complaining that that's not the
+ideal solution"). The touchscreen stays the trackpad it is. With mouse mode on, the pad is the mouse, so a game's
+pointer (a Unity configuration window, say) works without touching the screen:
+- the right stick (or the left, per game) moves the pointer; a push under 15% is rest, and the speed rises with the
+  square of the push to 1.5 screen widths a second at full, so a small push places it and a full one crosses quickly;
+- R1 clicks and L1 right-clicks (or, per game, A and B), held for a drag;
+- the moving stick's own click held turns that stick into a wheel (up to 12 steps a second);
+- the other buttons and the other stick still reach the game; the stick that moves the pointer does not;
+- both stick clicks held 0.6 s turn it on or off at any time, and the Quick Menu's Game section has a Mouse mode row;
+  a "Mouse mode" badge in the top corner shows while it is on, and TalkBack hears the change;
+- remembered per game (`PadMousePrefs`); off by default, unless the game's runner says it needs a mouse (none says so
+  yet; `PadMouse.initial`).
+It is the pointer path the screen's touch trackpad already uses (`XServer.injectPointerMoveDelta`, button presses,
+the wheel as scroll-button presses), not a second one: the screen offers it as `OwnGameScreens.Screen.pointer`
+(`XServerPointer`), and both `PadMouseDriver` (in `WineGameActivity`, ahead of the XInput bridge; `PadMouse`, pure and
+tested) and the companion drive that. The Quick Menu row reaches the screen through `OwnGameScreens.Screen.padMouse`.
+**The companion's Keys trackpad is the game's mouse** while droidtop's own game screen is on the screen the companion
+types to (`TrackpadRoute.GAME`, ahead of the accessibility pointer, after the shell's own selection when the Quick Menu
+is up): finger travel is scaled to the game's width, with the trackpad's acceleration and speed setting, tap to click,
+two-finger scroll and right-click as everywhere else (`GamePointerTrackpadSink`), and it needs no accessibility
+service. No second touch path is added on the main screen, which keeps the Windows screen's own trackpad (the owner's
+clarification above).
 
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with
@@ -12479,7 +12527,13 @@ follows:
   person left on (every owned DLC until they choose, "DLC and versions" below),
   downloaded by
   JavaSteam's depot downloader into `<game folder>/Steam/<install folder>`,
-  chunks put together in the app's cache. A stopped download continues; an
+  chunks put together in the app's cache. JavaSteam decrypts the manifests' file names with Bouncy Castle's provider,
+  which it leaves to the app: `:stores` carries `bcprov-jdk18on` and R8 keeps its provider classes (console, build
+  1767: every Steam download died without it, Droidtop/tracker#313). A store download that stopped (a crash left it
+  Paused with an empty bar) has, on its page in Downloads, Resume, which continues from the files on disk, and
+  Start over, which asks first and then cancels it, deleting what was downloaded, and starts the same game again into
+  the same folder (`StoreInstallJob.restart`); its Cancel says it deletes what was downloaded so far. A folder a store
+  is still downloading into is not a game to the library walk (`ScanPrune`), whatever state its job is in. A stopped download continues; an
   update fetches only what changed. Verify checks every file of the installed
   depots' manifests (which the download keeps in the game's
   `.DepotDownloader` folder) by size and SHA-1, with no network. The update
@@ -21609,10 +21663,30 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   as decided on 2026-10-07; the one separate section is the one that searches
   another kind of thing. The PC library and a console list do not offer Settings:
   they search their own games.
-- **Picking.** A device row opens the app or plays the game (the PC library's
-  opens the game's page). A source row always opens its detail
-  (`GameSourceProvider.detailScreen`); the destination is worked out when it is
-  picked, off the main thread (`SourceDestinations`), never while typing.
+- **Picking.** The owner, 2026-10-16: "Clicking on the game entry should give the game's page, or options if it's
+  available from multiple sources. When I clicked, it just gave an f95zone error". So:
+  - **A game row opens the game's page**, where Play or Install is, never a raw start (`LauncherSearchScreen.onOpen`):
+    Gaming's left-menu search and a system search open `nav.openDetail`; Standard opens the Games screen on the page
+    (`LauncherGamesActivity.pageIntent`) for a PC or engine game, the games Standard gives a page; Desktop has no game
+    page and plays it. An app row opens the app. **A console or Android game in Standard's search opens a mini-popup**
+    (the owner, 2026-10-16, asked whether Standard should get a page for them: "we can create a mini-popup"): a small
+    card over the search with Play and the game's few key actions and facts, not a full page. Until it is built,
+    Standard starts such a game as before.
+  - **One game is one row.** The library's row and every source's row whose titles fold to one key
+    (`StoreIdentity.titleKey`, the fold matching uses: case, accents, "&" as "and", a leading "The" and edition labels)
+    are one row (`UnifiedSearch.merge`), the best-ranked in front, its detail naming every place ("Steam · Installed ·
+    F95zone"), its value "N places". Apps and the web row never merge.
+  - **Picking a merged row asks where from**: a short list under "<title>: where from", one row per place with its
+    state (a library game says Installed or Not installed), the source's own columns (version, size) and Get where it
+    can be fetched from there; picking one opens that one's page or gets it. B or Back returns to the results.
+  - A source row alone opens its detail (`GameSourceProvider.detailScreen`), or gets it when its row offers Get; the
+    destination is worked out when it is picked, off the main thread (`SourceDestinations`), never while typing.
+  - **A plugin's failure is a plain sentence that says what to do**, never its raw words: every error notice a plugin
+    page or action draws goes through `SourceFailures` (`PluginViewCall.errorNotice`; it moved to plugin-host for
+    this), so "f95zone answered HTTP 403" reads "This site needs a sign-in in the browser", with droidtop's Sign in
+    when the plugin has a `web.session` site; what it said stays under Technical details. A failed source page also
+    has "Open <source>'s page" under it (`AcquireContentSources.pluginPageRow`, the row a blocked source opens), and
+    a Get that failed says the same plain sentence on the status line.
   The pad reaches every row: Down leaves the field for the first row (the
   soft keyboard goes away), Up from the first row returns to the field, A
   opens the row, and typing puts the cursor back in the field. The cursor

@@ -226,6 +226,12 @@ class PointerInjectionTest {
         assertEquals(TrackpadRoute.UNAVAILABLE, TrackpadRoute.of(shellOnTarget = false, pointerReachable = false))
     }
 
+    @Test fun `droidtop's own game on the screen is driven as the game's mouse, without the accessibility service`() {
+        assertEquals(TrackpadRoute.GAME, TrackpadRoute.of(shellOnTarget = false, pointerReachable = false, gameOnTarget = true))
+        assertEquals(TrackpadRoute.GAME, TrackpadRoute.of(shellOnTarget = false, pointerReachable = true, gameOnTarget = true))
+        assertEquals("the shell in front (its Quick Menu) still wins", TrackpadRoute.FOCUS, TrackpadRoute.of(shellOnTarget = true, pointerReachable = true, gameOnTarget = true))
+    }
+
     private class Tagged(val name: String, val log: MutableList<String>) : TrackpadOutput {
         override fun onMove(dxMm: Float, dyMm: Float, speedMmPerS: Float) { log += "$name move" }
         override fun onScroll(dxMm: Float, dyMm: Float) { log += "$name scroll" }

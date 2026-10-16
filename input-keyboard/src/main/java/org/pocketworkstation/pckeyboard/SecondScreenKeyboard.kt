@@ -191,11 +191,10 @@ object SecondScreenKeyboard {
         context: Context,
         listener: LatinKeyboardBaseView.OnKeyboardActionListener,
         heightPercent: Float = DEFAULT_HEIGHT_PERCENT,
-        functionRow: Boolean = false,
     ): LatinKeyboardView {
         val view = LayoutInflater.from(context)
             .inflate(R.layout.input_material_dark, null) as LatinKeyboardView
-        applyLayout(view, context, functionLayer = false, heightPercent = heightPercent, functionRow = functionRow)
+        applyLayout(view, context, functionLayer = false, heightPercent = heightPercent)
         view.setOnKeyboardActionListener(listener)
         // No key-preview bubbles: they pop ABOVE the touched key, so the
         // top row's would be clipped by the display edge, and a keyboard
@@ -211,18 +210,12 @@ object SecondScreenKeyboard {
      * symbols and secondary keys live. Driven by the Fn and layout-switch
      * keys, which otherwise would do nothing at all on this surface,
      * because the [LatinIME] that normally handles them is not in the loop.
-     *
-     * [functionRow] builds the full layout with its extension row (F1 to F12, Home, End) above the five rows, the
-     * layout's own switch ([GlobalKeyboardSettings.useExtension]) that only the input method ever turned on. The
-     * flag is read while the keyboard is built, so it is set around that and put back: the input method's own
-     * keyboards, built from the same shared settings, are not changed by a panel asking for the row.
      */
     fun applyLayout(
         view: LatinKeyboardView,
         context: Context,
         functionLayer: Boolean,
         heightPercent: Float = DEFAULT_HEIGHT_PERCENT,
-        functionRow: Boolean = false,
     ) {
         val xml = if (functionLayer) R.xml.kbd_full_fn else R.xml.kbd_full
         val mode = if (functionLayer) {
@@ -230,14 +223,7 @@ object SecondScreenKeyboard {
         } else {
             KeyboardSwitcher.KEYBOARDMODE_NORMAL
         }
-        val settings = LatinIME.sKeyboardSettings
-        val before = settings.useExtension
-        settings.useExtension = functionRow && !functionLayer
-        try {
-            view.setKeyboard(LatinKeyboard(context, xml, mode, heightPercent))
-        } finally {
-            settings.useExtension = before
-        }
+        view.setKeyboard(LatinKeyboard(context, xml, mode, heightPercent))
     }
 
     /**

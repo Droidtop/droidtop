@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -108,6 +109,32 @@ object StoreInstallJob {
     /** The running or paused job for [key], if there is one. */
     fun jobFor(key: String): PluginJobsCenter.Entry? =
         PluginJobsCenter.entries().value.firstOrNull { it.nativeKind == KIND && !it.done && it.resumePayload == key }
+
+    /**
+     * Starts [jobId]'s store download over (Droidtop/tracker#313: a download that crashed sat Paused with an empty bar):
+     * the job is cancelled, which deletes what it downloaded so far (its cancel hook, [discard]), and once it has
+     * ended the same game is started again into the same folder. Only after the person confirmed: it deletes files.
+     * False when [jobId] is not a store download droidtop still knows.
+     */
+    fun restart(context: Context, jobId: String): Boolean {
+        val entry = PluginJobsCenter.entries().value.firstOrNull { it.jobId == jobId && it.nativeKind == KIND } ?: return false
+        val args = PluginJobsCenter.argsOf(jobId) ?: return false
+        val key = args[ARG_KEY] ?: return false
+        val root = args[ARG_ROOT]?.let(::File) ?: return false
+        val app = context.applicationContext
+        PluginJobsCenter.cancel(jobId)
+        scope.launch {
+            // The cancel hook deletes off the main thread; starting before the old job has ended would find it
+            // still there and resume it instead of starting over.
+            kotlinx.coroutines.withTimeoutOrNull(RESTART_WAIT_MS) {
+                PluginJobsCenter.entries().first { list -> list.none { it.jobId == jobId && !it.done } }
+            }
+            start(app, key, entry.title, root, args[DownloadGate.ARG_BYTES]?.toLongOrNull() ?: 0L)
+        }
+        return true
+    }
+
+    private const val RESTART_WAIT_MS = 30_000L
 
     /** Resumes [key]'s paused download; false when there is none to resume. */
     fun resume(key: String): Boolean = jobFor(key)?.takeIf { it.paused }?.let { PluginJobsCenter.resume(it.jobId) } ?: false

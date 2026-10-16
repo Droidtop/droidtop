@@ -3,7 +3,12 @@ package dev.droidtop.app
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
@@ -32,12 +37,19 @@ internal fun CompanionDockedSlab(request: KeyboardTargets.Request) {
     )
     // A new request is a new entry: the slab opens fresh (on g, letters, Shift off) for it.
     key(request) {
+        var slab by remember { mutableStateOf<SlabView?>(null) }
+        // The pad on the screen with the field drives this slab while it shows (KeyboardTargets.routePad).
+        DisposableEffect(slab) {
+            val shown = slab
+            if (shown != null) KeyboardTargets.companionPad = shown::handleKey
+            onDispose { if (shown != null && KeyboardTargets.companionPad == shown::handleKey) KeyboardTargets.companionPad = null }
+        }
         AndroidView(
             modifier = Modifier.fillMaxWidth(),
             factory = { context ->
                 SlabView(context, Slab.Kind.PLAIN, Slab.Form.FIELD, Slab.EnterPurpose.DONE, colors, SlabCaps::label, { output ->
                     SlabSink.deliver(output, request.sink, onClose = { KeyboardTargets.hideCompanion() })
-                })
+                }).also { slab = it }
             },
         )
     }

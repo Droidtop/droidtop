@@ -444,7 +444,10 @@ fun GamingTheme(content: @Composable () -> Unit) {
     }
     val palette = GamingTheme.palette
     CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
-        MaterialTheme(colorScheme = palette.colorScheme, typography = palette.typography, content = content)
+        MaterialTheme(colorScheme = palette.colorScheme, typography = palette.typography) {
+            // No full-screen input method over droidtop's own fields (Droidtop/tracker#485 comment 6224857113).
+            dev.droidtop.ui.shared.NoFullscreenTextInput(content)
+        }
     }
 }
 

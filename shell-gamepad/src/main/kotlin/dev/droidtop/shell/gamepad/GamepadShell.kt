@@ -104,6 +104,7 @@ import dev.droidtop.shell.gamepad.query.SheetAction
 import dev.droidtop.shell.gamepad.query.appsQueryScope
 import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.needsInstall
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.CapsuleStatusBadge
 import dev.droidtop.shell.gamepad.pc.onPcGamesTab
@@ -866,7 +867,11 @@ private fun GamepadShellBody(
                     )
                 }
             },
-            onPlay = onLaunch,
+            // Every game opens its page (Play or Install is there), never a raw start (docs/SPEC.md 12a).
+            onOpen = { entry ->
+                globalSearchOpen = false
+                nav.openDetail(entry.id)
+            },
             settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
             onDismiss = { globalSearchOpen = false },
         )
@@ -889,10 +894,11 @@ private fun GamepadShellBody(
                         game.id,
                         dev.droidtop.library.integrations.SearchRowKind.GAME,
                         dev.droidtop.library.GameNaming.displayName(game.title),
-                        systemName,
+                        listOf(systemName, if (game.needsInstall()) "Not installed" else "Installed").joinToString(" · "),
                     ) {
                         systemSearch = null
-                        onLaunch(game)
+                        // Its page, with Play or Install, as the global search does (docs/SPEC.md 12a).
+                        nav.openDetail(game.id)
                     }
                 }
             },

@@ -83,10 +83,12 @@ class UnifiedSearchTest {
             emptyList(),
             listOf(s),
         )
+        // The library's Sonic and the source's Sonic are one game: one row, the device's in front (docs/SPEC.md 12a).
         assertEquals(
-            listOf("APP:Sonic", "GAME:Sonic", "SOURCE:Sonic", "SOURCE:Sonic Mania", "GAME:Ultrasonic"),
+            listOf("APP:Sonic", "GAME:Sonic", "SOURCE:Sonic Mania", "GAME:Ultrasonic"),
             rows.map { "${it.kind}:${it.title}" },
         )
+        assertEquals(listOf("GAME:Sonic", "SOURCE:Sonic"), rows[1].choices.map { "${it.kind}:${it.title}" })
     }
 
     @Test
@@ -99,7 +101,7 @@ class UnifiedSearchTest {
     }
 
     @Test
-    fun `two sources tie in the order they were asked`() {
+    fun `two sources tie in the order they were asked, as the places of one row`() {
         val a = source("a")
         val b = source("b")
         val rows = UnifiedSearch.rank(
@@ -107,7 +109,7 @@ class UnifiedSearchTest {
             listOf(SourceOutcome(b, listOf(result("b1", "X"))), SourceOutcome(a, listOf(result("a1", "X")))),
             emptyList(), listOf(a, b),
         )
-        assertEquals(listOf("a1", "b1"), rows.map { it.hit!!.result.id })
+        assertEquals(listOf("a1", "b1"), rows.single().choices.map { it.hit!!.result.id })
     }
 
     @Test
@@ -193,5 +195,38 @@ class UnifiedSearchTest {
         }
         delay(50)
         assertFalse(finished)
+    }
+
+    @Test
+    fun `the same game from the library and a source is one row that offers both`() {
+        // Owner, 2026-10-16: "Clicking on the game entry should give the game's page, or options if it's available
+        // from multiple sources".
+        val rows = UnifiedSearch.rank(
+            "love",
+            listOf(LocalSearchRow("lib", SearchRowKind.GAME, "Love and Sex: Second Base", "Game") {}),
+            listOf(SourceOutcome(source("f95"), listOf(result("1", "Love & Sex: Second Base")))),
+            emptyList(),
+            listOf(source("f95")),
+        )
+        assertEquals(1, rows.size)
+        assertEquals("lib", rows.single().key)
+        assertEquals(2, rows.single().choices.size)
+        assertEquals("Game · F95", rows.single().detail)
+    }
+
+    @Test
+    fun `different games and apps are never merged`() {
+        val rows = UnifiedSearch.rank(
+            "zelda",
+            listOf(
+                LocalSearchRow("app", SearchRowKind.APP, "Zelda", "App") {},
+                LocalSearchRow("game", SearchRowKind.GAME, "Zelda", "Game") {},
+            ),
+            listOf(SourceOutcome(source("s"), listOf(result("2", "Zelda II")))),
+            emptyList(),
+            listOf(source("s")),
+        )
+        assertEquals(3, rows.size)
+        assertTrue(rows.all { it.others.isEmpty() })
     }
 }

@@ -19,6 +19,7 @@ import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.ProvidedPoint
+import dev.droidtop.pluginhost.SourceFailures
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

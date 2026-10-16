@@ -1,8 +1,10 @@
-package dev.droidtop.library.integrations
+package dev.droidtop.pluginhost
 
 /**
- * A download source's failure in words a person reads (docs/SPEC.md 12a "One
- * search", Droidtop/tracker#375, #485). A source reports whatever its code
+ * A plugin's failure in words a person reads (docs/SPEC.md 12a "One search",
+ * Droidtop/tracker#375, #485): a source's line in the one search, and every
+ * error notice a plugin page or action draws ([PluginViewCall.errorNotice]),
+ * which is why it lives here and not in the library. A source reports whatever its code
  * saw: a site's own page text ("JavaScript is disabled. For a better
  * experience..."), a platform exception, a socket error. None of that belongs
  * on a list row. [plain] names what the person can do about it; [technical]
@@ -30,12 +32,12 @@ object SourceFailures {
      * permission, or null when [raw] is not such a refusal. Its page is where it is turned on, and the search offers it
      * (Droidtop/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission).
      */
-    fun permissionOff(raw: String?, code: dev.droidtop.pluginhost.PluginErrorCode? = null): String? {
+    fun permissionOff(raw: String?, code: PluginErrorCode? = null): String? {
         val text = raw.orEmpty()
         val label = TURNED_OFF.find(text)?.groupValues?.get(1) ?: NEEDS_ALLOW.find(text)?.groupValues?.get(1)
         return when {
             label != null -> "It needs \u201c$label\u201d, which is not allowed for it"
-            code == dev.droidtop.pluginhost.PluginErrorCode.PERMISSION_DENIED -> PERMISSION_OFF
+            code == PluginErrorCode.PERMISSION_DENIED -> PERMISSION_OFF
             else -> null
         }
     }

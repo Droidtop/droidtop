@@ -31,7 +31,9 @@ import dev.droidtop.input.TrackpadRoute
 import dev.droidtop.input.TrackpadView
 import dev.droidtop.runtime.keyboard.AccessibilityKeyboard
 import dev.droidtop.shell.gamepad.KeyboardTargets
-import org.pocketworkstation.pckeyboard.KeyboardPanel
+import org.pocketworkstation.pckeyboard.Slab
+import org.pocketworkstation.pckeyboard.SlabSink
+import org.pocketworkstation.pckeyboard.SlabView
 import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.SecondScreenKeyboard
 import java.lang.ref.WeakReference
@@ -189,6 +191,9 @@ class SecondScreenInputView(
     private val tabs = Button(context)
     private val controllers = TextView(context)
 
+    /** The keyboard ([slab]), set while the view is built: declared before init so init's value is the one kept. */
+    private var keys: SlabView? = null
+
     /** The screens Input can type to, read off the main thread when the view attaches or regains focus. */
     @Volatile
     private var screens: List<InputTarget.Screen> = emptyList()
@@ -231,16 +236,27 @@ class SecondScreenInputView(
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
 
-        // droidtop's one keyboard view (KeyboardPanel); only the destination is this surface's own. It suppresses
-        // the input method's view while it is on screen, so the user never gets two keyboards.
-        addView(
-            KeyboardPanel(context, requestAwareSink(keyboardSink()), suppressImeView = true, functionRow = true),
-            LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
+        // The S7 keyboard (Slab) with a whole keyboard's keys: Esc, Tab, Ctrl, Alt, Super, the arrows and F1 to F12
+        // (Droidtop/tracker#567, docs/SPEC.md 4c). It takes a fixed share of the tab and lays its rows out from that
+        // share's real height, so it scales with the screen and the font, keeps its keys at least MIN_ROW_DP tall, and
+        // never runs past its edge. Only the destination is this surface's own.
+        val slabSink = requestAwareSink(keyboardSink())
+        val tokens = dev.droidtop.shell.gamepad.MenuTokens
+        val colors = SlabView.Colors(
+            ground = tokens.Ground.toArgb(),
+            key = tokens.Card.toArgb(),
+            keyFocused = tokens.CardFocused.toArgb(),
+            text = tokens.OnSurface.toArgb(),
+            muted = tokens.OnSurfaceMuted.toArgb(),
+            accent = tokens.Accent.toArgb(),
         )
+        addView(slab(colors, slabSink), LayoutParams(LayoutParams.MATCH_PARENT, 0, KEYBOARD_WEIGHT))
 
         status.setTextColor(dev.droidtop.shell.gamepad.MenuTokens.OnSurfaceMuted.toArgb())
         status.textSize = 13f
         status.gravity = Gravity.CENTER
+        // Fixed heights: a fact that changes (the target, a controller, the input method) never moves the keys.
+        status.setLines(2)
         addView(status, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         imePicker.text = "Use droidtop keyboard"
@@ -253,15 +269,50 @@ class SecondScreenInputView(
 
         pointerHelp.gravity = Gravity.CENTER
         pointerHelp.setOnClickListener { AccessibilityKeyboard.openSettings(context) }
-        pointerHelp.visibility = View.GONE
+        pointerHelp.visibility = View.INVISIBLE
         addView(pointerHelp, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         controllers.setTextColor(dev.droidtop.shell.gamepad.MenuTokens.OnSurfaceMuted.toArgb())
         controllers.textSize = 13f
         controllers.gravity = Gravity.CENTER
+        controllers.setSingleLine()
         addView(controllers, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
-        addView(trackpad, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
+        addView(trackpad, LayoutParams(LayoutParams.MATCH_PARENT, 0, TRACKPAD_WEIGHT))
+    }
+
+    private fun slab(colors: SlabView.Colors, sink: KeyboardSink): SlabView = SlabView(
+        context, Slab.Kind.PLAIN, Slab.Form.FIELD, Slab.EnterPurpose.ENTER, colors,
+        dev.droidtop.shell.gamepad.input.SlabCaps::label,
+        // Nothing on this tab closes: the keys stay until the person leaves the tab.
+        { output -> SlabSink.deliver(output, sink, onClose = {}) },
+        extras = true,
+        // The keys repeat here unless the destination repeats a held key itself (Desktop's seat).
+        repeatHeld = { sink.repeatsAtSource },
+    ).also { keys = it }
+
+    /**
+     * The keyboard gets its share (KEYBOARD_WEIGHT of what is left under the header and the fact lines), and never less
+     * than the height that keeps its keys at least MIN_ROW_DP tall: on a short screen (the RP5's panel turned to
+     * landscape) the trackpad gets only what is left, down to nothing, rather than the keys being cut off
+     * (Droidtop/tracker#567).
+     */
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val slab = keys
+        val params = slab?.layoutParams as? LayoutParams
+        if (slab == null || params == null || MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+            return
+        }
+        params.height = 0
+        params.weight = KEYBOARD_WEIGHT
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        val least = SlabView.minimumHeight(resources.displayMetrics.density, extras = true)
+        if (slab.measuredHeight < least) {
+            params.height = least
+            params.weight = 0f
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+        }
     }
 
     /** Re-reads the screens and the controllers off the main thread, then names the target. */
@@ -274,7 +325,7 @@ class SecondScreenInputView(
             val pads = runCatching { Controllers.read(app) }.getOrDefault(emptyList())
             post {
                 controllers.text = Controllers.line(pads)?.let { "Controllers: $it" }.orEmpty()
-                controllers.visibility = if (pads.isEmpty()) View.GONE else View.VISIBLE
+                controllers.visibility = if (pads.isEmpty()) View.INVISIBLE else View.VISIBLE
                 syncTarget()
                 syncPointerHelp()
                 status.text = statusText()
@@ -295,7 +346,7 @@ class SecondScreenInputView(
         val id = targetId()
         val screen = screens.firstOrNull { it.id == id }
         target.text = InputTarget.label(desktop, screen, pinned != null && screen?.uniqueId == pinned)
-        pin.visibility = if (desktop || screen?.uniqueId == null) View.GONE else View.VISIBLE
+        pin.visibility = if (desktop || screen?.uniqueId == null) View.INVISIBLE else View.VISIBLE
         pin.text = if (pinned != null) "Unpin" else "Pin"
         pin.contentDescription = if (pinned != null) "Stop typing only to ${screen?.name}" else "Always type to ${screen?.name}"
     }
@@ -321,6 +372,7 @@ class SecondScreenInputView(
         status.text = statusText()
         refreshFacts()
         syncImePicker()
+        syncImeSuppression()
         syncPointerHelp()
         Thread {
             elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
@@ -330,6 +382,21 @@ class SecondScreenInputView(
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         syncImePicker()
+        syncImeSuppression()
+    }
+
+    private var countedForIme = false
+
+    /**
+     * While this tab is on screen the input method does not also put its own view up, so there are never two keyboards
+     * ([SecondScreenKeyboard.setAttached]). It follows window visibility, not attachment, because a stopped Activity's
+     * views stay attached (Droidtop/tracker#156).
+     */
+    private fun syncImeSuppression() {
+        val shouldCount = isAttachedToWindow && windowVisibility == View.VISIBLE
+        if (shouldCount == countedForIme) return
+        countedForIme = shouldCount
+        SecondScreenKeyboard.setAttached(shouldCount)
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {
@@ -344,10 +411,14 @@ class SecondScreenInputView(
         imePicker.visibility = if (
             mode != SecondaryDisplayContent.Mode.DESKTOP && !SecondScreenKeyboard.imeRunning &&
                 !AccessibilityKeyboard.connected && KeyboardTargets.companion.value == null
-        ) View.VISIBLE else View.GONE
+        ) View.VISIBLE else View.INVISIBLE
     }
 
     override fun onDetachedFromWindow() {
+        if (countedForIme) {
+            countedForIme = false
+            SecondScreenKeyboard.setAttached(false)
+        }
         trackpad.engine = null
         pointerSink?.cancel()
         PointerCursor.hide()
@@ -359,20 +430,25 @@ class SecondScreenInputView(
 
     /**
      * What the trackpad drives outside Desktop right now: droidtop's own selection while the shell is what the target
-     * screen shows (pointer and focus are one selection there), else a pointer on that screen when droidtop's
-     * accessibility service can play touches on it, else nothing.
+     * screen shows (pointer and focus are one selection there), else the game's mouse while droidtop's own game screen
+     * is there (Droidtop/tracker#565), else a pointer on that screen when droidtop's accessibility service can play
+     * touches on it, else nothing.
      */
     private fun currentRoute(): TrackpadRoute {
         val id = targetId()
         return TrackpadRoute.of(
             shellOnTarget = id != null && shellDisplayId() == id,
             pointerReachable = id != null && AccessibilityPointer.canReach(id),
+            gameOnTarget = id != null && gamePointer()?.displayId == id,
         )
     }
 
+    /** The pointer of droidtop's own game screen while one runs. */
+    private fun gamePointer(): dev.droidtop.library.OwnGameScreens.Pointer? = dev.droidtop.library.OwnGameScreens.current?.pointer
+
     private fun syncPointerHelp() {
         val missing = mode != SecondaryDisplayContent.Mode.DESKTOP && targetId() != null && currentRoute() == TrackpadRoute.UNAVAILABLE
-        pointerHelp.visibility = if (missing) View.VISIBLE else View.GONE
+        pointerHelp.visibility = if (missing) View.VISIBLE else View.INVISIBLE
         pointerHelp.text = if (AccessibilityKeyboard.connected) "Turn the accessibility service off and on" else "Turn on the pointer"
     }
 
@@ -387,6 +463,7 @@ class SecondScreenInputView(
             naturalScroll = settings.naturalScroll,
         )
         pointerSink = pointer
+        val game = GamePointerTrackpadSink(::gamePointer, userSpeed = trackpadSpeed(settings), naturalScroll = settings.naturalScroll)
         var lastTarget: Int? = null
         return RoutedTrackpadOutput {
             val id = targetId()
@@ -404,6 +481,7 @@ class SecondScreenInputView(
             }
             when (route) {
                 TrackpadRoute.FOCUS -> focus
+                TrackpadRoute.GAME -> game
                 TrackpadRoute.POINTER -> pointer
                 TrackpadRoute.UNAVAILABLE -> null
             }
@@ -502,9 +580,16 @@ class SecondScreenInputView(
     /** What the trackpad is doing outside Desktop, in a few words. */
     private fun padLine(): String = when (currentRoute()) {
         TrackpadRoute.FOCUS -> "Trackpad moves the selection"
+        TrackpadRoute.GAME -> "Trackpad is the game's mouse"
         TrackpadRoute.POINTER -> "Trackpad is a pointer"
         TrackpadRoute.UNAVAILABLE ->
             if (targetId() == null) "No other screen" else "Pointer needs the accessibility service"
+    }
+
+    companion object {
+        /** The keyboard's and the trackpad's shares of the height left under the header and the fact lines. */
+        const val KEYBOARD_WEIGHT = 3f
+        const val TRACKPAD_WEIGHT = 2f
     }
 }
 

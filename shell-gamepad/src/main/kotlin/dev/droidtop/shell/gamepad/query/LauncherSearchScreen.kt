@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.needsInstall
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.integrations.LocalSearchRow
 import dev.droidtop.library.integrations.LocalSimilarityRecommendations
@@ -61,7 +62,9 @@ fun LauncherSearchScreen(
     initialText: String,
     games: List<LibraryEntry>?,
     findApps: suspend (String) -> List<LauncherSearchApp>,
-    onPlay: (LibraryEntry) -> Unit,
+    // A game row picked: its page where the surface has one, else play it. The owner, 2026-10-16: "Clicking on
+    // the game entry should give the game's page" (docs/SPEC.md 12a).
+    onOpen: (LibraryEntry) -> Unit,
     onDismiss: () -> Unit,
     // The settings of this surface, searched with the rest (null: this surface has none to search).
     settingsRoot: dev.droidtop.library.settings.CatalogScreen? = null,
@@ -104,7 +107,9 @@ fun LauncherSearchScreen(
                     LocalSearchRow(app.key, SearchRowKind.APP, app.title, APP_DETAIL, app.icon, app.open)
                 }
                 val matching = playable.filter { matchesSearchText(it, text) }.take(MAX_GAME_ROWS).map { game ->
-                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), kindBadgeOf(game, systemNames)?.text.orEmpty()) { onPlay(game) }
+                    // The detail says whether it is here, so the places of one game (docs/SPEC.md 12a) say which one is installed.
+                    val detail = listOfNotNull(kindBadgeOf(game, systemNames)?.text, if (game.needsInstall()) NOT_INSTALLED else INSTALLED).joinToString(" · ")
+                    LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), detail) { onOpen(game) }
                 }
                 // The web is one row, after everything else: the query is its detail, not its title, so the title never
                 // matches it and the row ranks last (SearchRank OTHER, then SearchRowKind.WEB). Picking it searches and
@@ -124,4 +129,6 @@ fun LauncherSearchScreen(
 
 private const val MAX_GAME_ROWS = 20
 private const val APP_DETAIL = "App"
+private const val INSTALLED = "Installed"
+private const val NOT_INSTALLED = "Not installed"
 private const val WEB_TITLE = "Search the web"
