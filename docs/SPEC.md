@@ -1061,7 +1061,14 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     playable games (one card per game, as the Games grid groups them) to pick from. The pick is kept by the widget's
     id (`WidgetConfigs`) and forgotten when the widget is removed. A game that left the library says so, and a tap
     picks again.
-- None of these is gated by a mode: the library is never mode-gated (2c).
+  - **Downloads**: the downloads running or paused with their progress, then how many games have an update; a row
+    opens Downloads or Updates. Drawn again when the jobs change, at most every 2 s (`DownloadsWidgetProvider.watch`,
+    following `PluginJobsCenter` from :app's start).
+  - **Desktop**: start or go back to the Desktop, saying whether its session runs (following
+    `DesktopSessionService.state`), and open Containers. Container apps on it come later.
+- The library widgets are not gated by a mode: the library is never mode-gated (2c). The Desktop widget is: its
+  provider is enabled only while Desktop is on (`ModeStartup`, `ModePiece.DESKTOP_SESSION`), which is how Android
+  hides a widget from every launcher's picker. What a launcher does with one already placed is for the rig to see.
 - **Dynamic app shortcuts** (`DroidtopShortcuts`), beside the static four (Games, Social, Downloads, Updates, 7j): the
   last three games played (each plays through `GameLaunchActivity`, with its art), then Search, the Quick Menu and
   Switch mode, then Gaming and Desktop, each only while that mode is on. Rebuilt whole at start, whenever a mode is

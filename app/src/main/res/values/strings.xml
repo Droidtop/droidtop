@@ -22,6 +22,9 @@
     <string name="widget_search_title">Library search</string>
     <string name="widget_search_hint">Search games and apps</string>
     <string name="widget_quick_launch_title">Quick launch</string>
+    <string name="widget_downloads_title">Downloads</string>
+    <string name="widget_desktop_title">Desktop</string>
+    <string name="widget_downloads_empty">Nothing downloading, and no updates</string>
     <string name="widget_quick_launch_pick">Pick a game</string>
     <string name="widget_quick_launch_gone">This game left your library</string>
     <!-- TypingAccessibilityService (docs/SPEC.md 4c, "Typing on the add-on display"): its name and what it does,
