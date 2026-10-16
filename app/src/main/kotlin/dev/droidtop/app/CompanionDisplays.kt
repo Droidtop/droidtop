@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
@@ -218,8 +219,10 @@ private class NumberPresentation(context: Context, display: Display, private val
                 text = "$number\n$name"
                 textSize = 72f
                 gravity = Gravity.CENTER
-                setTextColor(android.graphics.Color.WHITE)
-                setBackgroundColor(android.graphics.Color.argb(200, 0, 0, 0))
+                // droidtop's palette in the current appearance (docs/SPEC.md 7k, "Light and dark").
+                val palette = dev.droidtop.shell.gamepad.GamingTheme.palette
+                setTextColor(palette.onSurface.toArgb())
+                setBackgroundColor(palette.overlaySurface.copy(alpha = 0.8f).toArgb())
                 contentDescription = "Screen $number, $name"
                 setOnClickListener { dismiss() }
             },
