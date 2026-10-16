@@ -3475,8 +3475,9 @@ arrays under the manifest's own keys (`V2Declarations`).
     `exec {argv: [string], timeoutMs?} -> {exit, stdout, stderr}`,
     permission `priv.shell.adb` (critical). `argv` is executed directly, not
     through a shell, and each stream is capped at 64 KiB.
-  The other `priv.packages` ops of §2.2 (install, uninstall) are not
-  specified or built. Two more are (2026-10-09, Droidtop/tracker#248), for the
+  The other `priv.packages` op of §2.2, install, is designed on
+  Droidtop/tracker#130 and not built yet. Two more ops are specified
+  and built (2026-10-09, Droidtop/tracker#248), for the
   Emulator setup helper, both under the `priv.packages` permission:
   - `set_appop {package, op, mode} -> {}`: `appops set <package> <op> <mode>`.
     `op` is an upper-case AppOps name (`^[A-Z][A-Z0-9_]*$`, the helper uses
@@ -3486,6 +3487,23 @@ arrays under the manifest's own keys (`V2Declarations`).
   - `grant_permission {package, permission} -> {}`: `pm grant <package>
     <permission>`; Android itself refuses a permission the app does not declare
     or that is not a runtime permission.
+  Three more (2026-10-16, Droidtop/tracker#130; Shizuku plugin 1.5.0), also
+  under `priv.packages`:
+  - `revoke_permission {package, permission} -> {}`: `pm revoke`, the pair to
+    `grant_permission`, with the same checks.
+  - `clear_data {package} -> {cleared: true}`: `pm clear <package>`.
+  - `uninstall {package} -> {uninstalled: true}`: `pm uninstall --user 0
+    <package>`.
+  Neither of the last two ever touches droidtop itself (any package of
+  droidtop's uid), the provider's own app (Shizuku), the app Android opens on
+  Home at that moment (the launcher the active mode uses), or a system app: the
+  provider reads all four on the device before it runs anything and answers
+  `PERMISSION_DENIED` with the reason, and `NOT_FOUND` for an app that is not
+  installed. Each succeeds only on the command's final `Success` line. A
+  provider checks every request's shape (a package name, an AppOps name and
+  mode, a permission name) before it runs anything, and each value is one
+  argument of the command, never shell text. No droidtop screen calls these
+  three yet; they are for plugins that manage apps.
   droidtop calls them only for the person's own action: Settings > Risky actions
   > "Give another app access" is on and that one use was confirmed with the app
   and the exact permission or appop named (docs/SPEC.md "Risky actions"), and it
