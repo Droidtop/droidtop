@@ -120,6 +120,36 @@ object KeyboardTargets {
             ?.hideSoftInputFromWindow(view.windowToken, 0)
     }
 
+    /**
+     * The companion's docked slab, while it shows (owner, 2026-10-16: the keyboard is "PART of the companion"): it
+     * takes the pad's keys, so the pad on the screen with the field moves across and presses the slab on the other.
+     * Registered by the companion; null while none shows.
+     */
+    @Volatile
+    var companionPad: ((android.view.KeyEvent) -> Boolean)? = null
+
+    /**
+     * A pad key from any droidtop window ([PadGate]): the companion's docked slab gets it while a field's keys are
+     * typed there; true when it took it. A keyboard's keys (its arrows, Enter) still go to the field.
+     */
+    fun routePad(event: android.view.KeyEvent): Boolean {
+        if (companionRequest.value == null) return false
+        val handler = companionPad ?: return false
+        if (!isPadKey(event)) return false
+        return handler(event)
+    }
+
+    internal fun isPadKey(event: android.view.KeyEvent): Boolean {
+        val fromPad = event.isFromSource(android.view.InputDevice.SOURCE_GAMEPAD) || event.isFromSource(android.view.InputDevice.SOURCE_JOYSTICK)
+        return android.view.KeyEvent.isGamepadButton(event.keyCode) || (fromPad && event.keyCode in PAD_DPAD)
+    }
+
+    private val PAD_DPAD = setOf(
+        android.view.KeyEvent.KEYCODE_DPAD_UP, android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+        android.view.KeyEvent.KEYCODE_DPAD_LEFT, android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+        android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+    )
+
     /** The companion's Hide. */
     fun hideCompanion() {
         val request = companionRequest.value ?: return
