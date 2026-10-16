@@ -104,6 +104,16 @@ class PcShelvesTest {
     }
 
     @Test
+    fun `a badge that does not fit drops the kind word, then the name, never cutting a word`() {
+        // The capsule draws the first form that fits its card (tracker#434: "ENGINE · RPG MAK...").
+        assertEquals(
+            listOf("Engine" to "RPG Maker MV", null to "RPG Maker MV", "Engine" to null),
+            KindBadge(BadgeKind.ENGINE, "RPG Maker MV").forms,
+        )
+        assertEquals(listOf("App" to null), KindBadge(BadgeKind.APP, null).forms)
+    }
+
+    @Test
     fun `the backdrop prefers the landscape hero and preloads the neighbours either side`() {
         val list = (0..6).map { game("/g$it").copy(artworkUri = "box$it", heroUri = if (it == 3) "hero3" else null) }
 
