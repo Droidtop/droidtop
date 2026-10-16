@@ -404,7 +404,9 @@ class WineGameActivity : Activity() {
             text = "Mouse mode"
             setTextColor(Color.WHITE)
             textSize = 14f
-            setBackgroundColor(0xB0000000.toInt())
+            // The screen's own ground (black), at 70% over the game, so the white text reads over any frame.
+            setBackgroundColor(Color.BLACK)
+            background.alpha = (0.7f * 255).toInt()
             val pad = (8 * resources.displayMetrics.density).toInt()
             setPadding(pad * 2, pad, pad * 2, pad)
             visibility = View.GONE
