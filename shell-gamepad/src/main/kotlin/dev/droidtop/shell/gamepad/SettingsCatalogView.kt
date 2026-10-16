@@ -1612,9 +1612,15 @@ private fun CatalogRowView(
         uniformHeight = true,
         // The row's sentence: under the row when the person chose that (Info text), else on the focus line,
         // with the info glyph saying there is one (docs/SPEC.md 7k, "Explanations").
-        subtitle = item.subtitle.takeIf { infoUnderRow },
-        uniformSummaryLines = if (infoUnderRow && item.subtitle != null) 2 else 0,
-        info = !infoUnderRow && hasInfo(item),
+        // A summary row (a plugin card, a catalog row: tracker#514) always shows its one line, whatever the choice.
+        subtitle = item.subtitle.takeIf { infoUnderRow || item.summaryShown },
+        uniformSummaryLines = when {
+            item.subtitle == null -> 0
+            infoUnderRow -> 2
+            item.summaryShown -> 1
+            else -> 0
+        },
+        info = !infoUnderRow && !item.summaryShown && hasInfo(item),
         onInfo = onLongClick,
         // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
         switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,

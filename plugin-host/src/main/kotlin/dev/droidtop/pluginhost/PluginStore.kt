@@ -22,6 +22,17 @@ object PluginStore {
 
     fun payloadDirFor(context: Context, pluginId: String): File = File(root(context), pluginId)
 
+    /**
+     * The plugin's own icon (its presentation's `icon`, a signed payload file) as a path, when it is there and inside
+     * the plugin's payload; null otherwise. Reads the disk: call it off the main thread. One answer for the plugin's
+     * card, its page and its catalog row (Droidtop/tracker#513).
+     */
+    fun iconFile(context: Context, manifest: PluginManifest): String? {
+        val path = manifest.presentation.icon ?: return null
+        val root = payloadDirFor(context, manifest.id)
+        return File(root, path).takeIf { f -> f.isFile && f.canonicalPath.startsWith(root.canonicalPath + File.separator) }?.path
+    }
+
     /** Every installed plugin, valid or not, for the approval screen -- a plugin whose files fail re-verification is still listed, just shown as broken rather than silently vanishing. */
     fun installed(context: Context): List<PluginRecord> {
         val dir = root(context)

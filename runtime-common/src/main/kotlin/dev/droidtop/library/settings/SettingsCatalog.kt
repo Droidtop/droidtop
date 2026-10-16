@@ -95,6 +95,12 @@ sealed interface CatalogItem {
      * droidtop's): a fact the person must see without opening anything, never a tooltip. Null draws none.
      */
     val chip: String? get() = null
+
+    /**
+     * True when [subtitle] is the row's one-line summary, shown under the title on every surface at all times (a
+     * plugin card, a catalog row: Droidtop/tracker#514), not an explanation kept on the focus line and in Info.
+     */
+    val summaryShown: Boolean get() = false
 }
 
 /**
@@ -376,6 +382,7 @@ class NestedScreenItem(
     override val progress: Float? = null,
     override val chip: String? = null,
     override val iconFile: String? = null,
+    override val summaryShown: Boolean = false,
 ) : CatalogItem {
     init {
         require((inline != null) != (registryId != null)) { "Exactly one of inline/registryId must be set" }

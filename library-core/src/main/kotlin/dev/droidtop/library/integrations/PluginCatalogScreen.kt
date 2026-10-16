@@ -449,7 +449,7 @@ object PluginCatalogScreen {
             }
             val rows = index.origins.flatMap { origin ->
                 val state = PluginCatalog.originState(current, origin, userKeys)
-                origin.plugins.filter { matchesQuery(it, origin.origin, query) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id]) }
+                origin.plugins.filter { matchesQuery(it, origin.origin, query) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id], installed[plugin.id]?.let { PluginStore.iconFile(context, it.manifest) }) }
             }
             groups += CatalogGroup(
                 id = "plugins_catalog_list",
@@ -572,6 +572,8 @@ object PluginCatalogScreen {
         state: PluginCatalog.OriginState,
         plugin: PluginCatalogPlugin,
         installed: PluginRecord?,
+        // The installed plugin's own icon; the catalog index carries none, so a plugin not installed has none yet.
+        iconFile: String?,
     ): CatalogItem {
         val action = actionFor(source, state, plugin, installed)
         val id = "plugins_catalog_${plugin.id}"
@@ -614,6 +616,9 @@ object PluginCatalogScreen {
             inline = page,
             valueLabel = { action.value },
             chip = chipFor(source),
+            iconFile = iconFile,
+            // The summary is always under the name (#514), not only in Info.
+            summaryShown = true,
         )
     }
 
