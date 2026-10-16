@@ -965,13 +965,21 @@ class ConsoleRomProvider(
         // says so and names the setup row (Droidtop/tracker#270: NetherSX2 black, then not responding, on the link).
         // It also tells the watchdog this is an emulator playing a game, so one that sits idle is reported
         // (Droidtop/tracker#270, #271).
+        // The emulator's BIOS comes from droidtop's own copy (a games folder's bios folder), one source as with RetroArch
+        // cores (docs/SPEC.md "Emulator setup helper", Droidtop/tracker#270: NetherSX2 sat black on an empty BIOS folder
+        // while the PS2 BIOS was in the games folder). Copied in where the emulator's folder can be looked in and written
+        // (the helper behind Risky actions); what is still missing is named to the watchdog for this launch.
+        val biosAdvice = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { biosAdvice(context, system, player) }
         LaunchWatchdog.expectNext(
             player.packageName,
-            if (playerNeedsAllFilesAccess(context, player)) {
-                fileAccessAdvice(player.name, system.displayName, EmulatorAccess.canGrantAllFiles())
-            } else {
-                null
-            },
+            listOfNotNull(
+                if (playerNeedsAllFilesAccess(context, player)) {
+                    fileAccessAdvice(player.name, system.displayName, EmulatorAccess.canGrantAllFiles())
+                } else {
+                    null
+                },
+                biosAdvice,
+            ).joinToString(" ").ifEmpty { null },
         )
         if (player.killPackageProcesses) killPackageProcessesBestEffort(player.packageName)
         try {

@@ -691,7 +691,11 @@ object AppSettingsCatalogs {
         val reach = dev.droidtop.library.consoles.EmulatorSetup.writeReach("$folder/x")
         val viaHelper = reach == dev.droidtop.library.consoles.EmulatorSetup.Reach.HELPER
         if (reach != dev.droidtop.library.consoles.EmulatorSetup.Reach.DIRECT && !viaHelper) return null
-        val row = dev.droidtop.library.integrations.PluginBios.row(context, spec.systemId, spec.name, spec, folder, "the games folder", viaHelper)
+        val row = dev.droidtop.library.integrations.PluginBios.row(
+            context, spec.systemId, spec.name, spec,
+            // droidtop's own bios folder keeps the database's layout (bios/<system>/<name>).
+            dev.droidtop.library.consoles.EmulatorSetupSpec(), folder, "the games folder", viaHelper,
+        )
             ?: return null
         return CatalogGroup(id = "bios_get", title = null, items = listOf(row))
     }

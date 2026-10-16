@@ -8679,6 +8679,21 @@ menu_displaylist.c and msg_hash_us.h). The rows and the manual steps read the sa
   target name comes from the database, never from the plugin; the file's md5 must be one the database lists for it.
   A failed placement keeps the download and says where. This is the one place droidtop fetches firmware, and only
   at the person's press, from a plugin they approved; without a provider nothing changes.
+- **One source of BIOS files: droidtop's own** (coordinator, 2026-10-16, after the 1923 rig: NetherSX2 sat black and
+  stalled while the PS2 BIOS was on the SD card and NetherSX2's own `files/bios` was empty, Droidtop/tracker#270).
+  droidtop keeps BIOS files in a games folder's `bios` folder (`bios/<system>/<name>` as the database names them,
+  or `bios/<name>`; `EmulatorSetup.droidtopBios`), and an emulator gets a copy in its own folder
+  (`EmulatorSetup.syncBios`, through the one write path, so another app's folder still needs Risky actions > Write
+  another app's files). The same pattern as RetroArch cores (7e2c): droidtop holds the file, the emulator's folder
+  is where it is handed over. It happens from the BIOS row's **Use droidtop's BIOS files** (shown when droidtop has
+  any of the missing files) and before every launch through a preset whose setup names a BIOS folder droidtop can
+  look in: copying a file droidtop already has into the emulator's own BIOS folder is not asking for file access
+  (the rule below stays), and nothing is asked. A file still missing after that is named, with the folder, in the
+  launch watchdog's sentence for that launch (`biosMissingSentence`) and in the BIOS row. A row's `setup.biosFlat`
+  says the emulator reads BIOS files from the top of its folder under any name (the PCSX2 family: NetherSX2 and
+  AetherSX2 scan one level), so a file goes there under the database's base name, not its `ps2/` subfolder; the
+  "Add a BIOS file" and plugin rows use the same target (`EmulatorSetup.biosTarget`). Without a `setup` for the
+  emulator, the row says to open it, as before.
 - **Emulator options.** Each setting row shows the value the emulator's own config holds and cycles it on A,
   changing only that key (`ConfigText`: every other line is kept; an INI key goes in its own section). An
   emulator that writes its config back when it closes (`writesOnExit`, RetroArch) is named in the row, since
