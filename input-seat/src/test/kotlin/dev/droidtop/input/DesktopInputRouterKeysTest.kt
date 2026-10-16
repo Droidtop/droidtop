@@ -44,6 +44,33 @@ class DesktopInputRouterKeysTest {
     }
 
     @Test
+    fun `Ctrl, Alt and Meta only in the meta state are pressed around the key too`() {
+        // `adb shell input keycombination CTRL_LEFT MINUS` and many IMEs send Ctrl only as META_CTRL_ON on the key:
+        // foot's font-decrease (Control+minus) saw a bare minus (rig 2026-10-16).
+        val bridge = FakeHostBridge()
+        val router = router(bridge)
+        val ctrl = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+
+        router.onKeyEvent(KeyEvent.KEYCODE_MINUS, KeyEvent.ACTION_DOWN, 0, ctrl)
+        router.onKeyEvent(KeyEvent.KEYCODE_MINUS, KeyEvent.ACTION_UP, 0, ctrl)
+        assertEquals(listOf(29 to true, 12 to true, 12 to false, 29 to false), bridge.keys)
+
+        // Two at once: each pressed before the key and released after it.
+        bridge.keys.clear()
+        router.onKeyEvent(KeyEvent.KEYCODE_T, KeyEvent.ACTION_DOWN, 0, ctrl or KeyEvent.META_ALT_ON)
+        router.onKeyEvent(KeyEvent.KEYCODE_T, KeyEvent.ACTION_UP, 0, ctrl or KeyEvent.META_ALT_ON)
+        assertEquals(listOf(29 to true, 56 to true, 20 to true, 20 to false, 29 to false, 56 to false), bridge.keys)
+
+        // A Ctrl the container already sees held is not pressed a second time.
+        bridge.keys.clear()
+        router.onKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_DOWN, 0, ctrl)
+        router.onKeyEvent(KeyEvent.KEYCODE_EQUALS, KeyEvent.ACTION_DOWN, 0, ctrl)
+        router.onKeyEvent(KeyEvent.KEYCODE_EQUALS, KeyEvent.ACTION_UP, 0, ctrl)
+        router.onKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_UP, 0, 0)
+        assertEquals(listOf(29 to true, 13 to true, 13 to false, 29 to false), bridge.keys)
+    }
+
+    @Test
     fun `a typed key and its synthesized Shift go through the text keyboard, a physical key through the layout one`() {
         val bridge = FakeHostBridge()
         val router = router(bridge)
