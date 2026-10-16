@@ -226,4 +226,7 @@
     <string name="drawer_tab_delete">Delete tab</string>
     <string name="drawer_tab_as_folder">Show as a folder in All</string>
     <string name="drawer_tab_name_taken">A tab needs a name that no other tab has</string>
+    <!-- droidtop: widget stacks (Droidtop/tracker#564). -->
+    <string name="widget_stack_here">Stack a widget here</string>
+    <string name="widget_stack_none">This device has no widgets to stack</string>
 </resources>
