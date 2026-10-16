@@ -2618,9 +2618,43 @@ the `ContainerRuntime` interface that already exists (§3):
   every front. Image ids are the digest's hex without `sha256:`, as Podman writes them. Checked against Podman's own
   remote clients, 5.2.5 and 4.9.5 built from source, over these shapes: `version`, `info`, `ps` (`-a`, `--pod`,
   `--filter label=`), `inspect`, `images`, `image inspect`, `pod ps`, `pod inspect`, `network ls`, `network
-  inspect` and each `exists`. Every write route answers not built until the next slice; containers' short ids are
-  droidtop's own (`droidtop-sibling-...`), which both tools' `ps` cut to the same twelve characters, so NAMES is
-  what tells them apart.
+  inspect` and each `exists`. Containers' short ids are droidtop's own (`droidtop-sibling-...`), which both
+  tools' `ps` cut to the same twelve characters, so NAMES is what tells them apart.
+  **libpod writes (built 2026-10-16, D15 second slice).** `podman run`, `create`, `start`, `stop`, `restart`,
+  `kill`, `wait`, `rm`, `pull`, `logs` and `exec` work against the libpod API, through the same `EngineActions` as
+  every other front. The routes whose paths and answers are the same in both APIs (start, stop, restart, kill,
+  attach, logs, exec create, start and inspect) are read by Docker's router; the rest answer in Podman's shapes:
+  - Create takes Podman's own body (`LibpodApi.createRequest`, its SpecGenerator), read into the one request
+    model as Docker's create is, nothing that changes a container dropped. Taken: `name`, `image`, `command`,
+    `env`, `labels`, `restart_policy` and `restart_tries`, `remove` (`--rm`), `volumes` (a folder the person
+    mapped, where `-v` puts it), `portmappings` on a port's own number, `pod`, and `Networks` (a network of
+    droidtop's own; `podman`, Podman's default network, is the device's, as bridge and host are). Answered from
+    the D10 feature table: `resource_limits` (`--memory`, `--cpus`, `--pids-limit`), `hostname`, a read-only
+    root, `--network none` and a port on another number. Answered not built: `entrypoint`, `work_dir`, a non-root
+    `user`, a terminal or open input, `mounts` (a bind mount by path, tmpfs), devices, capabilities, secrets, DNS
+    settings, extra hosts, sysctls, health checks. Refused: `privileged`, and `--rm` with a restart policy (409).
+    The fields Podman's client always sends with what droidtop does anyway (its id mappings, umask, stop timeout,
+    systemd mode) are left alone.
+  - `wait` (conditions stopped and exited, or none: until the program is over) answers the exit code alone.
+    `DELETE /containers/{id}` answers a report per container removed, and with `ignore` a container that is not
+    there is no error. `images/pull` takes Podman's policies: `missing` and `never` take a stored image as it is,
+    `never` pulls nothing, `always` and `newer` pull; its 200 is followed by a progress line and the image's id,
+    or by the error, as Podman's service streams them. A pull for another platform or of all tags is not built.
+  - `logs`: Podman's client sends Go's zero time for no since or until, and -1 for every line, which are read as
+    such; `-f` is not built, as on the Docker API.
+  - Exec: Podman's client reads the output from the socket itself once it has read the head, so a byte sent with
+    the head would be lost in its read-ahead. The head goes first, the frames once the command has run, and the
+    connection closes, as on Podman's own service. `POST /exec/{id}/remove`, which the client sends after reading
+    the exit code, forgets a finished exec.
+  - A thing that is not there answers 404 in Podman's words (`no container with name or ID "x" found: no such
+    container`): Podman's client tells a missing container from another failure by that text, so
+    `podman rm --ignore` passes over one.
+  Checked against Podman's own remote clients, 5.2.5 and 4.9.5, over a harness serving `LibpodApi`: `run -d` with
+  `-e`, `-l`, `--restart`, `-v`, `-p`, `--pod` and `--network` (each read into the request), `run` and `run --rm`
+  (attach, start and wait: the program's output and its exit code), `rm -f`, `rm --ignore`, `stop`, `start`,
+  `restart`, `kill`, `wait`, `logs`, `logs --tail`, `pull`, `exec` with `-e` and `-w` (output and exit code) and
+  `exec -d`, and the refusals (`-w`, `--memory`, `-v /etc:/x`, `-p 8080:80`, `--network none`, an unknown
+  network, `--rm --restart always`). Pods' and networks' writes are the next slice.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept

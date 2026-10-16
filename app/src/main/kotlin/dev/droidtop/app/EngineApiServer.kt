@@ -194,7 +194,7 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.Container -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
-                val info = find(runtime.listContainers(), call.id) ?: return DockerApi.error(404, "No such container: ${call.id}")
+                val info = find(runtime.listContainers(), call.id) ?: return missing(libpod, DockerApi.Kind.CONTAINER, call.id)
                 val facts = EngineFacts.of(app, runtime, info, EngineFacts.pods(app))
                 EngineHttp.Response.json(200, libpod?.let { LibpodApi.inspect(facts, it) } ?: DockerApi.container(facts))
             }
@@ -205,21 +205,23 @@ internal object EngineApiServer {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
                 val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
                 val networks = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
-                val (create, refused) = DockerApi.createRequest(String(request.body, Charsets.UTF_8), call.name, features, networks)
+                val body = String(request.body, Charsets.UTF_8)
+                val (create, refused) = if (libpod != null) LibpodApi.createRequest(body, features, networks)
+                else DockerApi.createRequest(body, call.name, features, networks)
                 refused?.let { return it }
                 val made = EngineActions.make(app, runtime, runtime.listContainers(), create!!).getOrElse {
                     return DockerApi.error(409, it.message ?: "could not create the container")
                 }
                 EngineHttp.Response.json(201, DockerApi.created(made.container.id, made.notes))
             }
-            is DockerApi.Call.Start -> withContainer(runtime, call.id) { rt, info ->
+            is DockerApi.Call.Start -> withContainer(libpod, runtime, call.id) { rt, info ->
                 when {
                     ContainerPrograms.isRunning(info.container.id) -> EngineHttp.Response(304, "text/plain", ByteArray(0))
                     EngineActions.start(app, rt, info) -> EngineHttp.Response(204, "text/plain", ByteArray(0))
                     else -> DockerApi.error(500, "${info.displayName} has no program of its own to start (its image names none)")
                 }
             }
-            is DockerApi.Call.Stop -> withContainer(runtime, call.id) { _, info ->
+            is DockerApi.Call.Stop -> withContainer(libpod, runtime, call.id) { _, info ->
                 if (!ContainerPrograms.isRunning(info.container.id)) {
                     EngineHttp.Response(304, "text/plain", ByteArray(0))
                 } else {
@@ -227,14 +229,14 @@ internal object EngineApiServer {
                     EngineHttp.Response(204, "text/plain", ByteArray(0))
                 }
             }
-            is DockerApi.Call.Restart -> withContainer(runtime, call.id) { rt, info ->
+            is DockerApi.Call.Restart -> withContainer(libpod, runtime, call.id) { rt, info ->
                 if (EngineActions.restart(app, rt, info)) {
                     EngineHttp.Response(204, "text/plain", ByteArray(0))
                 } else {
                     DockerApi.error(500, "${info.displayName} has no program of its own to restart (its image names none)")
                 }
             }
-            is DockerApi.Call.Kill -> withContainer(runtime, call.id) { _, info ->
+            is DockerApi.Call.Kill -> withContainer(libpod, runtime, call.id) { _, info ->
                 if (!ContainerPrograms.isRunning(info.container.id)) {
                     DockerApi.error(409, "Container ${info.displayName} is not running")
                 } else {
@@ -242,25 +244,18 @@ internal object EngineApiServer {
                     EngineHttp.Response(204, "text/plain", ByteArray(0))
                 }
             }
-            is DockerApi.Call.Remove -> withContainer(runtime, call.id) { rt, info ->
-                when (val removal = EngineActions.remove(app, rt, info, call.force)) {
-                    EngineActions.Removal.Removed -> EngineHttp.Response(204, "text/plain", ByteArray(0))
-                    EngineActions.Removal.Primary -> DockerApi.error(409, "${info.displayName} is the desktop's own container; droidtop does not remove it")
-                    EngineActions.Removal.Running -> DockerApi.error(
-                        409,
-                        "You cannot remove a running container ${info.displayName}. Stop the container before attempting removal or force remove",
-                    )
-                    is EngineActions.Removal.Failed -> DockerApi.error(500, removal.message)
+            is DockerApi.Call.Remove -> {
+                // libpod's ignore: a container that is not there is no error, and no report.
+                if (call.ignoreMissing && runtime != null && find(runtime.listContainers(), call.id) == null) {
+                    return EngineHttp.Response.json(200, LibpodApi.removed(emptyList()))
                 }
+                withContainer(libpod, runtime, call.id) { rt, info -> remove(app, libpod, rt, info, call.force) }
             }
-            is DockerApi.Call.Pull -> EngineActions.pull(app, call.reference).fold(
-                onSuccess = { EngineHttp.Response.json(200, DockerApi.pulled(call.reference, it)) },
-                onFailure = { DockerApi.error(500, it.message ?: it.javaClass.simpleName) },
-            )
-            is DockerApi.Call.Logs -> withContainer(runtime, call.id) { _, info ->
+            is DockerApi.Call.Pull -> pull(app, libpod, call)
+            is DockerApi.Call.Logs -> withContainer(libpod, runtime, call.id) { _, info ->
                 EngineHttp.Response(200, "application/vnd.docker.multiplexed-stream", DockerApi.logFrames(EngineActions.logs(app, info, call.tail)))
             }
-            is DockerApi.Call.Wait -> withContainer(runtime, call.id) { _, info ->
+            is DockerApi.Call.Wait -> withContainer(libpod, runtime, call.id) { _, info ->
                 val id = info.container.id
                 if (!ContainerPrograms.isRunning(id) && call.condition == "next-exit") {
                     DockerApi.notBuilt("wait?condition=next-exit on a stopped container")
@@ -288,12 +283,12 @@ internal object EngineApiServer {
                             delay(WAIT_LOOK_MS)
                         }
                     }
-                    EngineHttp.Response.json(200, DockerApi.waited(code))
+                    EngineHttp.Response.json(200, if (libpod != null) LibpodApi.waited(code) else DockerApi.waited(code))
                 }
             }
             is DockerApi.Call.ImageGet -> {
                 val store = OciImageStore.of(app)
-                val entry = DockerApi.findImage(store.entries(), call.name) ?: return DockerApi.error(404, "No such image: ${call.name}")
+                val entry = DockerApi.findImage(store.entries(), call.name) ?: return missing(libpod, DockerApi.Kind.IMAGE, call.name)
                 val config = store.runConfig(entry.digest)
                 EngineHttp.Response.json(200, if (libpod != null) LibpodApi.image(entry, config, arch()) else DockerApi.image(entry, config, arch()))
             }
@@ -305,7 +300,7 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.NetworkGet -> {
                 val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
-                val network = ContainerNetworks.find(all, call.id) ?: return DockerApi.error(404, "network ${call.id} not found")
+                val network = ContainerNetworks.find(all, call.id) ?: return missing(libpod, DockerApi.Kind.NETWORK, call.id)
                 val names = containerNames(runtime)
                 EngineHttp.Response.json(200, if (libpod != null) LibpodApi.networkJson(network, names) else DockerApi.networkJson(network, names))
             }
@@ -322,7 +317,7 @@ internal object EngineApiServer {
                     return@withLock DockerApi.error(403, "${call.id} is a pre-defined network and cannot be removed")
                 }
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
-                val network = ContainerNetworks.find(existing, call.id) ?: return@withLock DockerApi.error(404, "network ${call.id} not found")
+                val network = ContainerNetworks.find(existing, call.id) ?: return@withLock missing(libpod, DockerApi.Kind.NETWORK, call.id)
                 val live = runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty().map { it.container.id }.toSet()
                 if (network.members.any { it in live }) {
                     return@withLock DockerApi.error(403, "error while removing network: network ${network.name} has active endpoints")
@@ -333,16 +328,16 @@ internal object EngineApiServer {
             is DockerApi.Call.NetworkConnect -> networksLock.withLock {
                 runtime ?: return@withLock DockerApi.error(500, "the desktop is not running")
                 val ref = DockerApi.connectTarget(String(request.body, Charsets.UTF_8)) ?: return@withLock DockerApi.error(400, "name a Container")
-                val info = find(runtime.listContainers(), ref) ?: return@withLock DockerApi.error(404, "No such container: $ref")
+                val info = find(runtime.listContainers(), ref) ?: return@withLock missing(libpod, DockerApi.Kind.CONTAINER, ref)
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
                 if (call.id in ContainerNetworks.PREDEFINED) return@withLock EngineHttp.Response(200, "text/plain", ByteArray(0))
-                val network = ContainerNetworks.find(existing, call.id) ?: return@withLock DockerApi.error(404, "network ${call.id} not found")
+                val network = ContainerNetworks.find(existing, call.id) ?: return@withLock missing(libpod, DockerApi.Kind.NETWORK, call.id)
                 val next = if (call.connect) ContainerNetworks.withMember(existing, network.id, info.container.id)
                 else ContainerNetworks.withoutMember(existing, info.container.id, network.id)
                 withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, next) }
                 EngineHttp.Response(200, "text/plain", ByteArray(0))
             }
-            is DockerApi.Call.ExecCreate -> withContainer(runtime, call.containerId) { _, info ->
+            is DockerApi.Call.ExecCreate -> withContainer(libpod, runtime, call.containerId) { _, info ->
                 // Behind the same switch as droidtop's own docker exec: the container's "Run its commands from the
                 // desktop" (docs/SPEC.md 3d).
                 val allowed = withContext(Dispatchers.IO) { dev.droidtop.runtime.ContainerEnter.allowed(app.filesDir, info.container.id) }
@@ -355,10 +350,10 @@ internal object EngineApiServer {
                 EngineHttp.Response.json(201, DockerApi.execCreated(id))
             }
             is DockerApi.Call.ExecStart -> {
-                val exec = execs[call.execId] ?: return DockerApi.error(404, "No such exec instance: ${call.execId}")
+                val exec = execs[call.execId] ?: return noExec(libpod, call.execId)
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
                 val info = runtime.listContainers().firstOrNull { it.container.id == exec.containerId }
-                    ?: return DockerApi.error(404, "No such container: ${exec.containerId}")
+                    ?: return missing(libpod, DockerApi.Kind.CONTAINER, exec.containerId)
                 if (exec.running || exec.exitCode != null) return DockerApi.error(409, "exec ${call.execId} has already run")
                 exec.running = true
                 val run: suspend () -> dev.droidtop.runtime.ContainerExecResult? = {
@@ -379,14 +374,24 @@ internal object EngineApiServer {
                     execScope.launch { run() }
                     return EngineHttp.Response(200, "text/plain", ByteArray(0))
                 }
-                val result = run()
-                val frames = DockerApi.outputFrames(result?.stdout.orEmpty(), result?.stderr ?: "the command could not be run\n")
+                fun frames(result: dev.droidtop.runtime.ContainerExecResult?) =
+                    DockerApi.outputFrames(result?.stdout.orEmpty(), result?.stderr ?: "the command could not be run\n")
+                // Podman's client reads the output from the socket itself once it has the head, so a byte sent with the
+                // head is lost in its read-ahead: the head goes first, the frames once the command has run, and the
+                // connection then closes, as on Podman's own service.
+                if (libpod != null) {
+                    return EngineHttp.Response(200, "application/vnd.docker.raw-stream", ByteArray(0), stream = { out ->
+                        out.write(frames(run()))
+                        out.flush()
+                    })
+                }
+                val output = frames(run())
                 // Docker's CLI asks to take the connection over (Upgrade: tcp); a client that does not gets the frames
                 // as an ordinary body.
                 val upgrade = request.headers["upgrade"]?.equals("tcp", ignoreCase = true) == true
-                EngineHttp.Response(if (upgrade) 101 else 200, "application/vnd.docker.multiplexed-stream", frames)
+                EngineHttp.Response(if (upgrade) 101 else 200, "application/vnd.docker.multiplexed-stream", output)
             }
-            is DockerApi.Call.Attach -> withContainer(runtime, call.id) { _, info ->
+            is DockerApi.Call.Attach -> withContainer(libpod, runtime, call.id) { _, info ->
                 val log = dev.droidtop.runtime.ContainerProgram.hostLogFile(app.filesDir, info.container.id)
                 val upgrade = request.headers["upgrade"]?.equals("tcp", ignoreCase = true) == true
                 EngineHttp.Response(
@@ -397,10 +402,16 @@ internal object EngineApiServer {
                 )
             }
             is DockerApi.Call.ExecGet -> {
-                val exec = execs[call.execId] ?: return DockerApi.error(404, "No such exec instance: ${call.execId}")
+                val exec = execs[call.execId] ?: return noExec(libpod, call.execId)
                 EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, exec.containerId, exec.spec, exec.running, exec.exitCode))
             }
-            is DockerApi.Call.Exists -> if (exists(app, runtime, call)) EngineHttp.Response(204, "text/plain", ByteArray(0)) else DockerApi.error(404, "no such ${call.kind.name.lowercase()}: ${call.id}")
+            is DockerApi.Call.ExecRemove -> {
+                val exec = execs[call.execId] ?: return noExec(libpod, call.execId)
+                if (exec.running) return DockerApi.error(409, "exec session ${call.execId} is running and cannot be removed")
+                execs.remove(call.execId)
+                EngineHttp.Response(200, "text/plain", ByteArray(0))
+            }
+            is DockerApi.Call.Exists -> if (exists(app, runtime, call)) EngineHttp.Response(204, "text/plain", ByteArray(0)) else missing(libpod, call.kind, call.id)
             is DockerApi.Call.Pods -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
                 LibpodApi.unknownPodFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return LibpodApi.notBuilt("pod filters ${it.joinToString(", ")}") }
@@ -408,7 +419,7 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.PodGet -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
-                val pod = ContainerPods.find(EngineFacts.pods(app), call.id) ?: return DockerApi.error(404, "no such pod: ${call.id}")
+                val pod = ContainerPods.find(EngineFacts.pods(app), call.id) ?: return missing(libpod, DockerApi.Kind.POD, call.id)
                 EngineHttp.Response.json(200, LibpodApi.pod(podFacts(app, runtime, listOf(pod)).single()))
             }
             is DockerApi.Call.Refused -> DockerApi.error(call.status, call.message)
@@ -416,6 +427,54 @@ internal object EngineApiServer {
             DockerApi.Call.NotFound -> DockerApi.error(404, "page not found")
         }
     }
+
+    /** Removes [info] through the one removal path; libpod answers with a report per container, Docker with 204. */
+    private suspend fun remove(
+        app: Context,
+        libpod: LibpodApi.Version?,
+        runtime: dev.droidtop.runtime.ContainerRuntime,
+        info: ContainerInfo,
+        force: Boolean,
+    ): EngineHttp.Response = when (val removal = EngineActions.remove(app, runtime, info, force)) {
+        EngineActions.Removal.Removed ->
+            if (libpod != null) EngineHttp.Response.json(200, LibpodApi.removed(listOf(info.container.id))) else EngineHttp.Response(204, "text/plain", ByteArray(0))
+        EngineActions.Removal.Primary -> DockerApi.error(409, "${info.displayName} is the desktop's own container; droidtop does not remove it")
+        EngineActions.Removal.Running -> DockerApi.error(
+            409,
+            "You cannot remove a running container ${info.displayName}. Stop the container before attempting removal or force remove",
+        )
+        is EngineActions.Removal.Failed -> DockerApi.error(500, removal.message)
+    }
+
+    /**
+     * A pull. Docker's answers its progress lines after the pull, or 500. libpod's takes Podman's policies (missing and
+     * never take a stored image as it is; never pulls nothing) and, after its 200, says a failure in the stream, as
+     * Podman's service does.
+     */
+    private suspend fun pull(app: Context, libpod: LibpodApi.Version?, call: DockerApi.Call.Pull): EngineHttp.Response {
+        if (libpod == null) {
+            return EngineActions.pull(app, call.reference).fold(
+                onSuccess = { EngineHttp.Response.json(200, DockerApi.pulled(call.reference, it)) },
+                onFailure = { DockerApi.error(500, it.message ?: it.javaClass.simpleName) },
+            )
+        }
+        val stored = DockerApi.findImage(OciImageStore.of(app).entries(), call.reference)
+        if (stored != null && call.policy in setOf("missing", "never")) return EngineHttp.Response.json(200, LibpodApi.present(stored.digest))
+        if (call.policy == "never") return EngineHttp.Response.json(200, LibpodApi.pullFailed("${call.reference}: image not known, and the pull policy is never"))
+        return EngineActions.pull(app, call.reference).fold(
+            onSuccess = { EngineHttp.Response.json(200, LibpodApi.pulled(call.reference, it)) },
+            onFailure = { EngineHttp.Response.json(200, LibpodApi.pullFailed(it.message ?: it.javaClass.simpleName)) },
+        )
+    }
+
+    /** 404 for an exec that is not there; Podman's client knows it by "no such exec session". */
+    private fun noExec(libpod: LibpodApi.Version?, id: String) =
+        if (libpod != null) LibpodApi.error(404, "no exec session with ID $id found: no such exec session", "no such exec session")
+        else DockerApi.error(404, "No such exec instance: $id")
+
+    /** 404 for [ref] in the asking API's words. */
+    private fun missing(libpod: LibpodApi.Version?, kind: DockerApi.Kind, ref: String) =
+        if (libpod != null) LibpodApi.missing(kind, ref) else DockerApi.missing(kind, ref)
 
     /** 501 for [what], naming the API's own section of docs/SPEC.md. */
     private fun notBuilt(libpod: LibpodApi.Version?, what: String) = if (libpod != null) LibpodApi.notBuilt(what) else DockerApi.notBuilt(what)
@@ -503,12 +562,13 @@ internal object EngineApiServer {
 
     /** [block] with the running desktop's runtime and the container [ref] names; 500 or 404 otherwise. */
     private suspend fun withContainer(
+        libpod: LibpodApi.Version?,
         runtime: dev.droidtop.runtime.ContainerRuntime?,
         ref: String,
         block: suspend (dev.droidtop.runtime.ContainerRuntime, ContainerInfo) -> EngineHttp.Response,
     ): EngineHttp.Response {
         runtime ?: return DockerApi.error(500, "the desktop is not running")
-        val info = find(runtime.listContainers(), ref) ?: return DockerApi.error(404, "No such container: $ref")
+        val info = find(runtime.listContainers(), ref) ?: return missing(libpod, DockerApi.Kind.CONTAINER, ref)
         return block(runtime, info)
     }
 

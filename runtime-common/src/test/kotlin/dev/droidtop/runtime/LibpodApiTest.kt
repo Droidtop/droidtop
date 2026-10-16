@@ -58,7 +58,7 @@ class LibpodApiTest {
         assertEquals(DockerApi.Call.Networks(mapOf("name" to listOf("x"))), get("/networks/json", mapOf("filters" to """{"name":["x"]}""")))
         assertEquals(DockerApi.Call.Exists(DockerApi.Kind.NETWORK, "x"), get("/networks/x/exists"))
         assertTrue(get("/containers/json", mapOf("filters" to "[1]")) is DockerApi.Call.Refused)
-        assertEquals(DockerApi.Call.NotBuilt("POST /libpod/containers/create"), LibpodApi.route("POST", "/v5.2.5/libpod/containers/create", emptyMap()))
+        assertEquals(DockerApi.Call.NotBuilt("POST /libpod/pods/create"), LibpodApi.route("POST", "/v5.2.5/libpod/pods/create", emptyMap()))
         assertEquals(DockerApi.Call.NotFound, get("/nothing"))
         assertTrue(LibpodApi.notBuilt("x").body.toString(Charsets.UTF_8).contains("The libpod API"))
     }
@@ -137,5 +137,89 @@ class LibpodApiTest {
         assertEquals("arm64", info.getValue("host").jsonObject.str("arch"))
         assertEquals("2", info.getValue("store").jsonObject.getValue("containerStore").jsonObject.str("stopped"))
         assertEquals("2", info.getValue("store").jsonObject.getValue("imageStore").jsonObject.str("number"))
+    }
+
+    @Test
+    fun `the write routes are the same calls, with Podman's wait, rm, pull and logs read its way`() {
+        fun post(path: String, query: Map<String, String> = emptyMap()) = LibpodApi.route("POST", "/v5.2.5/libpod$path", query)
+        assertEquals(DockerApi.Call.Create(null), post("/containers/create"))
+        assertEquals(DockerApi.Call.Start("web"), post("/containers/web/start"))
+        assertEquals(DockerApi.Call.Stop("web"), post("/containers/web/stop", mapOf("ignore" to "false")))
+        assertEquals(DockerApi.Call.Kill("web", "SIGKILL"), post("/containers/web/kill", mapOf("signal" to "SIGKILL")))
+        assertEquals(DockerApi.Call.Wait("web", "not-running"), post("/containers/web/wait", mapOf("interval" to "250ms")))
+        assertEquals(DockerApi.Call.Wait("web", "not-running"), post("/containers/web/wait", mapOf("condition" to "exited")))
+        assertTrue(post("/containers/web/wait", mapOf("condition" to "healthy")) is DockerApi.Call.NotBuilt)
+        assertEquals(
+            DockerApi.Call.Remove("web", force = true, ignoreMissing = true),
+            LibpodApi.route("DELETE", "/v5.2.5/libpod/containers/web", mapOf("force" to "true", "ignore" to "true", "depend" to "false", "volumes" to "false")),
+        )
+        assertEquals(DockerApi.Call.Pull("nginx", "missing"), post("/images/pull", mapOf("reference" to "nginx", "policy" to "missing", "arch" to "", "alltags" to "false")))
+        assertTrue(post("/images/pull", mapOf("reference" to "nginx", "arch" to "arm")) is DockerApi.Call.NotBuilt)
+        assertTrue(post("/images/pull", mapOf("reference" to "nginx", "policy" to "sometimes")) is DockerApi.Call.Refused)
+        // Podman's client sends Go's zero time for no since or until, and -1 for every line.
+        val zero = EngineInspect.ZERO_TIME
+        assertEquals(
+            DockerApi.Call.Logs("web", EngineCli.MAX_TAIL, stdout = true, stderr = true),
+            LibpodApi.route("GET", "/v5.2.5/libpod/containers/web/logs", mapOf("since" to zero, "until" to zero, "tail" to "-1", "stdout" to "true", "stderr" to "true", "follow" to "false", "timestamps" to "false")),
+        )
+        assertEquals(DockerApi.Call.ExecCreate("web"), post("/containers/web/exec"))
+        assertEquals(DockerApi.Call.ExecStart("e1"), post("/exec/e1/start"))
+        assertEquals(DockerApi.Call.ExecRemove("e1"), post("/exec/e1/remove"))
+    }
+
+    @Test
+    fun `a create body is Podman's own, read into the one run request`() {
+        val network = Network(ContainerNetworks.newId(), "demo_default", 1L)
+        // What podman create --name y -e A=B -l k=v --restart on-failure:3 -v Music:... -p 8080:8080 --pod demo
+        // --network demo_default nginx echo hi sends (Podman 5.2.5), trimmed of the fields droidtop leaves alone.
+        val body = """{"name":"y","pod":"demo","command":["echo","hi"],"env":{"A":"B"},"terminal":false,"stdin":false,""" +
+            """"labels":{"k":"v"},"stop_timeout":10,"restart_policy":"on-failure","restart_tries":3,"systemd":"true","remove":false,""" +
+            """"image":"nginx","raw_image_name":"nginx","volumes":[{"Name":"Music","Dest":"/run/droidtop-mounts/Music","Options":null,"IsAnonymous":false,"SubPath":""}],""" +
+            """"umask":"0022","netns":{"nsmode":"bridge"},"portmappings":[{"host_ip":"","container_port":8080,"host_port":8080,"range":1,"protocol":""}],""" +
+            """"Networks":{"demo_default":{"interface_name":""}},"idmappings":{"HostUIDMapping":true}}"""
+        val (run, refused) = LibpodApi.createRequest(body, null, listOf(network))
+        assertNull(refused)
+        run!!
+        assertEquals("nginx", run.image)
+        assertEquals("y", run.name)
+        assertEquals(listOf("echo", "hi"), run.args)
+        assertEquals(listOf("A=B"), run.env)
+        assertEquals(mapOf("k" to "v"), run.labels)
+        assertEquals(ContainerProgram.RestartPolicy.OnFailure(3), run.restart)
+        assertEquals(listOf("Music"), run.volumes)
+        assertEquals(listOf(ExposedPort(8080)), run.publish)
+        assertEquals("demo", run.pod)
+        assertEquals(listOf(network.id), run.networks.map { it.networkId })
+        assertEquals(false, run.start)
+
+        fun answer(json: String) = LibpodApi.createRequest(json, null, listOf(network)).let { (r, a) -> assertNull(r); a!!.status to a.body.toString(Charsets.UTF_8) }
+        val image = "\"image\":\"nginx\""
+        assertEquals(501, answer("{$image,\"work_dir\":\"/srv\"}").first)
+        assertEquals(501, answer("{$image,\"mounts\":[{\"destination\":\"/x\",\"type\":\"bind\",\"source\":\"/etc\"}]}").first)
+        assertTrue(answer("{$image,\"resource_limits\":{\"memory\":{\"limit\":1}}}").second.contains("--memory"))
+        assertEquals(501, answer("{$image,\"portmappings\":[{\"container_port\":80,\"host_port\":8080}]}").first)
+        assertEquals(501, answer("{$image,\"terminal\":true}").first)
+        assertEquals(501, answer("{$image,\"netns\":{\"nsmode\":\"none\"}}").first)
+        assertEquals(404, answer("{$image,\"Networks\":{\"nope\":{}}}").first)
+        assertEquals(409, answer("{$image,\"remove\":true,\"restart_policy\":\"always\"}").first)
+        assertEquals(400, answer("{$image,\"privileged\":true}").first)
+        assertEquals(400, answer("{$image,\"volumes\":[{\"Name\":\"\",\"Dest\":\"/data\",\"IsAnonymous\":true}]}").first)
+        assertEquals(true, LibpodApi.createRequest("{$image,\"remove\":true,\"user\":\"root\",\"Networks\":{\"podman\":{}}}", null, emptyList()).first?.autoRemove)
+    }
+
+    @Test
+    fun `pull, rm, wait and a missing thing answer as Podman's client reads them`() {
+        val lines = LibpodApi.pulled("alpine", digest).trim().lines().map { obj(it) }
+        assertEquals("ab".repeat(32), lines.last().str("id"))
+        assertEquals("ab".repeat(32), lines.last().getValue("images").jsonArray.single().jsonPrimitive.content)
+        assertEquals("no", obj(LibpodApi.pullFailed("no")).str("error"))
+        assertEquals("web", list(LibpodApi.removed(listOf("web"))).single().jsonObject.str("Id"))
+        assertEquals("[]", LibpodApi.removed(emptyList()).trim())
+        assertEquals("3", LibpodApi.waited(3).trim())
+        // Podman's client knows a missing container by this text (errorhandling.Contains with define.ErrNoSuchCtr).
+        val missing = LibpodApi.missing(DockerApi.Kind.CONTAINER, "nope")
+        assertEquals(404, missing.status)
+        assertTrue(obj(missing.body.toString(Charsets.UTF_8)).str("message").contains("no such container"))
+        assertTrue(obj(LibpodApi.missing(DockerApi.Kind.POD, "p").body.toString(Charsets.UTF_8)).str("message").contains("no such pod"))
     }
 }

@@ -76,6 +76,25 @@ object LibpodApi {
             p == "/networks/json" && read -> filtered { DockerApi.Call.Networks(it) }
             segments.size == 3 && segments[0] == "networks" && segments[2] == "json" && read -> DockerApi.Call.NetworkGet(segments[1])
             segments.size == 3 && segments[0] == "networks" && segments[2] == "exists" && read -> DockerApi.Call.Exists(DockerApi.Kind.NETWORK, segments[1])
+            // A create body is Podman's own (a SpecGenerator), read by [createRequest]; its name is in the body.
+            p == "/containers/create" && method == "POST" -> DockerApi.Call.Create(null)
+            segments.size == 3 && segments[0] == "containers" && segments[2] == "wait" && method == "POST" -> wait(segments[1], query)
+            segments.size == 2 && segments[0] == "containers" && method == "DELETE" -> when {
+                flag(query["depend"]) -> DockerApi.Call.NotBuilt("rm --depend")
+                else -> DockerApi.Call.Remove(segments[1], force = flag(query["force"]), ignoreMissing = flag(query["ignore"]))
+            }
+            p == "/images/pull" && method == "POST" -> pull(query)
+            segments.size == 3 && segments[0] == "exec" && segments[2] == "remove" && method == "POST" -> DockerApi.Call.ExecRemove(segments[1])
+            // Podman's client sends Go's zero time for no since or until, and -1 for every line.
+            segments.size == 3 && segments[0] == "containers" && segments[2] == "logs" && read -> DockerApi.route(
+                method,
+                p,
+                query.filterNot { (k, v) -> k in setOf("since", "until") && v == EngineInspect.ZERO_TIME } +
+                    (query["tail"]?.takeIf { it == "-1" }?.let { mapOf("tail" to "all") } ?: emptyMap()),
+            )
+            // The actions whose paths, queries and answers are the same in both APIs are Docker's.
+            (segments.size == 3 && segments[0] == "containers" && segments[2] in setOf("start", "stop", "restart", "kill", "attach", "exec")) ||
+                (segments.size == 3 && segments[0] == "exec" && segments[2] in setOf("start", "json")) -> DockerApi.route(method, p, query)
             segments.firstOrNull() in setOf(
                 "containers", "images", "pods", "networks", "volumes", "exec", "events", "system", "manifests", "secrets",
                 "play", "generate", "kube", "build", "quadlets", "artifacts",
@@ -86,11 +105,178 @@ object LibpodApi {
 
     private fun flag(value: String?): Boolean = value == "1" || value == "true" || value == "True"
 
+    /** libpod's wait: until the program is over (its conditions stopped and exited), as Docker's not-running. */
+    private fun wait(id: String, query: Map<String, String>): DockerApi.Call {
+        val condition = query["condition"].orEmpty()
+        return if (condition.isEmpty() || condition in setOf("stopped", "exited")) DockerApi.Call.Wait(id, "not-running")
+        else DockerApi.Call.NotBuilt("wait --condition $condition")
+    }
+
+    private fun pull(query: Map<String, String>): DockerApi.Call {
+        val reference = query["reference"].orEmpty()
+        val policy = query["policy"].orEmpty().ifEmpty { "always" }
+        return when {
+            reference.isEmpty() || !EngineCli.PODMAN.validReference(reference) -> DockerApi.Call.Refused(400, "not an image reference: $reference")
+            policy !in setOf("always", "missing", "newer", "never") -> DockerApi.Call.Refused(400, "pull policy $policy is not always, missing, newer or never")
+            flag(query["allTags"]) || flag(query["alltags"]) -> DockerApi.Call.NotBuilt("pull --all-tags")
+            listOf("arch", "os", "variant").any { !query[it].isNullOrEmpty() } -> DockerApi.Call.NotBuilt("pull for another platform (--arch, --os, --variant)")
+            else -> DockerApi.Call.Pull(reference, policy)
+        }
+    }
+
     /** Pod filters droidtop applies: name and id. Any other is said, never ignored. */
     fun unknownPodFilters(filters: Map<String, List<String>>): Set<String> = filters.keys - setOf("name", "id")
 
+    /**
+     * 404 for [ref] in Podman's words. Podman's client tells a missing container, pod or exec from another failure by
+     * the message holding its error's text ("no such container"), so `podman rm --ignore` passes over one.
+     */
+    fun missing(kind: DockerApi.Kind, ref: String): EngineHttp.Response = when (kind) {
+        DockerApi.Kind.CONTAINER -> error(404, "no container with name or ID \"$ref\" found: no such container", "no such container")
+        DockerApi.Kind.POD -> error(404, "no pod with name or ID $ref found: no such pod", "no such pod")
+        DockerApi.Kind.IMAGE -> error(404, "$ref: image not known", "image not known")
+        DockerApi.Kind.NETWORK -> error(404, "unable to find network with name or ID $ref: network not found", "network not found")
+    }
+
+    /** An error in Podman's shape: the message, its cause and the status. */
+    fun error(status: Int, message: String, cause: String): EngineHttp.Response = EngineHttp.Response.json(
+        status,
+        JsonObject(mapOf("cause" to JsonPrimitive(cause), "message" to JsonPrimitive(message), "response" to JsonPrimitive(status))).toString() + "\n",
+    )
+
     fun notBuilt(what: String): EngineHttp.Response =
         DockerApi.error(501, "$what is not built in droidtop's engine yet (docs/SPEC.md 3d, \"The libpod API\")")
+
+    /**
+     * A create body (`POST /libpod/containers/create`, Podman's SpecGenerator) read into the one request model, or the
+     * answer it gets when it asks for what droidtop does not do. As with Docker's create, nothing that changes what a
+     * container is is dropped: it is taken, answered from the D10 feature table, or answered as not built. Fields
+     * Podman's client always sends with what droidtop does anyway (its id mappings, umask, stop timeout, ...) are
+     * left alone. Pure.
+     */
+    fun createRequest(body: String, features: EngineFeatures?, networks: List<Network>): Pair<EngineRequest.Run?, EngineHttp.Response?> {
+        fun refuse(status: Int, message: String) = null to DockerApi.error(status, message)
+        fun notYet(what: String) = null to notBuilt(what)
+        fun feature(option: String) = refuse(501, EngineOptions.refusal("podman create", option, features))
+        val o = runCatching { kotlinx.serialization.json.Json.parseToJsonElement(body.ifBlank { "{}" }) as JsonObject }.getOrNull()
+            ?: return refuse(400, "the body is not a JSON object")
+        fun string(obj: JsonObject?, key: String): String? = (obj?.get(key) as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "null" }
+        fun bool(key: String): Boolean = (o[key] as? JsonPrimitive)?.content == "true"
+        fun list(key: String): List<JsonElement> = (o[key] as? JsonArray).orEmpty()
+        fun strings(key: String): List<String> = list(key).mapNotNull { (it as? JsonPrimitive)?.content }
+        fun map(key: String): Map<String, String> = (o[key] as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.content ?: "" }.orEmpty()
+        fun given(key: String): Boolean = when (val v = o[key]) {
+            null, JsonNull -> false
+            is JsonArray -> v.isNotEmpty()
+            is JsonObject -> v.isNotEmpty()
+            is JsonPrimitive -> v.content.isNotEmpty() && v.content != "false" && v.content != "0"
+        }
+
+        val image = string(o, "image") ?: return refuse(400, "a container needs an image")
+        if (!EngineCli.PODMAN.validReference(image)) return refuse(400, "not an image reference: $image")
+        if (bool("privileged")) return refuse(400, "droidtop's containers never run privileged")
+        if (strings("entrypoint").isNotEmpty()) return notYet("entrypoint (podman run --entrypoint)")
+        string(o, "work_dir")?.let { return notYet("work_dir (podman run -w)") }
+        string(o, "user")?.takeIf { it.substringBefore(':') !in setOf("root", "0") }?.let { return notYet("user (podman run -u)") }
+        if (bool("terminal") || bool("stdin")) return notYet("a container with a terminal or open input (podman run -t, -i)")
+        string(o, "hostname")?.let { return feature("--hostname") }
+        if (bool("read_only_filesystem")) return feature("--read-only")
+        (o["resource_limits"] as? JsonObject)?.takeIf { it.isNotEmpty() }?.let { limits ->
+            return when {
+                "memory" in limits -> feature("--memory")
+                "cpu" in limits -> feature("--cpus")
+                "pids" in limits -> feature("--pids-limit")
+                else -> notYet("resource_limits ${limits.keys.joinToString(", ")}")
+            }
+        }
+        listOf(
+            "mounts" to "mounts (bind mounts by path and tmpfs; -v takes a folder you mapped in Containers)",
+            "image_volumes" to "image_volumes", "overlay_volumes" to "overlay_volumes", "devices" to "devices",
+            "cap_add" to "cap_add", "secrets" to "secrets", "secret_env" to "secret_env", "dns_server" to "dns_server",
+            "dns_search" to "dns_search", "hostadd" to "hostadd (--add-host)", "sysctl" to "sysctl", "healthconfig" to "healthconfig",
+            "volumes_from" to "volumes_from", "dependencyContainers" to "requires",
+        ).forEach { (key, what) -> if (given(key)) return notYet(what) }
+
+        // Volumes: the name of a folder the person mapped, where -v puts it (docs/SPEC.md 3d "Home and folders").
+        val volumes = list("volumes").map { v ->
+            val volume = v as? JsonObject
+            val options = (volume?.get("Options") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
+            val spec = listOfNotNull(string(volume, "Name"), string(volume, "Dest")).joinToString(":") +
+                options.singleOrNull()?.takeIf { it == "ro" || it == "rw" }?.let { ":$it" }.orEmpty()
+            val folder = if (options.size <= 1 && options.all { it == "ro" || it == "rw" }) EngineCli.PODMAN.volume(spec) else null
+            folder ?: return refuse(
+                400,
+                "-v takes the name of a folder you mapped in Containers (it appears at ${ContainerLayout.EXTRA_MOUNTS_DIR}/<name>); $spec is not one droidtop can mount",
+            )
+        }
+
+        val joins = mutableListOf<EngineRequest.NetworkJoin>()
+        val nsmode = string(o["netns"] as? JsonObject, "nsmode").orEmpty()
+        when {
+            nsmode == "none" -> return feature("--network")
+            nsmode.startsWith("ns:") || nsmode == "path" || nsmode == "container" -> return notYet("--network $nsmode")
+        }
+        (o["Networks"] as? JsonObject)?.forEach { (ref, options) ->
+            val aliases = ((options as? JsonObject)?.get("aliases") as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }.orEmpty()
+            DockerApi.join(joins, networks, ref, aliases, features, "podman create", setOf("default", "host", "bridge", "podman"))?.let { return null to it }
+        }
+
+        val publish = mutableListOf<ExposedPort>()
+        list("portmappings").forEach { m ->
+            val mapping = m as? JsonObject
+            val container = string(mapping, "container_port") ?: return refuse(400, "a port mapping needs a container_port")
+            if ((string(mapping, "range")?.toIntOrNull() ?: 1) > 1) return notYet("a range of ports")
+            val host = string(mapping, "host_port")?.takeIf { it != "0" }
+            val address = string(mapping, "host_ip")
+            (string(mapping, "protocol") ?: ExposedPort.TCP).split(',').forEach { protocol ->
+                val spec = listOfNotNull(address, host).joinToString(":").let { if (it.isEmpty()) container else "$it:$container" } + "/$protocol"
+                val (published, refused) = EngineCli.PODMAN.publish(spec, features, "create")
+                refused?.let { return refuse(501, it.text.trim()) }
+                publish += published!!
+            }
+        }
+
+        val restart = string(o, "restart_policy")?.let { policy ->
+            val tries = string(o, "restart_tries")?.toIntOrNull() ?: 0
+            ContainerProgram.RestartPolicy.parse(if (policy == "on-failure" && tries > 0) "on-failure:$tries" else policy)
+                ?: return refuse(400, "restart_policy takes no, on-failure, always or unless-stopped, not $policy")
+        } ?: ContainerProgram.RestartPolicy.No
+        val autoRemove = bool("remove")
+        if (autoRemove && restart != ContainerProgram.RestartPolicy.No) return refuse(409, "the --rm option conflicts with --restart")
+        return EngineRequest.Run(
+            image = image,
+            name = string(o, "name"),
+            args = strings("command").takeIf { o["command"] is JsonArray && it.isNotEmpty() },
+            env = map("env").map { (k, v) -> "$k=$v" },
+            volumes = volumes,
+            restart = restart,
+            pod = string(o, "pod"),
+            publish = publish,
+            start = false,
+            labels = map("labels"),
+            networks = joins,
+            autoRemove = autoRemove,
+        ) to null
+    }
+
+    /** `POST /libpod/images/pull`'s answer: a line of progress, then the image's id, as Podman's client reads them. */
+    fun pulled(reference: String, digest: String): String =
+        JsonObject(mapOf("stream" to JsonPrimitive("Pulled $reference\n"))).toString() + "\n" + present(digest)
+
+    /** The pull answer for an image already stored, which a `missing` or `never` policy takes as it is. */
+    fun present(digest: String): String = buildJsonObject {
+        putJsonArray("images") { add(JsonPrimitive(imageId(digest))) }
+        put("id", imageId(digest))
+    }.toString() + "\n"
+
+    /** A pull that failed: Podman's service says so in the stream, after its 200. */
+    fun pullFailed(message: String): String = JsonObject(mapOf("error" to JsonPrimitive(message))).toString() + "\n"
+
+    /** `DELETE /libpod/containers/{id}`'s answer: one report per container removed. */
+    fun removed(ids: List<String>): String = JsonArray(ids.map { JsonObject(mapOf("Id" to JsonPrimitive(it))) }).toString() + "\n"
+
+    /** `POST /libpod/containers/{id}/wait`'s answer: the exit code alone. */
+    fun waited(code: Int): String = "$code\n"
 
     /** The headers every libpod answer carries, as Podman's service sends them: its client reads the version on ping. */
     fun headers(version: Version): Map<String, String> = mapOf(
