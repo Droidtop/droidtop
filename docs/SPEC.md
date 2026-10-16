@@ -2654,7 +2654,25 @@ the `ContainerRuntime` interface that already exists (§3):
   (attach, start and wait: the program's output and its exit code), `rm -f`, `rm --ignore`, `stop`, `start`,
   `restart`, `kill`, `wait`, `logs`, `logs --tail`, `pull`, `exec` with `-e` and `-w` (output and exit code) and
   `exec -d`, and the refusals (`-w`, `--memory`, `-v /etc:/x`, `-p 8080:80`, `--network none`, an unknown
-  network, `--rm --restart always`). Pods' and networks' writes are the next slice.
+  network, `--rm --restart always`).
+  **libpod pods and networks (built 2026-10-16, D15 third slice).** `pods/create` (Podman's PodSpecGenerator:
+  its name and labels; the namespaces a pod shares are what its containers have anyway, a port is taken on its own
+  number, and limits, a hostname, `--network none` and a port on another number answer from the feature table),
+  `pods/{id}/start`, `stop`, `restart` and `kill` (KILL, TERM or INT end the programs, as stop does; another signal
+  is not built), and `DELETE /pods/{id}` (its containers go with it; with one running only with `force`). These are
+  the podman front's own pod actions, now `EngineActions.makePod`, `startPod`, `stopPod` and `removePod`, which
+  `podman pod ...` in a container's terminal runs too: one mechanism. A pod keeps labels (`pod create --label`),
+  reported in `pods/json` and `pods/{id}/json` and taken by the label filter. `networks/create` (netavark's body,
+  under the same rules as Docker's create; with `ignoreIfExists` a network of that name already there is the
+  answer), `DELETE /networks/{id}` (a report for the network; `force`, which would take its containers with it, is
+  not built), and `connect` and `disconnect` (libpod writes the container `container`; `podman`, Podman's name for
+  its default network, is the device's, as bridge and host are). A connect's aliases, libpod's `aliases` and
+  Docker's EndpointConfig.Aliases, are now kept on both APIs, and as at create they do not resolve. Checked with
+  Podman's own remote clients, 5.2.5 and 4.9.5: `pod create` (with `--name`, `--label`, `-p 8080:8080`), `pod start`,
+  `stop`, `restart`, `kill`, `rm -f`, `network create`, `network rm`, `network connect --alias`, `network
+  disconnect`, and the refusals for `pod create -p 8080:80`, `pod create --memory`, `pod kill -s HUP`, `network
+  create --internal`, `--subnet` and `-d macvlan`. Podman 5's `pod start` and `pod stop` print an empty line where
+  Podman 4 prints the pod's id: the 5.x client prints a field its own service never sends either.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
   device's, so a pod here is a named group the podman front starts, stops and removes together (`ContainerPods`, kept

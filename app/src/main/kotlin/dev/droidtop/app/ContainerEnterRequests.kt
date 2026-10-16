@@ -15,7 +15,6 @@ import dev.droidtop.runtime.EngineFeatures
 import dev.droidtop.runtime.EngineInspect
 import dev.droidtop.runtime.EngineOptions
 import dev.droidtop.runtime.OciImageStore
-import dev.droidtop.runtime.Pod
 import java.io.File
 import java.io.FileOutputStream
 import kotlinx.coroutines.CoroutineScope
@@ -264,16 +263,7 @@ internal object ContainerEnterRequests {
                 answer(dir, if (facts.isEmpty()) "[]\n" else EngineInspect.format(facts, cli.front), err.toString(), if (err.isEmpty()) 0 else 1)
             }
             is EngineRequest.PodCreate -> {
-                val made = withContext(Dispatchers.IO) {
-                    val current = ContainerPods.read(app.filesDir)
-                    val id = ContainerPods.newId()
-                    val podName = command.name ?: ContainerPods.defaultName(id)
-                    ContainerPods.problemWith(current, podName)?.let { return@withContext Result.failure<Pod>(IllegalStateException(it)) }
-                    val pod = Pod(id, podName, System.currentTimeMillis())
-                    ContainerPods.save(app.filesDir, ContainerPods.with(current, pod))
-                    Result.success(pod)
-                }
-                made.fold(
+                EngineActions.makePod(app, command.name).fold(
                     onSuccess = { answer(dir, it.id + "\n", "", 0) },
                     onFailure = { refuse(dir, "${cli.name} pod create: ${it.message}", 1) },
                 )
@@ -295,9 +285,7 @@ internal object ContainerEnterRequests {
                 val err = StringBuilder()
                 for (wanted in names) {
                     val pod = ContainerPods.find(pods, wanted) ?: run { err.append("Error: no pod with name or ID $wanted found\n"); null } ?: continue
-                    for (member in pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }) {
-                        if (starting) ContainerPrograms.startedByPerson(app, runtime, member.container) else ContainerPrograms.stoppedByPerson(app, member.container.id)
-                    }
+                    if (starting) EngineActions.startPod(app, runtime, pod, containers) else EngineActions.stopPod(app, pod, containers)
                     out.append(pod.id).append('\n')
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 125)
@@ -308,25 +296,14 @@ internal object ContainerEnterRequests {
                 for (wanted in command.pods) {
                     val pods = withContext(Dispatchers.IO) { ContainerPods.read(app.filesDir) }
                     val pod = ContainerPods.find(pods, wanted) ?: run { err.append("Error: no pod with name or ID $wanted found\n"); null } ?: continue
-                    val members = pod.members.mapNotNull { id -> containers.firstOrNull { it.container.id == id } }
-                    val running = members.filter { ContainerPrograms.isRunning(it.container.id) || (it.running && runtime.siblingsNeedStart) }
-                    if (running.isNotEmpty() && !command.force) {
-                        err.append("Error: pod ${pod.name} has running containers (${running.joinToString(", ") { it.displayName }}); stop it first or use podman pod rm -f\n")
-                        continue
-                    }
                     // Its containers go with it, as Podman's pod rm removes them.
-                    val failed = members.mapNotNull { member ->
-                        runCatching {
-                            if (member.running && runtime.siblingsNeedStart) runtime.stop(member.container)
-                            ContainerRemoval.remove(app, runtime, member)
-                        }.exceptionOrNull()?.let { "${member.displayName}: ${it.message ?: it.javaClass.simpleName}" }
+                    when (val removal = EngineActions.removePod(app, runtime, pod, containers, command.force)) {
+                        is EngineActions.PodRemoval.Removed -> out.append(pod.id).append('\n')
+                        is EngineActions.PodRemoval.Running -> err.append(
+                            "Error: pod ${pod.name} has running containers (${removal.names.joinToString(", ")}); stop it first or use podman pod rm -f\n",
+                        )
+                        is EngineActions.PodRemoval.Failed -> err.append("Error: pod ${pod.name}: ${removal.messages.joinToString("; ")}\n")
                     }
-                    if (failed.isNotEmpty()) {
-                        err.append("Error: pod ${pod.name}: ${failed.joinToString("; ")}\n")
-                        continue
-                    }
-                    withContext(Dispatchers.IO) { ContainerPods.save(app.filesDir, ContainerPods.without(ContainerPods.read(app.filesDir), pod.id)) }
-                    out.append(pod.id).append('\n')
                 }
                 answer(dir, out.toString(), err.toString(), if (err.isEmpty()) 0 else 125)
             }

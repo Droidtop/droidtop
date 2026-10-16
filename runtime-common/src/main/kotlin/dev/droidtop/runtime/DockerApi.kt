@@ -55,7 +55,8 @@ object DockerApi {
 
         data class Networks(val filters: Map<String, List<String>>) : Call
         data class NetworkGet(val id: String) : Call
-        data object NetworkCreate : Call
+        /** [ignoreIfExists]: libpod's, a network of that name already there is the answer. */
+        data class NetworkCreate(val ignoreIfExists: Boolean = false) : Call
         data class NetworkRemove(val id: String) : Call
         data class NetworkConnect(val id: String, val connect: Boolean) : Call
         data class ImageGet(val name: String) : Call
@@ -70,6 +71,11 @@ object DockerApi {
         data class Exists(val kind: Kind, val id: String) : Call
         data class Pods(val filters: Map<String, List<String>>) : Call
         data class PodGet(val id: String) : Call
+        data object PodCreate : Call
+
+        /** Start, stop, restart or kill (with [signal]) every program in a pod. */
+        data class PodAction(val id: String, val action: String, val signal: String? = null) : Call
+        data class PodRemove(val id: String, val force: Boolean) : Call
 
         /** A request Docker would take that droidtop refuses as asked: answered [status] with [message]. */
         data class Refused(val status: Int, val message: String) : Call
@@ -114,7 +120,7 @@ object DockerApi {
             p.startsWith("/images/") && p.endsWith("/json") && p.length > "/images//json".length && read ->
                 Call.ImageGet(p.removePrefix("/images/").removeSuffix("/json"))
             p == "/networks" && read -> filters(query["filters"])?.let { Call.Networks(it) } ?: Call.Refused(400, "filters is not the JSON object Docker sends")
-            p == "/networks/create" && method == "POST" -> Call.NetworkCreate
+            p == "/networks/create" && method == "POST" -> Call.NetworkCreate()
             p == "/networks/prune" -> Call.NotBuilt("POST /networks/prune")
             segments.size == 2 && segments[0] == "networks" && read -> Call.NetworkGet(segments[1])
             segments.size == 2 && segments[0] == "networks" && method == "DELETE" -> Call.NetworkRemove(segments[1])
@@ -364,9 +370,21 @@ object DockerApi {
     /** `GET /networks/{id}`: one network as text. */
     fun networkJson(n: Network, names: Map<String, String>): String = network(n, names).toString() + "\n"
 
-    /** The container a network connect or disconnect body names (`{"Container": ...}`), or null. Pure. */
-    fun connectTarget(body: String): String? =
-        runCatching { (Json.parseToJsonElement(body) as JsonObject)["Container"] as? JsonPrimitive }.getOrNull()?.content?.takeIf { it.isNotEmpty() }
+    /**
+     * The container a network connect or disconnect body names, or null: Docker's `{"Container": ...}`, and libpod's
+     * connect, which writes it `container`. Pure.
+     */
+    fun connectTarget(body: String): String? = runCatching {
+        val o = Json.parseToJsonElement(body) as JsonObject
+        (o["Container"] ?: o["container"]) as? JsonPrimitive
+    }.getOrNull()?.content?.takeIf { it.isNotEmpty() }
+
+    /** The names a connect body gives the container on the network: Docker's EndpointConfig.Aliases, libpod's aliases. Pure. */
+    fun connectAliases(body: String): List<String> = runCatching {
+        val o = Json.parseToJsonElement(body) as JsonObject
+        val list = (o["aliases"] ?: ((o["EndpointConfig"] as? JsonObject)?.get("Aliases"))) as? JsonArray
+        list.orEmpty().mapNotNull { (it as? JsonPrimitive)?.content?.takeIf { a -> a.isNotEmpty() } }
+    }.getOrDefault(emptyList())
 
     /** `POST /networks/create`'s answer. */
     fun networkCreated(id: String): String = buildJsonObject {

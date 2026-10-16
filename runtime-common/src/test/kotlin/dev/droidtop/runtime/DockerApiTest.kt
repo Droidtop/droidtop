@@ -209,7 +209,7 @@ class DockerApiTest {
     @Test
     fun `networks are named groups a create joins, and what would need isolation is said`() {
         assertEquals(DockerApi.Call.Networks(emptyMap()), DockerApi.route("GET", "/v1.43/networks", emptyMap()))
-        assertEquals(DockerApi.Call.NetworkCreate, DockerApi.route("POST", "/networks/create", emptyMap()))
+        assertEquals(DockerApi.Call.NetworkCreate(), DockerApi.route("POST", "/networks/create", emptyMap()))
         assertEquals(DockerApi.Call.NetworkGet("demo_default"), DockerApi.route("GET", "/networks/demo_default", emptyMap()))
         assertEquals(DockerApi.Call.NetworkRemove("demo_default"), DockerApi.route("DELETE", "/networks/demo_default", emptyMap()))
         assertEquals(DockerApi.Call.NetworkConnect("n", connect = false), DockerApi.route("POST", "/networks/n/disconnect", emptyMap()))
