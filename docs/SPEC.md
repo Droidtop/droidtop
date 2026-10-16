@@ -17153,8 +17153,10 @@ to be able to sync between handhelds." And the same day, for this part: "Let's a
   The pairing-finished screen asks once, with both switches, and leaving it
   without an answer keeps them off. A game this device has too stays one
   entry, this device's own, and the switches change nothing about save sync.
-  Opening such an entry says which computer has it; streaming it is
-  windowcast's (7a). The entries are read from the core's library file after
+  Opening such a game asks its computer to start it when the game is not
+  Steam's ("Starting a game on a computer: games the computer's program
+  starts"); otherwise, and for an application, it says which computer has
+  it. Streaming is windowcast's (7a). The entries are read from the core's library file after
   each sync and switch change (not indexed).
 - **The person's marks travel both ways** (Droidtop/tracker#469 part 1):
   favourite, hidden, completed, kid game, rating, the person's own title
@@ -17270,6 +17272,44 @@ controls how we handle steam games. Simplifies stuff".
 - **Not built:** the `computers.list` and `computers.launch_game` plugin
   operations. The owner approved them but they are not needed until
   something outside droidtop wants them.
+
+### Starting a game on a computer: games the computer's program starts (Droidtop/tracker#552)
+
+Owner, 2026-10-16 (#461): the agent launching only for Steam Link is the
+Steam case; "given windowcast, yeah, have it be able to do general
+launches". A program that hosts the agent in its own process and keeps a
+library of its own (Pythia) registers a launcher, states the hello feature
+`launch_host`, and starts its own games for a handheld (droidtop-agent
+docs/DESIGN.md section 17, "Games the host starts").
+
+- **One way to ask.** `ComputerLaunch` (`:library-core`,
+  `dev.droidtop.library.computers`) is the only code that sends
+  `launch_game`, orders the computers and turns each answer into words.
+  "Stream with Steam Link" uses it as well.
+- **Where it starts.** Opening a computer's game in the library
+  (`COMPUTER_GAME`, "On <computer>") whose key is not Steam's asks that
+  computer, the one the entry is filed under. A Steam game opened there says
+  that Stream with Steam Link is in its menu. An application (`REMOTE_STREAM`)
+  is not asked: launch_host covers the host's games.
+- **`started` says how to show it.** With `stream: windowcast`, droidtop
+  opens windowcast's viewer (`dev.windowcast.viewer`) plainly, and the line
+  says to choose the computer there. The viewer takes no link that names a
+  computer yet (its manifest has only the launcher entry), so this is the
+  same two steps as Steam Link. Pythia answers `windowcast` only while a
+  windowcast host runs on the computer. Without a stream, the line says the
+  game shows on the computer's own screen and nothing here streams it.
+  droidtop streams nothing itself.
+- **Honest states.** The answers and their words are Steam Link's
+  (allowed, too old, failed, offline), with one difference. For a key that
+  is not Steam's, `unknown_game` also says that only a desktop manager such
+  as Pythia starts games other than Steam's: droidtop-agent on its own
+  registers no launcher and answers that way. The Android library does not
+  report hello features, so the answer is the only signal.
+- **The viewer missing** is said plainly. It is not published yet (windowcast
+  CI builds it), so no store page is offered.
+- **Not built:** a link into windowcast's viewer that picks the computer and
+  the window. That is windowcast's to add, and droidtop passes it on when
+  one exists.
 
 ### Transports
 
