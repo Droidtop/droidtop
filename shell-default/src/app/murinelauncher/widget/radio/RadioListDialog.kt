@@ -155,7 +155,9 @@ object RadioListDialog {
         )
         root.addView(
             TextView(context).apply {
-                text = "Up/Down Navigate  ·  A Select  ·  B Cancel"
+                // By role, not letter: Android, not droidtop's key map, decides which face
+                // button confirms here, so a letter would be wrong on a swapped pad (SPEC, #365).
+                text = "Up/Down navigate  ·  Confirm select  ·  Back cancel"
                 textSize = 13f
                 setTextColor(HINT_COLOR)
                 gravity = Gravity.START
