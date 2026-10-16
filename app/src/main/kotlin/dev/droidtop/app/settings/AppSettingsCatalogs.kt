@@ -176,7 +176,6 @@ object AppSettingsCatalogs {
     const val SCREEN_PLUGINS = AcquireContentSources.PLUGINS_SCREEN_ID
     const val SCREEN_PLUGIN_KEYS = "plugin_keys"
     const val SCREEN_WINDOWS_GAMES = "windows_games"
-    const val SCREEN_PC_STORES = "pc_stores"
     const val SCREEN_ACCOUNTS_AND_SOURCES = "accounts_and_sources"
     const val SCREEN_ANDROID_SETTINGS = "android_settings"
     const val SCREEN_ENGINEHOST = "enginehost"
@@ -212,7 +211,6 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(WindowsInstallCatalog.screen())
         SettingsScreenRegistry.register(LinuxGameToolsCatalog.screen())
-        SettingsScreenRegistry.register(pcStoresScreen())
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())
@@ -1362,94 +1360,6 @@ object AppSettingsCatalogs {
                         )
                     }
                 },
-            ),
-        )
-    }
-
-    // ------------------------------------------------------------------
-    // Stores, folders and downloads: where PC games come FROM.
-    // ------------------------------------------------------------------
-
-    /**
-     * The PC surface's own first-run repairs and store state (docs/SPEC.md
-     * 7i, build-plan step 6): sign in to a store, add a games folder, set
-     * up Windows games, see what is downloading.
-     *
-     * A catalog screen rather than a screen of its own, for two reasons.
-     * It is reachable from both settings surfaces for free, and the
-     * Gaming PC surface renders it in place through the same
-     * CatalogNavigator it already uses, so "the first-run cards" and "the
-     * surface's options menu" are one list of rows instead of two
-     * implementations of the same four actions.
-     *
-     * Every row states the real state it found: a store says whether it is
-     * signed in, and each count is read rather than assumed.
-     */
-    private fun pcStoresScreen() = CatalogScreen(
-        id = SCREEN_PC_STORES,
-        // Not "Stores and folders" any more: the store SIGN-INS moved to
-        // Settings > Accounts and sources with every other account and
-        // source droidtop has (docs/SPEC.md settings architecture, "a
-        // source is a detail on a game and a filter, never its own
-        // screen"). This screen is what is left once accounts are gone:
-        // the PC surface's own first-run setup for folders and downloads.
-        title = "PC setup",
-        subtitle = "The folders droidtop scans, the Wine environment for Windows games, and what is downloading",
-        groups = { context -> pcStoresGroups(context) },
-    )
-
-    private suspend fun pcStoresGroups(context: Context): List<CatalogGroup> {
-        val folders = withContext(Dispatchers.IO) { GamesRootPrefs.gamesRootPaths(context) }
-        val signedInCount = withContext(Dispatchers.IO) { PcStore.entries.count { it.signedIn(context) } }
-
-        return listOf(
-            CatalogGroup(
-                id = "pc_stores_accounts",
-                title = null,
-                items = listOf(
-                    NestedScreenItem(
-                        id = "pc_stores_accounts_link",
-                        title = "Game sources",
-                        subtitle = "Sign in to Steam, GOG, Epic, Amazon Games or itch.io to download your library",
-                        registryId = StoresCatalog.SCREEN_ID,
-                        valueLabel = { "$signedInCount of ${PcStore.entries.size} stores signed in" },
-                        icon = CatalogIcon.GLOBAL,
-                    ),
-                ),
-            ),
-            CatalogGroup(
-                id = "pc_stores_folders",
-                title = "Folders and setup",
-                items = listOf(
-                    NestedScreenItem(
-                        id = "pc_stores_game_folders",
-                        title = "Game folders",
-                        subtitle = "The folders droidtop scans for games, Windows and engine games alike",
-                        registryId = SCREEN_ROM_FOLDERS,
-                        valueLabel = { if (folders.isEmpty()) "none yet" else "${folders.size}" },
-                        icon = CatalogIcon.GAME_FOLDERS,
-                    ),
-                    NestedScreenItem(
-                        id = "pc_stores_windows",
-                        title = "Windows games",
-                        subtitle = "The Wine environment Windows games run inside, and the folders it can reach",
-                        registryId = SCREEN_WINDOWS_GAMES,
-                        icon = CatalogIcon.WINDOWS_GAMES,
-                    ),
-                    // The one jobs list, where store installs run (docs/SPEC.md 7g "Stores").
-                    NestedScreenItem(
-                        id = "pc_stores_downloads",
-                        title = "Downloads",
-                        subtitle = "What is downloading or waiting, with Pause, Resume and Cancel",
-                        registryId = dev.droidtop.library.integrations.PluginJobsScreen.ID,
-                    ),
-                    NestedScreenItem(
-                        id = "pc_stores_download_rules",
-                        title = "Download rules",
-                        subtitle = "Wi-Fi only or mobile data, a time for updates, and which games keep themselves up to date",
-                        registryId = DownloadRulesCatalog.SCREEN_ID,
-                    ),
-                ),
             ),
         )
     }

@@ -135,6 +135,7 @@ internal fun QuickMenu(
     library: dev.droidtop.library.Library,
     onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
     onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
+    onKill: (entry: dev.droidtop.library.LibraryEntry) -> Unit,
     quitOutcome: dev.droidtop.library.QuitResult?,
     onOpenLeftMenu: () -> Unit,
     openPlace: (screenId: String) -> Boolean,
@@ -247,7 +248,7 @@ internal fun QuickMenu(
                 key(section) {
                     when (section) {
                         QuickSection.GAME -> runningEntry?.let {
-                            GameTab(it, library, onResume, onQuit, quitOutcome, close, onSearchSystem)
+                            GameTab(it, library, onResume, onQuit, onKill, quitOutcome, close, onSearchSystem)
                         }
                         QuickSection.APPS -> AppsTab(close)
                         QuickSection.NOTIFICATIONS -> NotificationsTab(close)
@@ -856,6 +857,7 @@ private fun GameTab(
     library: dev.droidtop.library.Library,
     onResume: (dev.droidtop.library.LibraryEntry) -> Unit,
     onQuit: (entry: dev.droidtop.library.LibraryEntry, restart: Boolean) -> Unit,
+    onKill: (entry: dev.droidtop.library.LibraryEntry) -> Unit,
     quitOutcome: dev.droidtop.library.QuitResult?,
     onDismiss: () -> Unit,
     onSearchSystem: (systemId: String, systemName: String) -> Unit,
@@ -962,13 +964,15 @@ private fun GameTab(
     }
     // The Stop pill in the header (DroidDeck's red Stop, Steam's destructive red): ending the game
     // without restarting it, with the same second press as the rows.
+    // Kill force-stops at once, not the gentler Quit (Droidtop/tracker#571 row 16; the owner: "kill should
+    // immediately force-stop it"); its second press asks Kill's own question.
     val stop = GameQuickTile(title = "Kill", subtitle = null, dangerAction = true) {
-        if (secondPress(dev.droidtop.library.settings.GameRow.QUIT, armed == GameEnding.KILL)) {
+        if (secondPress(dev.droidtop.library.settings.GameRow.KILL, armed == GameEnding.KILL)) {
             armed = GameEnding.KILL
         } else {
             armed = null
             lastEnding = GameEnding.KILL
-            onQuit(entry, false)
+            onKill(entry)
         }
     }
 

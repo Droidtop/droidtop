@@ -53,7 +53,6 @@ import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.shell.gamepad.AppOptionsMenu
-import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.GamelistOptionsMenu
 import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.GamingSection
@@ -174,7 +173,6 @@ internal class PcGamesState {
     var menuId by mutableStateOf<String?>(null)
     /** The open menu starts on the Engine picker (the page's "Choose a runner"). */
     var menuEnginePicker by mutableStateOf(false)
-    var setupOpen by mutableStateOf(false)
     var optionsOpen by mutableStateOf(false)
     var filterOpen by mutableStateOf(false)
     var sortOpen by mutableStateOf(false)
@@ -778,10 +776,8 @@ internal fun PcGamesSection(
 
     // Which level B leaves (docs/SPEC.md 6e: B always goes back one level).
     // Home is the root: B does nothing there (Overview goes back to it).
-    val storesScreen = remember { SettingsScreenRegistry.get(PC_STORES_SCREEN_ID) }
     val knownEmpty = games?.isEmpty() == true
-    val showingSetup = state.setupOpen && storesScreen != null
-    val canGoBack = state.setupOpen || state.view != PcView.HOME
+    val canGoBack = state.view != PcView.HOME
     LaunchedEffect(canGoBack) {
         // The shell's one footer draws this tab's hints too: the focused
         // element declares them ([declaresHints] below), so the tab claims
@@ -789,29 +785,21 @@ internal fun PcGamesSection(
         onHelpRowClaim(HelpRowClaim.NONE)
         onCanGoBackChanged(canGoBack)
     }
-    BackHandler(enabled = canGoBack && !showingSetup) {
+    BackHandler(enabled = canGoBack) {
         EsDeNavigationSounds.play(UiSound.BACK)
         state.stripIndex = 0
         // A grid view or Collections goes back to Overview, Overview back to Home, the hub.
         if (state.view == PcView.GRID || state.view == PcView.COLLECTIONS) state.showOverview() else state.open(home = true)
     }
 
-    if (showingSetup) {
-        // "PC setup" (game folders, the Windows system files, Downloads):
-        // the level above the library, and what an empty library opens
-        // on instead of nothing (docs/SPEC.md 7i). CatalogNavigator owns
-        // its own B; at its root that leaves the level.
-        CatalogNavigator(root = storesScreen!!, onExit = { state.setupOpen = false })
-        return
-    }
     // Home also shows the Retro library and the launcher apps: it is empty only when they are too.
     if (knownEmpty && (!state.home || (retro.isEmpty() && apps.isEmpty()))) {
-        // An empty library is its own place's empty state, with PC setup ("Game sources") as its button, rather than
-        // opening on PC setup as if the person had chosen it (Droidtop/tracker#533).
+        // An empty library is its own place's empty state, with Game sources as its button (Droidtop/tracker#533); it
+        // opens the Game sources place itself, the "PC setup" screen of links being gone (Droidtop/tracker#571 row 4).
         dev.droidtop.shell.gamepad.EmptyLibrary(
             line = if (state.home) "No games yet" else "No PC games yet",
             actionLabel = "Game sources",
-            onAction = { state.setupOpen = true },
+            onAction = { onOpenSection(GamingSection.STORES) },
             pc = !state.home,
         )
         return
@@ -1389,7 +1377,7 @@ internal fun PcGamesSection(
                 state.stripFocused = false
                 state.itemIndex = index.coerceIn(0, (listed.size - 1).coerceAtLeast(0))
             },
-            onOpenStores = { state.setupOpen = true },
+            onOpenStores = { onOpenSection(GamingSection.STORES) },
         )
     }
     // A page or menu open on a game a rescan no longer has closes itself
