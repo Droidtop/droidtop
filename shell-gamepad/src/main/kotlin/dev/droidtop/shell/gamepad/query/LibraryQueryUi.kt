@@ -71,7 +71,6 @@ import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.PluginRuntimeNeeds
 import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.PluginStore
-import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuSectionLabel
@@ -887,10 +886,8 @@ internal fun LibrarySearchDialog(
             activeCatalog = null
             searchTick += 1
         }
-        Dialog(onDismissRequest = close) {
-            GatePadInThisDialog()
-            CatalogNavigator(root = screen, onExit = close)
-        }
+        // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
+        dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = close)
     }
 }
 

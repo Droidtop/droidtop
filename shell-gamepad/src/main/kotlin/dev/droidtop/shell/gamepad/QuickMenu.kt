@@ -1,6 +1,5 @@
 package dev.droidtop.shell.gamepad
 
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -820,10 +819,8 @@ private fun PluginsTab(
     )
     replyScreen?.let { screen ->
         val close = { replyScreen = null }
-        androidx.compose.ui.window.Dialog(onDismissRequest = close) {
-            GatePadInThisDialog()
-            CatalogNavigator(root = screen, onExit = close)
-        }
+        // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
+        CatalogSheet(root = screen, onExit = close)
     }
 }
 

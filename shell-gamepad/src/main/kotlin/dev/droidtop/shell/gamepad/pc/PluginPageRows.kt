@@ -10,13 +10,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.integrations.PluginContextActions
 import dev.droidtop.library.integrations.PluginGameSections
 import dev.droidtop.library.settings.CatalogScreen
-import dev.droidtop.shell.gamepad.CatalogNavigator
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -147,8 +144,6 @@ internal fun rememberPluginPageRows(entry: LibraryEntry): PluginPageRows {
 @Composable
 internal fun PluginPageScreen(rows: PluginPageRows) {
     val screen = rows.screen ?: return
-    Dialog(onDismissRequest = rows.closeScreen) {
-        GatePadInThisDialog()
-        CatalogNavigator(root = screen, onExit = rows.closeScreen)
-    }
+    // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the page behind show through (rig, 0.2.0-dev.2070).
+    dev.droidtop.shell.gamepad.CatalogSheet(root = screen, onExit = rows.closeScreen)
 }
