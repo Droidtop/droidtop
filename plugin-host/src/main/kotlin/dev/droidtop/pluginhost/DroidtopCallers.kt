@@ -17,8 +17,9 @@ import android.os.Process
  * in `:plugin_sandbox*` under an isolated UID of their own.
  */
 object DroidtopCallers {
-    private const val PLUGIN_SUFFIXES = "pluginhost|plugin_open|plugin_sandbox"
-    private val pluginSuffix = Regex(":($PLUGIN_SUFFIXES)\\d*")
+    // Full access: `:pluginhost` and `:pluginhost1`..7; open: `:plugin_open0`..7 (always numbered); contained:
+    // `:plugin_sandbox` and `:plugin_sandbox0`..7.
+    private val pluginSuffix = Regex(":(pluginhost\\d*|plugin_open\\d+|plugin_sandbox\\d*)")
 
     /** True when [processName] is one of droidtop's plugin processes. */
     fun isPluginProcess(packageName: String, processName: String): Boolean =
