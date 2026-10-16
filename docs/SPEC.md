@@ -15212,7 +15212,16 @@ UI through the one palette (`GamingPalette`) every token reads:
   the theme's scrim in a dark appearance, black at 45 and 32 percent in a light one, where the scrim, the pale ground
   at 80 percent, washed the page out. A dialog's own dim was already black. When the Gaming theme has a colour scheme
   of its own chosen, it wins over Light or dark on every Gaming-themed screen, settings included, so the Light or
-  dark row says so and that Theme color scheme > Automatic makes them follow it.
+  dark row says so and that Theme color scheme > Automatic makes them follow it. It says so ON the row, as the row's
+  chip with the scheme's own label ("Theme keeps Dark [Screenshots]", `AppearancePrefs.schemeChip`; `ChoiceItem.chip`),
+  and how to undo it in its explanation: the follow-up rig (2026-10-16, v0.2.0-dev.2011) never saw the explanation
+  alone, because Gaming keeps a subtitle on the focus line and in Info.
+- **The Desktop session's Start menu and its Switch mode sheet follow Light or dark the same way (follow-up rig
+  2026-10-16).** They are Gaming-themed (the Desktop shell is wrapped in `GamingTheme`; the Switch mode sheet takes it
+  through `rememberGamingThemed`), so they follow Appearance through the theme's matching scheme, and a colour scheme
+  chosen by name for the Gaming theme keeps them in that scheme, as it does Gaming's own screens. They are not dark by
+  design; with Theme color scheme on Automatic they follow Light. The rig saw them dark in Light with
+  "Dark [Screenshots]" chosen, which is this rule, not a fault.
 - Not yet covered, each its own issue: the Windows runtime's views (#561) and droidtop's keyboard (#562).
 - **The role tokens** for UI droidtop does not draw itself (a plugin's own pages, #559): one set, read from the palette
   in use (`GamingTheme.palette`, the theme's in Gaming, droidtop's own otherwise), never restated. `theme` is `light`
