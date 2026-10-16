@@ -1604,22 +1604,67 @@ Names elsewhere in this document that predate 2.1 mean the op in this table.
     than a file deep inside a folder droidtop has never seen.
 
 **A3 Metadata providers and scrapers.** EP `library.metadata@1`. Risk
-medium.
-- **For:** candidate metadata (title, description, dates, genre,
-  developer, players, rating, cross-store ids) offered next to the
-  built-in scrapers (§7h's honesty rules apply).
+medium. The owner, 2026-10-16: "can we add an automatic scraping system?
+We have LOTS of games with no metadata" (Droidtop/tracker#568), and on
+the same issue: "That's fine for plugins, but our built-in scrapers don't
+talk over the API".
+- **For:** what a plugin knows about a game, offered next to droidtop's
+  built-in sources (§7h's honesty rules apply).
+- **Plugins only.** droidtop's built-in sources stay inside the scrape
+  job, in droidtop's own process, and never go through this point:
+  ScreenScraper, TheGamesDB, the libretro database, store data, the PC
+  sources, and Steam's `appdetails` (`SteamStoreClient`). This point is
+  how a plugin adds to them.
 - **Ops:**
-  - `match {entry facts} → candidates[{ids, confidence}]`;
-  - `fetch {ids} → fields`.
+  - `match {facts} → {candidates: [{ids, confidence 0..1, title?}]}`.
+    - Facts:
+      - `title`, `fileName`, `systemId`, `systemName`;
+      - `version` (the folder or archive's version text);
+      - `folder` (`name`, `exe`, `engine`, `sizeBytes`);
+      - `storeIds` (`{steam, vndb, f95, dlsite, ...}`: the game's links
+        and the ids read from its folder);
+      - `sourceLinks`, kept for plugins written before `storeIds`.
+    - The host takes the most confident candidate at or above 0.5 (a
+      candidate without a confidence counts as 0.5). A candidate's
+      `title` names it in "Rescrape with…".
+  - `fetch {ids} → fields`:
+    - `title`;
+    - `description`, `developer`, `publisher`, `genre`, `tags`;
+    - `releaseDate` (YYYY-MM-DD, YYYY-MM or YYYY);
+    - `players`, `rating` (0..1);
+    - `cover` and `screenshots` (https URLs);
+    - `links` (`[{label, url}]`);
+    - `storeIds`, so a later scrape can skip `match`.
+    Every field is optional.
+  - `cancel {callId}`: the scrape stopped. Answering is optional; the
+    host does not wait.
 - **Surfaces:**
   - G/A/D: the Scraper screen lists it as a source; the game's detail
     screen offers "Rescrape with…".
+  - The automatic scrape (#568) asks it for every game still missing
+    fields, as a background job.
 - **Permission:** `provide:library.metadata`, `net.domains`.
-- **Status:** declared (`metadata_source`) with **no caller** (§6).
+- **Status:** match and fetch are called by the scrape job
+  (`PluginMetadataSources`). The new facts and fields, the rate limit
+  and `cancel` are being built (#568).
 - **Rules:**
-  - The host merges, stores and attributes the result, and the plugin
-    never writes to the database.
-  - It runs in the scrape job, never in list rendering.
+  - The host merges, stores and attributes the result.
+  - A plugin fills only fields still empty after the built-in sources,
+    never overwrites another source's value, and is recorded as the
+    source of each field it fills.
+  - The plugin never writes to the database or the media folder. It
+    returns image URLs, and the host downloads them through its download
+    manager, checks their type and size, and stores them (A4's rules). A
+    URL's host must be in the plugin's `net.domains`.
+  - The host enforces the pace; the plugin is not trusted to:
+    - one call in flight per source;
+    - calls spaced to the `rate.perMinute` on the manifest's `provides`
+      entry (default 30, at most 120);
+    - a `RATE_LIMITED` reply rests that source for the rest of the pass;
+    - each call's deadline is 15 s;
+    - cancelling the scrape cancels the call in flight.
+  - It runs in the scrape job, never in list rendering. The plugin sees
+    only the facts above, one game at a time.
 
 **A4 Artwork and media providers.** EP `library.artwork@1`. Risk medium.
 - **For:** box art, logos, heroes, screenshots, videos and manuals (the
@@ -3633,7 +3678,7 @@ into the v2 shape at parse time, so the host has one model internally.
 | Today (code) | v2 | Implicit v2 permissions for a v1 plugin | Callers today |
 | --- | --- | --- | --- |
 | `acquire_content` (`PluginCapability.ACQUIRE_CONTENT`) | EP `library.sources@1` (A2); `invoke{action:search}` → `search`, `startJob{action:download}` → `acquire` | `provide:library.sources`, `library.folders.write` (the destination only), `net.any` | `AcquireContentSources` → Get games (system settings, gamelist Options) |
-| `metadata_source` | EP `library.metadata@1` (A3) | `provide:library.metadata`, `net.any` | **none**: declared, never called |
+| `metadata_source` | EP `library.metadata@1` (A3) | `provide:library.metadata`, `net.any` | the scrape job (`PluginMetadataSources`) |
 | `library_action` | EP `ui.context_action@1` (C4) with `targets: [game]` | `provide:ui.context_action`, `library.read` | **none**: declared, never called |
 | `status_tile` | EP `ui.status_tile@1` (C3); also rendered as a read-only C2 quick tile | — | `PluginStatusWidgetProvider`, the Plugins screen's debug row |
 | `settings_rows` | EP `ui.settings@1` (C1), `target=global` → `plugin`, `system:<id>` unchanged | — | `PluginSettingsRows` |
