@@ -170,8 +170,10 @@ class DockerApiTest {
         assertTrue(answer("""{"Image":"alpine","HostConfig":{"Memory":536870912}}""").second.contains("--memory needs cgroups"))
         assertTrue(answer("""{"Image":"alpine","HostConfig":{"PortBindings":{"80/tcp":[{"HostPort":"8080"}]}}}""").second.contains("network namespaces"))
         assertTrue(answer("""{"Image":"alpine","HostConfig":{"Binds":["/etc:/host-etc"]}}""").second.contains("a folder you mapped"))
-        assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"NetworkMode":"demo_default"}}""").first)
-        assertEquals(501, answer("""{"Image":"alpine","NetworkingConfig":{"EndpointsConfig":{"demo_default":{}}}}""").first)
+        // A network droidtop does not have is not found, as Docker says; none needs network namespaces.
+        assertEquals(404, answer("""{"Image":"alpine","HostConfig":{"NetworkMode":"demo_default"}}""").first)
+        assertEquals(404, answer("""{"Image":"alpine","NetworkingConfig":{"EndpointsConfig":{"demo_default":{}}}}""").first)
+        assertTrue(answer("""{"Image":"alpine","HostConfig":{"NetworkMode":"none"}}""").second.contains("network namespaces"))
         assertEquals(501, answer("""{"Image":"alpine","Entrypoint":["/bin/sh"]}""").first)
         assertEquals(501, answer("""{"Image":"alpine","User":"1000"}""").first)
         assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"volume","Source":"data","Target":"/data"}]}}""").first)
@@ -201,5 +203,61 @@ class DockerApiTest {
         assertTrue(DockerApi.created("droidtop-sibling-1a2b", listOf("note")).contains("\"Warnings\":[\"note\"]"))
         assertTrue(DockerApi.waited(3).contains("\"StatusCode\":3"))
         assertTrue(DockerApi.pulled("nginx", "sha256:abc").lines().first().contains("Pulling from nginx"))
+    }
+
+    @Test
+    fun `networks are named groups a create joins, and what would need isolation is said`() {
+        assertEquals(DockerApi.Call.Networks(emptyMap()), DockerApi.route("GET", "/v1.43/networks", emptyMap()))
+        assertEquals(DockerApi.Call.NetworkCreate, DockerApi.route("POST", "/networks/create", emptyMap()))
+        assertEquals(DockerApi.Call.NetworkGet("demo_default"), DockerApi.route("GET", "/networks/demo_default", emptyMap()))
+        assertEquals(DockerApi.Call.NetworkRemove("demo_default"), DockerApi.route("DELETE", "/networks/demo_default", emptyMap()))
+        assertEquals(DockerApi.Call.NetworkConnect("n", connect = false), DockerApi.route("POST", "/networks/n/disconnect", emptyMap()))
+        assertEquals(DockerApi.Call.ImageGet("docker.io/library/nginx:1.27"), DockerApi.route("GET", "/v1.43/images/docker.io/library/nginx:1.27/json", emptyMap()))
+
+        val (made, refused) = DockerApi.networkRequest("""{"Name":"demo_default","Driver":"bridge","Labels":{"com.docker.compose.project":"demo"}}""", emptyList(), none)
+        assertNull(refused)
+        val demo = made!!
+        assertEquals("demo_default", demo.name)
+        assertEquals(64, demo.id.length)
+        assertEquals(409, DockerApi.networkRequest("""{"Name":"demo_default"}""", listOf(demo), none).second!!.status)
+        assertEquals(409, DockerApi.networkRequest("""{"Name":"bridge"}""", emptyList(), none).second!!.status)
+        assertEquals(501, DockerApi.networkRequest("""{"Name":"x","Internal":true}""", emptyList(), none).second!!.status)
+        assertEquals(501, DockerApi.networkRequest("""{"Name":"x","IPAM":{"Config":[{"Subnet":"10.0.0.0/24"}]}}""", emptyList(), none).second!!.status)
+        assertEquals(501, DockerApi.networkRequest("""{"Name":"x","Driver":"overlay"}""", emptyList(), none).second!!.status)
+
+        val (run, _) = DockerApi.createRequest(
+            """{"Image":"nginx","HostConfig":{"NetworkMode":"demo_default"},"NetworkingConfig":{"EndpointsConfig":{"demo_default":{"Aliases":["web","demo-web-1"]}}}}""",
+            "demo-web-1", none, listOf(demo),
+        )
+        assertEquals(listOf(EngineRequest.NetworkJoin(demo.id, listOf("web", "demo-web-1"))), run!!.networks)
+
+        var nets = ContainerNetworks.withMember(listOf(demo), demo.id, "droidtop-sibling-1", listOf("web"))
+        val json = DockerApi.networks(ContainerNetworks.predefined() + nets, mapOf("droidtop-sibling-1" to "demo-web-1"), mapOf("label" to listOf("com.docker.compose.project=demo")))
+        assertTrue(json.contains("\"Name\":\"demo_default\""))
+        assertTrue(json.contains("\"droidtop-sibling-1\":{\"Name\":\"demo-web-1\""))
+        assertTrue(!json.contains("\"Name\":\"bridge\""))
+        assertTrue(DockerApi.networks(ContainerNetworks.predefined(), emptyMap(), emptyMap()).contains("\"Driver\":\"host\""))
+        assertEquals(ContainerNetworks.predefinedId("bridge"), ContainerNetworks.predefinedId("bridge"))
+        nets = ContainerNetworks.withoutMember(nets, "droidtop-sibling-1")
+        assertEquals(emptyList<String>(), nets.single().members)
+        assertEquals(emptyMap<String, List<String>>(), nets.single().aliases)
+        assertEquals(setOf("driver"), DockerApi.unknownNetworkFilters(mapOf("driver" to listOf("bridge"), "name" to listOf("x"))))
+    }
+
+    @Test
+    fun `an image is found by any of Docker's spellings and described from its config`() {
+        val entries = listOf(
+            OciImageStore.Entry("sha256:0123456789abcdef", "docker.io/library/nginx:1.27-alpine", 21_400_000),
+            OciImageStore.Entry("sha256:fedcba9876543210", "alpine", 3_000_000),
+        )
+        assertEquals("sha256:0123456789abcdef", DockerApi.findImage(entries, "nginx:1.27-alpine")?.digest)
+        assertEquals("sha256:0123456789abcdef", DockerApi.findImage(entries, "docker.io/library/nginx:1.27-alpine")?.digest)
+        assertEquals("sha256:fedcba9876543210", DockerApi.findImage(entries, "alpine:latest")?.digest)
+        assertEquals("sha256:fedcba9876543210", DockerApi.findImage(entries, "fedcba98")?.digest)
+        assertNull(DockerApi.findImage(entries, "nginx:1.26"))
+        val json = DockerApi.image(entries[0], ImageRunConfig(cmd = listOf("nginx"), ports = listOf(ExposedPort(80))), "arm64")
+        assertTrue(json.contains("\"RepoTags\":[\"nginx:1.27-alpine\"]"))
+        assertTrue(json.contains("\"Cmd\":[\"nginx\"]"))
+        assertTrue(json.contains("\"ExposedPorts\":{\"80/tcp\":{}}"))
     }
 }

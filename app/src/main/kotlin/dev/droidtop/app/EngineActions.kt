@@ -3,6 +3,7 @@ package dev.droidtop.app
 import android.content.Context
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerInfo
+import dev.droidtop.runtime.ContainerNetworks
 import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerPods
 import dev.droidtop.runtime.ContainerProgram
@@ -61,6 +62,15 @@ internal object EngineActions {
                 ContainerPods.save(app.filesDir, ContainerPods.withMember(current, pod.id, created.id))
             }
         }
+        // Networks of droidtop's own it joins (docs/SPEC.md 3d, "Networks"): by name only, every container being on
+        // the device's network already.
+        if (request.networks.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                var current = ContainerNetworks.read(app.filesDir)
+                request.networks.forEach { current = ContainerNetworks.withMember(current, it.networkId, created.id, it.aliases) }
+                ContainerNetworks.save(app.filesDir, current)
+            }
+        }
         // An app container keeps its files to itself (the review's default for app containers, docs/SPEC.md 3d).
         runCatching {
             val current = runtime.mounts(created)
@@ -75,7 +85,10 @@ internal object EngineActions {
         }
         val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()
             ?.let { ContainerProgram.effectiveConfig(app.filesDir, created.id, it) }?.program().orEmpty()
-        val notes = request.publish.map { "$name listens on the device's own port $it; -p $it is what happens anyway" }
+        val notes = request.publish.map { "$name listens on the device's own port $it; -p $it is what happens anyway" } +
+            request.networks.flatMap { it.aliases }.distinct().takeIf { it.isNotEmpty() }
+                ?.let { listOf("the names ${it.joinToString(", ")} are kept but do not resolve yet: every container is on the device's network, so reach another by localhost") }
+                .orEmpty()
         val start = request.start && program.isNotEmpty()
         if (start) ContainerPrograms.start(app, runtime, created)
         return Result.success(Made(created, name, notes, start, program.isNotEmpty()))

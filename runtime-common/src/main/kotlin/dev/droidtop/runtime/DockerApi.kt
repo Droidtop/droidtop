@@ -51,6 +51,13 @@ object DockerApi {
         data class Logs(val id: String, val tail: Int, val stdout: Boolean, val stderr: Boolean) : Call
         data class Wait(val id: String, val condition: String) : Call
 
+        data class Networks(val filters: Map<String, List<String>>) : Call
+        data class NetworkGet(val id: String) : Call
+        data object NetworkCreate : Call
+        data class NetworkRemove(val id: String) : Call
+        data class NetworkConnect(val id: String, val connect: Boolean) : Call
+        data class ImageGet(val name: String) : Call
+
         /** A request Docker would take that droidtop refuses as asked: answered [status] with [message]. */
         data class Refused(val status: Int, val message: String) : Call
 
@@ -82,6 +89,15 @@ object DockerApi {
                 if (query["link"].let { it != null && flag(it) }) Call.NotBuilt("DELETE /containers/{id}?link") else Call.Remove(segments[1], flag(query["force"]))
             segments.size == 3 && segments[0] == "containers" && segments[2] == "logs" && read -> logs(segments[1], query)
             p == "/images/create" && method == "POST" -> pull(query)
+            p.startsWith("/images/") && p.endsWith("/json") && p.length > "/images//json".length && read ->
+                Call.ImageGet(p.removePrefix("/images/").removeSuffix("/json"))
+            p == "/networks" && read -> filters(query["filters"])?.let { Call.Networks(it) } ?: Call.Refused(400, "filters is not the JSON object Docker sends")
+            p == "/networks/create" && method == "POST" -> Call.NetworkCreate
+            p == "/networks/prune" -> Call.NotBuilt("POST /networks/prune")
+            segments.size == 2 && segments[0] == "networks" && read -> Call.NetworkGet(segments[1])
+            segments.size == 2 && segments[0] == "networks" && method == "DELETE" -> Call.NetworkRemove(segments[1])
+            segments.size == 3 && segments[0] == "networks" && method == "POST" && segments[2] in setOf("connect", "disconnect") ->
+                Call.NetworkConnect(segments[1], segments[2] == "connect")
             segments.firstOrNull() in setOf("containers", "images", "exec", "volumes", "networks", "build", "events", "system", "plugins", "swarm", "nodes", "services", "tasks", "secrets", "configs", "distribution", "session", "auth", "commit") ->
                 Call.NotBuilt("$method $p")
             else -> Call.NotFound
@@ -159,7 +175,12 @@ object DockerApi {
      * it asks for what droidtop does not do. Every field droidtop does not apply is refused or answered as not built,
      * never dropped: a client is never told a container has what it does not. Pure.
      */
-    fun createRequest(body: String, name: String?, features: EngineFeatures?): Pair<EngineRequest.Run?, EngineHttp.Response?> {
+    fun createRequest(
+        body: String,
+        name: String?,
+        features: EngineFeatures?,
+        networks: List<Network> = emptyList(),
+    ): Pair<EngineRequest.Run?, EngineHttp.Response?> {
         fun refuse(status: Int, message: String) = null to error(status, message)
         fun notYet(what: String) = null to notBuilt(what)
         val o = runCatching { Json.parseToJsonElement(body.ifBlank { "{}" }) as JsonObject }.getOrNull() ?: return refuse(400, "the body is not a JSON object")
@@ -198,10 +219,21 @@ object DockerApi {
         )
         limits.forEach { (key, option) -> if (number(host, key) > 0) return refuse(501, EngineOptions.refusal("docker create", option, features)) }
         string(host, "CpusetCpus")?.let { return refuse(501, EngineOptions.refusal("docker create", "--cpuset-cpus", features)) }
-        string(host, "NetworkMode")?.takeIf { it !in setOf("default", "host", "bridge") }?.let { return notYet("NetworkMode $it (networks of droidtop's own; every container is on the device's network)") }
-        ((o["NetworkingConfig"] as? JsonObject)?.get("EndpointsConfig") as? JsonObject)?.keys
-            ?.firstOrNull { it !in setOf("default", "host", "bridge") }
-            ?.let { return notYet("network $it (networks of droidtop's own; every container is on the device's network)") }
+        // Networks: bridge, host and default are what every container already has; a network of droidtop's own is
+        // joined by name; none needs network namespaces (docs/SPEC.md 3d, "Networks").
+        val joins = mutableListOf<EngineRequest.NetworkJoin>()
+        fun join(ref: String, aliases: List<String>): EngineHttp.Response? {
+            if (ref in setOf("default", "host", "bridge")) return null
+            if (ref == "none") return error(501, EngineOptions.refusal("docker create", "--network", features))
+            val network = ContainerNetworks.find(networks, ref) ?: return error(404, "network $ref not found")
+            val at = joins.indexOfFirst { it.networkId == network.id }
+            if (at < 0) joins += EngineRequest.NetworkJoin(network.id, aliases) else joins[at] = joins[at].copy(aliases = (joins[at].aliases + aliases).distinct())
+            return null
+        }
+        string(host, "NetworkMode")?.let { mode -> join(mode, emptyList())?.let { return null to it } }
+        ((o["NetworkingConfig"] as? JsonObject)?.get("EndpointsConfig") as? JsonObject)?.forEach { (ref, endpoint) ->
+            join(ref, strings((endpoint as? JsonObject)?.get("Aliases")).orEmpty())?.let { return null to it }
+        }
 
         val volumes = strings(host?.get("Binds")).orEmpty().map { spec ->
             EngineCli.DOCKER.volume(spec) ?: return refuse(
@@ -236,8 +268,105 @@ object DockerApi {
             publish = publish,
             start = false,
             labels = labels,
+            networks = joins,
         ) to null
     }
+
+    /** What a network-create body asks for, read; or the answer when it asks for isolation droidtop cannot give. Pure. */
+    fun networkRequest(body: String, existing: List<Network>, features: EngineFeatures?): Pair<Network?, EngineHttp.Response?> {
+        val o = runCatching { Json.parseToJsonElement(body.ifBlank { "{}" }) as JsonObject }.getOrNull()
+            ?: return null to error(400, "the body is not a JSON object")
+        fun string(key: String): String? = (o[key] as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() && it != "null" }
+        fun bool(key: String): Boolean = (o[key] as? JsonPrimitive)?.content == "true"
+        val name = string("Name") ?: return null to error(400, "a network needs a Name")
+        ContainerNetworks.problemWith(existing, name)?.let { return null to error(409, it) }
+        string("Driver")?.takeIf { it != "bridge" }?.let { return null to notBuilt("the $it network driver") }
+        if (bool("Internal")) return null to error(501, EngineOptions.refusal("docker network create", "--network", features) + " (an internal network)")
+        if (bool("EnableIPv6") || bool("Ingress")) return null to notBuilt("IPv6 and ingress networks")
+        ((o["IPAM"] as? JsonObject)?.get("Config") as? JsonArray)?.takeIf { it.isNotEmpty() }?.let { return null to notBuilt("subnets of a network's own (IPAM Config)") }
+        (o["Options"] as? JsonObject)?.takeIf { it.isNotEmpty() }?.let { return null to notBuilt("network Options") }
+        val labels = (o["Labels"] as? JsonObject)?.mapValues { (it.value as? JsonPrimitive)?.content ?: "" }.orEmpty()
+        return Network(ContainerNetworks.newId(), name, System.currentTimeMillis(), labels) to null
+    }
+
+    /** A network as Docker describes one; [names] names its members by container id. */
+    fun network(n: Network, names: Map<String, String>): JsonObject = buildJsonObject {
+        put("Name", n.name)
+        put("Id", n.id)
+        put("Created", if (n.createdMs > 0) java.time.Instant.ofEpochMilli(n.createdMs).toString() else "0001-01-01T00:00:00Z")
+        put("Scope", "local")
+        put("Driver", when (n.name) { "host" -> "host"; "none" -> "null"; else -> "bridge" })
+        put("EnableIPv6", false)
+        putJsonObject("IPAM") {
+            put("Driver", "default")
+            putJsonObject("Options") { }
+            putJsonArray("Config") { }
+        }
+        put("Internal", false)
+        put("Attachable", false)
+        put("Ingress", false)
+        putJsonObject("Containers") {
+            n.members.forEach { id ->
+                putJsonObject(id) {
+                    put("Name", names[id] ?: id)
+                    put("EndpointID", "")
+                    put("MacAddress", "")
+                    put("IPv4Address", "")
+                    put("IPv6Address", "")
+                }
+            }
+        }
+        putJsonObject("Options") { }
+        putJsonObject("Labels") { n.labels.forEach { (k, v) -> put(k, v) } }
+    }
+
+    /** `GET /networks`: [all] that pass [filters] (name, id, label). */
+    fun networks(all: List<Network>, names: Map<String, String>, filters: Map<String, List<String>>): String = JsonArray(
+        all.filter { n ->
+            filters.all { (key, wanted) ->
+                when (key) {
+                    "name" -> wanted.any { n.name.contains(it) }
+                    "id" -> wanted.any { n.id.startsWith(it) }
+                    "label" -> wanted.any { w ->
+                        val k = w.substringBefore('=')
+                        if (w.contains('=')) n.labels[k] == w.substringAfter('=') else n.labels.containsKey(k)
+                    }
+                    else -> true
+                }
+            }
+        }.map { network(it, names) },
+    ).toString() + "\n"
+
+    fun unknownNetworkFilters(filters: Map<String, List<String>>): Set<String> = filters.keys - setOf("name", "id", "label")
+
+    /** The stored image [ref] names: its reference in any of Docker's spellings, its digest, or a start of it. Pure. */
+    fun findImage(entries: List<OciImageStore.Entry>, ref: String): OciImageStore.Entry? {
+        val wanted = EngineCli.PODMAN.fullImage(ref)
+        return entries.firstOrNull { EngineCli.PODMAN.fullImage(it.reference) == wanted }
+            ?: entries.firstOrNull { it.digest == ref }
+            ?: entries.filter { ref.removePrefix("sha256:").length >= 3 && it.digest.removePrefix("sha256:").startsWith(ref.removePrefix("sha256:")) }.singleOrNull()
+    }
+
+    /** `GET /images/{name}/json`: what droidtop knows of a stored image, in Docker's shape. */
+    fun image(e: OciImageStore.Entry, config: ImageRunConfig?, arch: String): String = buildJsonObject {
+        put("Id", e.digest)
+        putJsonArray("RepoTags") { add(JsonPrimitive(EngineCli.PODMAN.fullImage(e.reference).removePrefix("docker.io/library/").removePrefix("docker.io/"))) }
+        putJsonArray("RepoDigests") { }
+        put("Parent", "")
+        put("Created", "0001-01-01T00:00:00Z")
+        put("Os", "linux")
+        put("Architecture", arch)
+        put("Size", e.sizeBytes)
+        putJsonObject("Config") {
+            putJsonArray("Env") { config?.env?.forEach { add(JsonPrimitive(it)) } }
+            putJsonArray("Cmd") { config?.cmd?.forEach { add(JsonPrimitive(it)) } }
+            putJsonArray("Entrypoint") { config?.entrypoint?.forEach { add(JsonPrimitive(it)) } }
+            put("WorkingDir", config?.workingDir ?: "")
+            put("User", config?.user ?: "")
+            putJsonObject("ExposedPorts") { config?.ports?.forEach { put(it.toString(), JsonObject(emptyMap())) } }
+        }
+        putJsonObject("RootFS") { put("Type", "layers") }
+    }.toString() + "\n"
 
     /** `/images/create`'s answer: the progress lines Docker's clients read, all at once after the pull. */
     fun pulled(reference: String, digest: String): String = listOf(

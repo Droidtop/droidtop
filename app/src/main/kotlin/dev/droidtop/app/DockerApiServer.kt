@@ -7,6 +7,7 @@ import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.util.Log
 import dev.droidtop.runtime.ContainerInfo
+import dev.droidtop.runtime.ContainerNetworks
 import dev.droidtop.runtime.DockerApi
 import dev.droidtop.runtime.EngineFeatureProbe
 import dev.droidtop.runtime.EngineHttp
@@ -18,6 +19,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -178,7 +185,8 @@ internal object DockerApiServer {
             is DockerApi.Call.Create -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
                 val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
-                val (create, refused) = DockerApi.createRequest(String(request.body, Charsets.UTF_8), call.name, features)
+                val networks = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                val (create, refused) = DockerApi.createRequest(String(request.body, Charsets.UTF_8), call.name, features, networks)
                 refused?.let { return it }
                 val made = EngineActions.make(app, runtime, runtime.listContainers(), create!!).getOrElse {
                     return DockerApi.error(409, it.message ?: "could not create the container")
@@ -255,11 +263,67 @@ internal object DockerApiServer {
                     EngineHttp.Response.json(200, DockerApi.waited(code))
                 }
             }
+            is DockerApi.Call.ImageGet -> {
+                val store = OciImageStore.of(app)
+                val entry = DockerApi.findImage(store.entries(), call.name) ?: return DockerApi.error(404, "No such image: ${call.name}")
+                EngineHttp.Response.json(200, DockerApi.image(entry, store.runConfig(entry.digest), arch()))
+            }
+            is DockerApi.Call.Networks -> {
+                DockerApi.unknownNetworkFilters(call.filters).takeIf { it.isNotEmpty() }?.let { return DockerApi.notBuilt("network filters ${it.joinToString(", ")}") }
+                val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                EngineHttp.Response.json(200, DockerApi.networks(all, containerNames(runtime), call.filters))
+            }
+            is DockerApi.Call.NetworkGet -> {
+                val all = ContainerNetworks.predefined() + withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                val network = ContainerNetworks.find(all, call.id) ?: return DockerApi.error(404, "network ${call.id} not found")
+                EngineHttp.Response.json(200, DockerApi.network(network, containerNames(runtime)).toString() + "\n")
+            }
+            DockerApi.Call.NetworkCreate -> networksLock.withLock {
+                val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
+                val (network, refused) = DockerApi.networkRequest(String(request.body, Charsets.UTF_8), existing, features)
+                refused?.let { return@withLock it }
+                withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.with(existing, network!!)) }
+                EngineHttp.Response.json(201, buildString { append("{\"Id\":\"").append(network!!.id).append("\",\"Warning\":\"\"}\n") })
+            }
+            is DockerApi.Call.NetworkRemove -> networksLock.withLock {
+                if (ContainerNetworks.PREDEFINED.any { it == call.id || ContainerNetworks.predefinedId(it) == call.id }) {
+                    return@withLock DockerApi.error(403, "${call.id} is a pre-defined network and cannot be removed")
+                }
+                val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                val network = ContainerNetworks.find(existing, call.id) ?: return@withLock DockerApi.error(404, "network ${call.id} not found")
+                val live = runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty().map { it.container.id }.toSet()
+                if (network.members.any { it in live }) {
+                    return@withLock DockerApi.error(403, "error while removing network: network ${network.name} has active endpoints")
+                }
+                withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, ContainerNetworks.without(existing, network.id)) }
+                EngineHttp.Response(204, "text/plain", ByteArray(0))
+            }
+            is DockerApi.Call.NetworkConnect -> networksLock.withLock {
+                runtime ?: return@withLock DockerApi.error(500, "the desktop is not running")
+                val body = runCatching { Json.parseToJsonElement(String(request.body, Charsets.UTF_8)) as JsonObject }.getOrNull()
+                val ref = (body?.get("Container") as? JsonPrimitive)?.content ?: return@withLock DockerApi.error(400, "name a Container")
+                val info = find(runtime.listContainers(), ref) ?: return@withLock DockerApi.error(404, "No such container: $ref")
+                val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
+                if (call.id in ContainerNetworks.PREDEFINED) return@withLock EngineHttp.Response(200, "text/plain", ByteArray(0))
+                val network = ContainerNetworks.find(existing, call.id) ?: return@withLock DockerApi.error(404, "network ${call.id} not found")
+                val next = if (call.connect) ContainerNetworks.withMember(existing, network.id, info.container.id)
+                else ContainerNetworks.withoutMember(existing, info.container.id, network.id)
+                withContext(Dispatchers.IO) { ContainerNetworks.save(app.filesDir, next) }
+                EngineHttp.Response(200, "text/plain", ByteArray(0))
+            }
             is DockerApi.Call.Refused -> DockerApi.error(call.status, call.message)
             is DockerApi.Call.NotBuilt -> DockerApi.notBuilt(call.what)
             DockerApi.Call.NotFound -> DockerApi.error(404, "page not found")
         }
     }
+
+    /** One network change at a time: each reads, changes and writes networks.json whole. */
+    private val networksLock = Mutex()
+
+    /** Every container's name by its id, for a network's members; empty with the desktop down. */
+    private suspend fun containerNames(runtime: dev.droidtop.runtime.ContainerRuntime?): Map<String, String> =
+        runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty().associate { it.container.id to it.displayName }
 
     /** [block] with the running desktop's runtime and the container [ref] names; 500 or 404 otherwise. */
     private suspend fun withContainer(
