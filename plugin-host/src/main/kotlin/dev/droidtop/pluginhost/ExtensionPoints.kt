@@ -28,7 +28,7 @@ data class ExtensionPoint(
 /** The extension-point registry. An id not in [all] is unsupported (kept, listed, never called). */
 object ExtensionPoints {
     val all: List<ExtensionPoint> = listOf(
-        ExtensionPoint("library.sources", "Get games from a source", PointRisk.HIGH, lets = "Lets it search a source and download games into your game folders."),
+        ExtensionPoint("library.sources", "Get games from a source", PointRisk.HIGH, lets = "Lets it see what you search for, search a source with it and download games into your game folders."),
         // docs/plugin-api.md 3 A11: BIOS files for the emulator setup helper. The files are placed by droidtop, in the emulator's BIOS folder.
         ExtensionPoint("emulator.bios", "BIOS files for emulators", PointRisk.MEDIUM, lets = "Lets it offer BIOS files that droidtop downloads for your emulators, when you ask for them."),
         // docs/plugin-api.md 3 A12: Android app catalogs (an F-Droid repository client, a release-page tracker). The plugin

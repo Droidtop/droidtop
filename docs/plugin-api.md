@@ -23,6 +23,50 @@ to be exhaustive. Every group is designed now, even where nothing is built
 yet, so that later additions fit one model instead of each inventing its
 own.
 
+**Everything goes over the API (owner, 2026-10-16; §1.0a).** The owner,
+verbatim: "Remember that ALL plugin activity happens over the API. This
+means programmatic control should be simpler, because plugins need to be
+uniform. We need to ensure that plugins have absolutely zero access to
+droidtop ANYTHING except through the API". This is the rule above every
+other in this document:
+
+- A plugin reaches droidtop only by being called at a point it declared
+  (`handle`, jobs, events) and by calling the host APIs it was granted
+  (`host.call` and its kind's equivalents, through the broker). Nothing
+  else droidtop has (its classes and their state, its Android context,
+  resources, preferences, databases and files, its components and binder
+  services, its UID, its process memory, its environment and its open
+  descriptors) is the plugin's by any other path, in any kind (`native_bundle`,
+  `python`, `flutter_embed`, an application interface) and in any tier.
+- **Full access means more API grants. It doesn't mean a back door into
+  droidtop's internals.** The owner, verbatim, the same day: "Full access
+  should ALSO mean restricted access API paths designed specifically for
+  those purposes". So inside droidtop's API, full access is never the same
+  API with its checks switched off: it is a set of dedicated, restricted
+  points, one per full-access purpose (installing a package through
+  droidtop, for example), and each one is declared in the manifest, granted
+  only to a full-access plugin, shown to the person in plain words, logged,
+  and shaped to its one job, never a general escape hatch.
+- **The OS is a separate rule.** The owner, verbatim, correcting the scope:
+  "Shizuku does need direct access to android APIs. We can allow for that,
+  but our plugin sandbox needs to block it when full access isn't enabled.
+  I said the only path into DROIDTOP is through teh API. I didn't say that
+  about the OS". So there are two rules:
+  1. **Into droidtop:** only through the API, for every plugin in every
+     tier, full access included.
+  2. **Into the OS** (Android's APIs, system services, Shizuku, the
+     kernel): a full-access plugin may use them directly (the Shizuku
+     bridge does, and keeps doing so; it is not turned into a droidtop
+     point). Without full access the sandbox blocks direct OS use: a
+     contained or open plugin reaches the OS only through droidtop's API
+     or through the one hole a granted permission opens (§5.3, "Open
+     processes").
+- So everything a plugin needs from droidtop is a declared point or a host
+  API, the same for every kind, and a test proves each other path closed.
+  The audit of those paths (into droidtop at every tier, and into the OS
+  without full access), what closed each and the test that proves it, is
+  §5.6 (Droidtop/tracker#53).
+
 **Scope.** This is droidtop's plugin API only. Enginehost has its own
 plugin system, and the two share nothing but a design language (§12a,
 "REDECIDED"). Engine games reach droidtop through the players database,
@@ -757,6 +801,74 @@ A source that fails `search` with a setup problem answers FAILED with a
 plain sentence ("The game index is not downloaded yet"); droidtop shows it
 under the source's name and, when the source provides `ui.settings`, an
 "Open <plugin> settings" row right there.
+
+**Fetchers answer in the one search (2026-10-16, Droidtop/tracker#218).**
+The owner, 2026-10-16: "The Get Games sheet shouldn't really be a sheet.
+Get Games results should be injected into the search by fetcher plugins".
+And the same day: "Remember that ALL plugin activity happens over the
+API" (§1.0a): a fetcher's results reach the search only through this
+point, as every other answer of a plugin does.
+
+- **No new point.** The one search (SPEC 12a "One search") asks every
+  granted `library.sources` source with `search` as above, `limit` 10.
+  Where Get games used to open its own sheet, droidtop opens the one search
+  scoped to that system (`context.system`, the sources that serve it); the
+  surface is the UI lane's (#218). `form`, `detail` and `acquire` keep
+  their meaning.
+- **Result fields added** (each optional; an older droidtop ignores them,
+  and none needs a contract bump):
+  - `version`: the release's version as the site gives it (`"1.0.4"`,
+    `"v0.12 Final"`), cut to a title's length; droidtop shows it as the
+    first column.
+  - `size`: the download's size in bytes, a positive integer; droidtop
+    writes it in its own units ("1.2 GB"). A source that only has text for
+    it keeps that in `columns`.
+  - `get`: `{values?, title?}`, where `values` is an object of strings. It
+    says the result can be fetched without its detail page: droidtop's
+    row offers Get, which starts `acquire {ref, values: get.values,
+    context}` as a job, exactly as a `job` action on the detail page does
+    (the destination by SPEC 12a "Download destination"; the job is titled
+    `get.title`, else "Getting <title>"). Without `get`, Get opens `detail`
+    as a page, for a result that needs a version, a mirror or a sign-in
+    picked first.
+  - The source's name on a row is droidtop's: the `label` of the
+    plugin's `library.sources` entry, else the plugin's own. Nothing in a
+    result names a source, so a plugin cannot pass its rows off as
+    another's.
+- **Budget: 10 s, not a crash.** Every `search` (the one search's and a
+  source page's) carries `deadlineMs` 10000 (§8,
+  `PluginGameSource.SEARCH_TIMEOUT_MS`). A source that misses it shows
+  under its name as "didn't answer in time" while every other row stands,
+  and the miss is not a crash: it never counts toward disabling the plugin,
+  because a slow site is slow, not broken. droidtop's own backstop for a
+  call that never returns at all is a second longer
+  (`PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS`, 11 s).
+- **Cancellation: one call per source, the newest query wins.** droidtop
+  waits for typing to pause (350 ms) before it asks. A source has at most
+  one `search` from the one search in flight: while it runs, droidtop
+  sends that source nothing more; when it answers, its reply is dropped if
+  the query has moved on, and only the newest query is sent then (the ones
+  in between are never sent). Leaving the search drops whatever is in
+  flight. There is no cancel message, because no kind can interrupt a
+  call: a source keeps its work within `deadlineMs`, and the rule above
+  keeps it to one search at a time.
+- **Permissions** are any declared point's: `provide:library.sources` (a
+  source the person unticked is never asked, and one waiting for approval
+  is droidtop's "waiting for approval" row, never its results), the
+  source's own `net` grants for its site, and `library.folders.write` for
+  the destination when it acquires. Every granted source sees the query
+  text, and the point's line on the approval list says so: "Lets it see
+  what you search for, search a source with it and download games into
+  your game folders."
+- **As built (2026-10-16), the plugin half:** `SourceResultProtocol`
+  reads `version`, `size` and `get` (`SourceGet`; `PluginViewTest`);
+  `PluginGameSource` puts the version first in the row's columns and the
+  size in droidtop's units (`SourceSize`), and answers `canGet` and `get`,
+  which runs the same `PluginViews.acquire` as the detail page's job
+  action; the search budget is `SEARCH_TIMEOUT_MS`; the one search asks
+  each source through `SourceSearchFlight` (one call in flight, the newest
+  next; `SourceSearchFlightTest`). The rows' Get and the sheet's
+  replacement are the UI lane's (#218).
 
 **Pad and hint row (#179).** A plugin never binds a button. On every
 plugin row, tile and menu entry, droidtop's input pipeline (SPEC 6e,
@@ -3328,6 +3440,29 @@ opens that one hole:
   limited to official origins by default, and why each one is its own
   process.
 
+### 5.6 Every path but the API (audit, 2026-10-16, Droidtop/tracker#53)
+
+The audit the rule "Everything goes over the API" (top of this document)
+asks for. Its scope, from the coordinator's package of 2026-10-16:
+
+- **Into droidtop, every kind and every tier (full access included):**
+  class loading (the parent class loader, reflection into droidtop's
+  classes, its singletons); the Android context plugin code holds
+  (`getApplicationContext`, droidtop's resources, preferences, databases
+  and files); droidtop's components (activities, services, receivers,
+  providers), intents and PendingIntents; binder services, a shared UID
+  and process memory; files outside the plugin's own folder and the
+  broker's passthrough claims; environment variables and inherited
+  descriptors.
+- **Into the OS, contained and open tiers:** direct use of Android's APIs
+  and system services is blocked except for the hole a granted permission
+  opens. A full-access plugin's direct OS use (the Shizuku bridge) is
+  allowed and is not listed as a finding.
+
+Each path is listed with its status, the commit that closed it and the
+test that proves it closed. The table is filled in as the audit lands; it
+is posted on Droidtop/tracker#53.
+
 ---
 
 ## 6. Mapping today's plugin API onto this model
@@ -3917,6 +4052,7 @@ does not duplicate it once built.
 | default `handle` | 15 s (`CALL_TIMEOUT_MS`) | counts as a crash → the plugin is disabled (today's rule) |
 | `enabled` for a context action (C4) | 500 ms | shown enabled; not a crash |
 | search `query` (C5) | 1.5 s | results omitted; not a crash |
+| source `search` (`library.sources`, the one search and a source page) | 10 s, one in flight per source | "didn't answer in time" under the source; not a crash |
 | `pre_launch` hook (B3) | 2 s | launch proceeds; not a crash |
 | status or quick tile `state` (C2, C3) | 5 s (the widget's existing value) | last value kept; not a crash |
 | widget `snapshot` (C10) | 5 s, at most once every 30 s | last snapshot kept; not a crash |

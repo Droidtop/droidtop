@@ -137,7 +137,11 @@ data class AcquireContentOption(val label: String, val index: Int)
  * settled on: [id], [title], [subtitle], [platform], an optional [artUrl],
  * and an [options] list of labelled choices (source/mirror/region/format).
  * [sizeLabel] is kept for the older per-system "Get games" screen this
- * file already renders.
+ * file already renders. [version], [sizeBytes] and [getValuesJson] are a
+ * contract 2 result's for the one search (docs/plugin-api.md "Fetchers
+ * answer in the one search", Droidtop/tracker#218): [getValuesJson] is set
+ * when the result can be fetched from its row without its detail page
+ * ([GameSourceProvider.get]), titled [getTitle] when the source gave one.
  */
 data class AcquireContentResult(
     val id: String,
@@ -150,7 +154,26 @@ data class AcquireContentResult(
     val raw: String,
     val columns: List<String> = emptyList(),
     val badges: List<String> = emptyList(),
+    val version: String? = null,
+    val sizeBytes: Long? = null,
+    val getValuesJson: String? = null,
+    val getTitle: String? = null,
 )
+
+/** A result's size in bytes as a row shows it: "640 KB", "1.2 GB" (decimal units, as Android's own Files app). */
+object SourceSize {
+    fun label(bytes: Long): String {
+        val units = listOf("B", "KB", "MB", "GB", "TB")
+        var size = bytes.toDouble()
+        var unit = 0
+        while (size >= 1000 && unit < units.lastIndex) {
+            size /= 1000
+            unit++
+        }
+        val number = if (unit == 0 || size >= 10) size.toLong().toString() else String.format(java.util.Locale.ROOT, "%.1f", size).removeSuffix(".0")
+        return "$number ${units[unit]}"
+    }
+}
 
 /** What a finished (or failed) download job reported, translated out of plugin-host's own `PluginResult` so callers never need that type. */
 data class AcquireDownloadOutcome(val ok: Boolean, val message: String, val filePath: String?)

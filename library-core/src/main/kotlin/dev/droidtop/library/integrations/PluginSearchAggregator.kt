@@ -69,16 +69,11 @@ fun List<SourceOutcome>.hits(): List<SourceHit> = flatMap { it.hits }
  */
 object PluginSearchAggregator {
     /**
-     * Slightly over the per-call watchdog
-     * ([dev.droidtop.pluginhost.PluginRunner.CALL_TIMEOUT_MS], 15s) a
-     * single plugin's own `invoke()` is already bounded by, so a plugin
-     * that answers right at that limit is not itself the reason the
-     * fan-out looks slower than any one source -- this timeout is a
-     * backstop for a source that never returns at all (a hung bind, a
-     * stuck coroutine), not the plugin's own watchdog's job. A future
-     * store adapter must honor its own bound inside this window too.
+     * A second over a source's own `search` budget ([PluginGameSource.SEARCH_TIMEOUT_MS], 10 s, which is never a
+     * crash), so the plugin's own deadline is what ends a slow search: this is the backstop for a source that never
+     * returns at all (a hung bind, a stuck coroutine). A future store adapter must honor its own bound inside it too.
      */
-    const val PER_SOURCE_TIMEOUT_MS = 16_000L
+    const val PER_SOURCE_TIMEOUT_MS = 11_000L
 
     /** The runtime a failed plugin source lacks, so its row can offer the download; null for any other source or when it has what it needs. */
     internal fun runtimeNeedOf(context: Context, source: GameSourceProvider): RuntimeNeed? =

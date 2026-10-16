@@ -18,11 +18,10 @@ import java.io.File
  * store adapter making a real HTTP call must do the same) -- nothing in
  * this interface is safe to call from a UI thread directly.
  *
- * **Timeout.** A plugin implementation is bounded by the plugin runner's
- * own watchdog ([dev.droidtop.pluginhost.PluginRunner.CALL_TIMEOUT_MS],
- * 15s) for [search]/[lookup]; [PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS]
- * (16s) is the caller-side backstop for a source that never returns at
- * all. A store adapter must declare and honor its own bound the same way
+ * **Timeout.** A plugin's [search]/[lookup] has its own budget
+ * ([PluginGameSource.SEARCH_TIMEOUT_MS], 10 s, never a crash);
+ * [PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS] (11 s) is the caller-side
+ * backstop for a source that never returns at all. A store adapter must declare and honor its own bound the same way
  * when one is built.
  *
  * **Errors.** [search] and [lookup] return `Result.failure` rather than
@@ -69,6 +68,23 @@ interface GameSourceProvider {
     fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen
 
     fun settingsScreen(): CatalogScreen? = null
+
+    /** True when [result] can be fetched straight from its row, without its detail page (a result's `get`). */
+    fun canGet(result: AcquireContentResult): Boolean = false
+
+    /**
+     * Fetches [result] from its row into [destination] (docs/plugin-api.md "Fetchers answer in the one search",
+     * Droidtop/tracker#218): the same `acquire` job the detail page starts, with the values the result gave. The
+     * outcome's message is the sentence to show. Only called when [canGet].
+     */
+    suspend fun get(
+        context: Context,
+        result: AcquireContentResult,
+        systemId: String?,
+        systemName: String?,
+        destination: File,
+        onStatus: (String) -> Unit,
+    ): AcquireDownloadOutcome = AcquireDownloadOutcome(false, "$label can't fetch this from search", null)
 }
 
 /**
@@ -106,11 +122,45 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         destination?.let { hostContext.put("destination", it.absolutePath) }
         val args = org.json.JSONObject().put("query", query).put("values", org.json.JSONObject(values as Map<*, *>)).put("context", hostContext)
         limit?.let { args.put("limit", it) }
-        val reply = PluginViews.call(context, source.record, "library.sources", "search", args)
+        // A slow site is slow, not broken: a search that misses its budget is "didn't answer in time", not a crash.
+        val reply = PluginViews.call(context, source.record, "library.sources", "search", args, timeoutMs = SEARCH_TIMEOUT_MS)
         if (!reply.ok) return Result.failure(SourceReplyFailure(reply.code ?: dev.droidtop.pluginhost.PluginErrorCode.FAILED, reply.message, reply.detail))
         return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).let { rows -> if (limit != null) rows.take(limit) else rows }.map { row ->
-            AcquireContentResult(row.id, row.title, row.subtitle, null, row.platform, null, emptyList(), row.refJson, row.columns, row.badges)
+            AcquireContentResult(
+                row.id, row.title, row.subtitle, row.sizeBytes?.let(SourceSize::label), row.platform, null, emptyList(), row.refJson,
+                columns = listOfNotNull(row.version) + row.columns, badges = row.badges,
+                version = row.version, sizeBytes = row.sizeBytes, getValuesJson = row.get?.valuesJson, getTitle = row.get?.title,
+            )
         })
+    }
+
+    override fun canGet(result: AcquireContentResult): Boolean = source.record.manifest.contractVersion >= 2 && result.getValuesJson != null
+
+    override suspend fun get(
+        context: Context,
+        result: AcquireContentResult,
+        systemId: String?,
+        systemName: String?,
+        destination: File,
+        onStatus: (String) -> Unit,
+    ): AcquireDownloadOutcome {
+        if (!canGet(result)) return super.get(context, result, systemId, systemName, destination, onStatus)
+        if (!destination.isDirectory) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { destination.mkdirs() }
+        val given = org.json.JSONObject(result.getValuesJson ?: "{}")
+        val values = given.keys().asSequence().associateWith { given.optString(it) }
+        val hostContext = org.json.JSONObject()
+            .put("system", org.json.JSONObject().put("id", systemId.orEmpty()).put("name", systemName.orEmpty()))
+            .put("destination", destination.absolutePath)
+        val args = dev.droidtop.pluginhost.PluginViewCall.args(org.json.JSONObject().put("ref", org.json.JSONObject(result.raw)), values, hostContext)
+        val title = result.getTitle ?: "Getting ${result.title}"
+        val done = PluginViews.acquire(context, source.record, title, hostContext, args, onStatus)
+        val message = if (done.ok) done.values["summary"] ?: done.values["message"] ?: "Got ${result.title}" else "$label: ${done.error ?: "failed"}"
+        return AcquireDownloadOutcome(done.ok, message, done.values["filePath"])
+    }
+
+    companion object {
+        /** A source's `search` budget (docs/plugin-api.md "Fetchers answer in the one search", §8): missed, it is not a crash. */
+        const val SEARCH_TIMEOUT_MS = 10_000L
     }
 
     override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen {
