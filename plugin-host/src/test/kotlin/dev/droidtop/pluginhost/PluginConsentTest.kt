@@ -34,7 +34,7 @@ class PluginConsentTest {
         val ask = PluginConsent.of(m, listOf(record(m)), badgeFor = { "Added by you" }).asks.single()
         assertEquals("Use the graphics chip to draw its screen", ask.line.title)
         assertEquals(
-            "A plugin with this could reach past droidtop's checks, so only allow it for a plugin from a source you trust - Smooth animations",
+            "A plugin with this could reach past droidtop's checks, so only allow it for a plugin from a source you trust. Smooth animations.",
             ask.line.detail,
         )
         assertFalse("asks first, never pre-ticked", ask.line.ticked)
@@ -80,7 +80,7 @@ class PluginConsentTest {
         assertTrue("what the point lets the plugin do is the detail", sources.detail!!.startsWith("Lets it"))
         assertTrue(view.adds[0].second.single().let { it.ticked && !it.highRisk })
         assertEquals(
-            listOf("See whether you are online", "Connect to: listed domains (api.acme.example)"),
+            listOf("See whether you are online", "Connect to: listed domains"),
             view.can.map { it.title },
         )
         // Critical first, then dangerous; the high-risk point is a tick box under "Adds", not a second line here.
@@ -95,14 +95,17 @@ class PluginConsentTest {
         assertEquals("clipboard.read", clip.line.id)
         assertTrue(view.can.all { it.ticked && it.id != null })
         assertEquals(setOf("provide:ui.status_tile", "provide:library.sources", "net.state", "net.domains", "clipboard.read", "containers.exec"), view.items.map { it.id }.toSet())
-        assertEquals("Reads the code you copy", clip.line.detail)
+        assertEquals("Reads the code you copy.", clip.line.detail)
+        // #516: which sites is a sentence under the title, never part of it.
+        assertEquals("Only the site api.acme.example.", view.can.single { it.id == "net.domains" }.detail)
         assertEquals(listOf("extension point future.point", "permission made.up"), view.unsupported)
 
         val shell = view.uses[0]
         assertTrue(shell.optional)
         assertEquals("Acme VPN", shell.providerLabel)
         assertEquals("Official", shell.providerBadge)
-        assertEquals("level adb - Restart the app", shell.line.detail)
+        assertEquals("Needs ADB-level access. Restart the app.", shell.line.detail)
+        assertFalse("never the interface's id (#516)", shell.line.title.contains("priv."))
         assertNull(view.uses[1].providerLabel)
         assertFalse(view.olderPluginFullAccess)
     }
