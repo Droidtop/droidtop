@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.runtime.FailureText
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.library.friendlyLocation
 import dev.droidtop.shell.gamepad.menuMove
@@ -731,7 +732,7 @@ internal fun PcGameMenu(
             status = runCatching {
                 context.startActivity(intent)
                 null
-            }.getOrElse { "Enginehost didn't take that: ${it.message}" }
+            }.getOrElse { "Enginehost didn't take that: ${FailureText.of("PcGameMenu", it)}" }
         },
         hasWindowsRoute = hasWindowsRoute,
         hasLinuxRoute = hasLinuxRoute,
@@ -1630,7 +1631,7 @@ private suspend fun lookUpSteamNews(appId: Long): SteamNewsState = withContext(D
             ScrapeLookup.NoMatch -> SteamNewsState.Unavailable("The developer has posted no news on Steam for this game")
             is ScrapeLookup.Refused -> SteamNewsState.Unavailable("Steam's news could not be reached (error ${lookup.httpStatus})")
         }
-    }.getOrElse { SteamNewsState.Unavailable("Steam's news could not be reached: ${it.message ?: it}") }
+    }.getOrElse { SteamNewsState.Unavailable("Steam's news could not be reached: ${FailureText.of("PcGameMenu", it)}") }
 }
 
 /** Network: the IO dispatcher. Every outcome is a sentence, never a silent blank. */
@@ -1643,7 +1644,7 @@ private suspend fun lookUpProtonDb(entry: LibraryEntry, name: String): ProtonDbS
             ScrapeLookup.NoMatch -> ProtonDbState.Unavailable("ProtonDB has no reports for this game yet")
             is ScrapeLookup.Refused -> ProtonDbState.Unavailable("ProtonDB could not be reached (error ${lookup.httpStatus})")
         }
-    }.getOrElse { ProtonDbState.Unavailable("ProtonDB could not be reached: ${it.message ?: it}") }
+    }.getOrElse { ProtonDbState.Unavailable("ProtonDB could not be reached: ${FailureText.of("PcGameMenu", it)}") }
 }
 
 /** The name one folder derives for its game, before any grouping is worked out. */
