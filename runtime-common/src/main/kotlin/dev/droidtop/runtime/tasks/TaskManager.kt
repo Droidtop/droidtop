@@ -93,6 +93,14 @@ object TaskManager {
             null
         }
 
+    /** Kills one app: a force-stop at once, or a plain refusal when nothing can force-stop ([AppCloser.kill]). */
+    suspend fun kill(context: Context, packageName: String): CloseOutcome =
+        withContext(Dispatchers.IO) {
+            val outcome = closer(context).kill(packageName)
+            if (outcome.sessionOver) refreshNow(context)
+            outcome
+        }
+
     /** Closes one app by the strongest path available, and says what that achieved. */
     suspend fun close(context: Context, packageName: String): CloseOutcome =
         withContext(Dispatchers.IO) {

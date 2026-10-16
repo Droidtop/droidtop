@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.util.Log
 import dev.droidtop.runtime.AudioHandOff
-import dev.droidtop.runtime.LaunchSoundExperiment
 import dev.droidtop.runtime.tasks.LaunchLedger
 import dev.droidtop.runtime.tasks.sessionOver
 import kotlinx.coroutines.CoroutineScope
@@ -187,15 +186,6 @@ object LaunchDisplay {
     var onLaunched: ((Int?) -> Unit)? = null
 
     /**
-     * Invoked on the main thread as every launch is dispatched, before the
-     * audio hand-off: the shell plays a held-back launch sample here when
-     * the launch-static experiment is on variant B (docs/SPEC.md "Launch
-     * audio hand-off", Droidtop/tracker#160).
-     */
-    @Volatile
-    var beforeDispatch: (() -> Unit)? = null
-
-    /**
      * Invoked just BEFORE the launch intent is dispatched, with the
      * display the launch is going to. The shell hooks this to place
      * droidtop's idle surface on any secondary display the launch is
@@ -244,8 +234,7 @@ object LaunchDisplay {
                 startOn(context, intent, decision.displayId, replacing)
             }
             LaunchScreenResolution.Decision.Ask -> {
-                LaunchSoundExperiment.variant(context)
-                // The question is a modal layer, so the shell silences droidtop's sound behind it by the layer
+                    // The question is a modal layer, so the shell silences droidtop's sound behind it by the layer
                 // rule (docs/SPEC.md "Launch audio hand-off"); the line says what was open as it appeared.
                 AudioHandOff.mark("screen question opened (${options!!.size} screens); open: ${AudioHandOff.openStreams()}")
                 ask!!(options, ctx != null) { chosen, remember ->
@@ -310,11 +299,7 @@ object LaunchDisplay {
      */
     private fun startOn(context: Context, intent: Intent, displayId: Int?, replacing: LaunchReplace.Running? = null) {
         dispatchScope.launch {
-            LaunchSoundExperiment.variant(context)
             AudioHandOff.mark("launch dispatch: display ${displayId ?: "default"}")
-            // The launch-static experiment's variant B plays the theme's launch sample here, once the launch
-            // is certain, instead of at the A press; the hand-off below lets it play out (docs/SPEC.md).
-            beforeDispatch?.invoke()
             AudioHandOff.traceLaunch(context)
             AudioHandOff.release("launch")
             try {

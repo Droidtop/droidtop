@@ -29,6 +29,25 @@ class AppCloser(
         return closeConnected(packageName)
     }
 
+    /**
+     * Kill: force-stop at once, with none of [close]'s gentler steps first (Enginehost's own end, the move to the
+     * background). The owner, 2026-10-16: "kill should immediately force-stop it" (Droidtop/tracker#571 row 16).
+     * Without a helper that can force-stop there is no such stop on Android, and it says so instead of trying less.
+     */
+    fun kill(packageName: String): CloseOutcome {
+        ops.connect(CONNECT_MS)
+        return when (val result = ops.forceStop(packageName)) {
+            ForceStopResult.Stopped -> {
+                onClosed(packageName)
+                CloseOutcome.Closed
+            }
+            is ForceStopResult.Failed -> CloseOutcome.Failed("Couldn't kill it: ${result.message}")
+            ForceStopResult.NoProvider -> CloseOutcome.Failed(
+                "Kill needs the helper app to force-stop it" + (ops.unavailableReason()?.let { ": $it" } ?: "") + ". Quit ends it the way Android allows",
+            )
+        }
+    }
+
     private fun closeConnected(packageName: String): CloseOutcome {
         var providerFailure: String? = null
         var asked = false

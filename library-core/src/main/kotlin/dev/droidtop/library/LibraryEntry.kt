@@ -2006,6 +2006,31 @@ class Library(
         }
 
     /**
+     * Kill for the running game (the Quick Menu's Kill pill, the companion's Kill row): force-stopped at once, never
+     * the gentler steps Quit tries first (Droidtop/tracker#571 row 16; the owner: "kill should immediately force-stop
+     * it"). droidtop's own Windows screen ends its guest immediately either way. With nothing in the ledger droidtop
+     * does not know which app to stop, and says to use Quit.
+     */
+    suspend fun killRunning(context: android.content.Context, entry: LibraryEntry): QuitResult =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+            val outcome = try {
+                val running = dev.droidtop.runtime.tasks.LaunchLedger.last?.packageName
+                when {
+                    running == context.packageName -> {
+                        OwnGameScreens.stop()
+                        QuitResult.Ended
+                    }
+                    running != null -> dev.droidtop.runtime.tasks.TaskManager.kill(context, running).toQuitResult()
+                    else -> QuitResult.NotEnded("droidtop doesn't know which app is running ${entry.title}. Quit ends it")
+                }
+            } catch (e: Exception) {
+                QuitResult.NotEnded("Couldn't kill it: ${e.message ?: e.javaClass.simpleName}")
+            }
+            if (outcome is QuitResult.Ended) LaunchDisplay.clearRunning()
+            outcome
+        }
+
+    /**
      * [quitRunning] for the game droidtop believes is running, for a caller that holds no entry (the play-time
      * limit, Droidtop/tracker#421): the entry is looked up by the running session's game id. Null when nothing is running.
      */

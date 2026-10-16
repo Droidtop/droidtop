@@ -8,9 +8,6 @@ import dev.droidtop.library.theme.EsDeAspectRatio
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.ThemePrefs
-import dev.droidtop.runtime.LaunchSoundExperiment
-import dev.droidtop.runtime.LaunchSoundPlan
-import dev.droidtop.runtime.LaunchSoundVariant
 import dev.droidtop.runtime.systemstatus.PowerAction
 import dev.droidtop.runtime.tasks.text
 
@@ -65,7 +62,6 @@ object GamingSettingsCatalog {
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
     const val ID_GAME_AWAKE = "pref_gaming_game_awake"
-    const val ID_LAUNCH_SOUND_EXPERIMENT = "pref_gaming_launch_sound_experiment"
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
     const val ID_EMULATORS = "pref_gaming_emulators"
@@ -83,7 +79,6 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_BATTERY = "pref_gaming_system_battery"
     const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
     const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
-    const val ID_SYSTEM_OPEN_SETTINGS = "pref_gaming_system_open_settings"
     const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
@@ -260,18 +255,6 @@ object GamingSettingsCatalog {
                                 runCatching { GameAwakeMode.valueOf(value) }.getOrDefault(GameAwakeMode.NEVER_SLEEP),
                             )
                         },
-                    ),
-                )
-                // A test, for tracking down the burst of static some people hear when a game starts
-                // (docs/SPEC.md "Launch audio hand-off", tracker#160). Remove once the cause is fixed.
-                add(
-                    ChoiceItem(
-                        id = ID_LAUNCH_SOUND_EXPERIMENT,
-                        title = "Launch sound test",
-                        subtitle = null,
-                        options = LaunchSoundVariant.entries.map { ChoiceOption(it.name, it.label) },
-                        current = LaunchSoundExperiment.variant(context).name,
-                        onSelect = { ctx, value -> LaunchSoundExperiment.set(ctx, LaunchSoundPlan.parse(value)) },
                     ),
                 )
             },
@@ -502,28 +485,6 @@ object GamingSettingsCatalog {
                         title = "Switch mode",
                         subtitle = "Home screen",
                         run = launchComponent("dev.droidtop.app.ModeSwitcherActivity"),
-                    ),
-                )
-                // The direct route into Gaming's own Settings section
-                // (docs/SPEC.md "One settings entry point"): Start/Menu
-                // and the R2 pill both open this menu, and until this row
-                // existed the only way from here into Settings was two
-                // hops through Switch mode -> Modes and settings, which
-                // lands on GLOBAL settings, not Gaming's own. Deep-links
-                // back into the already-running shell the same way Browse
-                // themes does (EXTRA_GAMING_START_SECTION, read by
-                // GamepadShell's own deepLinkToken effect) rather than a
-                // second settings surface.
-                add(
-                    ActionItem(
-                        id = ID_SYSTEM_OPEN_SETTINGS,
-                        title = "Settings",
-                        subtitle = "Gaming settings",
-                        run = launchComponent(
-                            "dev.droidtop.app.MainActivity",
-                            "dev.droidtop.app.EXTRA_MODE" to "gaming",
-                            "dev.droidtop.app.EXTRA_GAMING_START_SECTION" to "SETTINGS",
-                        ),
                     ),
                 )
                 add(

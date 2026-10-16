@@ -315,6 +315,7 @@ fun QuickMenuStandalone(
             library = library,
             onResume = {},
             onQuit = { _, _ -> },
+            onKill = { },
             quitOutcome = null,
             onOpenLeftMenu = onOpenStartMenu,
             openPlace = { screenId ->
