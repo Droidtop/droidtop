@@ -445,6 +445,14 @@ object MenuTokens {
     val Surface: Color get() = GamingTheme.palette.rowFill
     val SurfaceSelected: Color get() = GamingTheme.palette.rowFillSelected
     val OverlaySurface: Color get() = GamingTheme.palette.overlaySurface
+
+    /**
+     * The plate under a control floating over art (the status cluster, the Start and R2 pills): the overlay surface,
+     * nearly opaque, so the muted text on it keeps the 4.5:1 the palette holds it to over any artwork. It was [Surface]
+     * at 58%, the ink itself, so text and plate came from the same end of the scale: pale text on a pale pill over light
+     * art (rig, droidtop 0.2.0-dev.1931, Droidtop/tracker#559).
+     */
+    val FloatingPlate: Color get() = GamingTheme.palette.overlaySurface.copy(alpha = 0.92f)
     val OnSurface: Color get() = GamingTheme.palette.onSurface
     val OnSurfaceMuted: Color get() = GamingTheme.palette.onSurfaceMuted
     val Value: Color get() = GamingTheme.palette.value

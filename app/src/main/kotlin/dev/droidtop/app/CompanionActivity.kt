@@ -61,7 +61,7 @@ class CompanionActivity : AppCompatActivity() {
         widgetManager = AppWidgetManager.getInstance(this)
         widgetHost = CompanionWidgets.host(this)
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+            dev.droidtop.app.ui.DroidtopTheme {
                 // Touch only: the D-pad never reaches these controls (dispatchKeyEvent below). Turned inside
                 // the window when the display cannot take the orientation asked for (Lock to landscape, #213).
                 dev.droidtop.display.DisplayOrientationContent {

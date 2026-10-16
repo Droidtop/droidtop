@@ -1,14 +1,16 @@
 package dev.droidtop.app.ui
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
 import dev.droidtop.shell.gamepad.GamingTheme
-import dev.droidtop.shell.gamepad.ChromeColors
+import dev.droidtop.shell.gamepad.GamingPalette
+import dev.droidtop.shell.gamepad.rememberLightAppearance
+import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.shell.gamepad.DroidtopTypography
 
 /**
@@ -19,7 +21,8 @@ import dev.droidtop.shell.gamepad.DroidtopTypography
  * [MaterialTheme] instead of hardcoding either.
  *
  * Both halves come from the design system in `:shell-gamepad`
- * (`DesignTokens.kt`, docs/SPEC.md section 7k): [ChromeColors] is the
+ * (`DesignTokens.kt`, docs/SPEC.md section 7k): droidtop's own palette in
+ * the Appearance setting's light or dark ([GamingPalette.defaultFor]) is the
  * colour source for this surface family and [DroidtopTypography] is
  * droidtop's type scale, supplied here rather than inherited from the
  * platform default so that two screens in the same flow cannot size the
@@ -37,7 +40,6 @@ import dev.droidtop.shell.gamepad.DroidtopTypography
  */
 @Composable
 fun DroidtopTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
     gamingThemed: Boolean = false,
     content: @Composable () -> Unit,
 ) {
@@ -45,11 +47,13 @@ fun DroidtopTheme(
         GamingTheme(content)
         return
     }
-    MaterialTheme(
-        colorScheme = if (darkTheme) ChromeColors.Dark else ChromeColors.Light,
-        typography = DroidtopTypography,
-        content = content,
-    )
+    // Light or dark is the Appearance setting's, for every root (docs/SPEC.md 7k, "Light and dark"): droidtop's own
+    // palette in that appearance, its Material scheme and its notice colours, the ones a Gaming surface draws with
+    // when no theme is held. Every root used to force dark, the companion among them (rig 1931, Droidtop/tracker#559).
+    val palette = GamingPalette.defaultFor(rememberLightAppearance())
+    CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
+        MaterialTheme(colorScheme = palette.colorScheme, typography = DroidtopTypography, content = content)
+    }
 }
 
 /**

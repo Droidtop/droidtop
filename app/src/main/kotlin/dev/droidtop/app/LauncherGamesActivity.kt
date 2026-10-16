@@ -121,7 +121,7 @@ class LauncherGamesActivity : AppCompatActivity() {
         window.statusBarColor = android.graphics.Color.TRANSPARENT
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true) {
+            dev.droidtop.app.ui.DroidtopTheme {
                 val shown by games.collectAsStateWithLifecycle(initialValue = null)
                 LauncherGamesScreen(
                     games = shown,

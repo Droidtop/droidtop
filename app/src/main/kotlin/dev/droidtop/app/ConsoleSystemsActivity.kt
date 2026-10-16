@@ -46,7 +46,7 @@ class ConsoleSystemsActivity : AppCompatActivity() {
         AppSettingsCatalogs.ensureRegistered()
         val screen = SettingsScreenRegistry.get(AppSettingsCatalogs.SCREEN_CONSOLE_SYSTEMS)!!
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 Box(Modifier.fillMaxSize().groundBackground()) {
                     CatalogNavigator(root = screen, onExit = { finish() })
                 }
