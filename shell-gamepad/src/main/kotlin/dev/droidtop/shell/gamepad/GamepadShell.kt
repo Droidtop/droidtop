@@ -105,6 +105,7 @@ import dev.droidtop.shell.gamepad.query.SheetAction
 import dev.droidtop.shell.gamepad.query.appsQueryScope
 import dev.droidtop.shell.gamepad.query.rememberSavedViews
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.library.needsInstall
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.CapsuleStatusBadge
 import dev.droidtop.shell.gamepad.pc.onPcGamesTab
@@ -867,7 +868,16 @@ private fun GamepadShellBody(
                     )
                 }
             },
-            onPlay = onLaunch,
+            // A game that is not on the device yet opens its page, where Install is, rather than failing to start
+            // ("This game's folder isn't on this device"; console rig, 2026-10-16, Droidtop/tracker#485).
+            onPlay = { entry ->
+                if (entry.needsInstall()) {
+                    globalSearchOpen = false
+                    nav.openDetail(entry.id)
+                } else {
+                    onLaunch(entry)
+                }
+            },
             settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
             onDismiss = { globalSearchOpen = false },
         )
@@ -893,7 +903,8 @@ private fun GamepadShellBody(
                         systemName,
                     ) {
                         systemSearch = null
-                        onLaunch(game)
+                        // Not on the device yet: its page, with Install, as the global search does.
+                        if (game.needsInstall()) nav.openDetail(game.id) else onLaunch(game)
                     }
                 }
             },

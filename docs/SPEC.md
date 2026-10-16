@@ -21573,7 +21573,10 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
   as decided on 2026-10-07; the one separate section is the one that searches
   another kind of thing. The PC library and a console list do not offer Settings:
   they search their own games.
-- **Picking.** A device row opens the app or plays the game (the PC library's
+- **Picking.** A device row opens the app or plays the game; a game that is not on the device yet (a store game
+  never installed, `needsInstall`) opens its page, where Install is, rather than failing to start (console rig,
+  2026-10-16: "This game's folder isn't on this device"; Standard's search goes through `GameLaunchActivity`, which
+  does the same) (the PC library's
   opens the game's page). A source row always opens its detail
   (`GameSourceProvider.detailScreen`); the destination is worked out when it is
   picked, off the main thread (`SourceDestinations`), never while typing.
