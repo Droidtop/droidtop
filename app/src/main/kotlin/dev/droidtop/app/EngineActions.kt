@@ -95,7 +95,8 @@ internal object EngineActions {
                 .orEmpty()
         val start = request.start && program.isNotEmpty()
         if (start) ContainerPrograms.start(app, runtime, created)
-        if (request.autoRemove) removeWhenOver(app, runtime, created)
+        // An attached `run --rm` is removed by its front, once it has read the program's last output.
+        if (request.autoRemove && (request.detach || !start)) removeWhenOver(app, runtime, created)
         return Result.success(Made(created, name, notes, start, program.isNotEmpty()))
     }
 

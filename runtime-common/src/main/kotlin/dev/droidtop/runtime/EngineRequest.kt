@@ -8,7 +8,8 @@ package dev.droidtop.runtime
  */
 sealed interface EngineRequest {
     /** `ps`: containers whose program or container is up; [all] lists every one, [quiet] only names. */
-    data class Ps(val all: Boolean, val quiet: Boolean) : EngineRequest
+    /** `ps`; [format] is `--format`'s template as given (`table`, `json`, or Go template fields), checked when read. */
+    data class Ps(val all: Boolean, val quiet: Boolean, val format: String? = null) : EngineRequest
 
     /** `images`: the images droidtop's store holds. */
     data class Images(val quiet: Boolean) : EngineRequest
@@ -53,6 +54,12 @@ sealed interface EngineRequest {
         val networks: List<NetworkJoin> = emptyList(),
         /** `--rm`, the Engine API's AutoRemove: the container is removed once its program has run and ended. */
         val autoRemove: Boolean = false,
+        /**
+         * False for a `run` without `-d`: the command front stays attached, printing the program's output as it comes
+         * and ending with its exit code, as Docker's and Podman's do. True for `-d` and for the APIs, whose clients
+         * attach on their own.
+         */
+        val detach: Boolean = true,
     ) : EngineRequest
 
     /** A network a new container joins, by its id, and the aliases it was given there. */

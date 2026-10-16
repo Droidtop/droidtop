@@ -223,7 +223,11 @@ internal object ContainerEnterRequests {
                 if (command.start && !made.hasProgram) {
                     notes += "${made.name}'s image names no program to run, so nothing was started; use ${cli.name} exec ${made.name} sh"
                 }
-                answer(dir, "${EngineIds.of(made.container.id)}\n", notes.joinToString("") { it + "\n" }, 0)
+                if (made.started && !command.detach) {
+                    attached(app, runtime, dir, made, notes, command.autoRemove)
+                } else {
+                    answer(dir, "${EngineIds.of(made.container.id)}\n", notes.joinToString("") { it + "\n" }, 0)
+                }
             }
             is EngineRequest.Remove -> {
                 val out = StringBuilder()
@@ -317,6 +321,94 @@ internal object ContainerEnterRequests {
      * Ends a request that will not run: the reason on its stderr, its stdout closed, and [code] as its status. Opening
      * a FIFO for writing waits for the helper's reader, which the helper opens before it waits.
      */
+    /**
+     * A `run` without `-d` (rig 2026-10-16: it printed only the id): the program's output as it comes, then its exit
+     * code, as Docker and Podman end an attached run. The program writes stdout and stderr together to its log
+     * ([ContainerProgram.command]), so both arrive on stdout here; stdin is not attached. With `--rm` the container is
+     * removed after the last of its output is read.
+     */
+    private suspend fun attached(
+        app: Context,
+        runtime: dev.droidtop.runtime.ContainerRuntime,
+        dir: File,
+        made: EngineActions.Made,
+        notes: List<String>,
+        autoRemove: Boolean,
+    ) = withContext(Dispatchers.IO) {
+        val id = made.container.id
+        val log = ContainerProgram.hostLogFile(app.filesDir, id)
+        runCatching { FileOutputStream(File(dir, "err")).use { it.write(notes.joinToString("") { n -> n + "\n" }.toByteArray()) } }
+        runCatching {
+            FileOutputStream(File(dir, "out")).use { out ->
+                val follow = LogFollower(log)
+                while (ContainerPrograms.isRunning(id)) {
+                    follow.copyTo(out)
+                    kotlinx.coroutines.delay(FOLLOW_MS)
+                }
+                follow.copyTo(out)
+                follow.finish(out)
+            }
+        }
+        val code = when (val state = ContainerPrograms.state(id)) {
+            is ContainerPrograms.State.Ended -> state.exitCode
+            is ContainerPrograms.State.Waiting -> state.lastExit
+            else -> 125
+        }
+        if (autoRemove) {
+            runCatching { runtime.listContainers() }.getOrNull()?.firstOrNull { it.container.id == id }
+                ?.let { EngineActions.remove(app, runtime, it, force = true) }
+        }
+        writeStatus(dir, code)
+    }
+
+    /** How often an attached run looks for more output. */
+    private const val FOLLOW_MS = 100L
+
+    /**
+     * Reads what a program's log gained since the last look, leaving out the line the program's wrapper writes before
+     * each start. Should the log be trimmed meanwhile ([ContainerProgram.trim]), reading goes on from its new end.
+     */
+    private class LogFollower(private val log: File) {
+        private var offset = 0L
+        private var pending = ByteArray(0)
+
+        fun copyTo(out: java.io.OutputStream) {
+            val length = log.length()
+            if (length < offset) offset = length
+            if (length == offset) return
+            val bytes = java.io.RandomAccessFile(log, "r").use { file ->
+                file.seek(offset)
+                ByteArray((length - offset).coerceAtMost(MAX_READ.toLong()).toInt()).also { file.readFully(it) }
+            }
+            offset += bytes.size
+            // Whole lines only, so the start marker is recognised wherever a read ends.
+            val text = pending + bytes
+            val cut = text.lastIndexOf('\n'.code.toByte()) + 1
+            pending = text.copyOfRange(cut, text.size)
+            write(out, String(text, 0, cut, Charsets.UTF_8).split('\n').dropLast(1))
+        }
+
+        /** The last line, when the program ended without a newline after it. */
+        fun finish(out: java.io.OutputStream) {
+            if (pending.isEmpty()) return
+            out.write(pending)
+            out.flush()
+            pending = ByteArray(0)
+        }
+
+        private fun write(out: java.io.OutputStream, lines: List<String>) {
+            val shown = lines.filterNot { it.startsWith(START_MARKER) }
+            if (shown.isEmpty()) return
+            out.write(shown.joinToString("") { it + "\n" }.toByteArray(Charsets.UTF_8))
+            out.flush()
+        }
+
+        companion object {
+            private const val MAX_READ = 1 shl 20
+            private const val START_MARKER = "--- started "
+        }
+    }
+
     private fun refuse(dir: File, message: String, code: Int) {
         Log.w(TAG, message)
         answer(dir, "", message + "\n", code)
