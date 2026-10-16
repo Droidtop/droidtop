@@ -306,6 +306,7 @@ class QuickTilesTest {
             GamingSettingsCatalog.ID_SYSTEM_DND,
             GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
             GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
+            GamingSettingsCatalog.ID_ORIENTATION_HERE,
             GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH,
             GamingSettingsCatalog.ID_SYSTEM_AIRPLANE,
             GamingSettingsCatalog.ID_SYSTEM_POWER_MENU,
