@@ -39,7 +39,7 @@ class ShelfWidgetService : RemoteViewsService() {
         }
 
         override fun getViewAt(position: Int): RemoteViews {
-            val cell = cells.getOrNull(position) ?: return loadingView
+            val cell = cells.getOrNull(position) ?: return blankCell
             val views = RemoteViews(context.packageName, R.layout.widget_shelf_cell)
             if (cell.art != null) views.setImageViewBitmap(R.id.widget_icon, cell.art) else views.setImageViewResource(R.id.widget_icon, R.mipmap.ic_launcher)
             views.setTextViewText(R.id.widget_title, cell.name)
@@ -57,7 +57,7 @@ class ShelfWidgetService : RemoteViewsService() {
             cells = emptyList()
         }
 
-        private val loadingView: RemoteViews get() = RemoteViews(context.packageName, R.layout.widget_shelf_cell)
+        private val blankCell: RemoteViews get() = RemoteViews(context.packageName, R.layout.widget_shelf_cell)
     }
 
     private companion object {
