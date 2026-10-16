@@ -208,12 +208,9 @@ class OnboardingActivity : AppCompatActivity() {
             persistent = firstRun && startStep == null,
         )
         setContent {
-            // Onboarding is dark, like the shell it hands over to. It used
-            // to follow the system setting, so a device in light mode got
-            // a white first run that dropped into an always-dark Gaming
-            // shell at the end of it (SPEC 7b).
+            // Onboarding follows the Appearance setting like every other screen, so a first run in light mode hands
+            // over to a light shell (SPEC 7b, 7k "Light and dark").
             dev.droidtop.app.ui.DroidtopTheme(
-                darkTheme = true,
                 // Entered from Gaming (a step re-opened from its Settings)
                 // the screens wear the Gaming theme; a first run is
                 // still choosing one.

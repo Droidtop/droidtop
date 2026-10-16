@@ -159,6 +159,17 @@ class GamingThemeMappingTest {
     }
 
     @Test
+    fun `droidtop's own palette has a light twin that is light, undeclared and readable`() {
+        val light = GamingThemeMapping.defaultFor(light = true)
+        assertTrue(light.isLight)
+        assertFalse(light.declared)
+        assertAccessible(light)
+        assertSame(GamingThemeColors.DEFAULT, GamingThemeMapping.defaultFor(light = false))
+        // A theme that declares nothing draws droidtop's own palette in the appearance asked for.
+        assertSame(light, GamingThemeMapping.map(null, light = true))
+    }
+
+    @Test
     fun `the first colour with chroma is the accent, and a neutral theme gets a neutral one`() {
         val coloured = theme(
             system = listOf(

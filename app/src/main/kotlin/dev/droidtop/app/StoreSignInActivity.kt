@@ -115,7 +115,7 @@ class StoreSignInActivity : AppCompatActivity() {
         account = session
         session.start()
         setContent {
-            DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 AccountSignIn(
                     label = store.label,
                     session = session,
@@ -131,7 +131,7 @@ class StoreSignInActivity : AppCompatActivity() {
 
     private fun showWebSignIn(store: StoreLibrary, signIn: StoreSignIn.WebPage) {
         setContent {
-            DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),

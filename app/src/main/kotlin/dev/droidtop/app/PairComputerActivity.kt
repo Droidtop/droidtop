@@ -68,7 +68,7 @@ class PairComputerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 // This screen has no Surface, whose job is to set the text colour: without it every Text is
                 // black, on the ground's black (Droidtop/tracker#527).
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {

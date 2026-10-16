@@ -27,7 +27,7 @@ class PluginGrantSheetActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         live = true
         setContent {
-            dev.droidtop.app.ui.DroidtopTheme(darkTheme = true, gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
+            dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 val pending by PluginGrantPrompts.pending.collectAsState()
                 val current = pending
                 if (current == null || isFinishing) {

@@ -1500,7 +1500,7 @@ private fun GamepadShellBody(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = shellWindow.edgePadding, bottom = 4.dp)
-                        .background(MenuTokens.Surface.copy(alpha = 0.58f), RoundedCornerShape(12.dp)),
+                        .background(MenuTokens.FloatingPlate, RoundedCornerShape(12.dp)),
                 )
             }
             // Over the themed canvas, at the place the theme itself laid
