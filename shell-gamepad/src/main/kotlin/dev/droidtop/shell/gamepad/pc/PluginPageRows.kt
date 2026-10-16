@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.input.PressWords
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -104,7 +105,7 @@ internal fun rememberPluginPageRows(entry: LibraryEntry): PluginPageRows {
                     add(
                         PageFact(
                             title = row.title,
-                            value = if (armed == key) row.confirm ?: "Press A again" else status[key] ?: row.value,
+                            value = if (armed == key) row.confirm ?: PressWords.againSentence else status[key] ?: row.value,
                             subtitle = row.subtitle,
                             onActivate = onActivate,
                             tip = from,

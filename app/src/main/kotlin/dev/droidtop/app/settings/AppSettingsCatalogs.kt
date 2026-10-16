@@ -2214,7 +2214,7 @@ object AppSettingsCatalogs {
             return AsyncActionItem(
                 id = "plugins_${need.runtime.lowercase()}_runtime_download",
                 title = need.actionLabel,
-                subtitle = "Press A to download; $forPluginLabel needs it",
+                subtitle = "$forPluginLabel needs it",
                 run = { ctx, onStatus -> PluginRuntimeNeeds.install(ctx, need, onStatus) ?: "${need.runtime} runtime installed" },
             )
         }

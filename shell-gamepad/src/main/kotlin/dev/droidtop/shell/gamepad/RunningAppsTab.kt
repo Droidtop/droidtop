@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.PressWords
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -97,7 +98,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
                             val targets = TaskManager.clearAllTargets(context)
                             if (TaskPolicy.needsClearAllConfirm(targets.size) && !clearAllArmed) {
                                 clearAllArmed = true
-                                message = "Press A again: close ${targets.size}"
+                                message = "${PressWords.againSentence}: close ${targets.size}"
                             } else {
                                 clearAllArmed = false
                                 message = "Closing…"
