@@ -50,7 +50,7 @@ class EngineCliTest {
         assertTrue(answer(listOf("compose", "up")).text.contains("not built in droidtop yet"))
         assertTrue(answer(listOf("build", ".")).text.contains("do not have this"))
         assertTrue(answer(listOf("frobnicate")).text.contains("not a docker command"))
-        assertEquals(1, answer(listOf("ps", "--format", "{{.ID}}")).code)
+        assertEquals(1, answer(listOf("ps", "--format", "{{.Nope}}")).code)
         assertEquals(1, answer(listOf("logs", "-f", "gitea")).code)
         assertEquals(1, answer(listOf("logs", "-n", "x", "gitea")).code)
         assertEquals(1, answer(listOf("logs")).code)
@@ -85,6 +85,19 @@ class EngineCliTest {
         assertEquals("droidtop-sibling-1a2b\ndroidtop-sibling-9f00\n", EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(all = true, quiet = true), now))
         // A container made before droidtop kept the time has no CREATED.
         assertTrue(EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(all = true, quiet = false), now).lines()[2].contains("\"\"   "))
+        // --format: Go template fields, a table with its header, and json (rig 2026-10-16).
+        assertEquals("gitea\tUp\n", EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(false, false, "{{.Names}}\\t{{.Status}}"), now))
+        assertEquals(
+            "NAMES   STATE\ngitea   running\narch    created\n",
+            EngineCli.DOCKER.formatPs(rows.map { if (it.up) it else it.copy(status = "Created") }, EngineRequest.Ps(true, false, "table {{.Names}}\\t{{.State}}"), now),
+        )
+        val json = EngineCli.DOCKER.formatPs(rows, EngineRequest.Ps(false, false, "json"), now)
+        assertTrue(json.startsWith("{\"ID\":\"droidtop-sibling-1a2b\",\"Image\":\"gitea/gitea:1.22\""))
+        assertTrue(json.contains("\"RunningFor\":\"5 minutes ago\""))
+        assertEquals(EngineRequest.Ps(true, false, "{{.ID}}"), EngineCli.DOCKER.parse(listOf("ps", "-a", "--format", "{{.ID}}")))
+        assertEquals(EngineRequest.Ps(false, false, "json"), EngineCli.DOCKER.parse(listOf("ps", "--format=json")))
+        assertTrue((EngineCli.DOCKER.parse(listOf("ps", "--format", "{{.Nope}}")) as EngineRequest.Answer).text.contains("no field .Nope"))
+        assertTrue((EngineCli.DOCKER.parse(listOf("ps", "--format", "{{json .Labels}}")) as EngineRequest.Answer).text.contains("not built"))
         assertEquals("About a minute ago", EngineCli.DOCKER.ago(90_000))
         assertEquals("3 days ago", EngineCli.DOCKER.ago(3 * 86_400_000L))
 
@@ -134,8 +147,10 @@ class EngineCliTest {
         assertEquals(1, answer(listOf("pull", "../../etc")).code)
 
         assertEquals(EngineRequest.Run("gitea/gitea:1.22", "git"), EngineCli.DOCKER.parse(listOf("run", "-d", "--name", "git", "gitea/gitea:1.22")))
-        assertEquals(EngineRequest.Run("redis", "cache"), EngineCli.DOCKER.parse(listOf("run", "-it", "--name=cache", "redis")))
-        assertEquals(EngineRequest.Run("redis", null), EngineCli.DOCKER.parse(listOf("run", "redis")))
+        assertEquals(EngineRequest.Run("redis", "cache", detach = false), EngineCli.DOCKER.parse(listOf("run", "-it", "--name=cache", "redis")))
+        assertEquals(EngineRequest.Run("redis", null, detach = false), EngineCli.DOCKER.parse(listOf("run", "redis")))
+        // -d in any of its spellings detaches; without it the front stays attached.
+        assertEquals(true, (EngineCli.DOCKER.parse(listOf("run", "-dit", "redis")) as EngineRequest.Run).detach)
         // Known flags droidtop has not built say so; a command after the image is refused, not ignored.
         assertTrue(answer(listOf("run", "-p", "8080:80", "nginx")).text.contains("-p is not built in droidtop yet"))
         assertTrue(answer(listOf("run", "--entrypoint=sh", "nginx")).text.contains("not built in droidtop yet"))
@@ -152,7 +167,7 @@ class EngineCliTest {
     fun `run takes a command, environment and folders the person mapped, never a host path`() {
         val mounts = ContainerLayout.EXTRA_MOUNTS_DIR
         assertEquals(
-            EngineRequest.Run("alpine", "box", listOf("sh", "-c", "echo hi"), listOf("A=1", "B="), listOf("Music", "Saves")),
+            EngineRequest.Run("alpine", "box", listOf("sh", "-c", "echo hi"), listOf("A=1", "B="), listOf("Music", "Saves"), detach = false),
             EngineCli.DOCKER.parse(listOf("run", "--name", "box", "-e", "A=1", "--env=B=", "-v", "Music", "--volume=Saves:$mounts/Saves:ro", "alpine", "sh", "-c", "echo hi")),
         )
         // Flags after the image belong to its command.
@@ -172,8 +187,8 @@ class EngineCliTest {
         assertTrue(memory.text.contains("--memory needs cgroups, which this device's kernel does not have"))
         assertTrue((EngineCli.DOCKER.parse(listOf("run", "--cpus=2", "alpine"), none) as EngineRequest.Answer).text.contains("cgroups"))
         // What the containers already are is taken as given.
-        assertEquals(EngineRequest.Run("alpine", null), EngineCli.DOCKER.parse(listOf("run", "--network", "host", "alpine"), none))
-        assertEquals(EngineRequest.Run("alpine", null), EngineCli.DOCKER.parse(listOf("run", "--pid=host", "alpine"), none))
+        assertEquals(EngineRequest.Run("alpine", null, detach = false), EngineCli.DOCKER.parse(listOf("run", "--network", "host", "alpine"), none))
+        assertEquals(EngineRequest.Run("alpine", null, detach = false), EngineCli.DOCKER.parse(listOf("run", "--pid=host", "alpine"), none))
         assertEquals(EngineRequest.Info, EngineCli.DOCKER.parse(listOf("info")))
         assertEquals(1, answer(listOf("info", "-f", "x")).code)
         val info = EngineCli.DOCKER.formatInfo(none, null)

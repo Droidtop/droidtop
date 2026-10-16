@@ -45,10 +45,24 @@ internal object EngineApiServer {
     private const val MAX_CONNECTIONS = 16
     private const val IDLE_MS = 60_000
     private const val WAIT_LOOK_MS = 250L
+    private const val RELISTEN_MS = 1_000L
 
     private val SOCKETS = listOf(DockerApi.SOCKET_NAME, LibpodApi.SOCKET_NAME)
 
-    @Volatile private var servers: List<LocalServerSocket> = emptyList()
+    /**
+     * Each socket being listened on, with the [LocalSocket] that bound its file. The bound socket is held for as long
+     * as the server: [LocalServerSocket] shares its descriptor, and a LocalSocket left unreferenced is finalized,
+     * which closes that descriptor under the server. That is how the API answered one ping on the RP5 and then
+     * refused every connection (rig 2026-10-16, droidtop 0.2.0-dev.1964).
+     */
+    private class Listening(val bound: LocalSocket, val server: LocalServerSocket) {
+        fun close() {
+            runCatching { server.close() }
+            runCatching { bound.close() }
+        }
+    }
+
+    @Volatile private var servers: List<Listening> = emptyList()
     @Volatile private var stopping = false
     private var job: Job? = null
     private val open = AtomicInteger(0)
@@ -64,18 +78,31 @@ internal object EngineApiServer {
         }
     }
 
+    /**
+     * Listens on [file] until the session stops. Should accepting fail for any other reason, the socket is bound again
+     * after [RELISTEN_MS], so the API never goes quiet while the desktop runs.
+     */
     private suspend fun listen(app: Context, file: File): Unit = coroutineScope {
+        while (isActive && !stopping) {
+            listenOnce(app, file)
+            if (!stopping) kotlinx.coroutines.delay(RELISTEN_MS)
+        }
+    }
+
+    private suspend fun listenOnce(app: Context, file: File): Unit = coroutineScope {
         val listening = runCatching {
             // A socket file left by an earlier session is stale: one file, removed before binding.
             file.delete()
             val bound = LocalSocket(LocalSocket.SOCKET_STREAM)
             bound.bind(LocalSocketAddress(file.absolutePath, LocalSocketAddress.Namespace.FILESYSTEM))
-            LocalServerSocket(bound.fileDescriptor)
+            Listening(bound, LocalServerSocket(bound.fileDescriptor))
         }.onFailure { Log.w(TAG, "Could not listen on ${file.path}", it) }.getOrNull() ?: return@coroutineScope
         synchronized(this@EngineApiServer) { servers = servers + listening }
         Log.i(TAG, "Listening on ${file.path}")
         while (isActive && !stopping) {
-            val connection = runCatching { listening.accept() }.getOrNull() ?: break
+            val connection = runCatching { listening.server.accept() }
+                .onFailure { if (!stopping) Log.w(TAG, "Accepting on ${file.path} failed; listening again", it) }
+                .getOrNull() ?: break
             if (stopping) {
                 runCatching { connection.close() }
                 break
@@ -94,7 +121,8 @@ internal object EngineApiServer {
             }
         }
         // Closed here too: a stop that came before this socket was listed only woke it.
-        runCatching { listening.close() }
+        synchronized(this@EngineApiServer) { servers = servers - listening }
+        listening.close()
     }
 
     /**
@@ -115,7 +143,7 @@ internal object EngineApiServer {
                     LocalSocket(LocalSocket.SOCKET_STREAM).use { it.connect(LocalSocketAddress(file.absolutePath, LocalSocketAddress.Namespace.FILESYSTEM)) }
                 }
             }
-            listening.forEach { runCatching { it.close() } }
+            listening.forEach { it.close() }
             SOCKETS.forEach { File(app.filesDir, it).delete() }
         }
     }

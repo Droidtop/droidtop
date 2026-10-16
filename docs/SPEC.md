@@ -2524,6 +2524,18 @@ the `ContainerRuntime` interface that already exists (§3):
   API's and libpod's image lists and inspects give too. A container's CREATED is the time droidtop made the
   container (`ContainerPrograms.recordCreated`, from every place droidtop creates one: `run` and the two Create rows
   in Containers); a container made before this has an empty CREATED rather than a guessed one.
+  **`ps --format` (built 2026-10-16; the rig's first run found it missing).** Go template fields as both tools name
+  them (`{{.ID}}`, `.Image`, `.Command`, `.CreatedAt`, `.RunningFor`, `.Ports`, `.State`, `.Status`, `.Names`;
+  `.Labels`, `.Mounts`, `.Networks` and `.Size` are empty, droidtop not keeping them), `\t` and `\n` as a tab and a new
+  line, `table` before a template for a header row and aligned columns, `table` alone for the usual table, and
+  `json` for one object a line. A template naming another field, or a function (`{{json .Labels}}`), is refused when
+  read, not printed half (`EngineCli.psTemplateProblem`). `-q` wins over `--format`, as in Docker.
+  **An attached `run` (built 2026-10-16; the rig's first run printed only the id).** `run` without `-d` stays
+  attached, as both tools do: it prints the program's output as it comes and ends with the program's exit code
+  (`ContainerEnterRequests.attached`, following the program's log). The program writes stdout and stderr together to
+  its log, so both arrive on stdout; stdin is not attached (`-i` and `-t` are accepted and change nothing). With
+  `--rm` the front removes the container after the last of its output is read; a detached `run --rm` is removed when
+  its program ends, as before. `-d` prints the id as before; the APIs' clients attach on their own.
   **inspect, create, restart and -p (built 2026-10-16, Droidtop/tracker#555 D13), on both fronts.** `create` reads
   what `run` reads and makes the container without starting its program. `run` and `create` print the new
   container's id, as both tools do (`run` printed its name). `restart` stops a container's program and starts it
@@ -2547,7 +2559,10 @@ the `ContainerRuntime` interface that already exists (§3):
   droidtop's wrapper on the `PATH`, so installing one is all it takes. It is on demand: droidtop holds only the
   listening socket while the desktop runs (`EngineApiServer`, started and stopped with the desktop session) and
   serves each connection off the main thread; nothing runs inside a container for it, and with the desktop down
-  nothing listens, which to a client is the same as no daemon. The HTTP is `EngineHttp`: one request at a time on a
+  nothing listens, which to a client is the same as no daemon. The listening socket is bound through a `LocalSocket`
+  that is held for as long as the server: left unreferenced it was finalized, which closed the descriptor the
+  `LocalServerSocket` shares, so the API answered one ping and then refused every connection (rig 2026-10-16, RP5).
+  Should accepting fail anyway, the socket is bound again a second later. The HTTP is `EngineHttp`: one request at a time on a
   kept-alive connection, bodies by Content-Length or chunks, at most 64 KB of headers and 1 MB of body (413
   beyond), a connection idle for a minute closed, at most 16 served at once. Routes (`DockerApi.route`, with or
   without the `/vX.Y` prefix): `_ping`, `version` (Docker 24.0, the release whose API is v1.43, on a platform

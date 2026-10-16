@@ -66,8 +66,7 @@ class EngineCli private constructor(val front: Front) {
         val rest = args.drop(1)
         return when (sub) {
             "-h", "--help", "help" -> EngineRequest.Answer(usage, 0)
-            "ps" -> flags(rest, setOf("-a", "--all", "-q", "--quiet", "-aq", "-qa"))?.let { bad -> error("ps", bad) }
-                ?: EngineRequest.Ps(all = rest.any { it in setOf("-a", "--all", "-aq", "-qa") }, quiet = rest.any { it in setOf("-q", "--quiet", "-aq", "-qa") })
+            "ps" -> ps(rest)
             "images" -> flags(rest, setOf("-q", "--quiet"))?.let { bad -> error("images", bad) }
                 ?: EngineRequest.Images(quiet = rest.isNotEmpty())
             "logs" -> logs(rest)
@@ -102,6 +101,29 @@ class EngineCli private constructor(val front: Front) {
         if (arg.startsWith("-")) "${front.command} $sub: unknown flag: $arg\n" else "${front.command} $sub: unexpected argument: $arg\n",
         1,
     )
+
+    /** `ps [-a] [-q] [--format TEMPLATE]`; a template naming what droidtop cannot fill is refused here, not printed half. */
+    private fun ps(args: List<String>): EngineRequest {
+        var all = false
+        var quiet = false
+        var format: String? = null
+        var i = 0
+        while (i < args.size) {
+            when (val a = args[i]) {
+                "-a", "--all" -> all = true
+                "-q", "--quiet" -> quiet = true
+                "-aq", "-qa" -> {
+                    all = true
+                    quiet = true
+                }
+                "--format" -> format = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} ps: --format needs a template\n", 1)
+                else -> if (a.startsWith("--format=")) format = a.substringAfter('=') else return error("ps", a)
+            }
+            i++
+        }
+        format?.let { template -> psTemplateProblem(template)?.let { return EngineRequest.Answer("${front.command} ps: $it\n", 1) } }
+        return EngineRequest.Ps(all, quiet, format)
+    }
 
     private fun logs(args: List<String>): EngineRequest {
         var tail = DEFAULT_TAIL
@@ -226,11 +248,13 @@ class EngineCli private constructor(val front: Front) {
         var restart: ContainerProgram.RestartPolicy = ContainerProgram.RestartPolicy.No
         var pod: String? = null
         var autoRemove = false
+        var detach = false
         val labels = linkedMapOf<String, String>()
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
-                "-d", "--detach", "-i", "-t", "-it", "-ti", "-dit", "-itd" -> Unit
+                "-d", "--detach", "-dit", "-itd", "-dt", "-td", "-di", "-id" -> detach = true
+                "-i", "-t", "-it", "-ti", "--interactive", "--tty" -> Unit
                 "--name" -> name = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: --name needs a name\n", 1)
                 "-e", "--env" -> {
                     val kv = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs NAME=VALUE\n", 1)
@@ -315,6 +339,8 @@ class EngineCli private constructor(val front: Front) {
         return EngineRequest.Run(
             image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish,
             start = sub == "run", labels = labels, autoRemove = autoRemove,
+            // `create` starts nothing to attach to.
+            detach = detach || sub != "run",
         )
     }
 
@@ -439,6 +465,8 @@ class EngineCli private constructor(val front: Front) {
     fun formatPs(rows: List<PsRow>, command: EngineRequest.Ps, nowMs: Long = System.currentTimeMillis()): String {
         val shown = if (command.all) rows else rows.filter { it.up }
         if (command.quiet) return shown.joinToString("") { it.id + "\n" }
+        val format = command.format?.trim()?.takeIf { it.isNotEmpty() && it != "table" }
+        if (format != null) return formatPsTemplate(shown, format, nowMs)
         return table(
             listOf("CONTAINER ID", "IMAGE", "COMMAND", "CREATED", "STATUS", "PORTS", "NAMES"),
             shown.map {
@@ -454,6 +482,59 @@ class EngineCli private constructor(val front: Front) {
             },
         )
     }
+
+    /**
+     * `ps --format` (rig 2026-10-16: not built). `json` prints each container as one JSON object a line; `table` before a
+     * template prints a header row and aligns the tab-separated columns; any other template is filled once a container.
+     * The fields are Go template fields, `{{.Names}}`, as both tools name them, and `\t` and `\n` are a tab and a new
+     * line, as the tools read them. A field droidtop does not keep (labels, mounts, networks, size) is empty.
+     */
+    internal fun formatPsTemplate(rows: List<PsRow>, format: String, nowMs: Long): String {
+        if (format == "json") {
+            return rows.joinToString("") { row ->
+                kotlinx.serialization.json.buildJsonObject {
+                    PS_FIELDS.keys.forEach { field -> put(field, kotlinx.serialization.json.JsonPrimitive(psField(row, field, nowMs))) }
+                }.toString() + "\n"
+            }
+        }
+        val isTable = format.startsWith("table ")
+        val template = (if (isTable) format.removePrefix("table ") else format).replace("\\t", "\t").replace("\\n", "\n")
+        fun fill(value: (String) -> String) = PS_TEMPLATE_FIELD.replace(template) { value(it.groupValues[1]) }
+        val lines = rows.map { row -> fill { psField(row, it, nowMs) } }
+        if (!isTable) return lines.joinToString("") { it + "\n" }
+        val header = fill { PS_FIELDS[it].orEmpty() }
+        return table(header.split('\t'), lines.map { line -> line.split('\t').let { cells -> header.split('\t').indices.map { cells.getOrElse(it) { "" } } } })
+    }
+
+    /** What is wrong with a `--format` template droidtop cannot fill, or null when it can. */
+    internal fun psTemplateProblem(format: String): String? {
+        val body = format.trim().let { if (it == "json" || it == "table") return null else it.removePrefix("table ") }
+        val actions = Regex("""\{\{(.*?)\}\}""").findAll(body).map { it.groupValues[1].trim() }.toList()
+        actions.forEach { action ->
+            val field = Regex("""^\.([A-Za-z]+)$""").find(action)?.groupValues?.get(1)
+                ?: return "--format: {{$action}} is not built in droidtop yet; it fills fields such as {{.Names}}"
+            if (field !in PS_FIELDS) return "--format: there is no field .$field; the fields are ${PS_FIELDS.keys.joinToString(", ") { ".$it" }}"
+        }
+        return null
+    }
+
+    private fun psField(row: PsRow, field: String, nowMs: Long): String = when (field) {
+        "ID" -> row.id
+        "Image" -> if (front == Front.DOCKER) shortImage(row.image) else fullImage(row.image)
+        "Command" -> commandColumn(row.command)
+        "CreatedAt" -> row.createdMs?.let { createdAt(it) }.orEmpty()
+        "RunningFor" -> row.createdMs?.let { ago(nowMs - it) }.orEmpty()
+        "Ports" -> row.ports.joinToString(", ")
+        "State" -> if (row.up) "running" else if (row.status.startsWith("Created")) "created" else "exited"
+        "Status" -> row.status
+        "Names" -> row.name
+        else -> ""
+    }
+
+    /** When a container was made, as Docker's CreatedAt prints it: "2026-10-16 13:04:49 +0000 UTC". */
+    private fun createdAt(ms: Long): String =
+        java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", java.util.Locale.ROOT)
+            .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }.format(java.util.Date(ms)) + " UTC"
 
     /** The COMMAND column: Docker's quoted and cut at 20 with an ellipsis, Podman's bare and cut with three dots. */
     internal fun commandColumn(argv: List<String>): String {
@@ -579,6 +660,14 @@ class EngineCli private constructor(val front: Front) {
     }
 
     companion object {
+        /** `ps --format`'s fields, with the column each heads under `table`, as Docker names them. */
+        private val PS_FIELDS = linkedMapOf(
+            "ID" to "CONTAINER ID", "Image" to "IMAGE", "Command" to "COMMAND", "CreatedAt" to "CREATED AT",
+            "RunningFor" to "CREATED", "Ports" to "PORTS", "State" to "STATE", "Status" to "STATUS", "Names" to "NAMES",
+            "Labels" to "LABELS", "Mounts" to "MOUNTS", "Networks" to "NETWORKS", "Size" to "SIZE",
+        )
+        private val PS_TEMPLATE_FIELD = Regex("""\{\{\s*\.([A-Za-z]+)\s*\}\}""")
+
         /** The COMMAND column's width, as Docker cuts it. */
         private const val COMMAND_WIDTH = 20
 
