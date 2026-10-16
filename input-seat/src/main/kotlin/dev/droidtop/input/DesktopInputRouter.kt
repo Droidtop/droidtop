@@ -61,14 +61,11 @@ class DesktopInputRouter {
     private val heldButtons = mutableSetOf<Int>()
 
     /**
-     * Keys currently held down under the Shift [onKeyEvent] synthesized for
-     * them. Shift is released when the last of them is released, not with
-     * the first, so two overlapping shifted keystrokes share one press.
+     * For each modifier this router pressed itself ([Modifier.press], its evdev code), the keys held down under it.
+     * The modifier is released when the last of them is, not with the first, so two overlapping keystrokes share one
+     * press. A modifier is in the map exactly while its synthesized press is down at the container.
      */
-    private val shiftDependents = mutableSetOf<Int>()
-
-    /** True while a Shift press this router sent is still down at the container. */
-    private var synthesizedShiftDown = false
+    private val synthesized = linkedMapOf<Int, MutableSet<Int>>()
 
     private var stickX = 0f
     private var stickY = 0f
@@ -107,8 +104,7 @@ class DesktopInputRouter {
         }
         heldButtons.clear()
         heldKeys.clear()
-        shiftDependents.clear()
-        synthesizedShiftDown = false
+        synthesized.clear()
         touchButtonDown = false
         touchScrolling = false
         lastMouseButtonState = 0
@@ -381,7 +377,7 @@ class DesktopInputRouter {
                 // repeat rate and delay. Forwarding Android's repeats as
                 // fresh presses would stack a second repeat on top of it.
                 if (repeatCount == 0) {
-                    synthesizeShiftDown(seat, evdev, metaState, typed)
+                    synthesizeModifiersDown(seat, evdev, metaState, typed)
                     heldKeys[evdev] = typed
                     seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = true, typed = typed)
                 }
@@ -391,7 +387,7 @@ class DesktopInputRouter {
                 // Released through the keyboard it was pressed on, whatever this event says.
                 val pressedTyped = heldKeys.remove(evdev) ?: typed
                 seat.onKey(InputSource.LAPDOCK_PERIPHERAL, evdev, down = false, typed = pressedTyped)
-                releaseSynthesizedShift(seat, evdev)
+                releaseSynthesizedModifiers(seat, evdev)
             }
 
             else -> return false
@@ -414,48 +410,56 @@ class DesktopInputRouter {
     }
 
     /**
-     * Shift can arrive with no press for the compositor to latch: Android
-     * carries it in the meta state of the character key itself, which is
-     * all an IME-synthesized keystroke has, and a hardware keyboard whose
-     * Shift press predates this surface's focus never delivered one either.
-     * Both reached the container unshifted — '!' as '1', capitals as
-     * lowercase (Droidtop/tracker#147) — so when the meta state says Shift
-     * is part of the keystroke and the container does not already see a
-     * Shift, one is sent around the key. The container sees it as Shift
-     * because host-bridge follows every modifier key with the keyboard's
-     * modifier state (KeyboardModifiers; docs/SPEC.md 6b "Modifiers").
+     * A modifier can arrive with no press for the compositor to latch: Android carries it in the meta state of the key
+     * itself, which is all an IME-synthesized keystroke has (and `adb shell input keycombination` sends), and a hardware
+     * keyboard whose modifier press predates this surface's focus never delivered one either. Shift was handled so
+     * first ('!' reached the container as '1', capitals as lowercase, Droidtop/tracker#147); Ctrl, Alt and Meta went
+     * unpressed, so Ctrl+minus reached foot as a bare minus (rig 2026-10-16). Now, for every modifier the meta state
+     * says is part of the keystroke and the container does not already see held, one is pressed around the key. The
+     * container sees it because host-bridge follows every modifier key with the keyboard's modifier state
+     * (KeyboardModifiers; docs/SPEC.md 6b "Modifiers").
      *
-     * Shift's own events are exempt (a Shift press carries META_SHIFT_ON
-     * too) and so is a Shift already down, whether the user's press was
-     * forwarded or this synthesis is still serving a held key. Caps lock
-     * is deliberately not read as shift: the Caps Lock key is forwarded
-     * like any other and toggles the container's own caps state, which a
-     * synthesized Shift on top of it would cancel.
+     * A modifier's own events are exempt (a Ctrl press carries META_CTRL_ON too), and so is a modifier already down,
+     * whether the person's press was forwarded or this synthesis is still serving a held key. Caps lock is
+     * deliberately not read as Shift: the Caps Lock key is forwarded like any other and toggles the container's own
+     * caps state, which a synthesized Shift on top of it would cancel.
      */
-    private fun synthesizeShiftDown(seat: InputSeat, evdev: Int, metaState: Int, typed: Boolean) {
-        if (evdev == EvdevKeys.SHIFT_LEFT || evdev == EvdevKeys.SHIFT_RIGHT) return
-        val shiftBits =
-            KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_RIGHT_ON
-        if (metaState and shiftBits == 0) return
-        if (synthesizedShiftDown) {
-            // Chording under a Shift we are already holding down.
-            shiftDependents += evdev
-            return
+    private fun synthesizeModifiersDown(seat: InputSeat, evdev: Int, metaState: Int, typed: Boolean) {
+        for (modifier in Modifier.ALL) {
+            if (evdev in modifier.keys) continue
+            if (metaState and modifier.bits == 0) continue
+            synthesized[modifier.press]?.let {
+                // Chording under a modifier we are already holding down.
+                it += evdev
+                continue
+            }
+            if (modifier.keys.any { it in heldKeys }) continue
+            synthesized[modifier.press] = mutableSetOf(evdev)
+            heldKeys[modifier.press] = typed
+            seat.onKey(InputSource.LAPDOCK_PERIPHERAL, modifier.press, down = true, typed = typed)
         }
-        if (EvdevKeys.SHIFT_LEFT in heldKeys || EvdevKeys.SHIFT_RIGHT in heldKeys) return
-        synthesizedShiftDown = true
-        shiftDependents += evdev
-        heldKeys[EvdevKeys.SHIFT_LEFT] = typed
-        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = true, typed = typed)
     }
 
-    /** Takes the synthesized Shift away again once every key it was sent for is up. */
-    private fun releaseSynthesizedShift(seat: InputSeat, evdev: Int) {
-        if (!shiftDependents.remove(evdev)) return
-        if (shiftDependents.isNotEmpty() || !synthesizedShiftDown) return
-        synthesizedShiftDown = false
-        val shiftTyped = heldKeys.remove(EvdevKeys.SHIFT_LEFT) ?: false
-        seat.onKey(InputSource.LAPDOCK_PERIPHERAL, EvdevKeys.SHIFT_LEFT, down = false, typed = shiftTyped)
+    /** Takes each synthesized modifier away again once every key it was pressed for is up. */
+    private fun releaseSynthesizedModifiers(seat: InputSeat, evdev: Int) {
+        val done = synthesized.filter { (_, dependents) -> dependents.remove(evdev) && dependents.isEmpty() }.keys.toList()
+        for (press in done) {
+            synthesized.remove(press)
+            val pressTyped = heldKeys.remove(press) ?: false
+            seat.onKey(InputSource.LAPDOCK_PERIPHERAL, press, down = false, typed = pressTyped)
+        }
+    }
+
+    /** A modifier as the meta state carries it ([bits]), its two keys, and the one this router presses for it. */
+    private class Modifier(val bits: Int, val keys: Set<Int>, val press: Int) {
+        companion object {
+            val ALL = listOf(
+                Modifier(KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON or KeyEvent.META_SHIFT_RIGHT_ON, setOf(EvdevKeys.SHIFT_LEFT, EvdevKeys.SHIFT_RIGHT), EvdevKeys.SHIFT_LEFT),
+                Modifier(KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON or KeyEvent.META_CTRL_RIGHT_ON, setOf(EvdevKeys.CTRL_LEFT, EvdevKeys.CTRL_RIGHT), EvdevKeys.CTRL_LEFT),
+                Modifier(KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON or KeyEvent.META_ALT_RIGHT_ON, setOf(EvdevKeys.ALT_LEFT, EvdevKeys.ALT_RIGHT), EvdevKeys.ALT_LEFT),
+                Modifier(KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON or KeyEvent.META_META_RIGHT_ON, setOf(EvdevKeys.META_LEFT, EvdevKeys.META_RIGHT), EvdevKeys.META_LEFT),
+            )
+        }
     }
 
     private fun pressButton(seat: InputSeat, source: InputSource, button: Int) {

@@ -37,6 +37,12 @@ object EvdevKeys {
     // place that speaks them: DesktopInputRouter's Shift synthesis.
     const val SHIFT_LEFT = 42
     const val SHIFT_RIGHT = 54
+    const val CTRL_LEFT = 29
+    const val CTRL_RIGHT = 97
+    const val ALT_LEFT = 56
+    const val ALT_RIGHT = 100
+    const val META_LEFT = 125
+    const val META_RIGHT = 126
 
     /**
      * The Android [KeyEvent] keycode -> evdev KEY_* table. Absent means
@@ -77,7 +83,7 @@ object EvdevKeys {
         put(KeyEvent.KEYCODE_LEFT_BRACKET, 26)
         put(KeyEvent.KEYCODE_RIGHT_BRACKET, 27)
         put(KeyEvent.KEYCODE_ENTER, 28)
-        put(KeyEvent.KEYCODE_CTRL_LEFT, 29)
+        put(KeyEvent.KEYCODE_CTRL_LEFT, CTRL_LEFT)
 
         put(KeyEvent.KEYCODE_A, 30)
         put(KeyEvent.KEYCODE_S, 31)
@@ -106,7 +112,7 @@ object EvdevKeys {
         put(KeyEvent.KEYCODE_SLASH, 53)
         put(KeyEvent.KEYCODE_SHIFT_RIGHT, SHIFT_RIGHT)
         put(KeyEvent.KEYCODE_NUMPAD_MULTIPLY, 55)
-        put(KeyEvent.KEYCODE_ALT_LEFT, 56)
+        put(KeyEvent.KEYCODE_ALT_LEFT, ALT_LEFT)
         put(KeyEvent.KEYCODE_SPACE, 57)
         put(KeyEvent.KEYCODE_CAPS_LOCK, 58)
 
@@ -141,10 +147,10 @@ object EvdevKeys {
         put(KeyEvent.KEYCODE_F12, 88)
 
         put(KeyEvent.KEYCODE_NUMPAD_ENTER, 96)
-        put(KeyEvent.KEYCODE_CTRL_RIGHT, 97)
+        put(KeyEvent.KEYCODE_CTRL_RIGHT, CTRL_RIGHT)
         put(KeyEvent.KEYCODE_NUMPAD_DIVIDE, 98)
         put(KeyEvent.KEYCODE_SYSRQ, 99)
-        put(KeyEvent.KEYCODE_ALT_RIGHT, 100)
+        put(KeyEvent.KEYCODE_ALT_RIGHT, ALT_RIGHT)
 
         put(KeyEvent.KEYCODE_MOVE_HOME, 102)
         put(KeyEvent.KEYCODE_DPAD_UP, 103)
@@ -161,8 +167,8 @@ object EvdevKeys {
         put(KeyEvent.KEYCODE_BREAK, 119)
         put(KeyEvent.KEYCODE_NUMPAD_COMMA, 121)
 
-        put(KeyEvent.KEYCODE_META_LEFT, 125)
-        put(KeyEvent.KEYCODE_META_RIGHT, 126)
+        put(KeyEvent.KEYCODE_META_LEFT, META_LEFT)
+        put(KeyEvent.KEYCODE_META_RIGHT, META_RIGHT)
         put(KeyEvent.KEYCODE_MENU, 127) // KEY_COMPOSE — the pc105 "menu" key
     }
 
