@@ -8688,8 +8688,11 @@ menu_displaylist.c and msg_hash_us.h). The rows and the manual steps read the sa
   is where it is handed over. It happens from the BIOS row's **Use droidtop's BIOS files** (shown when droidtop has
   any of the missing files) and before every launch through a preset whose setup names a BIOS folder droidtop can
   look in: copying a file droidtop already has into the emulator's own BIOS folder is not asking for file access
-  (the rule below stays), and nothing is asked. A file still missing after that is named, with the folder, in the
-  launch watchdog's sentence for that launch (`biosMissingSentence`) and in the BIOS row. A row's `setup.biosFlat`
+  (the rule below stays), and nothing is asked. The BIOS row lists what the folder
+  lacks. The launch watchdog's sentence for that launch (`biosMissingSentence`) names the files and the folder only
+  when the folder holds none of the system's files after the copy (`BiosSync.none`): the database lists alternatives
+  and optional files (several PlayStation revisions, the DSi files beside the DS ones), and a folder with one of them
+  is not missing its BIOS. A row's `setup.biosFlat`
   says the emulator reads BIOS files from the top of its folder under any name (the PCSX2 family: NetherSX2 and
   AetherSX2 scan one level), so a file goes there under the database's base name, not its `ps2/` subfolder; the
   "Add a BIOS file" and plugin rows use the same target (`EmulatorSetup.biosTarget`). Without a `setup` for the
