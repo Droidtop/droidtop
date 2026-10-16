@@ -5123,7 +5123,13 @@ companion trackpad's pointer, `canPerformGestures`, see "Input (slice C12)"), wh
     the slab's Done is pressed, or the request ends any other way. The tab the person chose is never
     overwritten or switched (Droidtop/tracker#369); changing tab keeps the keyboard, and on the Input
     tab, which types into the request itself, no second keyboard docks. It used to switch the strip to
-    the Input tab for the request (until 2026-10-16). A Hide holds only
+    the Input tab for the request (until 2026-10-16).
+    The pad on the screen with the field drives the docked slab while it shows: every droidtop window's
+    pad keys pass `PadGate`, which hands a gamepad button or a pad's D-pad to the slab first
+    (`KeyboardTargets.routePad`, the slab registered as `companionPad`), so the cursor moves on the
+    companion's slab and A, X, Y, L1, R1, R2 and B do their keycaps' jobs there; a hardware keyboard's
+    keys still go to the field. A field in another app's window (droidtop as the system keyboard) is
+    typed on the slab by touch; its pad keys go to that app. A Hide holds only
     until the field is asked for again: another field taking focus, a tap on the focused field
     (`InWindowKeyboard`), or the app asking the input method for the keyboard again
     (`LatinIME.onShowInputRequested`, `ShowRequests.reasked`) brings the keyboard back. It hosts only while a companion host is started on another
