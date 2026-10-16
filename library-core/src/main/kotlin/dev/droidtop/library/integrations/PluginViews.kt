@@ -171,12 +171,14 @@ object PluginViews {
                 }
                 onJobDone(context, result)
                 val replaced = result.values["view"]?.let { text -> runCatching { PluginView.parse(JSONObject(text), messages) }.getOrNull() }
-                val message = if (result.ok) result.values["message"] ?: "Done" else "${record.manifest.label}: ${result.error ?: "failed"}"
+                // A download's own outcome ("Added <file>") says more than the plugin's message from before it ran (#558).
+                val said = result.values["summary"] ?: result.values["message"]
+                val message = if (result.ok) said ?: "Done" else "${record.manifest.label}: ${result.error ?: "failed"}"
                 val notice = if (result.ok) {
                     // The plugin's own notice when it sent one; otherwise droidtop's (#521 item 9), so a finished job always
                     // says so on the page that started it, with the plugin's sentence when it gave one.
                     result.values["notice"]?.let { text -> runCatching { PluginViewCall.replyNotice(JSONObject().put("notice", JSONObject(text)), messages) }.getOrNull() }
-                        ?: finishedNotice(result.values["message"])
+                        ?: finishedNotice(said)
                 } else {
                     PluginViewCall.errorNotice(PluginReply.error(PluginErrorCode.FAILED, result.error ?: "failed"), emptySet(), FAILED_TITLE, messages)
                 }
