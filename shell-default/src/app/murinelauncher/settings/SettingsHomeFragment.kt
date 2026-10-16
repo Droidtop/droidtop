@@ -12,6 +12,7 @@ import android.text.TextUtils
 import androidx.annotation.RequiresApi
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.Preference
+import androidx.preference.SwitchPreferenceCompat
 import app.murinelauncher.receiver.ScreenOffAdminReceiver
 import app.murinelauncher.widget.radio.RadioGroupPreference
 import app.murinelauncher.widget.smartspace.SmartspaceMode
@@ -22,6 +23,7 @@ import com.android.launcher3.Flags
 import com.android.launcher3.InvariantDeviceProfile
 import com.android.launcher3.LauncherPrefs
 import com.android.launcher3.R
+import com.android.launcher3.SessionCommitReceiver
 import com.android.launcher3.Utilities
 import com.android.launcher3.states.RotationHelper
 import com.android.launcher3.util.DisplayController
@@ -32,6 +34,7 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val FIXED_LANDSCAPE_MODE: String = "pref_fixed_landscape_mode"
         const val GRID_SIZE_WIDTH: String = "pref_grid_size_width"
         const val GRID_SIZE_HEIGHT: String = "pref_grid_size_height"
+        const val LOCK_HOME_SCREEN: String = "pref_lock_home_screen"
         // droidtop patch: superseded by DOUBLE_TAP_ACTION/SWIPE_DOWN_ACTION
         // below -- kept only as the migration source key
         // (GestureActionMigration), never bound to a preference row itself.
@@ -122,6 +125,15 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                 // Turning it on asks for the accessibility access its window needs.
                 preference.setOnPreferenceChangeListener { _, newValue ->
                     if (newValue == true && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) requestAccessibilityPermission(requireContext())
+                    true
+                }
+                return true
+            }
+            LOCK_HOME_SCREEN -> {
+                val addIcon = findPreference<Preference>(SessionCommitReceiver.ADD_ICON_PREFERENCE_KEY)
+                addIcon?.isEnabled = !(preference as SwitchPreferenceCompat).isChecked
+                preference.setOnPreferenceChangeListener { _, newValue ->
+                    addIcon?.isEnabled = !(newValue as Boolean)
                     true
                 }
                 return true
