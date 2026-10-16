@@ -312,6 +312,8 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         mFooter = findViewById(R.id.folder_footer);
         mFooterHeight = dp.folderFooterHeightPx;
         mFolderName = findViewById(R.id.folder_name);
+        View options = findViewById(R.id.folder_options);
+        if (options != null) options.setOnClickListener(this::showOptions);
         mFolderName.setTextSize(TypedValue.COMPLEX_UNIT_PX, dp.folderLabelTextSizePx);
         mFolderName.setOnBackKeyListener(this);
         mFolderName.setOnEditorActionListener(this);
@@ -475,6 +477,29 @@ public class Folder extends AbstractFloatingView implements ClipPathView, DragSo
         }
 
         return insets;
+    }
+
+    /**
+     * droidtop: the folder's own options (Droidtop/tracker#564), each saved with the folder. Swipe to open makes
+     * a tap start the first app and a swipe up open the folder; a cover shows the first app's icon. Read only
+     * while the home screen is locked.
+     */
+    private void showOptions(View anchor) {
+        android.widget.PopupMenu menu = new android.widget.PopupMenu(getContext(), anchor);
+        int[] flags = {FolderInfo.FLAG_SWIPE_TO_OPEN, FolderInfo.FLAG_COVER};
+        int[] labels = {R.string.folder_option_swipe_to_open, R.string.folder_option_cover};
+        boolean editable = mLauncherDelegate.isDraggingEnabled();
+        for (int i = 0; i < flags.length; i++) {
+            menu.getMenu().add(0, i, i, labels[i]).setCheckable(true)
+                    .setChecked(mInfo.hasOption(flags[i])).setEnabled(editable);
+        }
+        menu.setOnMenuItemClickListener(item -> {
+            int flag = flags[item.getItemId()];
+            mInfo.setOption(flag, !mInfo.hasOption(flag), mLauncherDelegate.getModelWriter());
+            mFolderIcon.onOptionsChanged();
+            return true;
+        });
+        menu.show();
     }
 
     public FolderIcon getFolderIcon() {
