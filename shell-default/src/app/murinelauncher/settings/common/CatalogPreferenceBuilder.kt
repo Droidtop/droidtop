@@ -3,6 +3,7 @@ package app.murinelauncher.settings.common
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
+import androidx.compose.ui.graphics.toArgb
 import android.graphics.Typeface
 import android.os.Bundle
 import android.text.SpannableStringBuilder
@@ -675,6 +676,21 @@ class CatalogPreferenceNavigator(
             summary = listOfNotNull(item.currentLabel()?.takeIf { it.isNotBlank() }, item.subtitle)
                 .joinToString("  ·  ")
                 .ifBlank { null }
+                ?.let { text ->
+                    // A state with a tone (a plugin's Ask first, Blocked) is its tone's colour, in bold
+                    // (Droidtop/tracker#519).
+                    val tone = item.currentTone()
+                    val label = item.currentLabel()
+                    if (tone == null || label.isNullOrBlank() || !text.startsWith(label)) {
+                        text
+                    } else {
+                        android.text.SpannableString(text).apply {
+                            val ink = dev.droidtop.ui.shared.NoticePalette.Default.ink(tone).toArgb()
+                            setSpan(android.text.style.ForegroundColorSpan(ink), 0, label.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                            setSpan(android.text.style.StyleSpan(android.graphics.Typeface.BOLD), 0, label.length, android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                        }
+                    }
+                }
             // Remember the row was used: picking a value from this row's
             // dialog is the one catalog action that recreates the
             // foreground activity (Text size, Droidtop/tracker#139), and

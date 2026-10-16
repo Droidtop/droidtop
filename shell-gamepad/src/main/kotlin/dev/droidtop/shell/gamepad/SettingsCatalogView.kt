@@ -909,6 +909,10 @@ fun CatalogNavigator(
         selectedRowItem?.let { item ->
             listOfNotNull(
                 HintBinding(GamepadAction.A, "Select").takeIf { item !is TextBlockItem },
+                // A row that steps in place says so: "◄ ► Change" (Droidtop/tracker#519). Left's label is empty so
+                // the pair reads as one hint, keycaps then the word.
+                HintBinding(GamepadAction.LEFT, "").takeIf { item.stepsInPlace() },
+                HintBinding(GamepadAction.RIGHT, "Change").takeIf { item.stepsInPlace() },
                 HintBinding(GamepadAction.Y, "Info").takeIf { hasInfo(item) },
                 HintBinding(GamepadAction.B, "Back"),
             )
@@ -1586,6 +1590,9 @@ private fun CatalogRowView(
         title = if (confirmArmed) "${item.title}: ${if (PadModality.showsFocus) "press A" else "tap"} again to confirm" else item.title,
         value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
         chip = item.chip,
+        // A state with a tone (a plugin's Allowed / Ask first / Blocked) is a chip in that tone (tracker#519).
+        valueChip = status == null && !locked && (item as? ChoiceItem)?.toned == true,
+        valueTone = (item as? ChoiceItem)?.currentTone(),
         placeholder = placeholder,
         adjustable = status == null && item.stepsInPlace(),
         chevron = chevron,

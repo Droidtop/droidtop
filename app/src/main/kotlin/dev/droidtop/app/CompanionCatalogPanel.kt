@@ -40,6 +40,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.NoticeItem
+import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.TextBlockItem
 import dev.droidtop.library.settings.ToggleItem
@@ -49,6 +50,7 @@ import dev.droidtop.shell.gamepad.QuickTiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.ui.shared.NoticeCard
 
 /**
@@ -162,7 +164,15 @@ internal fun CompanionNestedScreen(
 }
 
 @Composable
-private fun CatalogRow(title: String, subtitle: String?, value: String?, onClick: (() -> Unit)?) {
+private fun CatalogRow(
+    title: String,
+    subtitle: String?,
+    value: String?,
+    // The value as a state chip (ChoiceItem.toned), in its tone or neutral (Droidtop/tracker#519).
+    valueChip: Boolean = false,
+    valueTone: NoticeTone? = null,
+    onClick: (() -> Unit)?,
+) {
     val colors = MaterialTheme.colorScheme
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -177,7 +187,22 @@ private fun CatalogRow(title: String, subtitle: String?, value: String?, onClick
             Text(title, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface)
             if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
         }
-        if (!value.isNullOrBlank()) Text(value, style = MaterialTheme.typography.labelLarge, color = colors.primary, modifier = Modifier.padding(start = 12.dp))
+        if (!value.isNullOrBlank()) {
+            if (valueChip) {
+                val palette = LocalNoticePalette.current
+                Text(
+                    value,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = valueTone?.let(palette::on) ?: colors.onSurfaceVariant,
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .background(valueTone?.let(palette::plate) ?: colors.surfaceVariant, RoundedCornerShape(50))
+                        .padding(horizontal = 10.dp, vertical = 2.dp),
+                )
+            } else {
+                Text(value, style = MaterialTheme.typography.labelLarge, color = colors.primary, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
     }
 }
 
@@ -258,7 +283,7 @@ private fun CatalogToggleRow(item: ToggleItem, onChanged: () -> Unit) {
 private fun CatalogChoiceRow(item: ChoiceItem, onChanged: () -> Unit) {
     val context = LocalContext.current
     var open by remember(item) { mutableStateOf(false) }
-    CatalogRow(item.title, item.subtitle, item.currentLabel()) { open = !open }
+    CatalogRow(item.title, item.subtitle, item.currentLabel(), valueChip = item.toned, valueTone = item.currentTone()) { open = !open }
     if (open) {
         Column(modifier = Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             item.options.forEach { option ->
