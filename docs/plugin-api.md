@@ -2324,7 +2324,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | D4 | File picker (SAF) | let the user choose a file or folder for the plugin | `files.pick {mode, mime}` → a grant token; `files.open {token}` → fd | the system picker | `files.picker` (normal; the user's pick is the consent) | low | built (2026-10-08): `files.pick {mode: open \| create, mime, name}` → {picked, token, name, writable}, only during a call the person started; `files.open {token, mode}` → fd; `files.forget {token}`; folders are not offered |
 | D5 | Shared files | broad access to shared storage | `files.shared` `list`, `read`, `write`, `mkdir`, `delete`, `open` `{path, volume?}`, `path` inside one of the folders the permission entry declares (`paths`, `"*"` for all) | data | `files.shared.read` / `files.shared.write` (dangerous; droidtop holds MANAGE_EXTERNAL_STORAGE) | high | built (2026-10-08): never `Android/data` or `Android/obb`, checked again after links are followed, and only while droidtop itself has all-files access |
 | D6 | Clipboard | copy a code or link; read for paste-to-search | `clipboard.write {text}`; `clipboard.read()` only during a user-initiated call | data | `clipboard.write` (normal) / `clipboard.read` (dangerous) | low / high | not built |
-| D7 | Power and battery | defer work on low battery; power profiles | `power.state()` → {level, charging, saver}; `power.keep_awake {≤10 min}` (only while a job runs); events `power.low`, `power.charging` | data | `power.state` (normal) / `power.keep_awake` (normal, quota) | low | not built |
+| D7 | Power and battery | defer work on low battery; power profiles | `power.get_state()` → {level (0 to 100, null without a battery), charging, saver}; `power.keep_awake {≤10 min}` (only while a job runs); events `power.low`, `power.charging` | data | `power.state` (normal) / `power.keep_awake` (normal, quota) | low | `power.get_state` built (2026-10-16, Droidtop/tracker#553: read from the battery broadcast and Battery Saver; a plugin reads it instead of `/sys/class/power_supply`); `keep_awake` and the events not built |
 | D8 | Display | know the displays (internal, companion, external) to place content | `display.list()` → [{id, role, size, density, hdr}]; events `display.added` / `removed`; `display.set {brightness}` | data; C15 renders | `display.info` (normal) / `display.control` (dangerous) | low / medium | not built |
 | D9 | Audio routing | route or duck audio per session | `audio.routes()`, `audio.set_route {id}`, `audio.volume {stream, level}`; event `audio.route_changed` | G Quick Menu | `audio.control` (normal); **no microphone API** (P2 decision: `audio.record` would be critical and needs a real use) | medium | not built |
 | D12 | Network links | a plugin with its own sockets (`net.sockets`, §5.3 "Open processes") binds, announces and resolves names itself | `net.get_links()` → {links: [{name, type, active, metered, addresses: [{address, prefixLength}], dns: [...], searchDomains: [...]}], dns: [...]}; the active link first, top-level `dns` its servers | data | `net.sockets` (dangerous) | low | built (2026-10-15, Droidtop/tracker#553; `NetLinks`, read from Android's `LinkProperties` of every network up) |
@@ -3071,6 +3071,21 @@ the plugin declared and the person granted (`PluginTiers.holes`):
   servers and search domains from Android's own view of it, and the
   plugin resolves names against those servers (Go's pure resolver, its
   dialer pointed at them) and binds and announces on those addresses.
+- **Shared folders by path (2026-10-16, Droidtop/tracker#553).** An open
+  process also reaches, by path, the shared-storage folders its granted
+  `files.shared.read` and `files.shared.write` entries declare (D5), on
+  every mounted volume, while droidtop has all-files access: the file
+  broker's rules hold them, read or read and write as granted
+  (`SharedFiles.brokerRules`). It is the same scope the `files.shared` ops
+  apply: never `Android/data` or `Android/obb`, nothing that climbs out
+  with `..`, links resolved before the rule decides; a whole volume (`"*"`)
+  keeps `Android` out in every spelling of its case, because shared storage
+  matches names without case and the broker's rules match them exactly. A
+  sync engine (the Syncthing plugin) works on games, ROMs and saves in
+  place. A changed `files.shared` grant retires the process, as a changed
+  hole does, so a refused folder is gone at once. A contained process has
+  no such rule: its isolated UID cannot reach shared storage, and the D5
+  ops are its way there.
 - **The Containment check** names the holes ("A process of its own with
   graphics access and its own internet connections ...") and its network
   line shows what the filter reported.
@@ -3602,6 +3617,11 @@ version was bumped.
   plugin still works.
 
 **Changelog (additive changes; no version moved).**
+
+- 2026-10-16 (Droidtop/tracker#553): `power.get_state` (D7), under
+  `power.state`. An open process reaches the shared-storage folders its
+  granted `files.shared` entries declare by path (5.3, "Shared folders by
+  path").
 
 - 2026-10-16 (Droidtop/tracker#563): widgets (C10) are built for Android
   app widgets: `ui.widget@1` `snapshot` and `action` with the value, list,

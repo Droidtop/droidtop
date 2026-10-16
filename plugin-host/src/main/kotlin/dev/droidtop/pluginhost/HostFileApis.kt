@@ -95,6 +95,78 @@ object SharedFiles {
         return clean
     }
 
+    /** The permissions an open process's file rules are built from: changing one retires its process ([PluginGrants.set]). */
+    val PERMISSIONS: Set<String> = setOf(READ, WRITE)
+
+    /**
+     * The broker rules for shared storage under [roots]: each folder in [read] (granted `files.shared.read`, null when
+     * not) readable and each in [write] writable, `"*"` being the whole volume. Pure.
+     *
+     * The same folders `files.shared` would reach: a path that climbs out or names `Android/data` or `Android/obb` is
+     * left out ([normalise]), and so is `Android` on its own. A whole volume denies `Android` in every
+     * spelling of its case, since shared storage matches names without case and the broker's rules match them exactly:
+     * other apps' folders, and droidtop's own there, stay out. A deeper folder there (`Android/media/<app>`) can still
+     * be declared, and its rule, longer, decides for it.
+     */
+    fun brokerRules(roots: Collection<String>, read: List<String>?, write: List<String>?): Map<String, Int> {
+        val modes = LinkedHashMap<String, Int>()
+        fun add(paths: List<String>?, mode: Int) = paths.orEmpty().forEach { declared ->
+            val clean = if (declared == "*") "" else normalise(declared)?.takeIf { it.isNotEmpty() } ?: return@forEach
+            if (clean.equals("android", ignoreCase = true)) return@forEach
+            modes[clean] = (modes[clean] ?: 0) or mode
+        }
+        add(read, BROKER_READ)
+        add(write, BROKER_WRITE)
+        // The longest rule decides alone, so a folder keeps what any folder above it was given ("*" read, "Saves" write).
+        val merged = modes.mapValues { (relative, mode) ->
+            modes.entries.fold(mode) { acc, (other, otherMode) ->
+                if (other == "" || relative.startsWith("$other/")) acc or otherMode else acc
+            }
+        }
+        val rules = LinkedHashMap<String, Int>()
+        for (root in roots.map { it.trimEnd('/') }.distinct()) {
+            for ((relative, mode) in merged) rules[if (relative.isEmpty()) root else "$root/$relative"] = mode
+            if ("" in modes) caseSpellings("Android").forEach { rules["$root/$it"] = BROKER_DENY }
+        }
+        return rules
+    }
+
+    /** The broker's rule modes (`sbx.h`): deny, read, write. */
+    private const val BROKER_DENY = 0
+    private const val BROKER_READ = 1
+    private const val BROKER_WRITE = 2
+
+    /** Every spelling of [word] in upper and lower case: 2^letters of them. */
+    internal fun caseSpellings(word: String): List<String> = word.fold(listOf("")) { acc, c ->
+        if (c.isLetter()) acc.flatMap { listOf(it + c.lowercaseChar(), it + c.uppercaseChar()) } else acc.map { it + c }
+    }
+
+    /** Whether droidtop itself may reach all of shared storage (all-files access; the storage permission before API 30). */
+    fun allowed(context: android.content.Context): Boolean =
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.os.Environment.isExternalStorageManager()
+        } else {
+            context.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+
+    /**
+     * Each mounted volume's root by id ("primary", or the volume's own id). Found from droidtop's own app folder on each
+     * volume, which exists on every API level this build runs on, rather than from a call only API 30 has.
+     */
+    fun roots(context: android.content.Context): Map<String, File> {
+        val storage = context.getSystemService(android.os.storage.StorageManager::class.java)
+        val out = LinkedHashMap<String, File>()
+        @Suppress("DEPRECATION")
+        out["primary"] = android.os.Environment.getExternalStorageDirectory()
+        context.getExternalFilesDirs(null).filterNotNull().forEach { dir ->
+            val root = dir.absolutePath.substringBefore("/Android/data/").takeIf { it != dir.absolutePath }?.let { File(it) } ?: return@forEach
+            val volume = storage?.getStorageVolume(dir) ?: return@forEach
+            if (volume.isPrimary) return@forEach
+            out[volume.uuid ?: root.name] = root
+        }
+        return out
+    }
+
     /** The file [path] names under [root], checked again after links are followed. */
     fun resolve(root: File, path: String): File {
         val clean = normalise(path) ?: throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "$path is not reachable")

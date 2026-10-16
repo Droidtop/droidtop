@@ -18744,6 +18744,18 @@ Advanced.
   Android's `LinkProperties`, the active one first. Next: the Syncthing
   plugin itself, paired through droidtop's own device pairing
   (Droidtop/tracker#556).
+- **An open process's shared folders, and the battery** (2026-10-16,
+  Droidtop/tracker#553, found by the Syncthing plugin). An open process
+  reaches the shared-storage folders its granted `files.shared` entries
+  declare by path, through the file broker's rules
+  (`SharedFiles.brokerRules`), in the scope the `files.shared` ops already
+  apply: never `Android/data` or `Android/obb`, and a whole volume denies
+  `Android` in every spelling of its case (shared storage matches names
+  without case; the broker's rules match exactly). A changed `files.shared`
+  grant retires the process like a changed hole. A contained process gets
+  no such rule. `power.get_state` (D7, under `power.state`) reports the
+  battery level, charging and Battery Saver, so no plugin reads
+  `/sys/class/power_supply` itself.
 - **The graphics tier** (`gpu.render`, built plugin-enforce-4, 2026-10-09):
   a plugin that needs the GPU and nothing else declares `gpu.render` and the
   person ticks it. Granting it runs the plugin in a droidtop-owned process

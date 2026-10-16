@@ -19,6 +19,11 @@ import java.io.File
  *   private folder ([privateRoots], the claims of `SBX_LOCK_PASSTHROUGH`); every other path stays the kernel's, where
  *   its isolated UID and SELinux already decide.
  *
+ * - An open process also reaches the shared-storage folders its granted `files.shared.read` / `files.shared.write`
+ *   entries declare ([SharedFiles.brokerRules]), by path, as the same plugin reaches them through `files.shared` (docs/plugin-api.md
+ *   3 D5): a sync engine (the Syncthing plugin, Droidtop/tracker#553) works on games, ROMs and saves in place. A
+ *   contained process does not: its isolated UID cannot reach shared storage, and the D5 ops are its way there.
+ *
  * Plugin files keep coming as descriptors (the guarded hooks' virtual paths, local files of the library) and plugin data
  * through the broker API, as before. Every refusal is logged under `droidtop.sandbox` with the plugin's id.
  */
@@ -73,6 +78,7 @@ internal object SandboxBroker {
             ).forEach { rules[it] = READ }
             // Devices ART opens after the fact (/dev/ashmem<boot id> is allowed by the broker's decider).
             listOf("/dev/null", "/dev/zero", "/dev/random", "/dev/urandom", "/dev/ashmem").forEach { rules[it] = READ or WRITE }
+            rules.putAll(sharedRulesFor(context, pluginId))
             // The graphics driver's devices, only for the gpu.render hole: a networked process does not get the GPU.
             if (PluginTiers.GPU_RENDER in holes) {
                 listOf(
@@ -82,6 +88,22 @@ internal object SandboxBroker {
             }
         }
         return rules
+    }
+
+    /** [SharedFiles.brokerRules] for [pluginId]'s granted shared-files entries, on every mounted volume, while droidtop has all-files access. */
+    private fun sharedRulesFor(context: Context, pluginId: String): Map<String, Int> {
+        val record = PluginStore.installed(context).firstOrNull { it.manifest.id == pluginId } ?: return emptyMap()
+        val grants = PluginGrants.forContext(context).read(pluginId)
+        fun granted(permission: String): List<String>? {
+            val declared = record.manifest.v2.permissions.firstOrNull { it.id == permission } ?: return null
+            if (PluginGrants.stateOf(record, grants, permission) != GrantState.GRANTED) return null
+            return SharedFiles.declaredPaths(declared)
+        }
+        val read = granted(SharedFiles.READ)
+        val write = granted(SharedFiles.WRITE)
+        if (read == null && write == null) return emptyMap()
+        if (!SharedFiles.allowed(context)) return emptyMap()
+        return SharedFiles.brokerRules(SharedFiles.roots(context).values.map { it.path }, read, write)
     }
 
     /** Droidtop's private folders, by every name, mapped to [pluginId]'s own. */

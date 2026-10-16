@@ -305,6 +305,21 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun roleTokens(): dev.droidtop.library.theme.RoleTokens.Set = dev.droidtop.library.theme.RoleTokens.current(appContext)
 
+    override fun powerState(): PowerState {
+        // The battery broadcast is sticky: registering no receiver reads its last value.
+        val battery = appContext.registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        val present = battery?.getBooleanExtra(android.os.BatteryManager.EXTRA_PRESENT, false) == true
+        val level = if (!present) null else HostPowerApis.level(
+            battery!!.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1),
+            battery.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, -1),
+        )
+        val plugged = battery?.getIntExtra(android.os.BatteryManager.EXTRA_PLUGGED, 0) ?: 0
+        val status = battery?.getIntExtra(android.os.BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val charging = plugged != 0 || status == android.os.BatteryManager.BATTERY_STATUS_CHARGING || status == android.os.BatteryManager.BATTERY_STATUS_FULL
+        val saver = appContext.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode == true
+        return PowerState(level, charging, saver)
+    }
+
     override fun pairedDevices(pluginId: String): List<dev.droidtop.net.peer.PairedDevices.Device> =
         dev.droidtop.net.peer.PairedDevices.forPlugin(appContext, pluginId)
 
@@ -484,30 +499,9 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         appContext.contentResolver.openFileDescriptor(android.net.Uri.parse(uri), resolverMode)
     }.getOrNull()
 
-    override fun sharedFilesAllowed(): Boolean =
-        if (Build.VERSION.SDK_INT >= 30) {
-            android.os.Environment.isExternalStorageManager()
-        } else {
-            appContext.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
+    override fun sharedFilesAllowed(): Boolean = SharedFiles.allowed(appContext)
 
-    /**
-     * Each mounted volume's root by id ("primary", or the volume's own id). Found from droidtop's own app folder on each
-     * volume, which exists on every API level this build runs on, rather than from a call only API 30 has.
-     */
-    override fun storageRoots(): Map<String, java.io.File> {
-        val storage = appContext.getSystemService(android.os.storage.StorageManager::class.java)
-        val out = LinkedHashMap<String, java.io.File>()
-        @Suppress("DEPRECATION")
-        out["primary"] = android.os.Environment.getExternalStorageDirectory()
-        appContext.getExternalFilesDirs(null).filterNotNull().forEach { dir ->
-            val root = dir.absolutePath.substringBefore("/Android/data/").takeIf { it != dir.absolutePath }?.let { java.io.File(it) } ?: return@forEach
-            val volume = storage?.getStorageVolume(dir) ?: return@forEach
-            if (volume.isPrimary) return@forEach
-            out[volume.uuid ?: root.name] = root
-        }
-        return out
-    }
+    override fun storageRoots(): Map<String, java.io.File> = SharedFiles.roots(appContext)
 
     override fun storageVolumes(): JSONArray {
         val storage = appContext.getSystemService(android.os.storage.StorageManager::class.java)
