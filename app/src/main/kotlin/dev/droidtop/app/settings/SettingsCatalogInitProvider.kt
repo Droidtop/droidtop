@@ -49,6 +49,10 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.library.stores.StoreSaves.register(appContext)
         // Copying a game's version between this device and a computer (docs/SPEC.md 7o, "Game updates").
         dev.droidtop.library.computers.ComputerGames.register(appContext) { dev.droidtop.app.LibraryCore.library(it) }
+        // The paired devices plugins see (docs/plugin-api.md D21): they hear of a change, and the paired handhelds
+        // are served again while a plugin has announced something to them; a file read and a listener, off this thread.
+        dev.droidtop.net.peer.PairedDevices.onChanged = { ctx -> dev.droidtop.library.integrations.notifyDevicesChanged(ctx) }
+        Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.serve(appContext) } }, "devices-serve").start()
         // Every social provider's message notifications and the Quick Menu's unread count
         // (SPEC "Social"), then Steam, which stays connected while signed in for friends and
         // chat: its service, then the connection itself (7g, "Stores").

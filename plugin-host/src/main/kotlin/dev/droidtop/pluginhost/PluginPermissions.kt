@@ -70,6 +70,9 @@ object PluginPermissions {
             android = AndroidNeed("android.permission.INTERNET"),
             caution = "A plugin with this connects by itself, also to other apps on this device, so only allow it for a plugin from a source you trust",
         ),
+        // D21 (Droidtop/tracker#556, #553): the computers and handhelds the person paired, and what the same plugin
+        // announced on each; never an address, a key or another plugin's value.
+        PluginPermission("devices.paired", PermissionTier.DANGEROUS, "See and reach the devices you paired with droidtop"),
         PluginPermission("storage.volumes", PermissionTier.NORMAL, "See your storage devices and free space"),
         PluginPermission("files.picker", PermissionTier.NORMAL, "Ask you to choose files or folders"),
         PluginPermission("files.shared.read", PermissionTier.DANGEROUS, "Read all files on shared storage"),

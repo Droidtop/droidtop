@@ -303,6 +303,15 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
             .put("vpn", caps?.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN) == true)
     }
 
+    override fun pairedDevices(pluginId: String): List<dev.droidtop.net.peer.PairedDevices.Device> =
+        dev.droidtop.net.peer.PairedDevices.forPlugin(appContext, pluginId)
+
+    override fun announceToDevices(pluginId: String, value: JSONObject?) {
+        dev.droidtop.net.peer.PairedDevices.problem(pluginId, value)?.let { throw BrokerException(PluginErrorCode.INVALID_ARGS, it) }
+        // Reaching every paired device can take far longer than a call may: the value is kept and sent on its own thread.
+        Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.announce(appContext, pluginId, value) } }, "devices-announce").start()
+    }
+
     override fun netLinks(): List<NetLinks.Link> {
         val cm = appContext.getSystemService(android.net.ConnectivityManager::class.java) ?: return emptyList()
         val active = cm.activeNetwork
