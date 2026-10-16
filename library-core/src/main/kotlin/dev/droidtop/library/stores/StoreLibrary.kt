@@ -232,6 +232,12 @@ interface StoreLibrary {
      */
     val label: String
 
+    /**
+     * The store's own web site. Its declared icon is the store's mark, which droidtop caches once the store is
+     * signed in ([StoreMarks], Droidtop/tracker#503). Null: no mark is fetched and the generic glyph stays.
+     */
+    val siteUrl: String? get() = null
+
     /** Whether this device holds a sign-in for the store. A file check, cheap enough for a row. */
     fun signedIn(context: Context): Boolean
 

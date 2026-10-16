@@ -31,6 +31,7 @@ import timber.log.Timber
  */
 class ItchStore : StoreLibrary {
     override val id = "itch"
+    override val siteUrl = "https://itch.io/"
     override val label = "itch.io"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(

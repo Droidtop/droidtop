@@ -36,6 +36,7 @@ import timber.log.Timber
  */
 class AmazonStore : StoreLibrary {
     override val id = "amazon"
+    override val siteUrl = "https://gaming.amazon.com/"
     override val label = "Amazon"
 
     override val webPages = dev.droidtop.library.stores.StoreWebPages(

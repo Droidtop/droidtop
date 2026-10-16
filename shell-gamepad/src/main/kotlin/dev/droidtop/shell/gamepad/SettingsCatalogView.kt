@@ -1240,6 +1240,7 @@ private fun SettingsCategoryColumn(
                 CategoryEntry(
                     label = category.label,
                     icon = category.icon,
+                    iconFile = category.iconFile,
                     current = index == current,
                     cursor = cursor == index + offset,
                     onClick = { onPick(index) },
@@ -1261,7 +1262,7 @@ private fun SettingsCategoryColumn(
  * phase. The window's one sliding ring marks the cursor as everywhere else.
  */
 @Composable
-private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, cursor: Boolean, onClick: () -> Unit) {
+private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, cursor: Boolean, onClick: () -> Unit, iconFile: String? = null) {
     val shown = cursor && PadModality.showsFocus
     val strength = when {
         shown -> SettingsLayout.FocusedGradient
@@ -1298,10 +1299,10 @@ private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, c
                 transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
             },
         ) {
-            if (icon != null) {
-                Icon(
-                    icon.glyph(),
-                    contentDescription = null,
+            if (icon != null || iconFile != null) {
+                CatalogGlyph(
+                    icon,
+                    iconFile,
                     tint = if (current || cursor) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
                     modifier = Modifier.size(SettingsLayout.CategoryIcon),
                 )
@@ -1592,6 +1593,7 @@ private fun CatalogRowView(
         danger = confirmArmed,
         accent = (item as? NestedScreenItem)?.accent?.let { Color(it) },
         icon = item.icon,
+        iconFile = item.iconFile,
         onClick = onClick,
         onLongClick = onLongClick,
         onAdjust = onAdjust,

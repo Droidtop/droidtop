@@ -64,6 +64,9 @@ import kotlinx.coroutines.withContext
 import dev.droidtop.ui.shared.NoticeViews
 import dev.droidtop.ui.shared.PageViews
 
+/** Decodes catalog pictures ([dev.droidtop.library.settings.CatalogItem.iconFile]) one at a time, off the main thread. */
+private val iconLoader = java.util.concurrent.Executors.newSingleThreadExecutor()
+
 /**
  * The Preference-surface renderer for the shared settings catalogs
  * (docs/SPEC.md settings architecture): turns catalog layout -- groups,
@@ -635,14 +638,27 @@ class CatalogPreferenceNavigator(
      * space, matching the Compose renderer drawing nothing at all (not
      * even a blank slot) for a leaf row.
      */
-    private fun Preference.applyCatalogIcon(catalogIcon: CatalogIcon?) {
+    private fun Preference.applyCatalogIcon(catalogIcon: CatalogIcon?, iconFile: String? = null) {
         if (catalogIcon != null) {
             icon = ContextCompat.getDrawable(context, catalogIcon.drawableRes())
             isIconSpaceReserved = true
         } else {
-            isIconSpaceReserved = false
+            isIconSpaceReserved = iconFile != null
+        }
+        // A picture in place of the glyph (a store's cached mark, Droidtop/tracker#503): decoded off the main thread,
+        // then swapped in; the glyph shows until then and stays if the file cannot be read.
+        if (iconFile != null) {
+            val preference = this
+            val res = context.resources
+            iconLoader.execute {
+                val bitmap = runCatching { android.graphics.BitmapFactory.decodeFile(iconFile) }.getOrNull() ?: return@execute
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    preference.icon = android.graphics.drawable.BitmapDrawable(res, bitmap)
+                }
+            }
         }
     }
+
 
     private fun toPreference(context: Context, item: CatalogItem): Preference = when (item) {
         is ChoiceItem -> ListPreference(context).apply {
@@ -877,7 +893,7 @@ class CatalogPreferenceNavigator(
             summary = listOfNotNull(item.subtitle, item.valueLabel?.invoke(context)?.takeIf { it.isNotBlank() })
                 .joinToString("  ·  ")
                 .ifBlank { null }
-            applyCatalogIcon(item.icon)
+            applyCatalogIcon(item.icon, item.iconFile)
             setOnPreferenceClickListener {
                 val child = item.resolve()
                 if (child != null) push(child)
