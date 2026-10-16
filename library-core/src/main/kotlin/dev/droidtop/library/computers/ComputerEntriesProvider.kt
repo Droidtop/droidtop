@@ -8,8 +8,12 @@ import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.LibraryProvider
 import dev.droidtop.library.PcInfo
 import dev.droidtop.library.PcSource
+import dev.droidtop.net.peer.Computer
 import dev.droidtop.net.peer.Computers
 import dev.droidtop.net.peer.DeviceIdentity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 
 /**
  * What the person's paired computers have that this device does not, in this
@@ -70,15 +74,42 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
     }
 
     /**
-     * Nothing here runs it: it is on the computer. Streaming it is windowcast's
-     * (docs/SPEC.md 7a), and installing it here is the game's own store or
-     * copy; the person is told which computer has it.
+     * Nothing here runs it: it is on the computer (docs/SPEC.md 7o, "Starting
+     * a game on a computer"). A game that is not Steam's is asked of that
+     * computer through [ComputerLaunch]; the program hosting its agent
+     * (Pythia) starts its own games, and windowcast's viewer opens when it
+     * says windowcast shows the game. A Steam game is streamed with the Steam
+     * module's "Stream with Steam Link", in its menu. An application stays
+     * windowcast's (7a), and the person is told which computer has it.
      */
     override suspend fun launch(entry: LibraryEntry) {
-        val computerId = entry.id.removePrefix("computer:").substringBefore(':')
-        val name = Computers.list(context).firstOrNull { it.id == computerId }?.name ?: "one of your computers"
-        val text = "${entry.title} is installed on $name, not on this device"
+        val text = withContext(Dispatchers.IO) { answerFor(entry) }
         Handler(Looper.getMainLooper()).post { dev.droidtop.library.settings.Notices.flash(text, context = context) }
+    }
+
+    /** Reads the computers' file and may ask one over the network: on IO. */
+    private fun answerFor(entry: LibraryEntry): String {
+        val (computerId, key) = entry.id.removePrefix("computer:").split(':', limit = 2).let { it[0] to it.getOrElse(1) { "" } }
+        val computer = Computers.list(context).firstOrNull { it.id == computerId }
+        val name = computer?.name ?: "one of your computers"
+        return when {
+            computer == null || entry.kind != LibraryEntryKind.COMPUTER_GAME -> "${entry.title} is installed on $name, not on this device"
+            key.startsWith("steam:") -> "${entry.title} is installed on $name, not on this device. Stream with Steam Link is in its menu."
+            else -> startOn(computer, key, entry.title)
+        }
+    }
+
+    private fun startOn(computer: Computer, key: String, title: String): String {
+        val (_, outcome) = ComputerLaunch.start(context, listOf(computer), key, title) ?: return "${computer.name} could not be asked."
+        if (!outcome.started) {
+            Timber.w("Start on a computer: %s (%s): %s", computer.name, key, outcome.line)
+            return outcome.line
+        }
+        return when (outcome.stream) {
+            ComputerLaunch.STREAM_WINDOWCAST -> ComputerLaunch.openWindowcast(context, computer.name, outcome.line)
+            // Started, with nothing on this device to show it (no windowcast host there).
+            else -> "${outcome.line} It shows on ${computer.name}'s screen; nothing here streams it."
+        }
     }
 
     private companion object {
