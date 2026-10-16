@@ -105,14 +105,20 @@ internal object DroidtopWidgets {
         }
     }
 
-    /** A tap that opens [intent], distinct per [key] so two rows never share one PendingIntent. */
-    fun activity(context: Context, key: String, intent: Intent): PendingIntent =
-        PendingIntent.getActivity(
+    /**
+     * A tap on widget [widgetId] that opens [intent], distinct per widget and per [key] ([WidgetTaps]): no two rows,
+     * and no two widgets, share one PendingIntent, so one widget's update never rewrites another's tap.
+     */
+    fun activity(context: Context, widgetId: Int, key: String, intent: Intent): PendingIntent {
+        // An intent naming its component is matched by it alone, so the address only tells taps apart.
+        if (intent.component != null && intent.data == null) intent.data = android.net.Uri.parse(dev.droidtop.runtime.WidgetTaps.address(widgetId, key))
+        return PendingIntent.getActivity(
             context,
-            key.hashCode(),
+            dev.droidtop.runtime.WidgetTaps.requestCode(widgetId, key),
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+    }
 
     /**
      * The library's games, from the same in-RAM index every surface reads, never a folder walk. In a cold process (a

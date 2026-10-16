@@ -61,12 +61,5 @@ public class MurineClockWidgetPlugin implements CustomWidgetPlugin {
         info.minHeight = 48;
         info.resizeMode = AppWidgetProviderInfo.RESIZE_HORIZONTAL | AppWidgetProviderInfo.RESIZE_VERTICAL;
         info.icon = R.drawable.ic_pref_smartspace_clock;
-        // droidtop patch (Droidtop/tracker#563): the clock is placed by the Smartspace setting
-        // (ModelCallbacks.bindSmartspaceWidget), not from the widget picker, where it showed under droidtop
-        // as a nameless "Calendar 0 x 0" entry (rig, 2026-10-16). Hidden from the picker; the setting still
-        // places it.
-        if (com.android.launcher3.Utilities.ATLEAST_P) {
-            info.widgetFeatures |= AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_PICKER;
-        }
     }
 }

@@ -54,7 +54,7 @@ class ContinuePlayingWidgetProvider : AppWidgetProvider() {
             val rows = recentEntries(context).map { entry ->
                 DroidtopWidgets.Row(
                     dev.droidtop.library.GameNaming.displayName(entry.title),
-                    DroidtopWidgets.activity(context, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)),
+                    DroidtopWidgets.activity(context, widgetId, "play:${entry.id}", GameLaunchActivity.intentFor(context, entry.id)),
                 )
             }
             return DroidtopWidgets.rows(

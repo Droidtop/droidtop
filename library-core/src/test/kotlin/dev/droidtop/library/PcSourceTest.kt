@@ -13,6 +13,15 @@ class PcSourceTest {
     private val roots = listOf("/storage/card/Games", "/storage/card/Games/BATTLE.NET", "/storage/emulated/0/PC")
 
     @Test
+    fun `a store's game with no install needs installing, and nothing else does`() {
+        assertEquals(true, entry("gog:1", PcInfo(storeId = "gog:1", installed = false)).needsInstall())
+        assertEquals(false, entry("gog:2", PcInfo(storeId = "gog:2", installed = true, installPath = "/games/two")).needsInstall())
+        // A folder game, a Wine shortcut and a console ROM are never "not installed".
+        assertEquals(false, entry("/games/three", PcInfo(storeId = "/games/three", installed = true)).needsInstall())
+        assertEquals(false, entry("rom", kind = LibraryEntryKind.CONSOLE_ROM).needsInstall())
+    }
+
+    @Test
     fun `a store row is its store, whatever store it is`() {
         assertEquals(PcSource.Store("gog"), PcSource.of(entry("gog:1207658691", PcInfo(storeId = "gog:1207658691", installed = false))))
         // A store this build has no code for is still a store, not dropped.

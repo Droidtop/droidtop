@@ -66,7 +66,7 @@ class CompanionWidgetProvider : AppWidgetProvider() {
                 DroidtopWidgets.Row(
                     "Open the companion",
                     DroidtopWidgets.activity(
-                        context, "companion",
+                        context, widgetId, "companion",
                         Intent(CompanionSheet.ACTION).setPackage(context.packageName).putExtra(CompanionSheet.EXTRA_TRAY, false),
                     ),
                 )
@@ -87,7 +87,7 @@ class CompanionWidgetProvider : AppWidgetProvider() {
                 context,
                 DroidtopWidgets.look(context),
                 context.getString(R.string.widget_companion_title),
-                listOf(companion, DroidtopWidgets.Row("Reinitialize displays", DroidtopWidgets.activity(context, "reinit", reinit))),
+                listOf(companion, DroidtopWidgets.Row("Reinitialize displays", DroidtopWidgets.activity(context, widgetId, "reinit", reinit))),
                 "",
             )
         }

@@ -26,7 +26,7 @@ class LibrarySearchWidgetProvider : AppWidgetProvider() {
             views.setTextColor(R.id.widget_title, look.muted)
             views.setInt(R.id.widget_icon, "setColorFilter", look.ink)
             val search = Intent(LauncherSearch.ACTION_SEARCH).setPackage(context.packageName)
-            views.setOnClickPendingIntent(R.id.widget_root, DroidtopWidgets.activity(context, "search", search))
+            views.setOnClickPendingIntent(R.id.widget_root, DroidtopWidgets.activity(context, widgetId, "search", search))
             return views
         }
     }

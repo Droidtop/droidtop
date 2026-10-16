@@ -93,6 +93,8 @@ fun LauncherGamesScreen(
     library: dev.droidtop.library.Library? = null,
     /** The Downloads place, where a store install runs (the page's and the install offer's link). */
     onOpenDownloads: () -> Unit = {},
+    /** A game whose page opens at once (a widget's tap on a store game that is not installed: Install is there). */
+    openPageId: String? = null,
 ) {
     val shellWindow = currentShellWindow()
     CompositionLocalProvider(LocalShellWindow provides shellWindow) {
@@ -135,6 +137,7 @@ fun LauncherGamesScreen(
                     onOpenFolders = if (foldersScreen != null) ({ foldersOpen = true }) else null,
                     library = library,
                     onOpenDownloads = onOpenDownloads,
+                    openPageId = openPageId,
                 )
             }
         }
@@ -149,12 +152,13 @@ private fun GamesGrid(
     onOpenFolders: (() -> Unit)?,
     library: dev.droidtop.library.Library?,
     onOpenDownloads: () -> Unit,
+    openPageId: String?,
 ) {
     val window = LocalShellWindow.current
     val pad = rememberGridPad()
     // A PC or engine game takes the PC Games tab's primary action and has its page (Droidtop/tracker#349).
     fun hasPage(entry: LibraryEntry) = library != null && entry.isPcOrEngineGame
-    var pageId by remember { mutableStateOf<String?>(null) }
+    var pageId by remember(openPageId) { mutableStateOf(openPageId?.takeIf { library != null }) }
     val pcLaunch = dev.droidtop.shell.gamepad.pc.rememberPcLaunch(onLaunch = onPlay, onOpenDownloads = onOpenDownloads)
     val play: (LibraryEntry) -> Unit = { entry -> if (hasPage(entry)) pcLaunch.launch(entry) else onPlay(entry) }
     val emptyAction = remember { FocusRequester() }
