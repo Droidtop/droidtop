@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.shell.gamepad.input.PressWords
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -892,7 +893,7 @@ private fun GameTab(
         fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = GameQuickTile(
             title = title,
             subtitle = when {
-                armed == kind -> "Press A again"
+                armed == kind -> PressWords.againSentence
                 lastEnding == kind && quitOutcome != null -> quitOutcome.message
                 else -> idle
             },
@@ -1007,7 +1008,7 @@ private fun GameTab(
                 modifier = Modifier.weight(1f),
             )
             StopPill(
-                label = if (armed == GameEnding.KILL) "Press A again" else stop.title,
+                label = if (armed == GameEnding.KILL) PressWords.againSentence else stop.title,
                 selected = focusIndex == STOP_PILL,
                 onClick = {
                     if (focusIndex != STOP_PILL) armed = null
