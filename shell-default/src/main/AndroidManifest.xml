@@ -218,6 +218,13 @@
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!-- droidtop: importing a Nova or Apex backup (LauncherImport), from Standard's settings. -->
+        <activity
+            android:name="dev.droidtop.shell.standard.LauncherImportActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <!-- droidtop: the image picker for one home-screen item's picture (ItemCustomize). -->
         <activity
             android:name="dev.droidtop.shell.standard.ItemPictureActivity"

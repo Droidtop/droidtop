@@ -142,6 +142,18 @@
     <string name="item_customize_swipe_up_pick">Swipe up on this icon</string>
     <string name="item_customize_swipe_down_pick">Swipe down on this icon</string>
     <string name="folder_option_picture">Choose a picture</string>
+    <string name="launcher_import_title">Import from Nova or Apex</string>
+    <string name="launcher_import_desc">Your home screen, dock, folders, gestures and drawer from a .novabackup or .apexbackup file</string>
+    <string name="launcher_import_heading">Import from %1$s</string>
+    <string name="launcher_import_brought">What comes across</string>
+    <string name="launcher_import_changed">Changed on the way</string>
+    <string name="launcher_import_left_out">Not brought across</string>
+    <string name="launcher_import_replaces">This replaces your home screen and dock. Drawer tabs, hidden apps and app names are added to yours.</string>
+    <string name="launcher_import_nothing">There is nothing in this backup that droidtop can bring across.</string>
+    <string name="launcher_import_go">Import</string>
+    <string name="launcher_import_working">Importing your home screen…</string>
+    <string name="launcher_import_done">Your %1$s home screen is in place</string>
+    <string name="launcher_import_failed">This backup could not be imported</string>
     <string name="gesture_action_clear_all_apps_summary">Ends every open app except droidtop, after asking when there are several</string>
 
     <!-- Murine search bar -->

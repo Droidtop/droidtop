@@ -28,6 +28,7 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
         const val PREF_DROIDTOP_HOME_SCREEN: String = "pref_droidtop_home_screen"
         const val BACKUP_EXPORT: String = "pref_backup_export"
         const val BACKUP_IMPORT: String = "pref_backup_import"
+        const val LAUNCHER_IMPORT: String = "pref_launcher_import"
         private const val BACKUP_MIME = "application/octet-stream"
     }
 
@@ -122,6 +123,14 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
             BACKUP_IMPORT -> {
                 preference.setOnPreferenceClickListener {
                     importBackup.launch(arrayOf(BACKUP_MIME))
+                    true
+                }
+                return true
+            }
+            LAUNCHER_IMPORT -> {
+                // Droidtop/tracker#564: a Nova or Apex backup as Standard's home screen.
+                preference.setOnPreferenceClickListener {
+                    context.startActivity(Intent(context, dev.droidtop.shell.standard.LauncherImportActivity::class.java))
                     true
                 }
                 return true
