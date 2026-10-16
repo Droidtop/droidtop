@@ -15,7 +15,11 @@ import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.Pod
 import dev.droidtop.runtime.RootfsImage
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -91,8 +95,38 @@ internal object EngineActions {
                 .orEmpty()
         val start = request.start && program.isNotEmpty()
         if (start) ContainerPrograms.start(app, runtime, created)
+        if (request.autoRemove) removeWhenOver(app, runtime, created)
         return Result.success(Made(created, name, notes, start, program.isNotEmpty()))
     }
+
+    private val watchers = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** How long `--rm` waits for a container's program to be started (by `start`, after `create`) before giving up. */
+    private const val START_WAIT_MS = 10 * 60_000L
+
+    /**
+     * `--rm` (docs/SPEC.md 3d): once [container]'s program has been started and has ended, the container is removed
+     * by the one removal path. A container whose program is never started in [START_WAIT_MS] is kept, as nothing ran.
+     */
+    private fun removeWhenOver(app: Context, runtime: ContainerRuntime, container: Container) {
+        watchers.launch {
+            val id = container.id
+            val before = ContainerPrograms.state(id)
+            // Started is the job seen running, or the state turned to over since: a quick program can do both between
+            // two looks.
+            fun ranSince(): Boolean = ContainerPrograms.state(id).let {
+                it !== before && (it is ContainerPrograms.State.Ended || it is ContainerPrograms.State.Failed)
+            }
+            val waitUntil = System.currentTimeMillis() + START_WAIT_MS
+            while (!ContainerPrograms.isRunning(id) && !ranSince() && System.currentTimeMillis() < waitUntil) delay(LOOK_MS)
+            if (!ContainerPrograms.isRunning(id) && !ranSince()) return@launch
+            while (ContainerPrograms.isRunning(id)) delay(LOOK_MS)
+            val info = runCatching { runtime.listContainers() }.getOrNull()?.firstOrNull { it.container.id == id } ?: return@launch
+            remove(app, runtime, info, force = true)
+        }
+    }
+
+    private const val LOOK_MS = 250L
 
     /** A reason a request was not done, worded for a person; the front adds its own name before it. */
     class Refused(message: String) : Exception(message)

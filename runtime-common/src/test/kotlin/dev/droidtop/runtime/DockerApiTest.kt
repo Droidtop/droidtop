@@ -66,7 +66,7 @@ class DockerApiTest {
         assertEquals(DockerApi.Call.Containers(all = false), DockerApi.route("GET", "/containers/json/", emptyMap()))
         assertEquals(DockerApi.Call.Container("web"), DockerApi.route("GET", "/v1.43/containers/web/json", emptyMap()))
         assertEquals(DockerApi.Call.Images, DockerApi.route("GET", "/images/json", emptyMap()))
-        assertEquals(DockerApi.Call.NotBuilt("POST /containers/web/attach"), DockerApi.route("POST", "/v1.43/containers/web/attach", emptyMap()))
+        assertEquals(DockerApi.Call.NotBuilt("POST /containers/web/pause"), DockerApi.route("POST", "/v1.43/containers/web/pause", emptyMap()))
         assertEquals(DockerApi.Call.NotBuilt("POST /exec/abc/resize"), DockerApi.route("POST", "/exec/abc/resize", emptyMap()))
         assertEquals(DockerApi.Call.NotFound, DockerApi.route("GET", "/nonsense", emptyMap()))
         assertTrue(String(DockerApi.notBuilt("POST /containers/create").body).contains("not built in droidtop's engine yet"))
@@ -131,7 +131,8 @@ class DockerApiTest {
         assertTrue(DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "follow" to "1")) is DockerApi.Call.NotBuilt)
         assertEquals(DockerApi.Call.Refused(400, "You must choose at least one stream"), DockerApi.route("GET", "/containers/web/logs", emptyMap()))
         assertEquals(DockerApi.Call.Wait("web", "not-running"), DockerApi.route("POST", "/containers/web/wait", emptyMap()))
-        assertTrue(DockerApi.route("POST", "/containers/web/wait", mapOf("condition" to "removed")) is DockerApi.Call.NotBuilt)
+        assertEquals(DockerApi.Call.Wait("web", "removed"), DockerApi.route("POST", "/containers/web/wait", mapOf("condition" to "removed")))
+        assertTrue(DockerApi.route("POST", "/containers/web/wait", mapOf("condition" to "never")) is DockerApi.Call.NotBuilt)
         assertEquals(
             DockerApi.Call.Containers(all = true, filters = mapOf("label" to listOf("com.docker.compose.project=demo"))),
             DockerApi.route("GET", "/containers/json", mapOf("all" to "1", "filters" to "{\"label\":[\"com.docker.compose.project=demo\"]}")),
@@ -303,5 +304,28 @@ class DockerApiTest {
         assertEquals(listOf("/bin/sh", "-c"), argv.take(2))
         assertEquals(listOf("sh", "ls", "-la"), argv.drop(3))
         assertEquals(mapOf("DROIDTOP_CWD" to "/srv"), ContainerEnter.execEnvironment("/srv"))
+    }
+
+    @Test
+    fun `attach follows the output, --rm removes after the run, and input or a terminal is said not built`() {
+        assertEquals(
+            DockerApi.Call.Attach("web", logs = false, stream = true),
+            DockerApi.route("POST", "/v1.43/containers/web/attach", mapOf("stream" to "1", "stdout" to "1", "stderr" to "1")),
+        )
+        assertTrue(DockerApi.route("POST", "/containers/web/attach", mapOf("stream" to "1", "stdin" to "1")) is DockerApi.Call.NotBuilt)
+
+        assertTrue(create("""{"Image":"alpine","HostConfig":{"AutoRemove":true}}""").first!!.autoRemove)
+        assertEquals(409, create("""{"Image":"alpine","HostConfig":{"AutoRemove":true,"RestartPolicy":{"Name":"always"}}}""").second!!.status)
+        assertEquals(501, create("""{"Image":"alpine","Tty":true,"OpenStdin":true}""").second!!.status)
+        assertTrue((EngineCli.DOCKER.parse(listOf("run", "--rm", "alpine", "echo", "hi")) as EngineRequest.Run).autoRemove)
+        assertTrue((EngineCli.DOCKER.parse(listOf("run", "--rm", "--restart", "always", "alpine")) as EngineRequest.Answer).text.contains("cannot be used together"))
+
+        assertEquals(listOf<Byte>(1, 0, 0, 0, 0, 0, 0, 2), DockerApi.frame(1, "hi".toByteArray()).take(8))
+        assertEquals(0, DockerApi.frame(2, ByteArray(0)).size)
+        val out = ByteArrayOutputStream()
+        EngineHttp.write(out, EngineHttp.Response(200, "application/vnd.docker.multiplexed-stream", ByteArray(0), stream = { }), DockerApi.headers)
+        val head = out.toString(Charsets.ISO_8859_1.name())
+        assertTrue(head.contains("Connection: close\r\n"))
+        assertTrue(!head.contains("Content-Length"))
     }
 }

@@ -51,7 +51,8 @@ class EngineCli private constructor(val front: Front) {
         add("run takes --restart no|on-failure[:N]|always|unless-stopped (no by default).")
         if (front == Front.PODMAN) add("run takes --pod POD to join a pod, or --pod new:NAME to make one.")
         add("-p takes a port on its own number (-p 80:80), which is what happens anyway: a port is the device's own.")
-        add("Not yet: -w, --entrypoint, --rm, -u. Options that need a kernel feature (-p 8080:80, --memory, --network,")
+        add("--rm removes the container once its program has run and ended.")
+        add("Not yet: -w, --entrypoint, -u. Options that need a kernel feature (-p 8080:80, --memory, --network,")
         add("--hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.")
         add("Containers here share the device's network and processes: a port is the device's own.")
     }.joinToString("\n") + "\n"
@@ -224,6 +225,7 @@ class EngineCli private constructor(val front: Front) {
         val volumes = mutableListOf<String>()
         var restart: ContainerProgram.RestartPolicy = ContainerProgram.RestartPolicy.No
         var pod: String? = null
+        var autoRemove = false
         val labels = linkedMapOf<String, String>()
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
@@ -239,6 +241,7 @@ class EngineCli private constructor(val front: Front) {
                     val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs a folder\n", 1)
                     volumes += volume(spec) ?: return volumeRefused(spec, sub)
                 }
+                "--rm" -> autoRemove = true
                 "-l", "--label" -> {
                     val kv = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs KEY=VALUE\n", 1)
                     labels[kv.substringBefore('=')] = kv.substringAfter('=', "")
@@ -306,7 +309,13 @@ class EngineCli private constructor(val front: Front) {
         val podName = if (newPod) pod!!.removePrefix("new:") else pod
         if (podName != null && !ContainerPods.validName(podName)) return EngineRequest.Answer("podman $sub: not a pod name: $podName\n", 1)
         if (labels.keys.any { it.isBlank() }) return EngineRequest.Answer("${front.command} $sub: a label needs a key\n", 1)
-        return EngineRequest.Run(image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish, start = sub == "run", labels = labels)
+        if (autoRemove && restart != ContainerProgram.RestartPolicy.No) {
+            return EngineRequest.Answer("${front.command} $sub: --restart and --rm cannot be used together\n", 1)
+        }
+        return EngineRequest.Run(
+            image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish,
+            start = sub == "run", labels = labels, autoRemove = autoRemove,
+        )
     }
 
     /** Podman's `pod` subcommands droidtop answers; the rest say they are not built yet. */
@@ -349,7 +358,7 @@ class EngineCli private constructor(val front: Front) {
     }
 
     /** `run` flags droidtop knows of and has not built: said as such, not as unknown. */
-    private val NOT_YET_RUN = setOf("-w", "--workdir", "--entrypoint", "--rm", "-u", "--user")
+    private val NOT_YET_RUN = setOf("-w", "--workdir", "--entrypoint", "-u", "--user")
 
     private fun restartRefused(words: String, sub: String) = EngineRequest.Answer(
         "${front.command} $sub: --restart takes no, on-failure[:N], always or unless-stopped, not $words\n",

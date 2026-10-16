@@ -58,6 +58,7 @@ object DockerApi {
         data class NetworkConnect(val id: String, val connect: Boolean) : Call
         data class ImageGet(val name: String) : Call
         data class ExecCreate(val containerId: String) : Call
+        data class Attach(val id: String, val logs: Boolean, val stream: Boolean) : Call
         data class ExecStart(val execId: String) : Call
         data class ExecGet(val execId: String) : Call
 
@@ -87,6 +88,10 @@ object DockerApi {
             p == "/images/json" && read -> Call.Images
             p == "/containers/create" && method == "POST" -> Call.Create(query["name"]?.takeIf { it.isNotEmpty() })
             segments.size == 3 && segments[0] == "containers" && segments[2] == "exec" && method == "POST" -> Call.ExecCreate(segments[1])
+            segments.size == 3 && segments[0] == "containers" && segments[2] == "attach" && method == "POST" -> when {
+                flag(query["stdin"]) -> Call.NotBuilt("attach with input (docker run -i; droidtop's own docker command streams it)")
+                else -> Call.Attach(segments[1], logs = flag(query["logs"]), stream = flag(query["stream"]))
+            }
             segments.size == 3 && segments[0] == "exec" && segments[2] == "start" && method == "POST" -> Call.ExecStart(segments[1])
             segments.size == 3 && segments[0] == "exec" && segments[2] == "json" && read -> Call.ExecGet(segments[1])
             segments.size == 3 && segments[0] == "containers" && method == "POST" && segments[2] in setOf("start", "stop", "restart", "kill", "wait") ->
@@ -152,7 +157,7 @@ object DockerApi {
             else Call.NotBuilt("signal $signal (a container's program is ended, not signalled)")
         }
         else -> query["condition"].orEmpty().ifEmpty { "not-running" }.let { condition ->
-            if (condition == "not-running" || condition == "next-exit") Call.Wait(id, condition) else Call.NotBuilt("wait?condition=$condition")
+            if (condition in setOf("not-running", "next-exit", "removed")) Call.Wait(id, condition) else Call.NotBuilt("wait?condition=$condition")
         }
     }
 
@@ -213,6 +218,8 @@ object DockerApi {
 
         val host = o["HostConfig"] as? JsonObject
         if (bool(host, "Privileged")) return refuse(400, "droidtop's containers never run privileged")
+        if (bool(o, "Tty") || bool(o, "OpenStdin")) return notYet("a container with a terminal or open input (docker run -t, -i)")
+        val autoRemove = bool(host, "AutoRemove")
         listOf("CapAdd", "Devices", "SecurityOpt", "Links", "VolumesFrom").forEach { key ->
             strings(host?.get(key))?.takeIf { it.isNotEmpty() }?.let { return notYet(key) }
         }
@@ -275,7 +282,11 @@ object DockerApi {
             start = false,
             labels = labels,
             networks = joins,
-        ) to null
+            autoRemove = autoRemove,
+        ).let { run ->
+            if (autoRemove && run.restart != ContainerProgram.RestartPolicy.No) return refuse(409, "AutoRemove and a restart policy cannot be used together")
+            run
+        } to null
     }
 
     /** What a network-create body asks for, read; or the answer when it asks for isolation droidtop cannot give. Pure. */
@@ -426,18 +437,14 @@ object DockerApi {
         runCatching { ((Json.parseToJsonElement(body) as JsonObject)["Detach"] as? JsonPrimitive)?.content == "true" }.getOrDefault(false)
 
     /** A command's output as Docker's multiplexed frames: stdout on stream 1, stderr on stream 2. Pure. */
-    fun outputFrames(stdout: String, stderr: String): ByteArray {
-        val out = java.io.ByteArrayOutputStream()
-        fun frame(stream: Int, text: String) {
-            if (text.isEmpty()) return
-            val payload = text.toByteArray(Charsets.UTF_8)
-            val n = payload.size
-            out.write(byteArrayOf(stream.toByte(), 0, 0, 0, (n ushr 24).toByte(), (n ushr 16).toByte(), (n ushr 8).toByte(), n.toByte()))
-            out.write(payload)
-        }
-        frame(1, stdout)
-        frame(2, stderr)
-        return out.toByteArray()
+    fun outputFrames(stdout: String, stderr: String): ByteArray =
+        frame(1, stdout.toByteArray(Charsets.UTF_8)) + frame(2, stderr.toByteArray(Charsets.UTF_8))
+
+    /** One multiplexed frame of [payload] bytes on [stream] (1 stdout, 2 stderr), empty for no bytes. Pure. */
+    fun frame(stream: Int, payload: ByteArray): ByteArray {
+        if (payload.isEmpty()) return ByteArray(0)
+        val n = payload.size
+        return byteArrayOf(stream.toByte(), 0, 0, 0, (n ushr 24).toByte(), (n ushr 16).toByte(), (n ushr 8).toByte(), n.toByte()) + payload
     }
 
     /** `GET /exec/{id}/json`: whether it runs, and its exit code once it has ended. */

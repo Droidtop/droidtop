@@ -129,6 +129,11 @@ internal object DockerApiServer {
                 runCatching {
                     EngineHttp.write(output, if (head) response.copy(body = ByteArray(0)) else response, DockerApi.headers)
                 }.onFailure { return }
+                // A streamed body (attach) is written as it comes, until it ends or the client goes.
+                response.stream?.let { stream ->
+                    runCatching { stream(output) }
+                    return
+                }
                 // A hijacked connection (101) carries one stream and then ends.
                 if (request.closes || response.status == 101) return
             }
@@ -258,6 +263,15 @@ internal object DockerApiServer {
                         is ContainerPrograms.State.Failed -> 125
                         else -> 0
                     }
+                    // removed (docker run --rm): the exit code once --rm has removed it, or after half a minute.
+                    if (call.condition == "removed") {
+                        val giveUp = System.currentTimeMillis() + REMOVED_WAIT_MS
+                        while (System.currentTimeMillis() < giveUp &&
+                            runCatching { runtime?.listContainers() }.getOrNull().orEmpty().any { it.container.id == id }
+                        ) {
+                            delay(WAIT_LOOK_MS)
+                        }
+                    }
                     EngineHttp.Response.json(200, DockerApi.waited(code))
                 }
             }
@@ -353,6 +367,16 @@ internal object DockerApiServer {
                 val upgrade = request.headers["upgrade"]?.equals("tcp", ignoreCase = true) == true
                 EngineHttp.Response(if (upgrade) 101 else 200, "application/vnd.docker.multiplexed-stream", frames)
             }
+            is DockerApi.Call.Attach -> withContainer(runtime, call.id) { _, info ->
+                val log = dev.droidtop.runtime.ContainerProgram.hostLogFile(app.filesDir, info.container.id)
+                val upgrade = request.headers["upgrade"]?.equals("tcp", ignoreCase = true) == true
+                EngineHttp.Response(
+                    status = if (upgrade) 101 else 200,
+                    contentType = "application/vnd.docker.multiplexed-stream",
+                    body = ByteArray(0),
+                    stream = { out -> followLog(log, info.container.id, fromStart = call.logs, live = call.stream, out) },
+                )
+            }
             is DockerApi.Call.ExecGet -> {
                 val exec = execs[call.execId] ?: return DockerApi.error(404, "No such exec instance: ${call.execId}")
                 EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, exec.containerId, exec.spec, exec.running, exec.exitCode))
@@ -373,6 +397,52 @@ internal object DockerApiServer {
     private val execs = java.util.concurrent.ConcurrentHashMap<String, Exec>()
     private const val MAX_EXECS = 256
     private val execScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * Attach's stream (docs/SPEC.md 3d, "Attach"): a program's output goes to its log, so attach follows that file and
+     * sends what is added as stdout frames, from where it ends now (or from the start with [fromStart]). With [live]
+     * it goes on until the program has run and ended: attach comes before start, so it waits for the start, giving up
+     * after [ATTACH_START_WAIT_MS] if none comes. The log may be trimmed under it, which starts it from the top.
+     */
+    private suspend fun followLog(log: File, containerId: String, fromStart: Boolean, live: Boolean, out: java.io.OutputStream) {
+        var offset = if (fromStart) 0L else withContext(Dispatchers.IO) { log.length() }
+        val startBy = System.currentTimeMillis() + ATTACH_START_WAIT_MS
+        var started = ContainerPrograms.isRunning(containerId)
+        // A program that starts and ends between two looks is seen by its state changing to over since the attach.
+        val before = ContainerPrograms.state(containerId)
+        while (true) {
+            offset = withContext(Dispatchers.IO) {
+                val size = log.length()
+                val from = if (size < offset) 0L else offset
+                if (size > from) {
+                    val bytes = java.io.RandomAccessFile(log, "r").use { f ->
+                        f.seek(from)
+                        ByteArray(minOf(size - from, MAX_FRAME.toLong()).toInt()).also { f.readFully(it) }
+                    }
+                    out.write(DockerApi.frame(1, bytes))
+                    out.flush()
+                    from + bytes.size
+                } else {
+                    from
+                }
+            }
+            if (!live) return
+            val running = ContainerPrograms.isRunning(containerId)
+            val now = ContainerPrograms.state(containerId)
+            if (running || (now !== before && (now is ContainerPrograms.State.Ended || now is ContainerPrograms.State.Failed))) started = true
+            if (started && !running) {
+                if (withContext(Dispatchers.IO) { log.length() } <= offset) return
+            } else if (!started && System.currentTimeMillis() > startBy) {
+                return
+            } else {
+                delay(WAIT_LOOK_MS)
+            }
+        }
+    }
+
+    private const val ATTACH_START_WAIT_MS = 5 * 60_000L
+    private const val REMOVED_WAIT_MS = 30_000L
+    private const val MAX_FRAME = 64 * 1024
 
     /** One network change at a time: each reads, changes and writes networks.json whole. */
     private val networksLock = Mutex()
