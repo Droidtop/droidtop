@@ -246,3 +246,55 @@ object Slab {
     /** Font scale at which Large keys turn on by themselves (S7 5.2). */
     const val LARGE_KEYS_FONT_SCALE = 1.3f
 }
+
+/**
+ * The slab's output delivered into a [KeyboardSink] (the companion's docked slab, any host whose field is reached
+ * through a sink): text through the sink's text channel, keys as a down and an up. [onClose] is B or Done, and the
+ * clipboard and the globe key go to the host ([onOther]). A sink without a text channel (a compositor) gets each
+ * character as its key where the US layout has one, Shift around a capital or a shifted symbol.
+ */
+object SlabSink {
+    fun deliver(output: Slab.Output, sink: KeyboardSink, onClose: () -> Unit, onOther: (Slab.Output) -> Unit = {}) {
+        when (output) {
+            is Slab.Output.Type -> if (sink.takesText) sink.text(output.text) else output.text.forEach { typeAsKeys(it, sink) }
+            is Slab.Output.Press -> {
+                sink.key(output.keyCode, true)
+                sink.key(output.keyCode, false)
+            }
+            Slab.Output.Close -> onClose()
+            else -> onOther(output)
+        }
+    }
+
+    private fun typeAsKeys(ch: Char, sink: KeyboardSink) {
+        val (code, shifted) = UsKeys.of(ch) ?: return
+        if (shifted) sink.key(KeyEvent.KEYCODE_SHIFT_LEFT, true)
+        sink.key(code, true)
+        sink.key(code, false)
+        if (shifted) sink.key(KeyEvent.KEYCODE_SHIFT_LEFT, false)
+    }
+
+    /** The US layout's key for a character, and whether Shift is held for it. */
+    internal object UsKeys {
+        private const val UNSHIFTED = "`1234567890-=[]\\;',./"
+        private const val SHIFTED = "~!@#\$%^&*()_+{}|:\"<>?"
+        private val CODES = intArrayOf(
+            KeyEvent.KEYCODE_GRAVE, KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_3, KeyEvent.KEYCODE_4,
+            KeyEvent.KEYCODE_5, KeyEvent.KEYCODE_6, KeyEvent.KEYCODE_7, KeyEvent.KEYCODE_8, KeyEvent.KEYCODE_9,
+            KeyEvent.KEYCODE_0, KeyEvent.KEYCODE_MINUS, KeyEvent.KEYCODE_EQUALS, KeyEvent.KEYCODE_LEFT_BRACKET,
+            KeyEvent.KEYCODE_RIGHT_BRACKET, KeyEvent.KEYCODE_BACKSLASH, KeyEvent.KEYCODE_SEMICOLON,
+            KeyEvent.KEYCODE_APOSTROPHE, KeyEvent.KEYCODE_COMMA, KeyEvent.KEYCODE_PERIOD, KeyEvent.KEYCODE_SLASH,
+        )
+
+        fun of(ch: Char): Pair<Int, Boolean>? = when {
+            ch in 'a'..'z' -> KeyEvent.KEYCODE_A + (ch - 'a') to false
+            ch in 'A'..'Z' -> KeyEvent.KEYCODE_A + (ch - 'A') to true
+            ch == ' ' -> KeyEvent.KEYCODE_SPACE to false
+            ch == '\t' -> KeyEvent.KEYCODE_TAB to false
+            ch in UNSHIFTED -> CODES[UNSHIFTED.indexOf(ch)] to false
+            // The shifted characters pair with the unshifted ones position for position (~ on `, ! on 1, ...).
+            ch in SHIFTED -> CODES[SHIFTED.indexOf(ch)] to true
+            else -> null
+        }
+    }
+}

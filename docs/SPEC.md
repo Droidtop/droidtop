@@ -4016,6 +4016,13 @@ intent filters and user-facing strings all survive.
 
 ### The companion's tabs (decided 2026-10-02, Droidtop/tracker#247, #273)
 
+**The keyboard is part of the companion (owner, 2026-10-16: "by default, it's PART of the companion,, especially if droidtop is set as the keyboard").**
+While a field on the other screen wants keys, droidtop's keyboard slab is docked at the bottom of the companion's own
+layout, under whatever tab is showing (`CompanionDockedSlab`), not a separate floating panel and not a switch to the
+Input tab. This is the default for droidtop's own text entry and always the case when droidtop is the system
+keyboard, whose requests come the same way (`KeyboardTargets.companion`). Changing tab keeps it; the Input tab, which
+types into the request already, shows no second one.
+
 The companion is a tabbed, touch-only second screen. One entry, `CompanionTabs` (`:app`), is drawn by
 every host that draws the companion (the registry's `Surface`, used by `SecondScreenPresentation` and
 `SecondaryDisplayActivity`, and `CompanionActivity`). Standard draws the same tabs (decided 2026-10-08, Droidtop/tracker#347): its own
@@ -5000,8 +5007,9 @@ rig check in the commit message.
     (`TextEntryEdits`, tested: typing at the caret replacing a selection, Backspace, the caret's moves, the length
     limit). Where the keys are typed elsewhere (the companion, the internal screen), the host passes no slab and a cue
     under the plate.
-  - Where the keys are typed (S7 5.6) is "Keyboard displays on" through `KeyboardTargets.placement`: the
-    companion's Input controller while a companion is started on another screen (one that is absent, asleep or
+  - Where the keys are typed (S7 5.6) is "Keyboard displays on" through `KeyboardTargets.placement`, Companion by
+    default (owner, 2026-10-16: "by default, it's PART of the companion,, especially if droidtop is set as the keyboard"; this settles the design's open question on the default): the
+    slab docked in the companion's layout while a companion is started on another screen (one that is absent, asleep or
     stopped is not, and the field's own screen types instead, silently), the internal screen, or this screen. With an
     assistive service on (TalkBack or touch exploration, Switch Access, Select to Speak: `KeyboardTargets.assistiveOn`)
     the system keyboard types instead, whatever the setting (`AddonKeyboardRules.keyboardPlacement(assistive)`),
@@ -5102,12 +5110,13 @@ companion trackpad's pointer, `canPerformGestures`, see "Input (slice C12)"), wh
     other apps) asks `KeyboardTargets.open`, which answers draw it here, elsewhere, or nowhere. The
     keys always go to the asker's own sink (the window's keys, the input method's connection, or
     `RoutedKeyboardSink`), so the field keeps its focus wherever the keyboard is drawn.
-  - Companion: the companion switches to its own input controller, the Input tab
-    (`SecondScreenInputView`, the same keyboard and trackpad Desktop mode uses), whose keys go to the
-    requesting field while the request lasts, and is on the tab it was on again when the field
-    loses focus, its Hide is pressed or the request ends any other way. The tab the person chose is
-    never overwritten: the Input tab is what the strip shows while a request stands (`shown` in
-    `CompanionTabs`), so there is no remembered tab to lose (Droidtop/tracker#369). A Hide holds only
+  - Companion (owner, 2026-10-16: "by default, it's PART of the companion,, especially if droidtop is set as the keyboard"): the keyboard is part of the companion's layout. The slab
+    (`CompanionDockedSlab`: `SlabView` with `SlabSink` delivering into the request's sink) docks under
+    the tab that is showing while the request lasts, and goes when the field loses focus, its Hide or
+    the slab's Done is pressed, or the request ends any other way. The tab the person chose is never
+    overwritten or switched (Droidtop/tracker#369); changing tab keeps the keyboard, and on the Input
+    tab, which types into the request itself, no second keyboard docks. It used to switch the strip to
+    the Input tab for the request (until 2026-10-16). A Hide holds only
     until the field is asked for again: another field taking focus, a tap on the focused field
     (`InWindowKeyboard`), or the app asking the input method for the keyboard again
     (`LatinIME.onShowInputRequested`, `ShowRequests.reasked`) brings the keyboard back. It hosts only while a companion host is started on another

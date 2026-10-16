@@ -294,9 +294,9 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             job?.cancel()
         }
     }
-    // A field on the other screen wants keys: the input controller is what shows while the request stands, and
-    // the selected tab is never touched, so Hide, Back and a field losing focus all land on the tab the person was
-    // on however the request ended (Droidtop/tracker#369). A tab pressed meanwhile ends the request first.
+    // A field on the other screen wants keys: the slab docks under whatever tab is showing while the request stands
+    // (CompanionDockedSlab), part of this layout, and the selected tab is never touched, so Hide, Back and a field
+    // losing focus all leave the person where they were (Droidtop/tracker#369). Changing tab keeps the keyboard.
     val requested by KeyboardTargets.companion.collectAsState()
 
     // Screens plugged in or out: the companion goes back to the screen chosen for the new set by itself (the
@@ -358,7 +358,6 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             if (bar.all.any { it.id == id }) id else CompanionTab.HOME.id
         }
         fun select(id: String) {
-            if (requested != null) KeyboardTargets.hideCompanion()
             CompanionInputHandle.showTabs.value = false
             socialStart = null
             moreOpen = false
@@ -393,7 +392,9 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
             }
         }
 
-        val shown = if (requested != null) CompanionTab.INPUT.id else selected
+        // The keyboard for a field on the other screen is part of this layout, under the tab the person is on (owner,
+        // 2026-10-16: "by default, it's PART of the companion"); the tab itself stays (Droidtop/tracker#369).
+        val shown = selected
         val colors = MaterialTheme.colorScheme
         val railColors = RailColors(
             selected = colors.surfaceVariant,
@@ -457,6 +458,8 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                     }
                 }
             }
+            // The Input tab types into the request already (its routed sink); everywhere else the slab docks here.
+            requested?.takeIf { shown != CompanionTab.INPUT.id }?.let { CompanionDockedSlab(it) }
             if (!settings.barTipSeen) {
                 CompanionTip(
                     if (portrait) {
