@@ -4985,8 +4985,23 @@ rig check in the commit message.
   The face-button map and the double press for Caps are the design's own and are to compare with a Deck: Valve
   documents none for the Deck's keyboard (coordinator, 2026-10-16, from the public reference on #485, comment
   6224222271). There is no emoji page (the Deck's emoji menu is a difference noted there, not adopted); the email
-  layer follows the Deck API's email mode. The slab's drawing, the Field and Prompt entry (`TextEntry`, `:ui-shared`)
-  and where it shows are the next slices.
+  layer follows the Deck API's email mode.
+  - Drawn by `SlabView` (`:input-keyboard`): rows of 38 dp (Large keys 48 dp) with 6 dp gaps, so 226 dp (222 dp
+    Large); keys on the theme's card colour over its overlay surface; the focused key scaled 1.06 on the focused fill
+    with a 3 dp accent ring; labels 18 sp for a character and 15 sp for a named key, both capped at 60% of the row;
+    each pad key's printed button (from the host's controller layout, so a Nintendo pad's Backspace keycap reads Y)
+    in its lower right, at least 14 sp; every press, by pad or touch, an 80 ms flash and a keyboard haptic tick. It is
+    never a focus target: the host forwards the pad's keys to it and the field keeps focus.
+  - Hosted by `TextEntry` (`:ui-shared`) in two forms: `TextEntryField`, a plate in place with the slab under it (B
+    keeps the text and leaves; R2 submits), and `TextEntryPrompt`, Steam's rename dialog (a card at most 560 dp wide
+    above the slab, the page dimmed at 0.6, a 20 sp title, the plate, small Cancel and Save buttons; B cancels). The
+    plate is a real text field whose input method stays away (`showKeyboardOnFocus = false`), at least 64 dp (56 dp
+    for search) on 6 dp corners with a 2 dp accent underline. The slab's presses edit the value directly
+    (`TextEntryEdits`, tested: typing at the caret replacing a selection, Backspace, the caret's moves, the length
+    limit). Where the keys are typed elsewhere (the companion, the internal screen), the host passes no slab and a cue
+    under the plate.
+  - Moving the existing fields onto it is slice 8; where the slab shows (the placement matrix with its fallbacks) is
+    the host's, next in slice 6.
 - **Other apps on the add-on display: droidtop's input method, drawn where the app is.** droidtop's
   keyboard is already a selectable input method; its connection to the focused editor exists even
   where Android draws no keyboard window. When an editor asks it for the keyboard
