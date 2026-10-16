@@ -46,8 +46,10 @@ object DockerApi {
         data class Stop(val id: String) : Call
         data class Restart(val id: String) : Call
         data class Kill(val id: String, val signal: String?) : Call
-        data class Remove(val id: String, val force: Boolean) : Call
-        data class Pull(val reference: String) : Call
+        /** [ignoreMissing]: libpod's `ignore`, a container that is not there is not an error. */
+        data class Remove(val id: String, val force: Boolean, val ignoreMissing: Boolean = false) : Call
+        /** [policy]: libpod's pull policy, always, missing, newer or never; Docker's pull is always. */
+        data class Pull(val reference: String, val policy: String = "always") : Call
         data class Logs(val id: String, val tail: Int, val stdout: Boolean, val stderr: Boolean) : Call
         data class Wait(val id: String, val condition: String) : Call
 
@@ -61,6 +63,8 @@ object DockerApi {
         data class Attach(val id: String, val logs: Boolean, val stream: Boolean) : Call
         data class ExecStart(val execId: String) : Call
         data class ExecGet(val execId: String) : Call
+        /** libpod's: forget a finished exec, which Podman's client does after reading its exit code. */
+        data class ExecRemove(val execId: String) : Call
 
         /** The libpod API's own: whether a container, image, pod or network exists (204, or 404). */
         data class Exists(val kind: Kind, val id: String) : Call
@@ -239,17 +243,8 @@ object DockerApi {
         )
         limits.forEach { (key, option) -> if (number(host, key) > 0) return refuse(501, EngineOptions.refusal("docker create", option, features)) }
         string(host, "CpusetCpus")?.let { return refuse(501, EngineOptions.refusal("docker create", "--cpuset-cpus", features)) }
-        // Networks: bridge, host and default are what every container already has; a network of droidtop's own is
-        // joined by name; none needs network namespaces (docs/SPEC.md 3d, "Networks").
         val joins = mutableListOf<EngineRequest.NetworkJoin>()
-        fun join(ref: String, aliases: List<String>): EngineHttp.Response? {
-            if (ref in setOf("default", "host", "bridge")) return null
-            if (ref == "none") return error(501, EngineOptions.refusal("docker create", "--network", features))
-            val network = ContainerNetworks.find(networks, ref) ?: return error(404, "network $ref not found")
-            val at = joins.indexOfFirst { it.networkId == network.id }
-            if (at < 0) joins += EngineRequest.NetworkJoin(network.id, aliases) else joins[at] = joins[at].copy(aliases = (joins[at].aliases + aliases).distinct())
-            return null
-        }
+        fun join(ref: String, aliases: List<String>) = join(joins, networks, ref, aliases, features, "docker create", setOf("default", "host", "bridge"))
         string(host, "NetworkMode")?.let { mode -> join(mode, emptyList())?.let { return null to it } }
         ((o["NetworkingConfig"] as? JsonObject)?.get("EndpointsConfig") as? JsonObject)?.forEach { (ref, endpoint) ->
             join(ref, strings((endpoint as? JsonObject)?.get("Aliases")).orEmpty())?.let { return null to it }
@@ -294,6 +289,28 @@ object DockerApi {
             if (autoRemove && run.restart != ContainerProgram.RestartPolicy.No) return refuse(409, "AutoRemove and a restart policy cannot be used together")
             run
         } to null
+    }
+
+    /**
+     * Adds the network [ref] names to [joins], with [aliases], or the answer when it cannot: [defaults] are what every
+     * container already has (each API's own words for its default network), a network of droidtop's own is joined by
+     * name, none needs network namespaces (docs/SPEC.md 3d, "Networks"), another is not found.
+     */
+    internal fun join(
+        joins: MutableList<EngineRequest.NetworkJoin>,
+        networks: List<Network>,
+        ref: String,
+        aliases: List<String>,
+        features: EngineFeatures?,
+        command: String,
+        defaults: Set<String>,
+    ): EngineHttp.Response? {
+        if (ref in defaults) return null
+        if (ref == "none") return error(501, EngineOptions.refusal(command, "--network", features))
+        val network = ContainerNetworks.find(networks, ref) ?: return error(404, "network $ref not found")
+        val at = joins.indexOfFirst { it.networkId == network.id }
+        if (at < 0) joins += EngineRequest.NetworkJoin(network.id, aliases) else joins[at] = joins[at].copy(aliases = (joins[at].aliases + aliases).distinct())
+        return null
     }
 
     /** What a network-create body asks for, read; or the answer when it asks for isolation droidtop cannot give. Pure. */
@@ -519,6 +536,14 @@ object DockerApi {
     /** An error in Docker's shape, `{"message": ...}`. */
     fun error(status: Int, message: String): EngineHttp.Response =
         EngineHttp.Response.json(status, JsonObject(mapOf("message" to JsonPrimitive(message))).toString() + "\n")
+
+    /** 404 for [ref] in Docker's words. Docker has no pods; a pod is only asked for on libpod paths. */
+    fun missing(kind: Kind, ref: String): EngineHttp.Response = when (kind) {
+        Kind.CONTAINER -> error(404, "No such container: $ref")
+        Kind.IMAGE -> error(404, "No such image: $ref")
+        Kind.POD -> error(404, "no such pod: $ref")
+        Kind.NETWORK -> error(404, "network $ref not found")
+    }
 
     fun notBuilt(what: String): EngineHttp.Response =
         error(501, "$what is not built in droidtop's engine yet (docs/SPEC.md 3d, \"The Docker Engine API\")")
