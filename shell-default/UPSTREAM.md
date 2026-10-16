@@ -47,6 +47,16 @@ upstream commits since the base that are not in this table, so a new upstream co
 | `6206042` | LAUNCHER_ICON - add monochrome icon | Not for this tree: Murine's own app icon; droidtop has its own |
 | `9001d72` | ICONS - add monochrome icons option for Android 13+ | Taken |
 | `e0f2e25` | ICONS - resolve correct icon while dragging on Android 8-11 | Taken, after the icon options it builds on; one import fitted by hand |
+| `17740a9` | DRAWER - add drawer search autofocus | Skipped on purpose (coordinator, 2026-10-16): the drawer's search field opens droidtop's one search (Droidtop/tracker#12), so focusing it on open would open that search every time |
+| `e4e124c` | QSB - search within apps | Skipped on purpose (coordinator, 2026-10-16): it makes the home search bar a second app search; apps are found by droidtop's one search (`LauncherSearchActivity`), which the drawer's search field opens, and the home search bar keeps its web search |
+| `72bd0fa` | QSB - long-press menu and drag icons from QSB search | Skipped with `e4e124c`, whose results it acts on |
+| `831bcd2` | APP_LOCK - removed reflection and using direct calls | Waits: calls Android 17's App Lock API directly, and shell-default compiles against SDK 36 |
+| `507fc48` | APP_LOCK - add protected apps tab | Waits with `831bcd2`, which it builds on |
+| `50cc836` | I18N - add remaining locked_apps_label localizations | Waits with `507fc48`; only es and it are kept here |
+| `9901444` | APP_LOCK - add native app lock toggle in app info bottom sheet | Waits with `831bcd2` |
+| `b726053` | APP_LOCK - use "Hidden & Protected apps" label when protected apps are supported | Waits with `507fc48` |
+| `2ccb47e` | APP_LOCK - do not show lock / unlock button for deep shortcuts | Waits with `9901444` |
+| `f7e2f56` | REFACTOR - remove TODO to hide the "search hidden apps" toggle in the Locked tab | Waits with `507fc48` |
 
 Not yet decided: the rest of the list `scripts/murine-upstream.sh` prints. Of those, the website (`WEBSITE - ...`),
 version bumps and upstream's own build moves (AGP and Gradle upgrades, `4e670a4` moving every module under
