@@ -130,6 +130,7 @@ object GamingSettingsCatalog {
     const val ID_THEME_ASPECT_RATIO = "pref_gaming_theme_aspect_ratio"
     const val ID_BROWSE_THEMES = "pref_gaming_browse_themes"
     const val ID_APPS_GRID_COLUMNS = "pref_gaming_apps_grid_columns"
+    const val ID_ICON_PACK = "pref_gaming_icon_pack"
     const val ID_DESKTOP_SETTINGS = "pref_gaming_desktop_settings"
     const val ID_STANDARD_SETTINGS = "pref_gaming_standard_settings"
 
@@ -469,6 +470,7 @@ object GamingSettingsCatalog {
                     ),
                 )
                 add(appsGridColumnsItem(context))
+                iconPackItem(context)?.let { add(it) }
             },
         ),
         // Live device state and one-shot device actions: the Quick Menu's
@@ -1639,6 +1641,24 @@ object GamingSettingsCatalog {
             options = ratios.map { ChoiceOption(it, EsDeAspectRatio.labelFor(it)) },
             current = ThemePrefs.aspectRatio(context, themeName) ?: ratios.first(),
             onSelect = { ctx, value -> ThemePrefs.setAspectRatio(ctx, themeName, value) },
+        )
+    }
+
+    /**
+     * The icon pack Apps and Standard's drawer draw their icons with (Droidtop/tracker#508): the one choice Standard's
+     * launcher keeps ([IconPacks]). System icons are the default. Not shown when no launcher registered the source.
+     */
+    private fun iconPackItem(context: Context): ChoiceItem? {
+        val source = IconPacks.source ?: return null
+        val packs = runCatching { source.installed(context) }.getOrDefault(emptyList())
+        if (packs.size <= 1) return null
+        return ChoiceItem(
+            id = ID_ICON_PACK,
+            title = "Icon pack",
+            subtitle = "App icons in Apps and on the Android home screen",
+            options = packs.map { (pack, label) -> ChoiceOption(pack, label) },
+            current = source.selected(context),
+            onSelect = { ctx, pack -> source.select(ctx, pack) },
         )
     }
 
