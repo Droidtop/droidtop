@@ -143,10 +143,25 @@ object DownloadJobs {
     internal fun placeInFolder(file: File, args: Map<String, String>): File {
         val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
         require(destination.isDirectory || destination.mkdirs()) { "the game folder ${destination.absolutePath} is not available" }
-        val target = File(destination, requireNotNull(args["targetName"]) { "the file name is missing" })
-        require(!target.exists()) { "${target.absolutePath} already exists" }
+        // A name already in the folder keeps both (Droidtop/tracker#355 G5): the new one is "Name (2).ext", never a
+        // failure after the whole download and never a replacement.
+        val target = freeName(destination, requireNotNull(args["targetName"]) { "the file name is missing" })
         moveFile(file, target)
         return target
+    }
+
+    /**
+     * [name] in [folder], or the first of "Name (2).ext", "Name (3).ext", ... that is free, so a download never replaces
+     * what is there (Droidtop/tracker#355 G5). Throws when 99 copies already exist.
+     */
+    internal fun freeName(folder: File, name: String): File {
+        val first = File(folder, name)
+        if (!first.exists()) return first
+        val dot = name.lastIndexOf('.').takeIf { it > 0 && !File(folder, name).isDirectory } ?: name.length
+        val stem = name.substring(0, dot)
+        val ext = name.substring(dot)
+        return (2..99).asSequence().map { File(folder, "$stem ($it)$ext") }.firstOrNull { !it.exists() }
+            ?: throw IllegalArgumentException("${first.absolutePath} and 98 copies already exist")
     }
 
     /**
@@ -238,8 +253,8 @@ object DownloadJobs {
         val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
         require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
         val targetName = requireNotNull(args["targetName"]) { "the file name is missing" }
-        val folder = File(destination, requireNotNull(archiveStem(targetName)) { "$targetName is not a zip, 7z or rar archive" })
-        require(!folder.exists()) { "a folder with that name already exists" }
+        // An existing folder is never unpacked over: the new game is "Name (2)" beside it (#355 G5).
+        val folder = freeName(destination, requireNotNull(archiveStem(targetName)) { "$targetName is not a zip, 7z or rar archive" })
         val building = File(destination, ".${folder.name}.unpacking")
         try {
             ArchiveExtractor.extract(file, building)

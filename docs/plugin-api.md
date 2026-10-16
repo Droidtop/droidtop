@@ -3632,6 +3632,12 @@ version was bumped.
 
 **Changelog (additive changes; no version moved).**
 
+- 2026-10-16 (Droidtop/tracker#355 G5): a download whose name is already in
+  the game folder is kept beside it as "Name (2).ext" (an unpacked game as
+  "Name (2)"), never replacing it and never failing after the download; a
+  set of several files whose names are taken still stops, since its files
+  name each other.
+
 - 2026-10-16 (Droidtop/tracker#520): an `apps.bridge` entry may carry
   `app`, `packages` and `get`; `needs: "app"` on a node or a tile. droidtop
   draws the missing-app notice itself.
