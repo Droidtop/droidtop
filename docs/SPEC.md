@@ -1067,8 +1067,9 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     id (`WidgetConfigs`) and forgotten when the widget is removed. A game that left the library says so, and a tap
     picks again.
   - **Downloads**: the downloads running or paused with their progress, then how many games have an update; a row
-    opens Downloads or Updates. Drawn again when the jobs change, at most every 2 s (`DownloadsWidgetProvider.watch`,
-    following `PluginJobsCenter` from :app's start).
+    opens Downloads or Updates. With nothing running and no update, a tap anywhere on it opens Downloads
+    (`DroidtopWidgets.rows(emptyTap)`; it did nothing, rig on 0.2.0-dev.2070). Drawn again when the jobs change, at
+    most every 2 s (`DownloadsWidgetProvider.watch`, following `PluginJobsCenter` from :app's start).
   - **Shelf**, with the first widget maker (`ShelfConfigureActivity`, opened on placement and to reconfigure):
     recently played, recently added, favourites, one of the person's collections or a system that has games, as a
     grid of art (a `RemoteViewsService` collection, `ShelfWidgetService`, each cell filling in its game's id) or a
