@@ -26,5 +26,6 @@ internal object ContainerRemoval {
             ContainerPods.save(files, ContainerPods.withoutMember(ContainerPods.read(files), info.container.id))
             ContainerNetworks.save(files, ContainerNetworks.withoutMember(ContainerNetworks.read(files), info.container.id))
         }
+        DesktopWidgetProvider.requestUpdate(context)
     }
 }

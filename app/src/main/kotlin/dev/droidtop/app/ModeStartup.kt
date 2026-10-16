@@ -33,8 +33,10 @@ object ModeStartup {
         val live = ModeGate.piecesToStart(Modes.enabled)
         fun on(piece: ModePiece) = piece in live
 
-        // droidtop's dynamic app shortcuts offer Gaming and Desktop only while each is on (Droidtop/tracker#563).
+        // droidtop's dynamic app shortcuts and the full-page widget offer Gaming and Desktop only while each is on
+        // (Droidtop/tracker#563).
         DroidtopShortcuts.refresh(app)
+        DroidtopWidgets.refreshAll(app)
 
         // Launcher mode is the Launcher3 fork. Its Activities already
         // follow the HOME role (HomeRolePrefs enables exactly one of them,
@@ -84,6 +86,8 @@ object ModeStartup {
         // Other apps' "Open with" lists offer droidtop only while Desktop
         // mode, which runs what it opens, is on.
         setComponentEnabled(app, OpenWithActivity::class.java.name, on(ModePiece.DESKTOP_OPEN_WITH))
+        // The Desktop widget is offered in launchers' pickers only while Desktop is on (Droidtop/tracker#563).
+        setComponentEnabled(app, DesktopWidgetProvider::class.java.name, on(ModePiece.DESKTOP_SESSION))
 
         // Desktop switched off takes its running session with it: the
         // compositor and everything on the desktop, not only the next start.

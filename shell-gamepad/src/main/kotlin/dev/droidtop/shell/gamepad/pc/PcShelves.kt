@@ -19,6 +19,7 @@ import dev.droidtop.shell.gamepad.query.holding
 import dev.droidtop.shell.gamepad.query.listExclusion
 import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.query.StripTabs
+import dev.droidtop.shell.gamepad.query.addedEpochMs
 
 /**
  * One row of the PC Games home (docs/SPEC.md 7i): a title, the games on
@@ -207,14 +208,6 @@ internal fun pcShelves(
         shelf(SHELF_WISHLIST, "Wishlist (not owned)", games.filter { it.holding() == StoreHolding.WISHLIST && !it.hidden })?.let(::add)
     }
 }
-
-/**
- * When the library first saw this entry; an installed app the library index
- * has not stamped falls back to the package manager's install time. 0 when
- * neither is known. Pure.
- */
-internal fun LibraryEntry.addedEpochMs(): Long =
-    firstSeenEpochMs.takeIf { it > 0L } ?: appFacts?.firstInstalledEpochMs ?: 0L
 
 /** What a game is, in the one word a badge leads with. */
 internal enum class BadgeKind(val word: String) { PC("PC"), ENGINE("Engine"), RETRO("Retro"), APP("App") }

@@ -553,7 +553,13 @@ private fun LibrarySortKey.hasFact(entry: LibraryEntry, context: LibraryQueryCon
     LibrarySortKey.SIZE -> (entry.pcInfo?.sizeBytes ?: 0L) > 0L
 }
 
-/** When the entry arrived: an app's install time, else the library's first sighting. */
+/**
+ * When the entry arrived (docs/SPEC.md 7i, "When a game was added"): an installed app's install time when the package
+ * manager knows it, else the library's first sighting, 0 when neither is known. The one definition: the Added sort,
+ * PC Games' Recently added and Home's games row, and Home's What's new additions all read it, so they order alike.
+ * First-seen alone stamps everything the first scan found with the same moment, so it cannot order a library that
+ * existed before droidtop; an install time can. Pure.
+ */
 internal fun LibraryEntry.addedEpochMs(): Long =
     appFacts?.firstInstalledEpochMs?.takeIf { it > 0L } ?: firstSeenEpochMs
 

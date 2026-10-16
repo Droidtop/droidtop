@@ -250,6 +250,77 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_quick_launch_info" />
         </receiver>
+        <receiver
+            android:name="dev.droidtop.app.DownloadsWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_downloads_info" />
+        </receiver>
+        <receiver
+            android:name="dev.droidtop.app.DesktopWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_desktop_info" />
+        </receiver>
+        <receiver
+            android:name="dev.droidtop.app.CompanionWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_companion_info" />
+        </receiver>
+        <receiver
+            android:name="dev.droidtop.app.FullPageWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_page_info" />
+        </receiver>
+        <receiver
+            android:name="dev.droidtop.app.ShelfWidgetProvider"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_shelf_info" />
+        </receiver>
+        <service
+            android:name="dev.droidtop.app.ShelfWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
+        <activity
+            android:name="dev.droidtop.app.ShelfConfigureActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+        <!-- Runs an exported container app from outside the shell (ExportLaunch; the Desktop widget). -->
+        <activity
+            android:name="dev.droidtop.app.ExportLaunchActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay" />
         <activity
             android:name="dev.droidtop.app.QuickLaunchConfigureActivity"
             android:exported="true"

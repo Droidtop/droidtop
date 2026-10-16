@@ -649,11 +649,13 @@ object ContainersCatalog {
                             title = app.name,
                             subtitle = "Shown in the desktop's menus as \"${app.name} (on ${info.displayName})\"",
                             current = app.id in exported,
-                            onToggle = { _, on ->
+                            onToggle = { ctx, on ->
                                 withContext(Dispatchers.IO) {
                                     val export = ExportedApp(container.id, info.displayName, app)
                                     ContainerExports.save(filesDir, ContainerExports.with(ContainerExports.read(filesDir), export, on))
                                 }
+                                // The Desktop widget lists the exported apps.
+                                dev.droidtop.app.DesktopWidgetProvider.requestUpdate(ctx)
                             },
                         )
                     }

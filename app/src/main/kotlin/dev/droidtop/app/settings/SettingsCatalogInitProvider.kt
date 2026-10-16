@@ -63,6 +63,10 @@ class SettingsCatalogInitProvider : ContentProvider() {
             dev.droidtop.library.integrations.notifyThemeChanged(ctx, set.light)
             dev.droidtop.app.DroidtopWidgets.refreshAll(ctx)
         }
+        // The Downloads widget follows the jobs while the process lives (Droidtop/tracker#563).
+        dev.droidtop.app.DownloadsWidgetProvider.watch(appContext)
+        dev.droidtop.app.DesktopWidgetProvider.watch(appContext)
+        dev.droidtop.app.CompanionWidgetProvider.watch(appContext)
         dev.droidtop.library.theme.RoleTokens.attach(appContext)
         appearanceWatch = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == dev.droidtop.library.settings.AppearancePrefs.KEY_APPEARANCE) dev.droidtop.library.theme.RoleTokens.checkSoon()
