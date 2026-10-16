@@ -3628,6 +3628,12 @@ prescribed by the API". So:
   it whose allowlist is the plugin's declared `priv.*` points (a shell
   command for `priv.shell`, the package calls for `priv.packages`), so the
   plugin's Shizuku calls are made as droidtop and only those calls.
+  Confirmed through the coordinator with the owner's approval, 2026-10-16:
+  "Every plugin is isolated", full access only through what the API
+  prescribes, and "Shizuku reaches Android only through the relay's
+  allowlist". The earlier "Shizuku does need direct access to android
+  APIs" means Android's APIs reached through the relay, not a plugin
+  process with droidtop's identity.
 
 Built (2026-10-16): an open plugin's `net.sockets` runs isolated on
 Android 11 and later (`PluginTiers.runsIsolated`; the sandbox's
