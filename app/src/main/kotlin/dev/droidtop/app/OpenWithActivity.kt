@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.DocumentsContract
-import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
@@ -64,14 +63,17 @@ import java.io.File
 /**
  * "Open with droidtop" (docs/SPEC.md 4b): a downloaded `.exe`, `.msi`,
  * `.deb`, `.rpm` or `.AppImage`, tapped in a browser or file manager,
- * opens here, and runs or installs from where it is. Nothing is copied.
+ * opens here, and runs or installs from where it is when Android's own storage or Downloads provider names the
+ * file; from any other app's provider it is copied into droidtop's cache first, as that provider's word for where the
+ * file is cannot be trusted (review, 2026-10-16).
  *
  * Windows programs go to a Wine prefix through the same engine a library
  * game uses ([WinePrefixes]); packages and AppImages go to a container
  * through the desktop session ([DesktopSessionService.runInPrimary]), so
  * the program lives as long as the session, not as long as this screen.
  * The choice is the one choice component; the last one per extension is
- * offered first, and "always" is an explicit row, never a silent default.
+ * offered first, and "always" is an explicit row that preselects it. Nothing runs without a press: any app can send
+ * a file here, so a remembered choice never starts a program by itself (review, 2026-10-16).
  *
  * Enabled as a component only while Desktop mode is on
  * ([dev.droidtop.library.settings.ModePiece.DESKTOP_OPEN_WITH]).
@@ -129,8 +131,6 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
     var failure by remember { mutableStateOf<String?>(null) }
     val install by OpenWithActivity.lastInstall.collectAsState()
 
-    var autoOpened by remember { mutableStateOf(false) }
-
     // Re-resolved when the desktop connects: container choices need it.
     LaunchedEffect(uri, connected) {
         val (resolved, remembered, rememberedAlways) = withContext(Dispatchers.IO) {
@@ -143,16 +143,8 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
         val preferred = ready.choices.firstOrNull { it.key == remembered && it.available }
             ?: ready.choices.firstOrNull { it.available }
         if (ready.choices.none { it.key == selectedKey && it.available }) selectedKey = preferred?.key
-        if (!autoOpened) always = rememberedAlways
-        // "Always" was chosen for this kind: open straight away, once, and
-        // keep this screen up with the way back to choosing.
-        if (!autoOpened && rememberedAlways && preferred != null && preferred.key == remembered) {
-            autoOpened = true
-            working = "Opening ${ready.file.name} with ${preferred.title}…"
-            failure = preferred.open(context)
-            working = null
-            if (failure == null && !ready.kind.isInstall()) onClose()
-        }
+        // "Always" preselects the remembered choice; opening still takes a press.
+        always = rememberedAlways
     }
 
     fun open(ready: OpenWithState.Ready) {
@@ -208,7 +200,7 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
                     if (s.choices.any { it.available }) {
                         SelectableRow(
                             title = "Always open .${s.kind.extension} files this way",
-                            supporting = if (always) "On: next time this opens without asking" else "Off: asks every time",
+                            supporting = if (always) "On: next time this choice is already picked" else "Off: picks nothing ahead",
                             selected = always,
                             onClick = if (working == null) ({ always = !always }) else null,
                         )
@@ -294,8 +286,7 @@ private suspend fun resolveState(context: Context, uri: Uri?, desktopConnected: 
         ?: return OpenWithState.Unreadable("droidtop opens .exe, .msi, .deb, .rpm and .AppImage files.")
     if (file == null || !file.canRead()) {
         return OpenWithState.Unreadable(
-            "droidtop runs a file from where it is, and this one isn't in a folder it can read. " +
-                "Save it to your Download folder first, then open it from there.",
+            "droidtop couldn't read this file. Save it to your Download folder first, then open it from there.",
         )
     }
     return if (kind.runsInWine) wineChoices(context, file, kind) else containerChoices(context, file, kind, desktopConnected)
@@ -407,24 +398,32 @@ private fun runInContainer(
 }
 
 /**
- * The file behind a `VIEW` or `SEND` URI, as a real path on shared
- * storage, or null when only a content provider serves it. Covers what
- * browsers and file managers actually hand over: a `file://` path, the
- * system file picker's external-storage documents, the Downloads
- * provider's `raw:` ids, and any provider that still answers the media
- * `_data` column (readable to an app with all-files access).
+ * The file behind a `VIEW` or `SEND` URI as a path droidtop can run: a `file://` path, or a document of Android's own
+ * external-storage or Downloads provider (`raw:` ids), whose paths come from the system. Any other content provider
+ * is not asked where its file is (its `_data` or `raw:` answer could name any file droidtop can read): the stream it
+ * serves is copied into droidtop's cache and that copy is run (review, 2026-10-16).
  */
 internal object OpenWithSource {
+    private const val EXTERNAL_STORAGE = "com.android.externalstorage.documents"
+    private const val DOWNLOADS = "com.android.providers.downloads.documents"
+    private const val COPY_DIR = "open-with"
+
     fun resolve(context: Context, uri: Uri): File? {
         if (uri.scheme == ContentResolver.SCHEME_FILE) return uri.path?.let(::File)
         if (uri.scheme != ContentResolver.SCHEME_CONTENT) return null
-        documentPath(context, uri)?.let { return it }
-        return runCatching {
-            context.contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getString(0)?.let(::File) else null
-            }
-        }.getOrNull()?.takeIf { it.isFile }
+        documentPath(context, uri)?.takeIf { it.isFile }?.let { return it }
+        return copy(context, uri)
     }
+
+    /** The provider's stream, copied into droidtop's cache under its display name; null when it cannot be read. */
+    private fun copy(context: Context, uri: Uri): File? = runCatching {
+        // The provider's name for it, as one plain file name: never a path, "." or "..".
+        val name = displayName(context, uri)?.substringAfterLast('/')?.takeIf { it.isNotBlank() && it != "." && it != ".." } ?: return null
+        val dir = File(context.cacheDir, COPY_DIR).apply { mkdirs() }
+        val target = File(dir, name)
+        context.contentResolver.openInputStream(uri)?.use { input -> target.outputStream().use { input.copyTo(it) } } ?: return null
+        target.takeIf { it.isFile }
+    }.getOrNull()
 
     fun displayName(context: Context, uri: Uri): String? = runCatching {
         context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
@@ -435,8 +434,9 @@ internal object OpenWithSource {
     private fun documentPath(context: Context, uri: Uri): File? {
         if (!DocumentsContract.isDocumentUri(context, uri)) return null
         val id = DocumentsContract.getDocumentId(uri)
-        if (id.startsWith("raw:")) return File(id.removePrefix("raw:"))
-        if (uri.authority != "com.android.externalstorage.documents") return null
+        // Only Android's own providers are believed about where a file is.
+        if (uri.authority == DOWNLOADS) return if (id.startsWith("raw:")) File(id.removePrefix("raw:")) else null
+        if (uri.authority != EXTERNAL_STORAGE) return null
         val volume = id.substringBefore(':')
         val relative = id.substringAfter(':', "")
         val root = if (volume.equals("primary", ignoreCase = true)) {

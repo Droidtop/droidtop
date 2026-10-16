@@ -3954,11 +3954,12 @@ not settled designs):
   declared for `VIEW` and `SEND` on the MIME types and path patterns of
   `.exe`, `.msi`, `.AppImage`, `.deb` and `.rpm`, and enabled as a component
   only while Desktop mode is on (`ModePiece.DESKTOP_OPEN_WITH`, §2c). It
-  resolves the content URI to a real path on a volume droidtop can read (a
-  `file://` path, the system picker's external-storage documents, the
-  Downloads provider's `raw:` ids, or a provider's `_data` column; a file
-  only a provider serves is not one, and the Activity says the file has to
-  be saved to the Download folder first). It then shows the chooser, which
+  runs the file from where it is only when Android itself names that place: a `file://` path, the system picker's
+  external-storage documents, or the system Downloads provider's `raw:` ids. Any other app's provider is never asked
+  where its file is (its `_data` or `raw:` answer could name any file droidtop can read, and droidtop would run it):
+  the stream it serves is copied into droidtop's cache (`open-with/<name>`, never a path or `..`) and the copy is run
+  (review, 2026-10-16). **Nothing runs without a press**: any app can send a file here, so "Always open … this way"
+  remembers and preselects the choice and never starts a program by itself. It then shows the chooser, which
   is the one choice component (§7b, `ui/SelectableRow`, shared with
   onboarding): for `.exe`/`.msi`, droidtop's provisioned Wine environment
   plus every per-game prefix (§7i, `WinePrefixes`), launched through the
@@ -8083,8 +8084,7 @@ the capture, and the resulting layout, so a console check reads the whole chain 
 face button, the Nintendo convention) and `keysSwapped` (the system reports the pad's face keys swapped
 against their position; Android's key codes are positional, `BUTTON_A` bottom, `BUTTON_B` right,
 `BUTTON_X` left, `BUTTON_Y` top). The key map swaps A with B and X with Y (the diamond turns as a whole)
-exactly when the two differ; a keyboard's Enter and Escape and the system back key are never swapped. A
-pill draws the glyph PRINTED on the button that does the job: Xbox A/B/X/Y, PlayStation cross, circle,
+exactly when the two differ; a keyboard's Enter and Escape and the system back key are never swapped. A pill draws the glyph PRINTED on the button that does the job: Xbox A/B/X/Y, PlayStation cross, circle,
 square, triangle, Nintendo with A on the right. So on an Xbox-printed handheld toggled to the Nintendo
 layout the confirm pill says B, because that is what the plastic says on the right button; pills always
 point at a real button. Resolution order, strongest first:
