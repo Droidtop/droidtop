@@ -119,6 +119,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The in-game performance overlay (SPEC "Performance overlay", tracker#83): drawn over the game while its level
         // (Quick Menu > Performance) is not Off. Main process only.
         PerformanceOverlayHost.install(this)
+        // The launch watchdog's alert above the game on its own display (SPEC "The launch watchdog"): the shell's
+        // dialog is behind the game. Main process only.
+        LaunchAlertOverlay.install(this)
         // The download policy (docs/SPEC.md "Download rules", tracker#226): every download job is held or let run by
         // the person's rules, and games set to keep themselves up to date are checked a little after start.
         // Main process only: the jobs registry lives there.

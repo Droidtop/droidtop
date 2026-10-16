@@ -8202,6 +8202,20 @@ game file, any BIOS the system needs, and the emulator's file access; a RetroArc
 sentence and Get the core. Before this, a hang that nobody touched was reported only once a key reached it,
 or never.
 
+"No longer running" needs both looks and the process check because one look reads two harmless moments as gone
+(rig, droidtop 0.2.0-dev.1923, Droidtop/tracker#271): RetroArch restarts itself for a new core (its singleInstance
+activity exits and starts again), and a process from before the launch, the RetroArch a core sideload opened, ended
+75 ms after the retry started and raised a stale alert. An app process that started before the launch is not this
+launch.
+
+**Where the alert is seen** (rig, 1923: the alert sat behind RetroArch and no notification appeared). Three surfaces
+follow `LaunchWatchdog.alert`: the shell's dialog (Close it, Get the core), which is behind the game; the
+notification, which needs droidtop's notification permission; and a card above the game on the game's own display
+(`LaunchAlertOverlay`), drawn the one way droidtop draws over a game (`GameOverlay`: droidtop's accessibility
+overlay, else "Display over other apps", as the performance overlay). The card is focusable so the pad reaches it,
+not the stuck game: A or Back to droidtop brings the shell forward on its screen, where the dialog is; B, Back or
+Dismiss clears the alert. Without either overlay route the notification is the only sign.
+
 **Without a privileged helper the watchdog sees nothing, by design.** Every signal above except the shell
 coming back needs the `priv.shell` provider (Shizuku with droidtop's full access, Sui, or the root helper).
 Android gives an unprivileged app no view of another app's process: `/proc/<pid>` is hidden from other uids,
