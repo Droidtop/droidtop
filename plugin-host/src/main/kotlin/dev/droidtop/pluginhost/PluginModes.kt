@@ -37,9 +37,10 @@ object PluginModes {
         "ui.quick_tile" to setOf(GAMING, STANDARD, DESKTOP),
         // Home shelves: Gaming's Home and Desktop's Start menu. Standard has no shelf of games.
         "gaming.rows" to setOf(GAMING, DESKTOP),
-        // A game's page and its actions exist in Gaming only.
+        // A game's page exists in Gaming only. Its actions are also on Standard's long-press app menu and Desktop's
+        // Start menu row menu (Droidtop/tracker#67).
         "ui.game_section" to setOf(GAMING),
-        "ui.context_action" to setOf(GAMING),
+        "ui.context_action" to setOf(GAMING, STANDARD, DESKTOP),
         "social.provider" to setOf(GAMING, STANDARD, DESKTOP),
     )
 
@@ -87,6 +88,10 @@ object PluginModes {
         const val STANDARD_HOME = "standard.home"
         const val DESKTOP_TASKBAR = "desktop.taskbar"
         const val DESKTOP_START_MENU = "desktop.start_menu"
+
+        /** Context actions (C4): a game's or app's detail screen in Gaming, Standard's long-press app menu. */
+        const val GAME_DETAIL = "game.detail"
+        const val STANDARD_APP_MENU = "standard.app_menu"
         const val SETTINGS = "settings"
 
         /**

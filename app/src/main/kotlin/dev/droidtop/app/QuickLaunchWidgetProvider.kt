@@ -44,7 +44,7 @@ class QuickLaunchWidgetProvider : AppWidgetProvider() {
                 views.setImageViewResource(R.id.widget_icon, R.mipmap.ic_launcher)
                 val pick = Intent(context, QuickLaunchConfigureActivity::class.java)
                     .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId)
-                views.setOnClickPendingIntent(R.id.widget_root, DroidtopWidgets.activity(context, "pick:$widgetId", pick))
+                views.setOnClickPendingIntent(R.id.widget_root, DroidtopWidgets.activity(context, widgetId, "pick:$widgetId", pick))
                 return views
             }
             views.setTextViewText(R.id.widget_title, GameNaming.displayName(entry.title))
@@ -53,7 +53,7 @@ class QuickLaunchWidgetProvider : AppWidgetProvider() {
             if (art != null) views.setImageViewBitmap(R.id.widget_icon, art) else views.setImageViewResource(R.id.widget_icon, R.mipmap.ic_launcher)
             views.setOnClickPendingIntent(
                 R.id.widget_root,
-                DroidtopWidgets.activity(context, "play:$widgetId", GameLaunchActivity.intentFor(context, entry.id)),
+                DroidtopWidgets.activity(context, widgetId, "play:$widgetId", GameLaunchActivity.intentFor(context, entry.id)),
             )
             return views
         }

@@ -22,6 +22,19 @@ object PluginStore {
 
     fun payloadDirFor(context: Context, pluginId: String): File = File(root(context), pluginId)
 
+    /**
+     * The plugin's own icon (its presentation's `icon`) as a path in its payload; null when it declares none. One
+     * answer for the plugin's card, its page, its catalog row and its panel's title (Droidtop/tracker#513, #515).
+     * It reads nothing, so any thread may ask: the manifest keeps only a .png or .webp among its signed payload files
+     * (PluginPresentation.fromJson), a path that climbs out of the payload is refused here, and every renderer loads
+     * the file off the main thread and draws nothing when it is missing.
+     */
+    fun iconFile(context: Context, manifest: PluginManifest): String? {
+        val path = manifest.presentation.icon ?: return null
+        if (path.startsWith("/") || path.split('/', '\\').any { it == ".." }) return null
+        return File(payloadDirFor(context, manifest.id), path).path
+    }
+
     /** Every installed plugin, valid or not, for the approval screen -- a plugin whose files fail re-verification is still listed, just shown as broken rather than silently vanishing. */
     fun installed(context: Context): List<PluginRecord> {
         val dir = root(context)

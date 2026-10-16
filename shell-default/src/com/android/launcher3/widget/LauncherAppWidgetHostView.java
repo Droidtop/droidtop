@@ -244,8 +244,19 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
             dragLayer.setTouchCompleteListener(this);
         }
         if (stackSwipeIntercepts(ev)) return true;
-        mLongPressHelper.onTouchEvent(ev);
         return mLongPressHelper.hasPerformedLongPress();
+    }
+
+    /**
+     * droidtop patch (Droidtop/tracker#563): the long press that starts a widget's drag watches every event the
+     * widget gets, here, not only those offered to {@link #onInterceptTouchEvent}. A grid or list inside a widget
+     * (droidtop's Shelf) asks its parents not to intercept once it handles a touch, so the watch fed from
+     * onInterceptTouchEvent lost the rest of the gesture and the widget could not be dragged off (rig, build 2011).
+     */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        mLongPressHelper.onTouchEvent(ev);
+        return super.dispatchTouchEvent(ev);
     }
 
     @Override
@@ -262,8 +273,8 @@ public class LauncherAppWidgetHostView extends BaseLauncherAppWidgetHostView
             }
             return true;
         }
-        mLongPressHelper.onTouchEvent(ev);
-        // We want to keep receiving though events to be able to cancel long press on ACTION_UP
+        // The long press is fed in dispatchTouchEvent. We want to keep receiving events to be able to cancel it on
+        // ACTION_UP.
         return true;
     }
 

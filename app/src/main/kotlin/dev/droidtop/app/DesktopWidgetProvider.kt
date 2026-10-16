@@ -61,10 +61,10 @@ class DesktopWidgetProvider : AppWidgetProvider() {
                 DroidtopWidgets.look(context),
                 context.getString(R.string.widget_desktop_title),
                 listOf(
-                    DroidtopWidgets.Row(if (running) "Go to the desktop (running)" else "Start the desktop", DroidtopWidgets.activity(context, "desktop", open)),
-                    DroidtopWidgets.Row("Containers", DroidtopWidgets.activity(context, "containers", CatalogScreenLink.intent(context, ContainersCatalog.SCREEN_ID))),
+                    DroidtopWidgets.Row(if (running) "Go to the desktop (running)" else "Start the desktop", DroidtopWidgets.activity(context, widgetId, "desktop", open)),
+                    DroidtopWidgets.Row("Containers", DroidtopWidgets.activity(context, widgetId, "containers", CatalogScreenLink.intent(context, ContainersCatalog.SCREEN_ID))),
                 ) + ExportLaunch.published(context).sortedBy { it.app.name.lowercase() }.take(DroidtopWidgets.MAX_ROWS - 2).map { export ->
-                    DroidtopWidgets.Row(export.title, DroidtopWidgets.activity(context, "export:${export.token}", ExportLaunchActivity.intentFor(context, export)))
+                    DroidtopWidgets.Row(export.title, DroidtopWidgets.activity(context, widgetId, "export:${export.token}", ExportLaunchActivity.intentFor(context, export)))
                 },
                 "",
             )

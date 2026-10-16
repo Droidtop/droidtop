@@ -14,6 +14,7 @@ import dev.droidtop.pluginhost.PluginCapability
 import dev.droidtop.pluginhost.PluginMainUi
 import dev.droidtop.pluginhost.PluginModes
 import dev.droidtop.pluginhost.PluginRecord
+import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.ProvidedPoint
 import dev.droidtop.pluginhost.TileState
 import kotlinx.coroutines.Dispatchers
@@ -186,6 +187,8 @@ object PluginPanels {
                 hostContext = hostContext,
                 leadGroups = tiles,
                 extraGroups = { _, _ -> more },
+                panel = true,
+                iconFile = PluginStore.iconFile(context, record.manifest),
             )
         } else {
             CatalogScreen(
@@ -194,6 +197,8 @@ object PluginPanels {
                 subtitle = "From ${record.manifest.label}",
                 groups = { ctx -> withContext(Dispatchers.IO) { tiles(ctx) + more } },
                 indexGroups = { emptyList() },
+                panel = true,
+                iconFile = PluginStore.iconFile(context, record.manifest),
             )
         }
     }

@@ -11,12 +11,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
-import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.integrations.PluginContextActions
 import dev.droidtop.library.integrations.PluginGameSections
 import dev.droidtop.library.settings.CatalogScreen
-import dev.droidtop.pluginhost.ContextTarget
 import dev.droidtop.shell.gamepad.CatalogNavigator
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import kotlinx.coroutines.Dispatchers
@@ -53,9 +51,7 @@ internal fun pageTabForSection(tab: String): PageTab = when (tab) {
 internal fun rememberPluginPageRows(entry: LibraryEntry): PluginPageRows {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val target = remember(entry.id) {
-        ContextTarget(kind = "game", id = entry.id, title = GameNaming.displayName(entry.title), systemId = entry.systemId)
-    }
+    val target = remember(entry.id) { PluginContextActions.targetOf(entry) }
     var token by remember(entry.id) { mutableIntStateOf(0) }
     var status by remember(entry.id) { mutableStateOf(emptyMap<String, String>()) }
     var armed by remember(entry.id) { mutableStateOf<String?>(null) }

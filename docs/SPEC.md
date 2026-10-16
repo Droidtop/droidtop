@@ -1131,12 +1131,12 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Icon options: wrapping legacy icons as adaptive always, except for system apps, or never, or forcing the legacy icon even where the app ships an adaptive one (Android 8-12, through the resource resolver; greyed out where the platform's method has moved), themed (monochrome) icons on Android 13+ (Murine upstream's, taken 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.ADAPTIVE_ICONS` (`AdaptiveIcons`), `LauncherIconProvider`, `util/ResourceUtils.kt`; shell-default/UPSTREAM.md lists the commits |
 | Drawer order: Alphabetical or Most used first (built 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.DRAWER_SORT` (`DrawerSort`), Settings > App drawer > Order. Most used counts launches made from the launcher (`RecentAppsStore.launchCounts`, kept beside the Recent row's list, the 300 most launched), from the first launch after this was built; ties and never-launched apps follow alphabetically. In that order the list is one section, so the fast scroller shows no letter, and it is sorted again each time the drawer opens (`AlphabeticalAppsList.refreshOnOpen`). Horizontal or list styles are not built |
 | Drawer tabs: groups the person names, as a row of chips at the top of the drawer ("All" first) that stays with the header as the list scrolls (built 2026-10-16, Droidtop/tracker#564) | HAVE | `DrawerTabs` (one JSON string in the launcher's preferences, beside the hidden apps, read once and held in memory), `DrawerTabsRow` (a `FloatingHeaderRow` in `floating_header_content.xml`, above the personal and work tabs), and the filter in `AlphabeticalAppsList.onAppsUpdated`. An app's long-press menu in the drawer has "Drawer tabs": a tick per tab, and New tab, which makes one holding that app. A long press on a tab's chip renames, moves or deletes it. The row shows only once a tab exists. A tab hides the Recent row and the private space; search still covers every app. The chosen tab is not saved, so the drawer opens on All after a restart. An app can be in several tabs, and an uninstalled app drops out on its own |
-| Drawer folders: a drawer tab marked "Show as a folder in All" (the tab chip's long-press menu) is one folder in All, its apps leaving the list; it opens the same folder view as the home screen (built 2026-10-16, Droidtop/tracker#564) | HAVE | One model: the tab (`DrawerTabs.Tab.folder`). Coordinator, 2026-10-16: present it as Nova does, with the home screen's folder view reused, not copied. `AlphabeticalAppsList.onAppsUpdated` makes a `FolderInfo` per such tab on the personal list in All (two apps or more; a folder of one is just the app), in no database, and `BaseAllAppsAdapter.VIEW_TYPE_DRAWER_FOLDERS` is one row of them above the Recent row, each from `FolderIcon.inflateDrawerFolder`. That folder is read only (`Folder.setDrawerFolder`, `LauncherDelegate.DrawerFolderDelegate`): it opens and starts apps as any folder does, but nothing in it is dragged, renamed, saved or turned back into an icon. Its apps change from the tab ("Drawer tabs" in an app's menu, or the tab itself) |
+| Drawer folders: a drawer tab marked "Show as a folder in All" (the tab chip's long-press menu) is one folder in All, its apps leaving the list; it opens the same folder view as the home screen (built 2026-10-16, Droidtop/tracker#564) | HAVE | One model: the tab (`DrawerTabs.Tab.folder`). Coordinator, 2026-10-16: "Drawer folders: keep one data model... tapping the tile opens the same popup folder view the home screen uses (reuse that view, not a copy)". `AlphabeticalAppsList.onAppsUpdated` makes a `FolderInfo` per such tab on the personal list in All (two apps or more; a folder of one is just the app), in no database, and `BaseAllAppsAdapter.VIEW_TYPE_DRAWER_FOLDERS` is one row of them above the Recent row, each from `FolderIcon.inflateDrawerFolder`. That folder is read only (`Folder.setDrawerFolder`, `LauncherDelegate.DrawerFolderDelegate`): it opens and starts apps as any folder does, but nothing in it is dragged, renamed, saved or turned back into an icon. Its apps change from the tab ("Drawer tabs" in an app's menu, or the tab itself) |
 | Home screen lock (no moving, adding or removing icons and widgets), labels hidden everywhere or shown on Home only, drawer side padding (Murine upstream's, taken 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.LOCK_HOME_SCREEN` (`Launcher.isDraggingEnabled`), `LabelVisibility.NEVER_FULL`/`NEVER_DRAWER`, `LauncherPrefs.DRAWER_PADDING`; shell-default/UPSTREAM.md lists the commits. "Home only" shows labels on the home screen as Always does: it used to mean Auto there, which drops labels where the layout is short of room, so on a landscape handheld it showed none (rig, 2026-10-16; Always worked). The rule is `LauncherLabels` in `:runtime-common`, used by `DeviceProfile` and tested there |
 | Folder covers, per folder: swipe to open (a tap starts the folder's first app, a swipe up on the icon opens the folder) and a cover (the folder shows its first app's icon in place of its preview) (built 2026-10-16, Droidtop/tracker#564) | HAVE | The open folder's footer has a Folder options button (`Folder.showOptions`), two ticks saved with the folder as `FolderInfo.FLAG_SWIPE_TO_OPEN` and `FLAG_COVER` in its `options` column, read only while the home screen is locked. The first app is the lowest rank (`FolderInfo.firstApp`), so reordering the folder changes it. The tap goes through `ItemClickHandler.onClickAppShortcut`, the same path as an icon's tap. The swipe is `FolderIcon.handleSwipeToOpen`: claimed from the workspace at half a touch slop when it goes more up than sideways (before the drawer's own swipe up takes it at one), so a page swipe that starts on the folder still pages. The cover is drawn in `FolderIcon.drawCover` from the app's in-memory icon, with the notification dot kept. A folder's own picture, drawn in place of both the preview and a cover, is one of the per-icon options below (built 2026-10-16) |
-| Widget stacks: several widgets in one place on the home screen; a vertical swipe on it shows the next, and dots down its edge show which (built 2026-10-16, Droidtop/tracker#564) | HAVE | The shown widget is the model's item; the others are bound to the launcher's widget host and listed in a side table (`WidgetStackTable` in `:runtime-common`, pure and unit-tested; `WidgetStacks` keeps it in the launcher's preferences). A swipe swaps the item's widget id and provider for the next member's and binds it again (`WidgetStacks.swipe`, from `LauncherAppWidgetHostView`). It is claimed from the workspace at half a touch slop when vertical, and not taken while what is under the finger can still scroll that way, so a list widget scrolls first. Adding: the widget's resize frame (after a long press) has a "Stack a widget here" button. `WidgetStackActivity` lists the device's widgets, gives the chosen one an id on the launcher's host, binds it (asking when the system wants that), runs its setup, and shows it in the stack. The one model change is the ghost-widget cleanup sparing live stacks' hidden widgets (shell-default/UPSTREAM.md, "Deliberate local changes"), because the loader keeps only widgets on the grid that overlap nothing. Removing the shown widget removes the stack, and its other widgets are freed at the next load. Taking one widget out of a stack is not built |
+| Widget stacks: several widgets in one place on the home screen; a vertical swipe on it shows the next, and dots down its edge show which (built 2026-10-16, Droidtop/tracker#564) | HAVE | The shown widget is the model's item; the others are bound to the launcher's widget host and listed in a side table (`WidgetStackTable` in `:runtime-common`, pure and unit-tested; `WidgetStacks` keeps it in the launcher's preferences). A swipe swaps the item's widget id and provider for the next member's and binds it again (`WidgetStacks.swipe`, from `LauncherAppWidgetHostView`). It is claimed from the workspace at half a touch slop when vertical, and not taken while what is under the finger can still scroll that way, so a list widget scrolls first. Adding: the widget's resize frame (after a long press) has a "Stack a widget here" button. `WidgetStackActivity` lists the device's widgets, gives the chosen one an id on the launcher's host, binds it (asking when the system wants that), runs its setup, and shows it in the stack. The one model change is the ghost-widget cleanup sparing live stacks' hidden widgets (shell-default/UPSTREAM.md, "Deliberate local changes"; coordinator, 2026-10-16: "Widget stacks: go with your design... Keep the Launcher3 change to that single removeGhostWidgets hook"), because the loader keeps only widgets on the grid that overlap nothing. Removing the shown widget removes the stack, and its other widgets are freed at the next load. Taking one widget out of a stack is not built |
 | Per-icon options on the home screen, in the dock and in folders: a title of the icon's own, a picture in place of its icon, and what a swipe up or down on it does (an action of Standard's or an app); a folder's own picture in place of its preview (built 2026-10-16 for the Nova and Apex import, Droidtop/tracker#564: both launchers have them) | HAVE | An app icon's long-press menu has Customize (not while the home screen is locked): Title, Choose a picture / Remove the picture, Swipe up, Swipe down. A folder's options (its footer button) have Choose a picture / Remove the picture. All are kept per item id by `HomeItemExtras` (`dev.droidtop.shell.standard`): the title as Launcher3's own per-item label (`IconPreferences`' instance labels, which the loader had applied to pinned shortcuts only), the picture as a PNG in the app's files (`home_item_pictures/<id>.png`, fitted into a square of at most 384 pixels, read into memory as the workspace loads so no view reads a file), the swipes as `HomeAction`s in one JSON object in the launcher's preferences (`home_item_swipes`). They are drawn when a view applies its item (`BubbleTextView.applyLabel` and its icon, the folder preview, `FolderIcon`'s cover), so an icon refresh keeps them, and forgotten when the item is deleted (`ModelWriter`). A title equal to the app's own clears it; a picture is never themed. The picture is picked with the system's file picker (`ItemPictureActivity`, `ACTION_OPEN_DOCUMENT`, images only, at most 16 MB read). An icon's swipe is claimed from the workspace as a folder's swipe to open is, one shared rule (`IconSwipe`: half a touch slop to claim, more vertical than sideways, one slop to fire), and only in a direction the icon has an action for, so the workspace's own swipe up (the drawer) and swipe down (its gesture) still work from an icon with nothing set. Per-app titles from the drawer (App info's rename) stay as they were, for every icon of that app. Standard's own backup (Settings > Backup) carries the pictures, one flat entry each (`home_item_picture_<id>.png`), and a restore replaces them; titles and swipes are in the preferences it already carries |
-| Import from Nova or Apex: a `.novabackup` or `.apexbackup` (or Apex's older loose `apex_settings.bak` / `apex_data.bak`) as Standard's home screen (built 2026-10-16, Droidtop/tracker#564; the coordinator cleared it with the formats in the tracker's coordination/standard/launcher-import-formats.md, read from decompiled Apex 4.9.20 and Nova 8.0.18) | HAVE | Settings > Misc > Backup > Import from Nova or Apex: the system's file picker (Apex's own folder under Android/data is not readable by other apps), then a summary, then Import. **Read** (`dev.droidtop.runtime.launcherimport`, pure, tested from the document's schemas): ZIP entries by base name only, each and in total capped (32 and 64 MB), a zipped `.novabackup` unwrapped once; preferences by a strict reader of the `<map>` format (no entity expanded); the database copied to the cache, opened read-only, its tables read as rows and the copy removed. Every column and key is read by presence, never by version, so older layouts read alike (Nova's `launcher.db` and legacy preferences, the pre-7.1 grid ints, `workspaceScreens` screen ids, `appgroup:` members, hidden apps at group 0). Intents are data: only a plain launch of an installed app's launcher activity is kept. **Mapping**: home and dock items, folders (with their name and multi-page flags; Nova's swipe-to-open folder becomes a cover folder with swipe to open), widgets as Launcher3's "tap to set up" placeholders (`appWidgetId` -1, restored `FLAG_ID_NOT_VALID`, `FLAG_PROVIDER_NOT_READY`, `FLAG_UI_NOT_READY`, as Nova's own restore does), grid and dock size, label switches (Apex), icon pack, gestures (to Standard's actions, or Open an app), hidden apps (added to droidtop's), drawer tabs and drawer folders (a Nova folder or Apex folder whose apps also stayed in the main list becomes a tab, said so in the summary), drawer renames (Nova), and each icon's own title, picture and swipes and a folder's own picture (the per-icon options above). Nova's half cells double the grid when it stays within 10, else round down; anything that then overlaps moves to the first free cell or a new page. Only the default dock page exists in droidtop. **Fitted to the device** (`ImportCheck`): apps not installed, widgets whose app is not, an icon pack that is not, and swipes or gestures to a missing app are left out; a folder left with one app becomes that app. **Never silent**: everything not brought across is a line of the summary with its reason (pinned shortcuts, which only their app can pin again; Nova's and Apex's own widgets; launcher actions droidtop has no equivalent of; other dock pages; gestures droidtop has no slot for; drawer-only custom icons), and so is everything changed on the way. **Apply** (`LauncherImport`, `LauncherImportActivity`): the grid and dock size first, on the main thread where the device profile follows them; then on the model thread the database for that grid (`tryMigrateDB`, as a grid change does) has every item replaced in one transaction; then the settings; then the launcher loads again. The import replaces the home screen and dock; drawer tabs, hidden apps and renames are added to. The file's entry list, its database's `user_version` and the Nova hidden-apps group's rows are logged (`droidtop.LauncherImport`) for the rig check the document asks for: there was no real backup file when this was built |
+| Import from Nova or Apex: a `.novabackup` or `.apexbackup` (or Apex's older loose `apex_settings.bak` / `apex_data.bak`) as Standard's home screen (built 2026-10-16, Droidtop/tracker#564; the coordinator cleared it with the formats in the tracker's coordination/standard/launcher-import-formats.md, read from decompiled Apex 4.9.20 and Nova 8.0.18) | HAVE | The scope, relayed by the coordinator, 2026-10-16: "The owner wants Nova's and Apex's features in Standard, not only their layouts. So for the items the document lists as having no droidtop equivalent, build the equivalent where it's a real launcher feature: per-icon swipe actions, a custom icon and title per item, a custom folder image, and gestures that launch an app. Then import those too. Some things can't come across, like Nova's or Apex's own custom widgets. Show those in an import summary with plain reasons; never drop them silently." Settings > Misc > Backup > Import from Nova or Apex: the system's file picker (Apex's own folder under Android/data is not readable by other apps), then a summary, then Import. **Read** (`dev.droidtop.runtime.launcherimport`, pure, tested from the document's schemas): ZIP entries by base name only, each and in total capped (32 and 64 MB), a zipped `.novabackup` unwrapped once; preferences by a strict reader of the `<map>` format (no entity expanded); the database copied to the cache, opened read-only, its tables read as rows and the copy removed. Every column and key is read by presence, never by version, so older layouts read alike (Nova's `launcher.db` and legacy preferences, the pre-7.1 grid ints, `workspaceScreens` screen ids, `appgroup:` members, hidden apps at group 0). Intents are data: only a plain launch of an installed app's launcher activity is kept. **Mapping**: home and dock items, folders (with their name and multi-page flags; Nova's swipe-to-open folder becomes a cover folder with swipe to open), widgets as Launcher3's "tap to set up" placeholders (`appWidgetId` -1, restored `FLAG_ID_NOT_VALID`, `FLAG_PROVIDER_NOT_READY`, `FLAG_UI_NOT_READY`, as Nova's own restore does), grid and dock size, label switches (Apex), icon pack, gestures (to Standard's actions, or Open an app), hidden apps (added to droidtop's), drawer tabs and drawer folders (a Nova folder or Apex folder whose apps also stayed in the main list becomes a tab, said so in the summary), drawer renames (Nova), and each icon's own title, picture and swipes and a folder's own picture (the per-icon options above). Nova's half cells double the grid when it stays within 10, else round down; anything that then overlaps moves to the first free cell or a new page. Only the default dock page exists in droidtop. **Fitted to the device** (`ImportCheck`): apps not installed, widgets whose app is not, an icon pack that is not, and swipes or gestures to a missing app are left out; a folder left with one app becomes that app. **Never silent**: everything not brought across is a line of the summary with its reason (pinned shortcuts, which only their app can pin again; Nova's and Apex's own widgets; launcher actions droidtop has no equivalent of; other dock pages; gestures droidtop has no slot for; drawer-only custom icons), and so is everything changed on the way. **Apply** (`LauncherImport`, `LauncherImportActivity`): the grid and dock size first, on the main thread where the device profile follows them; then on the model thread the database for that grid (`tryMigrateDB`, as a grid change does) has every item replaced in one transaction; then the settings; then the launcher loads again. The import replaces the home screen and dock; drawer tabs, hidden apps and renames are added to. The file's entry list, its database's `user_version` and the Nova hidden-apps group's rows are logged (`droidtop.LauncherImport`) for the rig check the document asks for: there was no real backup file when this was built |
 | Global settings, Desktop settings rendered in the shell's own row component, pad-navigable | HAVE (fixed 2026-09-24/25, UI pass H4) | `DroidtopWideSettings.kt`, `SettingsGlobalFragment.kt`'s `CatalogPreferenceNavigator` |
 | Icon-pack/drawer/hidden-apps settings pages left as stock Android preference UI | HAVE, and correct: H4's own fix text scopes the shell's row component to Global/Desktop only, and explicitly keeps these stock | `docs/audit-2026-09-24/ui-assessment.md` H4 |
 | Plugin contributions in the launcher: status tiles (**built this change**), search providers and app actions (still not buildable -- see below) | PARTIAL | `PluginStatusWidgetProvider.kt`; see below |
@@ -1196,11 +1196,36 @@ neither of them specific to the new widget:
    the receiver's metadata, disabled ones included. `WidgetManifestTest`
    ties the manifest's widget receivers to `DroidtopWidgets.PROVIDERS` and
    to that rule, and checks each has its own `android:label` (pickers show
-   it; without one they show the app's name). Murine's own clock
-   (`MurineClockWidgetPlugin`) is hidden from the picker
-   (`WIDGET_FEATURE_HIDE_FROM_PICKER`): the Smartspace setting places it,
-   and in the picker it showed under droidtop as a nameless "Calendar
-   0 x 0".
+   it; without one they show the app's name). "Calendar 0×0" was
+   com.android.calendar's own widget, not Murine's clock (rig, build 2011,
+   2026-10-16; coordinator: "The picker should drop providers whose declared
+   size can't fit (as stock Launcher3 does), not show 0×0. Undo the Murine
+   clock hide if it was only a guess"). It was only a guess, so Murine's
+   clock is in the picker again. A widget is offered only when it has a
+   place on the grid (`WidgetFit`, `:runtime-common`, tested, read by
+   `LauncherAppWidgetProviderInfo.initSpans`): its smallest size, its resize
+   minimum when it resizes that way or else its own size, measured by a
+   grid profile (never 0) and inside the grid. Stock let a widget that
+   cannot shrink and is larger than the grid through, clamped.
+   **Widget taps are each widget's own** (rig, build 2011: a tap on a freshly
+   placed Downloads widget once started a game; coordinator: "Use unique
+   request codes per widget id"). Every tap is keyed by its widget's id and
+   its own key (`WidgetTaps`, tested): the request code, and for an intent
+   naming its component a data address as well (`droidtop-widget://<id>/<key>`,
+   compared, never resolved), so one widget's update can never rewrite
+   another's launch. Whether this was that tap's cause is not proven.
+   **A store game that is not installed opens its page** (rig, build 2011: a
+   Quick launch widget did nothing; coordinator: "The tap should open the
+   game's page with Install"): `Library.launch` answers
+   `LaunchResult.NeedsInstall` for a store's game with no install
+   (`LibraryEntry.needsInstall`, tested), and a widget's or pinned icon's tap
+   (`GameLaunchActivity`) opens the Games screen on that game's page
+   (`LauncherGamesActivity.pageIntent`), where Install is.
+   **A long press anywhere on a widget starts its drag** (rig, build 2011:
+   the Shelf could not be dragged off): the host view watches the long press
+   on every event it gets (`dispatchTouchEvent`), not only those offered to
+   `onInterceptTouchEvent`, which a grid or list inside the widget switches
+   off once it handles a touch.
 2. **A `native_bundle` plugin self-disables on its very first real call on
    Android 10+.** Android refuses `DexClassLoader` on a file that is still
    writable by the app ("Writable dex file ... is not allowed"); this
@@ -2673,7 +2698,10 @@ the `ContainerRuntime` interface that already exists (§3):
   `DELETE /containers/{id}` (409 for a running one without `force`, and for the desktop's own), `images/create`
   (a pull; its progress lines all at once after it), `containers/{id}/logs` (Docker's multiplexed frames, the
   program's log as stdout; `follow`, `timestamps`, `since` and `until` not built) and `containers/{id}/wait`
-  (until the program is over; its exit code, 125 when it could not start). `containers/json` takes Docker's
+  (until the program is over, or for a program not started yet its start and end: "Wait before a start", below; its
+  exit code, 125 when it could not start). `version` gives every field of Docker's own reply (GitCommit and GoVersion
+  name droidtop's engine, which has neither), the Engine component's Details all strings, as Docker's CLI reads them
+  (rig, build 2011: `docker version` printed only its Client block). `containers/json` takes Docker's
   `filters` for label, name, id and status; any other filter is answered as not built, never ignored. Every action
   is `EngineActions`, the same code the command fronts run, so `docker run` and `POST /containers/create` make
   the same container. A create body (`DockerApi.createRequest`) becomes the one request model, and nothing in it is
@@ -2728,7 +2756,14 @@ the `ContainerRuntime` interface that already exists (§3):
   removal path once its program has run and ended (`EngineActions`, watching from the creation; a program never
   started within ten minutes leaves the container be); with a restart policy it is refused, as Docker refuses it.
   `wait?condition=removed`, which Docker's CLI uses for `--rm`, answers the exit code once the container is gone, or
-  after half a minute.
+  after half a minute. **Wait before a start (rig, build 2011, 2026-10-16; coordinator: "Implement next-exit
+  waits on a stopped container").** Docker's CLI asks `next-exit` (or `removed`) before it starts the container, so
+  a wait on a program that is not running waits for it to start (up to five minutes) and then to end; `not-running`
+  on one that is not running is answered at once, as Docker does (`DockerApi.waitPlan`, tested). The start is seen as
+  attach and `--rm` see it, one rule (`ContainerPrograms.awaitRun`: the program seen running, or its state turned to
+  over since the wait began). A stream (attach) shuts its writing half when it ends, before the connection closes,
+  so a relay into the container passes the end on (`docker run --rm` printed its output and hung, rig, build 2011),
+  and the engine logs each wait's answer and each stream's end under `droidtop.EngineApi`.
   **The libpod API (built 2026-10-16, Droidtop/tracker#555 D15, first slice: reads).** Podman's clients talk to
   Podman's own API, libpod, so droidtop serves it too: on `podman.sock` beside `docker.sock`, which every container
   sees as `/run/droidtop-app-storage/podman.sock` and `CONTAINER_HOST` names in its environment. A podman a container
@@ -2812,7 +2847,10 @@ the `ContainerRuntime` interface that already exists (§3):
   Podman's own remote clients, 5.2.5 and 4.9.5: `pod create` (with `--name`, `--label`, `-p 8080:8080`), `pod start`,
   `stop`, `restart`, `kill`, `rm -f`, `network create`, `network rm`, `network connect --alias`, `network
   disconnect`, and the refusals for `pod create -p 8080:80`, `pod create --memory`, `pod kill -s HUP`, `network
-  create --internal`, `--subnet` and `-d macvlan`. Podman 5's `pod start` and `pod stop` print an empty line where
+  create --internal`, `--subnet` and `-d macvlan`. droidtop's own `docker` and `podman` fronts have `network create
+  NAME`, `network ls [-q]` and `network rm NAME...` too (built 2026-10-16, rig, build 2011: they refused `network`
+  as having "no Podman service" while the API had it), on the same networks through the same actions and lock as the
+  API (`EngineActions.createNetwork`, `removeNetwork`): one mechanism. Podman 5's `pod start` and `pod stop` print an empty line where
   Podman 4 prints the pod's id: the 5.x client prints a field its own service never sends either.
   **Pods (built 2026-10-16, Droidtop/tracker#555 D12).** The podman front has Podman's pods; the docker front has
   none, as Docker has none. A pod's containers share one network, and droidtop's containers already share the
@@ -4182,9 +4220,14 @@ droidtop 0.2.0-dev.1931).
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
 - **Plugins (slice C9).** A plugin's companion panel is its Quick Menu panel (`ui.panel`, docs/plugin-api.md 3
   C15 and C17), drawn for touch by `CompanionPluginsTab` with `context.surface` `<mode>.companion`: there is no
-  second panel point. The Plugins tab lists every running panel by name with one line of what it declares
-  (`CompanionAbilities`: "Rows on Game", "Shows when it records", "Keeps this screen on", and how many tiles it has
-  to pin); a tap opens it with Back. Plugins sits under More unless chosen, and any one panel can be chosen as a tab
+  second panel point. The Plugins tab lists every running panel by name (no line of droidtop's internals under
+  it, Droidtop/tracker#515); a tap opens it with Back. **One panel frame** (Droidtop/tracker#515, built
+  2026-10-16): a panel is a `CatalogScreen` marked `panel`, with the plugin's icon (`iconFile`), and every host
+  draws it the same way: the icon before the panel's name at the title size, each row's subtitle as one line under
+  it (the whole text in Info on the shell, a tap on the line on the companion), and values in the one muted value
+  colour (the accent is for what acts). The Quick Menu, the Standard and Desktop plugin window
+  (`PluginHubActivity`) and the plugin's page in Settings draw it with Gaming's rows (`CatalogNavigator`), the
+  companion with its touch rows (`CompanionNestedScreen`). Plugins sits under More unless chosen, and any one panel can be chosen as a tab
   of its own (the Companion group's tab choices list Plugins and each panel, through `PluginShellHooks`). A panel
   that declares `keep_on` keeps the companion screen on while it shows. A panel that declares `game` gives rows for
   the running game, drawn on the Game tab under droidtop's own rows (`<mode>.companion_game`; not in Kid or Kiosk).
@@ -13545,7 +13588,7 @@ changed games roots starts the scrape without a question) and *Don't fetch*.
 
 ## 7i. PC Games — droidtop's own library tab, after Steam (decided 2026-10-01)
 
-**When a game was added (decided 2026-10-16).** One definition, `LibraryEntry.addedEpochMs()` (`query/LibraryQuery.kt`):
+**When a game was added (decided 2026-10-16).** Coordinator, 2026-10-16: "One definition: the install time when it's known, otherwise first-seen. That's what LibraryQuery.kt:556 already does. First-seen alone puts everything from the first scan at the same moment, so it can't order a library that existed before droidtop." One definition, `LibraryEntry.addedEpochMs()` (`query/LibraryQuery.kt`):
 an installed app's install time when the package manager knows it, else the library's first sighting
 (`firstSeenEpochMs`), 0 when neither is known. The Added sort, Recently added (PC Games' Overview and Home's games row)
 and Home's What's new additions all read it, so they order alike. First-seen alone stamps everything droidtop's first
@@ -15748,7 +15791,14 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   notification (`PlaceLinks`, below). Settings > System no longer
   carries a "Software updates" row of its own.
 - **Plugins** (`plugins`): the existing Plugins screen (installed,
-  approvals, repositories, catalog), opened in place.
+  approvals, repositories, catalog), opened in place. Each plugin's card and
+  each catalog row carries the plugin's own icon (its presentation icon,
+  `PluginStore.iconFile`; a catalog row only once the plugin is installed,
+  the catalog index having no icon) and its one-line summary under its
+  name, shown at all times on every surface (`CatalogItem.summaryShown`;
+  in Gaming one line even with Info text under rows off, the full text in
+  Info) (Droidtop/tracker#513, #514, built 2026-10-16). The companion draws a
+  row's picture too.
 
 **Places in every mode (decided 2026-10-08, Droidtop/tracker#346).** The
 places were Gaming sections only: Standard reached Stores, Social, Downloads
@@ -16976,9 +17026,13 @@ It never streams or remote-controls anything; that stays windowcast's (7a).
 - **Any number of computers and handhelds** (owner, 2026-10-10: "if we have 5
   droidtop devices and 5 desktops, we should be able to connect and pair any
   number of permutations of these devices and have them work"). Each device
-  pairs with any number of the other kind. A computer and a handheld exchange
-  what each has, so saves and library changes reach devices that are not
-  paired directly through the devices they share.
+  pairs with any number of other devices of either kind: computers with
+  handhelds and with computers (decided 2026-10-16, below). Owner,
+  2026-10-16: "Yes, droidtop can pair with multiple computers. That's why
+  save syncing has a 'preferred computer' entry" (see "Prefer this
+  computer's saves" under Saves, below). Paired devices
+  exchange what each has, so saves and library changes reach devices that
+  are not paired directly through the devices they share.
 - **Paired computers** (`Computers`, `:net-core`) are kept in
   `files/agent/computers.json`. Each computer has a folder,
   `files/agent/<id>/`, for its save baselines and kept copies. One of them
@@ -17064,7 +17118,7 @@ Pythia (bi0shacker001/pythia) is a game manager for the computer. It does droidt
 - No step needs a camera. The QR code stays an extra.
 - The new exchange and the `DTCQ1` answer belong in droidtop-agent's `discovery` and `pair` crates. That gives droidtop (`libdroidtop_agent.so`), droidtop-agent and Pythia one implementation. It is not built yet: that is Pythia UX review C1.
 
-Open point for the owner: Pythia's owner decision 1.5 says "A computer can also pair with another computer". droidtop-agent's DESIGN.md section 3 ("Kinds of device") says a computer refuses to pair with a computer. Nothing changes until that is settled.
+**Computers pair with computers (decided 2026-10-16).** The owner: "Computer to computer pairing is ABSOLUTELY a pythia feature, it's the whole fucking reason it exists". A computer pairs with other computers as well as with handhelds, through the same mutual-TLS device certificates and the same exchange. droidtop itself is a handheld, so nothing changes on its side beyond this text; Pythia and droidtop-agent build the computer side (droidtop-agent's DESIGN.md section 3, which had a computer refuse another computer, follows this decision).
 
 ### Saves
 
@@ -17820,7 +17874,7 @@ release; every other version's release is untouched, so nothing is ever
 pruned by this path (old releases are kept; a future pruning pass would
 still keep every non-dev version and at least the last 50).
 
-**A main build that started finishes (2026-10-16).** A newer push to a
+**A main build that started finishes (2026-10-16).** Coordinator, 2026-10-16, from the rig: "concurrency cancelled every build of main during rapid landings, so no release was produced for 939f7a3d. Make sure the newest main always produces a release." A newer push to a
 branch cancels that branch's build in progress, except on `main`, whose
 build publishes the release a rig installs. On 2026-10-16 a burst of
 landings cancelled every main build from 83dd9acc to 939f7a3d, so the rig

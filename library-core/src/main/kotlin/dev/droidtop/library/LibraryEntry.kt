@@ -824,7 +824,17 @@ interface EntryFactsOwner {
 sealed interface LaunchResult {
     data object Launched : LaunchResult
     data class Refused(val reason: String) : LaunchResult
+
+    /**
+     * A store's game that is not installed: nothing to start. A surface that has the game's page opens it, where
+     * Install is (Droidtop/tracker#563, rig, build 2011: a Quick launch widget did nothing visible).
+     */
+    data class NeedsInstall(val entryId: String, val title: String) : LaunchResult
 }
+
+/** A store's game with no install yet: its launch is the page's Install, never a start that fails. */
+fun LibraryEntry.needsInstall(): Boolean =
+    PcSource.storeIdOf(pcInfo?.storeId) != null && pcInfo?.installPath.isNullOrBlank()
 
 /**
  * What [LibraryProvider.quit] did to the running game, for the Quick
@@ -2033,6 +2043,7 @@ class Library(
         when {
             entry == null -> LaunchResult.Refused("That game isn't in the library. If it was added recently, rescan the library.")
             entry.missing -> LaunchResult.Refused("${entry.title} is missing: its files aren't where the library last found them.")
+            entry.needsInstall() -> LaunchResult.NeedsInstall(entry.id, entry.title)
             else -> try {
                 launch(entry)
                 LaunchResult.Launched

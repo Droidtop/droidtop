@@ -95,6 +95,12 @@ sealed interface CatalogItem {
      * droidtop's): a fact the person must see without opening anything, never a tooltip. Null draws none.
      */
     val chip: String? get() = null
+
+    /**
+     * True when [subtitle] is the row's one-line summary, shown under the title on every surface at all times (a
+     * plugin card, a catalog row: Droidtop/tracker#514), not an explanation kept on the focus line and in Info.
+     */
+    val summaryShown: Boolean get() = false
 }
 
 /**
@@ -352,6 +358,14 @@ class CatalogScreen(
     val live: kotlinx.coroutines.flow.Flow<Any?>? = null,
     /** How the screen is laid out (docs/SPEC.md 7k, "Page anatomy"); a page built by [pageScreen] names its own. */
     val layout: CatalogLayout = CatalogLayout.LIST,
+    /**
+     * A plugin's panel (Droidtop/tracker#515): every host draws it in the one panel frame, the plugin's icon
+     * ([iconFile]) before its title, and each row's subtitle as one line under it (the whole text in Info), so the
+     * Quick Menu, the companion and the Standard and Desktop windows show the same panel the same way.
+     */
+    val panel: Boolean = false,
+    /** A picture before the title (a plugin panel's own icon); a file in droidtop's storage, loaded off the main thread. */
+    val iconFile: String? = null,
 )
 
 /**
@@ -376,6 +390,7 @@ class NestedScreenItem(
     override val progress: Float? = null,
     override val chip: String? = null,
     override val iconFile: String? = null,
+    override val summaryShown: Boolean = false,
 ) : CatalogItem {
     init {
         require((inline != null) != (registryId != null)) { "Exactly one of inline/registryId must be set" }

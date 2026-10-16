@@ -300,6 +300,37 @@ internal fun StartMenu(
                 ),
             )
         }
+        // What plugins offer on this game or app (docs/plugin-api.md 3 C4, Droidtop/tracker#67): one row, shown when
+        // a plugin's static filter matches, opening the actions' own page; `enabled` is asked there.
+        val actionsContext = LocalContext.current
+        val actionTarget = target.entry?.let { dev.droidtop.library.integrations.PluginContextActions.targetOf(it) }
+        val hasActions by produceState(false, actionTarget) {
+            value = actionTarget != null && withContext(Dispatchers.IO) {
+                dev.droidtop.library.integrations.PluginContextActions
+                    .actionsFor(actionsContext, actionTarget, dev.droidtop.pluginhost.PluginModes.DESKTOP).isNotEmpty()
+            }
+        }
+        if (hasActions && actionTarget != null) {
+            menuRows.add(
+                HostedRow(
+                    key = "plugin_actions",
+                    title = "Plugin actions",
+                    onSelect = {
+                        menuFor = null
+                        val app = actionsContext.applicationContext
+                        dev.droidtop.library.integrations.PluginHub.open(
+                            actionsContext,
+                            dev.droidtop.library.integrations.PluginContextActions.screen(
+                                actionTarget,
+                                dev.droidtop.pluginhost.PluginModes.DESKTOP,
+                                dev.droidtop.pluginhost.PluginModes.Surfaces.DESKTOP_START_MENU,
+                            ) { screen -> dev.droidtop.library.integrations.PluginHub.open(app, screen) },
+                        )
+                        dismiss()
+                    },
+                ),
+            )
+        }
         menuRows.add(
             HostedRow(
                 key = "pin",

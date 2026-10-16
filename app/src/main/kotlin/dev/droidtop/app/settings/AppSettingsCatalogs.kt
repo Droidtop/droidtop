@@ -1742,7 +1742,7 @@ object AppSettingsCatalogs {
                         val update = PluginCatalog.offerFor(listings, record, userKeys) != null
                         val runtimeNeed = PluginRuntimeNeeds.missing(context, record.manifest)
                         val waiting = resolution.waiting[record.manifest.id]
-                        Triple(record, pluginState(record, grants, runtimeNeed, update, waiting), pluginCard(record, userKeys, catalogNames, waiting, grants, runtimeNeed, updateAvailable = update))
+                        Triple(record, pluginState(record, grants, runtimeNeed, update, waiting), pluginCard(context, record, userKeys, catalogNames, waiting, grants, runtimeNeed, updateAvailable = update))
                     }
                     val updates = cards.count { (_, state, _) -> state == "Update available" || state == "Needs an update" }
                     // Droidtop/tracker#513: what needs the person first, and the list narrowed to it.
@@ -1930,6 +1930,7 @@ object AppSettingsCatalogs {
 
     /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
     private fun pluginCard(
+        context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,
         userKeys: Map<String, UserOriginKey>,
         catalogNames: Map<String, String>,
@@ -1956,6 +1957,9 @@ object AppSettingsCatalogs {
             inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
             valueLabel = { "$state · v${m.version}" },
             chip = if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
+            // Its own icon and its summary, always shown (#513, #514). Built on IO, like the whole list.
+            iconFile = PluginStore.iconFile(context, m),
+            summaryShown = true,
         )
     }
 
@@ -2531,10 +2535,7 @@ object AppSettingsCatalogs {
             CatalogChip(if (isUnofficial(m.origin, userKeys)) "Unofficial" else pluginTrustBadge(m.origin, userKeys, catalogNames)),
             PluginTiers.badge(record, grants)?.let { CatalogChip("Full access") },
         )
-        val icon = m.presentation.icon?.let { path ->
-            val root = PluginStore.payloadDirFor(context, m.id)
-            File(root, path).takeIf { f -> f.isFile && f.canonicalPath.startsWith(root.canonicalPath + File.separator) }?.path
-        }
+        val icon = PluginStore.iconFile(context, m)
         val header = PageHeader(
             title = m.label,
             byline = listOfNotNull(m.presentation.publisher, "v${m.version}").joinToString(" · "),

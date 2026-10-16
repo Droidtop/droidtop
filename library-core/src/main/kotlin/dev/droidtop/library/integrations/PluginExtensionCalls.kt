@@ -92,6 +92,25 @@ object PluginContextActions {
         val runsAsJob: Boolean get() = ContextActionFilter.runsAsJob(entry)
     }
 
+    /**
+     * The target a library entry is (docs/plugin-api.md 3 C4, C18): an Android app is an `app` with its package,
+     * anything else a `game`. The one rule for every host that tells a plugin which game or app the person means.
+     */
+    fun targetOf(entry: dev.droidtop.library.LibraryEntry): ContextTarget {
+        val app = entry.kind == dev.droidtop.library.LibraryEntryKind.NATIVE_ANDROID_APP
+        return ContextTarget(
+            kind = if (app) "app" else "game",
+            id = entry.id,
+            title = dev.droidtop.library.GameNaming.displayName(entry.title),
+            systemId = entry.systemId,
+            packageName = if (app) entry.id else null,
+        )
+    }
+
+    /** An installed Android app as a target (Standard's long-press app menu). */
+    fun appTarget(packageName: String, label: String): ContextTarget =
+        ContextTarget(kind = "app", id = packageName, title = label, packageName = packageName)
+
     /** The actions whose static filter matches [target]. Reads manifests only; call it off the main thread. */
     fun actionsFor(context: Context, target: ContextTarget, mode: String? = null): List<Action> =
         providersOf(context, POINT, mode).filter { (_, entry) -> ContextActionFilter.matches(entry, target) }.map { (record, entry) -> Action(record, entry) }
@@ -99,13 +118,16 @@ object PluginContextActions {
     private fun argsFor(context: Context, action: Action, target: ContextTarget): JSONObject =
         JSONObject().put("actionId", action.id).put("target", targetArg(context, action.record, target))
 
-    /** Whether [action] is enabled for [target] right now. Anything but a clear "no" in time is yes. */
-    suspend fun enabled(context: Context, action: Action, target: ContextTarget): Boolean {
+    /**
+     * Whether [action] is enabled for [target] right now. Anything but a clear "no" in time is yes. [place] is where
+     * the person is ([PluginModes.Surfaces]), the call's `surface.place`.
+     */
+    suspend fun enabled(context: Context, action: Action, target: ContextTarget, place: String = PluginModes.Surfaces.GAME_DETAIL): Boolean {
         val policy = PluginCrashPolicy(context.applicationContext)
         return try {
             val reply = policy.handle(
                 action.record,
-                newCall(POINT, "enabled", "game.detail", argsFor(context, action, target), ENABLED_BUDGET_MS),
+                newCall(POINT, "enabled", place, argsFor(context, action, target), ENABLED_BUDGET_MS),
                 timeoutMs = ENABLED_BUDGET_MS,
                 crashOnTimeout = false,
             )
@@ -116,7 +138,7 @@ object PluginContextActions {
     }
 
     /** Runs [action] on [target] and returns the outcome (message or reply screen). */
-    suspend fun run(context: Context, action: Action, target: ContextTarget): PluginOutcome {
+    suspend fun run(context: Context, action: Action, target: ContextTarget, place: String = PluginModes.Surfaces.GAME_DETAIL): PluginOutcome {
         val args = argsFor(context, action, target)
         if (action.runsAsJob) {
             val flat = buildMap { args.keys().forEach { put(it, args.optString(it)) } }
@@ -128,7 +150,7 @@ object PluginContextActions {
         }
         val policy = PluginCrashPolicy(context.applicationContext)
         return try {
-            val reply = policy.handle(action.record, newCall(POINT, "run", "game.detail", args, 15_000L))
+            val reply = policy.handle(action.record, newCall(POINT, "run", place, args, 15_000L))
             if (!reply.ok) {
                 return PluginOutcome(
                     message = "${action.label} failed: ${reply.message}",
@@ -151,6 +173,45 @@ object PluginContextActions {
             policy.shutdown()
         }
     }
+
+    /**
+     * The actions plugins offer on one game or app, as a page (Droidtop/tracker#67): what Standard's long-press app menu
+     * and Desktop's Start menu open from their "Plugin actions" row, in [mode] at [place]. Which actions apply is read
+     * from manifests and `enabled` asked when the page opens, off the main thread; each action is a row that runs it and
+     * says what came of it, and a reply's view opens through [onReplyScreen].
+     */
+    fun screen(
+        target: ContextTarget,
+        mode: String,
+        place: String,
+        onReplyScreen: (CatalogScreen) -> Unit,
+    ): CatalogScreen = CatalogScreen(
+        id = "plugin_actions_${target.kind}_${target.id}",
+        title = target.title,
+        subtitle = "Plugin actions",
+        groups = { context ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                val actions = actionsFor(context, target, mode).filter { enabled(context, it, target, place) }
+                val items: List<dev.droidtop.library.settings.CatalogItem> = actions.map { action ->
+                    dev.droidtop.library.settings.AsyncActionItem(
+                        id = "plugin_action_${action.record.manifest.id}_${action.id}",
+                        title = action.label,
+                        subtitle = "From ${action.record.manifest.label}",
+                        run = { ctx, _ ->
+                            val outcome = run(ctx, action, target, place)
+                            outcome.screen?.let(onReplyScreen)
+                            outcome.message ?: "${action.label} done"
+                        },
+                    )
+                }.ifEmpty {
+                    listOf(dev.droidtop.library.settings.TextBlockItem(id = "plugin_actions_none", text = "No plugin has anything for ${target.title} right now."))
+                }
+                listOf(dev.droidtop.library.settings.CatalogGroup(id = "plugin_actions", title = null, items = items))
+            }
+        },
+        // The settings search must never call a plugin.
+        indexGroups = { emptyList() },
+    )
 }
 
 /**

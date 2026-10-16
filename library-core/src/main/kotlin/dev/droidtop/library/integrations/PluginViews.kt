@@ -90,7 +90,10 @@ object PluginViews {
         extraWhenFailed: () -> List<CatalogItem> = { emptyList() },
         extraGroups: suspend (Context, Map<String, String>) -> List<CatalogGroup> = { _, _ -> emptyList() },
         leadGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() },
-    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups).screen(id, title)
+        // A plugin's panel ([CatalogScreen.panel]) with its icon; false for any other plugin page.
+        panel: Boolean = false,
+        iconFile: String? = null,
+    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups).screen(id, title, panel, iconFile)
 
     /**
      * What running one view action came to: the sentence to show, a view the reply carried, whether the page should be
@@ -292,7 +295,7 @@ private class PluginPage(
         initial?.let { putAll(it.initialValues()) }
     }
 
-    fun screen(id: String, title: String): CatalogScreen = CatalogScreen(
+    fun screen(id: String, title: String, panel: Boolean = false, iconFile: String? = null): CatalogScreen = CatalogScreen(
         id = id,
         title = title,
         subtitle = "From ${record.manifest.label}",
@@ -305,6 +308,8 @@ private class PluginPage(
         },
         // The settings search walks screens; it must never call a plugin to do so.
         indexGroups = { emptyList() },
+        panel = panel,
+        iconFile = iconFile,
     )
 
     private suspend fun load(context: Context) {

@@ -930,6 +930,9 @@ fun CatalogNavigator(
         val pane: @Composable (Modifier, Dp) -> Unit = { modifier, startPadding ->
             CatalogPane(
                 title = paneTitle,
+                // A plugin's panel: its icon before its title, its rows' subtitles one line each (tracker#515).
+                titleIcon = screen.iconFile.takeIf { paneTitle != null },
+                panel = screen.panel,
                 hint = screen.subtitle,
                 rows = rows,
                 selected = selected,
@@ -1016,6 +1019,8 @@ fun CatalogNavigator(
 @Composable
 private fun CatalogPane(
     title: String?,
+    titleIcon: String? = null,
+    panel: Boolean = false,
     hint: String?,
     rows: List<CatalogRow>,
     selected: Int,
@@ -1051,7 +1056,7 @@ private fun CatalogPane(
         ?: hint?.takeIf { active }
     val reserveTip = hint != null || statusById.isNotEmpty() || rows.any { (!underRows && it.item.subtitle != null) || it.item.confirmText != null }
     Column(modifier) {
-        if (title != null) MenuHeader(title)
+        if (title != null) MenuHeader(title, iconFile = titleIcon)
         LazyColumn(
             state = state,
             // The list ends above the explanation strip (when the page has any explanations) and
@@ -1134,6 +1139,7 @@ private fun CatalogPane(
                         CatalogRowView(
                             row = row,
                             infoUnderRow = underRows,
+                            oneLineSummary = panel,
                             locked = (row.item as? AsyncActionItem)?.gate?.let { readGates[it] != true } ?: false,
                             isSelected = isSelected,
                             confirmArmed = confirmArmedId == row.item.id,
@@ -1569,6 +1575,8 @@ private fun CatalogRowView(
     row: CatalogRow,
     infoUnderRow: Boolean,
     locked: Boolean,
+    // Every subtitle shown as one line, as [CatalogItem.summaryShown] asks for one row (a plugin's panel, tracker#515).
+    oneLineSummary: Boolean = false,
     isSelected: Boolean,
     confirmArmed: Boolean,
     status: String?,
@@ -1612,9 +1620,15 @@ private fun CatalogRowView(
         uniformHeight = true,
         // The row's sentence: under the row when the person chose that (Info text), else on the focus line,
         // with the info glyph saying there is one (docs/SPEC.md 7k, "Explanations").
-        subtitle = item.subtitle.takeIf { infoUnderRow },
-        uniformSummaryLines = if (infoUnderRow && item.subtitle != null) 2 else 0,
-        info = !infoUnderRow && hasInfo(item),
+        // A summary row (a plugin card, a catalog row: tracker#514) always shows its one line, whatever the choice.
+        subtitle = item.subtitle.takeIf { infoUnderRow || item.summaryShown || oneLineSummary },
+        uniformSummaryLines = when {
+            item.subtitle == null -> 0
+            infoUnderRow -> 2
+            item.summaryShown || oneLineSummary -> 1
+            else -> 0
+        },
+        info = !infoUnderRow && !item.summaryShown && !oneLineSummary && hasInfo(item),
         onInfo = onLongClick,
         // A system state an action opens (Airplane mode, Bluetooth, VPN) is the same switch.
         switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,

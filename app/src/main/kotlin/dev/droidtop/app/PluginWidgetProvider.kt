@@ -48,6 +48,7 @@ class PluginWidgetProvider : AppWidgetProvider() {
             val title = context.getString(R.string.widget_plugin_title)
             val choose = DroidtopWidgets.activity(
                 context,
+                id,
                 "plugin-widget-choose-$id",
                 Intent(context, PluginWidgetConfigureActivity::class.java).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id),
             )

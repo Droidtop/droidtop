@@ -192,7 +192,12 @@ fun DesktopShell(
     val launchById: (String) -> Unit = { id ->
         // In the library's scope: closing the menu, which the same tap does, must not cancel it.
         library.launchInBackground(id) { result ->
-            if (result is LaunchResult.Refused) onLaunchFailure(result.reason)
+            when (result) {
+                is LaunchResult.Refused -> onLaunchFailure(result.reason)
+                // Desktop's own rows take the install offer first (pcLaunch, below); one that reaches here is said.
+                is LaunchResult.NeedsInstall -> onLaunchFailure("${result.title} isn't installed yet: open its page to install it")
+                LaunchResult.Launched -> Unit
+            }
         }
     }
     val launchEntry: (LibraryEntry) -> Unit = { entry -> launchById(entry.id) }
