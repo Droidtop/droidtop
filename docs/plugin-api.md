@@ -3046,8 +3046,67 @@ other path is made by the handler with the kernel deciding, where the
 isolated UID and SELinux keep droidtop's files out as before. The
 Containment check's "droidtop's files" line looks for droidtop's
 `files/plugins` folder by its own name, which in a plugin process is the
-plugin's folder, where there is none. Writes there do not count against
-the data store's quota yet.
+plugin's folder, where there is none.
+
+**What a contained plugin's own folder holds (design 2026-10-16,
+Droidtop/tracker#375).** Decided by the coordinator, 2026-10-16:
+"Contained Flutter plugins get shared_preferences, path_provider and `open`
+through droidtop, so standard Flutter packages just work while contained.
+It keeps contained-first, and it keeps the machinery invisible to plugin
+authors and users." On listing: "don't leave listing as a permanent limit if
+the broker can answer it." The folder above is the mechanism; what it serves:
+
+- **Packages that keep files.** `path_provider` (Flutter's `app_flutter`,
+  `getFilesDir`, `getCacheDir`), `shared_preferences` (Android's
+  `SharedPreferences` files under `shared_prefs`, written by a temporary file
+  and a rename, both brokered) and `sqflite` (the database under
+  `databases`, with its `-journal`, `-wal` and `-shm` files: each is created,
+  opened, renamed and unlinked by path, all brokered; its locks are `fcntl`
+  on the descriptor, which never leaves the process). The WAL's `-shm` is
+  mapped from a brokered descriptor; if SELinux refuses an isolated process
+  that mapping, SQLite reports it on opening in WAL mode, and `sqflite`'s
+  default (a rollback journal) needs no mapping. Nothing here is new to a
+  plugin author: the packages use the paths Android gives them.
+- **Listing a folder.** `getdents64` names no path, so it never reached the
+  broker, and SELinux refuses an isolated process a read of a folder :app
+  opened (`avc: denied { read } ... isolated_app`). The lockdown now traps
+  `getdents64` in passthrough. The handler first lists the folder itself (its
+  own call is let through by a mark in the upper half of the count argument,
+  which the kernel ignores); when that is refused it sends the descriptor
+  to the broker (`SBX_LIST`), which lists it only if it resolves under a rule
+  the process may read, with the same open file description, so the
+  position moves for both and `rewinddir` still works. One reply carries at
+  most 32 KiB of records; a larger read is answered in pieces, as the
+  kernel may. So `Directory.list`, `listFiles` and SQLite's own folder checks
+  work in the contained tier.
+- **`chmod` and `utimes`.** In passthrough these went to the kernel, which
+  answers `ENOENT` for an aliased name (Android's `FileUtils.setPermissions`,
+  called by `getDir` and `SharedPreferences`, logged "Failed to chmod"). The
+  lockdown now traps `fchmodat` and a path `utimensat` (and their old forms)
+  like the other path calls, and a claimed path goes to the broker
+  (`SBX_CHMOD`, `SBX_UTIMENS`), which applies them to the real file under a
+  write rule (the mode limited to the owner's bits and below `0777`). Any
+  other path still goes to the kernel.
+- **The quota.** The folder is inside the plugin's data store, so the
+  store's limit (`PluginDataStore.LIMIT_BYTES`, 512 MiB) covers both. The
+  broker's decider in :app checks every create, open for writing, `mkdir`
+  and rename into the folder: at or over the limit it answers `ENOSPC`
+  ("No space left on device": Dart's `FileSystemException`, SQLite's
+  `SQLITE_FULL`), never a crash. Usage is the folder's size, measured at
+  most once a second and kept between. A write on a file already open never
+  reaches the broker (a descriptor's writes stay in the process), so the
+  process also runs with `RLIMIT_FSIZE` at the limit and `SIGXFSZ` ignored:
+  one file can never pass the whole quota (that write gets `EFBIG`), and the
+  next create after the folder passes it gets `ENOSPC`.
+- **`open` over Flutter's `hostCall`** (kind parity with
+  `PluginContext.openFile` and `droidtop.host.open`). The channel method
+  `hostOpen` takes the same `{api, version, op, args}`; droidtop makes the
+  call through `openFile`, gives the descriptor a path of its own under
+  `/droidtop-sandbox/open/` as a local file of the sandbox library (read and
+  write when the op opened it for writing), and answers the broker's reply
+  with that `path` added. Dart opens it with `dart:io` like any file; every
+  open of that path is the same descriptor, so they share one position.
+  `hostClose {path}` lets it go, and a process keeps at most 64.
 **Open processes: one hole per permission (2026-10-15,
 Droidtop/tracker#553).** The graphics tier below became the first of a
 family. The owner's decision for Syncthing (a plugin that dials peers and
