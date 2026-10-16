@@ -40,7 +40,13 @@ upstream commits since the base that are not in this table, so a new upstream co
 | `7f84e03` | LABELS - full hide option (both home and drawer) | Taken |
 | `aa1bb09` | DRAWER - add side padding option | Taken |
 | `09fc582` | LABELS - show only in home option | Taken |
-| `e0f2e25` | ICONS - resolve correct icon while dragging on Android 8-11 | Waits for upstream's icon options (`ce7a74b`..`70d3436`), which it builds on |
+| `ce7a74b` | ICONS - adaptive icons toggle | Taken (Droidtop/tracker#564) |
+| `c549552` | ICONS - avoid double wrapping when adaptive icons are disabled | Taken |
+| `5104187` | ICONS - add option to force legacy icons | Taken |
+| `70d3436` | ICONS - gray out "Force legacy icons" if resource hack is outdated | Taken |
+| `6206042` | LAUNCHER_ICON - add monochrome icon | Not for this tree: Murine's own app icon; droidtop has its own |
+| `9001d72` | ICONS - add monochrome icons option for Android 13+ | Taken |
+| `e0f2e25` | ICONS - resolve correct icon while dragging on Android 8-11 | Taken, after the icon options it builds on; one import fitted by hand |
 
 Not yet decided: the rest of the list `scripts/murine-upstream.sh` prints. Of those, the website (`WEBSITE - ...`),
 version bumps and upstream's own build moves (AGP and Gradle upgrades, `4e670a4` moving every module under
