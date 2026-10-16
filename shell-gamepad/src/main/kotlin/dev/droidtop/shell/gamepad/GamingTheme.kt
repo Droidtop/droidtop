@@ -304,7 +304,9 @@ object GamingTheme {
         if (name != null && theme == null) return GamingPalette.defaultFor(key.light)
         val highContrast = key.highContrast
         val sentenceCase = key.sentenceCase || highContrast
-        val mapped = GamingThemeMapping.map(theme, key.light)
+        // A colour scheme the person named is drawn as the theme wrote it. Otherwise ThemeAssets loaded the scheme
+        // matching the appearance, and a theme with none gets its palette derived for it (docs/SPEC.md 7k, "Light and dark").
+        val mapped = GamingThemeMapping.map(theme, light = key.light.takeIf { key.colorScheme == null })
         val colors = if (highContrast) GamingThemeMapping.highContrast(mapped) else mapped
         val drawsOwnStatus = GamingThemeMapping.drawsOwnStatus(theme)
         val palette = when {
