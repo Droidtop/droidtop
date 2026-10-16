@@ -1,5 +1,6 @@
 package dev.droidtop.runtime.launcherimport
 
+import dev.droidtop.runtime.HomeAction
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -86,7 +87,7 @@ class NovaImportTest {
         assertEquals(chrome, app.component)
         assertEquals("Web", app.customTitle)
         assertArrayEquals(icon, app.customIcon)
-        assertEquals(PlanAction.Launch(maps), app.swipeUp)
+        assertEquals(HomeAction.Launch(maps), app.swipeUp)
         assertNull(app.swipeDown)
         assertTrue(plan.notes.any { it.what == "Web: swipe down" && "Weather" in it.reason })
     }
@@ -124,9 +125,9 @@ class NovaImportTest {
     @Test fun `gestures map to droidtop's, an app target included, the rest reported`() {
         assertEquals(
             mapOf(
-                ImportActions.DOUBLE_TAP to PlanAction.Droidtop("LOCK_SCREEN"),
-                ImportActions.SWIPE_DOWN to PlanAction.Droidtop("OPEN_NOTIFICATIONS"),
-                ImportActions.TWO_FINGER_UP to PlanAction.Launch(camera),
+                ImportActions.DOUBLE_TAP to HomeAction.Droidtop("LOCK_SCREEN"),
+                ImportActions.SWIPE_DOWN to HomeAction.Droidtop("OPEN_NOTIFICATIONS"),
+                ImportActions.TWO_FINGER_UP to HomeAction.Launch(camera),
             ),
             plan.gestures,
         )

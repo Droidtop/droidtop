@@ -126,6 +126,11 @@
     <string name="gesture_action_switch_mode_summary">Opens the mode switcher</string>
     <string name="gesture_action_open_games">Games</string>
     <string name="gesture_action_open_games_summary">Opens your games</string>
+    <string name="gesture_action_launch_app">Open an app</string>
+    <string name="gesture_action_launch_app_summary">Starts an app you choose</string>
+    <string name="home_action_open_app">Open %1$s</string>
+    <string name="home_action_app_missing">That app is not installed any more</string>
+    <string name="home_action_pick_app">Choose an app</string>
     <string name="gesture_action_clear_all_apps_summary">Ends every open app except droidtop, after asking when there are several</string>
 
     <!-- Murine search bar -->

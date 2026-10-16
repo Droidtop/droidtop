@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.launcherimport
 
+import dev.droidtop.runtime.HomeAction
+
 /**
  * A Nova Launcher backup as an [ImportPlan] (Droidtop/tracker#564; format in the tracker's
  * coordination/standard/launcher-import-formats.md, read from Nova 8.0.18). Tolerant of versions: the grid is read from
@@ -51,7 +53,7 @@ object NovaImport {
             if (Favorites.str(row, "customIconSource") != null) notes += ImportNote(component.substringBefore('/'), "A custom icon chosen in Nova's drawer is not brought across; droidtop's icon choices are per home-screen icon")
             Favorites.str(row, "title")?.takeIf { it.isNotBlank() }?.let { component to it }
         }.toMap()
-        val gestures = LinkedHashMap<String, PlanAction>()
+        val gestures = LinkedHashMap<String, HomeAction>()
         for ((key, slot) in GESTURES) {
             val value = prefs.string(key) ?: continue
             when (val action = action(value)) {
@@ -61,7 +63,7 @@ object NovaImport {
         }
         for ((key, name) in OTHER_GESTURES) {
             val value = prefs.string(key) ?: continue
-            if (action(value) != PlanAction.Droidtop("NONE")) notes += ImportNote("Gesture: $name", "droidtop has no such gesture")
+            if (action(value) != HomeAction.Droidtop("NONE")) notes += ImportNote("Gesture: $name", "droidtop has no such gesture")
         }
         return ImportPlan(
             source = SourceLauncher.NOVA,
@@ -121,10 +123,10 @@ object NovaImport {
     }
 
     /** A gesture's or a fling's value, `<title>$<intent>`: Nova's own action, or an app to start. */
-    internal fun action(value: String): PlanAction? {
+    internal fun action(value: String): HomeAction? {
         val intent = IntentUri.parse(value) ?: return null
-        intent.launcherAction?.let { name -> return ImportActions.droidtop(name)?.let { PlanAction.Droidtop(it) } }
-        return if (intent.isAppLaunch) PlanAction.Launch(intent.component!!) else null
+        intent.launcherAction?.let { name -> return ImportActions.droidtop(name)?.let { HomeAction.Droidtop(it) } }
+        return if (intent.isAppLaunch) HomeAction.Launch(intent.component!!) else null
     }
 
     private fun describe(value: String): String {
@@ -148,7 +150,7 @@ object NovaImport {
         override fun customIcon(row: Map<String, Any?>) =
             if (flags(row) and NOVA_FLAG_CUSTOM_ICON != 0L) Favorites.blob(row, "icon") else null
         override fun cover(row: Map<String, Any?>) = flags(row) and NOVA_FLAG_SWIPE_TO_OPEN != 0L
-        override fun swipe(row: Map<String, Any?>, up: Boolean): Pair<PlanAction?, String?> {
+        override fun swipe(row: Map<String, Any?>, up: Boolean): Pair<HomeAction?, String?> {
             val value = Favorites.str(row, if (up) "flingUpIntent" else "flingDownIntent")?.takeIf { it.isNotBlank() } ?: return null to null
             val action = action(value)
             return if (action != null) action to null else null to "Nova's \"${describe(value)}\" has no equivalent in droidtop"
