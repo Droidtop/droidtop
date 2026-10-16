@@ -46,7 +46,8 @@ private const val SCRAPE_ALL_PC = "Scrape PC and engine games"
 // settings screen it opens now holds only Game folders, Windows games
 // and Downloads -- store accounts moved to the "Accounts and sources"
 // settings area.
-private const val PC_SETUP = "PC setup"
+// Opens the Game sources place (Droidtop/tracker#571 row 4: the "PC setup" screen of links is gone).
+private const val PC_SETUP = "Game sources"
 private const val SORT_BY = "Sort by"
 private const val FILTER = "Filter"
 private const val SYSTEM_SETTINGS = "System settings"

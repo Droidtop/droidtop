@@ -99,15 +99,20 @@ object CompanionState {
 
     /**
      * Quit or Kill the running game from the companion: the one quit path (`Library.quitRunning`, the task
-     * manager's strongest close), run by the companion itself in the process scope. It used to be a seam that
+     * manager's strongest close) or, with [kill], the force-stop at once (`Library.killRunning`), run by the
+     * companion itself in the process scope. It used to be a seam that
      * MainActivity installed, so with no MainActivity alive a press did nothing at all.
      */
-    fun quit(context: android.content.Context, entry: LibraryEntry) {
+    fun quit(context: android.content.Context, entry: LibraryEntry, kill: Boolean = false) {
         val app = context.applicationContext
         stopStatus.value = "Ending ${entry.title}…"
         launchError.value = null
         scope.launch {
-            val stop = async(kotlinx.coroutines.Dispatchers.IO) { LibraryCore.library(app).quitRunning(app, entry) }
+            // Kill force-stops at once; Quit tries the gentler steps first (Droidtop/tracker#571 row 16).
+            val stop = async(kotlinx.coroutines.Dispatchers.IO) {
+                val library = LibraryCore.library(app)
+                if (kill) library.killRunning(app, entry) else library.quitRunning(app, entry)
+            }
             val outcome = kotlinx.coroutines.withTimeoutOrNull(STOP_WAIT_MS) { stop.await() }
             if (outcome == null) stopStatus.value = "${entry.title} has not ended yet; droidtop is still trying to end it"
             val text = when (val result = outcome ?: stop.await()) {

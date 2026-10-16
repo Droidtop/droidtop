@@ -3645,7 +3645,14 @@ a close path of its own. Every call works off the main thread.
   asks the provider again for a binder whose broadcast was missed. A
   surface never does nothing silently, and only a close that ended the session (`sessionOver`) is the Quick Menu's
   `QuitResult.Ended` (droidtop's running-game state clears on that alone, as the rule above already says).
-  Quit and the companion's Kill are one path, `Library.quitRunning`, run so that it finishes even when the
+  **Kill force-stops at once (2026-10-16, Droidtop/tracker#571 row 16; the owner: "Yep, kill should immediately
+  force-stop it").** Kill (the Quick Menu's Kill pill, the companion's Kill row) is `Library.killRunning`: a
+  helper's force-stop straight away (`TaskManager.kill`, `AppCloser.kill`), never Quit's gentler steps first
+  (Enginehost's own end, the move to the background); without a helper that can force-stop it says "Kill needs
+  the helper app to force-stop it ... Quit ends it the way Android allows" and stops nothing. droidtop's own
+  Windows screen ends its guest at once either way. Its second press asks Kill's own question ("It is stopped at
+  once, without saving"). Before this Kill and Quit were one call.
+  Quit is `Library.quitRunning`, run so that it finishes even when the
   surface that asked is recreated (the helper's sheet or the Home press can do that; the banner read "Quit failed:
   Job was cancelled" on build 1809): the companion's seams run in `CompanionState.scope`, not the activity's. A
   close that only reached `Requested` or `Failed` leaves the session standing and puts the reason on the banner:
@@ -5785,7 +5792,7 @@ one:
 
   **Downloads (Droidtop/tracker#181; reversed 2026-10-09 on the owner's "why can't we enable resuming?"):** every single-file HTTP(S) download droidtop itself makes is one native job of kind `download` (`DownloadJobs`, owner label "Downloads") in the same "Downloads and installs" list, and droidtop's own downloader does the transfer: `ResumableDownload` in `:net-core`, the one mechanism `Http.downloadTo` also goes through. Android's DownloadManager is not used for any of these (its path, `DownloadBackend` and the metered flag are deleted), and since 2026-10-14 not for droidtop's own APK update either: that is one of these jobs, with the post step `droidtop.self_update` (§10b). The file is fetched into `<name>.part` with a sidecar `<name>.part.meta` holding the server's `ETag`, `Last-Modified` and length, in droidtop's own external files directory (`downloads/<name>`, scoped storage needs no permission). A resume (after Pause, a lost connection, a network change or a restart) sends `Range: bytes=<have>-` with `If-Range` set to the strong ETag, else the `Last-Modified`: a `206` whose `Content-Range` starts at the byte asked for is appended; a `200` (the server does not do ranges, or the file changed) discards the partial file and starts from zero, which the job's status line says ("Started again: the server cannot resume."); a `416` on a partial file that is already the whole length finishes it, any other `416` starts again; with no validator at all a partial file is not trusted and starts again. A broken connection or a 5xx/429 is retried from the partial file with a backoff (1 s doubling to 30 s, up to six failures without progress, each saying "Waiting for the connection" or "Waiting to retry"); any other HTTP status fails the job with the server's answer. Redirects are followed by hand, and `Authorization`, `Proxy-Authorization`, `Cookie`, `Referer` and `Origin` go on only to the host the request was made to (a redirect to another host, or from https to http, drops them; Droidtop/tracker#417). Pause and Cancel cancel the job's coroutine, and a watcher closes the live connection at once so a blocked read does not hold the thread. Pause keeps the partial file; Cancel (the kind's `onCancel` hook, also for a restored job) deletes it and its sidecar. The checkpoint is `fetched`, reported once every byte is in the file: a restored job with that checkpoint goes straight to the post step, and one whose file was already moved into the game folder is finished and reported without downloading again (`registerNative(..., reattachOnRestart = true)`: a restored download runs again at once from its partial file, it is not left paused). Progress is reported at most once a second. The optional digest (SHA-256, SHA-1 or MD5, whichever the source publishes; the strongest given is checked, Droidtop/tracker#416) and size cap are checked (a file over the cap is refused as soon as its length is known, and nothing is kept), then the job's post-processing step (a name registered with `DownloadJobs.registerPost`, so a restored job finds it) moves, unpacks or installs the file and the runner deletes it. The step `keep` leaves the file for the caller. Android's own download notification is gone with its service: a download counts in the one summary notification below. **A download a sign-in site serves (2026-10-09, Droidtop/tracker#380):** a source plugin cannot open a web page (a contained one has no window or sockets), so a protected link is opened in droidtop's own web view with the plugin's signed-in session (docs/plugin-api.md 3 G3, `web.session open_in_session`); the first download the page starts is captured and the plugin's `acquire` reply names it by a one-use token (`download.session`), and droidtop adds the captured cookies, user agent and referrer itself. It is then the same Downloads job as any acquire download, its cookies held in memory like every credential header. **Opening a link in another app (Droidtop/tracker#418):** droidtop has no torrent client, so a source that finds a magnet link (or a page the person must use in a browser) calls the host op `apps.view` (docs/plugin-api.md 3 F2) from a button's job; droidtop builds the `ACTION_VIEW` intent itself and shows Android's chooser, for `https`, `http` and `magnet` links only, behind the normal permission "Open links in other apps". A `.torrent` file a site serves is deliberately not captured into a game folder; opening a file droidtop itself downloaded in another app is not built, because no plugin can name such a file and it would need a lifetime for files left in the downloads area. **Acquire reply extras (2026-10-09, Droidtop/tracker#417):** the file name is kept as the source gave it (only characters no file system takes are replaced; the downloads area itself names its file `acquire_<time>.<extension>`, so the display name never reaches a path there); `system` places the download in that system's games folder when the Get games screen is not already that system's (`AcquireSystemHint`; no such folder fails the job, nothing goes to another system's folder); `unpack: "archive"` makes the place step unpack a zip, 7z or rar with the one `ArchiveExtractor` (now in `:runtime-common`, shared with the itch.io store's installs) into a hidden `.<name>.unpacking` folder renamed to the archive's name less its extension when whole, then deletes the archive; a restored job whose folder is already there is finished without downloading again, an existing folder is never touched, and a failed unpack keeps the download. **Several files (Droidtop/tracker#417):** the acquire reply's `downloads` (1 to 16 descriptors) is one job and one entry in Downloads: the first file travels in the job's own arguments and the others in its `more` argument, each with its own name, digests and headers (the credential ones in memory only, keyed by the file's downloads-area name). The files are fetched and checked in turn, the checkpoint `fetched:<n>` counting the whole ones so a restart carries on with the next file from its partial file, and the post step (`DownloadMultiPost`, registered next to the single-file one) places them all or none; a job restored after the move finds every target in place and finishes without fetching. **Split releases (Droidtop/tracker#419):** several files with `unpack: "archive"` must be the numbered parts of one split archive (`SplitArchives`); byte-split parts (`.7z.001`, `.zip.001`, `.rar.001`) are concatenated in order after the last is checked, the parts deleted, and the joined file unpacked as a single archive (a failed unpack keeps the joined file). RAR volumes (`.partN.rar`) are placed together and not unpacked, deliberately: the libarchive binding the one `ArchiveExtractor` uses opens a single file, so extracting the first volume would drop the rest without an error.
   **A download pauses and resumes like any other job.** It is pausable and resumable (`startNative` defaults), so the jobs list shows Pause, Resume and Cancel for it, the Download rules policy can hold and release it (below), and a pause costs only the bytes in flight. The earlier decision not to offer Pause (DownloadManager has no public pause) is reversed by moving the transfer to droidtop's own downloader.
-  **Download rules (decided 2026-10-09, Droidtop/tracker#226; Steam's Downloads settings are the reference).** One policy object, `DownloadPolicy` in `:net-core`, is read by every download job; no store or source has a network rule of its own. `DownloadPolicy.decide(settings, conditions, job)` is the whole rule set and is pure (unit tested): it answers Go or Hold with the line the job shows. The person's choices live in Settings, **Download rules** (`DownloadRulesCatalog`, reached from PC setup and from the Downloads place):
+  **Download rules (decided 2026-10-09, Droidtop/tracker#226; Steam's Downloads settings are the reference).** One policy object, `DownloadPolicy` in `:net-core`, is read by every download job; no store or source has a network rule of its own. `DownloadPolicy.decide(settings, conditions, job)` is the whole rule set and is pure (unit tested): it answers Go or Hold with the line the job shows. The person's choices live in Settings, **Download rules** (`DownloadRulesCatalog`, reached from the Downloads place):
   - **Download over** (`NetworkRule`): *Wi-Fi only*; *Wi-Fi, and mobile data for small downloads* (the default; small is under 50 MB, and a download of unknown size counts as large, so an unsized install waits for Wi-Fi); *Any connection*. The network is what Android says about the active network: no internet holds with "Waiting for a network"; an internet network without `NOT_METERED` (mobile data, a hotspot, a Wi-Fi marked metered) is *metered*, which is what the rule restricts, holding with "Waiting for Wi-Fi". Unmetered Wi-Fi and ethernet always pass. The network rule governs every download.
   - **Automatic updates.** *Keep installed store games up to date* is the default for games that follow it (off until the person turns it on, since today nothing updates by itself). Each installed store game has its own **Keep up to date** row in its menu, cycling *Follow the default*, *On*, *Off* (`AutoUpdate`); the stores publish no default of their own that droidtop reads, so "follow" means follow this setting. *Update only during a set time* (from and to, on the hour, past midnight allowed) and *Update while a game is running* (off by default) hold **automatic** downloads only; a download the person started (an Install press, a plugin they ran) ignores the window and the game, because holding what they just asked for would be surprising. Held for the window reads "Waiting for 02:00", for a game "Waiting until you stop playing".
   - **Where it applies.** A native job kind registers with `registerNative(..., download = true)` and is then governed: single-file downloads (`download`), store installs and updates (`store_install`) and the desktop's font pack (`desktop_fonts`; its private "download on mobile data" switch is deleted, the font pack is a download like the others). `PluginJobsCenter.admission` holds a new job before a byte moves (it starts paused, the reason is its status line and `Entry.hold`); `DownloadGate` (`:plugin-host`) re-decides every job when Android's default network, the clock tick (a minute), the rules or the set of live downloads change, pausing a running job the policy now holds and resuming a held one when the verdict turns to go. The job's size and whether it is automatic ride in its arguments (`bytes`, `automatic`). Store installs keep what is on disk (each store resumes from its files), and a single-file download keeps its `.part` file, so pausing either loses nothing; a server that cannot resume restarts the file from zero and the row says so.
@@ -9711,19 +9718,14 @@ thread) for the file to load: a 16-bit PCM wav, or a compressed one, loads as
 it is; any other PCM or float wav is rewritten once as a 16-bit PCM copy in the
 app's cache folder (`nav-sounds`, named by the source's path, size and
 modification time) and that copy is loaded. The theme's own file is never
-touched. The experiment rows below stay until the owner has listened to a
-build with this change; if the static is gone in variant A, the row and its
-variants go and A is the behaviour.
-Until the cause is known there is a test row, "Launch sound test" in the
-Shell group of Settings, with three variants that change only the launch
-sample between the A press and the dispatch (`LaunchSoundVariant`,
-`LaunchSoundPlan`, unit-tested): A as it works (default); B holds the launch
-sample back until the launch is really dispatched, which is after the
-question, and the hand-off lets it play out; D plays no droidtop sound from
-the press on (no launch sample, preview silenced), a control. The row is
-removed once the cause is fixed and the variant that cured it becomes the
-behaviour. What was a fourth variant, silencing the preview while the
-question is up, is a rule for every modal layer, below.
+touched. **The launch sound test is gone (2026-10-16, Droidtop/tracker#571 row 40; the owner: "Yep, that
+seems to be fixed").** There was a test row, "Launch sound test" in the Shell group of Settings, whose
+variants changed only the launch sample between the A press and the dispatch: A as it worked, B holding the
+sample back until the dispatch, D no droidtop sound from the press on. With the static fixed, the row, its
+variants (`LaunchSoundVariant`, `LaunchSoundPlan`, `LaunchSoundExperiment`) and the hook B used
+(`LaunchDisplay.beforeDispatch`) are deleted, and A is the behaviour: the theme's launch sample plays at the
+A press. What was a fourth variant, silencing the preview while the question is up, is a rule for every
+modal layer, below (`AudioHandOff.silenced`).
 **Nothing plays beneath a modal layer (2026-10-02, tracker#160).** The owner
 has no preview video he knows of and asked why one would play under a prompt:
 no layer leaves media playing beneath it. While any layer on the hint bar's
@@ -10926,7 +10928,9 @@ Gaming, where the owner's ask was sharpest:
 - **Start opened the Quick Menu, exactly like R2** -- superseded
   2026-10-01 (Droidtop/tracker#258): Start now opens the left menu, and R2
   stays the Quick Menu's one button (§7j, "Gaming controls").
-- **The Quick Menu's System tab gained a "Settings" tile**
+- **The Quick Menu's System tab gained a "Settings" tile** -- removed 2026-10-16 (Droidtop/tracker#571 row 14;
+  the owner: "I guess so, but there's a lot of important work to do reorganizing stuf"): Start and the left menu
+  already open Settings, so the tile was a third way to one place. The rest of this entry is history.
   (`GamingSettingsCatalog.ID_SYSTEM_OPEN_SETTINGS`, in the existing
   `quickOnly` System group, right after "Switch mode") that deep-links
   into Gaming's own Settings section the same way "Browse themes" already
@@ -14197,13 +14201,12 @@ the pipeline applies it.
   pill (§7k) is live on this tab exactly while a game is under the cursor.
   With no game under the cursor (the strip, an empty list) Select opens the
   list's options (`GamelistOptionsMenu` with the `pc` system id: Jump to
-  letter, Random game, Get games, Get artwork and details, PC setup,
+  letter, Random game, Get games, Get artwork and details, Game sources,
   Close -- the console-only rows Open games on, System settings, Get artwork
   and details (per system) and Import from ES-DE are not offered for it,
   Droidtop/tracker#175), which is also the Filter sheet's last row, "List
   options", so it stays reachable from an empty library.
-  **B** goes back one level: from a grid view to Overview, from PC setup to
-  the library; Overview goes back to Home, which is the shell's top level and
+  **B** goes back one level: from a grid view to Overview; Overview goes back to Home, which is the shell's top level and
   does nothing.
 - **Touch is the same cursor.** A tap on a capsule that is not selected
   selects it (pointer and focus are one selection, and the hint row then
@@ -14347,9 +14350,10 @@ An empty library shows **one empty state** (`EmptyLibrary`, Droidtop/tracker#533
 Retro Games, PC Games and Home: a glyph, one line ("No games yet"; PC Games says "No PC games yet"), and
 two buttons side by side in the middle of the page, the place's own action first and **Get games**
 beside it (it opens the one search, scoped to the place; "There is no Get games sheet", 13). Retro Games' action is **Add a folder** (the Game folders page drawn in place); PC Games'
-and Home's is **Game sources**, which opens **PC setup** (`pc_stores`, the one settings-catalog screen
-for game folders, the Windows system files and Downloads -- store sign-ins are under Accounts and
-sources, §7f) in place; B leaves it, and the options menu's "PC setup" row opens the same screen.
+and Home's is **Game sources**, which opens the Game sources place; the options menu's "Game sources" row does
+the same. It used to open **PC setup** (`pc_stores`), a settings screen of links to game folders, the Windows
+system files, Downloads and Download rules, each of which already has a home; it is deleted (2026-10-16,
+Droidtop/tracker#571 row 4; the owner: "Yep").
 Neither button is drawn filled, so the focus ring is the only highlight (a filled first button beside
 a ringed second read as two chosen at once). PC Games and Home used to open on PC setup by
 themselves, which read as a redirect into Game sources. Home counts its Retro games and launcher apps
