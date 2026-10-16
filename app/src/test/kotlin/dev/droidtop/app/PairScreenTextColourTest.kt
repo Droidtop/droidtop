@@ -15,7 +15,7 @@ class PairScreenTextColourTest {
     fun `the pairing screen sets its text colour from the theme`() {
         val source = File("src/main/kotlin/dev/droidtop/app/PairComputerActivity.kt").readText()
         val colour = source.indexOf("LocalContentColor provides MaterialTheme.colorScheme.onBackground")
-        val screen = source.indexOf("PairScreen(onDone")
+        val screen = source.indexOf("PairScreen(handheld")
         assertTrue("PairComputerActivity sets no content colour", colour >= 0)
         assertTrue("the content colour is set after the screen is drawn", colour < screen)
     }
