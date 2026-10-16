@@ -80,7 +80,7 @@ internal fun SidePanelFrame(
     panelWidth: (screen: Dp) -> Dp = { it },
     bottomMaxHeight: Float = 0.72f,
     floatMargin: Dp = 0.dp,
-    scrim: Color = MenuTokens.Scrim.copy(alpha = MenuTokens.QuickPanelScrimAlpha),
+    scrim: Color = MenuTokens.PanelVeil,
     topInset: Dp = 0.dp,
     footer: (@Composable (close: () -> Unit) -> Unit)? = null,
     content: @Composable (width: Dp, close: () -> Unit) -> Unit,

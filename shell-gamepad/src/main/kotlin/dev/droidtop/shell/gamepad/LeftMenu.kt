@@ -179,7 +179,7 @@ internal fun LeftMenu(
         edge = PanelEdge.LEFT,
         onDismiss = onDismiss,
         panelWidth = { screen -> if (window.portrait) screen * SideMenu.PortraitFraction else SideMenu.Width.coerceAtMost(screen) },
-        scrim = MenuTokens.Scrim,
+        scrim = MenuTokens.Veil,
         topInset = SideMenu.VerticalInset,
         // Steam draws the main menu's legend where the footer is, not inside the panel.
         footer = {
