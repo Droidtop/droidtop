@@ -71,6 +71,36 @@ class DesktopInputRouterKeysTest {
     }
 
     @Test
+    fun `a key combination's Ctrl is let go with its own release, so the next key is plain`() {
+        // `adb shell input keycombination CTRL_LEFT B`: both downs, the second carrying Ctrl in its meta state, then
+        // both ups in the same order. Enter afterwards reached foot as Ctrl+Enter on the rig (2026-10-16).
+        val bridge = FakeHostBridge()
+        val router = router(bridge)
+        val ctrl = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+
+        router.onKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_DOWN, 0, ctrl)
+        router.onKeyEvent(KeyEvent.KEYCODE_B, KeyEvent.ACTION_DOWN, 0, ctrl)
+        router.onKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_UP, 0, 0)
+        router.onKeyEvent(KeyEvent.KEYCODE_B, KeyEvent.ACTION_UP, 0, ctrl)
+        router.onKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.ACTION_DOWN, 0, 0)
+        router.onKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.ACTION_UP, 0, 0)
+
+        assertEquals(listOf(29 to true, 48 to true, 29 to false, 48 to false, 28 to true, 28 to false), bridge.keys)
+    }
+
+    @Test
+    fun `a Ctrl whose release never came is let go when the surface loses input`() {
+        val bridge = FakeHostBridge()
+        val router = router(bridge)
+
+        router.onKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, KeyEvent.ACTION_DOWN, 0, 0)
+        router.releaseHeldInput()
+        router.onKeyEvent(KeyEvent.KEYCODE_X, KeyEvent.ACTION_DOWN, 0, 0)
+
+        assertEquals(listOf(29 to true, 29 to false, 45 to true), bridge.keys)
+    }
+
+    @Test
     fun `a typed key and its synthesized Shift go through the text keyboard, a physical key through the layout one`() {
         val bridge = FakeHostBridge()
         val router = router(bridge)
