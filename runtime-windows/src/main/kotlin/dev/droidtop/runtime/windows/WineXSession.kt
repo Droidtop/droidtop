@@ -142,7 +142,10 @@ class WineXSession(
             // so the same game keeps the same prefix no matter which
             // container was activated last.
             put("WINEPREFIX", File(prefix.rootDir, ".wine").absolutePath)
-            put("WINEDEBUG", "-all")
+            // Errors only, from every channel: what a failed launch needs to be read afterwards (console,
+            // 2026-10-17), bounded where the full trace would flood the output tail; a prefix's own WINEDEBUG,
+            // set below, still wins.
+            put("WINEDEBUG", WineLaunchPlan.DEFAULT_WINEDEBUG)
             // EnvVars parses a string or copies another EnvVars; there is
             // no map overload, so the plan's pairs go in one at a time.
             WineLaunchPlan.audioEnvVars(prefix.audioDriver, rootPath).forEach { (name, value) -> put(name, value) }
@@ -330,6 +333,9 @@ internal object WineWorkingDirectory {
  * tested without an Android environment, a container or a GPU.
  */
 object WineLaunchPlan {
+    /** Wine's log channels by default: errors only ("-all,err+all"), never the full trace. */
+    const val DEFAULT_WINEDEBUG = "-all,err+all"
+
 
     enum class AudioDriver { PULSEAUDIO, ALSA, NONE }
 
