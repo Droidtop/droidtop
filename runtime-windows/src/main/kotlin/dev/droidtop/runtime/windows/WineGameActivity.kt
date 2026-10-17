@@ -94,6 +94,9 @@ class WineGameActivity : Activity() {
     /** What a prefix tool is called, when this screen runs one ([WineEngine.launch]'s `tool`); null for a game. */
     private var tool: String? = null
 
+    /** What this run started, for its record in logs/wine-last.log. */
+    private var launchTarget: String? = null
+
     /** What the Quick Menu's Game section reaches this screen through (Resume is a relaunch, Stop is [stop]). */
     private val ownScreen = object : OwnGameScreens.Screen {
         override val entryId: String? get() = this@WineGameActivity.entryId
@@ -197,6 +200,7 @@ class WineGameActivity : Activity() {
         // because a .desktop shortcut stores a Windows path, and
         // File(...).name would keep the whole of one on Android.
         WinePresentation.fullscreenWMClass(target)?.let { renderer.forceFullscreenWMClass = it }
+        launchTarget = target
 
         winHandler = WinHandler(xServer, view).also { handler ->
             xServer.winHandler = handler
@@ -281,8 +285,18 @@ class WineGameActivity : Activity() {
      */
     private fun onGuestTerminated(status: Int) {
         val ranMs = SystemClock.elapsedRealtime() - startedAtMs
-        val report = WinePresentation.exitReport(status, ranMs, guestShowedWindow, session?.output().orEmpty(), tool = tool != null)
+        val output = session?.output().orEmpty()
+        val report = WinePresentation.exitReport(status, ranMs, guestShowedWindow, output, tool = tool != null)
         Timber.i("Wine exited %d after %d ms", status, ranMs)
+        // Every run leaves a trace (console, 2026-10-17: three failed launches of one game and none could be read
+        // afterwards): one logcat line, and the run's record in droidtop's logs folder, which Share diagnostics packs.
+        android.util.Log.i(WinePresentation.LOG_TAG, "Wine exited $status after $ranMs ms, window shown: $guestShowedWindow")
+        val record = WinePresentation.lastRunLog(launchTarget ?: tool, status, ranMs, guestShowedWindow, output, System.currentTimeMillis())
+        val logs = dev.droidtop.library.ScanLog.logsDir(applicationContext)
+        Thread {
+            runCatching { logs.mkdirs(); java.io.File(logs, WinePresentation.LAST_RUN_LOG).writeText(record) }
+                .onFailure { android.util.Log.w(WinePresentation.LOG_TAG, "could not write ${WinePresentation.LAST_RUN_LOG}", it) }
+        }.start()
         runOnUiThread {
             // The person left the game (Back): stopping the session killed
             // Wine (code 137), which is the quit itself, not a failure to report.
@@ -567,6 +581,28 @@ object WinePresentation {
     /** How Wine's end is put to the person: a headline and the detail under it. */
     data class ExitReport(val title: String, val detail: String)
 
+    const val LOG_TAG = "droidtop.wine"
+
+    /** The last Wine run's record, in droidtop's logs folder (ScanLog.logsDir), so Share diagnostics carries it. */
+    const val LAST_RUN_LOG = "wine-last.log"
+
+    /** How many of Wine's last lines the record keeps. */
+    const val LAST_RUN_LINES = 200
+
+    /** The record of one Wine run: what it started, how it ended, and the tail of what Wine printed. Pure. */
+    fun lastRunLog(target: String?, status: Int, ranMs: Long, showedWindow: Boolean, output: String, nowMs: Long): String {
+        val lines = output.lines().map(String::trimEnd).filter(String::isNotBlank).takeLast(LAST_RUN_LINES)
+        return buildString {
+            appendLine("Wine run ended at ${java.time.Instant.ofEpochMilli(nowMs)}")
+            appendLine("Started: ${target ?: "unknown"}")
+            appendLine("Exit code: $status")
+            appendLine("Ran: $ranMs ms")
+            appendLine("Showed a window: ${if (showedWindow) "yes" else "no"}")
+            appendLine("Last ${lines.size} lines Wine printed:")
+            lines.forEach { appendLine(it) }
+        }
+    }
+
     /** Wine ending this soon after it started means the game did not really run. */
     const val EXITED_AT_ONCE_MS = 10_000L
 
@@ -575,22 +611,27 @@ object WinePresentation {
 
     /**
      * What to say when Wine ends with [status] after [ranMs], given the tail
-     * of what it printed ([output]); null for a program that ran and quit with
-     * code 0, which needs no report. A code-0 exit within [EXITED_AT_ONCE_MS]
-     * is reported too when the guest never mapped a window of its own
-     * ([showedWindow]): a game that cannot create its device often quits
-     * cleanly (rig, a Unity game with no Direct3D 11 device), while a tool such
-     * as Wine configuration may well be closed again within seconds. A prefix
-     * [tool] is never reported for code 0.
+     * of what it printed ([output]); null for a game that showed a window and
+     * quit with code 0, which needs no report. A game that never mapped a
+     * window of its own ([showedWindow]) did not run, whatever its code and
+     * however long Wine lasted: a game that cannot create its device often
+     * quits cleanly (rig, a Unity game with no Direct3D 11 device), and one
+     * that quit cleanly after ten seconds showed nothing at all (console,
+     * 2026-10-17). A prefix [tool] is never reported for code 0: Wine
+     * configuration may well be closed again within seconds.
      */
     fun exitReport(status: Int, ranMs: Long, showedWindow: Boolean, output: String, tool: Boolean = false): ExitReport? {
         // A prefix tool (Wine configuration, the registry editor, an installer) is closed when its work is done,
         // however soon; only a failing exit is worth saying.
         if (tool && status == 0) return null
         val atOnce = ranMs < EXITED_AT_ONCE_MS
-        if (status == 0 && (!atOnce || showedWindow)) return null
+        if (status == 0 && (tool || showedWindow)) return null
         val what = if (tool) "program" else "game"
-        val title = if (atOnce) "This Windows $what closed straight after it started." else "This Windows $what stopped with an error."
+        val title = when {
+            atOnce -> "This Windows $what closed straight after it started."
+            status == 0 -> "This Windows $what closed without showing a window."
+            else -> "This Windows $what stopped with an error."
+        }
         val seconds = (ranMs / 1000).coerceAtLeast(0)
         val code = "Wine exited with code $status after $seconds s."
         val lines = output.lines().map(String::trimEnd).filter(String::isNotBlank).takeLast(EXIT_LINES)

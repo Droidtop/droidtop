@@ -458,6 +458,17 @@ fun listExclusion(
     }
 }
 
+/**
+ * The games a search looks through (docs/SPEC.md 12a, "One search"): every game the lists show, with the person's
+ * own ownership options ([saved], PC Games' List options), the search's own "include free-to-play" switch adding to
+ * them rather than replacing them, and games that are missing right now too (an offline card), which the lists also
+ * show (console, 2026-10-17: the companion's search said "No match" for games Gaming listed). Pure.
+ */
+fun searchablePool(games: List<LibraryEntry>, saved: OwnershipOptions, includeFree: Boolean, includeHidden: Boolean): List<LibraryEntry> {
+    val options = saved.copy(showFree = saved.showFree || includeFree)
+    return games.filter { listExclusion(it, ListPlace.LIST, options, includeHidden = includeHidden) == null }
+}
+
 /** A store row's holding, or null for anything no store holds (a folder game, a Wine shortcut, a ROM, an app). */
 internal fun LibraryEntry.holding(): StoreHolding? = pcInfo?.takeIf { PcSource.storeIdOf(it.storeId) != null }?.holding
 

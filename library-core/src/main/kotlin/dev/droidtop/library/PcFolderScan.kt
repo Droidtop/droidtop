@@ -255,6 +255,8 @@ object PcFolderScan {
             walk.walk(folder, depth = 1)
         } catch (_: FolderTooSlow) {
             return walk.abandoned(folder, mtime, System.currentTimeMillis() - startedAt)
+        } catch (unreadable: FolderUnreadable) {
+            return walk.unreadable(folder, mtime, System.currentTimeMillis() - startedAt, unreadable.folder)
         } catch (cancelled: CancellationException) {
             // An engine check stops with a cancellation when the budget ran out; only the caller's own cancel is passed on.
             if (walk.timedOut && !options.cancelled()) return walk.abandoned(folder, mtime, System.currentTimeMillis() - startedAt)
@@ -307,6 +309,8 @@ object PcFolderScan {
             walk.walk(folder, depth)
         } catch (_: FolderTooSlow) {
             null
+        } catch (_: FolderUnreadable) {
+            null
         } catch (cancelled: CancellationException) {
             if (walk.timedOut && !options.cancelled()) null else throw cancelled
         }
@@ -314,6 +318,15 @@ object PcFolderScan {
 
     /** Thrown inside a walk that ran past its folder budget. */
     private class FolderTooSlow : RuntimeException("PC folder scan over its time budget")
+
+    /**
+     * Thrown inside a walk that met a folder Android would not list (`listFiles()` null: access lost, a card or a
+     * share still coming up). "Could not be read" is not "holds no games": the folder is kept as it was.
+     */
+    private class FolderUnreadable(val folder: File) : RuntimeException("PC folder could not be listed: ${folder.path}")
+
+    /** The reason a folder that could not be listed is logged with. */
+    const val UNREADABLE_FOLDER_REASON = "skipped: could not be listed, kept as it was and walked again next scan"
 
     /**
      * What a read of one folder said: its subfolders in name order, and the
@@ -526,6 +539,12 @@ object PcFolderScan {
             return timedOut
         }
 
+        /** What a folder whose walk met [unlisted], a folder that could not be listed, comes back as: unwalked, kept as it was. */
+        fun unreadable(folder: File, mtime: Long, millis: Long, unlisted: File): TopLevelFolder {
+            val skips = ScanSkips().apply { add(unlisted, UNREADABLE_FOLDER_REASON) }
+            return TopLevelFolder(folder, emptyList(), mtime, skipped = true, work = work(millis), skips = skips)
+        }
+
         /** What a folder that ran past its budget comes back as: unwalked, never "holds no games". */
         fun abandoned(folder: File, mtime: Long, millis: Long): TopLevelFolder {
             val slowSkips = ScanSkips().apply { add(folder, SLOW_FOLDER_REASON) }
@@ -685,20 +704,25 @@ object PcFolderScan {
                 }
             }
             listings++
-            val listing = readListing(folder, mtime)
+            // Never cached: an unreadable folder read as empty would be kept as empty until its time changed.
+            val listing = readListing(folder, mtime) ?: throw FolderUnreadable(folder)
             entriesStatted += listing.entryCount
             if (cache != null && mtime != 0L) cache.put(folder, listing)
             return listing
         }
     }
 
-    /** One read of [folder]: ONE listing, ONE `stat` per entry, and what rules 2 and 4 and the store markers need from it. */
-    private fun readListing(folder: File, mtime: Long): Listing {
+    /**
+     * One read of [folder]: ONE listing, ONE `stat` per entry, and what rules 2 and 4 and the store markers need from
+     * it. Null when Android would not list it (`listFiles()` null), which is not an empty folder (console, 2026-10-17:
+     * "pc folders: 0 games" half an hour after 86).
+     */
+    private fun readListing(folder: File, mtime: Long): Listing? {
         val folders = ArrayList<File>()
         val markers = ArrayList<String>(0)
         var hasProgram = false
         var hasOwnFile = false
-        val entries = folder.listFiles() ?: emptyArray()
+        val entries = folder.listFiles() ?: return null
         for (entry in entries) {
             if (StoreMarkers.isMarkerName(entry.name)) markers += entry.name
             if (entry.isDirectory) {
@@ -724,7 +748,7 @@ object PcFolderScan {
     fun storeMarkerOf(folder: File, cache: ListingCache? = null): StoreMarker? {
         val mtime = folder.lastModified()
         val listing = cache?.takeIf { mtime != 0L }?.get(folder, mtime)
-            ?: readListing(folder, mtime).also { if (cache != null && mtime != 0L) cache.put(folder, it) }
+            ?: (readListing(folder, mtime) ?: return null).also { if (cache != null && mtime != 0L) cache.put(folder, it) }
         if (listing.markerRead) return listing.marker
         val marker = StoreMarkers.read(folder, listing.markerNames)
         listing.marker = marker

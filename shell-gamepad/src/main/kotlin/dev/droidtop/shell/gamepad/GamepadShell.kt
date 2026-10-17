@@ -861,7 +861,8 @@ private fun GamepadShellBody(
     systemSearch?.let { (systemId, systemName) ->
         // One system's search (docs/SPEC.md 12a, "One search: where it opens"): its games, matched in memory over the
         // list already loaded, and the sources that serve it.
-        val systemGames = remember(gameEntries, systemId) { gameEntries.orEmpty().filter { it.systemId == systemId && !it.missing } }
+        // Missing games too, as the system's list shows them (searchablePool).
+        val systemGames = remember(gameEntries, systemId) { gameEntries.orEmpty().filter { it.systemId == systemId } }
         dev.droidtop.shell.gamepad.query.LibrarySearchDialog(
             query = dev.droidtop.shell.gamepad.query.LibraryQuery(),
             matchCount = 0,

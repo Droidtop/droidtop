@@ -8922,11 +8922,19 @@ It watches other apps only. A game screen of droidtop's own, a Windows game's `W
 how its game ended and says so itself (Droidtop/tracker#302): the watchdog could only see droidtop's own
 package come back, so it told the person that "droidtop closed straight after it started" and pointed at
 emulator setup. `WinePresentation.exitReport` decides the screen's words: any non-zero exit, and a code-0
-exit within 10 s when the guest never mapped a window of its own (a game that finds no Direct3D device
-often quits cleanly), is shown with Wine's
-exit code, how long it ran and the last 12 lines Wine printed. A game that ran and quit with code 0 just
-returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit, however soon it
-ended, and the words say "program".
+exit when the guest never mapped a window of its own, however long Wine lasted (a game that finds no Direct3D
+device often quits cleanly; console, 2026-10-17: a clean exit after ten seconds showed nothing at all), is shown
+with Wine's exit code, how long it ran and the last 12 lines Wine printed. A game that showed a window and quit
+with code 0 just returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit,
+however soon it ended, and the words say "program".
+
+**Every Wine run leaves a trace** (console, 2026-10-17: three different failures launching one game, and none
+could be read afterwards). Its end is one logcat line under `droidtop.wine` ("Wine exited N after T ms, window
+shown: ..."), and its record replaces `logs/wine-last.log` in droidtop's logs folder (`ScanLog.logsDir`): what it
+started, the exit code, how long it ran, whether it showed a window, and the last 200 lines Wine printed. Share
+diagnostics packs the logs folder, so the record travels with it. Wine prints errors by default (`WINEDEBUG`
+`-all,err+all`, `WineLaunchPlan.DEFAULT_WINEDEBUG`), never the full trace, which would flood the kept tail; a
+prefix's own `WINEDEBUG` still wins.
 
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
@@ -12974,6 +12982,14 @@ identity line.
   RetroAchievements is a read of the service with their own account, for
   display only (7h, "RetroAchievements"). Store cloud saves (§7g yardstick) are the
   store client's feature and are reached through its own screens.
+- **A folder that cannot be listed is not an empty folder.** The PC folder
+  walk (`PcFolderScan`) reads a folder Android will not list (`listFiles()`
+  null: access lost, a card or a share still coming up inside a mounted
+  root) as unwalked, "skipped: could not be listed, kept as it was"
+  (`UNREADABLE_FOLDER_REASON`), never as a folder with no games, and never
+  keeps that answer in its listing cache. Before, it read as empty, and the
+  next pass marked every game under it missing (console, 2026-10-17: "pc
+  folders: 0 games" half an hour after 86).
 - **An unmounted root is skipped by every walk, never emptied.** A games
   root whose storage volume is not mounted (`StorageManager`'s volume
   state, or the path failing to list) is skipped by an ordinary scan and
@@ -21741,6 +21757,12 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 - **Everything**: **Y on Home** and the search target in Home's top band: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The left menu has one **Search** row, the one in its order above (under Resume, not in Kiosk and Kid), which opens the same runner through `LauncherSearchScreen` with the matching settings too; there is no second Search row under Home (two branches each added one; the merge of 2026-10-15 kept that one).
 - **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The Quick Menu's Game section has the same row for a running console game's system ("Search SNES", between Emulator and Restart; it opens the one search over that system's games and the sources that serve it, the Quick Menu closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
+
+The games a search looks through are the games the lists show (`searchablePool`): the person's own ownership
+options from PC Games' List options, to which the search's "Include free-to-play" switch adds, and games that are
+missing right now too (an offline card), whose row says "Missing" where another says Installed or Not installed.
+Before, the search left missing games out and read ownership as its defaults, so the companion's search said "No
+match" for games Gaming listed (console, 2026-10-17).
 
 - **One list.** The device's rows (installed apps, library games; the caller
   matches them over lists it already holds in memory, no disk lookups per

@@ -157,7 +157,25 @@ class WineLaunchPlanTest {
     @Test
     fun `a game that ran and quit with code 0 needs no report`() {
         assertNull(WinePresentation.exitReport(0, 120_000, showedWindow = true, output = "anything"))
-        assertNull(WinePresentation.exitReport(0, 120_000, showedWindow = false, output = ""))
+    }
+
+    @Test
+    fun `a game that never showed a window did not run, however long Wine lasted`() {
+        // Console, 2026-10-17: a clean exit after ten seconds with no window showed nothing at all.
+        val report = WinePresentation.exitReport(0, 12_000, showedWindow = false, output = "err:module:import_dll Library d3d11.dll not found")!!
+        assertEquals("This Windows game closed without showing a window.", report.title)
+        assertTrue(report.detail.startsWith("Wine exited with code 0 after 12 s."))
+        assertTrue(report.detail.endsWith("d3d11.dll not found"))
+    }
+
+    @Test
+    fun `every run leaves a record of how it ended and what Wine printed`() {
+        val record = WinePresentation.lastRunLog("/sd/Games/LoSeSb/LoSeSb.exe", 3, 4_200, showedWindow = false, output = "one\n\ntwo\n", nowMs = 0)
+        assertTrue(record.contains("Started: /sd/Games/LoSeSb/LoSeSb.exe"))
+        assertTrue(record.contains("Exit code: 3"))
+        assertTrue(record.contains("Showed a window: no"))
+        assertTrue(record.trimEnd().endsWith("one\ntwo"))
+        assertEquals("-all,err+all", WineLaunchPlan.DEFAULT_WINEDEBUG)
     }
 
     @Test
