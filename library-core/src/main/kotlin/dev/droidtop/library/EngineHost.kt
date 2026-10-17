@@ -175,13 +175,17 @@ object EngineHost {
         target: EnginehostTarget,
         engineVersion: String?,
         title: String? = null,
+        // The folder the engine's system save locations mean for this launch (the contract's inline `saveRoot`,
+        // tracker#580): a store game's cloud-synced folder. An inline key only, so it is sent whatever the folder's
+        // own enginehost.json says; Enginehost uses the person's own location when it refuses the path.
+        saveRoot: File? = null,
     ) {
         check(isInstalled(context)) { "enginehost ($PACKAGE_NAME) isn't installed" }
         val hasOwnConfig = File(gameFolder, "enginehost.json").isFile
         val intent = launchIntent().apply {
             // The one inline field that is always worth sending: the folder
             // wins at every key, so this only ever fills a gap.
-            title?.takeIf { it.isNotBlank() }?.let { putExtra("config", JSONObject().put("title", it).toString()) }
+            JSONObject().withTitle(title).withSaveRoot(saveRoot).takeIf { it.length() > 0 }?.let { putExtra("config", it.toString()) }
             // A filesystem path, not a content:// URI -- enginehost holds
             // its own storage permission and the contract is explicit
             // that the caller does not grant its UID by passing a URI.
@@ -196,6 +200,7 @@ object EngineHost {
                         target.copy(engineContext = remembered.engineContext)
                             .toConfigJson(remembered.engineVersion)
                             .withTitle(title)
+                            .withSaveRoot(saveRoot)
                             .toString(),
                     )
                     if (remembered.engineContext != null) putExtra("autoinstallPlugin", true)
@@ -225,7 +230,7 @@ object EngineHost {
                             if (!wroteFolder) {
                                 EnginehostManualChoicePrefs.set(context, gameFolder, choice)
                             }
-                            launch(context, gameFolder, target, chosen.engineVersion, title)
+                            launch(context, gameFolder, target, chosen.engineVersion, title, saveRoot)
                         }
                         return
                     }
@@ -242,7 +247,7 @@ object EngineHost {
                     LaunchDisplay.start(context, configureIntent(gameFolder, target))
                     return
                 }
-                putExtra("config", target.toConfigJson(effectiveVersion).withTitle(title).toString())
+                putExtra("config", target.toConfigJson(effectiveVersion).withTitle(title).withSaveRoot(saveRoot).toString())
                 // Confident = we know the exact compatibility line AND the
                 // exact version. A family whose context droidtop cannot
                 // yet determine (RPG Maker 2000 vs 2003, CMVS ps2 vs ps3)
@@ -258,6 +263,13 @@ object EngineHost {
     private fun JSONObject.withTitle(title: String?): JSONObject = apply {
         title?.takeIf { it.isNotBlank() }?.let { put("title", it) }
     }
+
+    private fun JSONObject.withSaveRoot(saveRoot: File?): JSONObject = apply {
+        saveRoot?.let { put("saveRoot", it.absolutePath) }
+    }
+
+    /** What Enginehost sends droidtop's package alone when a game droidtop launched ends (tracker#580). */
+    const val ACTION_GAME_ENDED = "dev.enginehost.GAME_ENDED"
 }
 
 /**
