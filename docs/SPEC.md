@@ -13003,7 +13003,10 @@ identity line.
   count; a `.cue` likewise hides the `.bin` files it names. A folder
   that holds only one game's discs and their `.m3u` is that game (§7h's
   container rules), and a disc image nothing names remains an entry of
-  its own.
+  its own. Built in the one walk every console scan uses (`RomScanWalk.namedDiscs`, 2026-10-17, from the gap
+  review: until then nothing read a playlist and a game of several discs was listed once per file, up to 7
+  times); an `.m3u` lists one path per line, `#` lines skipped, a `.cue` names its tracks in `FILE` lines, paths
+  are relative to the playlist's folder with either slash, and names compare without case.
 - **An archive is an entry as it is.** Emulators read `.zip` and `.7z`
   themselves, so droidtop never extracts one. Identity for a
   single-file `.zip` is the inner file's CRC32, read from the archive's
