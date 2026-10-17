@@ -775,6 +775,9 @@ object GamingSettingsCatalog {
                 )
                 // With the helper app (a `priv.shell` provider) Wi-Fi, Bluetooth and airplane mode switch in place through
                 // the shell's own command; without it they open Android's own panel (docs/SPEC.md "Privileged actions").
+                // Shizuku's binder reaches this process a moment after it starts: wait for it briefly, or the first
+                // menu after a start offered only links (tracker#581). Off the main thread, as the catalog is built.
+                runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.connect(1_500) }
                 val radios = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
                 if (radios) add(radioToggle(context, dev.droidtop.runtime.systemstatus.SystemControls.Radio.WIFI, ID_SYSTEM_WIFI, "Wi-Fi"))
                 if (radios) {
@@ -1051,9 +1054,15 @@ object GamingSettingsCatalog {
             title = title,
             subtitle = "Switches $title through the helper app",
             current = controls.radioOn(context, radio) == true,
-            onToggle = { _, on ->
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    dev.droidtop.runtime.tasks.TaskManager.shell.exec(controls.radioCommand(radio, on))
+            onToggle = { ctx, on ->
+                // Never a switch that silently does nothing (tracker#581): when Android did not end up in the state
+                // asked for, its own screen for the radio opens at once.
+                val switched = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    controls.switchRadio(ctx, dev.droidtop.runtime.tasks.TaskManager.shell, radio, on)
+                }
+                if (!switched) {
+                    Notices.flash("Android did not switch $title, so its screen is open", tone = NoticeTone.Caution, context = ctx)
+                    SettingsLaunch.start(ctx, controls.radioSettingsIntent(radio))
                 }
             },
         )
