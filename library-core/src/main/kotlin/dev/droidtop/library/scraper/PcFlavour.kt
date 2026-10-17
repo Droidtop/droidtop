@@ -87,8 +87,10 @@ internal fun IgdbGameMetadata.toPcMatch() = PcMatch(
  * person chose -- every other configured source that can answer BY THAT
  * IDENTITY is asked by it: IGDB by the game's Steam or GOG id, the Steam
  * store by its app id, Lutris's per-game record by its slug, SteamGridDB
- * by its own id or the game's Steam or GOG id. None of them is asked by
- * name, so none of them can put another game's description on this one.
+ * by its own id or the game's Steam or GOG id. The one other source asked
+ * by name is the keyless Steam store, for a match with no Steam id, and only
+ * an exact, unique answer counts ([steamByName]), so it cannot put another
+ * game's description on this one either.
  * Sources with no key set are simply not asked; the one selected for the
  * name search is the one whose missing key refuses the pass.
  *
@@ -113,15 +115,35 @@ internal class PcFlavour(context: Context) {
         return ask(IGDB) { IgdbScraperClient.byStoreId(clientId, clientSecret, storeId) }?.toPcMatch()
     }
 
+    /**
+     * The Steam store's record of the one app its own search names exactly [title] (docs/SPEC.md 7h, "A game with
+     * only a name"), or null: no such app, more than one, the store refused. The bar is [PcMatching]'s, the same one
+     * the selected source's search is held to, so this is a match, never a guess.
+     */
+    fun steamByName(title: String): PcMatch? {
+        val found = ask(SteamStoreClient.SOURCE) { SteamStoreClient.search(title) } ?: return null
+        val match = (PcMatching.decide(title, found) as? PcMatching.Decision.Confident)?.match ?: return null
+        val appId = match.ids.steamAppId ?: return null
+        return ask(SteamStoreClient.SOURCE) { SteamStoreClient.appDetails(appId) }
+    }
+
     /** [identity] with everything the other sources hold for that same game. */
     fun complete(entry: LibraryEntry, identity: PcMatch): PcRecord {
         var ids = PcGameIds.of(entry).orFrom(identity.ids)
+        // A match with no Steam id (a SteamGridDB match carries only its own id; a Lutris or IGDB one when the game
+        // is not on Steam) is looked for in the store by the name it matched, so the text the store holds is found.
+        val steamNamed = if (ids.steamAppId == null && identity.sourceLabel != SteamStoreClient.SOURCE) {
+            steamByName(identity.name)
+        } else {
+            null
+        }
+        steamNamed?.let { ids = ids.orFrom(it.ids) }
         val igdbRecord = if (identity.sourceLabel == IGDB) identity else ids.storeId?.let { igdbByStore(it) }
         igdbRecord?.let { ids = ids.orFrom(it.ids) }
         val steamRecord = if (identity.sourceLabel == SteamStoreClient.SOURCE) {
             identity
         } else {
-            ids.steamAppId?.let { appId -> ask(SteamStoreClient.SOURCE) { SteamStoreClient.appDetails(appId) } }
+            steamNamed ?: ids.steamAppId?.let { appId -> ask(SteamStoreClient.SOURCE) { SteamStoreClient.appDetails(appId) } }
         }
         val lutrisRecord = ids.lutrisSlug?.let { slug ->
             ask(LUTRIS) { LutrisScraperClient.details(slug) }?.let {
