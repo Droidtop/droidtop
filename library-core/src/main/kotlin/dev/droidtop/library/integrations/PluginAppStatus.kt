@@ -126,7 +126,8 @@ object PluginAppStatus {
                                 add(ActionItem(id = "plugin_app_status_${m.id}_version", title = "Version", value = version, run = {}))
                             }
                             // Undocumented values never reach the page as "Key: value" (Droidtop/tracker#544 item 5).
-                            if (technical.isNotEmpty()) {
+                            // A Developer menu row (docs/SPEC.md 7, "Developer menu").
+                            if (technical.isNotEmpty() && dev.droidtop.library.settings.DeveloperMenu.on(context)) {
                                 add(
                                     dev.droidtop.library.settings.NestedScreenItem(
                                         id = "plugin_app_status_${m.id}_technical",

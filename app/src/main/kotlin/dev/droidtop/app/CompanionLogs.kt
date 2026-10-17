@@ -121,11 +121,18 @@ internal fun CompanionLogs() {
     }
 }
 
-/** The Logs card on Performance, only where the mode allows it. */
+/**
+ * The Logs card on Performance, only where the mode allows it and while the Developer menu is on (docs/SPEC.md 7, "Developer menu",
+ * Droidtop/tracker#579): a log is for finding faults, not for playing.
+ */
 @Composable
 internal fun CompanionLogsCard() {
+    val context = LocalContext.current
     val uiMode by UiModeRefresh.mode.collectAsState()
-    if (!ControlAccess.shows(uiMode, ControlRow.LOGS)) return
+    val developer by androidx.compose.runtime.produceState(false) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { dev.droidtop.library.settings.DeveloperMenu.on(context) }
+    }
+    if (!developer || !ControlAccess.shows(uiMode, ControlRow.LOGS)) return
     CompanionCard("Logs") { CompanionLogs() }
 }
 
