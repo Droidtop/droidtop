@@ -12816,10 +12816,17 @@ follows:
   folder before the Wine runtime's locator, for a game recorded as launched through Enginehost. The launch
   (`GameEngineDetector`, ENGINEHOST) makes the folder, records the game folder against the store key, runs
   `StoreSaves.beforeLaunch` (the same 45 s bound and the same conflict dialog), and sends the inline config key
-  `saveRoot` = the prefix's `AppData/Roaming` (`EngineHost.launch`), whatever the game folder's own
-  `enginehost.json` holds, since `saveRoot` is never a folder key. Agreed with the Enginehost lane (tracker#580):
-  `saveRoot` is exactly the folder an engine's system save locations mean for that launch; Ren'Py and Godot
-  name their own subfolder in it, as under `%APPDATA%` on Windows; a refused path (outside shared storage,
+  `saveRoot` (`EngineHost.launch`), whatever the game folder's own `enginehost.json` holds, since `saveRoot` is
+  never a folder key. Agreed with the Enginehost lane (tracker#580): `saveRoot` is exactly the folder an engine's
+  system save locations mean for that launch. **Which folder lines up with Steam Cloud** (read from Enginehost's
+  cores, tracker#580 comment 6235943189; Enginehost keeps its layout, since existing saves use it, so droidtop
+  adapts, `EnginehostSaves.saveRootIn`): Ren'Py writes `<saveRoot>/<config.save_directory>` with no `RenPy/`
+  segment, so a Ren'Py game is given the prefix's `AppData/Roaming/RenPy`, where Windows keeps
+  `%APPDATA%/RenPy/<dir>`; Godot writes `<saveRoot>/godot/app_userdata/<project>` (or a custom user dir
+  `<saveRoot>/<custom>`, which already matches Windows), so Godot and every other engine are given
+  `AppData/Roaming` itself. Godot's folder is lowercase on Android and Linux and `Godot` on Windows, so a sync
+  renames it to `Godot` first and back to `godot` after (`toWindowsLayout`, `toEngineLayout`, through a third
+  name so a case-folding card takes it too). A refused path (outside shared storage,
   inside `Android/data`, not writable) falls back to the person's own location; it is accepted from any app the
   person allowed in App launch access, droidtop with no standing of its own. When the game ends, Enginehost
   sends droidtop's package `dev.enginehost.GAME_ENDED` (`path`, `saveFolder`, `reason`);

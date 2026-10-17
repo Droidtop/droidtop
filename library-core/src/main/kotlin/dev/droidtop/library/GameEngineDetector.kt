@@ -1796,7 +1796,7 @@ class EngineGameProvider(
                 val storeKey = dev.droidtop.library.stores.EnginehostSaves.storeKeyOf(entry.id, entry.pcInfo?.storeId)
                 val saveRoot = storeKey?.let { key ->
                     withContext(Dispatchers.IO) {
-                        dev.droidtop.library.stores.EnginehostSaves.saveRoot(key)?.also {
+                        dev.droidtop.library.stores.EnginehostSaves.saveRoot(key, resolved.detectedEngine)?.also {
                             dev.droidtop.library.stores.EnginehostSaves.remember(context, key, gameRoot)
                         }
                     }?.also {
