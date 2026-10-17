@@ -73,6 +73,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // A second-screen surface that becomes the top activity hands the pad back to the
         // shell instead of leaving keys without a window (SPEC 4c, console build 1386 ANR).
         ForegroundShell.installPadReturn(this)
+        // A plugin's web sign-in follows the keyboard placement droidtop's own pages do (WebViewKeys, docs/SPEC.md 4c).
+        dev.droidtop.pluginhost.WebSessionActivity.webViewSetup = WebViewKeys::attach
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
         // Which release line each catalog and plugin is offered on (SPEC 12a "Channels", Droidtop/tracker#179).

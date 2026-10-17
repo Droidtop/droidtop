@@ -170,6 +170,8 @@ class StoreSignInActivity : AppCompatActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun signInWebView(context: Context, store: StoreLibrary, signIn: StoreSignIn.WebPage): WebView =
         WebView(context).apply {
+            // The sign-in's fields type on the companion when it has the keyboard (docs/SPEC.md 4c).
+            WebViewKeys.attach(this)
             layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
             // The stores' sign-in pages need script and storage; nothing on the
             // device is reachable from them.

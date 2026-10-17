@@ -140,6 +140,8 @@ class WebSessionActivity : Activity() {
         }
 
         val view = WebView(this).apply {
+            // The keyboard placement droidtop's own pages follow (docs/SPEC.md 4c), installed by :app.
+            webViewSetup?.invoke(this)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.allowFileAccess = false
@@ -242,6 +244,13 @@ class WebSessionActivity : Activity() {
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     companion object {
+        /**
+         * What every droidtop web page gets when it is made: `:app` installs the keyboard placement (WebViewKeys), so
+         * a plugin's sign-in types on the companion when the companion has the keyboard. This module cannot see it.
+         */
+        @Volatile
+        var webViewSetup: ((WebView) -> Unit)? = null
+
         private const val EXTRA_ID = "dev.droidtop.pluginhost.web.id"
 
         /** How long a plugin's call waits for the person ([show]); then the answer is "nothing done". */
