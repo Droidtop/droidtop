@@ -823,6 +823,20 @@ object LibraryViewPrefs {
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().putString(CAPSULE_BADGE, style.name).apply()
     }
 
+    private const val NAMES_UNDER_IMAGES = "droidtop_library_pc_names_under_images"
+
+    /**
+     * Whether a PC game's capsule shows its name under its art (PC Games' List options and onboarding's look step,
+     * docs/SPEC.md 7i, Droidtop/tracker#578); on until changed. A capsule with no art shows its name either way.
+     * A preferences read.
+     */
+    fun namesUnderImages(context: Context): Boolean =
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getBoolean(NAMES_UNDER_IMAGES, true)
+
+    fun setNamesUnderImages(context: Context, on: Boolean) {
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().putBoolean(NAMES_UNDER_IMAGES, on).apply()
+    }
+
     fun setOwnershipOptions(context: Context, options: OwnershipOptions) {
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
             .putBoolean(SHOW_SHARED, options.showShared)
