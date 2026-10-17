@@ -11679,6 +11679,57 @@ linked answers for exactly that record. Its downloads go through
 id) that pins the placed game to that engine's Enginehost player before it is
 indexed. Neither is part of the update check.
 
+**Getting an update: the source's record page (2026-10-17).** The owner, from
+the console: "we need actual update management. the f95 plugin surfaces
+updates, but tapping on them doesn't give the link list to actually download
+updates for droidtop to place", and on how: "F95Checker's code does this
+beautifully. It provides filtered views of all the information. We even
+reimplemented it as my own f95seeker code." So:
+
+- **One page for a linked record, drawn by droidtop** (`SourceRecordPage`).
+  The source hands over data (`library.updates` `record`, docs/plugin-api.md
+  3 A6), never a screen, and droidtop draws F95Checker's four tabs, which own
+  L1/R1 as the game page's do:
+  - **Overview**: the cover, the version, the status and the description.
+  - **Changelog**: the source's changelog text, as given.
+  - **Downloads**: every link, grouped under the source's own section headings
+    ("Win/Linux", "Mac", "Android") and, within one, by file host, each row
+    the host and the link's label.
+  - **Info**: version, developer, status, rating with its vote count, when
+    the source last updated it, the tags, and Open the source's page.
+- **Where it opens:** tapping an update wherever it shows (the game page's
+  update line, the Update available shelf, a row of Settings > Updates, which
+  opened the game page before) opens the record of the source that named the
+  update; a linked source's row on the game page opens it too. With one source
+  linked there is no choice; with several, the one that named the update.
+- **Picking a link downloads that version for droidtop to place.** It is the
+  source's `download` job (A6), whose reply is an `acquire` reply (A2: one
+  file, several, captured in the signed-in web view, `unpack`), so it is one
+  Downloads job like any acquire. A link the site serves only to a signed-in
+  person opens in droidtop's web view with that host's download-site session
+  (12a, "Download sites").
+- **Where it lands is 7m's rule**, as the paired-computer copy (7n "Game
+  updates") already does: a new version folder beside the game's newest one,
+  named `<name> v<version>` so `GameNaming` reads it as the same game at that
+  version, and indexed at once (`Library.indexPaths`). An archive is unpacked
+  into it; a lone file is placed in it. The versions already here stay;
+  nothing is changed in place, rolling back is choosing a version in
+  Versions, and removing an old one is the person's choice. A folder of that
+  name already there is never touched: the job fails and says so.
+- **Saves come along** (the owner chose "Copy them in"). When the game's
+  saves are found in the newest version's own folder (Detected saves, the
+  `beside` place), they are copied into the same place in the new folder
+  before it is indexed, so its first launch continues them; the old folder
+  keeps its copy. Saves kept elsewhere (Enginehost's save folder, the Windows
+  setup) are the game's by name and already carry over. "No rule known" and
+  "Not known yet" copy nothing, and the job's last line says so.
+- **Filtered like F95Checker.** The facts a record carries for filtering
+  (status, tags, rating) also come back with the update round (`check`'s
+  `facts`), so the PC Games filter has them for every linked game without
+  opening a page: the facets **Release status**, **Tags**, **Rating** and
+  **Linked to** (the source keys a game is linked to), beside **Update
+  available** (7i "The filter").
+
 **One wording, everywhere it shows** (`GameUpdates.line`, "v0.9.6 is
 available"): the card's second line (from `LibraryGameGroup.displayEntry`'s
 `availableUpdate`, which only the whole game can know), the detail's
@@ -15423,6 +15474,7 @@ so each view keeps its own filters and sort. Pure and unit-tested
   "Include hidden games" and "Include free-to-play games not in your library",
   both off each time search opens; each result shows its Retro system or its
   PC/Engine word.
+- **What a linked source knows about a game (2026-10-17).** The owner, on F95Checker's "filtered views of all the information" (7g, "Getting an update"): **Release status** (Ongoing, Completed, On hold, Abandoned, as the source words it), **Tags** (values OR, like Collection), **Rating** (five bands of the source's rating, "4 stars and up" first) and **Linked to** (the update sources a game is linked to, by their row labels: "F95zone thread"). They are PC facets, read from the source's last answer (`source_answers`, its `facts`), never from the disk, and offered only when some game carries them, as every facet is. With several sources linked, the first in source-key order that gave the fact speaks for the game, as for the version.
 - **Counts.** Every facet is offered with the values the list actually
   holds and how many entries carry each (counted over the whole list, one
   pass per facet, off the main thread). A facet no entry has a value for is
@@ -16189,7 +16241,8 @@ function (`menuSectionsFor`, built on `sectionsFor`).
     app, emulators among them, with a newer version in an app catalog (an offer signed by another key says why it is
     not offered), each store game its store named an update for (`StoreAutoUpdates.startUpdate`, the one starter the
     automatic updates use; it goes to Downloads), and each folder game whose linked source names a newer version
-    (Update opens its page, where the source's Get is: droidtop does not replace a folder's files by itself). With
+    (Update opens that source's record page at Downloads, 7g "Getting an update"; the version picked lands as a new
+    version folder, and droidtop never replaces a folder's files). With
     nothing to update after a check that worked: "Everything is up to date", once.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
@@ -16461,6 +16514,12 @@ A condition the person should know about (an unofficial plugin, a feature that i
   - **One way in.** A plugin draws no sign-in, sign-out or account row of its own, in its settings or anywhere else (docs/plugin-api.md 3 G3). The sign-in a job asks for when it needs one (`web.session sign_in` during a call the person started) stays, and is the same web view, the same session and the same `doneCookie` rule; a source's `SIGN_IN_REQUIRED` gets droidtop's Sign in as before.
   - **Telling the plugin.** After a sign-in through droidtop (the row, Switch account, or a source's Sign in), a plugin that subscribed to `web.session.signed_in` is told, so it can read the account's name and whatever it syncs. A new sign-in forgets the name the plugin gave; a browser check keeps it.
   - **Why F95's sign-in failed besides.** Its own sign-in job never finished: cab4fa21 had put the binder caller check inside `PluginJobProgress` report, checkpoint and complete, which the plugin calls from its own process, so every job's report was refused ("only droidtop drives a plugin process"). d46dcfb4 took those three out. The row's sign-in runs in droidtop and needs no job; a job's sign-in works again with that fix.
+- **Download sites: droidtop's own sign-ins for file hosts (2026-10-17).** The owner: "I also don't know that we have the ability to save logins for download sites", and on how they are listed: "Fixed list, with the user able to add items to it using an \"add site\" button". A plugin's session (above) covers only the sites that plugin declares, and a link on a forum usually leads to a file host (Mega, Gofile, Pixeldrain), where a signed-in person gets more speed, no wait and no captcha. So droidtop keeps sessions of its own for those hosts (`DownloadSites`):
+  - **The list** is under Accounts and sources, after the plugins' account rows, headed "Download sites": a fixed set droidtop ships (Mega, Gofile, Pixeldrain, MediaFire, Workupload, each with its domain and sign-in page) and the sites the person added. Each row is the site's name, "Signed in" or "Not signed in", and behaves as a plugin's account row does: signed out, pressing it opens the site's sign-in in droidtop's web view at once; signed in, it offers Sign out (asked first). A shipped site cannot be removed from the list; an added one has Remove (asked first), which also signs it out.
+  - **Add site** (the list's last row) asks for an https address. Its host, less a leading `www.`, is the site's domain and covers its subdomains; its name is that domain until the person renames it; the address typed is its sign-in page. A domain already on the list, or one a plugin declares for its own session, is refused with the reason ("F95zone is the F95zone plugin's sign-in"). Nothing but https is taken.
+  - **Kept by droidtop, never by a plugin.** The cookies of a site's domain are sealed in droidtop's own vault, one entry per site, the way a plugin's session is sealed in its vault. No plugin op reads, lists or sets them, and no plugin is told whether a site is signed in.
+  - **Used only where droidtop is the browser.** When droidtop's web view opens a page (a plugin's `open_in_session`, a store's page, a sign-in), the cookies of every signed-in download site are put into the view's cookie store for those domains only, and taken out again when the view closes; cookies the site renewed meanwhile are sealed again. A download the view captures from such a site carries them like any captured header: in memory only, by the capture's one-use token (docs/plugin-api.md 3 G3). A plain request (`net.http`, a plugin's `web.session fetch`) never gets them.
+  - **What it cannot do.** A host that decrypts the file inside the page and hands the browser a `blob:` (Mega) gives the web view nothing to capture, signed in or not; the view says so ("This site builds the file in the page, which droidtop cannot capture"). A site that wants an app of its own is out of reach.
 - **Link fallbacks.** When `apps.view` cannot open a link (no app takes it, or the person turned "Open links in other apps" off), droidtop copies the link and says why in a caution flash; the plugin gets `{opened: false, reason, copied}` or the usual `PERMISSION_DENIED` and draws nothing.
 - **Failures.** An error's `message` is one plain sentence; the new `detail` field carries what the code saw, shown only behind "Technical details" (search outcomes and view notices). droidtop keeps guarding a message that is not plain.
 - **`data.read`** answers at most 48 KiB a call (the reply crosses the binder as UTF-16; 120 KiB of base64 was a 327808-byte reply), and a longer `length` gets 48 KiB with `eof: false`, so looping readers are unchanged.
