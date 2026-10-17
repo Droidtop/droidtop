@@ -20511,6 +20511,40 @@ what the index says is display data, never a trust decision.
   answers stored (sent back by a key change, or denied before) starts the
   approval list from those answers, not the defaults
   (`PluginGrants.approvalTicked`); the person still sees every tick.
+  **An update is one switch, never an edit in place** (rig 2026-10-17: the
+  F95 plugin kept coming back disabled with "manifest.json changed on disk
+  since approval"). The installer used to empty the plugin's folder and
+  write the new manifest, payload and record one file at a time, so a
+  check that ran during a catalog update read the new manifest against the
+  old record and disabled a plugin that was fine; emptying the folder also
+  took the plugin's `data/` and `contexts/` with it. The owner's rule:
+  "Keep the verified bundle as one immutable, read-only file per version,
+  named by its digest. The record points at that file, and switching
+  versions is a single record write", loaded "straight from the archive,
+  or from a read-only extract keyed by digest. Never edit files in place",
+  and "Verification checks the archive the record names, so an update
+  can't be seen half-written. Delete the old archive only once nothing has
+  it loaded." So each verified version is extracted, all of it read-only,
+  into `plugins/<id>/versions/<digest>/` (its manifest, its signature and
+  its payload), built under another name and renamed into place whole;
+  `record.json` is written to a new file and renamed over the old one, and
+  that rename is the switch (`PluginBundleInstaller.installedDir`). Every
+  check and every load goes through the record it was given, so a caller
+  holding the old record verifies and loads the old version whole, and one
+  holding the new record the new one. Processes running the old code are
+  retired after the switch, and the version replaced is kept for a caller
+  that read its record a moment before; the one before it is deleted at
+  the next update. A plugin's data, its contexts and its record are never
+  touched by an update. A check that fails on a record an update has
+  since replaced, while the current version verifies, fails that one call
+  without disabling the plugin. A plugin installed before this keeps
+  running from its folder until it updates, and its old files go at the
+  update after. A plugin an earlier build disabled this way ("... changed
+  on disk since approval", "plugin files are missing") comes back by
+  itself at the next start once its files verify
+  (`PluginStore.recoverVerified`): "A plugin already disabled this way
+  comes back on its own once it verifies." One the person switched off,
+  or one stopped for any other reason, does not.
 - **The flow — REDESIGNED (2026-09-28, agent pluginsui).** Settings →
   Library → Accounts and sources → Plugins (moved under uisources's
   Accounts and sources consolidation, above; still the one tidy settings

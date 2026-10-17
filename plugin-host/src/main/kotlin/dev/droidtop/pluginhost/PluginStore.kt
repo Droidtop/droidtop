@@ -8,7 +8,9 @@ import java.io.File
  * The install/uninstall/enable-disable/approve surface (docs/SPEC.md
  * 12a) -- droidtop's own install path now, not routed through
  * enginehost (that withdrawn text is gone from the spec). One plugin
- * lives at `filesDir/plugins/<id>/` (payload + `record.json`); nothing
+ * lives at `filesDir/plugins/<id>/`: its `record.json`, its data, and
+ * each installed version read-only under `versions/<digest>/`, the
+ * record naming the one that runs (12a, "Trust over updates"); nothing
  * here is synced, bundled or auto-downloaded -- a plugin arrives the way
  * an [dev.droidtop.library.integrations.Integration] file does: the user
  * picks it, or the catalog lists it and the user installs it from there
@@ -20,7 +22,12 @@ object PluginStore {
     fun dataDirFor(context: Context, pluginId: String): File =
         File(root(context), "$pluginId/data").apply { mkdirs() }
 
-    fun payloadDirFor(context: Context, pluginId: String): File = File(root(context), pluginId)
+    /** The folder [record]'s version runs from ([PluginBundleInstaller.installedDir]); what it was verified against. */
+    fun payloadDirFor(context: Context, record: PluginRecord): File = PluginBundleInstaller.installedDir(root(context), record)
+
+    /** The folder the plugin's current version runs from. Reads its record: prefer the overload taking the record. */
+    fun payloadDirFor(context: Context, pluginId: String): File =
+        PluginBundleInstaller.readRecord(root(context), pluginId)?.let { payloadDirFor(context, it) } ?: File(root(context), pluginId)
 
     /**
      * The plugin's own icon (its presentation's `icon`) as a path in its payload; null when it declares none. One
@@ -29,10 +36,10 @@ object PluginStore {
      * (PluginPresentation.fromJson), a path that climbs out of the payload is refused here, and every renderer loads
      * the file off the main thread and draws nothing when it is missing.
      */
-    fun iconFile(context: Context, manifest: PluginManifest): String? {
-        val path = manifest.presentation.icon ?: return null
+    fun iconFile(context: Context, record: PluginRecord): String? {
+        val path = record.manifest.presentation.icon ?: return null
         if (path.startsWith("/") || path.split('/', '\\').any { it == ".." }) return null
-        return File(payloadDirFor(context, manifest.id), path).path
+        return File(payloadDirFor(context, record), path).path
     }
 
     /** Every installed plugin, valid or not, for the approval screen -- a plugin whose files fail re-verification is still listed, just shown as broken rather than silently vanishing. */
@@ -162,6 +169,25 @@ object PluginStore {
         return installed(context).mapNotNull { record ->
             val again = record.afterHostUpdate(build) ?: return@mapNotNull null
             PluginBundleInstaller.writeRecord(dir, again)
+            record.manifest.id
+        }
+    }
+
+    /**
+     * Plugins an earlier droidtop disabled because their files did not match their record, which now verify: switched
+     * back on. Before installs were atomic, a check during an update could read the new manifest against the old record
+     * and disable a plugin that was fine (12a, "Trust over updates"). A plugin whose files match its signed hashes is
+     * the plugin that was approved, so nothing is lost by trusting it again. Disk: off the main thread.
+     */
+    fun recoverVerified(context: Context): List<String> {
+        val dir = root(context)
+        val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
+        return installed(context).mapNotNull { record ->
+            if (!record.recoverableOnceVerified()) return@mapNotNull null
+            if (PluginBundleInstaller.verifyInstalled(dir, record, userKeys) != null) return@mapNotNull null
+            val current = PluginBundleInstaller.readRecord(dir, record.manifest.id) ?: return@mapNotNull null
+            if (current != record) return@mapNotNull null
+            PluginBundleInstaller.writeRecord(dir, record.copy(enabled = true, disabledReason = null, disabledDetail = null, disabledBuild = 0))
             record.manifest.id
         }
     }

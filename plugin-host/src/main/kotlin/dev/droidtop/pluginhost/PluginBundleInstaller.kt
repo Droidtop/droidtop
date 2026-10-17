@@ -184,7 +184,6 @@ object PluginBundleInstaller {
         val keyFingerprint = verified.anchorSha256
 
         // Checklist point 2: never shadow a built-in id or one another origin already installed under.
-        val existingRoot = File(pluginsRoot, manifest.id)
         val existingState = readRecord(pluginsRoot, manifest.id)
         if (existingState != null && existingState.manifest.origin != manifest.origin) {
             return PluginInstallResult.Refused(PluginInstallError("\"${manifest.id}\" is already installed from origin \"${existingState.manifest.origin}\""))
@@ -207,37 +206,42 @@ object PluginBundleInstaller {
             }
         }
 
-        // Everything verified -- now, and only now, write to disk.
-        if (!existingRoot.isDirectory) existingRoot.mkdirs() else existingRoot.listFiles()?.forEach { it.deleteRecursively() }
-        File(existingRoot, "manifest.json").writeBytes(manifestBytes)
-        // Kept beside the manifest so every re-verification checks the same chain the install did.
-        File(existingRoot, BundleSignature.FILE_NAME).writeText(jws)
-        for (file in manifest.payload) {
-            val target = File(existingRoot, file.path)
-            target.parentFile?.mkdirs()
-            val from = staged.getValue(file.path).file
-            // A rename within one volume; the copy is the fallback if the staging folder were elsewhere.
-            if (!from.renameTo(target)) {
-                from.copyTo(target, overwrite = true)
-                from.delete()
+        // Everything verified -- now, and only now, write to disk: into a folder of this version's own, named by its
+        // digest, which nothing ever edits after (docs/SPEC.md 12a, "Trust over updates"). The record switches to it in
+        // one write below, so a check during the update sees the old version whole or the new one whole, never half.
+        val digest = Sha256.hex(manifestBytes)
+        val versionDir = versionDir(pluginsRoot, manifest.id, digest)
+        if (!versionDir.isDirectory || !versionIntact(versionDir, manifest, digest)) {
+            val building = File(versionDir.parentFile, ".building-" + System.nanoTime())
+            building.mkdirs()
+            try {
+                File(building, "manifest.json").writeBytes(manifestBytes)
+                // Kept beside the manifest so every re-verification checks the same chain the install did.
+                File(building, BundleSignature.FILE_NAME).writeText(jws)
+                for (file in manifest.payload) {
+                    val target = File(building, file.path)
+                    target.parentFile?.mkdirs()
+                    val from = staged.getValue(file.path).file
+                    // A rename within one volume; the copy is the fallback if the staging folder were elsewhere.
+                    if (!from.renameTo(target)) {
+                        from.copyTo(target, overwrite = true)
+                        from.delete()
+                    }
+                }
+                // Android 10+ refuses to DexClassLoader a writable file ("Writable dex file ... is not allowed"):
+                // confirmed live on an Android 14 emulator, where a native_bundle plugin came back disabled on its next
+                // call because nothing had marked its payload read-only. Every file of a version is read-only.
+                building.walkTopDown().filter { it.isFile }.forEach { it.setReadOnly() }
+                // A same-digest folder that no longer matches its hashes is already broken: it is replaced whole.
+                if (versionDir.exists()) removeTree(versionDir)
+                if (!building.renameTo(versionDir)) {
+                    return PluginInstallResult.Refused(PluginInstallError("couldn't store the plugin's files"))
+                }
+            } finally {
+                if (building.exists()) removeTree(building)
             }
-            // Android 10+ refuses to DexClassLoader a writable file
-            // ("Writable dex file ... is not allowed") -- confirmed live
-            // on emulator-5560 (Android 14): a native_bundle plugin
-            // approved and running fine moments earlier came back
-            // disabledReason="load failed: Writable dex file ... is not
-            // allowed" on its very next real invoke(), since nothing
-            // here had ever marked the extracted payload read-only. The
-            // BlueStacks rig (Android 9) never enforces this, which is
-            // why dq-plugins-01 read as a full pass there. PluginContext's
-            // own doc comment already called this payload "read-only" --
-            // this is what actually makes that true.
-            target.setReadOnly()
         }
 
-        val digest = Sha256.hex(manifestBytes)
-        // Other bytes than the installed ones: any process still running the old code lets go of it (Droidtop/tracker#539).
-        if (existingState != null && existingState.archiveDigest != digest) runCatching { PluginProcesses.retire(manifest.id) }
         // Approval carries over to an update verified under the SAME trust
         // anchor the plugin was approved under (docs/SPEC.md 12a, "Trust
         // over updates"): a re-install of the exact same bytes keeps
@@ -289,6 +293,13 @@ object PluginBundleInstaller {
             },
         )
         writeRecord(pluginsRoot, record)
+        // Other bytes than the installed ones: any process still running the old code lets go of it (Droidtop/tracker#539).
+        // After the switch, so a load in between cannot pick the old version up again.
+        if (existingState != null && existingState.archiveDigest != digest) {
+            runCatching { PluginProcesses.retire(manifest.id) }
+            // The version it replaced stays, for a caller that read the old record a moment ago; the ones before it go.
+            pruneVersions(pluginsRoot, manifest.id, keep = setOf(digest, existingState.archiveDigest))
+        }
         // A same-key update keeps the grants it effectively had; what it adds that is dangerous waits at `ask` (docs/plugin-api.md 1.5).
         if (carriedOver && !sameBytes && existingState != null) {
             PluginGrants.forPluginsRoot(pluginsRoot).applyUpdate(existingState, record)
@@ -310,14 +321,14 @@ object PluginBundleInstaller {
      * the bounded legacy path ([LegacyBundleSignature]) until it updates.
      */
     fun verifyInstalled(pluginsRoot: File, record: PluginRecord, userKeys: Map<String, String> = emptyMap()): PluginInstallError? {
-        val dir = File(pluginsRoot, record.manifest.id)
+        val dir = installedDir(pluginsRoot, record)
         val manifestFile = File(dir, "manifest.json")
         val jwsFile = File(dir, BundleSignature.FILE_NAME)
         val legacySigFile = File(dir, LegacyBundleSignature.SIGNATURE_FILE)
-        if (!manifestFile.isFile || (!jwsFile.isFile && !legacySigFile.isFile)) return PluginInstallError("plugin files are missing")
+        if (!manifestFile.isFile || (!jwsFile.isFile && !legacySigFile.isFile)) return PluginInstallError(PluginRecord.FILES_MISSING)
         val manifestBytes = manifestFile.readBytes()
         if (Sha256.hex(manifestBytes) != record.archiveDigest) {
-            return PluginInstallError("manifest.json changed on disk since approval")
+            return PluginInstallError("manifest.json ${PluginRecord.CHANGED_ON_DISK}")
         }
         val revocations = PluginRevocations.load(pluginsRoot)
         val verdict = if (jwsFile.isFile) {
@@ -335,7 +346,7 @@ object PluginBundleInstaller {
         for (file in record.manifest.payload) {
             val target = File(dir, file.path)
             if (!target.isFile || !Sha256.hex(target).equals(file.sha256, ignoreCase = true)) {
-                return PluginInstallError("${file.path} changed on disk since approval")
+                return PluginInstallError("${file.path} ${PluginRecord.CHANGED_ON_DISK}")
             }
         }
         return null
@@ -347,12 +358,74 @@ object PluginBundleInstaller {
         return runCatching { PluginRecord.fromJson(JSONObject(file.readText())) }.getOrNull()
     }
 
+    /**
+     * Writes the record whole and then renames it over the old one, so a reader sees one record or the other, never a
+     * half-written file. Switching a plugin to another version is this one write ([installedDir]).
+     */
     fun writeRecord(pluginsRoot: File, record: PluginRecord) {
         val dir = File(pluginsRoot, record.manifest.id)
         dir.mkdirs()
-        File(dir, "record.json").writeText(record.toJson().toString())
+        val tmp = File(dir, ".record-" + System.nanoTime() + "-" + Thread.currentThread().id)
+        tmp.writeText(record.toJson().toString())
+        if (!tmp.renameTo(File(dir, "record.json"))) {
+            tmp.delete()
+            throw java.io.IOException("couldn't write the record of ${record.manifest.id}")
+        }
         PluginEpoch.bump()
     }
+
+    /** Where one version of a plugin lives: its manifest, its signature and its payload, read-only, never edited. */
+    fun versionDir(pluginsRoot: File, pluginId: String, digest: String): File = File(pluginsRoot, "$pluginId/$VERSIONS/$digest")
+
+    /**
+     * The folder [record]'s version runs from: its own version folder, or for a plugin installed before versions were
+     * kept apart, the plugin's folder itself (its files are moved into a version by its next update).
+     */
+    fun installedDir(pluginsRoot: File, record: PluginRecord): File =
+        versionDir(pluginsRoot, record.manifest.id, record.archiveDigest).takeIf { it.isDirectory } ?: File(pluginsRoot, record.manifest.id)
+
+    /** Whether an existing version folder still holds exactly [manifest]'s files, so a re-install can keep it as it is. */
+    private fun versionIntact(dir: File, manifest: PluginManifest, digest: String): Boolean {
+        val manifestFile = File(dir, "manifest.json")
+        if (!manifestFile.isFile || Sha256.hex(manifestFile.readBytes()) != digest || !File(dir, BundleSignature.FILE_NAME).isFile) return false
+        return manifest.payload.all { File(dir, it.path).let { f -> f.isFile && Sha256.hex(f).equals(it.sha256, ignoreCase = true) } }
+    }
+
+    /**
+     * Removes the plugin's versions other than [keep]. A version installed before versions were kept apart lives in the
+     * plugin's folder itself; once the version it was replaced by has been replaced too, its files go as well: its
+     * manifest, its signatures and its declared payload files, one by one. The plugin's data, its contexts and its record
+     * are never touched.
+     */
+    private fun pruneVersions(pluginsRoot: File, pluginId: String, keep: Set<String>) {
+        // A folder still being built (".building-") is another install's, mid-way.
+        File(pluginsRoot, "$pluginId/$VERSIONS").listFiles()?.forEach { if (it.name !in keep && !it.name.startsWith(".")) removeTree(it) }
+        val root = File(pluginsRoot, pluginId)
+        val legacyManifest = File(root, "manifest.json")
+        if (!legacyManifest.isFile || Sha256.hex(legacyManifest.readBytes()) in keep) return
+        val payload = runCatching { PluginManifest.fromJson(JSONObject(legacyManifest.readText()))?.payload?.map { it.path } }.getOrNull().orEmpty()
+        val names = payload + listOf(BundleSignature.FILE_NAME, LegacyBundleSignature.SIGNATURE_FILE, LegacyBundleSignature.CERTIFICATE_FILE, "manifest.json")
+        for (name in names) {
+            if (name.startsWith("/") || name.split('/', '\\').any { it == ".." }) continue
+            val file = File(root, name)
+            if (!file.isFile) continue
+            file.setWritable(true)
+            file.delete()
+            // Folders the payload made, once empty; never the plugin's own folder.
+            var parent = file.parentFile
+            while (parent != null && parent != root && parent.list()?.isEmpty() == true && parent.delete()) parent = parent.parentFile
+        }
+    }
+
+    /** Deletes a folder droidtop made, read-only files included. */
+    private fun removeTree(dir: File) {
+        dir.walkBottomUp().forEach {
+            it.setWritable(true)
+            it.delete()
+        }
+    }
+
+    private const val VERSIONS = "versions"
 
     /** Built-in ids no plugin may ever declare (checklist point 2). */
     val PROTECTED_IDS = setOf("droidtop", "enginehost", "app", "settings", "library")

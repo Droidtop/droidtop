@@ -1568,7 +1568,7 @@ object AppSettingsCatalogs {
             valueLabel = { "$state · v${m.version}" },
             chip = if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
             // Its own icon and its summary, always shown (#513, #514). Built on IO, like the whole list.
-            iconFile = PluginStore.iconFile(context, m),
+            iconFile = PluginStore.iconFile(context, record),
             summaryShown = true,
         )
     }
@@ -2168,7 +2168,7 @@ object AppSettingsCatalogs {
             CatalogChip(if (isUnofficial(m.origin, userKeys)) "Unofficial" else pluginTrustBadge(m.origin, userKeys, catalogNames)),
             PluginTiers.badge(record, grants)?.let { CatalogChip("Full access") },
         )
-        val icon = PluginStore.iconFile(context, m)
+        val icon = PluginStore.iconFile(context, record)
         val header = PageHeader(
             title = m.label,
             byline = listOfNotNull(m.presentation.publisher, "v${m.version}").joinToString(" · "),
