@@ -191,6 +191,10 @@ interface RomDao {
     @Query("DELETE FROM game_metadata WHERE id IN (:ids)")
     suspend fun deleteGameMetadata(ids: List<String>)
 
+    // The games a PC pass left at "needs a pick" (PcScraper.NEEDS_PICK), for the list the person works through.
+    @Query("SELECT id FROM game_metadata WHERE scrape_confidence = :confidence")
+    suspend fun idsWithScrapeConfidence(confidence: String): List<String>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGameMetadata(metadata: GameMetadataEntity)
 
