@@ -332,6 +332,39 @@ object PcScraper {
         }
     }
 
+    /**
+     * The scrape confidence a game a pass could not decide carries until it is matched (docs/SPEC.md 7h, "Games
+     * that need your pick"): candidates came back, none exact. A match of any kind (by id, by name, or the
+     * person's pick, "manual") replaces it; a later pass that finds nothing at all clears it.
+     */
+    const val NEEDS_PICK = "needs_pick"
+
+    /** The PC Games options row that lists [needingPick], named here so the pass's summary can point at it. */
+    const val CHOOSE_MATCHES = "Choose matches"
+
+    /** The library's PC and engine games a pass left at [NEEDS_PICK], by title. Database work: call it off the main thread. */
+    suspend fun needingPick(context: Context): List<LibraryEntry> = withContext(Dispatchers.IO) {
+        val ids = RomDatabase.get(context).romDao().idsWithScrapeConfidence(NEEDS_PICK).toSet()
+        if (ids.isEmpty()) return@withContext emptyList()
+        LibraryScrapeJob.libraryGames(context)
+            .filter { it.id in ids && it.isPcOrEngineGame && !it.missing }
+            .sortedBy { it.title.lowercase() }
+    }
+
+    /**
+     * Records that [entry] needs a pick ([needs]), or that it no longer does. Never over a game already matched:
+     * a game the person picked a match for stays matched when a later pass finds it ambiguous again.
+     */
+    private suspend fun markNeedsPick(context: Context, entry: LibraryEntry, needs: Boolean) {
+        val dao = RomDatabase.get(context).romDao()
+        val row = dao.getGameMetadataSingle(entry.id)
+        when {
+            needs && (row?.scrapeConfidence == null) ->
+                dao.upsertGameMetadata((row ?: GameMetadataEntity(id = entry.id)).copy(scrapeConfidence = NEEDS_PICK))
+            !needs && row?.scrapeConfidence == NEEDS_PICK -> dao.upsertGameMetadata(row.copy(scrapeConfidence = null))
+        }
+    }
+
     /** Games are asked about at least this far apart: the Steam store allows about 200 requests in five minutes. */
     private const val GAME_PACE_MS = 1_600L
 
@@ -539,10 +572,12 @@ object PcScraper {
                     PcOutcome.ByStoreId -> counts.byStoreId++
                     PcOutcome.ByName -> counts.byName++
                     is PcOutcome.NeedsPicking -> {
+                        markNeedsPick(context, entry, needs = true)
                         counts.needsPicking++
                         counts.misses.add(ScrapeMisses.Kind.NEEDS_PICKING, entry.title, "${outcome.candidates} candidates")
                     }
                     is PcOutcome.NoMatch -> {
+                        markNeedsPick(context, entry, needs = false)
                         counts.noMatch++
                         counts.misses.add(ScrapeMisses.Kind.NO_MATCH, entry.title)
                     }
@@ -866,7 +901,7 @@ internal fun formatPcScrapeSummary(sourceLabel: String, counts: PcScrapeCounts):
     return buildString {
         append("$sourceLabel: matched $matched of ${counts.targeted}")
         if (counts.byStoreId > 0) append(" (${counts.byStoreId} by store id)")
-        if (counts.needsPicking > 0) append(", ${counts.needsPicking} need a match you pick (Choose match on the game)")
+        if (counts.needsPicking > 0) append(", ${counts.needsPicking} need a match you pick (PC Games options > ${PcScraper.CHOOSE_MATCHES}, or Choose match on the game)")
         if (counts.noMatch > 0) append(", ${counts.noMatch} had no result at all")
         if (counts.failed > 0) append(", ${counts.failed} failed")
         if (counts.refused > 0) append(", ${counts.refused} refused by the server")

@@ -13134,6 +13134,14 @@ the same care as the art.
     plugin declares one) are asked with the game's title, folder name and source links for every game the
     pass reaches, after the built-in sources, filling only what those left empty; that is unchanged, and
     now reaches the engine games the old "has details" rule passed over.
+- **Games that need your pick (directed 2026-10-17).** The coordinator's direction: "A game left at 'needs a
+  pick' appears in a list the person can work through with the pad, not only in the log." A pass that gets
+  candidates with none exact stores `scrape_confidence = "needs_pick"` on the game's row (`PcScraper.NEEDS_PICK`;
+  the column was there, so no migration), never over a game already matched by id, by name or by the person.
+  "Choose matches (N)" in the PC Games tab's options and the library's own options, shown while N is more than
+  0, opens `ChooseMatchesList`: one row per waiting game, Up and Down to move, A opens its manual match picker,
+  B closes. Any match replaces the state, so a matched game leaves the list as the picker closes and focus stays
+  where it was; a later pass that finds nothing at all clears it. The pass's summary points at the row.
 - **Ids travel.** Lutris's `provider_games` names a result's Steam app id and GOG product id,
   and IGDB's `external_games` does the same, so a Lutris or IGDB match of a folder game
   becomes a Steam/GOG identity and the keyless Steam store fills its developer, publisher and

@@ -142,6 +142,18 @@ internal fun GamelistOptionsMenu(
         else -> "Search: ${searchText.trim()}"
     }
     var searchOpen by remember { mutableStateOf(false) }
+    // The games a scrape left at "needs a pick" (docs/SPEC.md 7h, "Games that need your pick"), offered where the
+    // PC scrape is: the PC Games tab and the library's own options. Counted when the menu opens, and again when the
+    // list closes.
+    val offersChooseMatches = libraryScope || systemId == PC_SYSTEM_ID
+    var choosingMatches by remember { mutableStateOf(false) }
+    var needPickCount by remember { mutableIntStateOf(0) }
+    androidx.compose.runtime.LaunchedEffect(offersChooseMatches, choosingMatches) {
+        if (offersChooseMatches && !choosingMatches) {
+            needPickCount = dev.droidtop.library.scraper.PcScraper.needingPick(context).size
+        }
+    }
+    val chooseMatchesLabel = "${dev.droidtop.library.scraper.PcScraper.CHOOSE_MATCHES} ($needPickCount)"
     val actions = buildList {
         if (libraryScope) {
             // The library-wide actions that used to live in Settings.
@@ -149,6 +161,7 @@ internal fun GamelistOptionsMenu(
             add("Rescan library")
             add("Scrape all systems")
             add(SCRAPE_ALL_PC)
+            if (needPickCount > 0) add(chooseMatchesLabel)
             add(orphansLabel)
             add("Update platform databases")
         } else {
@@ -182,6 +195,7 @@ internal fun GamelistOptionsMenu(
             // covered them and there was no way to scrape them at all.
             // A console system's own row above carries the same label, so it is not added twice.
             if (games.any { it.isPcOrEngineGame } && (systemId == null || systemId == PC_SYSTEM_ID)) add(SCRAPE_PC_GAMES)
+            if (offersChooseMatches && needPickCount > 0) add(chooseMatchesLabel)
             // Only on the PC Games tab itself, whose games this whole list
             // is -- not a collection that merely happens to contain a PC
             // entry, which is not where a game folder belongs.
@@ -222,6 +236,10 @@ internal fun GamelistOptionsMenu(
     }
 
     fun activate(index: Int) {
+        if (actions[index] == chooseMatchesLabel) {
+            choosingMatches = true
+            return
+        }
         when (actions[index]) {
             "Rescan library" -> {
                 // Says it started and what it found, like the settings row
@@ -378,6 +396,14 @@ internal fun GamelistOptionsMenu(
         }
     }
 
+    if (choosingMatches) {
+        ChooseMatchesList {
+            choosingMatches = false
+            // A pick writes the game's art and details: rescan so the list shows them.
+            onScraped()
+        }
+        return
+    }
     if (gettingGames) {
         GetGamesSearch(systemId = systemId.takeIf { !libraryScope }, pc = systemId == PC_SYSTEM_ID && !libraryScope) {
             gettingGames = false
