@@ -43,6 +43,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -63,6 +65,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -1980,6 +1983,49 @@ private fun AppearanceStep(
                     LibraryThemePrefs.set(context, theme.name)
                 },
             )
+        }
+        // PC games draw as their box art; whether each also says its name under it (owner, 2026-10-17: "A toggle
+        // for 'show name under image' would be a good idea. Default to on, or ask in onboarding"; PC Games only,
+        // Droidtop/tracker#578). Asked here, on, and changed later in PC Games' List options.
+        var namesUnder by remember { mutableStateOf(true) }
+        val namesScope = rememberCoroutineScope()
+        LaunchedEffect(Unit) {
+            namesUnder = withContext(Dispatchers.IO) { dev.droidtop.shell.gamepad.query.LibraryViewPrefs.namesUnderImages(context) }
+        }
+        StepSectionLabel("PC Games")
+        listOf(true, false).forEach { on ->
+            SelectableRow(
+                title = if (on) "Show names under images" else "Images only",
+                supporting = if (on) "Each game's name under its art" else "The name shows for the game you're on",
+                selected = namesUnder == on,
+                leading = { CapsuleNamePreview(on) },
+                onClick = {
+                    namesUnder = on
+                    namesScope.launch(Dispatchers.IO) { dev.droidtop.shell.gamepad.query.LibraryViewPrefs.setNamesUnderImages(context, on) }
+                },
+            )
+        }
+    }
+}
+
+/** Two PC capsules as the PC Games tab draws them, with or without their names under the art: the choice, shown. */
+@Composable
+private fun CapsuleNamePreview(namesUnder: Boolean) {
+    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(Space.Xs)) {
+        repeat(2) {
+            Column(verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
+                Box(
+                    Modifier
+                        .width(28.dp)
+                        .height(42.dp)
+                        .clip(dev.droidtop.shell.gamepad.Corners.Crisp)
+                        .background(MenuTokens.Accent.copy(alpha = 0.55f)),
+                )
+                if (namesUnder) {
+                    Box(Modifier.width(24.dp).height(4.dp).background(MenuTokens.Value))
+                    Box(Modifier.width(16.dp).height(4.dp).background(MenuTokens.Value))
+                }
+            }
         }
     }
 }

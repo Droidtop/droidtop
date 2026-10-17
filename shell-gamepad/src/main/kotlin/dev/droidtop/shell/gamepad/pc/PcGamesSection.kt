@@ -369,6 +369,8 @@ internal fun PcGamesSection(
     var stripTabs by remember { mutableStateOf(StripTabs()) }
     // How much a capsule's badge says (List options > Capsule badge, docs/SPEC.md 7i).
     var badgeStyle by remember { mutableStateOf(dev.droidtop.library.CapsuleBadgeStyle.FULL) }
+    // Whether a capsule shows its game's name under its art (List options > Show names under images, #578).
+    var namesUnder by remember { mutableStateOf(true) }
     // Which games came through a launcher (Lutris): one read of the game settings.
     var viaByEntry by remember { mutableStateOf(emptyMap<String, String>()) }
     LaunchedEffect(Unit) {
@@ -379,6 +381,7 @@ internal fun PcGamesSection(
         ownership = options
         stripTabs = withContext(Dispatchers.IO) { LibraryViewPrefs.stripTabs(context) }
         badgeStyle = withContext(Dispatchers.IO) { LibraryViewPrefs.capsuleBadge(context) }
+        namesUnder = withContext(Dispatchers.IO) { LibraryViewPrefs.namesUnderImages(context) }
         viaByEntry = withContext(Dispatchers.IO) { runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap()) }
         pcRoots = roots
     }
@@ -389,6 +392,10 @@ internal fun PcGamesSection(
     fun setBadgeStyle(next: dev.droidtop.library.CapsuleBadgeStyle) {
         badgeStyle = next
         coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setCapsuleBadge(context, next) } }
+    }
+    fun setNamesUnder(next: Boolean) {
+        namesUnder = next
+        coroutines.launch { withContext(Dispatchers.IO) { LibraryViewPrefs.setNamesUnderImages(context, next) } }
     }
     // How many sources the library has rows from: a PC capsule names its source only when there
     // is more than one (docs/SPEC.md 7i, "Badges"). One pass over the fold, off the main thread.
@@ -1106,6 +1113,7 @@ internal fun PcGamesSection(
                 state.onShelves -> PcShelvesHome(
                     shelves = shelves,
                     state = state,
+                    namesUnder = namesUnder,
                     onDest = onDest,
                     home = if (state.home) {
                         HomeParts(
@@ -1183,6 +1191,7 @@ internal fun PcGamesSection(
                                     download = entry.downloadKey()?.let { downloads[it] },
                                     parts = partsOf(entry),
                                     badge = gridBadges.of(badgeOf(entry)),
+                                    nameUnder = namesUnder,
                                 )
                             }
                             // The last item, across the whole width: what the
@@ -1357,6 +1366,7 @@ internal fun PcGamesSection(
                     setStripTabs(stripTabs.copy(collections = !stripTabs.collections))
                 },
                 // Full ("PC · GOG", "Engine · Ren'Py"), Kind only ("PC"), Off: what a capsule's badge says.
+                ("Show names under images: " + if (namesUnder) "On" else "Off") to { setNamesUnder(!namesUnder) },
                 ("Capsule badge: " + badgeStyle.label) to {
                     val styles = dev.droidtop.library.CapsuleBadgeStyle.entries
                     setBadgeStyle(styles[(styles.indexOf(badgeStyle) + 1) % styles.size])
@@ -1585,6 +1595,8 @@ private fun PinnedTabMenu(
 private fun PcShelvesHome(
     shelves: List<PcShelf>,
     state: PcGamesState,
+    // Each card's name under its art (List options > Show names under images, #578).
+    namesUnder: Boolean,
     onDest: Boolean,
     onOpenSection: (Int) -> Unit,
     columnState: LazyListState,
@@ -1697,6 +1709,7 @@ private fun PcShelvesHome(
                             hero = hero,
                             // What each game is and where it is from, where that tells the cards apart (#496).
                             badge = pageBadges.of(badgeOf(entry)),
+                            nameUnder = namesUnder,
                         )
                     }
                 }

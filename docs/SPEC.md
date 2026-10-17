@@ -14136,6 +14136,22 @@ own games, in droidtop's own treatment:
   entries (a friend's game is a name from the service, not a card), so they
   carry no badge; the service is already named on the row.
   **A badge is a plain fact, shown only when it is useful** (owner, 2026-10-14, Droidtop/tracker#496: "Sounds somewhat good. We need to show info when useful, not when it's extraneous"): it shows a plain fact ("PC", "Retro", "Engine", the store name) only when the fact helps the user decide or act, never a folder name or an implementation category. No badge when it is extraneous: a fact that is obvious from context, or the same on every card in that view.
+- **Names under images** (Droidtop/tracker#578; the owner, 2026-10-17: "We
+  also need to display game titles better, too. A toggle for 'show name under
+  image' would be a good idea. Default to on, or ask in onboarding", then "The
+  setting is for the PC Games context, so it shouldn't affect the retro
+  section" and "it's just adding an option to PC games, which currently ONLY
+  display the icon"). The List option **Show names under images**, on by
+  default, puts each PC capsule's name (`GameNaming.displayName`) under its
+  art, in two lines held for every card so a row keeps one height, ending in
+  an ellipsis, in the body size and the palette's value colour (the on-surface
+  colour on the selected card), on the PC grid and on every shelf drawn with
+  capsules, Home's included. A capsule with no art that loads already carries
+  its name on its plate, whatever the option, and a hero card keeps its own
+  name under it. Onboarding's look step asks it under "PC Games", with a
+  preview, preselected on. The focus line still names the selected game.
+  Retro systems, the ES-DE themed views, Standard's widgets and the companion
+  are not changed by it.
 - **Art that does not load is no art** (console, build 1386: three empty
   frames on Recently added). A card whose art fails to load (`AsyncImage`
   `onError`) draws the plate with the name, the same as a card with no art.
