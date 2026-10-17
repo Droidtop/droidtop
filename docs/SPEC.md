@@ -7646,7 +7646,7 @@ app-drawer icon or a floating switcher button:
   a new device brings back everything a person did in droidtop and
   nothing that needs a grant; the row is named "Back up droidtop" for
   that reason, and Restore says what it will and will not bring back
-  before it runs. The index is rebuilt from the restored records (Data
+  before it runs. The index is rebuilt from the restored records (Developer
   › Rebuild the library index), never copied. Android's own Settings are reached from
   Settings > Android settings, so Global has no second shortcut to them.
   Standard mode's launcher pages (icons, drawer, home screen) stay stock
@@ -7661,6 +7661,40 @@ app-drawer icon or a floating switcher button:
     new Kotlin code per integration — is worth adopting once more than
     one external launcher needs supporting via `JoiPlayGameProvider`; not
     done in this pass.
+
+### Developer menu (Droidtop/tracker#579)
+
+The owner, 2026-10-17: "It's probably worth moving a lot of the advanced
+stuff (like the containment checker) to a dev menu." Settings has a
+**Developer menu**, off until it is turned on, built on the one settings
+catalog (no second settings system):
+
+- **Turning it on.** Global settings ends with **About droidtop**, whose
+  **Version** row shows the installed version. Seven taps on it within a few
+  seconds of each other turn the menu on, as Android's own developer options
+  are found; the last taps count down ("2 more taps..."). Then a
+  **Developer** row under About opens the menu (`DeveloperMenu.SCREEN`).
+  Its last row turns it off again. The switch is one preference
+  (`DeveloperMenu.on`), and a catalog builder adds a developer row only
+  while it is on.
+- **What the menu holds** (droidtop-wide rows, moved out of everyday
+  groups): **Share diagnostics** (from Data), **Rebuild the library index**
+  (from the Library group, recovery for a list that looks wrong), **Install
+  debug builds** (from Updates), and on a debug build **Debug: force a
+  crash**.
+- **Technical rows stay on their own page, shown only while it is on:**
+  a plugin's **Advanced** group (its id, origin, archive digest and the
+  containment check), **Plugin messages**, every **Technical details** row
+  (a disabled plugin's, an app status's, a source's failure), the emulator
+  and custom player **Launch test**, the Windows **Unpacker** check, and the
+  companion's **Logs** card. They belong to the thing they describe, so they
+  are not copied into one list.
+- **Everyday rows stay where they are**, technical-looking or not: a
+  plugin's version, update, permissions and Activity; keys you trust and
+  catalog fingerprints (a trust decision is made on them); Rescan, Back up
+  and Restore, Rerun onboarding; the Build channel; performance readouts and
+  the overlay; a custom player's Check of what was typed; containers'
+  sockets and mounts.
 
 ## 7a. Remote PC streaming — via windowcast, not a droidtop module
 
@@ -10877,7 +10911,7 @@ orphaned media is one row that finds on the first A and deletes on the
 second, recomputing first), Scrape this system in a system's gamelist
 options menu — and
 the Settings section keeps no action rows but Check now (updates),
-Update platform databases and Rebuild the library index (Data). A
+Update platform databases (Data), and Rebuild the library index in the Developer menu. A
 setting exists in one place and a count is one number: the carousel and
 the PC grid agree on what they count or say what each counts.
 

@@ -126,7 +126,8 @@ object SourceScreens {
                 // stack line) is for its developer and sits one step behind "Technical details".
                 add(ActionItem("source_failure_${source.id}", "Couldn't search ${source.label}", subtitle = "It did not answer. Try again in a moment.", run = {}))
                 val technical = error.message?.trim().orEmpty().ifBlank { error::class.java.simpleName }
-                add(
+                // A Developer menu row (docs/SPEC.md 7, "Developer menu").
+                if (dev.droidtop.library.settings.DeveloperMenu.on(context)) add(
                     NestedScreenItem(
                         "source_failure_detail_${source.id}", "Technical details", subtitle = "What the source reported, for its developer",
                         inline = CatalogScreen("source_failure_detail_screen_${source.id}", "Technical details", groups = {

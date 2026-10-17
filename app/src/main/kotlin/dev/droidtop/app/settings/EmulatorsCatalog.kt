@@ -356,12 +356,15 @@ object EmulatorsCatalog {
                                     )
                                 },
                             ).toTypedArray(),
-                            NestedScreenItem(
-                                id = "emulator_test_open_${system.id}",
-                                title = "Launch test",
-                                subtitle = "Start one of your games to check this emulator works, and say why if it does not",
-                                inline = launchTestScreen(system),
-                            ),
+                            // A test action: a Developer menu row (docs/SPEC.md 7, "Developer menu").
+                            *listOfNotNull(
+                                NestedScreenItem(
+                                    id = "emulator_test_open_${system.id}",
+                                    title = "Launch test",
+                                    subtitle = "Start one of your games to check this emulator works, and say why if it does not",
+                                    inline = launchTestScreen(system),
+                                ).takeIf { dev.droidtop.library.settings.DeveloperMenu.on(context) },
+                            ).toTypedArray(),
                         ),
                     ),
                 ) + listOfNotNull(resolved?.player?.let { setupGroup(context, system, it) }) + listOf(
@@ -852,7 +855,7 @@ object EmulatorsCatalog {
                     CatalogGroup(
                         id = "emulator_custom_actions",
                         title = null,
-                        items = listOf(
+                        items = listOfNotNull(
                             ActionItem(
                                 id = "emulator_custom_check",
                                 title = "Check",
@@ -864,12 +867,13 @@ object EmulatorsCatalog {
                                 value = if (faults.isEmpty()) "OK" else "Fix it",
                                 run = {},
                             ),
+                            // A test action: a Developer menu row (docs/SPEC.md 7, "Developer menu").
                             NestedScreenItem(
                                 id = "emulator_custom_test",
                                 title = "Launch test",
                                 subtitle = "Start one of your games with this player",
                                 inline = launchTestScreen(system, player),
-                            ),
+                            ).takeIf { dev.droidtop.library.settings.DeveloperMenu.on(context) },
                             DocumentPickItem(
                                 id = "emulator_custom_share",
                                 title = "Save as a file",

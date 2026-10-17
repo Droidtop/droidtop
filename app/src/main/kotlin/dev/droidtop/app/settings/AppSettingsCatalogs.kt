@@ -85,6 +85,7 @@ import dev.droidtop.library.settings.CatalogChip
 import dev.droidtop.library.settings.CatalogPage
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
+import dev.droidtop.library.settings.DeveloperMenu
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
@@ -183,6 +184,34 @@ object AppSettingsCatalogs {
 
     @Volatile private var registered = false
 
+    /** Rebuild the library index, the recovery path the Developer menu holds (docs/SPEC.md 7, "Developer menu"). */
+    fun rebuildIndexItem(): CatalogItem =
+        // A different job from Rescan: it walks no folder.
+        // The index is derived from the per-game records
+        // (docs/SPEC.md 7g), so it can always be rebuilt
+        // from them; this is the recovery path when the
+        // list looks wrong but the games have not changed.
+        AsyncActionItem(
+            id = "library_rebuild_index",
+            title = "Rebuild the library index",
+            subtitle = "Rebuilds the game list from what droidtop already knows about each " +
+                "game, without scanning any folder. Use it if the list looks wrong after an " +
+                "update; to pick up new or changed games, use Rescan library",
+            run = { ctx, onStatus ->
+                onStatus("Rebuilding...")
+                val result = withContext(Dispatchers.IO) {
+                    dev.droidtop.app.LibraryCore.library(ctx).rebuildIndexFromRecords()
+                }
+                when {
+                    result.records == 0 && result.keptWithoutRecord == 0 ->
+                        "Nothing to rebuild from yet: scan the library first"
+                    result.keptWithoutRecord == 0 -> "Rebuilt from ${result.records} game records"
+                    else -> "Rebuilt from ${result.records} game records, and kept " +
+                        "${result.keptWithoutRecord} listed games that had none"
+                }
+            },
+        )
+
     fun ensureRegistered() {
         if (registered) return
         registered = true
@@ -221,6 +250,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.standardScreen())
+        SettingsScreenRegistry.register(DroidtopWideSettings.developerScreen())
         SettingsScreenRegistry.register(ContainersCatalog.screen())
     }
 
@@ -1627,7 +1657,7 @@ object AppSettingsCatalogs {
             val unofficialFrom = userKeys[m.origin]?.catalog?.takeIf { !PluginOriginKeys.isOfficial(m.origin) }
             // The approval screen says where the plugin came from before anything is approved
             // (docs/SPEC.md 12a "Added catalogs"): from a catalog that is not droidtop's, it is Unofficial.
-            // U3 (docs/SPEC.md 7k, "Notices"): an update from a different maker waits for the person, in caution, with the
+            // U3 (docs/SPEC.md 7, "Developer menu", "Notices"): an update from a different maker waits for the person, in caution, with the
             // fingerprints in Info; approving it asks in red (D3).
             if (record.trust == PluginTrustState.PENDING && record.replacedKeySha256 != null) {
                 add(
@@ -1645,7 +1675,7 @@ object AppSettingsCatalogs {
                 )
             }
             if (record.trust == PluginTrustState.PENDING && unofficialFrom != null) {
-                // U1 (docs/SPEC.md 7k, "Notices"): the caution banner, its exact source and maker in Info.
+                // U1 (docs/SPEC.md 7, "Developer menu", "Notices"): the caution banner, its exact source and maker in Info.
                 add(
                     NoticeItem(
                         id = "plugin_${m.id}_unofficial",
@@ -1720,9 +1750,10 @@ object AppSettingsCatalogs {
                 }
             }
             // The headline above is a plain sentence; what the plugin actually reported is one press away,
-            // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167).
+            // for its developer or a bug report (docs/SPEC.md 12a, Droidtop/tracker#167), in the Developer menu's
+            // rows (docs/SPEC.md 7, "Developer menu").
             val detail = record.disabledDetail
-            if (record.disabledReason != null && detail != null) {
+            if (record.disabledReason != null && detail != null && DeveloperMenu.on(context)) {
                 add(
                     NestedScreenItem(
                         id = "plugin_${m.id}_detail",
@@ -1853,8 +1884,9 @@ object AppSettingsCatalogs {
                         inline = pluginPermissionsScreen(m.id),
                         valueLabel = { summary },
                     ),
-                    // What droidtop had to change to draw its pages (docs/SPEC.md 7k, "Notices"), for the plugin's maker.
-                    *dev.droidtop.pluginhost.PluginMessages.read(context, m.id).size.takeIf { it > 0 }?.let { count ->
+                    // What droidtop had to change to draw its pages (docs/SPEC.md 7, "Developer menu", "Notices"), for the plugin's maker.
+                    // A Developer menu row (docs/SPEC.md 7, "Developer menu").
+                    *dev.droidtop.pluginhost.PluginMessages.read(context, m.id).size.takeIf { it > 0 && DeveloperMenu.on(context) }?.let { count ->
                         arrayOf(
                             NestedScreenItem(
                                 id = "plugin_${m.id}_messages",
@@ -2101,7 +2133,9 @@ object AppSettingsCatalogs {
             runtimeGroupItem.takeIf { runtimeNeed == null },
             aboutGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_about_group", title = "About", items = it) },
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
-            CatalogGroup(id = "plugin_${m.id}_advanced_group", title = "Advanced", items = advancedGroup),
+            // Its id, origin, digest and containment check are for finding faults: Developer menu rows (docs/SPEC.md 7, "Developer menu";
+            // the owner, 2026-10-17: "moving a lot of the advanced stuff (like the containment checker) to a dev menu").
+            CatalogGroup(id = "plugin_${m.id}_advanced_group", title = "Advanced", items = advancedGroup).takeIf { DeveloperMenu.on(context) },
         )
         return pluginPageTop(context, record, userKeys, catalogNames, grantSnapshot, runtimeNeed, catalogOffer, approveAction, groups)
     }
@@ -2244,7 +2278,7 @@ object AppSettingsCatalogs {
     private val noticeScope = kotlinx.coroutines.MainScope()
 
     /**
-     * U4 (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#481): a plugin running with full access says so quietly on its page
+     * U4 (docs/SPEC.md 7, "Developer menu", "Notices"; Droidtop/tracker#481): a plugin running with full access says so quietly on its page
      * after it was allowed, with the way back. Limit access takes the grant away when the plugin can run with normal
      * protection, and otherwise turns the plugin off, since it cannot run any other way.
      */
@@ -2382,7 +2416,7 @@ object AppSettingsCatalogs {
     }
 
     /**
-     * One plugin's messages (docs/SPEC.md 7k, "Notices"; docs/plugin-api.md 1.6): what droidtop cut, dropped or moved
+     * One plugin's messages (docs/SPEC.md 7, "Developer menu", "Notices"; docs/plugin-api.md 1.6): what droidtop cut, dropped or moved
      * to draw its pages, newest first, with Copy all for a bug report.
      */
     private fun pluginMessagesScreen(pluginId: String, label: String) = CatalogScreen(
@@ -3075,31 +3109,6 @@ object AppSettingsCatalogs {
                     // so it is where a user wants to act on that change.
                     items = listOf(
                         GamingSettingsCatalog.rescanLibraryItem(),
-                        // A different job from Rescan: it walks no folder.
-                        // The index is derived from the per-game records
-                        // (docs/SPEC.md 7g), so it can always be rebuilt
-                        // from them; this is the recovery path when the
-                        // list looks wrong but the games have not changed.
-                        AsyncActionItem(
-                            id = "library_rebuild_index",
-                            title = "Rebuild the library index",
-                            subtitle = "Rebuilds the game list from what droidtop already knows about each " +
-                                "game, without scanning any folder. Use it if the list looks wrong after an " +
-                                "update; to pick up new or changed games, use Rescan library",
-                            run = { ctx, onStatus ->
-                                onStatus("Rebuilding...")
-                                val result = withContext(Dispatchers.IO) {
-                                    dev.droidtop.app.LibraryCore.library(ctx).rebuildIndexFromRecords()
-                                }
-                                when {
-                                    result.records == 0 && result.keptWithoutRecord == 0 ->
-                                        "Nothing to rebuild from yet: scan the library first"
-                                    result.keptWithoutRecord == 0 -> "Rebuilt from ${result.records} game records"
-                                    else -> "Rebuilt from ${result.records} game records, and kept " +
-                                        "${result.keptWithoutRecord} listed games that had none"
-                                }
-                            },
-                        ),
                     ),
                 ),
             )
