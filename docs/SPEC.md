@@ -8908,11 +8908,19 @@ It watches other apps only. A game screen of droidtop's own, a Windows game's `W
 how its game ended and says so itself (Droidtop/tracker#302): the watchdog could only see droidtop's own
 package come back, so it told the person that "droidtop closed straight after it started" and pointed at
 emulator setup. `WinePresentation.exitReport` decides the screen's words: any non-zero exit, and a code-0
-exit within 10 s when the guest never mapped a window of its own (a game that finds no Direct3D device
-often quits cleanly), is shown with Wine's
-exit code, how long it ran and the last 12 lines Wine printed. A game that ran and quit with code 0 just
-returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit, however soon it
-ended, and the words say "program".
+exit when the guest never mapped a window of its own, however long Wine lasted (a game that finds no Direct3D
+device often quits cleanly; console, 2026-10-17: a clean exit after ten seconds showed nothing at all), is shown
+with Wine's exit code, how long it ran and the last 12 lines Wine printed. A game that showed a window and quit
+with code 0 just returns to the shell. A prefix tool (§7c, Prefix tools) is reported only for a non-zero exit,
+however soon it ended, and the words say "program".
+
+**Every Wine run leaves a trace** (console, 2026-10-17: three different failures launching one game, and none
+could be read afterwards). Its end is one logcat line under `droidtop.wine` ("Wine exited N after T ms, window
+shown: ..."), and its record replaces `logs/wine-last.log` in droidtop's logs folder (`ScanLog.logsDir`): what it
+started, the exit code, how long it ran, whether it showed a window, and the last 200 lines Wine printed. Share
+diagnostics packs the logs folder, so the record travels with it. Wine prints errors by default (`WINEDEBUG`
+`-all,err+all`, `WineLaunchPlan.DEFAULT_WINEDEBUG`), never the full trace, which would flood the kept tail; a
+prefix's own `WINEDEBUG` still wins.
 
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
