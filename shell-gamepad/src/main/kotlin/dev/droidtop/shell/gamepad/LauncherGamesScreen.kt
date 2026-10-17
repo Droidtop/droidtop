@@ -39,6 +39,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.shell.gamepad.query.LAUNCHER_GAMES_SCOPE_ID
 import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
@@ -79,8 +80,9 @@ internal const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
  * A PC or engine game is Gaming's PC game wired out (Droidtop/tracker#349):
  * A follows the same primary-action rule as the PC Games tab (a store game
  * that is not installed offers the install), and a long press or Options >
- * Game page opens the same page and menu ([PcGameStandalone]). A long press
- * on any other game pins it. There are no themes or Quick Menu here.
+ * Game page opens the same page and menu ([PcGameStandalone]). A long press on any game opens its options:
+ * Game page for a PC game, Favourite, Hide, Pin to home screen (the gap review, 2026-10-17: a long press used to
+ * pin a console game outright, with no way to favourite or hide one here). There are no themes or Quick Menu here.
  *
  * [games] null is "not read yet", which says so rather than "no games".
  */
@@ -172,12 +174,26 @@ private fun GamesGrid(
         queryLoaded = true
     }
     val savedViews = rememberSavedViews(LAUNCHER_GAMES_SCOPE_ID)
-    val shown by produceState<List<LibraryEntry>?>(null, games, query, scope) {
-        value = games?.let { withContext(Dispatchers.Default) { query.applyTo(it, scope) } }
+    // A favourite or hide made here shows at once; the library's next read carries it from then on.
+    var favouriteNow by remember { mutableStateOf(emptyMap<String, Boolean>()) }
+    var hiddenNow by remember { mutableStateOf(emptyMap<String, Boolean>()) }
+    val withChanges = remember(games, favouriteNow, hiddenNow) {
+        games?.map { e ->
+            val favourite = favouriteNow[e.id]
+            val hidden = hiddenNow[e.id]
+            if (favourite == null && hidden == null) e else e.copy(favorite = favourite ?: e.favorite, hidden = hidden ?: e.hidden)
+        }
+    }
+    val shown by produceState<List<LibraryEntry>?>(null, withChanges, query, scope) {
+        value = withChanges?.let { withContext(Dispatchers.Default) { query.applyTo(it, scope) } }
     }
     var filterOpen by remember { mutableStateOf(false) }
     var sortOpen by remember { mutableStateOf(false) }
     var optionsOpen by remember { mutableStateOf(false) }
+    // The game the options are for: the focused one for Select, the pressed one for a long press.
+    var optionsGame by remember { mutableStateOf<LibraryEntry?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val actions = androidx.compose.runtime.rememberCoroutineScope()
     val list = shown.takeIf { queryLoaded }
     val total = remember(games, query, scope) { games?.let { query.totalIn(it, scope) } ?: 0 }
     Column(
@@ -202,6 +218,7 @@ private fun GamesGrid(
                         true
                     }
                     press.action == GamepadAction.SELECT && (onOpenFolders != null || !list.isNullOrEmpty()) -> {
+                        optionsGame = list?.getOrNull(pad.focused)
                         optionsOpen = true
                         true
                     }
@@ -274,9 +291,12 @@ private fun GamesGrid(
                                 modifier = Modifier.focusRequester(pad.requester(index)),
                                 onLaunch = { play(entry) },
                                 onFocused = { pad.focused = index },
-                                // A long press: the shell's "act on this one",
-                                // a PC game's page, else pinning it.
-                                onShowDetail = { if (hasPage(entry)) pageId = entry.id else onPin(entry) },
+                                // A long press: the shell's "act on this one", the game's options.
+                                onShowDetail = {
+                                    pad.focused = index
+                                    optionsGame = entry
+                                    optionsOpen = true
+                                },
                             )
                         }
                     }
@@ -326,10 +346,31 @@ private fun GamesGrid(
     }
     dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet(pcLaunch)
     if (optionsOpen) {
-        val focused = list?.getOrNull(pad.focused)
+        val focused = optionsGame?.let { picked -> list?.firstOrNull { it.id == picked.id } ?: picked }
         LauncherGamesOptions(
             game = focused,
             onPin = onPin,
+            onFavourite = library?.let { lib ->
+                { game: LibraryEntry ->
+                    actions.launch {
+                        lib.toggleFavorite(game)?.let { now ->
+                            favouriteNow = favouriteNow + (game.id to now)
+                            dev.droidtop.library.settings.Notices.flash(
+                                if (now) "${game.title} is a favourite" else "${game.title} is no longer a favourite",
+                                context = context,
+                            )
+                        }
+                    }
+                }
+            },
+            onHide = { game ->
+                val now = !game.hidden
+                hiddenNow = hiddenNow + (game.id to now)
+                actions.launch {
+                    withContext(Dispatchers.IO) { dev.droidtop.library.GameHiding.set(context, game.id, now) }
+                    dev.droidtop.library.settings.Notices.flash(if (now) "${game.title} hidden" else "${game.title} shown", context = context)
+                }
+            },
             onOpenPage = focused?.takeIf { hasPage(it) }?.let { game -> { pageId = game.id } },
             onOpenFolders = onOpenFolders,
             onDismiss = { optionsOpen = false },
@@ -338,7 +379,8 @@ private fun GamesGrid(
 }
 
 /**
- * Select on the Launcher's Games list: the focused game's own row (pin it to the home screen) and
+ * Select or a long press on the Launcher's Games list: the game's own rows (its page, favourite, hide, pin it to the
+ * home screen) and
  * Game folders, in the one menu shape the Apps view's options use. Controller-first: Up/Down moves,
  * A chooses, B or Select closes, and every row is a touch target.
  */
@@ -346,6 +388,8 @@ private fun GamesGrid(
 private fun LauncherGamesOptions(
     game: LibraryEntry?,
     onPin: (LibraryEntry) -> Unit,
+    onFavourite: ((LibraryEntry) -> Unit)?,
+    onHide: (LibraryEntry) -> Unit,
     onOpenPage: (() -> Unit)?,
     onOpenFolders: (() -> Unit)?,
     onDismiss: () -> Unit,
@@ -355,6 +399,10 @@ private fun LauncherGamesOptions(
     val options = remember(game, onOpenFolders, onOpenPage) {
         buildList<Option> {
             if (onOpenPage != null) add(Option("Game page") { onDismiss(); onOpenPage() })
+            if (game != null && onFavourite != null) {
+                add(Option(if (game.favorite) "Remove from favourites" else "Add to favourites") { onDismiss(); onFavourite(game) })
+            }
+            if (game != null) add(Option(if (game.hidden) "Show again" else "Hide") { onDismiss(); onHide(game) })
             if (game != null) add(Option("Pin to home screen") { onDismiss(); onPin(game) })
             if (onOpenFolders != null) add(Option("Game folders") { onDismiss(); onOpenFolders() })
         }
