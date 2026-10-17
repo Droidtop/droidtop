@@ -15927,7 +15927,17 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   scrim role's track filled in the accent, the same bar a capsule being
   installed carries; an empty track while the size is unknown), and in the
   value column how far it has got with roughly how long is left, then its
-  status line (a download's "120 MB of 300 MB"). Time left (`JobEta`) is
+  status line (a download's "120 MB of 300 MB"). A job's row moves at most
+  four times a second (`ProgressThrottle`, in `PluginJobsCenter`'s native
+  job reports): a new checkpoint is kept at once and the last report is
+  always shown, but a download that reports every chunk no longer rebuilds
+  the jobs list, persists it and wakes every reader for each one (owner on
+  the console, 0.2.0-dev.2127: "not a functional progress bar, laggy").
+  A Steam install's bar is each depot's own fraction from the depot
+  downloader, weighted by the depot's size and kept from going back (its
+  events arrive out of order); the fraction is of what that depot needs
+  after its manifest, so an update's bar runs over the difference it moves,
+  and the status line names the phase, not each file. Time left (`JobEta`) is
   measured from how fast the job has moved since droidtop first saw it, says
   nothing until it has moved 1% over 5 s, and starts again after a pause:
   "Under a minute left", "About 8 min left", "About 2 h left". A on a running
