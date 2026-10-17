@@ -14064,9 +14064,12 @@ copied:
   (`foldPcLibrary`, the tab's fold), finds the game an entry belongs to, and
   calls back to launch (the host's own launch path) and to open Downloads (the
   place, in the screen host).
-- Standard's Games grid: A on a PC or engine game takes the rule; a long press
-  or Options > Game page opens the page (a long press on any other game still
-  pins it). Desktop's Start menu: a tap takes the rule; Y or a long press opens
+- Standard's Games grid: A on a PC or engine game takes the rule; Options > Game page opens the page. A long
+  press on any game opens its options, the sheet Select opens (gap review, 2026-10-17; it used to pin a console
+  game outright): Game page for a PC or engine game, Add to / Remove from favourites (`Library.toggleFavorite`),
+  Hide / Show again (`GameHiding`, the `game_metadata` row's `hidden`, the one Hidden rule; the store mirror
+  `StoreHidden` writes through it too), Pin to home screen, Game folders. A change shows at once and the
+  library's next read carries it. Desktop's Start menu: a tap takes the rule; Y or a long press opens
   the row's menu, whose Game page row opens the page over the desktop. Retro
   games keep their themed detail in Gaming only.
 

@@ -1,8 +1,6 @@
 package dev.droidtop.library.stores
 
 import android.content.Context
-import dev.droidtop.library.consoles.GameMetadataEntity
-import dev.droidtop.library.consoles.RomDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -44,10 +42,8 @@ object StoreHidden {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val before = prefs.getStringSet(store.id, null)
         val plan = plan(store.id, before, now)
-        val dao = RomDatabase.get(context).romDao()
         (plan.hide.map { it to true } + plan.show.map { it to false }).forEach { (id, hidden) ->
-            val current = dao.getGameMetadataSingle(id) ?: GameMetadataEntity(id = id)
-            if (current.hidden != hidden) dao.upsertGameMetadata(current.copy(hidden = hidden))
+            dev.droidtop.library.GameHiding.set(context, id, hidden)
         }
         // A copy: the set the preferences hand back is the one they keep.
         prefs.edit().putStringSet(store.id, HashSet(now)).apply()
