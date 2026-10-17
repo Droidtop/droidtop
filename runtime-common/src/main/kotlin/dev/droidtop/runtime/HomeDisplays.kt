@@ -7,8 +7,12 @@ package dev.droidtop.runtime
  * HOME activity (HomeTrampolineActivity) and Home on a secondary display it decorates to droidtop's SECONDARY_HOME
  * activity (SecondaryDisplayActivity); each asks [targetFor] with its own display.
  *
- * The companion and the shell say where they are ([companionShown], [shellShown]): process memory, as the rest of
- * the screen arrangement is. A process that is not running knows neither, and Home then brings the main screen back,
+ * The companion and the shell say where they are ([companionShown], [shellShown]), and droidtop notes the display
+ * the person last used ([used]: one of its screens taking focus there, the companion covered by an app there, a game
+ * it launched there). Android starts no home on a display it does not decorate (the console's DP screen has no
+ * FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS), so Home pressed while playing there arrives at the default display's HOME;
+ * the display last used tells that press from one made on the default display. Process memory, as the rest of the
+ * screen arrangement is. A process that is not running knows neither, and Home then brings the main screen back,
  * which arranges the rest.
  */
 object HomeDisplays {
@@ -32,6 +36,15 @@ object HomeDisplays {
     var shellDisplayId: Int? = null
         private set
 
+    @Volatile
+    var lastUsedDisplayId: Int? = null
+        private set
+
+    /** The person is using [displayId] now: one of droidtop's screens took focus there, or droidtop opened a game there. */
+    fun used(displayId: Int?) {
+        if (displayId != null) lastUsedDisplayId = displayId
+    }
+
     /** The companion is on [displayId] (null: it is gone). */
     fun companionShown(displayId: Int?) {
         companionDisplayId = displayId
@@ -52,11 +65,20 @@ object HomeDisplays {
      * moved onto that display), the main screen where the shell lives or on the default display, and the secondary
      * surface on any other display. Pure.
      */
-    fun targetFor(pressedOn: Int, companionDisplayId: Int?, shellDisplayId: Int?, defaultDisplayId: Int = 0): Target = when {
+    fun targetFor(
+        pressedOn: Int,
+        companionDisplayId: Int?,
+        shellDisplayId: Int?,
+        lastUsedDisplayId: Int? = null,
+        defaultDisplayId: Int = 0,
+    ): Target = when {
+        // Home from a display Android starts no home on arrives here: the person was on the shell's screen.
+        pressedOn == defaultDisplayId && shellDisplayId != null && shellDisplayId != defaultDisplayId &&
+            lastUsedDisplayId == shellDisplayId -> Target.MAIN
         companionDisplayId == pressedOn && shellDisplayId != pressedOn -> Target.COMPANION
         shellDisplayId == pressedOn || pressedOn == defaultDisplayId -> Target.MAIN
         else -> Target.SURFACE
     }
 
-    fun targetFor(pressedOn: Int): Target = targetFor(pressedOn, companionDisplayId, shellDisplayId)
+    fun targetFor(pressedOn: Int): Target = targetFor(pressedOn, companionDisplayId, shellDisplayId, lastUsedDisplayId)
 }
