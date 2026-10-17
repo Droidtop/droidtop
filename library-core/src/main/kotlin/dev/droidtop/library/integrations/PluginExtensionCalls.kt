@@ -226,7 +226,23 @@ object PluginMetadataSources {
 
     data class Source(val record: PluginRecord, val entry: ProvidedPoint) {
         val label: String get() = entry.label ?: record.manifest.label
+
+        /** The game-link keys this plugin owns: its own `library.updates` entries. A fetch links a game under these only. */
+        val ownLinkKeys: Set<String>
+            get() = record.manifest.v2.provides.filter { it.point == "library.updates" }.mapNotNull { it.id }.toSet()
     }
+
+    /**
+     * What one source said about one game: the fields it fetched for its match and the links that match names
+     * (`sourceLinks`, so droidtop links the game to its record), or, when its best candidates tie, those candidates
+     * for the person to pick from (docs/SPEC.md 7h, "A source's own match").
+     */
+    data class Answer(
+        val source: Source,
+        val fields: MetadataFields?,
+        val links: Map<String, String> = emptyMap(),
+        val ambiguous: List<PluginMetadataProtocol.Candidate> = emptyList(),
+    )
 
     fun sources(context: Context): List<Source> = providersOf(context, POINT).map { (record, entry) -> Source(record, entry) }
 
@@ -235,9 +251,12 @@ object PluginMetadataSources {
         private val policy = PluginCrashPolicy(context.applicationContext)
 
         /** What each source knows about [facts], one entry per source that found something. A failing source is skipped, the pass goes on. */
-        suspend fun lookup(facts: JSONObject): List<MetadataFields> = sources.mapNotNull { source ->
+        suspend fun lookup(facts: JSONObject): List<MetadataFields> = answers(facts).mapNotNull { it.fields }
+
+        /** Every source's [Answer] for [facts]: a match's fields and links, or a tie to pick from. A failing source is skipped. */
+        suspend fun answers(facts: JSONObject): List<Answer> = sources.mapNotNull { source ->
             try {
-                lookupOne(source, facts)
+                answerOne(source, facts)
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
@@ -245,13 +264,33 @@ object PluginMetadataSources {
             }
         }
 
-        private suspend fun lookupOne(source: Source, facts: JSONObject): MetadataFields? {
-            val match = policy.handle(source.record, newCall(POINT, "match", "scrape", facts, 15_000L))
-            if (!match.ok) return null
-            val ids = PluginMetadataProtocol.bestCandidateIds(match.data) ?: return null
+        /** Every candidate each source offers for [facts], for the person to pick from ("Choose match"). */
+        suspend fun candidates(facts: JSONObject): List<Pair<Source, PluginMetadataProtocol.Candidate>> = sources.flatMap { source ->
+            try {
+                val match = policy.handle(source.record, newCall(POINT, "match", "pick", facts, 15_000L))
+                if (!match.ok) emptyList() else PluginMetadataProtocol.candidates(match.data).map { source to it }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                emptyList()
+            }
+        }
+
+        /** The fields and links [source] has for one candidate's [ids]. */
+        suspend fun fetch(source: Source, ids: JSONObject): Answer? {
             val fetch = policy.handle(source.record, newCall(POINT, "fetch", "scrape", JSONObject().put("ids", ids), 15_000L))
             if (!fetch.ok) return null
-            return PluginMetadataProtocol.fields(source.label, fetch.data)
+            return Answer(source, PluginMetadataProtocol.fields(source.label, fetch.data), PluginMetadataProtocol.sourceLinks(fetch.data, source.ownLinkKeys))
+        }
+
+        private suspend fun answerOne(source: Source, facts: JSONObject): Answer? {
+            val match = policy.handle(source.record, newCall(POINT, "match", "scrape", facts, 15_000L))
+            if (!match.ok) return null
+            return when (val decision = PluginMetadataProtocol.decide(match.data)) {
+                PluginMetadataProtocol.MatchDecision.None -> null
+                is PluginMetadataProtocol.MatchDecision.Ambiguous -> Answer(source, null, ambiguous = decision.candidates)
+                is PluginMetadataProtocol.MatchDecision.Match -> fetch(source, decision.candidate.ids)
+            }
         }
 
         fun close() = policy.shutdown()

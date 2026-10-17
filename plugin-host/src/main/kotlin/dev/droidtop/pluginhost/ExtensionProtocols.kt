@@ -159,20 +159,54 @@ object PluginMetadataProtocol {
      * `match` answers `{candidates: [{ids: {...}, confidence: 0..1}]}`. The ids of the most confident candidate
      * at or above [MIN_CONFIDENCE], or null when there is none (a candidate with no confidence counts as 0.5).
      */
-    fun bestCandidateIds(data: JSONObject): JSONObject? {
-        val candidates = data.optJSONArray("candidates") ?: return null
-        var best: JSONObject? = null
-        var bestConfidence = -1.0
-        for (i in 0 until candidates.length()) {
-            val candidate = candidates.optJSONObject(i) ?: continue
-            val ids = candidate.optJSONObject("ids") ?: continue
-            val confidence = candidate.optDouble("confidence", MIN_CONFIDENCE)
-            if (confidence >= MIN_CONFIDENCE && confidence > bestConfidence) {
-                best = ids
-                bestConfidence = confidence
-            }
-        }
-        return best
+    fun bestCandidateIds(data: JSONObject): JSONObject? = (decide(data) as? MatchDecision.Match)?.candidate?.ids
+
+    /** One `match` candidate: the ids to `fetch` it by, how sure the plugin is, and the name it goes by. */
+    data class Candidate(val ids: JSONObject, val confidence: Double, val title: String?)
+
+    /** What a `match` answer decides (docs/SPEC.md 7h, "A source's own match"). */
+    sealed interface MatchDecision {
+        /** One candidate is the most confident, at or above [MIN_CONFIDENCE]: it is the game. */
+        data class Match(val candidate: Candidate) : MatchDecision
+
+        /** Two or more share the top confidence: none is taken, and the person picks among them ("Choose matches"). */
+        data class Ambiguous(val candidates: List<Candidate>) : MatchDecision
+
+        data object None : MatchDecision
+    }
+
+    /** Every candidate of a `match` answer that has ids, most confident first (a candidate with no confidence counts as 0.5). */
+    fun candidates(data: JSONObject): List<Candidate> {
+        val array = data.optJSONArray("candidates") ?: return emptyList()
+        return (0 until array.length()).mapNotNull { i ->
+            val candidate = array.optJSONObject(i) ?: return@mapNotNull null
+            val ids = candidate.optJSONObject("ids")?.takeIf { it.length() > 0 } ?: return@mapNotNull null
+            Candidate(ids, candidate.optDouble("confidence", MIN_CONFIDENCE).coerceIn(0.0, 1.0), text(candidate, "title"))
+        }.sortedByDescending { it.confidence }
+    }
+
+    /**
+     * The scrape's rule for a `match` answer, the same as for its built-in sources: one candidate clearly first is
+     * taken; a tie at the top is never guessed between, so the person picks; nothing at or above [MIN_CONFIDENCE] is
+     * no match. Candidates with the same ids count once.
+     */
+    fun decide(data: JSONObject): MatchDecision {
+        val usable = candidates(data).filter { it.confidence >= MIN_CONFIDENCE }.distinctBy { it.ids.toString() }
+        if (usable.isEmpty()) return MatchDecision.None
+        val top = usable.filter { it.confidence == usable.first().confidence }
+        return if (top.size == 1) MatchDecision.Match(top.single()) else MatchDecision.Ambiguous(top)
+    }
+
+    /**
+     * The game links a `fetch` answer names (`sourceLinks: {key: id}`), kept to [ownKeys], the source keys the plugin
+     * itself declared (its `library.updates` entries): a plugin links games to its own site only. Ids are one line of
+     * at most 200 characters.
+     */
+    fun sourceLinks(data: JSONObject, ownKeys: Set<String>): Map<String, String> {
+        val links = data.optJSONObject("sourceLinks") ?: return emptyMap()
+        return links.keys().asSequence().filter { it in ownKeys }.mapNotNull { key ->
+            text(links, key)?.takeIf { it.length <= 200 && it.none(Char::isISOControl) }?.let { key to it }
+        }.toMap()
     }
 
     private fun text(data: JSONObject, key: String): String? =

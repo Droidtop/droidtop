@@ -74,12 +74,14 @@ internal fun ManualMatchPicker(
             // The credential-shaped failures land in Unavailable: its
             // message names the setting to fill in, so an unconfigured
             // IGDB reads as an instruction rather than an empty list.
+            // The PC source's candidates, then the metadata plugins' (an F95 thread, say): one list, the person picks.
+            val fromPlugins = PcScraper.pluginCandidates(context, entry).map { MatchCandidate.Plugin(it) }
             when (val found = PcScraper.candidates(context, entry)) {
                 is PcScraper.Candidates.Unavailable -> {
-                    status = found.message
-                    candidates = emptyList()
+                    status = found.message.takeIf { fromPlugins.isEmpty() }
+                    candidates = fromPlugins
                 }
-                is PcScraper.Candidates.Found -> candidates = found.matches.map { MatchCandidate.Pc(it) }
+                is PcScraper.Candidates.Found -> candidates = found.matches.map { MatchCandidate.Pc(it) } + fromPlugins
             }
             return@LaunchedEffect
         }
@@ -177,6 +179,7 @@ internal fun ManualMatchPicker(
                 dev.droidtop.library.scraper.applyManualMatch(context, entry, candidate.candidate.id)
             }
             is MatchCandidate.Pc -> PcScraper.apply(context, entry, candidate.match)
+            is MatchCandidate.Plugin -> PcScraper.applyPlugin(context, entry, candidate.pick)
         }
         applying = false
         onApplied(applied)
@@ -198,6 +201,12 @@ internal sealed interface MatchCandidate {
     data class Rom(val candidate: TheGamesDbClient.Candidate) : MatchCandidate {
         override val name: String get() = candidate.name
         override val subtitle: String? get() = candidate.releaseYear?.let { "Released $it" }
+    }
+
+    /** A metadata plugin's record (docs/SPEC.md 7h, "A source's own match"): picking it links the game to that record. */
+    data class Plugin(val pick: PcScraper.PluginPick) : MatchCandidate {
+        override val name: String get() = pick.name
+        override val subtitle: String get() = "from ${pick.source.label}"
     }
 
     data class Pc(val match: PcMatch) : MatchCandidate {

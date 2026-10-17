@@ -84,6 +84,32 @@ class ExtensionProtocolsTest {
     }
 
     @Test
+    fun `a tie at the top is not guessed between: the person picks`() {
+        val data = obj(
+            "candidates" to arr(
+                obj("ids" to obj("thread" to "1"), "confidence" to 0.6, "title" to "Eternum"),
+                obj("ids" to obj("thread" to "2"), "confidence" to 0.6, "title" to "Eternum"),
+                obj("ids" to obj("thread" to "3"), "confidence" to 0.5),
+            ),
+        )
+        assertNull(PluginMetadataProtocol.bestCandidateIds(data))
+        val decision = PluginMetadataProtocol.decide(data) as PluginMetadataProtocol.MatchDecision.Ambiguous
+        assertEquals(listOf("1", "2"), decision.candidates.map { it.ids.getString("thread") })
+        assertEquals("Eternum", decision.candidates.first().title)
+        // The same ids twice are one candidate, not a tie.
+        val twice = obj("candidates" to arr(obj("ids" to obj("thread" to "1"), "confidence" to 0.9), obj("ids" to obj("thread" to "1"), "confidence" to 0.9)))
+        assertTrue(PluginMetadataProtocol.decide(twice) is PluginMetadataProtocol.MatchDecision.Match)
+        assertEquals(PluginMetadataProtocol.MatchDecision.None, PluginMetadataProtocol.decide(obj()))
+    }
+
+    @Test
+    fun `a fetch links the game only under the plugin's own source keys`() {
+        val data = obj("sourceLinks" to obj("f95zone" to " 93340 ", "steam" to "570", "blank" to " "))
+        assertEquals(mapOf("f95zone" to "93340"), PluginMetadataProtocol.sourceLinks(data, setOf("f95zone", "blank")))
+        assertEquals(emptyMap<String, String>(), PluginMetadataProtocol.sourceLinks(obj(), setOf("f95zone")))
+    }
+
+    @Test
     fun `a candidate with no confidence counts as the floor`() {
         assertNotNull(PluginMetadataProtocol.bestCandidateIds(obj("candidates" to arr(obj("ids" to obj("a" to 1))))))
     }
