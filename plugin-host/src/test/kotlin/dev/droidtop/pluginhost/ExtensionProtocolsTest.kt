@@ -84,7 +84,7 @@ class ExtensionProtocolsTest {
     }
 
     @Test
-    fun `a tie at the top is not guessed between: the person picks`() {
+    fun `a tie at the top is not guessed between, and the person picks`() {
         val data = obj(
             "candidates" to arr(
                 obj("ids" to obj("thread" to "1"), "confidence" to 0.6, "title" to "Eternum"),
