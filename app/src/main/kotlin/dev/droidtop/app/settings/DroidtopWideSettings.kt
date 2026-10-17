@@ -204,6 +204,18 @@ object DroidtopWideSettings {
                                 )
                             },
                         ),
+                        // A feedback tool for anyone, not a developer's: the owner, 2026-10-17, "Diagnostics are a user
+                        // feedback tool, not a dev tool" (docs/SPEC.md 7, "Developer menu").
+                        AsyncActionItem(
+                            id = "pref_global_share_diagnostics",
+                            title = "Share diagnostics",
+                            subtitle = "Zip the logs, settings without credentials, build and theme names; " +
+                                "nothing is sent until you choose where to send it",
+                            run = { ctx, onStatus ->
+                                onStatus("Packing diagnostics...")
+                                shareDiagnostics(ctx)
+                            },
+                        ),
                         ToggleItem(
                             id = KEY_BACKUP_CREDENTIALS,
                             title = "Back up credentials",
@@ -246,7 +258,7 @@ object DroidtopWideSettings {
                             NestedScreenItem(
                                 id = "pref_global_developer",
                                 title = "Developer",
-                                subtitle = "Diagnostics, debug builds and recovery; and technical details on the pages they belong to",
+                                subtitle = "Debug builds and recovery; and technical details on the pages they belong to",
                                 registryId = DeveloperMenu.SCREEN,
                             )
                         } else {
@@ -509,18 +521,8 @@ object DroidtopWideSettings {
             listOf(
                 CatalogGroup(
                     id = "developer_diagnostics",
-                    title = "Diagnostics",
+                    title = "Recovery and debugging",
                     items = listOfNotNull(
-                        AsyncActionItem(
-                            id = "pref_global_share_diagnostics",
-                            title = "Share diagnostics",
-                            subtitle = "Zip the logs, settings without credentials, build and theme names; " +
-                                "nothing is sent until you choose where to send it",
-                            run = { ctx, onStatus ->
-                                onStatus("Packing diagnostics...")
-                                shareDiagnostics(ctx)
-                            },
-                        ),
                         AppSettingsCatalogs.rebuildIndexItem(),
                         UpdatesPage.debugBuildsItem(context),
                         debugCrashItem(context),

@@ -7678,21 +7678,23 @@ catalog (no second settings system):
   (`DeveloperMenu.on`), and a catalog builder adds a developer row only
   while it is on.
 - **What the menu holds** (droidtop-wide rows, moved out of everyday
-  groups): **Share diagnostics** (from Data), **Rebuild the library index**
+  groups): **Rebuild the library index**
   (from the Library group, recovery for a list that looks wrong), **Install
   debug builds** (from Updates), and on a debug build **Debug: force a
   crash**.
 - **Technical rows stay on their own page, shown only while it is on:**
   a plugin's **Advanced** group (its id, origin, archive digest and the
   containment check), **Plugin messages**, every **Technical details** row
-  (a disabled plugin's, an app status's, a source's failure), the emulator
-  and custom player **Launch test**, the Windows **Unpacker** check, and the
-  companion's **Logs** card. They belong to the thing they describe, so they
+  (a disabled plugin's, an app status's, a source's failure), the Windows
+  **Unpacker** check, and the companion's **Logs** card. They belong to the thing they describe, so they
   are not copied into one list.
 - **Everyday rows stay where they are**, technical-looking or not: a
   plugin's version, update, permissions and Activity; keys you trust and
-  catalog fingerprints (a trust decision is made on them); Rescan, Back up
-  and Restore, Rerun onboarding; the Build channel; performance readouts and
+  catalog fingerprints (a trust decision is made on them); **Share
+  diagnostics** in Data (the owner: "Nope. Diagnostics are a user feedback
+  tool, not a dev tool"); the emulator and custom player **Launch test** (the
+  owner, asked whether they stay as an everyday troubleshooting tool: "Yep");
+  Rescan, Back up and Restore, Rerun onboarding; the Build channel; performance readouts and
   the overlay; a custom player's Check of what was typed; containers'
   sockets and mounts.
 
