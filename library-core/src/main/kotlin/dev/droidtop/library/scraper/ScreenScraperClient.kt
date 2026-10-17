@@ -64,7 +64,7 @@ data class ScreenScraperGameMetadata(
  */
 object ScreenScraperClient {
 
-    private val anonymousPacing = ScreenScraperPacing()
+    private val anonymousPacing = RequestPacing()
 
     private val WANTED_MEDIA = setOf(
         "box-2D", "ss", "sstitle", "wheel", "wheel-hd", "support-2D", "fanart", "video", "video-normalized",

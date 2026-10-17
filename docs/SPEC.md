@@ -13104,7 +13104,8 @@ the same care as the art.
 **How that is built (decided 2026-09-25).**
 - **One source searches by name; every other source is asked by identity.** The selected
   PC source (Lutris, IGDB or SteamGridDB, `PcScraperSource`) is the only one ever given a
-  game's name, so the "one source, never a silent fallback chain" rule below still holds for
+  game's name (with the Steam store's own search, held to the same exact bar, since 2026-10-17:
+  "A game with only a name" below), so the "one source, never a silent fallback chain" rule below still holds for
   guesses. Once a game is identified -- by its own store id, by an exact unique name match,
   or by the person's pick -- `PcFlavour` asks every other configured source for THAT game by
   an id: IGDB by the game's Steam or GOG id (`external_games`, `external_game_source` 1 and
@@ -13112,6 +13113,27 @@ the same care as the art.
   own id or the game's Steam or GOG id. No source can put another game's text on this one,
   because none of them is asked by name. A source with no key set is not asked; only the
   selected source's missing key refuses the pass (`ScraperReadiness`).
+- **A game with only a name (directed 2026-10-17).** The owner, from the console: "It doesn't seem we can
+  scrape pc games that aren't from a store." The coordinator's direction: every PC folder game is covered,
+  not only store games, and "a name-only game gets text metadata: match it by name against the keyless Steam
+  store search and the other sources ... not artwork only". So:
+  - The keyless Steam store search (`SteamStoreClient.search`, `store.steampowered.com/api/storesearch`) is
+    the one source besides the selected one that is given a name. It is asked when the selected source is
+    not certain (no match, or candidates with none exact) and when the selected source's match carries no
+    Steam id (a SteamGridDB match carries only its own id, so before this a SteamGridDB pass gave a folder
+    game art and no text). Its answer is held to the same bar as the selected source's (`PcMatching`:
+    exactly one app whose name is the title, ignoring case, punctuation, spacing and a leading article),
+    and the app's own record is then read by id, so the rest follows as for a Steam game.
+  - Steam's storefront requests, search and record alike, are spaced 1.5 s apart (`RequestPacing`, the
+    one pacing class, shared with ScreenScraper's anonymous tier), since a game can now ask it twice.
+  - The Steam store refusing five lookups by app id in a row stops those lookups for the rest of the pass,
+    not the pass: the folder games after them are still asked of the selected source.
+  - An engine or PC game counts as having its details only when it has a description: an engine's detection
+    or a store install fills a developer or genre on its own (`PcScraper.picked`).
+  - Metadata plugins (`metadata_source`, A3 in docs/plugin-api.md; the F95zone source among them where its
+    plugin declares one) are asked with the game's title, folder name and source links for every game the
+    pass reaches, after the built-in sources, filling only what those left empty; that is unchanged, and
+    now reaches the engine games the old "has details" rule passed over.
 - **Ids travel.** Lutris's `provider_games` names a result's Steam app id and GOG product id,
   and IGDB's `external_games` does the same, so a Lutris or IGDB match of a folder game
   becomes a Steam/GOG identity and the keyless Steam store fills its developer, publisher and
@@ -13450,9 +13472,9 @@ cards, and its dialog said "no match for 2" without saying which two.
   that item alone; "Scrape the whole library" on the Scraper page is the same as "Scrape all systems".
   A single system or folder stays console only. The PC Games tab's "Get artwork and details" is the same
   job scoped to the games on screen (the `pc_ids` argument). The games come from the library's own index
-  (`LibraryScrapeJob.libraryGames`, set by :app; a walk only when the index is empty). Games a store
-  identifies (a Steam or GOG id, matched with certainty) come first so the quick wins land early, then
-  the rest, each by id (`PcScraper.orderKey`); the checkpoint is the order key of the last game finished, so Pause, Resume and a restart carry on after it. A source that is not
+  (`LibraryScrapeJob.libraryGames`, set by :app; a walk only when the index is empty). Store and folder
+  games are worked through together, by id (`PcScraper.orderKey`; until 2026-10-17 store games came first,
+  and a pass the Steam store stopped never reached a folder game); the checkpoint is the order key of the last game finished, so Pause, Resume and a restart carry on after it. A source that is not
   ready (`ScraperReadiness`) leaves its half out with its own sentence; the other half still runs, and a
   console source that refused everything does not stop the PC games, which ask a different source.
 - **Spacing.** Games in a PC pass are asked about at least 1.6 s apart (`PcScraper.GAME_PACE_MS`), because the
@@ -13463,8 +13485,10 @@ cards, and its dialog said "no match for 2" without saying which two.
   pick (with the candidate count), failed (with the message). The summary names up to six of each and counts
   the rest, in the ROM and the PC pass alike. Every game leaves one `scrape:` line in `logs/scan.log`: what
   was written and from which source, or `no match for "<searched title>"`, `N candidates, none exact ...:
-  needs a pick`, `refused, HTTP n: reason`, `failed: message`; each pass ends with one `scrape: ... summary:`
-  line. The result dialog is the shortest honest text: systems the filter left nothing to do for are one line
+  needs a pick`, `refused, HTTP n: reason`, `failed: message`, and for a game the pass was given but did
+  not ask about, `not asked, it already has what the "<filter>" filter looks for` or `not asked, <source>
+  refused 5 in a row`; each pass ends with one `scrape: ... summary:` line. So a folder game with no line
+  is one the library never handed to the pass. The result dialog is the shortest honest text: systems the filter left nothing to do for are one line
   naming them (`LibraryScrapeJob.summarize`), not a sentence each.
 - **Not done here.** The options menu's result panel still scrolls by touch only; making the shared
   `MenuPanel` scroll with the D-pad belongs with the shell-gamepad work (Droidtop/tracker, filed).

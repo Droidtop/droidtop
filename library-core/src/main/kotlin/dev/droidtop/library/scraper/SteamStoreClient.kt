@@ -31,16 +31,57 @@ object SteamStoreClient {
     /** The name the scrape records and reports this source by. */
     const val SOURCE = "Steam store"
 
+    /**
+     * The gap between any two storefront requests, search and appdetails alike: about 200 in five minutes is
+     * what Steam allows one address, and a game can now ask it twice (a name search, then that app's record).
+     */
+    private val pacing = RequestPacing(minimumIntervalMs = 1_500L)
+
     fun appDetails(appId: Int): ScrapeLookup<PcMatch> {
-        val url = URL("https://store.steampowered.com/api/appdetails?appids=$appId&l=english")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
+        val connection = open("https://store.steampowered.com/api/appdetails?appids=$appId&l=english")
+        val status = connection.responseCode
+        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, emptyList(), "app $appId")
+        return parse(appId, JSONObject(connection.inputStream.bufferedReader().readText()))
+    }
+
+    /**
+     * The storefront's own name search (docs/SPEC.md 7h, "A game with only a name"): keyless, the endpoint the
+     * store's search box uses, `GET /api/storesearch/?term=<name>&l=english&cc=US`, answering
+     * `{"total": n, "items": [{"type": "app", "name": ..., "id": <appid>, ...}]}`. Only names and app ids are
+     * taken: the scrape holds them to [PcMatching]'s exact, unique bar and reads the chosen app's record by id.
+     */
+    fun search(term: String): ScrapeLookup<List<PcMatch>> {
+        val query = java.net.URLEncoder.encode(term, "UTF-8").replace("+", "%20")
+        val connection = open("https://store.steampowered.com/api/storesearch/?term=$query&l=english&cc=US")
+        val status = connection.responseCode
+        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, emptyList(), "search \"$term\"")
+        return parseSearch(JSONObject(connection.inputStream.bufferedReader().readText()))
+    }
+
+    /** Pure, for the JVM tests. Bundles and anything without an app id are left out; nothing found is a real miss. */
+    internal fun parseSearch(response: JSONObject): ScrapeLookup<List<PcMatch>> {
+        val items = response.optJSONArray("items") ?: return ScrapeLookup.NoMatch
+        val matches = (0 until items.length()).mapNotNull { i ->
+            val item = items.optJSONObject(i) ?: return@mapNotNull null
+            if (item.optString("type", "app") != "app") return@mapNotNull null
+            val id = item.optInt("id", 0).takeIf { it > 0 } ?: return@mapNotNull null
+            val name = item.optString("name", "").trim().ifBlank { null } ?: return@mapNotNull null
+            PcMatch(name = name, sourceLabel = SOURCE, ids = PcGameIds(steamAppId = id))
+        }
+        return if (matches.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(matches)
+    }
+
+    private fun open(address: String): HttpURLConnection {
+        synchronized(pacing) {
+            val wait = pacing.delayBeforeRequest(System.currentTimeMillis())
+            if (wait > 0) Thread.sleep(wait)
+            pacing.requestStarted(System.currentTimeMillis())
+        }
+        return (URL(address).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 10_000
             readTimeout = 20_000
         }
-        val status = connection.responseCode
-        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, emptyList(), "app $appId")
-        return parse(appId, JSONObject(connection.inputStream.bufferedReader().readText()))
     }
 
     /** Pure, so the JVM tests exercise it against captured response shapes. */

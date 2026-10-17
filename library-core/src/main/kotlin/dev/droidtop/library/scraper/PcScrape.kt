@@ -302,13 +302,34 @@ val LibraryEntry.isPcOrEngineGame: Boolean
 object PcScraper {
 
     /**
-     * The order a pass works through games in, and the checkpoint's key: games a store identifies
-     * (a Steam or GOG id, answered certainly and without a picker) come first so the quick wins land
-     * early, then the rest, each group by id (docs/SPEC.md 7h, "The whole library").
+     * The order a pass works through games in, and the checkpoint's key: every game by id, store and folder games
+     * together (docs/SPEC.md 7h, "The whole library"). Store games used to come first, and a pass the Steam store
+     * stopped never reached a folder game. The "1|" is what the folder games' keys carried then, so a checkpoint
+     * saved by that order still resumes in place: a "1|" one after the same game, a "0|" one from the start.
      */
-    internal fun orderKey(entry: LibraryEntry): String {
-        val ids = PcGameIds.of(entry)
-        return (if (ids.steamAppId != null || ids.gogId != null) "0|" else "1|") + entry.id
+    internal fun orderKey(entry: LibraryEntry): String = "1|" + entry.id
+
+    /**
+     * Whether [filter] picks [entry] for a pass, given its metadata [row] and whether a scraped cover is on disk.
+     * Pure, for the JVM tests.
+     *
+     * A PC or engine game has its details when it has a description: an engine's detection or a store install fills
+     * a developer or a genre on its own, and a game with those and no description is a game nobody has looked up
+     * (a Ren'Py folder game skipped as "already has details" is how folder games went unscraped). What a PC
+     * provider brings as a picture is a store's icon or the icon inside an .exe, not a cover: only a scraped cover
+     * counts as art for one (see withScrapedMetadata's scrapedArtworkFirst). An engine game's art is what its
+     * folder or downloaded_media holds, which does count.
+     */
+    internal fun picked(entry: LibraryEntry, row: GameMetadataEntity?, scrapedCover: Boolean, filter: ScrapeFilter): Boolean {
+        val noMeta = row?.description.isNullOrBlank()
+        val noArt = !scrapedCover && (entry.kind == LibraryEntryKind.WINE_PROFILE || entry.artworkUri == null)
+        return when (filter) {
+            ScrapeFilter.MISSING_ANY -> noArt || noMeta
+            ScrapeFilter.MISSING_ARTWORK -> noArt
+            ScrapeFilter.MISSING_METADATA -> noMeta
+            ScrapeFilter.FAVORITES -> row?.favorite == true
+            ScrapeFilter.ALL -> true
+        }
     }
 
     /** Games are asked about at least this far apart: the Steam store allows about 200 requests in five minutes. */
@@ -455,23 +476,14 @@ object PcScraper {
             .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
         val filter = ScrapeOptionsPrefs.filter(context)
         val candidates = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
-        val targets = candidates.filter { entry ->
+        val (targets, passedOver) = candidates.partition { entry ->
             val row = existing[entry.id]
-            val noMeta = row?.description == null && row?.genre == null && row?.developer == null
-            val scrapedCover = row?.artworkPath?.let { File(it).isFile } == true
-            // What a PC provider brings on its own is a store's icon or
-            // the icon inside an .exe, not a cover: only a scraped cover
-            // counts as art for one (see withScrapedMetadata's
-            // scrapedArtworkFirst). An engine game's art is what its
-            // folder or downloaded_media holds, which does count.
-            val noArt = !scrapedCover && (entry.kind == LibraryEntryKind.WINE_PROFILE || entry.artworkUri == null)
-            when (filter) {
-                ScrapeFilter.MISSING_ANY -> noArt || noMeta
-                ScrapeFilter.MISSING_ARTWORK -> noArt
-                ScrapeFilter.MISSING_METADATA -> noMeta
-                ScrapeFilter.FAVORITES -> row?.favorite == true
-                ScrapeFilter.ALL -> true
-            }
+            picked(entry, row, scrapedCover = row?.artworkPath?.let { File(it).isFile } == true, filter = filter)
+        }
+        // Every game the pass was given leaves a line (docs/SPEC.md 7h, "Names and reasons"), the ones the
+        // filter passed over too, so a folder game missing from the log is a game the library never handed over.
+        for (entry in passedOver) {
+            dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc]: not asked, it already has what the \"${filter.label}\" filter looks for")
         }
         if (targets.isEmpty()) {
             return@withContext if (resumeAfter != null && candidates.isEmpty()) {
@@ -486,28 +498,42 @@ object PcScraper {
         // Metadata plugins (docs/plugin-api.md 3 A3), the same way the ROM pass asks them: after every built-in source,
         // filling only what those left empty. One scrape path for ROMs and PC and engine games.
         val plugins = if (wantMetadata) dev.droidtop.library.integrations.PluginMetadataSources.open(context) else null
-        var consecutiveRefusals = 0
+        // The same rule as the ROM pass, kept per source: several refusals in a row are about that server, not about
+        // any game. The selected source refusing ends the pass; the Steam store refusing only stops the store games'
+        // lookups by app id for the rest of it, so the folder games after them are still asked.
+        var refusedInARow = 0
+        var steamInARow = 0
+        var steamStopped: ScrapeLookup.Refused? = null
         for ((index, entry) in targets.withIndex()) {
             // A pause or cancel lands here, between games, never inside one.
             kotlin.coroutines.coroutineContext.ensureActive()
-            // The same rule as the ROM pass: several refusals in a row are
-            // about the server, not about any game, and asking again only
-            // spends the user's time to be told the same thing.
-            if (consecutiveRefusals >= REFUSAL_ABORT_THRESHOLD) break
+            if (refusedInARow >= REFUSAL_ABORT_THRESHOLD) {
+                for (left in targets.drop(index)) {
+                    dev.droidtop.library.ScanLog.write("scrape: ${left.title} [pc] via ${source.label}: not asked, ${source.label} refused $REFUSAL_ABORT_THRESHOLD in a row")
+                }
+                break
+            }
             onProgress(index, targets.size)
             // The sources are public services with their own limits (the Steam store allows about
             // 200 requests in five minutes) and one game can ask several of them: games are spaced.
             if (index > 0) kotlinx.coroutines.delay(GAME_PACE_MS)
             counts.attempted++
             try {
-                val outcome = scrapeOne(context, entry, source, flavour)
+                val outcome = scrapeOne(context, entry, source, flavour, steamStopped)
                 logOutcome(source.label, entry, outcome)
                 plugins?.let { fillFromPlugins(context, entry, it) }
                 if (outcome is PcOutcome.Refused) {
-                    consecutiveRefusals++
                     counts.lastRefusal = outcome.refusal
+                    when {
+                        !outcome.asked -> Unit
+                        // The selected source is never the Steam store, so a store refusal is one by app id.
+                        outcome.refusal.source == SteamStoreClient.SOURCE ->
+                            if (++steamInARow >= REFUSAL_ABORT_THRESHOLD) steamStopped = outcome.refusal
+                        else -> refusedInARow++
+                    }
                 } else {
-                    consecutiveRefusals = 0
+                    refusedInARow = 0
+                    if (outcome == PcOutcome.ByStoreId) steamInARow = 0
                 }
                 when (outcome) {
                     PcOutcome.ByStoreId -> counts.byStoreId++
@@ -525,7 +551,7 @@ object PcScraper {
             } catch (t: Exception) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
                 counts.failed++
-                consecutiveRefusals = 0
+                refusedInARow = 0
                 counts.misses.add(ScrapeMisses.Kind.FAILED, entry.title, t.message)
                 dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via ${source.label}: failed: ${t.message}")
                 android.util.Log.e("droidtop.Scraper", "Failed to scrape ${entry.title}", t)
@@ -546,7 +572,11 @@ object PcScraper {
             PcOutcome.ByStoreId, PcOutcome.ByName -> return
             is PcOutcome.NoMatch -> "no match for \"${outcome.searched}\""
             is PcOutcome.NeedsPicking -> "${outcome.candidates} candidates, none exact for \"${outcome.searched}\": needs a pick"
-            is PcOutcome.Refused -> "refused, HTTP ${outcome.refusal.httpStatus}" + (outcome.refusal.reason?.let { ": $it" } ?: "")
+            is PcOutcome.Refused -> if (outcome.asked) {
+                "refused, HTTP ${outcome.refusal.httpStatus}" + (outcome.refusal.reason?.let { ": $it" } ?: "")
+            } else {
+                "not asked, the ${outcome.refusal.source} refused $REFUSAL_ABORT_THRESHOLD in a row (HTTP ${outcome.refusal.httpStatus})"
+            }
         }
         dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via $sourceLabel: $what")
     }
@@ -581,7 +611,8 @@ object PcScraper {
         data object ByName : PcOutcome
         data class NeedsPicking(val searched: String, val candidates: Int) : PcOutcome
         data class NoMatch(val searched: String) : PcOutcome
-        data class Refused(val refusal: ScrapeLookup.Refused) : PcOutcome
+        /** [asked] false: the source had already refused [REFUSAL_ABORT_THRESHOLD] in a row and this game was not sent to it. */
+        data class Refused(val refusal: ScrapeLookup.Refused, val asked: Boolean = true) : PcOutcome
     }
 
     /**
@@ -597,9 +628,16 @@ object PcScraper {
      * Whatever identified the game, the rest of its flavour and art is then
      * asked for by that identity ([PcFlavour.complete]).
      */
-    private suspend fun scrapeOne(context: Context, entry: LibraryEntry, source: PcMetadataSource, flavour: PcFlavour): PcOutcome {
+    private suspend fun scrapeOne(
+        context: Context,
+        entry: LibraryEntry,
+        source: PcMetadataSource,
+        flavour: PcFlavour,
+        steamStopped: ScrapeLookup.Refused? = null,
+    ): PcOutcome {
         val own = PcGameIds.of(entry)
         own.steamAppId?.let { appId ->
+            steamStopped?.let { return PcOutcome.Refused(it, asked = false) }
             when (val lookup = SteamStoreClient.appDetails(appId)) {
                 is ScrapeLookup.Found -> {
                     write(context, entry, flavour.complete(entry, lookup.value), confidence = "id", replaceExisting = false)
@@ -616,17 +654,24 @@ object PcScraper {
             }
         }
         val title = searchTitleFor(entry)
-        return when (val lookup = source.search(title)) {
-            is ScrapeLookup.Refused -> PcOutcome.Refused(lookup)
-            ScrapeLookup.NoMatch -> PcOutcome.NoMatch(title)
-            is ScrapeLookup.Found -> when (val decision = PcMatching.decide(title, lookup.value)) {
-                is PcMatching.Decision.Confident -> {
-                    write(context, entry, flavour.complete(entry, decision.match), confidence = "name", replaceExisting = false)
-                    PcOutcome.ByName
-                }
-                is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking(title, decision.matches.size)
-                PcMatching.Decision.None -> PcOutcome.NoMatch(title)
-            }
+        val decision = when (val lookup = source.search(title)) {
+            is ScrapeLookup.Refused -> return PcOutcome.Refused(lookup)
+            ScrapeLookup.NoMatch -> PcMatching.Decision.None
+            is ScrapeLookup.Found -> PcMatching.decide(title, lookup.value)
+        }
+        if (decision is PcMatching.Decision.Confident) {
+            write(context, entry, flavour.complete(entry, decision.match), confidence = "name", replaceExisting = false)
+            return PcOutcome.ByName
+        }
+        // Not certain from the selected source: the keyless Steam store's own search, held to the same exact, unique
+        // bar (docs/SPEC.md 7h, "A game with only a name"), so a folder game that is on Steam gets the store's text.
+        flavour.steamByName(title)?.let { record ->
+            write(context, entry, flavour.complete(entry, record), confidence = "name", replaceExisting = false)
+            return PcOutcome.ByName
+        }
+        return when (decision) {
+            is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking(title, decision.matches.size)
+            else -> PcOutcome.NoMatch(title)
         }
     }
 

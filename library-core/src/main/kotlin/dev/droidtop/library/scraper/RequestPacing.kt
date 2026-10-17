@@ -1,7 +1,10 @@
 package dev.droidtop.library.scraper
 
-/** Pure quota policy for the anonymous ScreenScraper tier. */
-internal class ScreenScraperPacing(private val minimumIntervalMs: Long = 11_000L) {
+/**
+ * Pure request pacing for a source that limits how often it is asked: a minimum gap between requests and, for
+ * ScreenScraper's anonymous tier, a growing back-off after a quota answer ([response]). The Steam store uses the gap only.
+ */
+internal class RequestPacing(private val minimumIntervalMs: Long = 11_000L) {
     private var lastRequestAt = Long.MIN_VALUE
     private var backoffUntil = 0L
     private var failures = 0
