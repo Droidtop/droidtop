@@ -18,9 +18,13 @@ import `in`.dragonbra.javasteam.depotdownloader.data.DownloadItem
 import `in`.dragonbra.javasteam.types.DepotManifest
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.future.await
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import okio.Path.Companion.toPath
 import timber.log.Timber
@@ -55,7 +59,6 @@ internal object SteamDownload {
             existing?.installPath?.takeIf { it.isNotBlank() }?.let(::File)
                 ?: StoreFiles.freshFolder(root, app.folderName, "steam-${app.id}")
         }
-        val totalBytes = plan.all.values.sumOf { SteamDepots.downloadBytes(it, branch).coerceAtLeast(1L) }
         withContext(Dispatchers.IO) {
             if (!installed) {
                 StoreDiskSpace.shortfall(installDir, SteamDepots.installBytes(plan.all.values, branch), context.cacheDir)?.let { error(it) }
@@ -78,8 +81,10 @@ internal object SteamDownload {
         val depots = plan.all
         val info = DownloadInfo(jobCount = depots.size, gameId = app.id, downloadingAppIds = CopyOnWriteArrayList()).apply {
             setPersistencePath(installDir.absolutePath)
+            // The bar is each depot's own share done, weighted by its size: the downloader's percent is of the bytes
+            // that depot needs after its manifest (what an update or a resume actually moves), where a total from the
+            // product info counted the whole game and the bar ended low, then jumped (console, 0.2.0-dev.2127).
             depots.values.forEachIndexed { index, depot -> setWeight(index, SteamDepots.downloadBytes(depot, branch).coerceAtLeast(1L)) }
-            setTotalExpectedBytes(totalBytes)
             loadPersistedBytesDownloaded(installDir.absolutePath).takeIf { it > 0L }?.let { initializeBytesDownloaded(it) }
             updateStatusMessage("Preparing")
         }
@@ -112,14 +117,26 @@ internal object SteamDownload {
                     }
                     downloader.finishAdding()
                     downloader.startDownloading()
-                    downloader.getCompletion().await()
+                    // The downloader reports a failed item but never completes its future for it, so waiting on the
+                    // future alone left the job in its last state for ever. Whichever comes first ends the wait.
+                    coroutineScope {
+                        val done = async { downloader.getCompletion().await() }
+                        val failed = select<Boolean> {
+                            done.onAwait { false }
+                            listener.failed.onAwait { true }
+                        }
+                        if (failed) done.cancel()
+                    }
                 } finally {
                     runCatching { downloader.close() }
                     SafeDelete.deleteWithin(staging.parentFile ?: context.cacheDir, staging)
                 }
             }
         }
-        listener.failure?.let { throw IllegalStateException("Steam could not download ${app.name}: ${it.message ?: it.javaClass.simpleName}", it) }
+        listener.failure?.let {
+            Timber.tag(TAG).e(it, "Steam download of ${app.id} ended with a failure")
+            throw IllegalStateException("Steam could not download ${app.name}: ${dev.droidtop.runtime.FailureText.reason(it)}", it)
+        }
 
         withContext(Dispatchers.IO) {
             val mainDlc = plan.mainDepots.values.map { it.dlcAppId }.filter { it != SteamIds.INVALID_APP_ID }
@@ -228,12 +245,16 @@ internal object SteamDownload {
     }
 
     /** The depot downloader's progress, into the job's [DownloadInfo] (GameNative's AppDownloadListener). */
-    private class Listener(private val info: DownloadInfo, private val depotIndex: Map<Int, Int>) : IDownloadListener {
-        private val compressed = HashMap<Int, Long>()
+    internal class Listener(private val info: DownloadInfo, private val depotIndex: Map<Int, Int>) : IDownloadListener {
+        // The downloader sends every event from its own coroutine, so they arrive at once and out of order.
+        private val progress = DepotProgress()
 
         @Volatile
         var failure: Throwable? = null
             private set
+
+        /** Completed with the first failure the downloader reports. */
+        val failed = CompletableDeferred<Throwable>()
 
         override fun onItemAdded(item: DownloadItem) {}
 
@@ -248,29 +269,67 @@ internal object SteamDownload {
         override fun onDownloadFailed(item: DownloadItem, error: Throwable) {
             Timber.tag(TAG).e(error, "Steam app ${item.appId} failed to download")
             failure = error
+            failed.complete(error)
             info.failedToDownload()
         }
 
         override fun onStatusUpdate(message: String) {
-            info.updateStatusMessage(message)
+            // The phase, not the file: one line per file ("Allocating file: <name>") changed the row thousands of
+            // times while the files were being prepared.
+            val phase = DepotProgress.phaseOf(message)
+            if (phase != info.getCurrentStatusMessage()) info.updateStatusMessage(phase)
         }
 
         override fun onChunkCompleted(depotId: Int, depotPercentComplete: Float, compressedBytes: Long, uncompressedBytes: Long) {
-            add(depotId, compressedBytes)
-            depotIndex[depotId]?.let { info.setProgress(depotPercentComplete, it) }
-            info.persistProgressSnapshot()
+            record(depotId, depotPercentComplete, compressedBytes)
         }
 
         override fun onDepotCompleted(depotId: Int, compressedBytes: Long, uncompressedBytes: Long) {
-            add(depotId, compressedBytes)
-            depotIndex[depotId]?.let { info.setProgress(1f, it) }
-            info.persistProgressSnapshot()
+            record(depotId, 1f, compressedBytes)
         }
 
-        /** The downloader reports each depot's bytes so far; the job counts the difference. */
-        private fun add(depotId: Int, soFar: Long) {
-            val delta = soFar - (compressed.put(depotId, soFar) ?: 0L)
-            if (delta > 0L) info.updateBytesDownloaded(delta, System.currentTimeMillis())
+        private fun record(depotId: Int, fraction: Float, soFar: Long) {
+            val step = progress.record(depotId, fraction, soFar)
+            if (step.newBytes > 0L) info.updateBytesDownloaded(step.newBytes, System.currentTimeMillis())
+            if (step.moved) depotIndex[depotId]?.let { info.setProgress(step.fraction, it) }
+            info.persistProgressSnapshot()
+        }
+    }
+}
+
+/**
+ * Each depot's progress as the depot downloader reports it, kept so it only goes forward: its events arrive from
+ * concurrent coroutines, so a lower figure can come after a higher one, and counting the difference between the
+ * last two counted bytes twice and put the bar at its end early (console, 0.2.0-dev.2127: "not a functional progress
+ * bar"). Thread-safe; pure apart from its own state.
+ */
+internal class DepotProgress {
+    /** What one report changed: the depot's fraction now, whether it moved, and the bytes not counted before. */
+    data class Step(val fraction: Float, val moved: Boolean, val newBytes: Long)
+
+    private val fractions = HashMap<Int, Float>()
+    private val bytes = HashMap<Int, Long>()
+
+    @Synchronized
+    fun record(depot: Int, fraction: Float, bytesSoFar: Long): Step {
+        val before = fractions[depot] ?: 0f
+        val now = maxOf(before, fraction.coerceIn(0f, 1f))
+        fractions[depot] = now
+        val counted = bytes[depot] ?: 0L
+        val newBytes = (bytesSoFar - counted).coerceAtLeast(0L)
+        if (newBytes > 0L) bytes[depot] = bytesSoFar
+        return Step(now, now > before, newBytes)
+    }
+
+    companion object {
+        /** The phase a downloader status line names, without the file it is on ("Allocating file: a.dll" is "Allocating files"). */
+        fun phaseOf(message: String): String {
+            val phase = message.substringBefore(':').trim()
+            return when {
+                phase.isEmpty() -> message.trim()
+                phase.endsWith(" file") -> phase + "s"
+                else -> phase
+            }
         }
     }
 }

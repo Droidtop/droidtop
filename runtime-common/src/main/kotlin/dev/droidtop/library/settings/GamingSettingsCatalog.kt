@@ -8,9 +8,6 @@ import dev.droidtop.library.theme.EsDeAspectRatio
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.library.theme.ThemePrefs
-import dev.droidtop.runtime.LaunchSoundExperiment
-import dev.droidtop.runtime.LaunchSoundPlan
-import dev.droidtop.runtime.LaunchSoundVariant
 import dev.droidtop.runtime.systemstatus.PowerAction
 import dev.droidtop.runtime.tasks.text
 
@@ -65,7 +62,6 @@ object GamingSettingsCatalog {
     const val ID_ACCOUNTS_AND_SOURCES = "pref_gaming_accounts_and_sources"
     const val ID_SCREENSAVER = "pref_gaming_screensaver"
     const val ID_GAME_AWAKE = "pref_gaming_game_awake"
-    const val ID_LAUNCH_SOUND_EXPERIMENT = "pref_gaming_launch_sound_experiment"
     const val ID_UI_MODE = "pref_gaming_ui_mode"
     const val ID_CONSOLE_SYSTEMS = "pref_gaming_console_systems"
     const val ID_EMULATORS = "pref_gaming_emulators"
@@ -83,7 +79,6 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_BATTERY = "pref_gaming_system_battery"
     const val ID_SYSTEM_LEAVE_UI_MODE = "pref_gaming_system_leave_ui_mode"
     const val ID_SYSTEM_SWITCH_MODE = "pref_gaming_system_switch_mode"
-    const val ID_SYSTEM_OPEN_SETTINGS = "pref_gaming_system_open_settings"
     const val ID_SYSTEM_DND = "pref_gaming_system_dnd"
     const val ID_SYSTEM_DND_GRANT = "pref_gaming_system_dnd_grant"
     const val ID_SYSTEM_ADAPTIVE = "pref_gaming_system_adaptive"
@@ -99,12 +94,46 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_RESTART = "pref_gaming_system_restart"
     const val ID_AUDIO_OUTPUT = "pref_gaming_audio_output"
     const val ID_ORIENTATION = "pref_screen_orientation_gaming"
+
+    /**
+     * The Quick Menu's and the companion's Display "Screen orientation": the mode droidtop is in now, where
+     * [ID_ORIENTATION] (Gaming's own settings page) is always Gaming's (Droidtop/tracker#571 row 34: the shared row
+     * edited Gaming's orientation from Standard and Desktop too).
+     */
+    const val ID_ORIENTATION_HERE = "pref_screen_orientation_current"
     const val ID_PERFORMANCE_MODE = "pref_gaming_performance_mode"
     const val ID_SYSTEM_MIC_MUTE = "pref_gaming_system_mic_mute"
     const val ID_SYSTEM_FLASHLIGHT = "pref_gaming_system_flashlight"
     const val ID_SYSTEM_LOCATION = "pref_gaming_system_location"
     const val ID_SYSTEM_WIFI = "pref_gaming_system_wifi"
     const val ID_PRIVACY_DASHBOARD = "action_privacy_dashboard"
+
+    /**
+     * Screen orientation for the mode droidtop is in now ([Modes.lastMode]), stored under that mode's own key
+     * (`pref_screen_orientation_<mode>`, the key ScreenOrientationPrefs applies; Gaming has no portrait). Quick
+     * Menu and companion only ([ID_ORIENTATION_HERE]).
+     */
+    private fun currentModeOrientationItem(context: Context): ChoiceItem {
+        val mode = Mode.byId(Modes.lastMode(context)) ?: Mode.GAMING
+        val key = "pref_screen_orientation_" + mode.id
+        val options = buildList {
+            add(ChoiceOption("follow", "Follow device"))
+            if (mode != Mode.GAMING) {
+                add(ChoiceOption("portrait", "Portrait"))
+                add(ChoiceOption("portrait_flipped", "Portrait (flipped)"))
+            }
+            add(ChoiceOption("landscape", "Landscape"))
+            add(ChoiceOption("landscape_flipped", "Landscape (flipped)"))
+        }
+        return ChoiceItem(
+            id = ID_ORIENTATION_HERE,
+            title = "Screen orientation",
+            subtitle = "In ${mode.label} mode",
+            options = options,
+            current = CatalogPrefs.prefs(context).getString(key, "follow"),
+            onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(key, value).apply() },
+        )
+    }
 
     private val TIMEOUT_OPTIONS = dev.droidtop.runtime.systemstatus.SystemControls.SCREEN_TIMEOUTS
     const val ID_DOWNLOADS = "pref_gaming_downloads"
@@ -260,18 +289,6 @@ object GamingSettingsCatalog {
                                 runCatching { GameAwakeMode.valueOf(value) }.getOrDefault(GameAwakeMode.NEVER_SLEEP),
                             )
                         },
-                    ),
-                )
-                // A test, for tracking down the burst of static some people hear when a game starts
-                // (docs/SPEC.md "Launch audio hand-off", tracker#160). Remove once the cause is fixed.
-                add(
-                    ChoiceItem(
-                        id = ID_LAUNCH_SOUND_EXPERIMENT,
-                        title = "Launch sound test",
-                        subtitle = null,
-                        options = LaunchSoundVariant.entries.map { ChoiceOption(it.name, it.label) },
-                        current = LaunchSoundExperiment.variant(context).name,
-                        onSelect = { ctx, value -> LaunchSoundExperiment.set(ctx, LaunchSoundPlan.parse(value)) },
                     ),
                 )
             },
@@ -504,28 +521,6 @@ object GamingSettingsCatalog {
                         run = launchComponent("dev.droidtop.app.ModeSwitcherActivity"),
                     ),
                 )
-                // The direct route into Gaming's own Settings section
-                // (docs/SPEC.md "One settings entry point"): Start/Menu
-                // and the R2 pill both open this menu, and until this row
-                // existed the only way from here into Settings was two
-                // hops through Switch mode -> Modes and settings, which
-                // lands on GLOBAL settings, not Gaming's own. Deep-links
-                // back into the already-running shell the same way Browse
-                // themes does (EXTRA_GAMING_START_SECTION, read by
-                // GamepadShell's own deepLinkToken effect) rather than a
-                // second settings surface.
-                add(
-                    ActionItem(
-                        id = ID_SYSTEM_OPEN_SETTINGS,
-                        title = "Settings",
-                        subtitle = "Gaming settings",
-                        run = launchComponent(
-                            "dev.droidtop.app.MainActivity",
-                            "dev.droidtop.app.EXTRA_MODE" to "gaming",
-                            "dev.droidtop.app.EXTRA_GAMING_START_SECTION" to "SETTINGS",
-                        ),
-                    ),
-                )
                 add(
                     ActionItem(
                         id = ID_SYSTEM_NETWORK,
@@ -712,6 +707,7 @@ object GamingSettingsCatalog {
                             onToggle = { ctx, on -> controls.setAutoRotate(ctx, on) },
                         ),
                     )
+                    add(currentModeOrientationItem(context))
                     add(
                         ChoiceItem(
                             id = ID_SYSTEM_TIMEOUT,
@@ -853,7 +849,15 @@ object GamingSettingsCatalog {
                         ),
                     )
                 } else {
-                    add(ActionItem(id = ID_SYSTEM_SLEEP, title = "Sleep", value = "Power button", run = {}))
+                    // A press says what to do instead of nothing (Droidtop/tracker#571 row 20).
+                    add(
+                        AsyncActionItem(
+                            id = ID_SYSTEM_SLEEP,
+                            title = "Sleep",
+                            value = "Power button",
+                            run = { _, _ -> "Press the power button to sleep. With the helper app droidtop can do it from here" },
+                        ),
+                    )
                 }
                 // The power menu (shut down, restart) belongs to the system; a plain app has no call that
                 // opens it. With a privilege provider (Shizuku or Sui, the `priv.shell` capability) the

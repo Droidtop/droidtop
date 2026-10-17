@@ -110,6 +110,15 @@ object GameUpdates {
             null
         }
 
+    /**
+     * The games with an update waiting, one per game, titled with the game's name: what Updates, the companion's Home
+     * and the Downloads widget all count (Droidtop/tracker#570, #571). A store row's update and a linked source's are
+     * on the game ([LibraryGameGroup.displayEntry]), never on a scanned entry alone, so counting raw entries found
+     * none. Not for the main thread: it groups the whole library.
+     */
+    fun waiting(entries: List<LibraryEntry>): List<LibraryEntry> =
+        LibraryGrouping.group(entries).map { it.displayEntry }.filter { !it.hidden && it.availableUpdate != null }
+
     /** "v0.9.6 is available": a version that starts with a digit gets its `v`, a name ("Final") does not. */
     fun line(available: String): String =
         (if (available.firstOrNull()?.isDigit() == true) "v$available" else available) + " is available"

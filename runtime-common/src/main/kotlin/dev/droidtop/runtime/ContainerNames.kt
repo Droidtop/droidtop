@@ -36,7 +36,7 @@ class ContainerNames(private val file: File) {
     /** Renames [id] after checking [name] against the other containers' names ([problemWith]). */
     fun rename(id: String, name: String, containers: List<ContainerInfo>) {
         val others = named(containers).filter { it.container.id != id }.map { it.displayName }
-        problemWith(name, others)?.let { error(it) }
+        problemWith(name, others)?.let { throw PlainFailure(it) }
         set(id, name.trim())
     }
 

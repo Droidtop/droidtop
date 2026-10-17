@@ -64,20 +64,26 @@ class UiModePasskeyActivity : ComponentActivity() {
         }
     }
 
-    /** The pad's A presses the focused key (as the D-pad's centre does) and B cancels. */
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean = when (event.keyCode) {
-        KeyEvent.KEYCODE_BUTTON_A -> super.dispatchKeyEvent(
+    /**
+     * The pad's confirm button presses the focused key (as the D-pad's centre does) and its cancel button cancels,
+     * the face-button swap applied ([org.pocketworkstation.pckeyboard.FaceKeys]).
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = when {
+        !isFaceKey(event.keyCode) -> super.dispatchKeyEvent(event)
+        org.pocketworkstation.pckeyboard.FaceKeys.isConfirm(event.keyCode) -> super.dispatchKeyEvent(
             KeyEvent(
                 event.downTime, event.eventTime, event.action, KeyEvent.KEYCODE_DPAD_CENTER, event.repeatCount,
                 event.metaState, event.deviceId, event.scanCode, event.flags, event.source,
             ),
         )
-        KeyEvent.KEYCODE_BUTTON_B -> {
+        org.pocketworkstation.pckeyboard.FaceKeys.isCancel(event.keyCode) -> {
             if (event.action == KeyEvent.ACTION_UP) finish()
             true
         }
         else -> super.dispatchKeyEvent(event)
     }
+
+    private fun isFaceKey(keyCode: Int) = keyCode == KeyEvent.KEYCODE_BUTTON_A || keyCode == KeyEvent.KEYCODE_BUTTON_B
 }
 
 @Composable

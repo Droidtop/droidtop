@@ -545,15 +545,9 @@ private fun GamepadShellBody(
     var displayChoice by remember {
         mutableStateOf<DisplayChoiceRequest?>(null)
     }
-    // The launch-static experiment's variant B (tracker#160): the theme's launch sample is held back from the
-    // A press until the launch is really dispatched, which is after this question has been answered.
-    val pendingLaunchSound = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
     androidx.compose.runtime.DisposableEffect(Unit) {
         dev.droidtop.library.LaunchDisplay.chooser = { options, canRemember, onChosen ->
             displayChoice = DisplayChoiceRequest(options, canRemember, onChosen)
-        }
-        dev.droidtop.library.LaunchDisplay.beforeDispatch = {
-            if (pendingLaunchSound.getAndSet(false)) EsDeNavigationSounds.play(UiSound.LAUNCH)
         }
         // The dispatch itself runs after the audio hand-off, so a failure
         // there arrives here rather than through library.launch.
@@ -563,7 +557,6 @@ private fun GamepadShellBody(
         }
         onDispose {
             dev.droidtop.library.LaunchDisplay.chooser = null
-            dev.droidtop.library.LaunchDisplay.beforeDispatch = null
             dev.droidtop.library.LaunchDisplay.onLaunchFailed = null
         }
     }
@@ -575,7 +568,7 @@ private fun GamepadShellBody(
         kotlinx.coroutines.flow.combine(
             androidx.compose.runtime.snapshotFlow { focusedHints.layerOpen },
             dev.droidtop.runtime.AudioHandOff.handedOff,
-            dev.droidtop.runtime.LaunchSoundPlan::silenced,
+            dev.droidtop.runtime.AudioHandOff::silenced,
         ).collectLatest { silenced ->
             dev.droidtop.runtime.AudioHandOff.setQuiet("modal layer open", silenced)
         }
@@ -590,10 +583,7 @@ private fun GamepadShellBody(
             },
             onCancel = {
                 displayChoice = null
-                // Backed out: nothing launches, so nothing stays held back or silenced (tracker#160).
                 dev.droidtop.runtime.AudioHandOff.mark("screen question cancelled")
-                pendingLaunchSound.set(false)
-                dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", false)
             },
         )
     }
@@ -666,18 +656,10 @@ private fun GamepadShellBody(
         // or not a launch transition is configured), so it lives here in
         // the ONE launch handler rather than per key-handling site.
         //
-        // The launch-static experiment (tracker#160, docs/SPEC.md "Launch
-        // audio hand-off") decides here when that sample sounds and whether
-        // the rest of droidtop's sound carries on: see LaunchSoundPlan.
-        val soundVariant = dev.droidtop.runtime.LaunchSoundExperiment.variant(context)
         dev.droidtop.runtime.AudioHandOff.mark(
             "A pressed on a game: launch begins; open: ${dev.droidtop.runtime.AudioHandOff.openStreams()}",
         )
-        if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtPress(soundVariant)) EsDeNavigationSounds.play(UiSound.LAUNCH)
-        if (dev.droidtop.runtime.LaunchSoundPlan.launchSoundAtDispatch(soundVariant)) pendingLaunchSound.set(true)
-        if (dev.droidtop.runtime.LaunchSoundPlan.quietFromPress(soundVariant)) {
-            dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", true)
-        }
+        EsDeNavigationSounds.play(UiSound.LAUNCH)
         scope.launch {
             launchError = null
             launching = entry
@@ -687,8 +669,6 @@ private fun GamepadShellBody(
             runCatching { library.launch(entry) }
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
-                    pendingLaunchSound.set(false)
-                    dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", false)
                     launching = null
                     missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
                     unknownProgram = it as? dev.droidtop.library.ProgramNotIdentified
@@ -704,12 +684,6 @@ private fun GamepadShellBody(
             // arrives sooner.
             kotlinx.coroutines.delay(2500)
             launching = null
-            // A launch that never reached the dispatch (and is not waiting on the screen question) leaves
-            // nothing silenced or held back by the launch-static experiment.
-            if (displayChoice == null && !dev.droidtop.runtime.AudioHandOff.handedOff.value) {
-                pendingLaunchSound.set(false)
-                dev.droidtop.runtime.AudioHandOff.setQuiet("A pressed", false)
-            }
         }
     }
     // What A actually decides (docs/SPEC.md 7i, redecided 2026-09-26): a
@@ -803,6 +777,14 @@ private fun GamepadShellBody(
                         // entry again, but only now that it really ended.
                         if (restart) onLaunch(entry)
                     }
+                }
+            },
+            // Kill: force-stopped at once (Library.killRunning); its outcome shows in the row like Quit's.
+            onKill = { entry ->
+                scope.launch {
+                    val outcome = library.killRunning(context, entry)
+                    quitOutcome = outcome
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) quickMenuOpen = false
                 }
             },
             onOpenLeftMenu = {
@@ -1325,10 +1307,11 @@ private fun GamepadShellBody(
                     modifier = Modifier
                         .fillMaxSize()
                         // While the launch screen covers the content, the screen under it
-                        // keeps its place but takes no presses; only Back gets through,
+                        // keeps its place but takes no presses; only what means Back gets through (the
+                        // pad's cancel button with the face-button swap applied, Escape, Back: FaceKeys),
                         // to leave a launch that never produces a window.
                         .onPreviewKeyEvent { event ->
-                            launching != null && event.nativeKeyEvent.keyCode !in LAUNCH_COVER_PASS_KEYS
+                            launching != null && !org.pocketworkstation.pckeyboard.FaceKeys.isCancel(event.nativeKeyEvent.keyCode)
                         },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -2168,22 +2151,39 @@ internal fun GamingSection.displayName(): String = when (this) {
  * frames until the node exists; gives up quietly after ~1s of frames
  * rather than looping forever on a theme whose view genuinely never
  * attaches one (ES-DWEE's widgetless system view is the real case).
+ *
+ * The Compose droidtop ships (1.9) no longer throws for an unattached
+ * requester: requestFocus() prints a warning and does nothing, and only
+ * requestFocus(FocusDirection) says whether focus was taken. Reading "did
+ * not throw" as "taken" ended the retries on the first frame, before a
+ * dialog's field existed, so the search opened with no field focused and
+ * typed keys went nowhere until a tap (console, 0.2.0-dev.2127). Success is
+ * now what Compose returns.
  */
 internal suspend fun requestFocusWhenAttached(
     focusRequester: androidx.compose.ui.focus.FocusRequester,
     tag: String,
 ) {
-    var attached = false
-    repeat(60) {
-        if (!attached) {
-            attached = runCatching { focusRequester.requestFocus() }.isSuccess
-            if (!attached) withFrameNanos {}
-        }
-    }
-    if (!attached) {
-        android.util.Log.w("droidtop.GamepadShell", "$tag focus never attached after 60 frames")
+    val taken = retryEachFrame(
+        attempts = FOCUS_ATTEMPTS,
+        attempt = { runCatching { focusRequester.requestFocus(androidx.compose.ui.focus.FocusDirection.Enter) }.getOrDefault(false) },
+        nextFrame = { withFrameNanos {} },
+    )
+    if (!taken) {
+        android.util.Log.w("droidtop.GamepadShell", "$tag focus never attached after $FOCUS_ATTEMPTS frames")
     }
 }
+
+/** Runs [attempt] once a frame until it returns true, at most [attempts] times; whether it ever did. Pure. */
+internal suspend fun retryEachFrame(attempts: Int, attempt: () -> Boolean, nextFrame: suspend () -> Unit): Boolean {
+    repeat(attempts) { i ->
+        if (attempt()) return true
+        if (i < attempts - 1) nextFrame()
+    }
+    return false
+}
+
+private const val FOCUS_ATTEMPTS = 60
 
 private sealed interface GameGroup {
     val key: String
@@ -3847,13 +3847,6 @@ private fun AppIconGrid(
 }
 
 private val APP_TILE_HEIGHT = 136.dp
-
-/** The keys the shell lets through while the launch screen covers it: the ones that mean Back. */
-private val LAUNCH_COVER_PASS_KEYS = setOf(
-    android.view.KeyEvent.KEYCODE_BACK,
-    android.view.KeyEvent.KEYCODE_BUTTON_B,
-    android.view.KeyEvent.KEYCODE_ESCAPE,
-)
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable

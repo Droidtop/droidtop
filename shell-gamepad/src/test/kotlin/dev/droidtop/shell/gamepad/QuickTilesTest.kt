@@ -132,7 +132,7 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `the tab is the System group plus the display-role rows, in that order`() {
+    fun `the tab is the System group plus the Android settings link, and not the display roles`() {
         val groups = listOf(
             CatalogGroup(
                 GamingSettingsCatalog.GROUP_GAMING, null,
@@ -140,6 +140,7 @@ class QuickTilesTest {
                     toggle(GamingSettingsCatalog.ID_SHOW_HINTS, true),
                     choice(GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET, 4),
                     choice(GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET, 2),
+                    toggle(GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS, false),
                 ),
             ),
             CatalogGroup(
@@ -148,14 +149,8 @@ class QuickTilesTest {
             ),
         )
         val ids = QuickTiles.systemGroups(groups).single().items.map { it.id }
-        assertEquals(
-            listOf(
-                GamingSettingsCatalog.ID_SYSTEM_DND,
-                GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
-                GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
-            ),
-            ids,
-        )
+        // The display roles are the Display tab's (DISPLAY_IDS).
+        assertEquals(listOf(GamingSettingsCatalog.ID_SYSTEM_DND, GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS), ids)
     }
 
     @Test
@@ -311,6 +306,7 @@ class QuickTilesTest {
             GamingSettingsCatalog.ID_SYSTEM_DND,
             GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
             GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
+            GamingSettingsCatalog.ID_ORIENTATION_HERE,
             GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH,
             GamingSettingsCatalog.ID_SYSTEM_AIRPLANE,
             GamingSettingsCatalog.ID_SYSTEM_POWER_MENU,
@@ -323,6 +319,8 @@ class QuickTilesTest {
                 GamingSettingsCatalog.GROUP_SYSTEM, "System",
                 ids.map { ActionItem(id = it, title = it, run = {}) },
             ),
+            // Gaming's own Screen orientation row (Settings) is not the Display tab's: that one follows the mode
+            // droidtop is in (ID_ORIENTATION_HERE, a System row; Droidtop/tracker#571 row 34).
             CatalogGroup(
                 GamingSettingsCatalog.GROUP_SCREENS, "Screens",
                 listOf(ActionItem(id = GamingSettingsCatalog.ID_ORIENTATION, title = "Screen orientation", run = {})),
@@ -338,7 +336,7 @@ class QuickTilesTest {
             listOf(
                 GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
                 GamingSettingsCatalog.ID_SYSTEM_TIMEOUT,
-                GamingSettingsCatalog.ID_ORIENTATION,
+                GamingSettingsCatalog.ID_ORIENTATION_HERE,
                 GamingSettingsCatalog.ID_DISPLAY_SWAP,
             ),
             idsOf(QuickSection.DISPLAY),

@@ -1078,6 +1078,9 @@ internal fun openContainers(context: Context) {
 /** `ContainersCatalog.SCREEN_ID` in :app, which this module cannot see. */
 private const val CONTAINERS_SCREEN_ID = "containers"
 
+/** `AppSettingsCatalogs.SCREEN_ROM_FOLDERS` in :app: the game folders, where an empty library is filled. */
+internal const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
+
 internal fun openModes(context: Context) {
     val intent = Intent(Intent.ACTION_MAIN).apply {
         component = ComponentName(context.packageName, "dev.droidtop.app.ModeSwitcherActivity")

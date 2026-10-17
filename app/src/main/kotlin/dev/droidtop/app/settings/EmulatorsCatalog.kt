@@ -1,5 +1,7 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.runtime.FailureText
+import dev.droidtop.runtime.PlainFailure
 import android.content.Context
 import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.consoles.BiosDatabase
@@ -215,7 +217,7 @@ object EmulatorsCatalog {
                                 id = "emulator_app_${app.packageName}",
                                 title = label,
                                 subtitle = "Can run ${names.size} " + (if (names.size == 1) "system" else "systems") +
-                                    (if (names.isEmpty()) "" else ": $shown") + ". Press A to open it for its own settings",
+                                    (if (names.isEmpty()) "" else ": $shown") + ". Opens it for its own settings",
                                 name = label,
                                 packageName = app.packageName,
                             )
@@ -453,7 +455,7 @@ object EmulatorsCatalog {
                 ActionItem(
                     id = "emulator_known_${system.id}_$pkg",
                     title = name,
-                    subtitle = if (isInstalled) pkg else "Not installed. Press A to get it.",
+                    subtitle = if (isInstalled) pkg else "Not installed. Choose it to get it.",
                     value = if (isInstalled) "Installed" else "Not installed",
                     run = if (isInstalled) ({ _ -> }) else AppSettingsCatalogs.installPackageAction(pkg),
                 )
@@ -627,14 +629,14 @@ object EmulatorsCatalog {
                 val n = input.read(buffer)
                 if (n < 0) break
                 out.write(buffer, 0, n)
-                require(out.size() <= dev.droidtop.runtime.tasks.ElevatedFiles.MAX_WRITE_BYTES) { "that file is too large to be a BIOS file" }
+                if (out.size() > dev.droidtop.runtime.tasks.ElevatedFiles.MAX_WRITE_BYTES) throw PlainFailure("that file is too large to be a BIOS file")
             }
             out.toByteArray()
-        } ?: error("the file could not be opened")
+        } ?: throw PlainFailure("the file could not be opened")
         val target = EmulatorSetup.biosTarget(bios, picked, EmulatorSetup.md5(bytes))
             .let { if (spec.biosFlat) it.substringAfterLast('/') else it }
         if (EmulatorSetup.write("$folder/$target", bytes)) "Added $target to $name's BIOS folder" else "Not added: droidtop could not write to $folder"
-    }.getOrElse { "Not added: ${it.message ?: it.javaClass.simpleName}" }
+    }.getOrElse { "Not added: ${FailureText.of("Emulators", it)}" }
 
     private fun settingItem(player: Player.AmStart, name: String, config: ConfigSpec, setting: ConfigSetting, configText: String?): CatalogItem {
         val reach = EmulatorSetup.writeReach(config.file)
@@ -711,9 +713,13 @@ object EmulatorsCatalog {
                             runCatching {
                                 val text = ctx.contentResolver.openInputStream(uri)?.use { input ->
                                     input.bufferedReader().readText()
-                                } ?: error("the file could not be opened")
+                                } ?: throw PlainFailure("the file could not be opened")
                                 CustomPlayerPrefs.importJson(ctx, text).message
-                            }.getOrElse { "Not added: this is not a players file (${it.message ?: it.javaClass.simpleName})" }
+                            }.getOrElse {
+                                val why = if (it is PlainFailure) FailureText.reason(it) else "this is not a players file"
+                                FailureText.of("Emulators", it)
+                                "Not added: $why"
+                            }
                         }
                     },
                 ),
@@ -875,9 +881,9 @@ object EmulatorsCatalog {
                                         runCatching {
                                             val text = CustomPlayerPrefs.shareJson(system.id, listOf(player))
                                             ctx.contentResolver.openOutputStream(uri, "wt")?.use { it.write(text.toByteArray()) }
-                                                ?: error("the file could not be opened")
+                                                ?: throw PlainFailure("the file could not be opened")
                                             "Saved ${player.name}"
-                                        }.getOrElse { "Not saved: ${it.message ?: it.javaClass.simpleName}" }
+                                        }.getOrElse { "Not saved: ${FailureText.of("Emulators", it)}" }
                                     }
                                 },
                             ),

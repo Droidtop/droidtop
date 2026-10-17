@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.runtime.FailureText
+import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
@@ -46,12 +48,13 @@ private const val SCRAPE_ALL_PC = "Scrape PC and engine games"
 // settings screen it opens now holds only Game folders, Windows games
 // and Downloads -- store accounts moved to the "Accounts and sources"
 // settings area.
-private const val PC_SETUP = "PC setup"
+// Opens the Game sources place (Droidtop/tracker#571 row 4: the "PC setup" screen of links is gone).
+private const val PC_SETUP = "Game sources"
 private const val SORT_BY = "Sort by"
 private const val FILTER = "Filter"
 private const val SYSTEM_SETTINGS = "System settings"
 private const val ORPHANS_FIND = "Find orphaned media"
-private const val ORPHANS_DELETE = "Delete orphaned media: press A again"
+private const val ORPHANS_DELETE = "Delete orphaned media"
 
 /**
  * The in-gamelist options overlay (the ES-DE GuiGamelistOptions
@@ -264,7 +267,7 @@ internal fun GamelistOptionsMenu(
                     status = if (report.isEmpty) {
                         report.describe()
                     } else {
-                        report.describe() + "\nPress A again to delete them."
+                        report.describe() + "\n${PressWords.againSentence} to delete them."
                     }
                     orphansArmed = !report.isEmpty
                     busy = false
@@ -293,7 +296,7 @@ internal fun GamelistOptionsMenu(
                     status = withContext(Dispatchers.IO) {
                         runCatching {
                             dev.droidtop.library.consoles.PlatformDatabases.refresh(context) { status = it }
-                        }.getOrElse { "Update failed: ${it.message}" }
+                        }.getOrElse { "Update failed: ${FailureText.of("GamelistOptions", it)}" }
                     }
                     busy = false
                 }
@@ -449,7 +452,7 @@ internal fun GamelistOptionsMenu(
             } else {
                 actions.forEachIndexed { index, label ->
                     MenuRow(
-                        title = label,
+                        title = if (label == ORPHANS_DELETE) "$label: ${PressWords.again}" else label,
                         selected = index == focusIndex,
                         danger = label == ORPHANS_DELETE,
                         onClick = {

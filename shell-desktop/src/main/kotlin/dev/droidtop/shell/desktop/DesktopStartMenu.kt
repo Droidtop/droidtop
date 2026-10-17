@@ -22,6 +22,7 @@ import dev.droidtop.library.TaskbarPins
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.integrations.PluginShelves
 import dev.droidtop.library.scraper.isPcOrEngineGame
+import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.Place
 import dev.droidtop.library.settings.SocialBadge
 import dev.droidtop.library.settings.UiModePrefs
@@ -238,7 +239,19 @@ internal fun StartMenu(
         if (entries == null || sections == null) {
             out.add(HostedRow(key = "library-loading", title = "Loading the library…", section = "Library", onSelect = {}))
         } else if (sections.isEmpty()) {
-            out.add(HostedRow(key = "library-empty", title = "Nothing in the library yet.", section = "Library", onSelect = {}))
+            // The way to fill it, not a row that does nothing (Droidtop/tracker#571 row 29).
+            out.add(
+                HostedRow(
+                    key = "library-empty",
+                    title = "Nothing in the library yet",
+                    subtitle = "Add a games folder",
+                    section = "Library",
+                    onSelect = {
+                        context.startActivity(CatalogScreenLink.intent(context, GAME_FOLDERS_SCREEN_ID))
+                        dismiss()
+                    },
+                ),
+            )
         } else {
             StartSection.entries.forEach { section ->
                 sections[section].orEmpty().forEach { item ->

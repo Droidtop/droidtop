@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -88,6 +89,9 @@ internal fun CompanionDisplayCards() {
         value = withContext(Dispatchers.IO) { readCards(context.applicationContext) }
     }
     val status = remember { mutableStateMapOf<Int, String>() }
+    // The numbers come down with the page: a Presentation left showing after its page is gone leaks its window.
+    val identifying = remember { IdentifyingScreens() }
+    DisposableEffect(identifying) { onDispose { identifying.close() } }
     val list = cards ?: run { CompanionNote("Reading…"); return }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.padding(vertical = 4.dp)) {
         list.forEach { card ->
@@ -119,7 +123,7 @@ internal fun CompanionDisplayCards() {
                 }
             }
         }
-        CompanionPill("Identify screens") { identifyScreens(context, list) }
+        CompanionPill("Identify screens") { identifying.show(context, list) }
     }
 }
 
@@ -186,25 +190,39 @@ private fun readCards(context: Context): List<DisplayCard> {
 
 /**
  * Shows a large number on every screen for a few seconds (a Presentation on each screen but Android's default, where
- * a message says it), so the person can tell which is which; TalkBack hears the list.
+ * a message says it), so the person can tell which is which; TalkBack hears the list. One set shows at a time: pressing
+ * again replaces it, and [close] takes it down when the page goes.
  */
-private fun identifyScreens(context: Context, cards: List<DisplayCard>) {
-    val manager = context.getSystemService(DisplayManager::class.java) ?: return
-    val shown = cards.mapIndexedNotNull { index, card ->
-        val number = index + 1
-        if (card.id == Display.DEFAULT_DISPLAY) {
-            dev.droidtop.library.settings.Notices.flash("Screen $number: ${card.name}", context = context.applicationContext)
-            null
-        } else {
-            manager.getDisplay(card.id)?.let { display ->
-                runCatching { NumberPresentation(context, display, number, card.name).apply { show() } }.getOrNull()
+private class IdentifyingScreens {
+    private var shown: List<Presentation> = emptyList()
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val timeout = Runnable { close() }
+
+    fun show(context: Context, cards: List<DisplayCard>) {
+        close()
+        val manager = context.getSystemService(DisplayManager::class.java) ?: return
+        shown = cards.mapIndexedNotNull { index, card ->
+            val number = index + 1
+            if (card.id == Display.DEFAULT_DISPLAY) {
+                dev.droidtop.library.settings.Notices.flash("Screen $number: ${card.name}", context = context.applicationContext)
+                null
+            } else {
+                manager.getDisplay(card.id)?.let { display ->
+                    runCatching { NumberPresentation(context, display, number, card.name).apply { show() } }.getOrNull()
+                }
             }
         }
+        handler.postDelayed(timeout, IDENTIFY_MS)
+        // TalkBack hears every screen's number and name.
+        if (context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isEnabled == true) {
+            dev.droidtop.library.settings.Notices.flash(cards.mapIndexed { i, c -> "Screen ${i + 1}: ${c.name}" }.joinToString(". "), context = context.applicationContext)
+        }
     }
-    android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ shown.forEach { runCatching { it.dismiss() } } }, IDENTIFY_MS)
-    // TalkBack hears every screen's number and name.
-    if (context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isEnabled == true) {
-        dev.droidtop.library.settings.Notices.flash(cards.mapIndexed { i, c -> "Screen ${i + 1}: ${c.name}" }.joinToString(". "), context = context.applicationContext)
+
+    fun close() {
+        handler.removeCallbacks(timeout)
+        shown.forEach { runCatching { it.dismiss() } }
+        shown = emptyList()
     }
 }
 

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
@@ -120,8 +121,8 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
             result.status == ThemeDownloader.ThemeSyncStatus.CANCELLED) && entries.isEmpty()
         fetchStatus = when {
             result.status == ThemeDownloader.ThemeSyncStatus.CANCELLED && entries.isEmpty() ->
-                "Timed out waiting for a response. Check the connection, then press A to try again."
-            fetchFailed -> "Could not fetch the theme list. Check the connection, then press A to try again."
+                "Timed out waiting for a response. Check the connection, then ${PressWords.confirm} to try again."
+            fetchFailed -> "Could not fetch the theme list. Check the connection, then ${PressWords.confirm} to try again."
             entries.isEmpty() -> "The theme list is empty."
             else -> null
         }
@@ -162,7 +163,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     LaunchedEffect(entries) {
         if (entries.isEmpty()) return@LaunchedEffect
         repeat(10) {
-            if (runCatching { firstFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+            if (runCatching { firstFocus.requestFocus(androidx.compose.ui.focus.FocusDirection.Enter) }.getOrDefault(false)) return@LaunchedEffect
             kotlinx.coroutines.delay(50)
         }
     }

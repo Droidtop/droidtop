@@ -74,6 +74,7 @@ import dev.droidtop.shell.gamepad.RailColors
 import dev.droidtop.shell.gamepad.RailTab
 import dev.droidtop.shell.gamepad.TabRail
 import dev.droidtop.shell.gamepad.labelExtent
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -263,6 +264,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     DisposableEffect(lifecycle, view) {
         val scope = kotlinx.coroutines.MainScope()
         var job: kotlinx.coroutines.Job? = null
+        var back: kotlinx.coroutines.Job? = null
         fun mainDisplay(): Int = ForegroundShell.current()?.let { shell ->
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) shell.display?.displayId else null
         } ?: android.view.Display.DEFAULT_DISPLAY
@@ -283,7 +285,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                     job?.cancel()
                     job = null
                     val main = mainDisplay()
-                    scope.launch { dev.droidtop.runtime.tasks.PipMover.moveBack(main, companion) }
+                    back = scope.launch { dev.droidtop.runtime.tasks.PipMover.moveBack(main, companion) }
                 }
                 else -> Unit
             }
@@ -292,6 +294,10 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
         onDispose {
             lifecycle.lifecycle.removeObserver(observer)
             job?.cancel()
+            // The scope ends with the companion; a move back already under way finishes first, so video is not left
+            // on a screen that is going away.
+            val pending = back
+            if (pending == null || pending.isCompleted) scope.cancel() else pending.invokeOnCompletion { scope.cancel() }
         }
     }
     // A field on the other screen wants keys: the slab docks under whatever tab is showing while the request stands

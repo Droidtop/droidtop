@@ -254,7 +254,8 @@ class StoreSignInActivity : AppCompatActivity() {
     // pages and closes at the first; a step-by-step sign-in goes back to its
     // choices and closes from there.
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (event.keyCode == KeyEvent.KEYCODE_BUTTON_B || event.keyCode == KeyEvent.KEYCODE_BACK) {
+        // The pad's cancel button (the face-button swap applied, FaceKeys) or Back; a keyboard's Escape types on.
+        if (event.keyCode != KeyEvent.KEYCODE_ESCAPE && org.pocketworkstation.pckeyboard.FaceKeys.isCancel(event.keyCode)) {
             if (event.action == KeyEvent.ACTION_UP) {
                 val session = account
                 val view = webView

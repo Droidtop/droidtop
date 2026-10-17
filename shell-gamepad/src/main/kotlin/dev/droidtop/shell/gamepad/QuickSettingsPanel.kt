@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad
 
+import dev.droidtop.runtime.FailureText
+import dev.droidtop.shell.gamepad.input.PressWords
 import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -172,7 +174,7 @@ internal fun QuickSettingsPanel(
                 scope.launch {
                     statusById[action.id] = withContext(Dispatchers.IO) {
                         runCatching { action.run(context) { text -> statusById[action.id] = text } }
-                            .getOrElse { "Failed: ${it.message}" }
+                            .getOrElse { "Failed: ${FailureText.of("QuickSettings", it)}" }
                     }
                     refresh()
                 }
@@ -460,7 +462,7 @@ private fun QuickTileView(
         }
         Spacer(Modifier.weight(1f))
         Text(
-            if (confirmArmed) "${tile.label}: press A again" else tile.label,
+            if (confirmArmed) "${tile.label}: ${PressWords.again}" else tile.label,
             color = if (confirmArmed) MenuTokens.Danger else MenuTokens.OnSurface,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,

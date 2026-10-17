@@ -157,7 +157,11 @@ internal fun CompanionPinsSection() {
                 CompanionPill(if (editing) "Done" else "Edit pins", selected = editing) { editing = !editing }
             }
             if (editing) {
-                val choices = items.filter { ControlAccess.pinnable(uiMode, it.id) && it.id !in PinnedControls.STAND_INS.values }
+                val choices = items.filter {
+                    ControlAccess.pinnable(uiMode, it.id) && it.id !in PinnedControls.STAND_INS.values &&
+                        // A link is pinnable only when it can be opened from Home: it names a screen.
+                        (it !is dev.droidtop.library.settings.NestedScreenItem || it.registryId != null)
+                }
                     .map { it.id to it.title } + PinnedControls.STATS +
                     tiles.map { PinnedControls.tileId(it.key) to "${PluginTiles.cached(it)?.label ?: it.fallbackLabel} (${it.pluginLabel})" } +
                     appLabels.toList()
@@ -234,7 +238,16 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
                             onChanged()
                         }
                     }
-                    QuickPress.OPEN -> Unit
+                    // A pinned link opens its screen (Updates, Social, Android settings); it did nothing
+                    // (Droidtop/tracker#571 row 24). Only links with a screen id are offered for pinning.
+                    QuickPress.OPEN -> (item as? dev.droidtop.library.settings.NestedScreenItem)?.registryId?.let { id ->
+                        runCatching {
+                            context.startActivity(
+                                dev.droidtop.library.settings.CatalogScreenLink.intent(context, id)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        }
+                    }
                 }
             }
             .semantics {

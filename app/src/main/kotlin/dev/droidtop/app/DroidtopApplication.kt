@@ -130,6 +130,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         if (Build.VERSION.SDK_INT < 28 || Application.getProcessName() == packageName) {
             dev.droidtop.pluginhost.DownloadGate.install(this)
             dev.droidtop.library.stores.StoreAutoUpdates.requestLater(this)
+            // PC and engine games get their details by themselves (docs/SPEC.md 7h, Droidtop/tracker#568).
+            dev.droidtop.library.scraper.PcAutoScrape.requestLater(this)
         }
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).

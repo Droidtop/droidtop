@@ -64,7 +64,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
                 }
                 DroidtopWidgets.Row("${job.title} · $state", open)
             }
-            val updates = DroidtopWidgets.libraryGames(context).count { !it.hidden && it.availableUpdate != null }
+            val updates = dev.droidtop.library.GameUpdates.waiting(DroidtopWidgets.libraryGames(context)).size
             val updateRow = updates.takeIf { it > 0 }?.let { n ->
                 DroidtopWidgets.Row(
                     if (n == 1) "1 game update" else "$n game updates",

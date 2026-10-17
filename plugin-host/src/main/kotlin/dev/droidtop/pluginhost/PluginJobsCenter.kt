@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -394,14 +395,32 @@ object PluginJobsCenter {
             return
         }
         val previous = nativeJobs[jobId]
+        // A download reports for every chunk and file; each report used to rebuild the jobs list, persist it and wake
+        // every screen that reads it (the Home strip recomputed the whole library), which was the lag while a Steam
+        // game downloaded (console, 0.2.0-dev.2127). The row now moves at most [PROGRESS_INTERVAL_MS] apart, with
+        // the latest report always shown in the end and a new checkpoint kept at once, so a pause resumes from it.
+        val throttle = ProgressThrottle(PROGRESS_INTERVAL_MS) { System.currentTimeMillis() }
+        val trailing = java.util.concurrent.atomic.AtomicBoolean(false)
+        fun publish(report: ProgressThrottle.Report) {
+            // Progress that arrives after a pause belongs to the run being stopped, and a finished job keeps its end.
+            val now = find(jobId) ?: return
+            if (now.paused || now.done) return
+            update(jobId) { it.copy(percent = report.percent, statusLine = report.status, resumePayload = report.checkpoint ?: it.resumePayload) }
+        }
         nativeJobs[jobId] = nativeScope.launch(nativeDispatcher) {
             // A paused run may still be reaching its next boundary; never two at once.
             previous?.join()
             try {
                 val summary = runner(spec.args, checkpoint) { percent, status, newCheckpoint ->
-                    // Progress that arrives after a pause belongs to the run being stopped.
-                    if (find(jobId)?.paused == false) {
-                        update(jobId) { it.copy(percent = percent, statusLine = status, resumePayload = newCheckpoint ?: it.resumePayload) }
+                    val report = ProgressThrottle.Report(percent, status, newCheckpoint)
+                    if (throttle.offer(report)) {
+                        publish(report)
+                    } else if (trailing.compareAndSet(false, true)) {
+                        nativeScope.launch(nativeDispatcher) {
+                            delay(throttle.waitMs())
+                            trailing.set(false)
+                            throttle.takePending()?.let(::publish)
+                        }
                     }
                 }
                 finishNative(jobId, PluginResult.success(mapOf("summary" to summary)))
@@ -412,6 +431,9 @@ object PluginJobsCenter {
             }
         }
     }
+
+    /** The least time between two progress updates of one native job's row: about four a second. */
+    internal const val PROGRESS_INTERVAL_MS = 250L
 
     private fun finishNative(jobId: String, result: PluginResult) {
         update(jobId) {
