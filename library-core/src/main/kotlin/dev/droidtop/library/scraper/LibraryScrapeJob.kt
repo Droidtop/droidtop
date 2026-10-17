@@ -69,7 +69,9 @@ object LibraryScrapeJob {
     /** Registers the runner with the one jobs registry. Called once at process start. */
     fun register(context: Context) {
         val appContext = context.applicationContext
-        PluginJobsCenter.registerNative(KIND) { args, checkpoint, report -> execute(appContext, args, checkpoint, report) }
+        // A scrape stopped by a restart (a self-update) carries on from its checkpoint by itself; one the person paused
+        // waits for Resume (PluginJobsCenter.restore).
+        PluginJobsCenter.registerNative(KIND, reattachOnRestart = true) { args, checkpoint, report -> execute(appContext, args, checkpoint, report) }
     }
 
     /**
