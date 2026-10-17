@@ -80,12 +80,18 @@ class PerformanceMonitorTest {
     }
 
     @Test
-    fun `radio commands are the shell's own`() {
-        assertEquals(listOf("svc", "wifi", "enable"), SystemControls.radioCommand(SystemControls.Radio.WIFI, true))
-        assertEquals(listOf("svc", "bluetooth", "disable"), SystemControls.radioCommand(SystemControls.Radio.BLUETOOTH, false))
+    fun `radio commands try the current Android form first, then the older one`() {
         assertEquals(
-            listOf("cmd", "connectivity", "airplane-mode", "enable"),
-            SystemControls.radioCommand(SystemControls.Radio.AIRPLANE, true),
+            listOf(listOf("cmd", "bluetooth_manager", "enable"), listOf("svc", "bluetooth", "enable")),
+            SystemControls.radioCommands(SystemControls.Radio.BLUETOOTH, true),
+        )
+        assertEquals(
+            listOf(listOf("cmd", "wifi", "set-wifi-enabled", "disabled"), listOf("svc", "wifi", "disable")),
+            SystemControls.radioCommands(SystemControls.Radio.WIFI, false),
+        )
+        assertEquals(
+            listOf(listOf("cmd", "connectivity", "airplane-mode", "enable")),
+            SystemControls.radioCommands(SystemControls.Radio.AIRPLANE, true),
         )
     }
 

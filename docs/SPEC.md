@@ -3778,9 +3778,22 @@ a close path of its own. Every call works off the main thread.
     harmless.
 
 **Privileged actions go through Shizuku or Sui, from one of two backends (Droidtop/tracker#262, #72).** With a provider
-running, Wi-Fi, Bluetooth and airplane mode are switches in the catalog (the shell's own `svc` and `cmd
-connectivity` commands, `SystemControls.radioCommand`), on the Quick Menu and the companion alike; without one
-they are rows that open Android's own panel. Location, Mute microphone (AudioManager) and the flashlight (the
+running, Wi-Fi, Bluetooth and airplane mode are switches in the catalog, on the Quick Menu and the companion alike;
+without one they are rows that open Android's own panel. **A control never silently does nothing (decided
+2026-10-17, Droidtop/tracker#581).** The owner: "let's try to get shizuku-backed permissions working again", and
+the controls "fail to change. Shizuku should be able to make these changes, especially since on my device it's
+backed by root." Three causes, all fixed: the Bluetooth command was `svc bluetooth`, gone from Android 13 (now
+`SystemControls.radioCommands`: each Android version's own command first, `cmd bluetooth_manager`, `cmd wifi
+set-wifi-enabled`, `cmd connectivity airplane-mode`, then the older `svc` form); the switch ignored the command's
+answer (now `SystemControls.switchRadio`: a command that exits 0 and then waits up to 4 s for Android to report the
+state asked for, and anything short of that opens the radio's own Android screen with a notice); and the catalog
+asked about Shizuku before its binder reached the process, so the first menu after a start had links only (it now
+waits up to 1.5 s for the binder, `PrivilegedShell.connect`). At start (main process) `ElevatedGrants` takes,
+through Shizuku and only while droidtop lacks them, the grants the controls need, each checked again after: modify
+system settings (`appops set ... WRITE_SETTINGS allow`; brightness, auto-rotate and screen timeout), Bluetooth access
+(`pm grant ... BLUETOOTH_CONNECT`) and Do Not Disturb access (`cmd notification allow_dnd`). Each names droidtop's
+own package, so they are plain commands, not "Give another app access" (that switch stays for emulators). VPN has
+no shell switch and opens Android's VPN screen. Location, Mute microphone (AudioManager) and the flashlight (the
 camera torch) need no provider (Droidtop/tracker#414, slice C5).
 `PrivilegedShell` in `:runtime-common` is the only privileged boundary used by task management and the
 companion's controls; its capability snapshot names listing tasks, force-stop, shell commands (appops,
