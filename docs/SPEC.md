@@ -12968,6 +12968,14 @@ identity line.
   RetroAchievements is a read of the service with their own account, for
   display only (7h, "RetroAchievements"). Store cloud saves (§7g yardstick) are the
   store client's feature and are reached through its own screens.
+- **A folder that cannot be listed is not an empty folder.** The PC folder
+  walk (`PcFolderScan`) reads a folder Android will not list (`listFiles()`
+  null: access lost, a card or a share still coming up inside a mounted
+  root) as unwalked, "skipped: could not be listed, kept as it was"
+  (`UNREADABLE_FOLDER_REASON`), never as a folder with no games, and never
+  keeps that answer in its listing cache. Before, it read as empty, and the
+  next pass marked every game under it missing (console, 2026-10-17: "pc
+  folders: 0 games" half an hour after 86).
 - **An unmounted root is skipped by every walk, never emptied.** A games
   root whose storage volume is not mounted (`StorageManager`'s volume
   state, or the path failing to list) is skipped by an ordinary scan and

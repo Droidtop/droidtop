@@ -524,4 +524,24 @@ class PcFolderScanTest {
         assertFalse(GameEngineDetector.engineOwnsInstall(File(temp.root, "Humble/old_windows"), defs))
         assertEquals("Old.exe", GameExecutableResolver.windowsExecutable(File(temp.root, "Humble/old_windows"))?.name)
     }
+
+    @Test
+    fun `a folder Android will not list is kept as it was, never read as holding no games`() {
+        // Console, 2026-10-17: "pc folders: 0 games" half an hour after 86. An unlistable folder (access lost, a share
+        // still coming up) read as empty marked every game in it missing.
+        game("Studio/Some Game")
+        val studio = File(temp.root, "Studio")
+        studio.setReadable(false)
+        try {
+            org.junit.Assume.assumeTrue("needs a user that cannot read the folder", studio.listFiles() == null)
+            val top = PcFolderScan.scanTopLevel(studio, defs)
+            assertTrue(top.skipped)
+            assertTrue(top.games.isEmpty())
+            assertEquals(listOf(studio), top.skips.folders(PcFolderScan.UNREADABLE_FOLDER_REASON))
+        } finally {
+            studio.setReadable(true)
+        }
+        // Readable again, it is walked as before.
+        assertEquals(1, PcFolderScan.scanTopLevel(studio, defs).games.size)
+    }
 }
