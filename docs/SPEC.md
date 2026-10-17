@@ -12228,9 +12228,17 @@ install path, community compatibility, and the store cover when the
 folder has no ES-DE artwork of its own. The store id is what lets
 `withScrapedMetadata` also read back a `game_metadata` row scraped
 while the game was still a separate `pc` entry. Identity and routing
-stay the engine entry's: its id (the folder), its title, its kind, and
-a null `systemId` rather than `"pc"`, so it keeps grouping under its
-engine's system.
+stay the engine entry's: its id (the folder), its kind, and a null
+`systemId` rather than `"pc"`, so it keeps grouping under its engine's
+system. **Its name is the store's** (`StoreInstall.title`), also as the
+game's name when the library groups it (where the person has not named it
+themselves): a store names the install folder after the title with the
+characters a card refuses dropped, so the folder's name is not the game's
+(console, 0.2.0-dev.2129: "Love & Sex: Second Base" read "Love  Sex Second
+Base", and neither "love & sex" nor "love and sex" found it). A name made
+from a folder (`GameNaming.derive`, `displayName`) has one space where a
+run was, and a new install folder (`StoreFiles.folderName`) is made with
+one.
 
 `GameEngineDetector.detectGame` is the single-folder half of `scan`,
 extracted so the scan loop, `EngineGameProvider.resolveEntry` and the PC

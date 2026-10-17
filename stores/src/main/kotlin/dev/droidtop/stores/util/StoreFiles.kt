@@ -12,7 +12,10 @@ internal object StoreFiles {
      * more than ext4, SPEC 7g), or [fallback] when nothing is left.
      */
     fun folderName(title: String, fallback: String): String =
-        title.replace(UNSAFE, "").trim().trimEnd('.').ifBlank { fallback }
+        title.replace(UNSAFE, "").replace(SPACES, " ").trim().trimEnd('.').ifBlank { fallback }
+
+    // A dropped character between two words ("Love & Sex") leaves one space, not two.
+    private val SPACES = Regex(" {2,}")
 
     /**
      * The folder a NEW install of [title] goes in under its store's folder

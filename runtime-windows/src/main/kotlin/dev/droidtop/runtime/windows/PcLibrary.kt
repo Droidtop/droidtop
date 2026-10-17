@@ -780,7 +780,7 @@ object PcLibrary {
  * `GameEngineDetector.engineOwnsInstall`).
  */
 fun PcLibrary.Game.toStoreInstall(): StoreInstall? = installDir?.takeUnless { id.startsWith(PcLibrary.FLASHPOINT_PREFIX) }?.let { dir ->
-    StoreInstall(installDir = dir, pcInfo = toPcInfo(), artworkUri = artUrl)
+    StoreInstall(installDir = dir, pcInfo = toPcInfo(), artworkUri = artUrl, title = title)
 }
 
 /**

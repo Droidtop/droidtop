@@ -166,4 +166,34 @@ class StoreEngineGameTest {
             options.first { it.strategy == GameLaunchStrategy.ENGINEHOST }.state,
         )
     }
+
+    @Test
+    fun `a store-installed engine game is named and found by the store's own title`() {
+        // Console, 0.2.0-dev.2129: the folder a store made for "Love & Sex: Second Base" is "Love  Sex Second Base"
+        // (the characters a card refuses dropped), and the card read that; neither "love & sex" nor "love and sex"
+        // found it.
+        val install = File(tmp.root, "steamapps/common/Love  Sex Second Base")
+        File(install, "renpy").mkdirs()
+        File(install, "game").mkdirs()
+        File(install, "game/script.rpyc").createNewFile()
+        val store = storeInstall(install).copy(title = "Love & Sex: Second Base")
+        val entry = LibraryEntry(
+            id = install.absolutePath,
+            title = install.name,
+            kind = LibraryEntryKind.RENPY,
+        ).withStoreInstall(listOf(store).byInstallDir().forFolder(install))
+
+        assertEquals("Love & Sex: Second Base", entry.title)
+        val card = LibraryGrouping.group(listOf(entry), roots = listOf(tmp.root.absolutePath)).single()
+        assertEquals("Love & Sex: Second Base", card.game.name)
+        assertEquals("Love & Sex: Second Base", card.displayEntry.title)
+        assertTrue(StoreIdentity.matchesSearch(card.displayEntry.title, "love & sex"))
+        assertTrue(StoreIdentity.matchesSearch(card.displayEntry.title, "love and sex"))
+    }
+
+    @Test
+    fun `a name made from a folder has one space where a character was dropped`() {
+        assertEquals("Love Sex Second Base", GameNaming.displayName("Love  Sex Second Base"))
+        assertEquals("Love Sex Second Base", GameNaming.derive("Love  Sex Second Base").name)
+    }
 }

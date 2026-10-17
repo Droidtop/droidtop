@@ -424,6 +424,11 @@ data class StoreInstall(
     val pcInfo: PcInfo,
     /** The store's own cover/icon URL, used only when the folder has no ES-DE artwork. */
     val artworkUri: String? = null,
+    /**
+     * The store's own name for the game ("Love & Sex: Second Base"). The install folder's name cannot carry it: a
+     * store names the folder with the characters a card refuses dropped ("Love  Sex Second Base").
+     */
+    val title: String? = null,
 )
 
 /**
@@ -472,16 +477,19 @@ internal fun Map<String, StoreInstall>.forFolder(folder: File): StoreInstall? =
  * null, which is the normal case: a game in the user's own games folder
  * has no store behind it and must be unaffected by any of this.
  *
- * Identity and routing stay the engine entry's own — [LibraryEntry.id],
- * [LibraryEntry.title] and [LibraryEntry.kind] are what send this game
- * to enginehost, and [LibraryEntry.systemId] stays null rather than
- * becoming `"pc"` so the entry keeps grouping under its engine's system
- * rather than under the Wine-launched PC one. Everything that was only
- * ever known store-side comes across.
+ * Identity and routing stay the engine entry's own — [LibraryEntry.id]
+ * and [LibraryEntry.kind] are what send this game to enginehost, and
+ * [LibraryEntry.systemId] stays null rather than becoming `"pc"` so the
+ * entry keeps grouping under its engine's system rather than under the
+ * Wine-launched PC one. Everything that was only ever known store-side
+ * comes across, the store's name for the game included: the title is the
+ * store's, not the install folder's (console, 0.2.0-dev.2129: "Love & Sex:
+ * Second Base" read "Love  Sex Second Base" and no search found it).
  */
 internal fun LibraryEntry.withStoreInstall(install: StoreInstall?): LibraryEntry {
     if (install == null) return this
     return copy(
+        title = install.title?.trim()?.takeIf { it.isNotEmpty() } ?: title,
         pcInfo = pcInfo ?: install.pcInfo,
         // Local ES-DE media wins over a store CDN URL, same precedence
         // withScrapedMetadata already applies: what is on disk is the
