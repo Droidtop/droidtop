@@ -13017,7 +13017,10 @@ identity line.
   count; a `.cue` likewise hides the `.bin` files it names. A folder
   that holds only one game's discs and their `.m3u` is that game (§7h's
   container rules), and a disc image nothing names remains an entry of
-  its own.
+  its own. Built in the one walk every console scan uses (`RomScanWalk.namedDiscs`, 2026-10-17, from the gap
+  review: until then nothing read a playlist and a game of several discs was listed once per file, up to 7
+  times); an `.m3u` lists one path per line, `#` lines skipped, a `.cue` names its tracks in `FILE` lines, paths
+  are relative to the playlist's folder with either slash, and names compare without case.
 - **An archive is an entry as it is.** Emulators read `.zip` and `.7z`
   themselves, so droidtop never extracts one. Identity for a
   single-file `.zip` is the inner file's CRC32, read from the archive's
@@ -14090,9 +14093,12 @@ copied:
   (`foldPcLibrary`, the tab's fold), finds the game an entry belongs to, and
   calls back to launch (the host's own launch path) and to open Downloads (the
   place, in the screen host).
-- Standard's Games grid: A on a PC or engine game takes the rule; a long press
-  or Options > Game page opens the page (a long press on any other game still
-  pins it). Desktop's Start menu: a tap takes the rule; Y or a long press opens
+- Standard's Games grid: A on a PC or engine game takes the rule; Options > Game page opens the page. A long
+  press on any game opens its options, the sheet Select opens (gap review, 2026-10-17; it used to pin a console
+  game outright): Game page for a PC or engine game, Add to / Remove from favourites (`Library.toggleFavorite`),
+  Hide / Show again (`GameHiding`, the `game_metadata` row's `hidden`, the one Hidden rule; the store mirror
+  `StoreHidden` writes through it too), Pin to home screen, Game folders. A change shows at once and the
+  library's next read carries it. Desktop's Start menu: a tap takes the rule; Y or a long press opens
   the row's menu, whose Game page row opens the page over the desktop. Retro
   games keep their themed detail in Gaming only.
 

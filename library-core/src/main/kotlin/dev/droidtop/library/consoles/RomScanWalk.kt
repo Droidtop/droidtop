@@ -173,8 +173,44 @@ object RomScanWalk {
                 }
             }
         }
-        return RomScanResult(files.sortedBy { it.absolutePath }, skipped, stoppedAt)
+        val kept = if (extensions == null) files else files.minus(namedDiscs(files) { readLinesOrNull(it) })
+        return RomScanResult(kept.sortedBy { it.absolutePath }, skipped, stoppedAt)
     }
+
+    /**
+     * The files among [files] that a playlist names, so they are that playlist's discs and not entries of their own
+     * (docs/SPEC.md 7g, "A multi-disc game is its `.m3u`"): every disc an `.m3u` lists, one path per line with `#`
+     * lines skipped, and every track a `.cue` names in a `FILE "..."` line. Paths are relative to the playlist's own
+     * folder; either slash is accepted, and names compare without case, as a FAT or exFAT card stores them. A disc
+     * nothing names stays an entry. [read] gives a playlist's lines, or null when it cannot be read (then it names
+     * nothing). Pure apart from [read], for the JVM tests.
+     */
+    internal fun namedDiscs(files: List<File>, read: (File) -> List<String>?): Set<File> {
+        val byKey = files.associateBy { key(it) }
+        val named = mutableSetOf<File>()
+        for (playlist in files) {
+            val names = when (playlist.extension.lowercase()) {
+                "m3u" -> read(playlist).orEmpty().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("#") }
+                "cue" -> read(playlist).orEmpty().mapNotNull { line -> CUE_FILE.find(line.trim())?.let { it.groupValues[1].ifEmpty { it.groupValues[2] } } }
+                else -> continue
+            }
+            for (name in names) {
+                val path = name.replace('\\', '/')
+                val disc = if (path.startsWith("/")) File(path) else File(playlist.parentFile, path)
+                byKey[key(disc)]?.takeIf { it != playlist }?.let { named += it }
+            }
+        }
+        return named
+    }
+
+    // A cue sheet's track line: FILE "Game (Track 1).bin" BINARY, or an unquoted name without spaces.
+    private val CUE_FILE = Regex("""^FILE\s+(?:"([^"]+)"|(\S+))""", RegexOption.IGNORE_CASE)
+
+    private fun key(file: File): String = file.toPath().normalize().toString().lowercase()
+
+    // A playlist is a few lines; one that is not text or not readable names nothing.
+    private fun readLinesOrNull(file: File): List<String>? =
+        runCatching { if (file.length() > 64 * 1024) null else file.readLines() }.getOrNull()
 
     /** [walk]'s file list only, for callers with nothing to report. */
     fun romFiles(systemFolder: File, extensions: Set<String>): List<File> =

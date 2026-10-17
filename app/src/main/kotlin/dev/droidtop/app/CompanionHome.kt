@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import dev.droidtop.shell.gamepad.labelCase
 import dev.droidtop.library.format.ValueFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -105,7 +106,7 @@ internal fun CompanionSectionHeader(label: String, open: Boolean, summary: Strin
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 4.dp),
         ) {
             Text(
-                label.uppercase(),
+                label.labelCase(),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp),
                 color = if (open) colors.onBackground else colors.onSurfaceVariant,
             )
@@ -149,7 +150,7 @@ internal fun CompanionHomeSectionFrame(
 @Composable
 private fun Eyebrow(text: String) {
     Text(
-        text.uppercase(),
+        text.labelCase(),
         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold, letterSpacing = 1.5.sp),
         color = MaterialTheme.colorScheme.primary,
         maxLines = 1,

@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import dev.droidtop.shell.gamepad.labelCase
 import android.content.Context
 import android.util.LruCache
 import androidx.compose.foundation.Image
@@ -229,7 +230,7 @@ internal fun CompanionAppPicker(onClose: () -> Unit) {
                         section.title?.let { title ->
                             item(key = "h:$title") {
                                 Text(
-                                    title.uppercase(),
+                                    title.labelCase(),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = colors.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 6.dp).semantics { heading() },

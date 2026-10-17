@@ -514,4 +514,4 @@ private const val TEXTURE_STRENGTH = 0.6f
  * capitals, or as written when Sentence case or High contrast is on (docs/SPEC.md 7k, "High contrast").
  * Never for data a person typed or a game's own name (tracker#532: theme transforms never apply to data).
  */
-internal fun String.labelCase(): String = dev.droidtop.library.settings.ReadingPrefs.caps(this, GamingTheme.palette.sentenceCase)
+fun String.labelCase(): String = dev.droidtop.library.settings.ReadingPrefs.caps(this, GamingTheme.palette.sentenceCase)
