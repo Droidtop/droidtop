@@ -3,6 +3,7 @@ package dev.droidtop.library.scraper
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcInfo
+import dev.droidtop.library.consoles.GameMetadataEntity
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -114,12 +115,58 @@ class PcScrapeHonestyTest {
     }
 
     @Test
-    fun `games a store identifies are worked through first, each group by id`() {
+    fun `store and folder games are worked through together, by id`() {
         val folder = LibraryEntry(id = "/g/A Folder Game", title = "A", kind = LibraryEntryKind.RENPY)
         val steam = LibraryEntry(id = "steam:440", title = "TF2", kind = LibraryEntryKind.WINE_PROFILE)
         val gog = LibraryEntry(id = "gog:5", title = "G", kind = LibraryEntryKind.WINE_PROFILE)
-        val ordered = listOf(folder, steam, gog).sortedBy(PcScraper::orderKey).map { it.id }
-        assertEquals(listOf("gog:5", "steam:440", "/g/A Folder Game"), ordered)
+        val ordered = listOf(steam, gog, folder).sortedBy(PcScraper::orderKey).map { it.id }
+        assertEquals(listOf("/g/A Folder Game", "gog:5", "steam:440"), ordered)
+    }
+
+    @Test
+    fun `a checkpoint the store-first order saved still resumes`() {
+        val folder = LibraryEntry(id = "/g/B Folder Game", title = "B", kind = LibraryEntryKind.RENPY)
+        // A store-games checkpoint ("0|") sorts before every key: the pass starts again, and games with details are passed over.
+        assertTrue(PcScraper.orderKey(folder) > "0|steam:440")
+        // A folder-games checkpoint ("1|") resumes after the same game.
+        assertTrue(PcScraper.orderKey(folder) > "1|/g/A Folder Game")
+        assertFalse(PcScraper.orderKey(folder) > "1|/g/B Folder Game")
+    }
+
+    @Test
+    fun `an engine game with a developer and a genre but no description still needs its details`() {
+        val renpy = LibraryEntry(id = "/g/Some VN", title = "Some VN", kind = LibraryEntryKind.RENPY, artworkUri = "file:///g/Some VN/icon.png")
+        val detected = GameMetadataEntity(id = renpy.id, developer = "A Studio", genre = "Visual novel")
+        assertTrue(PcScraper.picked(renpy, detected, scrapedCover = false, filter = ScrapeFilter.MISSING_METADATA))
+        assertTrue(PcScraper.picked(renpy, detected, scrapedCover = false, filter = ScrapeFilter.MISSING_ANY))
+        val described = detected.copy(description = "A story.")
+        assertFalse(PcScraper.picked(renpy, described, scrapedCover = false, filter = ScrapeFilter.MISSING_ANY))
+        // A Windows game's exe icon is not a cover.
+        val wine = LibraryEntry(id = "wine:1", title = "W", kind = LibraryEntryKind.WINE_PROFILE, artworkUri = "file:///icon.ico")
+        assertTrue(PcScraper.picked(wine, described.copy(id = wine.id), scrapedCover = false, filter = ScrapeFilter.MISSING_ARTWORK))
+        assertFalse(PcScraper.picked(wine, described.copy(id = wine.id), scrapedCover = true, filter = ScrapeFilter.MISSING_ANY))
+    }
+
+    @Test
+    fun `the Steam store's search gives names and app ids, apps only`() {
+        // The response SHAPE of store.steampowered.com/api/storesearch, as the store's own search box receives it.
+        val response = JSONObject(
+            """
+            {"total": 3, "items": [
+              {"type": "app", "name": "Doki Doki Literature Club!", "id": 698780, "tiny_image": "https://x/capsule.jpg",
+               "metascore": "", "platforms": {"windows": true, "mac": true, "linux": false}},
+              {"type": "sub", "name": "Doki Doki Literature Club Plus! Bundle", "id": 5},
+              {"type": "app", "name": "Doki Doki Literature Club Plus!", "id": 1388880}
+            ]}
+            """.trimIndent(),
+        )
+        val found = SteamStoreClient.parseSearch(response) as ScrapeLookup.Found
+        assertEquals(listOf(698780, 1388880), found.value.map { it.ids.steamAppId })
+        assertEquals("Steam store", found.value.first().sourceLabel)
+        // The exact, unique bar picks the one app named exactly the folder's title.
+        val decision = PcMatching.decide("Doki Doki Literature Club", found.value) as PcMatching.Decision.Confident
+        assertEquals(698780, decision.match.ids.steamAppId)
+        assertEquals(ScrapeLookup.NoMatch, SteamStoreClient.parseSearch(JSONObject("""{"total": 0, "items": []}""")))
     }
 
     @Test

@@ -3,9 +3,9 @@ package dev.droidtop.library.scraper
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class ScreenScraperPacingTest {
+class RequestPacingTest {
     @Test fun `requests keep the minimum interval`() {
-        val pacing = ScreenScraperPacing(11_000)
+        val pacing = RequestPacing(11_000)
         assertEquals(0, pacing.delayBeforeRequest(100))
         pacing.requestStarted(100)
         assertEquals(11_000, pacing.delayBeforeRequest(100))
@@ -13,7 +13,7 @@ class ScreenScraperPacingTest {
     }
 
     @Test fun `quota refusals back off exponentially and ordinary refusals do not`() {
-        val pacing = ScreenScraperPacing(0)
+        val pacing = RequestPacing(0)
         pacing.response(403, "Forbidden", 100)
         assertEquals(0, pacing.delayBeforeRequest(100))
         pacing.response(429, "quota exceeded", 100)
