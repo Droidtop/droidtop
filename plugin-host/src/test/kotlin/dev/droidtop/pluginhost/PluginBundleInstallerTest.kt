@@ -422,7 +422,7 @@ class PluginBundleInstallerTest {
         DroidtopSigningRoot.withPinned(core.publicKey) {
             val record = (install(bundle, pluginsRoot) as PluginInstallResult.Installed).record
             assertEquals(Sha256.hex(core.publicKey.encoded), record.approvedKeySha256)
-            assertTrue(File(pluginsRoot, "droidtop.statustile/manifest.jws").isFile)
+            assertTrue(File(PluginBundleInstaller.installedDir(pluginsRoot, record), "manifest.jws").isFile)
             assertTrue(verifyInstalled(pluginsRoot, record) == null)
             // A user key claiming the official origin changes nothing: the official origin resolves to Core first.
             val forger = freshKeyPair()
