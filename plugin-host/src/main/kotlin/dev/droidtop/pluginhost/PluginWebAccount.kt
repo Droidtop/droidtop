@@ -92,8 +92,8 @@ object PluginWebAccount {
         val result = WebSessionActivity.show(context, WebSessionRequest(record.manifest.label, mode, url, domains, stored, done))
         val session = result.session?.takeIf { result.completed && it.cookies.isNotEmpty() } ?: return false
         // A sign-in may be another account, whose name the plugin tells again; a browser check keeps the name it had.
-        val account = if (need == Need.SIGN_IN) null else stored?.account
-        vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, session.copy(account = account).toJson())
+        val name = if (need == Need.SIGN_IN) null else stored?.account
+        vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, session.copy(account = name).toJson())
         if (account.grant == GrantState.ASK) PluginGrants.forContext(context).set(record.manifest.id, WebSessions.PERMISSION, GrantState.GRANTED)
         return true
     }
