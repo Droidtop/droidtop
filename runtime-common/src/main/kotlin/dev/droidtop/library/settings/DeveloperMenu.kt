@@ -7,7 +7,7 @@ import android.content.Context
  * worth moving a lot of the advanced stuff (like the containment checker) to a dev menu"). Off until the person taps
  * droidtop's version in Settings, About droidtop, [TAPS] times, as Android's own developer options are found; then a
  * Developer row opens [SCREEN] and the rows that are only for finding faults show where they belong (a plugin's
- * Advanced details, Technical details, launch tests, logs). Turned off again from the menu itself.
+ * Advanced details, Technical details, logs). Turned off again from the menu itself.
  *
  * One catalog, not a second settings system: a builder adds a developer row only when [on].
  */
