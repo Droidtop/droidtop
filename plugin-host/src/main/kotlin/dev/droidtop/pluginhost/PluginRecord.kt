@@ -100,6 +100,12 @@ data class PluginRecord(
     }
 
     companion object {
+        /** How [PluginBundleInstaller.verifyInstalled] ends the reason for a file that does not match its record. */
+        const val CHANGED_ON_DISK = "changed on disk since approval"
+
+        /** [PluginBundleInstaller.verifyInstalled]'s reason when the version's files are not there at all. */
+        const val FILES_MISSING = "plugin files are missing"
+
         /**
          * A field written as `value ?: JSONObject.NULL` (description,
          * entryClass, disabledReason) comes back from org.json's own
@@ -182,6 +188,17 @@ data class PluginRecord(
     fun afterHostUpdate(hostBuild: Int): PluginRecord? {
         if (hostBuild <= 0 || disabledReason == null || disabledBuild == hostBuild || trust != PluginTrustState.APPROVED) return null
         return copy(enabled = true, disabledReason = null, disabledDetail = null, disabledBuild = 0)
+    }
+
+    /**
+     * Disabled only because its files did not match this record ("... changed on disk since approval", "plugin files are
+     * missing"): it comes back by itself once they verify again ([PluginStore.recoverVerified]). A plugin the person
+     * switched off, or one stopped for any other reason, is not.
+     */
+    fun recoverableOnceVerified(): Boolean {
+        val reason = disabledReason ?: return false
+        return !enabled && trust == PluginTrustState.APPROVED &&
+            (reason.endsWith(CHANGED_ON_DISK) || reason == FILES_MISSING)
     }
 
     /** Whether this plugin is actually allowed to run right now, folding every gate into one check so a runner never has to re-derive it. */

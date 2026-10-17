@@ -92,7 +92,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // services and schedules the person switched on (E8, E9). Both read manifests off the main thread.
         dev.droidtop.library.integrations.PluginStandardHooks.install(this)
         // A plugin an older droidtop disabled after a failure is tried again by this build (PluginStore.retryAfterHostUpdate).
-        kotlin.concurrent.thread(name = "plugin-retry") { dev.droidtop.pluginhost.PluginStore.retryAfterHostUpdate(this) }
+        kotlin.concurrent.thread(name = "plugin-retry") {
+            dev.droidtop.pluginhost.PluginStore.retryAfterHostUpdate(this)
+            // One disabled by a check that ran mid-update, before installs were atomic, comes back once it verifies.
+            dev.droidtop.pluginhost.PluginStore.recoverVerified(this)
+        }
         PluginBackgroundHost.install(this)
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.

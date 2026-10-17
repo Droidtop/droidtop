@@ -188,7 +188,7 @@ object PluginPanels {
                 leadGroups = tiles,
                 extraGroups = { _, _ -> more },
                 panel = true,
-                iconFile = PluginStore.iconFile(context, record.manifest),
+                iconFile = PluginStore.iconFile(context, record),
             )
         } else {
             CatalogScreen(
@@ -198,7 +198,7 @@ object PluginPanels {
                 groups = { ctx -> withContext(Dispatchers.IO) { tiles(ctx) + more } },
                 indexGroups = { emptyList() },
                 panel = true,
-                iconFile = PluginStore.iconFile(context, record.manifest),
+                iconFile = PluginStore.iconFile(context, record),
             )
         }
     }

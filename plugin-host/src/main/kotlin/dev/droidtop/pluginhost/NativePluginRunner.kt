@@ -200,7 +200,7 @@ class NativePluginRunner(
             opened += broker
             names += ContainedFiles.BROKER
             // The run-anyway mark and the holes are droidtop's alone: a plugin's own manifest can never carry them.
-            val manifest = JSONObject(java.io.File(PluginStore.payloadDirFor(appContext, id), "manifest.json").readText()).apply {
+            val manifest = JSONObject(java.io.File(PluginStore.payloadDirFor(appContext, record), "manifest.json").readText()).apply {
                 remove(PluginDangers.RUN_UNPROTECTED_KEY)
                 if (PluginDangers.allowedThisRun(id)) put(PluginDangers.RUN_UNPROTECTED_KEY, true)
                 remove(PluginTiers.HOLES_KEY)

@@ -483,7 +483,7 @@ object PluginCatalogScreen {
             val rows = index.origins.flatMap { origin ->
                 val state = PluginCatalog.originState(current, origin, userKeys)
                 val kind = kinds[sourceId] ?: ALL_KINDS
-                origin.plugins.filter { matchesQuery(it, origin.origin, query) && (kind == ALL_KINDS || it.category == kind) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id], installed[plugin.id]?.let { PluginStore.iconFile(context, it.manifest) }) }
+                origin.plugins.filter { matchesQuery(it, origin.origin, query) && (kind == ALL_KINDS || it.category == kind) }.map { plugin -> rowFor(current, origin, state, plugin, installed[plugin.id], installed[plugin.id]?.let { PluginStore.iconFile(context, it) }) }
             }
             groups += CatalogGroup(
                 id = "plugins_catalog_list",

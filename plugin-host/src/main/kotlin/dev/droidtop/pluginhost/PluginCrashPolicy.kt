@@ -59,7 +59,7 @@ class PluginCrashPolicy(
         val (tier, refusal) = tierFor(record, userInitiated)
         if (tier == null) return refusal ?: "plugin failed to load"
         val id = record.manifest.id
-        val dir = PluginStore.payloadDirFor(context, id)
+        val dir = PluginStore.payloadDirFor(context, record)
         if (runner.load(record, dir.absolutePath, tier)) {
             PluginDangers.loaded(id)
             return null
@@ -285,8 +285,14 @@ class PluginCrashPolicy(
     private suspend fun gateOnVerification(record: PluginRecord): PluginResult? = withContext(Dispatchers.IO) {
         // Hashes every payload file: disk work, so never on the caller's (possibly main) thread.
         val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
-        val problem = PluginBundleInstaller.verifyInstalled(PluginStore.root(context), record, userKeys)
-        if (problem == null) return@withContext null
+        val root = PluginStore.root(context)
+        val problem = PluginBundleInstaller.verifyInstalled(root, record, userKeys) ?: return@withContext null
+        // The record this call was given may be one an update has replaced since: only the version the plugin is on
+        // now decides whether it is disabled (docs/SPEC.md 12a, "Trust over updates").
+        val current = PluginBundleInstaller.readRecord(root, record.manifest.id)
+        if (current != null && current.archiveDigest != record.archiveDigest && PluginBundleInstaller.verifyInstalled(root, current, userKeys) == null) {
+            return@withContext PluginResult.failure("${record.manifest.label} was updated during this call; try again")
+        }
         PluginStore.disableWithReason(context, record.manifest.id, problem.reason)
         PluginResult.failure(problem.reason)
     }

@@ -37,7 +37,7 @@ internal object ContainedFiles {
      * time ([PythonRuntimeManager.containedFiles]): call it off the main thread.
      */
     fun forRecord(context: Context, record: PluginRecord): Result {
-        val dir = PluginStore.payloadDirFor(context, record.manifest.id)
+        val dir = PluginStore.payloadDirFor(context, record)
         return when (record.manifest.kind) {
             PluginKind.NATIVE_BUNDLE -> {
                 val jar = File(dir, CLASSES)

@@ -103,6 +103,10 @@ class PluginBundleInstallerTest {
 
     private fun freshKeyPair() = TestPki.ec()
 
+    /** The classes.jar of the version the installed record runs. */
+    private fun installedJar(root: File): File =
+        File(PluginBundleInstaller.installedDir(root, PluginBundleInstaller.readRecord(root, "testorigin.statustile")!!), "classes.jar")
+
     /** The old format's manifest signature: base64 DER ECDSA over the manifest bytes. */
     private fun legacySignature(key: PrivateKey, data: ByteArray): String =
         Base64.getEncoder().encodeToString(Signature.getInstance("SHA256withECDSA").apply { initSign(key); update(data) }.sign())
@@ -117,7 +121,7 @@ class PluginBundleInstallerTest {
             assertTrue(result is PluginInstallResult.Installed)
             val record = (result as PluginInstallResult.Installed).record
             assertEquals(PluginTrustState.PENDING, record.trust)
-            val extracted = File(pluginsRoot, "testorigin.statustile/classes.jar")
+            val extracted = installedJar(pluginsRoot)
             assertTrue(extracted.isFile)
             assertTrue(extracted.readBytes().contentEquals(classesJarBytes))
         }
@@ -130,11 +134,11 @@ class PluginBundleInstallerTest {
         trusting("testorigin", pair) {
             val big = ByteArray(3 * 1024 * 1024) { (it * 31).toByte() }
             assertTrue(install(buildBundle("testorigin", pair, payloadBytes = big), pluginsRoot) is PluginInstallResult.Installed)
-            assertTrue(File(pluginsRoot, "testorigin.statustile/classes.jar").readBytes().contentEquals(big))
+            assertTrue(installedJar(pluginsRoot).readBytes().contentEquals(big))
             val refused = install(buildBundle("testorigin", pair, tamperPayloadAfterSigning = true), pluginsRoot)
             assertTrue(refused is PluginInstallResult.Refused)
             // A refused update leaves the installed version exactly as it was.
-            assertTrue(File(pluginsRoot, "testorigin.statustile/classes.jar").readBytes().contentEquals(big))
+            assertTrue(installedJar(pluginsRoot).readBytes().contentEquals(big))
             assertEquals(emptyList<String>(), pluginsRoot.parentFile.list().orEmpty().filter { it.startsWith(".plugin-install-") })
         }
     }
@@ -269,7 +273,7 @@ class PluginBundleInstallerTest {
             // access could always do, or this write fails with
             // FileNotFoundException (permission denied) before ever reaching
             // the check this test is actually exercising.
-            val edited = File(pluginsRoot, "testorigin.statustile/classes.jar")
+            val edited = installedJar(pluginsRoot)
             edited.setWritable(true)
             edited.writeBytes("edited on disk".toByteArray())
             val problem = verifyInstalled(pluginsRoot, record)
@@ -460,8 +464,89 @@ class PluginBundleInstallerTest {
             // The publisher wraps the same key in a certificate: the update installs over it, approval carried over.
             val update = (install(buildBundle("testorigin", pair, payloadBytes = "payload, version two".toByteArray()), pluginsRoot) as PluginInstallResult.Installed).record
             assertEquals(PluginTrustState.APPROVED, update.trust)
-            assertTrue(!File(dir, "manifest.sig").exists())
             assertTrue(verifyInstalled(pluginsRoot, update) == null)
+            // The old version stays while a caller may still hold its record; the next update removes it, data kept.
+            assertTrue(verifyInstalled(pluginsRoot, legacy) == null)
+            File(dir, "data").mkdirs()
+            File(dir, "data/kept.txt").writeText("mine")
+            val third = (install(buildBundle("testorigin", pair, payloadBytes = "payload, version three".toByteArray()), pluginsRoot) as PluginInstallResult.Installed).record
+            assertTrue(verifyInstalled(pluginsRoot, third) == null)
+            assertTrue(!File(dir, "manifest.sig").exists() && !File(dir, "manifest.json").exists() && !File(dir, "classes.jar").exists())
+            assertEquals("mine", File(dir, "data/kept.txt").readText())
+        }
+    }
+
+    @Test
+    fun `a check during an update sees one whole version, never the new manifest against the old record`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        trusting("testorigin", pair) {
+            val first = (install(buildBundle("testorigin", pair), pluginsRoot) as PluginInstallResult.Installed).record
+            approve(pluginsRoot, first)
+            val approved = PluginBundleInstaller.readRecord(pluginsRoot, first.manifest.id)!!
+            val second = (install(buildBundle("testorigin", pair, payloadBytes = "version two".toByteArray()), pluginsRoot) as PluginInstallResult.Installed).record
+            // A caller that read the record before the update still verifies the version it read, and the new record its own.
+            assertTrue(verifyInstalled(pluginsRoot, approved) == null)
+            assertTrue(verifyInstalled(pluginsRoot, second) == null)
+            assertTrue(PluginBundleInstaller.installedDir(pluginsRoot, approved) != PluginBundleInstaller.installedDir(pluginsRoot, second))
+            // The third version drops the first; the second stays for whoever read it last.
+            val third = (install(buildBundle("testorigin", pair, payloadBytes = "version three".toByteArray()), pluginsRoot) as PluginInstallResult.Installed).record
+            assertTrue(!PluginBundleInstaller.versionDir(pluginsRoot, first.manifest.id, first.archiveDigest).exists())
+            assertTrue(verifyInstalled(pluginsRoot, second) == null)
+            assertTrue(verifyInstalled(pluginsRoot, third) == null)
+        }
+    }
+
+    @Test
+    fun `an update keeps the plugin's data and contexts`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        trusting("testorigin", pair) {
+            val first = (install(buildBundle("testorigin", pair), pluginsRoot) as PluginInstallResult.Installed).record
+            val dir = File(pluginsRoot, first.manifest.id)
+            File(dir, "data").mkdirs()
+            File(dir, "data/settings.json").writeText("{}")
+            File(dir, "contexts").mkdirs()
+            File(dir, "contexts/a.json").writeText("[]")
+            install(buildBundle("testorigin", pair, payloadBytes = "version two".toByteArray()), pluginsRoot)
+            install(buildBundle("testorigin", pair, payloadBytes = "version three".toByteArray()), pluginsRoot)
+            assertEquals("{}", File(dir, "data/settings.json").readText())
+            assertEquals("[]", File(dir, "contexts/a.json").readText())
+        }
+    }
+
+    @Test
+    fun `a version's files are read-only and a re-install of the same bytes keeps its folder`() {
+        val pair = freshKeyPair()
+        val pluginsRoot = tmp.newFolder("plugins")
+        trusting("testorigin", pair) {
+            val first = (install(buildBundle("testorigin", pair), pluginsRoot) as PluginInstallResult.Installed).record
+            val dir = PluginBundleInstaller.installedDir(pluginsRoot, first)
+            assertTrue(dir.walkTopDown().filter { it.isFile }.none { it.canWrite() })
+            val jar = File(dir, "classes.jar")
+            val before = jar.lastModified()
+            Thread.sleep(20)
+            val again = (install(buildBundle("testorigin", pair), pluginsRoot) as PluginInstallResult.Installed).record
+            assertEquals(first.archiveDigest, again.archiveDigest)
+            assertEquals(before, jar.lastModified())
+            assertTrue(verifyInstalled(pluginsRoot, again) == null)
+        }
+    }
+
+    @Test
+    fun `a plugin disabled because its files did not match comes back once they verify`() {
+        val pair = freshKeyPair()
+        trusting("testorigin", pair) {
+            val pluginsRoot = tmp.newFolder("plugins")
+            val record = (install(buildBundle("testorigin", pair), pluginsRoot) as PluginInstallResult.Installed).record
+                .copy(trust = PluginTrustState.APPROVED, enabled = false, disabledReason = "manifest.json changed on disk since approval")
+            assertTrue(record.recoverableOnceVerified())
+            assertTrue(record.copy(disabledReason = PluginRecord.FILES_MISSING).recoverableOnceVerified())
+            // Switched off by the person, crashed, or never approved: not this.
+            assertTrue(!record.copy(disabledReason = null).recoverableOnceVerified())
+            assertTrue(!record.copy(disabledReason = "crashed").recoverableOnceVerified())
+            assertTrue(!record.copy(trust = PluginTrustState.PENDING).recoverableOnceVerified())
+            assertTrue(verifyInstalled(pluginsRoot, record) == null)
         }
     }
 }
