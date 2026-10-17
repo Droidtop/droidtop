@@ -126,17 +126,21 @@ object StoreSaves {
         if (store == null) {
             // No store cloud for this game: the paired computers, when there are any.
             if (Computers.list(context).isEmpty()) return@withContext null
-            val prefix = locator?.locate(context, entryId) ?: return@withContext null
+            val prefix = prefixOf(context, entryId) ?: return@withContext null
             return@withContext runCatching { ComputerSaves.sync(context, entryId, title, phase, prefix) }
                 .onFailure { Log.w(TAG, "Computer save sync failed for $entryId", it) }
                 .getOrElse { SaveSyncResult("Saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
         }
-        val prefix = locator?.locate(context, entryId) ?: return@withContext null
+        val prefix = prefixOf(context, entryId) ?: return@withContext null
         runCatching { store.syncSaves(context, entryId.substringAfter(':'), phase, prefix, title, resolver) }
             .onFailure { Log.w(TAG, "Cloud save sync failed for $entryId", it) }
             .getOrElse { SaveSyncResult("Cloud saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
             ?.also { result -> if (!result.unresolved) record(context, entryId, failed = result.failed) }
     }
+
+    /** Where [entryId]'s saves are synced: the folder droidtop gives Enginehost for it, else the Wine runtime's prefix. */
+    private fun prefixOf(context: Context, entryId: String): WinePrefixLocation? =
+        EnginehostSaves.prefixFor(context, entryId) ?: locator?.locate(context, entryId)
 
     /**
      * When a game's saves last matched its store's cloud ([okAt]) and when a

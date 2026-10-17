@@ -206,6 +206,14 @@
           platform delivers AppWidgetManager broadcasts to a receiver with
           no intent-filter category exposed for others to target).
         -->
+        <!-- Enginehost's game-ended report, sent to this package alone: uploads a store game's cloud saves (tracker#580). -->
+        <receiver
+            android:name="dev.droidtop.app.EnginehostGameEndedReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.enginehost.GAME_ENDED" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name="dev.droidtop.app.ContinuePlayingWidgetProvider"
             android:label="@string/widget_continue_playing_title"
