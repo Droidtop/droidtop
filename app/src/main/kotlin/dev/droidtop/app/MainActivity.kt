@@ -632,9 +632,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // See ForegroundShell for why that is the only route available.
         ForegroundShell.set(this)
         // Home on this display brings the shell back (dev.droidtop.runtime.HomeDisplays).
-        dev.droidtop.runtime.HomeDisplays.shellShown(
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) display?.displayId else android.view.Display.DEFAULT_DISPLAY,
-        )
+        val shellDisplay = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) display?.displayId else android.view.Display.DEFAULT_DISPLAY
+        dev.droidtop.runtime.HomeDisplays.shellShown(shellDisplay)
+        dev.droidtop.runtime.HomeDisplays.used(shellDisplay)
     }
 
     override fun onPause() {

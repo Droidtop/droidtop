@@ -14,6 +14,14 @@ class HomeDisplaysTest {
     }
 
     @Test
+    fun `Home pressed while playing on a screen Android starts no home on brings the main screen, not the companion`() {
+        // Console: the DP screen (6) has no FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS, so its Home arrives on display 0.
+        assertEquals(Target.MAIN, HomeDisplays.targetFor(pressedOn = 0, companionDisplayId = 0, shellDisplayId = 6, lastUsedDisplayId = 6))
+        // The person was on the built-in screen (an app opened over the companion): the companion comes back.
+        assertEquals(Target.COMPANION, HomeDisplays.targetFor(pressedOn = 0, companionDisplayId = 0, shellDisplayId = 6, lastUsedDisplayId = 0))
+    }
+
+    @Test
     fun `in the usual arrangement the shell is on the built-in screen and the companion on the second`() {
         assertEquals(Target.MAIN, HomeDisplays.targetFor(pressedOn = 0, companionDisplayId = 2, shellDisplayId = 0))
         assertEquals(Target.COMPANION, HomeDisplays.targetFor(pressedOn = 2, companionDisplayId = 2, shellDisplayId = 0))

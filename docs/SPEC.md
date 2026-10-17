@@ -623,7 +623,14 @@ holds HOME (it looks there first, `RootWindowContainer.resolveSecondaryHomeActiv
 `SecondaryDisplayActivity` the secondary home; the "Set as home" step covers both. A generic query for
 `SECONDARY_HOME` (`cmd package resolve-activity`) still answers Android's chooser, because more than one app
 declares the category, and that is not the window manager's answer. On a display Android does not decorate it
-starts no home at all; there droidtop's own placement (§4c) keeps its surface.
+starts no home at all; there droidtop's own placement (§4c) keeps its surface, and a Home press made there arrives
+at the default display's HOME. The console's DP screen is such a display (FLAG_PRESENTATION and FLAG_TRUSTED, no
+FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS), so droidtop notes the display the person last used (`HomeDisplays.used`: one
+of its screens taking focus there, the companion covered by an app there, a game it launched there). Home arriving at
+the default display after the person was on the shell's other screen brings the main screen back there, not the
+companion. No setting is needed for it. Android's developer option "Force desktop mode", which makes Android decorate
+secondary displays and start their home, is a hint for a person who wants Android's own Home on every screen; droidtop
+never requires it.
 
 Built 2026-09-25 (`HomeRolePrefs.isDroidtopHome`, `homeRequestIntent`),
 after the Android 14 rig answered "droidtop's own launcher" in setup and
