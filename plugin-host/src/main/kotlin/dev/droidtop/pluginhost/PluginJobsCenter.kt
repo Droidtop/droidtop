@@ -94,6 +94,11 @@ object PluginJobsCenter {
         val hold: String? = null,
         /** The person resumed a held job themselves: the policy leaves it alone for the rest of its life. */
         val policyOverride: Boolean = false,
+        /**
+         * A restored job the person had paused themselves. Every restored job comes back paused; one that was
+         * running when droidtop stopped (a restart, a self-update) is not this, and a reattaching kind resumes it.
+         */
+        val pausedByPerson: Boolean = false,
     )
 
     /**
@@ -170,7 +175,9 @@ object PluginJobsCenter {
         state.update { current -> (restored.filter { old -> current.none { it.jobId == old.jobId } } + current).distinctBy { it.jobId } }
         // A job that carries on from what it left on disk (a download's partial file) is not left paused for
         // the person to resume: it runs again from its checkpoint.
-        restored.filter { it.nativeKind in nativeReattachKinds && it.paused && !it.done && nativeSpecs.containsKey(it.jobId) }.forEach { entry ->
+        // One the person paused stays paused: only the restart stopped the others (console, 0.2.0-dev.2129: "Get details
+        // for PC games" came back Paused after the self-update and waited for Resume).
+        restored.filter { it.nativeKind in nativeReattachKinds && it.paused && !it.pausedByPerson && !it.done && nativeSpecs.containsKey(it.jobId) }.forEach { entry ->
             // A download the policy was holding stays held while the policy still says wait.
             val kind = entry.nativeKind
             if (entry.hold != null && kind != null && kind in downloadKinds && admission(kind, nativeSpecs[entry.jobId]?.args.orEmpty()) != null) return@forEach
@@ -590,6 +597,7 @@ object PluginJobsCenter {
             put(JSONObject().put("id", e.jobId).put("plugin", e.pluginId).put("label", e.pluginLabel).put("title", e.title)
                 .put("started", e.startedAtMs).put("percent", e.percent).put("status", e.statusLine).put("kind", e.kind)
                 .put("pausable", e.pausable).put("resumable", e.resumable).put("payload", e.resumePayload).put("paused", true)
+                .put("pausedByPerson", e.paused && e.hold == null)
                 .put("native", e.nativeKind).put("hold", e.hold).put("capability", spec?.capability?.id ?: e.capability?.id)
                 .put("args", JSONObject().apply { (spec?.args ?: nativeSpec?.args)?.forEach { (k, v) -> put(k, v) } }))
         }
@@ -604,6 +612,8 @@ object PluginJobsCenter {
             resumable = o.optBoolean("resumable"), resumePayload = o.optString("payload").takeIf { it.isNotEmpty() && it != "null" }, paused = true,
             nativeKind = o.optString("native").takeIf { it.isNotEmpty() && it != "null" },
             hold = o.optString("hold").takeIf { it.isNotEmpty() && it != "null" },
+            // An entry saved before this was recorded reads as running when droidtop stopped, as restore treated it.
+            pausedByPerson = o.optBoolean("pausedByPerson", false),
         ).also { entry ->
             val cap = PluginCapability.fromId(o.optString("capability"))
             val args = buildMap { o.optJSONObject("args")?.let { a -> a.keys().forEach { put(it, a.optString(it)) } } }

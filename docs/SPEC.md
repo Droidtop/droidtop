@@ -13746,6 +13746,14 @@ stays direct.
   scrape filter, so the filter cannot shift the position) and then through the
   rest of the queue. A folder that is gone from the queue starts from the top.
   A pause or cancel lands between two games, never inside one.
+- **A restart does not pause it.** A scrape that was running when droidtop
+  stopped (a restart, a self-update) carries on from its checkpoint by itself
+  (`registerNative(..., reattachOnRestart = true)`); one the person paused
+  stays paused until Resume. The jobs list records which it was
+  (`Entry.pausedByPerson`, saved with the job), so every reattaching kind,
+  downloads included, keeps a pause the person made across a restart
+  (console, 0.2.0-dev.2129: "Get details for PC games" came back Paused after
+  the self-update and waited for Resume).
 - **The rate limit is not the job's business.** Every request still goes
   through `ScreenScraperClient`'s anonymous pacing and quota backoff, so a
   paused, resumed or restarted job cannot ask faster than a fresh one.

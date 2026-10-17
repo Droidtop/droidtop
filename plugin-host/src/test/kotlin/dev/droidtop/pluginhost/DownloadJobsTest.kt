@@ -458,6 +458,35 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun aReattachingJobThePersonPausedStaysPausedAfterARestart() = runBlocking {
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val starts = CopyOnWriteArrayList<String?>()
+        val running = CompletableDeferred<Unit>()
+        PluginJobsCenter.registerNative("test_reattach_paused", reattachOnRestart = true) { _, checkpoint, report ->
+            starts += checkpoint
+            report(30, "Working", "item-3")
+            running.complete(Unit)
+            kotlinx.coroutines.awaitCancellation()
+        }
+        val id = PluginJobsCenter.startNative(null, "test_reattach_paused", "A scrape")!!
+        withTimeout(5_000) { running.await() }
+        assertTrue(PluginJobsCenter.pause(id))
+
+        // The process dies while the person has it paused.
+        val stored = PluginJobsCenter.encodeEntries(listOf(PluginJobsCenter.find(id)!!))
+        PluginJobsCenter.cancel(id)
+        withTimeout(5_000) { while (PluginJobsCenter.find(id) != null) delay(5) }
+        val restored = PluginJobsCenter.decodeEntries(stored).single()
+        assertTrue(restored.pausedByPerson)
+
+        PluginJobsCenter.restore(listOf(restored))
+        delay(200)
+        assertTrue("paused by the person, it waits for Resume", PluginJobsCenter.find(id)!!.paused)
+        assertEquals(listOf<String?>(null), starts.toList())
+        PluginJobsCenter.cancel(id)
+    }
+
+    @Test
     fun aDownloadIsPlacedInTheGameFolderUnderItsTargetName() {
         val downloaded = File(dir, "downloads/acquire_1_Game.zip").also { it.parentFile.mkdirs(); it.writeText("zip") }
         val games = File(dir, "games/snes")
