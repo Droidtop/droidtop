@@ -13227,6 +13227,11 @@ the same care as the art.
   and engine game only a real cover counts (`PcScraper.hasCover`): a cover a scrape filed (the row's artwork path,
   on disk), a `covers` image for it in downloaded_media, or a `cover` or `coverv` image in the game's own folder.
   "Games missing artwork" and "Games missing artwork or metadata" both read it (`PcScraper.picked`).
+- **A scraped cover is what shows (decided 2026-10-17).** The owner, from the console: Bare Witness got its box art
+  from a scrape but still showed its Ren'Py image. An engine game's own picture is often its engine's icon or
+  splash, so for engine games, as for PC store and Wine games, a scraped cover on disk is shown before the picture the
+  folder brought (`withScrapedMetadata(scrapedArtworkFirst = true)` in `GameEngineDetector`). Console ROMs keep their
+  ES-DE art first.
 - **One game asked for is scraped (decided 2026-10-17).** The owner, from the console, after the art fix: a
   single game's Scrape (its page, or its options menu) still said `nothing matches the "Games missing artwork" scrape
   filter`. The filter is for passes over the library; a game the person picks by name is scraped whatever it says

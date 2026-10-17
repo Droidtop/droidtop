@@ -40,8 +40,9 @@ suspend fun List<LibraryEntry>.withScrapedMetadata(
     alsoUnderId: (LibraryEntry) -> String? = { null },
     /**
      * Whether a scraped cover beats the art the provider brought. False for
-     * every provider whose art is a real cover on disk (the ES-DE layout,
-     * a game folder's own image). True for `PcGameProvider`: what a store
+     * every provider whose art is a real cover on disk (the ES-DE layout of
+     * console ROMs). True for engine games (`GameEngineDetector`), whose folder
+     * picture is often the engine's own icon or splash, and for `PcGameProvider`: what a store
      * row or a Wine shortcut carries is Steam's 32-pixel client icon, an
      * Epic icon or the icon inside an .exe, and a cover the user scraped or
      * picked by hand would otherwise never be seen at all.

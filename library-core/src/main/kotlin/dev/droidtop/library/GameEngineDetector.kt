@@ -1683,6 +1683,9 @@ class EngineGameProvider(
                 // longer exists, so without this fallback the scrape would
                 // look like it had been thrown away.
                 alsoUnderId = { it.pcInfo?.storeId },
+                // A scraped cover beats what the folder brought: an engine game's own picture is often its
+                // engine's icon or splash (a Ren'Py logo), not its cover (docs/SPEC.md 7h, "What counts as art").
+                scrapedArtworkFirst = true,
             )
 
     /**
