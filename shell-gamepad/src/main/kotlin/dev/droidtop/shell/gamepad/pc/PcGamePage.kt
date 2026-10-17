@@ -217,6 +217,9 @@ internal fun PcGamePage(
     val versions = remember(entry, siblings) { installedVersions(entry, siblings) }
     var linksToken by remember(entry.id) { mutableIntStateOf(0) }
     var editingSource by remember(entry.id) { mutableStateOf<UpdateSources.Source?>(null) }
+    // A linked source's record page (docs/SPEC.md 7g, "Getting an update"): the source, its record, the tab it opens on.
+    var viewingRecord by remember(entry.id) { mutableStateOf<Triple<UpdateSources.Source, String, RecordTab>?>(null) }
+    var updateStatus by remember(entry.id) { mutableStateOf<String?>(null) }
     val links by produceState<GameLinks?>(null, gameIds, linksToken) {
         value = if (library != null && isFolder) library.gameLinks(gameIds) else null
     }
@@ -301,7 +304,7 @@ internal fun PcGamePage(
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
     val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { dev.droidtop.library.format.ValueFormat.size(it) }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, links, updateSources, setVersion, fileVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, updateStatus, links, updateSources, setVersion, fileVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
         pageRows(
             entry, play, runner, siblings,
             origin = originText,
@@ -332,7 +335,11 @@ internal fun PcGamePage(
                 sourceRows(
                     sources = updateSources,
                     links = links,
-                    onEdit = { editingSource = it },
+                    // A linked source opens its record; an unlinked one, the sheet that links it.
+                    onEdit = { source ->
+                        val link = links?.link(source.key)
+                        if (link != null) viewingRecord = Triple(source, link.externalId, RecordTab.OVERVIEW) else editingSource = source
+                    },
                     onOpen = { url ->
                         runCatching {
                             context.startActivity(
@@ -359,6 +366,11 @@ internal fun PcGamePage(
                     null
                 },
             ),
+            // The update's row opens the record of the source that named it, at Downloads.
+            onOpenUpdate = updateSourceOf(updateSources, links, entry.availableUpdate)?.let { (source, id) ->
+                { viewingRecord = Triple(source, id, RecordTab.DOWNLOADS) }
+            },
+            updateStatus = updateStatus,
             onGetInstaller = { marker ->
                 val store = dev.droidtop.library.stores.StoreLibraries.byId(marker.storeId)
                 val page = store?.webPages?.accountLibrary
@@ -804,6 +816,32 @@ internal fun PcGamePage(
             onDismiss = { editingVersion = false },
         )
     }
+    val viewing = viewingRecord
+    if (viewing != null && library != null) {
+        SourceRecordPage(
+            library = library,
+            source = viewing.first,
+            externalId = viewing.second,
+            gameName = links?.gameName ?: entry.title,
+            newest = entry,
+            scope = scope,
+            say = { updateStatus = it },
+            onRelink = {
+                viewingRecord = null
+                editingSource = viewing.first
+            },
+            onOpen = { url ->
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+            onClose = { viewingRecord = null },
+            startTab = viewing.third,
+        )
+    }
     val linking = editingSource
     if (linking != null && library != null) {
         SourceLinkSheet(
@@ -1227,6 +1265,10 @@ private fun pageRows(
     onOpenLink: (String) -> Unit = {},
     // "Get the new installer" for a copy a store installed outside droidtop: its account library (docs/SPEC.md 7g).
     onGetInstaller: (dev.droidtop.library.StoreMarker) -> Unit = {},
+    // A folder game's update: the record page of the source that named it (docs/SPEC.md 7g, "Getting an update").
+    onOpenUpdate: (() -> Unit)? = null,
+    // What getting the update last said ("Downloading...", "Added Game v0.6. Copied 3 save files from Game v0.5").
+    updateStatus: String? = null,
     // The page's Details (docs/SPEC.md 7i, "The game page"): where it came from in full, its size on this device,
     // its cloud saves' row, the version the person set, and whether More is open.
     origin: String? = null,
@@ -1291,8 +1333,13 @@ private fun pageRows(
             PageFact(
                 "Update",
                 update,
-                subtitle = if (marker != null) "${GameUpdates.line(update)}. Get the new installer from your $markerStore library" else GameUpdates.line(update),
-                onActivate = marker?.let { m -> { onGetInstaller(m) } },
+                subtitle = when {
+                    marker != null -> "${GameUpdates.line(update)}. Get the new installer from your $markerStore library"
+                    updateStatus != null -> updateStatus
+                    onOpenUpdate != null -> "${GameUpdates.line(update)}. Get it from its source"
+                    else -> GameUpdates.line(update)
+                },
+                onActivate = marker?.let { m -> { onGetInstaller(m) } } ?: onOpenUpdate,
             ),
         )
     }
@@ -1611,4 +1658,16 @@ internal fun elsewhereRows(
         onActivate = { onSend(computer) },
         tab = PageTab.VERSIONS,
     )
+}
+
+/**
+ * The source that named [update], and its record, for the update row: the first linked source (in the sources' order)
+ * whose last answer is that version. Null when no linked source named it (a paired computer's version, a store's build).
+ */
+internal fun updateSourceOf(sources: List<UpdateSources.Source>, links: GameLinks?, update: String?): Pair<UpdateSources.Source, String>? {
+    update ?: return null
+    val wanted = update.trim().removePrefix("v")
+    return sources.firstNotNullOfOrNull { source ->
+        links?.link(source.key)?.takeIf { it.answer?.version?.trim()?.removePrefix("v") == wanted }?.let { source to it.externalId }
+    }
 }

@@ -25,6 +25,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.toLibraryEntryKind
 import org.json.JSONObject
 
 /** A plugin action or tile reply: either a message, or a screen to show, or both. */
@@ -414,7 +415,9 @@ object PluginTiles {
  * game's page, never from list rendering. A provider's `provides` entry
  * `id` is the source key its links are stored under (docs/SPEC.md 7g,
  * "Where an update comes from"); an entry without one is not a source.
- * Ops, all quick calls: `check {ids}`, `resolve {text}`, `match {title, versions}`.
+ * Ops, all quick calls: `check {ids}`, `resolve {text}`, `match {title, versions}`, `record {id}`; and the
+ * `download {id, link, version}` job, whose acquire reply is placed as a new version folder of the game
+ * (docs/SPEC.md 7g, "Getting an update").
  */
 class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources {
     private val app = context.applicationContext
@@ -477,6 +480,49 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         return (0 until minOf(rows.length(), MAX_CANDIDATES)).mapNotNull { rows.optJSONObject(it)?.let(::found) }
     }
 
+    override suspend fun record(source: String, externalId: String): dev.droidtop.library.UpdateSources.RecordAnswer {
+        val reply = call(source, "record", JSONObject().put("id", externalId), QUICK_BUDGET_MS, userInitiated = true)
+            ?: return dev.droidtop.library.UpdateSources.RecordAnswer(null, "The source $source is not installed or not running")
+        if (!reply.ok) {
+            return dev.droidtop.library.UpdateSources.RecordAnswer(
+                null,
+                reply.message ?: "The source did not answer",
+                unsupported = reply.code == dev.droidtop.pluginhost.PluginErrorCode.UNSUPPORTED,
+            )
+        }
+        val parsed = reply.data.optJSONObject("record")?.let { parseRecord(it, externalId) }
+        return dev.droidtop.library.UpdateSources.RecordAnswer(parsed, if (parsed == null) "The source sent no page for this record" else null)
+    }
+
+    override suspend fun download(
+        source: String,
+        externalId: String,
+        link: String,
+        version: String?,
+        gameName: String,
+        newest: dev.droidtop.library.LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String {
+        val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
+        val label = entry.label ?: record.manifest.label
+        // 7m: the new version is a folder beside the game's newest one; nothing that is there is touched.
+        val folder = dev.droidtop.library.PcRunnerOptions.gameFolderFor(newest) ?: return "The game's newest version has no folder on this device"
+        val games = folder.parentFile ?: return "The game's folder has no folder above it"
+        val name = UpdatePlacement.folderName(gameName, version) ?: return "$label gave no version to name the new folder by"
+        if (java.io.File(games, name).exists()) return "$name is already in ${games.name}"
+        val engine = dev.droidtop.library.GameEngine.entries.firstOrNull { it.toLibraryEntryKind() == newest.kind }
+        val beside = engine?.let { dev.droidtop.library.EnginesDatabase.defFor(app, it)?.saves?.beside }.orEmpty()
+        val placement = mapOf("destinationPath" to games.absolutePath, dev.droidtop.pluginhost.DownloadJobs.ARG_VERSION_FOLDER to name) +
+            UpdatePlacement.savesArgs(folder, beside)
+        val args = JSONObject().put("source", source).put("id", externalId).put("link", link).apply { version?.let { put("version", it) } }
+        val title = "Download $name"
+        val result = PluginViews.runJob(app, record, POINT, "download", args, title, onStatus)
+        if (!result.ok) return "${record.manifest.label}: ${result.error ?: "the download did not start"}"
+        val descriptors = dev.droidtop.pluginhost.AcquireDownloads.parse(result.values) ?: return "$label named no file to download"
+        val done = AcquireDownload.run(app, record, title, JSONObject(), result.values, descriptors, onStatus, update = placement)
+        return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
+    }
+
     private fun found(row: JSONObject): dev.droidtop.library.UpdateSources.Found? {
         val id = row.optString("id").trim().takeIf { it.isNotEmpty() && it.length <= 200 } ?: return null
         return dev.droidtop.library.UpdateSources.Found(
@@ -501,5 +547,53 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         const val QUICK_BUDGET_MS = 15_000L
 
         const val MAX_CANDIDATES = 20
+
+        /** The most links a record's Downloads tab shows (docs/plugin-api.md 3 A6). */
+        const val MAX_DOWNLOADS = 200
+        const val MAX_TEXT = 20_000
+        const val MAX_TAGS = 64
+        const val MAX_LINK = 2_048
+
+        /**
+         * A `record` reply's `record`, checked (docs/plugin-api.md 3 A6): long texts are cut, a link or address that is
+         * not what the contract says is dropped, and an id other than the one asked for is refused. Pure, for the tests.
+         */
+        fun parseRecord(row: JSONObject, askedId: String): dev.droidtop.library.UpdateSources.Record? {
+            fun text(name: String, max: Int = 200): String? =
+                if (row.isNull(name)) null else row.optString(name).trim().takeIf { it.isNotEmpty() }?.take(max)
+            val id = text("id") ?: askedId
+            if (id != askedId) return null
+            val downloads = row.optJSONArray("downloads")?.let { array ->
+                (0 until minOf(array.length(), MAX_DOWNLOADS)).mapNotNull { i ->
+                    val d = array.optJSONObject(i) ?: return@mapNotNull null
+                    val link = d.optString("link").takeIf { it.isNotBlank() && it.length <= MAX_LINK } ?: return@mapNotNull null
+                    dev.droidtop.library.UpdateSources.Download(
+                        section = d.optString("section").trim().take(80).ifEmpty { "Downloads" },
+                        host = d.optString("host").trim().take(80).ifEmpty { "Link" },
+                        label = d.optString("label").trim().take(200).ifEmpty { d.optString("host").trim().take(80).ifEmpty { "Download" } },
+                        link = link,
+                    )
+                }
+            }.orEmpty()
+            val tags = row.optJSONArray("tags")?.let { array ->
+                (0 until array.length()).mapNotNull { array.optString(it).trim().takeIf { t -> t.isNotEmpty() && t.length <= 40 } }.distinct().take(MAX_TAGS)
+            }.orEmpty()
+            return dev.droidtop.library.UpdateSources.Record(
+                externalId = id,
+                title = text("title") ?: "#$id",
+                url = text("url", MAX_LINK)?.takeIf { it.startsWith("https://") || it.startsWith("http://") },
+                version = text("version", 80),
+                developer = text("developer"),
+                status = text("status", 40),
+                rating = row.optDouble("rating").takeIf { !it.isNaN() && it in 0.0..1.0 },
+                votes = row.optInt("votes", -1).takeIf { it >= 0 },
+                tags = tags,
+                updatedEpochMs = row.optLong("updated", 0L).takeIf { it > 0 },
+                cover = text("cover", MAX_LINK)?.takeIf { it.startsWith("https://") },
+                overview = text("overview", MAX_TEXT),
+                changelog = text("changelog", MAX_TEXT),
+                downloads = downloads,
+            )
+        }
     }
 }

@@ -77,6 +77,13 @@ object DownloadJobs {
     private const val ARG_UNPACK = "unpack"
     private const val ARG_MORE = "more"
     private const val ARG_TARGET = "targetName"
+
+    /**
+     * The job argument naming the new version folder an update lands in (docs/SPEC.md 7g, "Getting an update"):
+     * `<name> v<version>` in `destinationPath`, beside the game's other versions. It must not exist yet; nothing that
+     * is there is touched.
+     */
+    const val ARG_VERSION_FOLDER = "versionFolder"
     private val PART_KEYS = listOf(ARG_URL, ARG_NAME, ARG_TARGET, ARG_SHA256, ARG_SHA1, ARG_MD5, ARG_MAX_BYTES, ARG_HEADERS)
 
     /** The job argument value that unpacks the downloaded archive into a folder instead of placing the file. */
@@ -101,30 +108,37 @@ object DownloadJobs {
      * before the library is told about it. The library lives above this module, so the engine hint of a source's acquire
      * reply (docs/plugin-api.md 1.6, `engine`) is applied there (`AcquireEngineHint` in :library-core).
      */
-    @Volatile var onPlaced: (context: Context, placed: File, args: Map<String, String>) -> Unit = { _, _, _ -> }
+    @Volatile var onPlaced: (context: Context, placed: File, args: Map<String, String>) -> String? = { _, _, _ -> null }
 
     /** Registers the runner with the one jobs registry. Called once at process start, before jobs are restored. */
     fun register(context: Context) {
         val appContext = context.applicationContext
         registerPost(POST_PLACE_IN_FOLDER) { jobContext, file, args ->
-            val target = withContext(Dispatchers.IO) {
-                (if (args[ARG_UNPACK] == UNPACK_ARCHIVE) unpackIntoFolder(file, args) else placeInFolder(file, args)).also {
-                    // What the job carries about the placed file beyond its bytes (a source's engine hint), applied
-                    // before the library looks at it, so the first index already reads it.
-                    runCatching { onPlaced(jobContext, it, args) }
-                    // The file is the library's from here, said by the job and not by whatever screen started it, so
-                    // a page that was closed, or a restart, loses nothing (docs/SPEC.md 7g, "Targeted indexing").
-                    LibraryPaths.report(jobContext, PathChange.added(it))
-                }
+            withContext(Dispatchers.IO) {
+                val target = if (args[ARG_UNPACK] == UNPACK_ARCHIVE) unpackIntoFolder(file, args) else placeInFolder(file, args)
+                // What the job carries about the placed file beyond its bytes (a source's engine hint, an update's
+                // saves), applied before the library looks at it, so the first index already reads it.
+                val note = runCatching { onPlaced(jobContext, target, args) }.getOrNull()
+                // The file is the library's from here, said by the job and not by whatever screen started it, so
+                // a page that was closed, or a restart, loses nothing (docs/SPEC.md 7g, "Targeted indexing").
+                LibraryPaths.report(jobContext, PathChange.added(target))
+                listOfNotNull("Added ${target.name}", note).joinToString(". ")
             }
-            "Added ${target.name}"
         }
         multiPosts[POST_PLACE_IN_FOLDER] = DownloadMultiPost { jobContext, files, parts ->
             val (placed, summary) = withContext(Dispatchers.IO) {
-                (if (parts.first()[ARG_UNPACK] == UNPACK_ARCHIVE) placeSplitSet(files, parts) else placeAllInFolder(files, parts).let { it to "Added ${it.size} files" })
-                    .also { (list, _) ->
-                        runCatching { list.forEach { onPlaced(jobContext, it, parts.first()) } }
+                (
+                    when {
+                        parts.first()[ARG_UNPACK] == UNPACK_ARCHIVE -> placeSplitSet(files, parts)
+                        // An update's files are one new version folder, and that folder is what the library is told of.
+                        parts.first()[ARG_VERSION_FOLDER] != null -> placeAllInFolder(files, parts).first().parentFile!!.let { listOf(it) to "Added ${it.name}" }
+                        else -> placeAllInFolder(files, parts).let { it to "Added ${it.size} files" }
+                    }
+                    )
+                    .let { (list, said) ->
+                        val notes = list.mapNotNull { runCatching { onPlaced(jobContext, it, parts.first()) }.getOrNull() }
                         LibraryPaths.report(jobContext, PathChange(added = list.map { it.absolutePath }))
+                        list to (listOf(said) + notes).joinToString(". ")
                     }
             }
             summary
@@ -141,6 +155,7 @@ object DownloadJobs {
 
     /** Moves [file] to `targetName` in `destinationPath`; the one place a download is placed in a game folder. Returns where it went. */
     internal fun placeInFolder(file: File, args: Map<String, String>): File {
+        args[ARG_VERSION_FOLDER]?.let { return placeAllInFolder(listOf(file), listOf(args)).single().parentFile!! }
         val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
         require(destination.isDirectory || destination.mkdirs()) { "the game folder ${destination.absolutePath} is not available" }
         // A name already in the folder keeps both (Droidtop/tracker#355 G5): the new one is "Name (2).ext", never a
@@ -197,8 +212,14 @@ object DownloadJobs {
      * any target exists or two share a name, and a move that fails puts the ones already moved back. Returns the targets.
      */
     internal fun placeAllInFolder(files: List<File>, parts: List<Map<String, String>>): List<File> {
-        val destination = File(requireNotNull(parts.first()["destinationPath"]) { "the game folder is missing" })
-        require(destination.isDirectory || destination.mkdirs()) { "the game folder ${destination.absolutePath} is not available" }
+        val games = File(requireNotNull(parts.first()["destinationPath"]) { "the game folder is missing" })
+        require(games.isDirectory || games.mkdirs()) { "the game folder ${games.absolutePath} is not available" }
+        // An update's files go into a new version folder of their own, made here and never one that exists.
+        val destination = parts.first()[ARG_VERSION_FOLDER]?.let { name ->
+            val folder = newVersionFolder(games, name)
+            require(folder.mkdir()) { "the folder ${folder.absolutePath} could not be made" }
+            folder
+        } ?: games
         val targets = parts.map { File(destination, requireNotNull(it[ARG_TARGET]) { "the file name is missing" }) }
         require(targets.map { it.name }.distinct().size == targets.size) { "two of the files have the same name" }
         targets.firstOrNull { it.exists() }?.let { throw IllegalArgumentException("${it.absolutePath} already exists") }
@@ -239,7 +260,14 @@ object DownloadJobs {
             throw IllegalStateException("could not join the parts: ${e.message}", e)
         }
         files.forEach { it.delete() }
-        val folder = unpackIntoFolder(joined, mapOf("destinationPath" to requireNotNull(parts.first()["destinationPath"]), ARG_TARGET to set.baseName))
+        val folder = unpackIntoFolder(
+            joined,
+            buildMap {
+                put("destinationPath", requireNotNull(parts.first()["destinationPath"]))
+                put(ARG_TARGET, set.baseName)
+                parts.first()[ARG_VERSION_FOLDER]?.let { put(ARG_VERSION_FOLDER, it) }
+            },
+        )
         return listOf(folder) to "Added ${folder.name}"
     }
 
@@ -253,16 +281,31 @@ object DownloadJobs {
         val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
         require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
         val targetName = requireNotNull(args["targetName"]) { "the file name is missing" }
-        // An existing folder is never unpacked over: the new game is "Name (2)" beside it (#355 G5).
-        val folder = freeName(destination, requireNotNull(archiveStem(targetName)) { "$targetName is not a zip, 7z or rar archive" })
+        val stem = requireNotNull(archiveStem(targetName)) { "$targetName is not a zip, 7z or rar archive" }
+        val version = args[ARG_VERSION_FOLDER]
+        // An existing folder is never unpacked over: the new game is "Name (2)" beside it (#355 G5), and an update's
+        // version folder must be new.
+        val folder = if (version != null) newVersionFolder(destination, version) else freeName(destination, stem)
         val building = File(destination, ".${folder.name}.unpacking")
         try {
             ArchiveExtractor.extract(file, building)
         } catch (e: java.io.IOException) {
             throw IllegalStateException("could not unpack $targetName: ${e.message}. The download is kept in droidtop's downloads folder", e)
         }
-        check(building.renameTo(folder)) { "the unpacked game could not be placed in the game folder" }
+        // A release usually packs one folder ("Game-0.6-pc/"): as a version folder, that folder's contents are the
+        // version, so the game is not one level further down than its other versions.
+        val inner = if (version != null) building.listFiles()?.singleOrNull()?.takeIf { it.isDirectory } else null
+        check((inner ?: building).renameTo(folder)) { "the unpacked game could not be placed in the game folder" }
+        if (inner != null) building.delete()
         file.delete()
+        return folder
+    }
+
+    /** [name] in [games] for an update's new version folder; throws when something of that name is already there. */
+    internal fun newVersionFolder(games: File, name: String): File {
+        require(name.isNotBlank() && '/' !in name && name != "." && name != "..") { "the version folder's name is not usable" }
+        val folder = File(games, name)
+        require(!folder.exists()) { "${folder.absolutePath} already exists; droidtop does not place a version over another" }
         return folder
     }
 
@@ -486,7 +529,8 @@ object DownloadJobs {
     ): String? {
         if (postName != POST_PLACE_IN_FOLDER || done < parts.size) return null
         return withContext(Dispatchers.IO) {
-            val destination = File(parts.first()["destinationPath"] ?: return@withContext null)
+            val games = File(parts.first()["destinationPath"] ?: return@withContext null)
+            val destination = parts.first()[ARG_VERSION_FOLDER]?.let { File(games, it) } ?: games
             val targets = parts.map { File(destination, it[ARG_TARGET] ?: return@withContext null) }
             if (files.any { it.exists() } || !targets.all { it.isFile }) return@withContext null
             reportPlaced(targets)
@@ -512,8 +556,13 @@ object DownloadJobs {
         return withContext(Dispatchers.IO) {
             val targetName = args["targetName"] ?: return@withContext null
             val unpacked = args[ARG_UNPACK] == UNPACK_ARCHIVE
-            val target = File(args["destinationPath"] ?: return@withContext null, if (unpacked) (archiveStem(targetName) ?: return@withContext null) else targetName)
-            if (file.exists() || !(if (unpacked) target.isDirectory else target.isFile)) return@withContext null
+            val games = args["destinationPath"] ?: return@withContext null
+            val version = args[ARG_VERSION_FOLDER]
+            val target = when {
+                version != null -> File(games, version)
+                else -> File(games, if (unpacked) (archiveStem(targetName) ?: return@withContext null) else targetName)
+            }
+            if (file.exists() || !(if (unpacked || version != null) target.isDirectory else target.isFile)) return@withContext null
             reportPlaced(target)
             "Added ${target.name}"
         }

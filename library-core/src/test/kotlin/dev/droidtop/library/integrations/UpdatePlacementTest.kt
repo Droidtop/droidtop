@@ -1,0 +1,81 @@
+package dev.droidtop.library.integrations
+
+import dev.droidtop.pluginhost.DownloadJobs
+import java.io.File
+import java.nio.file.Files
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+/** An update's new version folder, its saves, and a source's record page (docs/SPEC.md 7g, "Getting an update"). */
+class UpdatePlacementTest {
+    private val dir: File = Files.createTempDirectory("update-placement").toFile()
+
+    @Test
+    fun theVersionFolderIsTheGamesNameAndTheVersionLessItsV() {
+        assertEquals("Sample Game v0.6", UpdatePlacement.folderName("Sample Game", "v0.6"))
+        assertEquals("Sample Game v0.6 Ep 2", UpdatePlacement.folderName("Sample Game", "0.6 Ep 2"))
+        assertEquals("A B v1.0", UpdatePlacement.folderName("A: B", "1.0"))
+        assertNull(UpdatePlacement.folderName("Sample Game", " "))
+        assertNull(UpdatePlacement.folderName("Sample Game", null))
+    }
+
+    @Test
+    fun savesBesideTheGameAreCopiedAndTheReleasesOwnFilesWin() {
+        val old = File(dir, "Game v0.5").apply { File(this, "game/saves").mkdirs() }
+        File(old, "game/saves/1-1-LT1.save").writeText("progress")
+        File(old, "game/saves/persistent").writeText("old persistent")
+        File(old, "game/script.rpy").writeText("old script")
+        val new = File(dir, "Game v0.6").apply { File(this, "game/saves").mkdirs() }
+        File(new, "game/saves/persistent").writeText("shipped")
+
+        assertEquals(1, UpdatePlacement.copyBeside(old, new, listOf("game/saves/**")))
+        assertEquals("progress", File(new, "game/saves/1-1-LT1.save").readText())
+        assertEquals("a file the release brought stays", "shipped", File(new, "game/saves/persistent").readText())
+        assertFalse("only saves are copied", File(new, "game/script.rpy").exists())
+        assertEquals("the old folder keeps its copy", "progress", File(old, "game/saves/1-1-LT1.save").readText())
+    }
+
+    @Test
+    fun theJobSaysWhatItCopiedOrWhyNothing() {
+        val old = File(dir, "G v1").apply { File(this, "save").mkdirs() }
+        File(old, "save/a.sav").writeText("a")
+        File(old, "save/b.sav").writeText("b")
+        val new = File(dir, "G v2").apply { mkdirs() }
+        val args = mapOf(DownloadJobs.ARG_VERSION_FOLDER to "G v2") + UpdatePlacement.savesArgs(old, listOf("save/*.sav"))
+        assertEquals("Copied 2 save files from G v1", UpdatePlacement.copySaves(new, args))
+        assertEquals(
+            "No saves were copied: droidtop knows of none kept in this game's folder",
+            UpdatePlacement.copySaves(new, mapOf(DownloadJobs.ARG_VERSION_FOLDER to "G v2")),
+        )
+        assertNull("a download that is not an update says nothing", UpdatePlacement.copySaves(new, emptyMap()))
+    }
+
+    @Test
+    fun aRecordIsCheckedAndCut() {
+        val reply = JSONObject(
+            """
+            {"id": "18978", "title": "Sample Game", "version": "v0.6", "rating": 0.86, "votes": 120, "status": "Ongoing",
+             "url": "https://f95zone.to/threads/18978", "cover": "http://insecure.example/c.png",
+             "tags": ["2dcg", "", "2dcg", "${"x".repeat(41)}"], "changelog": "${"c".repeat(25_000)}",
+             "downloads": [
+               {"section": "Win/Linux", "host": "MEGA", "label": "MEGA", "link": "0"},
+               {"section": "Win/Linux", "host": "PIXELDRAIN", "label": "Part 1", "link": "1"},
+               {"section": "Mac", "host": "MEGA", "label": "MEGA", "link": ""}
+             ]}
+            """.trimIndent(),
+        )
+        val record = PluginUpdateSources.parseRecord(reply, "18978")!!
+        assertEquals("Sample Game", record.title)
+        assertEquals(listOf("2dcg"), record.tags)
+        assertNull("a cover must be https", record.cover)
+        assertEquals(20_000, record.changelog!!.length)
+        assertEquals(listOf("0", "1"), record.downloads.map { it.link })
+        assertEquals(120, record.votes)
+        assertNull("another record's page is refused", PluginUpdateSources.parseRecord(reply, "77"))
+        assertTrue(PluginUpdateSources.parseRecord(JSONObject(), "5")!!.downloads.isEmpty())
+    }
+}

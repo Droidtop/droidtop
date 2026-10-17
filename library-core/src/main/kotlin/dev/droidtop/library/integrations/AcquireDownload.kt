@@ -20,7 +20,8 @@ import org.json.JSONObject
 /**
  * Starts the Downloads job for the download part of a source's acquire reply (docs/plugin-api.md 1.6): where it goes
  * (the screen's folder, or the reply's `system` folder), the file names, the digests, the headers a web session captured,
- * and the engine hint. Several descriptors are one job.
+ * and the engine hint. Several descriptors are one job. An update ([update], docs/SPEC.md 7g "Getting an update") goes
+ * where it says instead: its new version folder beside the game's newest, with the saves to bring along.
  */
 internal object AcquireDownload {
     suspend fun run(
@@ -31,11 +32,16 @@ internal object AcquireDownload {
         values: Map<String, String>,
         descriptors: List<AcquireDownloadDescriptor>,
         onStatus: (String) -> Unit,
+        /** An update's placement: `destinationPath`, the `versionFolder` and the saves' arguments ([UpdatePlacement]). */
+        update: Map<String, String>? = null,
     ): PluginResult {
         if (descriptors.isEmpty()) return PluginResult.failure("${record.manifest.label} returned an invalid download descriptor")
-        // The source's system hint: the game's own system folder, unless this screen is already that system's.
-        val systemHint = AcquireSystemHint.valid(values[AcquireSystemHint.KEY])
-        val destination = if (AcquireSystemHint.overrides(systemHint, hostContext)) {
+        // The source's system hint: the game's own system folder, unless this screen is already that system's. An
+        // update goes beside the game's other versions whatever the source hints.
+        val systemHint = AcquireSystemHint.valid(values[AcquireSystemHint.KEY]).takeIf { update == null }
+        val destination = if (update != null) {
+            update["destinationPath"]
+        } else if (AcquireSystemHint.overrides(systemHint, hostContext)) {
             AcquireSystemHint.folderFor(context, systemHint!!)?.absolutePath
         } else {
             hostContext.optString("destination").takeIf { it.isNotBlank() }
@@ -55,7 +61,7 @@ internal object AcquireDownload {
         }
         // A BIOS file goes to the games folder's bios folder under the database's name, not among the games (#558).
         val systemId = systemHint ?: hostContext.optJSONObject("system")?.optString("id")?.takeIf { it.isNotBlank() }
-        val bios = descriptors.singleOrNull()?.takeIf { !it.unpack && systemId != null }?.let { only ->
+        val bios = descriptors.singleOrNull()?.takeIf { !it.unpack && systemId != null && update == null }?.let { only ->
             withContext(Dispatchers.IO) {
                 val files = BiosDatabase.forSystem(context, systemId!!)?.files.orEmpty()
                 val provides = ExtensionPoints.declares(record.manifest, PluginBios.POINT)
@@ -99,6 +105,7 @@ internal object AcquireDownload {
                 put("destinationPath", bios?.parentFile?.absolutePath ?: destination)
                 put("targetName", bios?.name ?: first.targetName)
                 AcquireEngineHint.valid(values[AcquireEngineHint.KEY])?.let { put(AcquireEngineHint.KEY, it) }
+                update?.let { putAll(it) }
             },
             onStatus = onStatus,
         )

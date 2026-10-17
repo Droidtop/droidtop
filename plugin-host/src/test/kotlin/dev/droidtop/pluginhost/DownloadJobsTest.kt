@@ -204,6 +204,46 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun anUpdateUnpacksIntoItsVersionFolderLiftingTheReleasesOneFolder() = runBlocking {
+        val archive = zipOf(File(dir, "downloads/acquire_4.zip").also { it.parentFile.mkdirs() }, "Game-0.6-pc/game/script.rpy" to "new", "Game-0.6-pc/Game.exe" to "exe")
+        val games = File(dir, "games/renpy")
+        File(games, "Game v0.5/game").mkdirs()
+        val args = mapOf("destinationPath" to games.path, "targetName" to "Game-0.6-pc.zip", DownloadJobs.ARG_VERSION_FOLDER to "Game v0.6")
+        val folder = DownloadJobs.unpackIntoFolder(archive, args)
+        // The release's one folder is the version: the game sits at the same depth as its other versions.
+        assertEquals(File(games, "Game v0.6"), folder)
+        assertEquals("new", File(folder, "game/script.rpy").readText())
+        assertTrue(File(games, "Game v0.5/game").isDirectory)
+        assertEquals(listOf("Game v0.5", "Game v0.6"), games.list()!!.sorted())
+    }
+
+    @Test
+    fun anUpdateNeverLandsOnAVersionFolderThatIsThere() = runBlocking {
+        val archive = zipOf(File(dir, "downloads/acquire_5.zip").also { it.parentFile.mkdirs() }, "a.txt" to "a")
+        val games = File(dir, "games/renpy")
+        File(games, "Game v0.6").mkdirs()
+        File(games, "Game v0.6/mine.txt").writeText("mine")
+        try {
+            DownloadJobs.unpackIntoFolder(archive, mapOf("destinationPath" to games.path, "targetName" to "x.zip", DownloadJobs.ARG_VERSION_FOLDER to "Game v0.6"))
+            fail("a version folder that exists must not be unpacked into")
+        } catch (e: IllegalArgumentException) {
+            assertTrue(e.message!!.contains("already exists"))
+        }
+        assertEquals(listOf("mine.txt"), File(games, "Game v0.6").list()!!.toList())
+        assertTrue("the download is kept", archive.exists())
+    }
+
+    @Test
+    fun anUpdatesLoneFileIsPlacedInItsNewVersionFolder() {
+        val file = File(dir, "downloads/acquire_6.bin").also { it.parentFile.mkdirs(); it.writeText("game") }
+        val games = File(dir, "games/html")
+        val placed = DownloadJobs.placeInFolder(file, mapOf("destinationPath" to games.path, "targetName" to "Game.html", DownloadJobs.ARG_VERSION_FOLDER to "Game v2"))
+        assertEquals(File(games, "Game v2"), placed)
+        assertEquals("game", File(placed, "Game.html").readText())
+        assertFalse(file.exists())
+    }
+
+    @Test
     fun anExistingFolderIsNeverUnpackedOver() = runBlocking {
         val archive = zipOf(File(dir, "downloads/acquire_3.zip").also { it.parentFile.mkdirs() }, "a.txt" to "a")
         val games = File(dir, "games/dos")
