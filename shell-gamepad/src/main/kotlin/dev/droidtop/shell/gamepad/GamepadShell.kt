@@ -2151,22 +2151,39 @@ internal fun GamingSection.displayName(): String = when (this) {
  * frames until the node exists; gives up quietly after ~1s of frames
  * rather than looping forever on a theme whose view genuinely never
  * attaches one (ES-DWEE's widgetless system view is the real case).
+ *
+ * The Compose droidtop ships (1.9) no longer throws for an unattached
+ * requester: requestFocus() prints a warning and does nothing, and only
+ * requestFocus(FocusDirection) says whether focus was taken. Reading "did
+ * not throw" as "taken" ended the retries on the first frame, before a
+ * dialog's field existed, so the search opened with no field focused and
+ * typed keys went nowhere until a tap (console, 0.2.0-dev.2127). Success is
+ * now what Compose returns.
  */
 internal suspend fun requestFocusWhenAttached(
     focusRequester: androidx.compose.ui.focus.FocusRequester,
     tag: String,
 ) {
-    var attached = false
-    repeat(60) {
-        if (!attached) {
-            attached = runCatching { focusRequester.requestFocus() }.isSuccess
-            if (!attached) withFrameNanos {}
-        }
-    }
-    if (!attached) {
-        android.util.Log.w("droidtop.GamepadShell", "$tag focus never attached after 60 frames")
+    val taken = retryEachFrame(
+        attempts = FOCUS_ATTEMPTS,
+        attempt = { runCatching { focusRequester.requestFocus(androidx.compose.ui.focus.FocusDirection.Enter) }.getOrDefault(false) },
+        nextFrame = { withFrameNanos {} },
+    )
+    if (!taken) {
+        android.util.Log.w("droidtop.GamepadShell", "$tag focus never attached after $FOCUS_ATTEMPTS frames")
     }
 }
+
+/** Runs [attempt] once a frame until it returns true, at most [attempts] times; whether it ever did. Pure. */
+internal suspend fun retryEachFrame(attempts: Int, attempt: () -> Boolean, nextFrame: suspend () -> Unit): Boolean {
+    repeat(attempts) { i ->
+        if (attempt()) return true
+        if (i < attempts - 1) nextFrame()
+    }
+    return false
+}
+
+private const val FOCUS_ATTEMPTS = 60
 
 private sealed interface GameGroup {
     val key: String
