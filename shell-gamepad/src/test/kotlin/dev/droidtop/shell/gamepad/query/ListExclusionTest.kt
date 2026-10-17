@@ -140,4 +140,17 @@ class ListExclusionTest {
         assertEquals(StoreHolding.OWNED, StoreHolding.strongest(listOf(StoreHolding.WISHLIST, StoreHolding.OWNED)))
         assertEquals(StoreHolding.NOT_OWNED, StoreHolding.strongest(listOf(StoreHolding.WISHLIST, StoreHolding.NOT_OWNED)))
     }
+
+    @Test
+    fun `a search looks through every game the lists show, missing ones and the person's own options included`() {
+        // Console, 2026-10-17: the companion's search said "No match" for games Gaming listed.
+        val missing = row(StoreHolding.OWNED, installed = true, id = "steam:missing").copy(missing = true)
+        val free = row(StoreHolding.FREE, id = "steam:free")
+        val wish = row(StoreHolding.WISHLIST, id = "steam:wish")
+        val all = listOf(missing, free, wish)
+        assertEquals(listOf(missing), searchablePool(all, OwnershipOptions(), includeFree = false, includeHidden = false))
+        // Free-to-play shown in PC Games is searched too, and the search's own switch adds it without the setting.
+        assertEquals(listOf(missing, free), searchablePool(all, OwnershipOptions(showFree = true), includeFree = false, includeHidden = false))
+        assertEquals(listOf(missing, free), searchablePool(all, OwnershipOptions(), includeFree = true, includeHidden = false))
+    }
 }

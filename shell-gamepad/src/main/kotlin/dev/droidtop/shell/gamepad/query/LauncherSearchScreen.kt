@@ -75,9 +75,12 @@ fun LauncherSearchScreen(
         val context = LocalContext.current
         var includeHidden by remember { mutableStateOf(false) }
         var includeFree by remember { mutableStateOf(false) }
-        val playable = remember(games, includeHidden, includeFree) {
-            val options = OwnershipOptions(showFree = includeFree)
-            games.orEmpty().filter { !it.missing && listExclusion(it, ListPlace.LIST, options, includeHidden = includeHidden) == null }
+        // The person's own ownership options, as PC Games shows them; a preferences read, off the main thread.
+        val saved by produceState(OwnershipOptions()) {
+            value = withContext(Dispatchers.IO) { LibraryViewPrefs.ownershipOptions(context) }
+        }
+        val playable = remember(games, includeHidden, includeFree, saved) {
+            searchablePool(games.orEmpty(), saved, includeFree = includeFree, includeHidden = includeHidden)
         }
         val suggestions by produceState(emptyList<Recommendation>(), playable) {
             value = LocalSimilarityRecommendations({ playable })
@@ -108,7 +111,12 @@ fun LauncherSearchScreen(
                 }
                 val matching = playable.filter { matchesSearchText(it, text) }.take(MAX_GAME_ROWS).map { game ->
                     // The detail says whether it is here, so the places of one game (docs/SPEC.md 12a) say which one is installed.
-                    val detail = listOfNotNull(kindBadgeOf(game, systemNames)?.text, if (game.needsInstall()) NOT_INSTALLED else INSTALLED).joinToString(" · ")
+                    val here = when {
+                        game.missing -> MISSING
+                        game.needsInstall() -> NOT_INSTALLED
+                        else -> INSTALLED
+                    }
+                    val detail = listOfNotNull(kindBadgeOf(game, systemNames)?.text, here).joinToString(" · ")
                     LocalSearchRow(game.id, SearchRowKind.GAME, GameNaming.displayName(game.title), detail) { onOpen(game) }
                 }
                 // The web is one row, after everything else: the query is its detail, not its title, so the title never
@@ -131,4 +139,7 @@ private const val MAX_GAME_ROWS = 20
 private const val APP_DETAIL = "App"
 private const val INSTALLED = "Installed"
 private const val NOT_INSTALLED = "Not installed"
+
+/** A game whose files are not reachable right now (an offline card or share): found, and said so. */
+private const val MISSING = "Missing"
 private const val WEB_TITLE = "Search the web"

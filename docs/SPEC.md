@@ -21674,6 +21674,12 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 - **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The Quick Menu's Game section has the same row for a running console game's system ("Search SNES", between Emulator and Restart; it opens the one search over that system's games and the sources that serve it, the Quick Menu closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
 
+The games a search looks through are the games the lists show (`searchablePool`): the person's own ownership
+options from PC Games' List options, to which the search's "Include free-to-play" switch adds, and games that are
+missing right now too (an offline card), whose row says "Missing" where another says Installed or Not installed.
+Before, the search left missing games out and read ownership as its defaults, so the companion's search said "No
+match" for games Gaming listed (console, 2026-10-17).
+
 - **One list.** The device's rows (installed apps, library games; the caller
   matches them over lists it already holds in memory, no disk lookups per
   keystroke) and every `GameSourceProvider` (built-in or plugin) are rows of
