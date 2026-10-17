@@ -8886,6 +8886,11 @@ hands straight back with none of them open (`EXITED_AT_ONCE`) was left there, by
 (`LaunchDisplay.clearRunning`), since no game ever ran. Before, Cancel raised "Enginehost closed straight after
 it started", pointed at the scan log, and left a Playing session with Resume and Kill. Every other trouble of
 Enginehost's, and an emulator that returns at once, is still an alert.
+Whether an Enginehost launch is still open is Enginehost's own word first (its `state` call,
+`EnginehostCapabilities.holdsTask`, through `LaunchWatchPolicy.listed`), the task list only when it cannot say: the
+task list missed the no-sandbox warning while it waited for an answer, and the watch ended the launch as left
+(console, 0.2.0-dev.2129: "dev.enginehost returned after 12289 ms with nothing open"). A pending Enginehost question is
+a launch still under way.
 
 Considered and not built (Droidtop/tracker#270): a timed "taking a long time" notice for an emulator that is open
 and responsive but never draws. Time alone does not tell it from a healthy long-running game, so it would fire on

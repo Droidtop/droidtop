@@ -145,6 +145,13 @@ internal object LaunchWatchPolicy {
      * open was cancelled there (Droidtop/tracker#289: Cancel on the warning raised "Enginehost closed straight after
      * it started" and left a Playing session). No alert, and the session ends: no game ever ran.
      */
+    /**
+     * Whether the launched app is open, from the app's own word where it gives one ([appSays]: Enginehost's `state`
+     * call) before the task list ([taskList]); null when neither can say. An Enginehost launch waiting on its own
+     * question (the no-sandbox warning) is open, still launching, whatever the task list shows. Pure.
+     */
+    fun listed(appSays: Boolean?, taskList: Boolean?): Boolean? = appSays ?: taskList
+
     fun leftBeforePlaying(packageName: String, trouble: LaunchTrouble): Boolean =
         packageName == EngineHost.PACKAGE_NAME && trouble == LaunchTrouble.EXITED_AT_ONCE
 
@@ -448,6 +455,19 @@ object LaunchWatchdog {
 
     /** Whether the task list holds the package; null when it cannot be read exactly (no privileged helper running). */
     private suspend fun taskListed(context: Context, packageName: String): Boolean? {
+        // Enginehost says itself whether it holds a task of its own (a launch's warning, a running game, an error
+        // screen): the task list missed its no-sandbox question while it was waiting for an answer, and the watch
+        // ended the session as "left before playing" (console, 0.2.0-dev.2129: "dev.enginehost returned after
+        // 12289 ms with nothing open").
+        val enginehost = if (packageName == EngineHost.PACKAGE_NAME) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { EnginehostCapabilities.holdsTask(context) }
+        } else {
+            null
+        }
+        return LaunchWatchPolicy.listed(enginehost, snapshotListed(context, packageName))
+    }
+
+    private suspend fun snapshotListed(context: Context, packageName: String): Boolean? {
         if (!TaskManager.privileges().shell) return null
         TaskManager.refresh(context)
         val snapshot = TaskManager.snapshot.value ?: return null
