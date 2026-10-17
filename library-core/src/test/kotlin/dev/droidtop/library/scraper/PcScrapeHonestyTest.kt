@@ -135,16 +135,22 @@ class PcScrapeHonestyTest {
 
     @Test
     fun `an engine game with a developer and a genre but no description still needs its details`() {
-        val renpy = LibraryEntry(id = "/g/Some VN", title = "Some VN", kind = LibraryEntryKind.RENPY, artworkUri = "file:///g/Some VN/icon.png")
-        val detected = GameMetadataEntity(id = renpy.id, developer = "A Studio", genre = "Visual novel")
-        assertTrue(PcScraper.picked(renpy, detected, scrapedCover = false, filter = ScrapeFilter.MISSING_METADATA))
-        assertTrue(PcScraper.picked(renpy, detected, scrapedCover = false, filter = ScrapeFilter.MISSING_ANY))
-        val described = detected.copy(description = "A story.")
-        assertFalse(PcScraper.picked(renpy, described, scrapedCover = false, filter = ScrapeFilter.MISSING_ANY))
-        // A Windows game's exe icon is not a cover.
-        val wine = LibraryEntry(id = "wine:1", title = "W", kind = LibraryEntryKind.WINE_PROFILE, artworkUri = "file:///icon.ico")
-        assertTrue(PcScraper.picked(wine, described.copy(id = wine.id), scrapedCover = false, filter = ScrapeFilter.MISSING_ARTWORK))
-        assertFalse(PcScraper.picked(wine, described.copy(id = wine.id), scrapedCover = true, filter = ScrapeFilter.MISSING_ANY))
+        val detected = GameMetadataEntity(id = "/g/Some VN", developer = "A Studio", genre = "Visual novel")
+        assertTrue(PcScraper.picked(detected, hasCover = true, filter = ScrapeFilter.MISSING_METADATA))
+        assertTrue(PcScraper.picked(detected, hasCover = true, filter = ScrapeFilter.MISSING_ANY))
+        assertFalse(PcScraper.picked(detected.copy(description = "A story."), hasCover = true, filter = ScrapeFilter.MISSING_ANY))
+    }
+
+    @Test
+    fun `only a cover is art, so a game showing an icon still misses its artwork`() {
+        // A described game whose picture is an .exe or store icon, or a screenshot: no cover, so both art filters pick it.
+        val described = GameMetadataEntity(id = "/g/F95 Game", description = "A story.")
+        assertTrue(PcScraper.picked(described, hasCover = false, filter = ScrapeFilter.MISSING_ARTWORK))
+        assertTrue(PcScraper.picked(described, hasCover = false, filter = ScrapeFilter.MISSING_ANY))
+        assertFalse(PcScraper.picked(described, hasCover = true, filter = ScrapeFilter.MISSING_ARTWORK))
+        assertFalse(PcScraper.picked(described, hasCover = true, filter = ScrapeFilter.MISSING_ANY))
+        // A game with no row at all misses both.
+        assertTrue(PcScraper.picked(null, hasCover = false, filter = ScrapeFilter.MISSING_ANY))
     }
 
     @Test
