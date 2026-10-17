@@ -64,6 +64,11 @@ public class LauncherApplication extends Application {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
+        // droidtop patch: as in onCreate, a contained plugin's isolated process
+        // has no preferences; reading the theme preference there threw on a
+        // dark-mode switch and took the plugin's sandbox down (console,
+        // 0.2.0-dev.2129, 2026-10-17 23:52).
+        if (dev.droidtop.runtime.util.IsolatedProcess.isIsolated()) return;
         int nightMode = newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK;
         if (nightMode != mNightMode) {
             mNightMode = nightMode;
