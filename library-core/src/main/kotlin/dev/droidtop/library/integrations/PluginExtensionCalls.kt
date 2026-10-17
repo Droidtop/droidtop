@@ -248,6 +248,8 @@ object PluginMetadataSources {
         val ambiguous: List<PluginMetadataProtocol.Candidate> = emptyList(),
         /** The cover picture's address, which droidtop fetches itself from the plugin's own sites. */
         val cover: String? = null,
+        /** The source searched and found nothing for this game (not a failure, which gives no answer at all). */
+        val noMatch: Boolean = false,
     )
 
     fun sources(context: Context): List<Source> = providersOf(context, POINT).map { (record, entry) -> Source(record, entry) }
@@ -260,7 +262,7 @@ object PluginMetadataSources {
         suspend fun lookup(facts: JSONObject): List<MetadataFields> = answers(facts).mapNotNull { it.fields }
 
         /** Every source's [Answer] for [facts]: a match's fields and links, or a tie to pick from. A failing source is skipped. */
-        suspend fun answers(facts: JSONObject): List<Answer> = sources.mapNotNull { source ->
+        suspend fun answers(facts: JSONObject, skip: (Source) -> Boolean = { false }): List<Answer> = sources.filterNot(skip).mapNotNull { source ->
             try {
                 answerOne(source, facts)
             } catch (e: CancellationException) {
@@ -298,7 +300,7 @@ object PluginMetadataSources {
             val match = policy.handle(source.record, newCall(POINT, "match", "scrape", facts, 15_000L))
             if (!match.ok) return null
             return when (val decision = PluginMetadataProtocol.decide(match.data)) {
-                PluginMetadataProtocol.MatchDecision.None -> null
+                PluginMetadataProtocol.MatchDecision.None -> Answer(source, null, noMatch = true)
                 is PluginMetadataProtocol.MatchDecision.Ambiguous -> Answer(source, null, ambiguous = decision.candidates)
                 is PluginMetadataProtocol.MatchDecision.Match -> fetch(source, decision.candidate.ids)
             }

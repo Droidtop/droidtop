@@ -651,7 +651,17 @@ object PcScraper {
         entry: LibraryEntry,
         plugins: dev.droidtop.library.integrations.PluginMetadataSources.Session,
     ): Boolean {
-        val answers = plugins.answers(pluginFacts(context, entry))
+        // Nothing left for a source to fill: it is not asked (docs/SPEC.md 7h, "Fewer requests").
+        if (!PluginScrapeMemory.wantsPluginFields(RomDatabase.get(context).romDao().getGameMetadataSingle(entry.id))) return false
+        val facts = pluginFacts(context, entry)
+        val linked = facts.optJSONObject("sourceLinks")?.keys()?.asSequence()?.toSet().orEmpty()
+        val now = System.currentTimeMillis()
+        // A source that found nothing for this game in the last week is not asked again, unless the game has since
+        // been linked to it (the link answers without a search).
+        val answers = plugins.answers(facts) { source ->
+            source.ownLinkKeys.none { it in linked } && PluginScrapeMemory.recentlyMissed(context, source.record.manifest.id, entry.id, now)
+        }
+        answers.forEach { PluginScrapeMemory.note(context, it.source.record.manifest.id, entry.id, missed = it.noMatch, now) }
         answers.forEach { linkFromPlugin(context, entry, it.links) }
         writePluginFields(context, entry, answers.mapNotNull { it.fields }.filterNot { it.isEmpty })
         coverFromPlugins(context, entry, answers)

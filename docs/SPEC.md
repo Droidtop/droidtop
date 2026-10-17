@@ -13181,6 +13181,11 @@ the same care as the art.
     WebP or GIF of at most 10 MiB, and is kept whole or not at all. It is filed where a scraped cover goes and
     recorded under the plugin's name; a cover already there, or one the person chose, is never replaced. Screenshots
     are later work.
+  - **Fewer requests (2026-10-17).** The owner: "Maybe caching might reduce our hits to the service somewhat". A
+    game that already has a description, a developer, a genre and a cover is not sent to plugin sources. A source
+    that found nothing for a game is not asked about it again for a week (`PluginScrapeMemory`), unless the game
+    has since been linked to that source; finding it clears the mark. A plugin may also keep what its site said
+    (the F95zone plugin keeps searches and thread details a week); game pages and update checks always ask anew.
 - **Ids travel.** Lutris's `provider_games` names a result's Steam app id and GOG product id,
   and IGDB's `external_games` does the same, so a Lutris or IGDB match of a folder game
   becomes a Steam/GOG identity and the keyless Steam store fills its developer, publisher and
