@@ -31,6 +31,9 @@ import androidx.compose.ui.graphics.Color
 class SecondaryDisplayActivity : ComponentActivity() {
 
     companion object {
+        private const val MAIN_ACTIVITY = "dev.droidtop.app.MainActivity"
+        private const val COMPANION_ACTIVITY = "dev.droidtop.app.CompanionActivity"
+
         /**
          * Which display this idle SECONDARY_HOME surface is actually
          * resumed on right now -- read by
@@ -65,6 +68,7 @@ class SecondaryDisplayActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.addFlags(SecondScreenWindowFlags.touchOnly())
         CompanionSurfaceLifetime.bind(this, secondaryOnly = true)
+        if (homePressed(intent)) return
         render()
     }
 
@@ -86,7 +90,36 @@ class SecondaryDisplayActivity : ComponentActivity() {
      */
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
+        if (homePressed(intent)) return
         render()
+    }
+
+    /**
+     * Home pressed on this display (Android's own SECONDARY_HOME start, not droidtop placing this surface): droidtop's
+     * own screen for this display comes back, the companion where it lives and the main shell where it runs
+     * (dev.droidtop.runtime.HomeDisplays, docs/SPEC.md 4c "Home on every screen"; the owner, 2026-10-17: "It should
+     * bring droidtop back on whichever screen we're looking at"). True when it handed the press on; this surface
+     * stays below whatever it brought forward.
+     */
+    private fun homePressed(intent: android.content.Intent?): Boolean {
+        if (intent?.hasCategory(android.content.Intent.CATEGORY_SECONDARY_HOME) != true) return false
+        val here = displayIdCompat() ?: return false
+        val target = when (dev.droidtop.runtime.HomeDisplays.targetFor(here)) {
+            dev.droidtop.runtime.HomeDisplays.Target.COMPANION -> COMPANION_ACTIVITY
+            dev.droidtop.runtime.HomeDisplays.Target.MAIN -> MAIN_ACTIVITY
+            dev.droidtop.runtime.HomeDisplays.Target.SURFACE -> return false
+        }
+        // A string component name: :display does not depend on :app.
+        return runCatching {
+            startActivity(
+                android.content.Intent(android.content.Intent.ACTION_MAIN)
+                    .setClassName(packageName, target)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                android.app.ActivityOptions.makeBasic().setLaunchDisplayId(here).toBundle(),
+            )
+            render()
+            true
+        }.getOrDefault(false)
     }
 
     /** See SecondScreenPresentation.dispatchTouchEvent: the same one-line probe for the idle surface. */
