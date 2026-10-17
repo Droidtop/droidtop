@@ -3668,6 +3668,29 @@ Needs a rig check: whether an isolated process may use the pipes of a
 process Shizuku started in the shell's domain. Until the per-plugin runs
 pass, the full-access rows above stay open.
 
+### 5.7 The download engine (decided 2026-10-17, Droidtop/tracker#577)
+
+droidtop's one download engine is aria2, embedded as libaria2 (SPEC 12a, "One download engine"). The owner, on its isolation: "it's important for security that we make sure plugin downloads are properly isolated, so the downloader should probably have some isolation. We don't want an injection attack to dump binary into our main process". And on its control: "No, the Aria2 RPC port is still available to droidtop. We just don't let plugins access it directly, we broker it". The engine is treated like an untrusted plugin: it parses whatever a server or a swarm sends, so a bug in it must not reach droidtop.
+
+- **Its own process.** The engine runs in an isolated service (`android:isolatedProcess`, a UID of its own) under droidtop's sandbox lockdown, the same lockdown as a contained plugin (§5.3), never in droidtop's main process. It holds no permission and no file of droidtop's.
+- **Network through the broker.** Its sockets are the sandbox's brokered sockets (`SBX_LOCK_NET_BROKERED`, §5.6): the broker in droidtop's main process creates, connects and accepts them. Name lookups go through netd's `dnsproxyd`, which the broker connects for it. So aria2 is built without c-ares, which would send its own DNS packets, and resolves with `getaddrinfo`. The engine may listen only for BitTorrent's incoming peers, on the one port droidtop gives it. On Android 10 and below, an isolated process cannot use a socket it was handed, so the engine runs in an open process (§5.3) with the internet sockets of `net.sockets` and nothing else, until the broker's byte relay covers it.
+- **Files through the broker, never by path.** The engine opens no path itself. Every path call traps to the sandbox's handler, and the broker in droidtop's process opens it under that download's rules. A download may write only its own destination and aria2's `.aria2` control file beside it, inside the folder it was given; nothing else is reachable. A download a plugin asked for writes only where that plugin's grant allows (its own data, or the destination droidtop chose for its acquire reply). CA certificates are read from the platform's store, read-only.
+- **Control is droidtop's alone.** droidtop's main process drives the engine over a narrow typed binder interface (add, pause, resume, remove, limits, events), whose caller checks admit droidtop's main process only (`AppCaller`, §5.6). aria2's JSON-RPC stays available to droidtop as well: it listens on loopback, through the broker, with a secret generated for each run that never leaves droidtop's main process. No plugin is given the port, the secret or the binder.
+- **Plugins go through the API.** A plugin asks for a download through the plugin API: `net.download`, an `acquire` reply's descriptors, or a captured web-session download (`download.session`). The broker checks the request against the plugin's grants before it issues anything to the engine:
+  - each URL's host against `net.domains`, `net.any` or `net.local`, hop by hop;
+  - the protocol: BitTorrent and magnet links need their own permission, planned as `net.torrent` (dangerous, "Download and share files with other people"), because a swarm sees the device's address and receives uploads;
+  - the destination;
+  - the size cap.
+  The engine's events reach the plugin only as its job's status (`job.get_status`).
+- **Nothing downloaded runs or is parsed in droidtop's process.** Torrent and Metalink metadata are parsed inside the isolated engine, and the main process gets typed results (names, sizes, the files a torrent holds). The main process never loads, runs or parses a downloaded file to act on it. Post steps that must read one hand it to their own contained tool: an archive is unpacked by the one `ArchiveExtractor`, and an APK is installed by Android's installer.
+- **Limits a hostile server or swarm cannot pass.**
+  - Each download has a size cap: the descriptor's size or digest, else a per-kind default.
+  - A torrent's file count and metadata size are capped.
+  - The engine refuses to start, and pauses, when free space would fall below a floor.
+  - Concurrency is capped.
+  - Seeding is off unless the person turns it on, with an upload limit when they do.
+- **Status:** decided; being built in `bi0shacker001/aria2-engine` and wired into droidtop this week. Enginehost hosts the same component the same way.
+
 ---
 
 ## 6. Mapping today's plugin API onto this model
