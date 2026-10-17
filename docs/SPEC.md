@@ -1310,6 +1310,11 @@ together with the source plugins' answers in the one list (12a "One search")
 and, while the field is empty, droidtop's Recommendations. A tap on an app opens
 it, a tap on a game plays it through `GameLaunchActivity.dispatch`, a tap on a
 source's result opens its detail.
+The field has focus the moment the search opens, so the first key typed (a hardware keyboard, the pad-driven slab or
+the input method) goes into it with no tap first (owner on the console, 0.2.0-dev.2127: "the search box isn't focused
+on open, so typing doesn't enter it until it's tapped on"). The focus is asked for each frame until Compose says it
+took it (`requestFocusWhenAttached`, which reads `requestFocus(FocusDirection)`'s answer: an unattached requester no
+longer throws in Compose 1.9, it does nothing).
 
 `:shell-default` cannot depend on `:app` or `:library-core`, so the seam is an
 action, `LauncherSearch.ACTION_SEARCH` (`dev.droidtop.shell.standard.

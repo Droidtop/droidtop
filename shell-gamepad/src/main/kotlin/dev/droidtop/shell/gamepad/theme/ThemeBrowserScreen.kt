@@ -163,7 +163,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
     LaunchedEffect(entries) {
         if (entries.isEmpty()) return@LaunchedEffect
         repeat(10) {
-            if (runCatching { firstFocus.requestFocus() }.isSuccess) return@LaunchedEffect
+            if (runCatching { firstFocus.requestFocus(androidx.compose.ui.focus.FocusDirection.Enter) }.getOrDefault(false)) return@LaunchedEffect
             kotlinx.coroutines.delay(50)
         }
     }
