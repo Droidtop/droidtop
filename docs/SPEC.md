@@ -13137,6 +13137,12 @@ the same care as the art.
     plugin declares one) are asked with the game's title, folder name and source links for every game the
     pass reaches, after the built-in sources, filling only what those left empty; that is unchanged, and
     now reaches the engine games the old "has details" rule passed over.
+- **What counts as art (decided 2026-10-17).** The owner, from the console: "Games missing artwork" always said
+  `nothing matches the "Games missing artwork" scrape filter`, because a folder or engine game counted as having
+  art when it showed any picture (its .exe's icon, a store's icon, a screenshot in downloaded_media). For every PC
+  and engine game only a real cover counts (`PcScraper.hasCover`): a cover a scrape filed (the row's artwork path,
+  on disk), a `covers` image for it in downloaded_media, or a `cover` or `coverv` image in the game's own folder.
+  "Games missing artwork" and "Games missing artwork or metadata" both read it (`PcScraper.picked`).
 - **Games that need your pick (directed 2026-10-17).** The coordinator's direction: "A game left at 'needs a
   pick' appears in a list the person can work through with the pad, not only in the log." A pass that gets
   candidates with none exact stores `scrape_confidence = "needs_pick"` on the game's row (`PcScraper.NEEDS_PICK`;
