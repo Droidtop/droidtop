@@ -13227,6 +13227,10 @@ the same care as the art.
   and engine game only a real cover counts (`PcScraper.hasCover`): a cover a scrape filed (the row's artwork path,
   on disk), a `covers` image for it in downloaded_media, or a `cover` or `coverv` image in the game's own folder.
   "Games missing artwork" and "Games missing artwork or metadata" both read it (`PcScraper.picked`).
+- **One game asked for is scraped (decided 2026-10-17).** The owner, from the console, after the art fix: a
+  single game's Scrape (its page, or its options menu) still said `nothing matches the "Games missing artwork" scrape
+  filter`. The filter is for passes over the library; a game the person picks by name is scraped whatever it says
+  (`PcScraper.scrape(filter = ScrapeFilter.ALL)` from `PcGameMenu` and `PcGamePage`).
 - **Games that need your pick (directed 2026-10-17).** The coordinator's direction: "A game left at 'needs a
   pick' appears in a list the person can work through with the pad, not only in the log." A pass that gets
   candidates with none exact stores `scrape_confidence = "needs_pick"` on the game's row (`PcScraper.NEEDS_PICK`;

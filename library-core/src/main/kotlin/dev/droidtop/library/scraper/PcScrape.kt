@@ -492,6 +492,9 @@ object PcScraper {
         // Told when the source refused every request this pass made, so a combined run does not go on asking.
         onRefusedEverything: () -> Unit = {},
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+        // A game the person asked to scrape by name (its page or menu) is scraped whatever the library filter says;
+        // the filter is for passes over the library (docs/SPEC.md 7h).
+        filter: ScrapeFilter? = null,
     ): String = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext it }
@@ -508,7 +511,7 @@ object PcScraper {
         val ordered = entries.sortedBy(::orderKey)
         val existing = ordered.map { it.id }.chunked(METADATA_READ_CHUNK)
             .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
-        val filter = ScrapeOptionsPrefs.filter(context)
+        val filter = filter ?: ScrapeOptionsPrefs.filter(context)
         val candidates = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
         val (targets, passedOver) = candidates.partition { entry ->
             val row = existing[entry.id]
