@@ -13156,6 +13156,21 @@ the same care as the art.
   0, opens `ChooseMatchesList`: one row per waiting game, Up and Down to move, A opens its manual match picker,
   B closes. Any match replaces the state, so a matched game leaves the list as the picker closes and focus stays
   where it was; a later pass that finds nothing at all clears it. The pass's summary points at the row.
+- **A source's own match: plugins search by name and link what they find (2026-10-17, Droidtop/tracker#575).**
+  The coordinator: the F95 plugin's metadata fetch needs a thread id, so the PC scrape got no F95 text for a game
+  nobody had linked. A metadata plugin (docs/plugin-api.md 3 A3) is now asked like a built-in source:
+  - **Facts:** the title the scrape searched, the folder's name (`fileName` and `folder.name`), the system folder
+    and the game's links. A source searches by title and by folder name, and matches exactly as the built-in
+    sources do.
+  - **Decision:** one candidate clearly the most confident (at or above 0.5) is the game. When two or more share
+    the top, droidtop never guesses between them: a game nothing else identified goes to "Choose matches", whose
+    picker lists the PC source's candidates and then each plugin's, named "from <plugin>".
+  - **Links:** a source's `fetch` names the record it matched (`sourceLinks: {<key>: <id>}`), under its own keys
+    only (the ids of its `library.updates` entries). droidtop links the game there unless the game is already
+    linked under that key; a link the person picked in the picker replaces one. A linked game is asked by its
+    link from then on, with no search, and the source's update checks find it.
+  - The text a source fetched fills only the fields the built-in sources left empty, recorded under the
+    plugin's name, as before.
 - **Ids travel.** Lutris's `provider_games` names a result's Steam app id and GOG product id,
   and IGDB's `external_games` does the same, so a Lutris or IGDB match of a folder game
   becomes a Steam/GOG identity and the keyless Steam store fills its developer, publisher and

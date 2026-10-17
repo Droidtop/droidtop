@@ -554,7 +554,8 @@ object PcScraper {
             try {
                 val outcome = scrapeOne(context, entry, source, flavour, steamStopped)
                 logOutcome(source.label, entry, outcome)
-                plugins?.let { fillFromPlugins(context, entry, it) }
+                // A plugin source whose best candidates tie leaves the game for the person to pick, as a built-in one does.
+                val pluginTie = plugins?.let { fillFromPlugins(context, entry, it) } ?: false
                 if (outcome is PcOutcome.Refused) {
                     counts.lastRefusal = outcome.refusal
                     when {
@@ -576,7 +577,11 @@ object PcScraper {
                         counts.needsPicking++
                         counts.misses.add(ScrapeMisses.Kind.NEEDS_PICKING, entry.title, "${outcome.candidates} candidates")
                     }
-                    is PcOutcome.NoMatch -> {
+                    is PcOutcome.NoMatch -> if (pluginTie) {
+                        markNeedsPick(context, entry, needs = true)
+                        counts.needsPicking++
+                        counts.misses.add(ScrapeMisses.Kind.NEEDS_PICKING, entry.title, "a plugin source's candidates tie")
+                    } else {
                         markNeedsPick(context, entry, needs = false)
                         counts.noMatch++
                         counts.misses.add(ScrapeMisses.Kind.NO_MATCH, entry.title)
@@ -617,27 +622,96 @@ object PcScraper {
     }
 
     /**
+     * The facts a metadata plugin gets for [entry] (docs/plugin-api.md 3 A3): the title the scrape searched, the folder's
+     * name (as `fileName` and `folder.name`, so a source can search by either), the system folder, and the game's source
+     * links (docs/SPEC.md 7g), so a source the person or an earlier scrape linked the game to answers for exactly that
+     * record.
+     */
+    private suspend fun pluginFacts(context: Context, entry: LibraryEntry): org.json.JSONObject {
+        val facts = org.json.JSONObject().put("title", searchTitleFor(entry))
+        entry.groupingPath()?.let { path ->
+            val name = File(path).name
+            facts.put("fileName", name)
+            facts.put("folder", org.json.JSONObject().put("name", name))
+        }
+        PcMediaLayout.systemFolderFor(entry)?.let { facts.put("systemId", it) }
+        val links = dev.droidtop.library.RoomGameLinksStore(context).getAll(listOf(entry.id))[entry.id]?.sources.orEmpty()
+        if (links.isNotEmpty()) facts.put("sourceLinks", org.json.JSONObject(links.associate { it.source to it.externalId }))
+        return facts
+    }
+
+    /**
      * What metadata plugins know about [entry], written into the fields the built-in sources left empty, each recorded
-     * under the plugin's name (docs/SPEC.md 7h). The facts a plugin gets: the title the scrape searched, the folder's
-     * name, the system folder, and the game's source links (docs/SPEC.md 7g), so a source the person linked the game to
-     * answers for exactly that record.
+     * under the plugin's name (docs/SPEC.md 7h). A source that matched also links the game to its record
+     * (`sourceLinks`, docs/SPEC.md 7h "A source's own match"), so the next scrape and the source's own update checks
+     * find it without a search. Returns whether a source's best candidates tied: the game then needs the person's pick.
      */
     private suspend fun fillFromPlugins(
         context: Context,
         entry: LibraryEntry,
         plugins: dev.droidtop.library.integrations.PluginMetadataSources.Session,
-    ) {
-        val facts = org.json.JSONObject().put("title", searchTitleFor(entry))
-        entry.groupingPath()?.let { facts.put("fileName", File(it).name) }
-        PcMediaLayout.systemFolderFor(entry)?.let { facts.put("systemId", it) }
-        val links = dev.droidtop.library.RoomGameLinksStore(context).getAll(listOf(entry.id))[entry.id]?.sources.orEmpty()
-        if (links.isNotEmpty()) facts.put("sourceLinks", org.json.JSONObject(links.associate { it.source to it.externalId }))
-        val found = plugins.lookup(facts).filterNot { it.isEmpty }
+    ): Boolean {
+        val answers = plugins.answers(pluginFacts(context, entry))
+        answers.forEach { linkFromPlugin(context, entry, it.links) }
+        writePluginFields(context, entry, answers.mapNotNull { it.fields }.filterNot { it.isEmpty })
+        return answers.any { it.ambiguous.isNotEmpty() } && answers.none { it.fields != null || it.links.isNotEmpty() }
+    }
+
+    /** Links [entry] under each key a source matched it to, unless the game is already linked under that key. */
+    private suspend fun linkFromPlugin(context: Context, entry: LibraryEntry, links: Map<String, String>, replace: Boolean = false) {
+        if (links.isEmpty()) return
+        val store = dev.droidtop.library.RoomGameLinksStore(context)
+        val have = store.getAll(listOf(entry.id))[entry.id]?.sources.orEmpty().associate { it.source to it.externalId }
+        for ((key, id) in links) {
+            if (!replace && have[key] != null) continue
+            store.setSourceLink(listOf(entry.id), key, id)
+            dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] linked to $key $id")
+        }
+    }
+
+    private suspend fun writePluginFields(context: Context, entry: LibraryEntry, found: List<dev.droidtop.pluginhost.MetadataFields>) {
         if (found.isEmpty()) return
         val dao = RomDatabase.get(context).romDao()
         val row = dao.getGameMetadataSingle(entry.id) ?: GameMetadataEntity(id = entry.id)
         val (filled, sources) = PcPluginFields.fill(row, found)
         if (sources.isNotEmpty()) dao.upsertGameMetadata(filled.copy(fieldSources = FieldSources.merge(row.fieldSources, sources)))
+    }
+
+    /** A metadata plugin's candidate for the picker: which source offered it, and its ids to fetch it by. */
+    data class PluginPick(
+        val source: dev.droidtop.library.integrations.PluginMetadataSources.Source,
+        val candidate: dev.droidtop.pluginhost.PluginMetadataProtocol.Candidate,
+    ) {
+        val name: String get() = candidate.title ?: entryIdText()
+        private fun entryIdText(): String = candidate.ids.keys().asSequence().joinToString(", ") { "$it ${candidate.ids.opt(it)}" }
+    }
+
+    /** The candidates metadata plugins offer for [entry], for the picker beside the PC source's. Never applies anything. */
+    suspend fun pluginCandidates(context: Context, entry: LibraryEntry): List<PluginPick> = withContext(Dispatchers.IO) {
+        val session = dev.droidtop.library.integrations.PluginMetadataSources.open(context) ?: return@withContext emptyList()
+        try {
+            session.candidates(pluginFacts(context, entry)).map { (source, candidate) -> PluginPick(source, candidate) }
+        } finally {
+            session.close()
+        }
+    }
+
+    /**
+     * Writes a plugin candidate the person picked: the game is linked to that record (replacing a link under the same
+     * key) and its fields fill what is still empty, recorded under the plugin's name. The game leaves "Choose matches".
+     */
+    suspend fun applyPlugin(context: Context, entry: LibraryEntry, pick: PluginPick): String = withContext(Dispatchers.IO) {
+        val session = dev.droidtop.library.integrations.PluginMetadataSources.open(context)
+            ?: return@withContext "${pick.source.label} is not running"
+        try {
+            val answer = session.fetch(pick.source, pick.candidate.ids) ?: return@withContext "${pick.source.label} did not answer"
+            linkFromPlugin(context, entry, answer.links, replace = true)
+            writePluginFields(context, entry, listOfNotNull(answer.fields?.takeUnless { it.isEmpty }))
+            markNeedsPick(context, entry, needs = false)
+            "Matched ${entry.title} to ${pick.name} (${pick.source.label})."
+        } finally {
+            session.close()
+        }
     }
 
     /** What happened to one game in the automatic pass; each lands in its own bucket of the summary. */

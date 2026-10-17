@@ -1624,9 +1624,17 @@ talk over the API".
       - `storeIds` (`{steam, vndb, f95, dlsite, ...}`: the game's links
         and the ids read from its folder);
       - `sourceLinks`, kept for plugins written before `storeIds`.
-    - The host takes the most confident candidate at or above 0.5 (a
-      candidate without a confidence counts as 0.5). A candidate's
-      `title` names it in "Rescrape with…".
+      - `folder` carries at least `name`, the game's folder name, also
+        sent as `fileName` (2026-10-17, Droidtop/tracker#575).
+    - A source with no link for the game searches by `title` and by
+      `folder.name`, and answers only exact matches, as droidtop's
+      built-in sources match.
+    - The host takes the one most confident candidate at or above 0.5 (a
+      candidate without a confidence counts as 0.5). When two or more
+      share the top confidence, it takes none: the game goes to "Choose
+      matches", where the person picks among them (SPEC 7h, "A source's
+      own match"). A candidate's `title` names it there and in
+      "Rescrape with…".
   - `fetch {ids} → fields`:
     - `title`;
     - `description`, `developer`, `publisher`, `genre`, `tags`;
@@ -1635,6 +1643,11 @@ talk over the API".
     - `cover` and `screenshots` (https URLs);
     - `links` (`[{label, url}]`);
     - `storeIds`, so a later scrape can skip `match`.
+    - `sourceLinks` (`{<key>: <id>}`), the record the source matched:
+      droidtop links the game under that key (one of the plugin's own
+      `library.updates` entry ids; any other key is ignored), unless it
+      is already linked there. The next `match` gets it in
+      `sourceLinks` and answers by it without searching.
     Every field is optional.
   - `cancel {callId}`: the scrape stopped. Answering is optional; the
     host does not wait.
