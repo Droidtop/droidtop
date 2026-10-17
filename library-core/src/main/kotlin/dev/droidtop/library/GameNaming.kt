@@ -247,11 +247,13 @@ object GameNaming {
      *    (`ThiefofHeartsPart3-0.0.9-pc`) -- see [trailingSegment].
      */
     fun derive(path: String): Derived {
-        val derived = deriveUntrimmed(path)
+        val derived = deriveUntrimmed(path).let { it.copy(name = it.name.replace(SPACE_RUN, " ").trim()) }
         val trimmed = GameTitleParser.trimTrailing(derived.name)
         if (trimmed.tokens.isEmpty()) return derived
         return derived.copy(name = trimmed.name, platform = trimmed.platform, tags = trimmed.tokens)
     }
+
+    private val SPACE_RUN = Regex("""\s{2,}""")
 
     private fun deriveUntrimmed(path: String): Derived {
         // Bracketed tags and scene dots come off every component first, so
@@ -353,7 +355,9 @@ object GameNaming {
      */
     fun displayName(name: String): String {
         val trimmed = name.trim()
-        if (trimmed.isEmpty() || trimmed.contains(' ')) return trimmed
+        if (trimmed.isEmpty()) return trimmed
+        // A name with spaces is already words; a run of them (a dropped "&") is one.
+        if (trimmed.contains(' ')) return trimmed.replace(SPACE_RUN, " ")
         var spaced = trimmed.replace('_', ' ')
         if (!spaced.contains(' ') && spaced.count { it == '-' } >= 2) spaced = spaced.replace('-', ' ')
         return spaced.replace(Regex("""\s+"""), " ").trim().ifEmpty { trimmed }

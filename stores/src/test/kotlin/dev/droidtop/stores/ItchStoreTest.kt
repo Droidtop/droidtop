@@ -41,6 +41,8 @@ class ItchStoreTest {
         assertEquals("Doki Doki Literature Club", StoreFiles.folderName("Doki Doki Literature Club!", "x"))
         assertEquals("Baldurs Gate 3", StoreFiles.folderName("Baldur's Gate 3", "x"))
         assertEquals("What", StoreFiles.folderName("What?:*|<>\"", "x"))
+        // A dropped character between two words leaves one space (console, 0.2.0-dev.2129).
+        assertEquals("Love Sex Second Base", StoreFiles.folderName("Love & Sex: Second Base", "x"))
         assertEquals("Version 1.0", StoreFiles.folderName("Version 1.0.", "x"))
         assertEquals("itch-42", StoreFiles.folderName("???", "itch-42"))
     }

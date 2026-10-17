@@ -145,7 +145,9 @@ object LibraryGrouping {
                     path = entry.id,
                     installed = entry.pcInfo?.installed != false,
                     latestKnown = entry.latestKnown,
-                    name = entry.gameName,
+                    // A store install's folder is named after the store's title with characters dropped; the store's
+                    // own name is the game's (StoreInstall.title), where the person has not named it themselves.
+                    name = entry.gameName ?: entry.title.takeIf { PcSource.of(entry) is PcSource.Store },
                     namePath = roots.firstNotNullOfOrNull { root -> GameNaming.relativeTo(root, path).takeIf { it != path } } ?: path,
                 )
             },
