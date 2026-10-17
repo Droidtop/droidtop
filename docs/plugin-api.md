@@ -3682,6 +3682,11 @@ droidtop's one download engine is aria2, embedded as libaria2 (SPEC 12a, "One do
   - the destination;
   - the size cap.
   The engine's events reach the plugin only as its job's status (`job.get_status`).
+- **What it reports itself as.** The owner: "I'd like us to report as whatever the system's primary browser is, for the sake of anonymity. The exception is for torrents (don't wanna be suspected of tracker rule evasion)", then "What if we just report a semi-sanitized android webview version?". So:
+  - **HTTP(S) and FTP:** downloads, a plugin's included, send the WebView user agent in Chrome's reduced form (SPEC 12a).
+  - **A plugin's explicit `User-Agent`:** an explicit `User-Agent` in a plugin's descriptor, or a captured site session's, is kept.
+  - **BitTorrent:** keeps aria2's own identity to trackers and peers; nothing spoofs a client.
+- **Options that run programs are refused.** aria2 can run a program when a download ends (`on-download-complete` and the other hooks), and some options name files anywhere. The engine refuses these from every caller, droidtop included, so nothing it downloads is ever run and it touches no file outside its folder.
 - **Nothing downloaded runs or is parsed in droidtop's process.** Torrent and Metalink metadata are parsed inside the isolated engine, and the main process gets typed results (names, sizes, the files a torrent holds). The main process never loads, runs or parses a downloaded file to act on it. Post steps that must read one hand it to their own contained tool: an archive is unpacked by the one `ArchiveExtractor`, and an APK is installed by Android's installer.
 - **Limits a hostile server or swarm cannot pass.**
   - Each download has a size cap: the descriptor's size or digest, else a per-kind default.
