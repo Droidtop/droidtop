@@ -16,11 +16,23 @@ object PluginWebAccount {
     enum class Need { SIGN_IN, BROWSER_CHECK }
 
     /**
-     * The account row's state: [site] is the first declared site; [signInUrl] the declared sign-in page (null when the
-     * plugin declared none: droidtop then offers no Sign in of its own); [grant] the `web.session` permission's state.
+     * The account row's state (docs/SPEC.md 12a "A plugin's site account"): [site] is the first declared site;
+     * [signInUrl] the declared sign-in page, null when the plugin declared none (sign-in then opens the site's home
+     * page, [checkUrl]); [name] the account's name when the plugin told it (`web.session set_account`); [grant] the
+     * `web.session` permission's state.
      */
-    data class Account(val site: String, val signInUrl: String?, val signedIn: Boolean, val grant: GrantState) {
+    data class Account(val site: String, val signInUrl: String?, val signedIn: Boolean, val grant: GrantState, val name: String? = null) {
         val allowed: Boolean get() = grant != GrantState.DENIED
+
+        /** Switch account: sign out, then sign in again on the declared sign-in page. Only where the plugin declared one. */
+        val canSwitch: Boolean get() = signInUrl != null
+
+        /** The row's value: who is signed in, or that no one is. */
+        val state: String get() = when {
+            !signedIn -> "Not signed in"
+            name != null -> name
+            else -> "Signed in"
+        }
     }
 
     /** The `signIn` address of [record]'s `web.session` entry, when it is https and on one of its declared sites. */
@@ -30,6 +42,16 @@ object PluginWebAccount {
         val url = runCatching { JSONObject(entry.extra).optString("signIn").trim() }.getOrDefault("")
         val domains = WebSessions.declaredDomains(permissions)
         return url.takeIf { it.isNotEmpty() && WebSessions.domainFor(it, domains) != null }
+    }
+
+    /**
+     * The `doneCookie` of [record]'s `web.session` entry: the cookie the site sets once someone is signed in, so the
+     * sign-in view closes by itself then (as a plugin's own `sign_in` may ask). Null when it declared none.
+     */
+    fun doneCookie(record: PluginRecord): String? {
+        val entry = record.manifest.v2.permissions.firstOrNull { it.id == WebSessions.PERMISSION } ?: return null
+        return runCatching { JSONObject(entry.extra).optString("doneCookie").trim() }.getOrDefault("")
+            .takeIf { it.matches(Regex("[A-Za-z0-9_.-]{1,64}")) }
     }
 
     /** Where a browser check is passed: the declared sign-in page's site, else the first declared site's home page. */
@@ -45,7 +67,7 @@ object PluginWebAccount {
         val snapshot = PluginGrants.forContext(context).read(record.manifest.id)
         val grant = PluginGrants.stateOf(record, snapshot, WebSessions.PERMISSION) ?: return null
         val stored = WebSessions.Stored.parse(PluginVault.forContext(context).getHost(record.manifest.id, WebSessions.VAULT_KEY))
-        return Account(site, signInUrl(record), stored?.cookies?.isNotEmpty() == true, grant)
+        return Account(site, signInUrl(record), stored?.cookies?.isNotEmpty() == true, grant, stored?.account)
     }
 
     /**
@@ -66,9 +88,12 @@ object PluginWebAccount {
         val vault = PluginVault.forContext(context)
         val stored = WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY))
         val mode = if (need == Need.SIGN_IN) WebSessionRequest.Mode.SIGN_IN else WebSessionRequest.Mode.CHECK
-        val result = WebSessionActivity.show(context, WebSessionRequest(record.manifest.label, mode, url, domains, stored, null))
+        val done = if (need == Need.SIGN_IN) doneCookie(record) else null
+        val result = WebSessionActivity.show(context, WebSessionRequest(record.manifest.label, mode, url, domains, stored, done))
         val session = result.session?.takeIf { result.completed && it.cookies.isNotEmpty() } ?: return false
-        vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, session.toJson())
+        // A sign-in may be another account, whose name the plugin tells again; a browser check keeps the name it had.
+        val account = if (need == Need.SIGN_IN) null else stored?.account
+        vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, session.copy(account = account).toJson())
         if (account.grant == GrantState.ASK) PluginGrants.forContext(context).set(record.manifest.id, WebSessions.PERMISSION, GrantState.GRANTED)
         return true
     }
@@ -82,4 +107,13 @@ object PluginWebAccount {
     /** Forgets [record]'s session (the account row's Sign out; the same as the plugin's own `web.session.clear`). */
     fun signOut(context: Context, record: PluginRecord): Boolean =
         PluginVault.forContext(context).deleteHost(record.manifest.id, WebSessions.VAULT_KEY)
+
+    /**
+     * Switch account: the session is forgotten and the declared sign-in page opened in a clean view. Backing out leaves
+     * the plugin signed out, which the row then says. Blocks until the view closes: never on the main thread.
+     */
+    fun switchAccount(context: Context, record: PluginRecord): Boolean {
+        signOut(context, record)
+        return open(context, record, Need.SIGN_IN)
+    }
 }

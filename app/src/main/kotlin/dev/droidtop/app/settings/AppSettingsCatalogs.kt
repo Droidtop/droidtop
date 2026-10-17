@@ -1961,36 +1961,11 @@ object AppSettingsCatalogs {
                     ),
                 )
             }
-            // The site account a web.session plugin signs in to (docs/plugin-api.md 3 G3, Droidtop/tracker#544 item 2):
-            // droidtop draws it from the session it keeps, so no plugin draws its own Sign in / Sign out row.
+            // The site account a web.session plugin signs in to (docs/SPEC.md 12a "A plugin's site account"): the one
+            // way in. Signed out, pressing the row signs in at once; signed in, it names the account and opens Sign out
+            // and Switch account. droidtop draws it from the session it keeps, so no plugin draws its own.
             if (record.runnable()) {
-                dev.droidtop.pluginhost.PluginWebAccount.of(context, record)?.let { account ->
-                    add(
-                        AsyncActionItem(
-                            id = "plugin_${m.id}_web_account",
-                            title = "${account.site} account",
-                            subtitle = when {
-                                !account.allowed -> "Sign-in is turned off for ${m.label} in its Permissions"
-                                account.signedIn -> "Your sign-in stays in droidtop: ${m.label} never sees your password. Press to sign out"
-                                account.signInUrl == null -> "${m.label} asks you to sign in when it needs to"
-                                else -> "Your sign-in stays in droidtop: ${m.label} never sees your password"
-                            },
-                            value = if (account.signedIn) "Signed in" else "Not signed in",
-                            confirmTitle = if (account.signedIn) "Sign out of ${account.site}?" else null,
-                            run = { ctx, _ ->
-                                // Sign-in waits for the web view to close: never on the main thread.
-                                withContext(Dispatchers.IO) { when {
-                                    !account.allowed -> "Turn sign-in on in ${m.label}'s Permissions first"
-                                    account.signedIn ->
-                                        if (dev.droidtop.pluginhost.PluginWebAccount.signOut(ctx, record)) "Signed out of ${account.site}" else "Already signed out"
-                                    account.signInUrl == null -> "${m.label} asks you to sign in when it needs to"
-                                    dev.droidtop.pluginhost.PluginWebAccount.open(ctx, record, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN) -> "Signed in to ${account.site}"
-                                    else -> dev.droidtop.pluginhost.PluginWebAccount.notKept(m.label, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN)
-                                } }
-                            },
-                        ),
-                    )
-                }
+                dev.droidtop.pluginhost.PluginWebAccount.of(context, record)?.let { account -> add(pluginAccountRow(record, account)) }
             }
             if (record.runnable() && PluginCapability.APP_STATUS in m.capabilities) {
                 add(
@@ -2141,6 +2116,84 @@ object AppSettingsCatalogs {
     }
 
     /** [pluginDetailPage]'s header and bar, around its [groups]. */
+    /** Signs in to [record]'s site from its account row, and tells the plugin it may read the account again. */
+    private suspend fun signInFromRow(ctx: Context, record: dev.droidtop.pluginhost.PluginRecord, switch: Boolean): String {
+        val m = record.manifest
+        val web = dev.droidtop.pluginhost.PluginWebAccount
+        val account = withContext(Dispatchers.IO) { web.of(ctx, record) } ?: return "${m.label} has no site account"
+        if (!account.allowed) return "Turn sign-in on in ${m.label}'s Permissions first"
+        // Sign-in waits for the web view to close: never on the main thread.
+        val kept = withContext(Dispatchers.IO) { if (switch) web.switchAccount(ctx, record) else web.open(ctx, record, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN) }
+        if (!kept) return web.notKept(m.label, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN)
+        dev.droidtop.library.integrations.notifyWebSignedIn(ctx, record)
+        return "Signed in to ${account.site}"
+    }
+
+    /**
+     * A plugin's site account row (docs/SPEC.md 12a "A plugin's site account"). Signed out, pressing it opens the site's
+     * sign-in straight away; signed in, its value is the account and pressing it offers Sign out, and Switch account
+     * where the plugin declared a sign-in page.
+     */
+    private fun pluginAccountRow(record: dev.droidtop.pluginhost.PluginRecord, account: dev.droidtop.pluginhost.PluginWebAccount.Account): CatalogItem {
+        val m = record.manifest
+        val title = "${account.site} account"
+        if (!account.signedIn) {
+            return AsyncActionItem(
+                id = "plugin_${m.id}_web_account",
+                title = title,
+                subtitle = if (account.allowed) "Your sign-in stays in droidtop: ${m.label} never sees your password" else "Sign-in is turned off for ${m.label} in its Permissions",
+                value = account.state,
+                run = { ctx, _ -> signInFromRow(ctx, record, switch = false) },
+            )
+        }
+        return NestedScreenItem(
+            id = "plugin_${m.id}_web_account",
+            title = title,
+            subtitle = "Your sign-in stays in droidtop: ${m.label} never sees your password",
+            valueLabel = { account.state },
+            inline = CatalogScreen(
+                id = "plugin_${m.id}_web_account_screen",
+                title = title,
+                groups = { context ->
+                    val now = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.PluginWebAccount.of(context, record) }
+                    listOf(
+                        CatalogGroup(
+                            id = "plugin_${m.id}_web_account_actions",
+                            title = null,
+                            items = buildList {
+                                if (now == null || !now.signedIn) {
+                                    add(AsyncActionItem(id = "plugin_${m.id}_web_sign_in", title = "Sign in", value = "Not signed in", run = { ctx, _ -> signInFromRow(ctx, record, switch = false) }))
+                                } else {
+                                    add(
+                                        AsyncActionItem(
+                                            id = "plugin_${m.id}_web_sign_out",
+                                            title = "Sign out",
+                                            value = now.state,
+                                            confirmTitle = "Sign out of ${now.site}?",
+                                            run = { ctx, _ ->
+                                                if (withContext(Dispatchers.IO) { dev.droidtop.pluginhost.PluginWebAccount.signOut(ctx, record) }) "Signed out of ${now.site}" else "Already signed out"
+                                            },
+                                        ),
+                                    )
+                                    if (now.canSwitch) {
+                                        add(
+                                            AsyncActionItem(
+                                                id = "plugin_${m.id}_web_switch",
+                                                title = "Switch account",
+                                                subtitle = "Signs out, then opens ${now.site}'s sign-in for another account",
+                                                run = { ctx, _ -> signInFromRow(ctx, record, switch = true) },
+                                            ),
+                                        )
+                                    }
+                                }
+                            },
+                        ),
+                    )
+                },
+            ),
+        )
+    }
+
     private fun pluginPageTop(
         context: Context,
         record: dev.droidtop.pluginhost.PluginRecord,

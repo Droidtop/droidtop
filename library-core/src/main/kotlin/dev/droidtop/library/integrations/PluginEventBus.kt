@@ -139,6 +139,23 @@ fun notifyThemeChanged(context: Context, light: Boolean) {
 }
 
 /**
+ * Fires [PluginEvent.WEB_SIGNED_IN] at [record] when it subscribed: the person signed in to its site through droidtop
+ * (docs/SPEC.md 12a "A plugin's site account"). Returns at once; the plugin is told off the caller's thread.
+ */
+fun notifyWebSignedIn(context: Context, record: dev.droidtop.pluginhost.PluginRecord) {
+    if (!record.runnable() || !record.manifest.subscribesTo(PluginEvent.WEB_SIGNED_IN)) return
+    val app = context.applicationContext
+    CoroutineScope(Dispatchers.IO).launch {
+        val policy = PluginCrashPolicy(app)
+        try {
+            runCatching { policy.notifyEvent(record, PluginEvent.WEB_SIGNED_IN, emptyMap()) }
+        } finally {
+            policy.shutdown()
+        }
+    }
+}
+
+/**
  * The exact args map [PluginEventBus.notifyDefaultPlayerChanged] delivers
  * as [PluginEvent.DEFAULT_PLAYER_CHANGED]'s payload -- pulled out of the
  * suspend dispatch (which needs a real [Context], the plugin store and a

@@ -54,11 +54,22 @@ internal object HostWebApis {
             val url = sessionUrl(args, domains)
             val doneCookie = args.optString("doneCookie").trim().takeIf { it.matches(Regex("[A-Za-z0-9_.-]{1,64}")) }
             val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.SIGN_IN, url, domains, stored(env, record), doneCookie))
-            if (result.completed) save(env, record, result.session)
+            // A new sign-in may be another account: its name is the plugin's to tell again (set_account).
+            if (result.completed) save(env, record, result.session?.copy(account = null))
             JSONObject().put("signedIn", result.completed && result.session?.cookies?.isNotEmpty() == true)
         },
         HostOp("web.session", "get_status", permission = WebSessions.PERMISSION) { env, record, _ ->
-            JSONObject().put("signedIn", stored(env, record)?.cookies?.isNotEmpty() == true)
+            val session = stored(env, record)
+            JSONObject().put("signedIn", session?.cookies?.isNotEmpty() == true).put("account", session?.account ?: JSONObject.NULL)
+        },
+        // The name of the account the session is signed in to, as the plugin read it from the site: droidtop shows it
+        // on the plugin's account row (docs/SPEC.md 12a "A plugin's site account"). Nothing else uses it.
+        HostOp("web.session", "set_account", permission = WebSessions.PERMISSION) { env, record, args ->
+            val name = WebSessions.Stored.accountName(args.optString("name")) ?: invalid("name must be one line of 1 to 64 characters")
+            val session = stored(env, record)?.takeIf { it.cookies.isNotEmpty() }
+                ?: return@HostOp JSONObject().put("saved", false)
+            save(env, record, session.copy(account = name))
+            JSONObject().put("saved", true)
         },
         HostOp("web.session", "clear", permission = WebSessions.PERMISSION, alwaysAudit = true) { env, record, _ ->
             JSONObject().put("cleared", vault(env).deleteHost(record.manifest.id, WebSessions.VAULT_KEY))
@@ -96,7 +107,7 @@ internal object HostWebApis {
             val max = args.optInt("max", 1).coerceIn(1, MAX_CAPTURED)
             val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null, maxDownloads = max))
             // The site may have renewed the session while the person was there.
-            result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it) }
+            result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it.copy(account = stored(env, record)?.account)) }
             if (result.downloads.isEmpty()) return@HostOp JSONObject().put("captured", false)
             val described = result.downloads.take(max).map { download ->
                 NetScope.hostOf(download.url) ?: invalid("the page started a download that is not an http or https address")

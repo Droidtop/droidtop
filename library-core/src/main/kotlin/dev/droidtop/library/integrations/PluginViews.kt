@@ -593,6 +593,7 @@ private class PluginPage(
                 details = node.details,
                 action = NoticeAction(label) { context ->
                     val kept = withContext(Dispatchers.IO) { PluginWebAccount.open(context, record, need) }
+                    if (kept && need == PluginWebAccount.Need.SIGN_IN) notifyWebSignedIn(context, record)
                     if (kept) stale = op != null else notice = PluginWebAccount.notKept(record.manifest.label, need)
                 },
                 source = record.manifest.label,
