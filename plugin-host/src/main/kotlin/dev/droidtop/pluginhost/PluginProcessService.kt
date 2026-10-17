@@ -256,17 +256,14 @@ abstract class PluginProcessService : Service() {
             }
             val progress = object : PluginJobProgress {
                 override fun report(percent: Int, statusLine: String) {
-            requireApp()
                     broadcastJobProgress(pluginId, jobId, percent, statusLine, null)
                 }
 
                 override fun checkpoint(percent: Int, statusLine: String, resumePayload: String?) {
-            requireApp()
                     broadcastJobProgress(pluginId, jobId, percent, statusLine, resumePayload?.takeIf { it.length <= MAX_RESUME_PAYLOAD_CHARS })
                 }
 
                 override fun complete(result: PluginResult) {
-            requireApp()
                     broadcastJobComplete(pluginId, jobId, result)
                 }
             }
