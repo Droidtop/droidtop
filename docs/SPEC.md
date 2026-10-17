@@ -606,6 +606,25 @@ the home app, is covered by the companion's Presentation while Gaming
 runs. Nothing else changes: Launcher mode stays enabled, because the
 person may pick droidtop again from that row.
 
+**Home brings back droidtop's screen for the display it was pressed on** (the owner, 2026-10-17: "It should bring
+droidtop back on whichever screen we're looking at. Companion if it's that screen, main if it's that one, etc.").
+`HomeTrampolineActivity` (Home on the default display) and `SecondaryDisplayActivity` (Home on a secondary display,
+Android's own `SECONDARY_HOME` start, told from droidtop placing it by the category) each ask
+`HomeDisplays.targetFor` with their own display. The companion is brought to the front on the display it lives on,
+the main screen (Gaming, Desktop or Standard, through the redirect below) on the display the shell runs on or on the
+default display, and droidtop's secondary surface anywhere else. `CompanionActivity` and `MainActivity` record where
+they are (`HomeDisplays.companionShown`, `shellShown`); a process that is not running knows neither, and Home then
+brings the main screen, which arranges the rest. Before, the redirect always started `MainActivity`: on the console,
+with the companion on the built-in screen and Gaming on the monitor, Home on the built-in screen brought Gaming
+forward on the monitor and left the app the person had opened in front, so Home looked ignored.
+
+There is no separate secondary home to choose. Android takes the `SECONDARY_HOME` activity from the package that
+holds HOME (it looks there first, `RootWindowContainer.resolveSecondaryHomeActivity`), so holding HOME makes
+`SecondaryDisplayActivity` the secondary home; the "Set as home" step covers both. A generic query for
+`SECONDARY_HOME` (`cmd package resolve-activity`) still answers Android's chooser, because more than one app
+declares the category, and that is not the window manager's answer. On a display Android does not decorate it
+starts no home at all; there droidtop's own placement (§4c) keeps its surface.
+
 Built 2026-09-25 (`HomeRolePrefs.isDroidtopHome`, `homeRequestIntent`),
 after the Android 14 rig answered "droidtop's own launcher" in setup and
 kept Pixel Launcher as Home while Global settings read "On"
@@ -4515,6 +4534,11 @@ different questions:
   shows when droidtop is not foreground: at boot, after a game on that
   display exits, while the user is in another app. The platform places
   and re-places it.
+- **Home on every screen** brings droidtop's own screen for that display
+  back (§2c, `HomeDisplays`): the companion where it lives, the shell where
+  it runs, the idle surface anywhere else. A Home press reaches
+  `SecondaryDisplayActivity` as an Android `SECONDARY_HOME` start; droidtop
+  placing it carries no such category, so the two are told apart.
 - **`Presentation` is the ACTIVE surface** — a window owned by the
   foreground shell, so companion content tracks shell focus without a
   second Activity competing for input focus.
