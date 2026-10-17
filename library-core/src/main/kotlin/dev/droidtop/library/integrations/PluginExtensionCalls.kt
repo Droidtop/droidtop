@@ -230,6 +230,10 @@ object PluginMetadataSources {
         /** The game-link keys this plugin owns: its own `library.updates` entries. A fetch links a game under these only. */
         val ownLinkKeys: Set<String>
             get() = record.manifest.v2.provides.filter { it.point == "library.updates" }.mapNotNull { it.id }.toSet()
+
+        /** The sites the plugin declared (`net.domains`): a picture it names is fetched only from these. */
+        val netDomains: List<String>
+            get() = dev.droidtop.pluginhost.NetScope.declaredDomains(record.manifest.v2.permissions)
     }
 
     /**
@@ -242,6 +246,8 @@ object PluginMetadataSources {
         val fields: MetadataFields?,
         val links: Map<String, String> = emptyMap(),
         val ambiguous: List<PluginMetadataProtocol.Candidate> = emptyList(),
+        /** The cover picture's address, which droidtop fetches itself from the plugin's own sites. */
+        val cover: String? = null,
     )
 
     fun sources(context: Context): List<Source> = providersOf(context, POINT).map { (record, entry) -> Source(record, entry) }
@@ -280,7 +286,12 @@ object PluginMetadataSources {
         suspend fun fetch(source: Source, ids: JSONObject): Answer? {
             val fetch = policy.handle(source.record, newCall(POINT, "fetch", "scrape", JSONObject().put("ids", ids), 15_000L))
             if (!fetch.ok) return null
-            return Answer(source, PluginMetadataProtocol.fields(source.label, fetch.data), PluginMetadataProtocol.sourceLinks(fetch.data, source.ownLinkKeys))
+            return Answer(
+                source,
+                PluginMetadataProtocol.fields(source.label, fetch.data),
+                PluginMetadataProtocol.sourceLinks(fetch.data, source.ownLinkKeys),
+                cover = PluginMetadataProtocol.cover(fetch.data),
+            )
         }
 
         private suspend fun answerOne(source: Source, facts: JSONObject): Answer? {

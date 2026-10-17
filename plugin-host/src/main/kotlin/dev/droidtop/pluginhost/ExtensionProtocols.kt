@@ -197,6 +197,9 @@ object PluginMetadataProtocol {
         return if (top.size == 1) MatchDecision.Match(top.single()) else MatchDecision.Ambiguous(top)
     }
 
+    /** The `cover` a `fetch` answer names: an https address, which the host fetches itself, or null. */
+    fun cover(data: JSONObject): String? = text(data, "cover")?.takeIf { NetScope.isHttps(it) && NetScope.hostOf(it) != null }
+
     /**
      * The game links a `fetch` answer names (`sourceLinks: {key: id}`), kept to [ownKeys], the source keys the plugin
      * itself declared (its `library.updates` entries): a plugin links games to its own site only. Ids are one line of
