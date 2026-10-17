@@ -20,6 +20,8 @@ import dev.droidtop.library.settings.Mode
 import dev.droidtop.library.settings.Modes
 import dev.droidtop.library.credentials.CredentialStore
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.DeveloperMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
 import org.json.JSONArray
 import org.json.JSONObject
@@ -202,6 +204,8 @@ object DroidtopWideSettings {
                                 )
                             },
                         ),
+                        // A feedback tool for anyone, not a developer's: the owner, 2026-10-17, "Diagnostics are a user
+                        // feedback tool, not a dev tool" (docs/SPEC.md 7, "Developer menu").
                         AsyncActionItem(
                             id = "pref_global_share_diagnostics",
                             title = "Share diagnostics",
@@ -234,7 +238,33 @@ object DroidtopWideSettings {
                             mimeType = "application/json",
                             onPicked = ::readBackup,
                         ),
-                    ) + listOfNotNull(debugCrashItem(context)),
+                    ),
+                ),
+                // Which droidtop this is; seven taps on it turn on the Developer menu, where it then opens from.
+                CatalogGroup(
+                    id = "global_about",
+                    title = "About droidtop",
+                    category = "System",
+                    items = listOfNotNull(
+                        ActionItem(
+                            id = "pref_global_version",
+                            title = "Version",
+                            value = dev.droidtop.app.update.AppSelfUpdate.installedVersionName(context),
+                            run = { ctx ->
+                                DeveloperMenu.versionTapped(ctx)?.let { dev.droidtop.library.settings.Notices.flash(it, context = ctx) }
+                            },
+                        ),
+                        if (DeveloperMenu.on(context)) {
+                            NestedScreenItem(
+                                id = "pref_global_developer",
+                                title = "Developer",
+                                subtitle = "Debug builds and recovery; and technical details on the pages they belong to",
+                                registryId = DeveloperMenu.SCREEN,
+                            )
+                        } else {
+                            null
+                        },
+                    ),
                 ),
             )
         },
@@ -478,6 +508,42 @@ object DroidtopWideSettings {
      * uncaught-exception handler exactly like a real crash, whichever
      * surface runs the row.
      */
+    /**
+     * The Developer menu (docs/SPEC.md 7, "Developer menu"; Droidtop/tracker#579): what is for finding faults in droidtop rather than
+     * for playing. Its own rows are droidtop-wide; a plugin's, an emulator's or a page's technical rows stay on their
+     * page and show there only while this menu is on ([DeveloperMenu.on]).
+     */
+    fun developerScreen() = CatalogScreen(
+        id = DeveloperMenu.SCREEN,
+        title = "Developer",
+        subtitle = "For finding faults in droidtop",
+        groups = { context ->
+            listOf(
+                CatalogGroup(
+                    id = "developer_diagnostics",
+                    title = "Recovery and debugging",
+                    items = listOfNotNull(
+                        AppSettingsCatalogs.rebuildIndexItem(),
+                        UpdatesPage.debugBuildsItem(context),
+                        debugCrashItem(context),
+                    ),
+                ),
+                CatalogGroup(
+                    id = "developer_menu",
+                    title = "Developer menu",
+                    items = listOf(
+                        ActionItem(
+                            id = "developer_turn_off",
+                            title = "Turn off the Developer menu",
+                            subtitle = "Hides this menu and the technical rows again; seven taps on the version bring it back",
+                            run = { ctx -> DeveloperMenu.set(ctx, false) },
+                        ),
+                    ),
+                ),
+            )
+        },
+    )
+
     private fun debugCrashItem(context: Context): ActionItem? {
         if (!AppSettingsCatalogs.ctxIsDebuggable(context)) return null
         return ActionItem(

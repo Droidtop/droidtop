@@ -7660,7 +7660,7 @@ app-drawer icon or a floating switcher button:
   a new device brings back everything a person did in droidtop and
   nothing that needs a grant; the row is named "Back up droidtop" for
   that reason, and Restore says what it will and will not bring back
-  before it runs. The index is rebuilt from the restored records (Data
+  before it runs. The index is rebuilt from the restored records (Developer
   › Rebuild the library index), never copied. Android's own Settings are reached from
   Settings > Android settings, so Global has no second shortcut to them.
   Standard mode's launcher pages (icons, drawer, home screen) stay stock
@@ -7675,6 +7675,42 @@ app-drawer icon or a floating switcher button:
     new Kotlin code per integration — is worth adopting once more than
     one external launcher needs supporting via `JoiPlayGameProvider`; not
     done in this pass.
+
+### Developer menu (Droidtop/tracker#579)
+
+The owner, 2026-10-17: "It's probably worth moving a lot of the advanced
+stuff (like the containment checker) to a dev menu." Settings has a
+**Developer menu**, off until it is turned on, built on the one settings
+catalog (no second settings system):
+
+- **Turning it on.** Global settings ends with **About droidtop**, whose
+  **Version** row shows the installed version. Seven taps on it within a few
+  seconds of each other turn the menu on, as Android's own developer options
+  are found; the last taps count down ("2 more taps..."). Then a
+  **Developer** row under About opens the menu (`DeveloperMenu.SCREEN`).
+  Its last row turns it off again. The switch is one preference
+  (`DeveloperMenu.on`), and a catalog builder adds a developer row only
+  while it is on.
+- **What the menu holds** (droidtop-wide rows, moved out of everyday
+  groups): **Rebuild the library index**
+  (from the Library group, recovery for a list that looks wrong), **Install
+  debug builds** (from Updates), and on a debug build **Debug: force a
+  crash**.
+- **Technical rows stay on their own page, shown only while it is on:**
+  a plugin's **Advanced** group (its id, origin, archive digest and the
+  containment check), **Plugin messages**, every **Technical details** row
+  (a disabled plugin's, an app status's, a source's failure), the Windows
+  **Unpacker** check, and the companion's **Logs** card. They belong to the thing they describe, so they
+  are not copied into one list.
+- **Everyday rows stay where they are**, technical-looking or not: a
+  plugin's version, update, permissions and Activity; keys you trust and
+  catalog fingerprints (a trust decision is made on them); **Share
+  diagnostics** in Data (the owner: "Nope. Diagnostics are a user feedback
+  tool, not a dev tool"); the emulator and custom player **Launch test** (the
+  owner, asked whether they stay as an everyday troubleshooting tool: "Yep");
+  Rescan, Back up and Restore, Rerun onboarding; the Build channel; performance readouts and
+  the overlay; a custom player's Check of what was typed; containers'
+  sockets and mounts.
 
 ## 7a. Remote PC streaming — via windowcast, not a droidtop module
 
@@ -8900,6 +8936,11 @@ hands straight back with none of them open (`EXITED_AT_ONCE`) was left there, by
 (`LaunchDisplay.clearRunning`), since no game ever ran. Before, Cancel raised "Enginehost closed straight after
 it started", pointed at the scan log, and left a Playing session with Resume and Kill. Every other trouble of
 Enginehost's, and an emulator that returns at once, is still an alert.
+Whether an Enginehost launch is still open is Enginehost's own word first (its `state` call,
+`EnginehostCapabilities.holdsTask`, through `LaunchWatchPolicy.listed`), the task list only when it cannot say: the
+task list missed the no-sandbox warning while it waited for an answer, and the watch ended the launch as left
+(console, 0.2.0-dev.2129: "dev.enginehost returned after 12289 ms with nothing open"). A pending Enginehost question is
+a launch still under way.
 
 Considered and not built (Droidtop/tracker#270): a timed "taking a long time" notice for an emulator that is open
 and responsive but never draws. Time alone does not tell it from a healthy long-running game, so it would fire on
@@ -10886,7 +10927,7 @@ orphaned media is one row that finds on the first A and deletes on the
 second, recomputing first), Scrape this system in a system's gamelist
 options menu — and
 the Settings section keeps no action rows but Check now (updates),
-Update platform databases and Rebuild the library index (Data). A
+Update platform databases (Data), and Rebuild the library index in the Developer menu. A
 setting exists in one place and a count is one number: the carousel and
 the PC grid agree on what they count or say what each counts.
 
@@ -12237,9 +12278,17 @@ install path, community compatibility, and the store cover when the
 folder has no ES-DE artwork of its own. The store id is what lets
 `withScrapedMetadata` also read back a `game_metadata` row scraped
 while the game was still a separate `pc` entry. Identity and routing
-stay the engine entry's: its id (the folder), its title, its kind, and
-a null `systemId` rather than `"pc"`, so it keeps grouping under its
-engine's system.
+stay the engine entry's: its id (the folder), its kind, and a null
+`systemId` rather than `"pc"`, so it keeps grouping under its engine's
+system. **Its name is the store's** (`StoreInstall.title`), also as the
+game's name when the library groups it (where the person has not named it
+themselves): a store names the install folder after the title with the
+characters a card refuses dropped, so the folder's name is not the game's
+(console, 0.2.0-dev.2129: "Love & Sex: Second Base" read "Love  Sex Second
+Base", and neither "love & sex" nor "love and sex" found it). A name made
+from a folder (`GameNaming.derive`, `displayName`) has one space where a
+run was, and a new install folder (`StoreFiles.folderName`) is made with
+one.
 
 `GameEngineDetector.detectGame` is the single-folder half of `scan`,
 extracted so the scan loop, `EngineGameProvider.resolveEntry` and the PC
@@ -13760,6 +13809,14 @@ stays direct.
   scrape filter, so the filter cannot shift the position) and then through the
   rest of the queue. A folder that is gone from the queue starts from the top.
   A pause or cancel lands between two games, never inside one.
+- **A restart does not pause it.** A scrape that was running when droidtop
+  stopped (a restart, a self-update) carries on from its checkpoint by itself
+  (`registerNative(..., reattachOnRestart = true)`); one the person paused
+  stays paused until Resume. The jobs list records which it was
+  (`Entry.pausedByPerson`, saved with the job), so every reattaching kind,
+  downloads included, keeps a pause the person made across a restart
+  (console, 0.2.0-dev.2129: "Get details for PC games" came back Paused after
+  the self-update and waited for Resume).
 - **The rate limit is not the job's business.** Every request still goes
   through `ScreenScraperClient`'s anonymous pacing and quota backoff, so a
   paused, resumed or restarted job cannot ask faster than a fresh one.
@@ -14150,6 +14207,22 @@ own games, in droidtop's own treatment:
   entries (a friend's game is a name from the service, not a card), so they
   carry no badge; the service is already named on the row.
   **A badge is a plain fact, shown only when it is useful** (owner, 2026-10-14, Droidtop/tracker#496: "Sounds somewhat good. We need to show info when useful, not when it's extraneous"): it shows a plain fact ("PC", "Retro", "Engine", the store name) only when the fact helps the user decide or act, never a folder name or an implementation category. No badge when it is extraneous: a fact that is obvious from context, or the same on every card in that view.
+- **Names under images** (Droidtop/tracker#578; the owner, 2026-10-17: "We
+  also need to display game titles better, too. A toggle for 'show name under
+  image' would be a good idea. Default to on, or ask in onboarding", then "The
+  setting is for the PC Games context, so it shouldn't affect the retro
+  section" and "it's just adding an option to PC games, which currently ONLY
+  display the icon"). The List option **Show names under images**, on by
+  default, puts each PC capsule's name (`GameNaming.displayName`) under its
+  art, in two lines held for every card so a row keeps one height, ending in
+  an ellipsis, in the body size and the palette's value colour (the on-surface
+  colour on the selected card), on the PC grid and on every shelf drawn with
+  capsules, Home's included. A capsule with no art that loads already carries
+  its name on its plate, whatever the option, and a hero card keeps its own
+  name under it. Onboarding's look step asks it under "PC Games", with a
+  preview, preselected on. The focus line still names the selected game.
+  Retro systems, the ES-DE themed views, Standard's widgets and the companion
+  are not changed by it.
 - **Art that does not load is no art** (console, build 1386: three empty
   frames on Recently added). A card whose art fails to load (`AsyncImage`
   `onError`) draws the plate with the name, the same as a card with no art.

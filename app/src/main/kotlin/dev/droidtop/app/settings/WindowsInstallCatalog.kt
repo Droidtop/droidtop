@@ -110,18 +110,21 @@ object WindowsInstallCatalog {
                         )
                     },
                 ),
-                CatalogGroup(
-                    id = "windows_unpack",
-                    title = "Unpacker",
-                    items = listOf(
-                        AsyncActionItem(
-                            id = "windows_unpack_check",
-                            title = "Check the unpacker",
-                            subtitle = "innoextract, built by droidtop's component catalog from its upstream source. Fetched when first needed and checked against the catalog's SHA-256; this asks it for its version",
-                            run = { ctx, onStatus -> InnoExtract.version(ctx, onStatus) },
+                // A tool check: a Developer menu group (docs/SPEC.md 7, "Developer menu").
+                *listOfNotNull(
+                    CatalogGroup(
+                        id = "windows_unpack",
+                        title = "Unpacker",
+                        items = listOf(
+                            AsyncActionItem(
+                                id = "windows_unpack_check",
+                                title = "Check the unpacker",
+                                subtitle = "innoextract, built by droidtop's component catalog from its upstream source. Fetched when first needed and checked against the catalog's SHA-256; this asks it for its version",
+                                run = { ctx, onStatus -> InnoExtract.version(ctx, onStatus) },
+                            ),
                         ),
-                    ),
-                ),
+                    ).takeIf { dev.droidtop.library.settings.DeveloperMenu.on(context) },
+                ).toTypedArray(),
                 CatalogGroup(
                     id = "windows_install_started",
                     title = "Installs started",

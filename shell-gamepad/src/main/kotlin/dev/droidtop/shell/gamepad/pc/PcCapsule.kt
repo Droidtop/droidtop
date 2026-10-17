@@ -183,10 +183,19 @@ internal fun PcCapsule(
     parts: Int = 1,
     hero: Boolean = false,
     badge: KindBadge? = null,
+    // The name under the art (PC Games' "Show names under images", docs/SPEC.md 7i, Droidtop/tracker#578). A card
+    // with no art carries its name on its plate whatever this says; a hero card has its own name under it.
+    nameUnder: Boolean = false,
 ) {
     val shape = Corners.Crisp
     val ring = selected && PadModality.showsFocus
     val title = GameNaming.displayName(entry.title)
+    // A hero card wants the landscape art; a capsule the box art.
+    val art = if (hero) entry.heroUri else entry.artworkUri
+    // Art that names a file which will not load (moved, not an image Android decodes) is no
+    // art: the card falls back to the plate with the name instead of staying an empty frame
+    // (console, build 1386: three blank cards on Home's Recently added).
+    var artFailed by remember(art) { mutableStateOf(false) }
     val view = androidx.compose.ui.platform.LocalView.current
     Column(
         modifier = modifier
@@ -219,12 +228,6 @@ internal fun PcCapsule(
             )
             .shine(ring),
     ) {
-        // A hero card wants the landscape art; a capsule the box art.
-        val art = if (hero) entry.heroUri else entry.artworkUri
-        // Art that names a file which will not load (moved, not an image Android decodes) is no
-        // art: the card falls back to the plate with the name instead of staying an empty frame
-        // (console, build 1386: three blank cards on Home's Recently added).
-        var artFailed by remember(art) { mutableStateOf(false) }
         if (art != null && !artFailed) {
             CapsuleArt(art, title, wholeIfWide = !hero, onError = { artFailed = true })
         } else if (hero && entry.artworkUri != null && entry.artworkUri != art) {
@@ -311,6 +314,19 @@ internal fun PcCapsule(
         }
         CapsuleStatusBadge(entry, download)
         CapsuleCorners(entry, download, parts, badge)
+    }
+    if (!hero && nameUnder && art != null && !artFailed) {
+        // The owner, 2026-10-17: "A toggle for 'show name under image'" for PC games, "which currently ONLY
+        // display the icon". Two lines held for every card, so a row of capsules keeps one height.
+        Text(
+            title,
+            color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
+            // Body size, not the supporting role's: read from across the room on a handheld.
+            style = MaterialTheme.typography.bodyMedium,
+            minLines = 2,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
     if (hero) {
         // Steam's featured card: the name in bold under the card, and under

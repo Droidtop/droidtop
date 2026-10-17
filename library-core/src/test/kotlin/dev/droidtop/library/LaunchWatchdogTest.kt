@@ -179,4 +179,13 @@ class LaunchWatchdogTest {
         }
         assertFalse(LaunchWatchPolicy.leftBeforePlaying("com.retroarch.aarch64", LaunchTrouble.EXITED_AT_ONCE))
     }
+
+    @Test
+    fun `an Enginehost launch waiting on its own question is open whatever the task list shows`() {
+        // Console, 0.2.0-dev.2129: the task list missed the no-sandbox warning and the launch was ended as left.
+        assertEquals(true, LaunchWatchPolicy.listed(appSays = true, taskList = false))
+        assertEquals(false, LaunchWatchPolicy.listed(appSays = false, taskList = null))
+        assertEquals(true, LaunchWatchPolicy.listed(appSays = null, taskList = true))
+        assertEquals(null, LaunchWatchPolicy.listed(appSays = null, taskList = null))
+    }
 }

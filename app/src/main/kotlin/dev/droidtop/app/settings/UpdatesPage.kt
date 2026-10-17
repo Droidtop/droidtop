@@ -39,6 +39,26 @@ import kotlinx.coroutines.withContext
  * reads only what checks already recorded; Check now is what asks.
  */
 object UpdatesPage {
+    /** Install debug builds: for finding faults in droidtop itself, so it is in the Developer menu (docs/SPEC.md 7, "Developer menu"). */
+    fun debugBuildsItem(context: android.content.Context): CatalogItem {
+        val update = AppSelfUpdate
+        return ToggleItem(
+            id = "updates_debug_builds",
+            title = "Install debug builds",
+            // A device can be ON a debug build while this stays Off: both variants are signed with the same
+            // key, so Check now finds and installs the faster release build either way.
+            subtitle = when {
+                update.debugBuilds(context) ->
+                    "Debug builds run several times slower. Turn this off and check again to go back"
+                AppSettingsCatalogs.ctxIsDebuggable(context) ->
+                    "Currently running a debug build. Update installs the faster release build with this off"
+                else -> "Much slower builds for debugging droidtop itself. Leave this off to play"
+            },
+            current = update.debugBuilds(context),
+            onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
+        )
+    }
+
     fun screen() = CatalogScreen(
         id = AppSettingsCatalogs.SCREEN_UPDATES,
         title = "Updates",
@@ -304,21 +324,6 @@ object UpdatesPage {
                                 options = AppSelfUpdate.Channel.entries.map { ChoiceOption(it.name, it.label) },
                                 current = update.channel(context).name,
                                 onSelect = { ctx, value -> update.setChannel(ctx, AppSelfUpdate.Channel.valueOf(value)) },
-                            ),
-                            ToggleItem(
-                                id = "updates_debug_builds",
-                                title = "Install debug builds",
-                                // A device can be ON a debug build while this stays Off: both variants are signed with the same
-                                // key, so Check now finds and installs the faster release build either way.
-                                subtitle = when {
-                                    update.debugBuilds(context) ->
-                                        "Debug builds run several times slower. Turn this off and check again to go back"
-                                    AppSettingsCatalogs.ctxIsDebuggable(context) ->
-                                        "Currently running a debug build. Update installs the faster release build with this off"
-                                    else -> "Much slower builds for debugging droidtop itself. Leave this off to play"
-                                },
-                                current = update.debugBuilds(context),
-                                onToggle = { ctx, value -> update.setDebugBuilds(ctx, value) },
                             ),
                             ToggleItem(
                                 id = "updates_apps_silent",

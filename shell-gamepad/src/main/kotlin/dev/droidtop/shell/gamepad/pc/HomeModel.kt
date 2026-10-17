@@ -24,7 +24,7 @@ internal sealed interface HomeCard {
     /** A game the person has, with a newer version known: "v0.9.6". Opens the game's page. */
     data class GameUpdate(val entry: LibraryEntry, val version: String) : HomeCard {
         override val id: String get() = "update:${entry.id}"
-        override val title: String get() = entry.title
+        override val title: String get() = dev.droidtop.library.GameNaming.displayName(entry.title)
         override val line: String get() = version.let { if (it.firstOrNull()?.isDigit() == true) "v$it" else it }
     }
 
@@ -34,7 +34,7 @@ internal sealed interface HomeCard {
      */
     data class Added(val place: String, val systemId: String?, val count: Int, val newestAt: Long, val single: LibraryEntry?, val now: Long) : HomeCard {
         override val id: String get() = "added:${systemId ?: place}:${newestAt / DAY_MS}"
-        override val title: String get() = single?.title ?: if (count == 1) "1 game added to $place" else "$count games added to $place"
+        override val title: String get() = single?.let { dev.droidtop.library.GameNaming.displayName(it.title) } ?: if (count == 1) "1 game added to $place" else "$count games added to $place"
         override val line: String get() = "Added ${ValueFormat.daysAgo(now, newestAt)}"
     }
 
