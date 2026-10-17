@@ -76,6 +76,27 @@ class WebSessionsTest {
     }
 
     @Test
+    fun `the account's name is kept with the session for the account row, and a new sign-in forgets it`() {
+        val (_, env) = env { WebSessionResult(true, WebSessions.Stored("UA", mapOf("forum.example" to "xf_user=abc")), null) }
+        // Nothing to name before a sign-in.
+        assertFalse(call(env, "web.session", "set_account", JSONObject().put("name", "Reader")).data.getBoolean("saved"))
+        call(env, "web.session", "sign_in", JSONObject().put("url", "https://forum.example/login/"))
+        assertTrue(call(env, "web.session", "set_account", JSONObject().put("name", "  Reader  ")).data.getBoolean("saved"))
+        assertEquals("Reader", call(env, "web.session", "get_status").data.getString("account"))
+        assertEquals(PluginErrorCode.INVALID_ARGS, call(env, "web.session", "set_account", JSONObject().put("name", "two\nlines")).code)
+        assertEquals(PluginErrorCode.INVALID_ARGS, call(env, "web.session", "set_account", JSONObject().put("name", "x".repeat(65))).code)
+        call(env, "web.session", "sign_in", JSONObject().put("url", "https://forum.example/login/"))
+        assertTrue(call(env, "web.session", "get_status").data.isNull("account"))
+    }
+
+    @Test
+    fun `a stored session reads back with its account, and an old one without`() {
+        val stored = WebSessions.Stored("UA", mapOf("forum.example" to "a=b"), "Reader")
+        assertEquals(stored, WebSessions.Stored.parse(stored.toJson()))
+        assertEquals(null, WebSessions.Stored.parse("""{"ua":null,"cookies":{"forum.example":"a=b"}}""")?.account)
+    }
+
+    @Test
     fun `sign-in only opens the sites the plugin declared, and backing out stores nothing`() {
         val (_, env) = env { WebSessionResult(false, WebSessions.Stored(null, mapOf("forum.example" to "a=b")), null) }
         assertEquals(PluginErrorCode.INVALID_ARGS, call(env, "web.session", "sign_in", JSONObject().put("url", "https://other.example/login")).code)

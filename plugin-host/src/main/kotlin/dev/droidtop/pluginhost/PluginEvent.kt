@@ -71,6 +71,13 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
      * mode, or the Gaming theme. A plugin that draws its own UI reads `ui.get_theme` again. Args: `theme`.
      */
     THEME_CHANGED("host.theme_changed", 1, "Theme changed"),
+
+    /**
+     * The person signed in to the plugin's site through droidtop (docs/SPEC.md 12a "A plugin's site account"): its
+     * account row, Switch account, or a source's Sign in. The plugin reads what it needs from the site again and may
+     * tell the account's name (`web.session set_account`). Only to a plugin holding `web.session`. No args.
+     */
+    WEB_SIGNED_IN("web.session.signed_in", 1, "Signed in to the plugin's site"),
     ;
 
     companion object {

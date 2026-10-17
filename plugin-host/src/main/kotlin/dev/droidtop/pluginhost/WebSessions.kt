@@ -41,10 +41,16 @@ object WebSessions {
     }
 
     /** What is kept: the web view's user agent (a site may tie a session to it) and the cookies per declared domain. */
-    data class Stored(val userAgent: String?, val cookies: Map<String, String>) {
+    data class Stored(
+        val userAgent: String?,
+        val cookies: Map<String, String>,
+        /** The account's name as the plugin read it from the site (`web.session set_account`), for the account row; null until told. */
+        val account: String? = null,
+    ) {
         fun toJson(): String = JSONObject()
             .put("ua", userAgent ?: JSONObject.NULL)
             .put("cookies", JSONObject(cookies as Map<*, *>))
+            .put("account", account ?: JSONObject.NULL)
             .toString()
 
         /** The `Cookie` header for [url], when it is under a domain with cookies. */
@@ -52,12 +58,17 @@ object WebSessions {
             domainFor(url, domains)?.let { cookies[it] }?.takeIf { it.isNotBlank() }
 
         companion object {
+            /** An account name fit to show: one line, at most 64 characters, no control characters; null otherwise. */
+            fun accountName(text: String?): String? =
+                text?.trim()?.takeIf { it.isNotEmpty() && it.length <= 64 && it.none { c -> c.isISOControl() } }
+
             fun parse(text: String?): Stored? = runCatching {
                 val json = JSONObject(requireNotNull(text))
                 val cookies = json.optJSONObject("cookies") ?: JSONObject()
                 Stored(
                     userAgent = json.optString("ua").takeIf { !json.isNull("ua") && it.isNotBlank() },
                     cookies = cookies.keys().asSequence().associateWith { cookies.optString(it) }.filterValues { it.isNotBlank() },
+                    account = accountName(json.optString("account").takeIf { !json.isNull("account") }),
                 )
             }.getOrNull()
         }

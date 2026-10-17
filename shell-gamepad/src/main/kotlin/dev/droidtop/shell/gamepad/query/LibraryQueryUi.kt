@@ -743,6 +743,7 @@ internal fun LibrarySearchDialog(
                             ) {
                                 coroutineScope.launch {
                                     val kept = withContext(Dispatchers.IO) { PluginWebAccount.open(context, record, access) }
+                                    if (kept && access == PluginWebAccount.Need.SIGN_IN) dev.droidtop.library.integrations.notifyWebSignedIn(context, record)
                                     if (kept) searchTick++ else statusLine = PluginWebAccount.notKept(record.manifest.label, access)
                                 }
                             },
