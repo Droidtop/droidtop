@@ -1544,8 +1544,12 @@ class EngineGameProvider(
                 val top = GameEngineDetector.topLevelFolders(root, systemsById)
                 val rootSkips = ScanSkips().apply { addAll(top.skipped) }
                 var rootGames = 0
+                var unchanged = 0
                 for ((index, folder) in top.folders.withIndex()) {
-                    if (skip(root, folder)) continue
+                    if (skip(root, folder)) {
+                        unchanged++
+                        continue
+                    }
                     place.set("Looking for engine games in ${root.name}: folder ${index + 1} of ${top.folders.size}")
                     showProgress()
                     val folderStartedAt = System.currentTimeMillis()
@@ -1599,7 +1603,9 @@ class EngineGameProvider(
                     games = rootGames,
                     skipped = rootSkips,
                     durationMs = System.currentTimeMillis() - rootStartedAt,
-                    note = "${top.folders.size} folders scanned",
+                    // Games in the folders walked this pass; an unchanged folder keeps its games in the index
+                    // (console, 2026-10-17: "0 games" here read as games lost).
+                    note = "${top.folders.size} folders: ${top.folders.size - unchanged} walked, $unchanged unchanged and kept",
                     base = root,
                 )
             }

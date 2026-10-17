@@ -663,11 +663,17 @@ object PcLibrary {
         for (folder in scanned) skips.addAll(folder.skips)
         // A scan that finds nothing and a scan that never ran look the
         // same from the library; this line is how they are told apart.
+        // Its count is of the folders walked this pass: a folder unchanged
+        // since the last walk is not walked, keeps its games in the index,
+        // and is counted here as unchanged, so a quiet slow pass no longer
+        // reads as "0 games" (console, 2026-10-17 00:45).
+        val unchanged = scanned.count { it.skipped }
         ScanLog.write(
             label = "pc folders under " + rootPaths.joinToString(", "),
             games = scanned.sumOf { it.gameFolders.size },
             skipped = skips,
             durationMs = android.os.SystemClock.elapsedRealtime() - startedAt,
+            note = "games in the ${scanned.size - unchanged} folders walked; $unchanged folders unchanged or not read, their games kept",
         )
         scanned
     }
