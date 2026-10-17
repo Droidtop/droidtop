@@ -606,6 +606,32 @@ the home app, is covered by the companion's Presentation while Gaming
 runs. Nothing else changes: Launcher mode stays enabled, because the
 person may pick droidtop again from that row.
 
+**Home brings back droidtop's screen for the display it was pressed on** (the owner, 2026-10-17: "It should bring
+droidtop back on whichever screen we're looking at. Companion if it's that screen, main if it's that one, etc.").
+`HomeTrampolineActivity` (Home on the default display) and `SecondaryDisplayActivity` (Home on a secondary display,
+Android's own `SECONDARY_HOME` start, told from droidtop placing it by the category) each ask
+`HomeDisplays.targetFor` with their own display. The companion is brought to the front on the display it lives on,
+the main screen (Gaming, Desktop or Standard, through the redirect below) on the display the shell runs on or on the
+default display, and droidtop's secondary surface anywhere else. `CompanionActivity` and `MainActivity` record where
+they are (`HomeDisplays.companionShown`, `shellShown`); a process that is not running knows neither, and Home then
+brings the main screen, which arranges the rest. Before, the redirect always started `MainActivity`: on the console,
+with the companion on the built-in screen and Gaming on the monitor, Home on the built-in screen brought Gaming
+forward on the monitor and left the app the person had opened in front, so Home looked ignored.
+
+There is no separate secondary home to choose. Android takes the `SECONDARY_HOME` activity from the package that
+holds HOME (it looks there first, `RootWindowContainer.resolveSecondaryHomeActivity`), so holding HOME makes
+`SecondaryDisplayActivity` the secondary home; the "Set as home" step covers both. A generic query for
+`SECONDARY_HOME` (`cmd package resolve-activity`) still answers Android's chooser, because more than one app
+declares the category, and that is not the window manager's answer. On a display Android does not decorate it
+starts no home at all; there droidtop's own placement (§4c) keeps its surface, and a Home press made there arrives
+at the default display's HOME. The console's DP screen is such a display (FLAG_PRESENTATION and FLAG_TRUSTED, no
+FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS), so droidtop notes the display the person last used (`HomeDisplays.used`: one
+of its screens taking focus there, the companion covered by an app there, a game it launched there). Home arriving at
+the default display after the person was on the shell's other screen brings the main screen back there, not the
+companion. No setting is needed for it. Android's developer option "Force desktop mode", which makes Android decorate
+secondary displays and start their home, is a hint for a person who wants Android's own Home on every screen; droidtop
+never requires it.
+
 Built 2026-09-25 (`HomeRolePrefs.isDroidtopHome`, `homeRequestIntent`),
 after the Android 14 rig answered "droidtop's own launcher" in setup and
 kept Pixel Launcher as Home while Global settings read "On"
@@ -4515,6 +4541,11 @@ different questions:
   shows when droidtop is not foreground: at boot, after a game on that
   display exits, while the user is in another app. The platform places
   and re-places it.
+- **Home on every screen** brings droidtop's own screen for that display
+  back (§2c, `HomeDisplays`): the companion where it lives, the shell where
+  it runs, the idle surface anywhere else. A Home press reaches
+  `SecondaryDisplayActivity` as an Android `SECONDARY_HOME` start; droidtop
+  placing it carries no such category, so the two are told apart.
 - **`Presentation` is the ACTIVE surface** — a window owned by the
   foreground shell, so companion content tracks shell focus without a
   second Activity competing for input focus.
@@ -4925,6 +4956,26 @@ had not moved.
   "covered" mark, so a stale one never blocks the next start.
 
 Verification: rig steps are in the commit message.
+
+### droidtop's web pages follow the keyboard placement (2026-10-17)
+
+The owner, from the console: "we need to stop surfacing a keyboard when the companion exists". During the F95
+sign-in droidtop's own WebView asked for Android's keyboard four times and Gboard came up over it. Every web page
+droidtop shows (a plugin's sign-in, `WebSessionActivity`; a store's, `StoreSignInActivity`; a key page,
+`KeyWebPane`) goes through `WebViewKeys`:
+
+- While droidtop's keyboard for that screen is the companion's (or the internal screen's,
+  `KeyboardTargets.placement`), the page's window does not use Android's input method at all
+  (`FLAG_ALT_FOCUSABLE_IM`), so the system keyboard cannot come up however often the page asks.
+- A field the page focuses opens the companion's slab (`KeyboardTargets.open`), which types into the page through
+  the window's own key path (`WindowKeySink`), as an attached keyboard would; leaving the field closes it. The page
+  says so through a script added to every frame and a message listener (`WebViewCompat.addDocumentStartJavaScript`,
+  `addWebMessageListener`); on a WebView without those, Android's keyboard is still kept away.
+- Elsewhere (no companion, an assistive service on) Android's keyboard serves the page as before.
+
+Other apps' fields reach the companion only through droidtop's own keyboard, so Settings' Keyboard row says, as a
+hint and only while another keyboard is chosen and a second screen is connected, "Choose droidtop's keyboard so
+other apps type on the companion too". It opens Android's own picker; droidtop never switches the keyboard itself.
 
 ### Typing on the add-on display (2026-10-08, Droidtop/tracker#314)
 

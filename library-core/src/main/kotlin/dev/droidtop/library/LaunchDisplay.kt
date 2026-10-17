@@ -333,6 +333,7 @@ object LaunchDisplay {
                 val resolved = LaunchScreenResolution.resolveDisplay(displayId, shellDisplayId)
                 AudioHandOff.mark("resuming ${runningGame?.gameId} in $packageName: brought to the front, not launched again")
                 context.startActivity(front, ActivityOptions.makeBasic().setLaunchDisplayId(resolved).toBundle())
+                dev.droidtop.runtime.HomeDisplays.used(resolved)
                 runningPackageName = packageName
                 parkedDisplayId = resolved
                 onLaunched?.invoke(resolved)
@@ -357,6 +358,8 @@ object LaunchDisplay {
         AudioHandOff.mark("startActivity called (${packageName ?: "unresolved package"}, display $resolvedDisplayId)")
         context.startActivity(intent, ActivityOptions.makeBasic().setLaunchDisplayId(resolvedDisplayId).toBundle())
         AudioHandOff.mark("startActivity returned")
+        // The person plays on that screen now: Home pressed there may arrive at the default display (HomeDisplays).
+        dev.droidtop.runtime.HomeDisplays.used(resolvedDisplayId)
         runningPackageName = packageName
         // The one place every app droidtop starts passes: the task manager's list of what droidtop opened,
         // and the app the Quick Menu's Quit row ends (docs/SPEC.md "The task manager").

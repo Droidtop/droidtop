@@ -108,6 +108,8 @@ class CompanionActivity : AppCompatActivity() {
     override fun onTopResumedActivityChanged(isTopResumedActivity: Boolean) {
         super.onTopResumedActivityChanged(isTopResumedActivity)
         dev.droidtop.display.TouchOnlySurfaceFocus.onTopResumedChanged(this, isTopResumedActivity, displayIdCompat())
+        // Focus on this screen: the person is using it (HomeDisplays).
+        if (isTopResumedActivity) dev.droidtop.runtime.HomeDisplays.used(displayIdCompat())
     }
 
     // Touch only (Droidtop/tracker#186): a pad key that still reaches this window goes to the shell
@@ -120,6 +122,8 @@ class CompanionActivity : AppCompatActivity() {
         // Paused with something in front of it (an app launched onto this screen,
         // the widget picker): the orchestration leaves that app alone (tracker#265).
         dev.droidtop.display.CompanionCover.paused(displayIdCompat(), isFinishing)
+        // Something opened over the companion here: this is the screen the person is using (HomeDisplays).
+        if (!isFinishing) dev.droidtop.runtime.HomeDisplays.used(displayIdCompat())
         super.onPause()
     }
 
@@ -135,6 +139,8 @@ class CompanionActivity : AppCompatActivity() {
         super.onStart()
         widgetHost.startListening()
         visible = true
+        // Home on this display brings the companion back (dev.droidtop.runtime.HomeDisplays).
+        dev.droidtop.runtime.HomeDisplays.companionShown(displayIdCompat())
     }
 
     override fun onStop() {
@@ -161,7 +167,10 @@ class CompanionActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         // A finished companion covers nothing; a stale cover would keep the next one from starting.
-        if (isFinishing) dev.droidtop.display.CompanionCover.retired(displayIdCompat())
+        if (isFinishing) {
+            dev.droidtop.display.CompanionCover.retired(displayIdCompat())
+            dev.droidtop.runtime.HomeDisplays.companionGone(displayIdCompat())
+        }
         super.onDestroy()
     }
 

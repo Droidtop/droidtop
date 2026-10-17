@@ -56,6 +56,27 @@ class HomeTrampolineActivity : Activity() {
             return
         }
 
+        // Home brings back droidtop's own screen for the display it was pressed on (docs/SPEC.md 2c; the owner,
+        // 2026-10-17: "Companion if it's that screen, main if it's that one"). On the console the companion holds
+        // the built-in screen while Gaming runs on the monitor, and this redirect brought Gaming forward on the
+        // monitor while the built-in screen kept the app the person had opened, so Home looked ignored.
+        val here = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+        } else {
+            android.view.Display.DEFAULT_DISPLAY
+        }
+        if (dev.droidtop.runtime.HomeDisplays.targetFor(here) == dev.droidtop.runtime.HomeDisplays.Target.COMPANION) {
+            lastHomePressMs = SystemClock.elapsedRealtime()
+            runCatching {
+                startActivity(
+                    Intent(Intent.ACTION_MAIN).setClassName(packageName, COMPANION_ACTIVITY).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    android.app.ActivityOptions.makeBasic().setLaunchDisplayId(here).toBundle(),
+                )
+            }
+            finish()
+            return
+        }
+
         if (BackButtonMenu.isExplicitHome(intent)) {
             // An explicit "Android" from the mode switcher (or a stray
             // relaunch of this exact component) never redirects; forward
@@ -107,6 +128,7 @@ class HomeTrampolineActivity : Activity() {
 
     private companion object {
         const val MAIN_ACTIVITY = "dev.droidtop.app.MainActivity"
+        const val COMPANION_ACTIVITY = "dev.droidtop.app.CompanionActivity"
         const val STANDARD_ACTIVITY = "com.android.launcher3.Launcher"
         const val DOUBLE_TAP_WINDOW_MS = 600L
 
