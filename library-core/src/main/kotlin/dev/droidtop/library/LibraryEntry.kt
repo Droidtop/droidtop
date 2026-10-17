@@ -1404,6 +1404,29 @@ class Library(
     suspend fun sourceMatches(source: String, title: String, versions: List<String>): List<UpdateSources.Found> =
         withContext(Dispatchers.IO) { runCatching { updateSources.match(source, title, versions) }.getOrDefault(emptyList()) }
 
+    /** The page of [source]'s record [externalId] (docs/SPEC.md 7g, "Getting an update"), or why there is none. */
+    suspend fun sourceRecord(source: String, externalId: String): UpdateSources.RecordAnswer = withContext(Dispatchers.IO) {
+        runCatching { updateSources.record(source, externalId) }
+            .getOrElse { UpdateSources.RecordAnswer(null, it.message ?: "The source did not answer") }
+    }
+
+    /**
+     * Downloads the version [link] of [source]'s record names and places it as a new version folder beside [newest]
+     * (docs/SPEC.md 7g, "Getting an update"). Returns the job's last line; the library learns of the folder from the job.
+     */
+    suspend fun downloadUpdate(
+        source: String,
+        externalId: String,
+        link: String,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = withContext(Dispatchers.IO) {
+        runCatching { updateSources.download(source, externalId, link, version, gameName, newest, onStatus) }
+            .getOrElse { it.message ?: "The download failed" }
+    }
+
     /** The record of [source] that a person's pasted [text] names, or null when it names none. */
     suspend fun resolveSourceText(source: String, text: String): UpdateSources.Found? =
         withContext(Dispatchers.IO) { runCatching { updateSources.resolve(source, text) }.getOrNull() }

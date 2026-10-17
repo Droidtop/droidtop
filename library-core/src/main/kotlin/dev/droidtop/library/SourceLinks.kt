@@ -69,6 +69,51 @@ interface UpdateSources {
 
     /** Records that may be the game called [title] with [versions], best first, for a person to pick from. */
     suspend fun match(source: String, title: String, versions: List<String>): List<Found>
+
+    /** One link of a record's Downloads tab: the source's heading, the file host, what the link says, and its token. */
+    data class Download(val section: String, val host: String, val label: String, val link: String)
+
+    /**
+     * A record's page, as the source tells it (docs/plugin-api.md 3 A6 `record`); droidtop draws it (docs/SPEC.md 7g,
+     * "Getting an update"). [rating] is 0 to 1; [updatedEpochMs] when the source last changed it.
+     */
+    data class Record(
+        val externalId: String,
+        val title: String,
+        val url: String? = null,
+        val version: String? = null,
+        val developer: String? = null,
+        val status: String? = null,
+        val rating: Double? = null,
+        val votes: Int? = null,
+        val tags: List<String> = emptyList(),
+        val updatedEpochMs: Long? = null,
+        val cover: String? = null,
+        val overview: String? = null,
+        val changelog: String? = null,
+        val downloads: List<Download> = emptyList(),
+    )
+
+    /** What a record page asks for: the record, or why there is none ([unsupported] when the source has no `record`). */
+    data class RecordAnswer(val record: Record?, val failure: String? = null, val unsupported: Boolean = false)
+
+    /** The record's page; a source that cannot answer says why. */
+    suspend fun record(source: String, externalId: String): RecordAnswer = RecordAnswer(null, unsupported = true)
+
+    /**
+     * Downloads the version [link] names (the person picked it on the record page) as the source's `download` job and
+     * places it as a new version folder of the game whose newest version is [newest], named for [gameName] and
+     * [version]. Returns the job's last line.
+     */
+    suspend fun download(
+        source: String,
+        externalId: String,
+        link: String,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = "This source cannot download an update"
 }
 
 object NoUpdateSources : UpdateSources {
