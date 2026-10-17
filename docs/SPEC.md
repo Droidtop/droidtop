@@ -4926,6 +4926,26 @@ had not moved.
 
 Verification: rig steps are in the commit message.
 
+### droidtop's web pages follow the keyboard placement (2026-10-17)
+
+The owner, from the console: "we need to stop surfacing a keyboard when the companion exists". During the F95
+sign-in droidtop's own WebView asked for Android's keyboard four times and Gboard came up over it. Every web page
+droidtop shows (a plugin's sign-in, `WebSessionActivity`; a store's, `StoreSignInActivity`; a key page,
+`KeyWebPane`) goes through `WebViewKeys`:
+
+- While droidtop's keyboard for that screen is the companion's (or the internal screen's,
+  `KeyboardTargets.placement`), the page's window does not use Android's input method at all
+  (`FLAG_ALT_FOCUSABLE_IM`), so the system keyboard cannot come up however often the page asks.
+- A field the page focuses opens the companion's slab (`KeyboardTargets.open`), which types into the page through
+  the window's own key path (`WindowKeySink`), as an attached keyboard would; leaving the field closes it. The page
+  says so through a script added to every frame and a message listener (`WebViewCompat.addDocumentStartJavaScript`,
+  `addWebMessageListener`); on a WebView without those, Android's keyboard is still kept away.
+- Elsewhere (no companion, an assistive service on) Android's keyboard serves the page as before.
+
+Other apps' fields reach the companion only through droidtop's own keyboard, so Settings' Keyboard row says, as a
+hint and only while another keyboard is chosen and a second screen is connected, "Choose droidtop's keyboard so
+other apps type on the companion too". It opens Android's own picker; droidtop never switches the keyboard itself.
+
 ### Typing on the add-on display (2026-10-08, Droidtop/tracker#314)
 
 Owner, 2026-10-07: "ANY keyboard input is broken when stuff is on the addon display", and, for

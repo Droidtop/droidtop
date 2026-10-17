@@ -187,6 +187,8 @@ internal fun KeyWebPane(
                         }
                         isFocusable = true
                         isFocusableInTouchMode = true
+                        // The page's fields type on the companion when it has the keyboard (docs/SPEC.md 4c).
+                        WebViewKeys.attach(this)
                         webViewClient = object : WebViewClient() {
                             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                                 if (request == null || !request.isForMainFrame) return false

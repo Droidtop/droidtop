@@ -1744,9 +1744,16 @@ private fun keyboardSubtitle(context: android.content.Context): String {
     return when {
         current == null -> "Choose which keyboard to use"
         current.isDroidtops -> "Has the full desktop key set. Select to switch"
+        // A hint only (docs/SPEC.md 4c): with a companion screen, droidtop's own keyboard is what sends other apps'
+        // fields to the companion; droidtop never switches it for the person.
+        hasCompanionScreen(context) -> "Choose droidtop's keyboard so other apps type on the companion too"
         else -> "Select to switch keyboards"
     }
 }
+
+/** Whether a second screen is connected, where droidtop's companion lives. */
+private fun hasCompanionScreen(context: android.content.Context): Boolean =
+    (context.getSystemService(android.hardware.display.DisplayManager::class.java)?.displays?.size ?: 1) > 1
 
 /** The companion Home sections that always draw when turned on; every other one hides itself while empty. */
 private val ALWAYS_SHOWN_HOME = setOf(CompanionHomeSection.NOTIFICATIONS, CompanionHomeSection.SYSTEM)
