@@ -1643,6 +1643,11 @@ talk over the API".
     - `cover` and `screenshots` (https URLs);
     - `links` (`[{label, url}]`);
     - `storeIds`, so a later scrape can skip `match`.
+    - `cover` (2026-10-17): the https address of the game's cover. droidtop
+      fetches it itself for a game with no cover: the address and every
+      redirect must be on the plugin's `net.domains`, and the answer a PNG,
+      JPEG, WebP or GIF of at most 10 MiB (SPEC 7h). `screenshots` are not
+      taken yet.
     - `sourceLinks` (`{<key>: <id>}`), the record the source matched:
       droidtop links the game under that key (one of the plugin's own
       `library.updates` entry ids; any other key is ignored), unless it

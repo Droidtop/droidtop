@@ -654,6 +654,7 @@ object PcScraper {
         val answers = plugins.answers(pluginFacts(context, entry))
         answers.forEach { linkFromPlugin(context, entry, it.links) }
         writePluginFields(context, entry, answers.mapNotNull { it.fields }.filterNot { it.isEmpty })
+        coverFromPlugins(context, entry, answers)
         return answers.any { it.ambiguous.isNotEmpty() } && answers.none { it.fields != null || it.links.isNotEmpty() }
     }
 
@@ -667,6 +668,34 @@ object PcScraper {
             store.setSourceLink(listOf(entry.id), key, id)
             dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] linked to $key $id")
         }
+    }
+
+    /**
+     * A cover a metadata plugin named, for a game that has none (docs/SPEC.md 7h, "A source's own match"): most games
+     * a forum source knows are on no store, so the source's picture is the only one. droidtop fetches it itself
+     * ([PluginImages]: https, from the plugin's own sites, a picture of at most 10 MiB), files it where a scraped cover
+     * goes, and records the plugin as the cover's source. A cover already there, or one the person chose, is kept.
+     */
+    private suspend fun coverFromPlugins(context: Context, entry: LibraryEntry, answers: List<dev.droidtop.library.integrations.PluginMetadataSources.Answer>) {
+        if (!ScrapeOptionsPrefs.scrapeArtwork(context)) return
+        val offered = answers.filter { it.cover != null }
+        if (offered.isEmpty()) return
+        val dao = RomDatabase.get(context).romDao()
+        val row = dao.getGameMetadataSingle(entry.id)
+        if (row?.artworkPath?.let { File(it).isFile } == true || !FieldSources.writable(row?.fieldSources, FieldSources.COVER)) return
+        val systemFolder = PcMediaLayout.systemFolderFor(entry) ?: return
+        val gamesRoot = mediaRootFor(context, entry) ?: return
+        val destination = PcMediaLayout.mediaFile(gamesRoot, systemFolder, "covers", PcMediaLayout.fileSafe(baseNameFor(entry)))
+        val won = offered.firstOrNull { answer ->
+            runCatching { PluginImages.download(answer.cover!!, answer.source.netDomains, destination) }
+                .onFailure { dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] cover from ${answer.source.label} not kept: ${it.message}") }
+                .isSuccess
+        } ?: return
+        val base = row ?: GameMetadataEntity(id = entry.id)
+        dao.upsertGameMetadata(
+            base.copy(artworkPath = destination.absolutePath, fieldSources = FieldSources.merge(base.fieldSources, mapOf(FieldSources.COVER to won.source.label))),
+        )
+        dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] cover from ${won.source.label}")
     }
 
     private suspend fun writePluginFields(context: Context, entry: LibraryEntry, found: List<dev.droidtop.pluginhost.MetadataFields>) {
@@ -707,6 +736,7 @@ object PcScraper {
             val answer = session.fetch(pick.source, pick.candidate.ids) ?: return@withContext "${pick.source.label} did not answer"
             linkFromPlugin(context, entry, answer.links, replace = true)
             writePluginFields(context, entry, listOfNotNull(answer.fields?.takeUnless { it.isEmpty }))
+            coverFromPlugins(context, entry, listOf(answer))
             markNeedsPick(context, entry, needs = false)
             "Matched ${entry.title} to ${pick.name} (${pick.source.label})."
         } finally {

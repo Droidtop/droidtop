@@ -13160,6 +13160,13 @@ the same care as the art.
     link from then on, with no search, and the source's update checks find it.
   - The text a source fetched fills only the fields the built-in sources left empty, recorded under the
     plugin's name, as before.
+  - **Its cover (2026-10-17).** The owner: "The cover now, since that's the big identifier. Most of my games sit
+    without identifier images because they don't exist on steam." A source's `fetch` may name a `cover`; droidtop
+    fetches it itself (`PluginImages`) only for a game with no cover, and only when the scrape's artwork option is on.
+    The address and every redirect must be https on the plugin's own `net.domains`; the answer must be a PNG, JPEG,
+    WebP or GIF of at most 10 MiB, and is kept whole or not at all. It is filed where a scraped cover goes and
+    recorded under the plugin's name; a cover already there, or one the person chose, is never replaced. Screenshots
+    are later work.
 - **Ids travel.** Lutris's `provider_games` names a result's Steam app id and GOG product id,
   and IGDB's `external_games` does the same, so a Lutris or IGDB match of a folder game
   becomes a Steam/GOG identity and the keyless Steam store fills its developer, publisher and
