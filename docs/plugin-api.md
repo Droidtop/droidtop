@@ -1193,7 +1193,7 @@ Every facet is one JSON object:
 | `badge` | `text` (at most 16 characters), `tone?` | A small chip on a row, a capsule or a tile ("Update", "Beta", "3 new") |
 | `progress` | `label`, `value` (0 to 100, or -1 for unknown), `sub?`, `cancel?` (an action) | A bar with its words; a job's progress is a job's, in Downloads and installs (§8) |
 | `meter` | `label`, `value`, `max`, `unit?`, `warnAt?`, `dangerAt?` | A gauge or fill bar (storage, battery, a quota) |
-| `chart` | `label`, `points` (at most 60 numbers), `unit?` | A sparkline only (a speed, a temperature over the last minutes). Nothing larger: a plugin that needs a real chart has a page of its own (C16) |
+| `chart` | `label`, `style` (`line` or `bars`), `points` (at most 60 numbers; for `bars`, at most 12 `{label, value}`), `unit?` | A sparkline (a speed, a temperature over the last minutes) or a small bar chart (storage by folder). Nothing larger: no axes the plugin draws, no colours of its own |
 | `action` | `label`, `sub?`, `call` (an action, below), `confirm?` (`none`, `confirm`, `danger`), `icon?` (from droidtop's icon set) | A button, a menu entry or a row, as the target draws actions. `confirm` is droidtop's two-step confirm; `danger` adds danger colours and names what is lost (`sub`) |
 | `toggle` | `label`, `value: bool`, `sub?`, `call` | A switch; the change is sent at once |
 | `choice` | `label`, `options: [{value, label}]` (at most 100), `value`, `sub?`, `call` | A pick-one |
@@ -1221,9 +1221,9 @@ the information means and can use it beyond drawing (filters, updates, linking, 
 | `metadata` | `title?`, `version?`, `developer?`, `publisher?`, `engine?` (an engines-database id), `status?` (`ongoing`, `completed`, `onhold`, `abandoned`), `released?` (`YYYY-MM-DD`), `updated?` (epoch ms), `rating?` (0 to 1), `votes?`, `tags?` (at most 64 of 40 characters), `genres?` (at most 16) | `info` and `badge` facets on the game page, list rows and capsules; the PC Games filters and sorts (Release status, Tags, Rating, Developer, Genre); `version` is what an update is compared with (docs/SPEC.md 7g) |
 | `description` | `overview?`, `changelog?` | `text` facets: the game page's About, the record page's Overview and Changelog |
 | `image` | as `media` | Filed by role; only for a role the game has no picture for, unless the person chose this source's art |
-| `download` | `entries: [{section, host, label, url?, link?, size?, kind?}]`, at most 200. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file`, `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands | A `list` of `action` entries on the record page's Downloads tab, grouped by section and then host. Picking one goes through droidtop's Downloads and the download engine and places the result (a new game, or a new version folder, docs/SPEC.md 7g). Kept, so nothing is fetched again to download (Droidtop/tracker#599) |
+| `download` | `entries: [{section, host, label, url?, link?, size?, version?, kind?}]`, at most 200. `version` lets one item offer several versions; an entry without one is the item's `metadata.version`. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file`, `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands | A `list` of `action` entries on the record page's Downloads tab, grouped by section and then host. Picking one goes through droidtop's Downloads and the download engine and places the result (a new game, or a new version folder, docs/SPEC.md 7g). Kept, so nothing is fetched again to download (Droidtop/tracker#599) |
 | `links` | `entries: [link]`, at most 32 | `link` facets: the game page's Links, Open the source's page |
-| `store` | `store`, `url`, `price?` (a decimal string), `currency?` (ISO 4217), `owned?`, `free?`, `onSale?` | An `info` and a `link`: where to get the game, the Wishlist shelf. droidtop never buys anything |
+| `store` | `store`, `url`, `price?` (a decimal string), `currency?` (ISO 4217), `owned?`, `free?`, `onSale?` | An `info` and a `link`: where to get the game, the Wishlist shelf. Any plugin may give it, guarded: it is always labelled "from <plugin>", its `url` must be on the plugin's `net.domains`, droidtop never buys anything, and `owned` is a store plugin's word only (another plugin's is ignored) |
 | `update` | `version?`, `url?`, `gone?` | A `badge` and an `info`: the Update available badge and shelf, Updates, the record page's version line |
 | `identity` | `ids: {key: id}` | Not drawn: linking. Only ids of the plugin's own `library.updates` keys are taken without asking; others are offered as matches |
 
@@ -1248,6 +1248,29 @@ its own (a game, an item) or none. A plugin declares the targets it uses on a `p
 | `status.area` | The status bar and the floating status cluster | `status` (the dot and label only), `badge`, `meter` | the device |
 | `widget` | Android home-screen widgets (C10) | `info`, `status`, `progress`, `meter`, `media`, `list` (5 rows), `action` (2) | the plugin, the device |
 | `plugin.page` | The plugin's own page under Plugins | everything | the plugin |
+| `desktop.tray` | The desktop's taskbar tray (C8) | `status`, `badge`, `action` (a menu of up to 8), `toggle`, `meter` | the device |
+| `files.action` | The file manager's actions and "open with" (C9) | `action` | a file or folder the person picked (droidtop passes a document token, D4, never a path) |
+| `launcher.drawer` | The app drawer's and home screen's actions (C12) | `action`, `badge` | an app |
+| `onboarding.step` | A step of onboarding (C13) | `info`, `text`, `media`, inputs, `action`, `notice` | the device. Risk high: offered only by plugins from the person's trusted catalogs, and shown only after droidtop's own steps |
+| `<plugin>:<slot>` | A slot another plugin opens in its own page or card (below) | what the slot's owner lists | the slot owner's subject |
+
+**Extending: slots and templates.** The system is meant to grow, and each way it grows is guarded:
+- **Slots.** A plugin may open a named slot in one of its own groups (`{"kind": "group", "slot": "addons"}`), and
+  another plugin may target `<owner>:<slot>`. The owner declares the slot on its `provides` entry with the kinds it
+  takes and a cap; the guest needs the target granted like any other, and its facets are drawn as droidtop draws all
+  facets, labelled "from <guest>". The owner never sees the guest's data or calls: droidtop routes each call to
+  the plugin that gave the facet.
+- **Templates.** A plugin may define a named arrangement of built-in kinds once (`{"kind": "template", "name":
+  "player", "facets": [...]}` with `{"$": "field"}` placeholders) and give many facets of it (`{"kind": "use",
+  "template": "player", "fields": {...}}`). A template is only ever built-in kinds: it adds no drawing, and it
+  is checked against the target like the facets it expands to.
+- **New kinds and targets** are droidtop's to add, in a droidtop release, behind a `v` and `host.info().facets`. A
+  plugin cannot define a kind that draws something droidtop does not draw, and a kind it does not know is skipped.
+- **Guards that hold for every extension:** no plugin code or markup runs in droidtop's process; text is text; media
+  is fetched by droidtop on the plugin's sites and checked by type and size; every target, slot and call has its
+  own permission row and per-call check (4.1); every count and length has a cap in the limits file; a facet is
+  always labelled with the plugin it came from wherever two plugins could be confused; and the person can hide
+  anything.
 
 **Place and order.** droidtop decides both. Within a target its own content comes first, then plugins in the
 person's order (by default the order they were installed), and within a plugin by `priority`, then the order the
@@ -1305,8 +1328,10 @@ Enforcement is droidtop's, at the API; a manifest only asks (docs/SPEC.md 12a):
   and the plugin is asked in the background.
 - **Never fetched to act:** a download, a link or a version comparison uses the kept facet. A `download` entry whose
   page no longer works opens the item's `source` link instead (Droidtop/tracker#599).
-- **Several plugins about one game:** each bundle follows the person's source order; `tags` and `genres` are joined,
-  images are per role, and `download` and `store` list each source's entries under its name.
+- **Several plugins about one game:** each bundle has its own source order (Settings, "Metadata sources", one list
+  per bundle, all starting from one default order: the game's own linked update source, then metadata plugins in
+  install order). `tags` and `genres` are joined, images are per role, and `download` and `store` list each source's
+  entries under its name.
 
 #### One mechanism: today's schema, panels and tiles become facets
 
@@ -1383,14 +1408,19 @@ The F95zone plugin's record (0.4.9), as contract 3 (`item.page`, kept per item):
 ]}]}
 ```
 
-#### Questions for the owner
+#### Decided by the owner (2026-10-22)
 
-1. Is `store` open to any plugin, or only to store plugins? As written, any plugin may say where a game is sold.
-2. One source order for every bundle, or one per bundle (art from SteamGridDB first, text from the linked source)?
-3. Should `download` entries carry their own version and size, so one item can offer several versions?
-4. Is the target list complete? Not in it yet: the desktop's taskbar and tray (C8), file-manager actions (C9), the
-   launcher's app drawer (C12) and onboarding (C13). As written they stay their own points until a later contract.
-5. `chart` is a sparkline only. Enough, or should a plugin have a small bar chart too (storage by folder, for example)?
+The owner, on this proposal's questions: "the system should be as extensible as possible, but remember to guard it."
+So:
+1. **Any plugin may give `store`**, guarded: labelled with the plugin, on its own sites, never a purchase, and
+   `owned` taken only from store plugins.
+2. **A source order per bundle**, all starting from one default order.
+3. **`download` entries carry their own `version` and `size`**, so one item may offer several versions.
+4. **The desktop tray, file-manager actions, the app drawer and onboarding are targets now**, each with its own
+   permission and risk (onboarding high, offered only from trusted catalogs).
+5. **`chart` has a small bar style beside the sparkline**, capped at 12 bars.
+6. **Extension points are slots and templates**, and new kinds and targets come only in droidtop releases (see
+   "Extending").
 
 ---
 
