@@ -136,7 +136,8 @@ internal object SteamUfsParser {
 /**
  * The `ufs` section kept per game in a small file beside the other Steam
  * files: product info is read per app only when an install, an update check
- * or a save sync asks for it, and the save sync then needs no second request.
+ * or a save sync asks for it, and each of them keeps it here, so the save sync
+ * needs no second request and a launch knows the game's save folder offline.
  */
 internal object SteamUfsCache {
     private val JSON = Json { ignoreUnknownKeys = true }
