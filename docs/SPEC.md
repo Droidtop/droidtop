@@ -416,7 +416,9 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   does (`rememberGamingThemed`: last mode Gaming or Desktop).
 - **Each is a sheet that is a window of its own** (a Dialog), so the one input pipeline (6e) runs in it.
   `HostedListSheet` (`:shell-gamepad`, `hosted/`) is `MenuPanel` over a lazy list of `MenuRow`s with
-  Gaming's sliding focus ring: Up and Down stop at the ends and keep the row on screen, A takes the row,
+  Gaming's sliding focus ring: Up and Down stop at the ends and keep the row on screen, Left and Right jump to the
+  previous or next section's first row in a list that has sections (Left inside a section goes to its first row
+  first; `sectionJump`, gap review 2026-10-17, so the Start menu's long All list is not the only way down), A takes the row,
   X its toggle, Y its menu, B closes, Start closes (the button that opened it), a long press is Y for a
   finger, and Gaming's `HintRow` sits inside it, where a tap on a hint presses the real button into the
   sheet's window. The Start menu and the windows list are two of them. A is "Bring to front" and X
