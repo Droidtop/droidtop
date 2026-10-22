@@ -11,6 +11,9 @@ import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.library.esDeSystemName
 import dev.droidtop.library.groupingPath
 import dev.droidtop.library.toLibraryEntryKind
+import JobHandle
+import OpenTarget
+import Outcome
 import dev.droidtop.runtime.prefs.PrefsFile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -521,7 +524,7 @@ object PcScraper {
         // filter passed over too, so a folder game missing from the log is a game the library never handed over.
         for (entry in passedOver) {
             dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc]: not asked, it already has what the \"${filter.label}\" filter looks for")
-            reported(entry, dev.droidtop.pluginhost.Outcome.SKIPPED, "Already has what \"${filter.label}\" looks for")
+            reported(entry, Outcome.SKIPPED, "Already has what \"${filter.label}\" looks for")
         }
         if (targets.isEmpty()) {
             return@withContext if (resumeAfter != null && candidates.isEmpty()) {
@@ -548,12 +551,12 @@ object PcScraper {
             if (refusedInARow >= REFUSAL_ABORT_THRESHOLD) {
                 for (left in targets.drop(index)) {
                     dev.droidtop.library.ScanLog.write("scrape: ${left.title} [pc] via ${source.label}: not asked, ${source.label} refused $REFUSAL_ABORT_THRESHOLD in a row")
-                    reported(left, dev.droidtop.pluginhost.Outcome.FAILED, "Not asked: ${source.label} refused $REFUSAL_ABORT_THRESHOLD times in a row")
+                    reported(left, Outcome.FAILED, "Not asked: ${source.label} refused $REFUSAL_ABORT_THRESHOLD times in a row")
                 }
                 break
             }
             onProgress(index, targets.size)
-            dev.droidtop.pluginhost.JobHandle.current()?.numbers(dev.droidtop.pluginhost.JobNumbers(itemsDone = index, itemsTotal = targets.size))
+            JobHandle.current()?.numbers(JobNumbers(itemsDone = index, itemsTotal = targets.size))
             // The sources are public services with their own limits (the Steam store allows about
             // 200 requests in five minutes) and one game can ask several of them: games are spaced.
             if (index > 0) kotlinx.coroutines.delay(GAME_PACE_MS)
@@ -601,7 +604,7 @@ object PcScraper {
                 counts.failed++
                 refusedInARow = 0
                 counts.misses.add(ScrapeMisses.Kind.FAILED, entry.title, t.message)
-                reported(entry, dev.droidtop.pluginhost.Outcome.FAILED, t.message ?: "Failed")
+                reported(entry, Outcome.FAILED, t.message ?: "Failed")
                 dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via ${source.label}: failed: ${t.message}")
                 android.util.Log.e("droidtop.Scraper", "Failed to scrape ${entry.title}", t)
             }
@@ -619,24 +622,23 @@ object PcScraper {
      * One line of the scrape job's report (docs/SPEC.md "Jobs and their results"): the game, what happened to it in
      * plain words, and its page to open. The same facts as its scan.log line, said for a person; nothing outside a job.
      */
-    private suspend fun reported(entry: LibraryEntry, outcome: dev.droidtop.pluginhost.Outcome, detail: String) {
-        dev.droidtop.pluginhost.JobHandle.current()?.item(entry.title, outcome, detail, dev.droidtop.pluginhost.OpenTarget.Game(entry.id))
+    private suspend fun reported(entry: LibraryEntry, outcome: Outcome, detail: String) {
+        JobHandle.current()?.item(entry.title, outcome, detail, OpenTarget.Game(entry.id))
     }
 
     /** The report line for a game that was not written; a written game reports itself in [write]. */
     private suspend fun reportOutcome(entry: LibraryEntry, outcome: PcOutcome, pluginTie: Boolean) {
-        val o = dev.droidtop.pluginhost.Outcome
         when (outcome) {
             PcOutcome.ByStoreId, PcOutcome.ByName -> Unit
-            is PcOutcome.NeedsPicking -> reported(entry, o.NEEDS_PICK, "${outcome.candidates} possible matches, none exact")
+            is PcOutcome.NeedsPicking -> reported(entry, Outcome.NEEDS_PICK, "${outcome.candidates} possible matches, none exact")
             is PcOutcome.NoMatch -> if (pluginTie) {
-                reported(entry, o.NEEDS_PICK, "A source's possible matches tie")
+                reported(entry, Outcome.NEEDS_PICK, "A source's possible matches tie")
             } else {
-                reported(entry, o.SKIPPED, "No match for \"${outcome.searched}\"")
+                reported(entry, Outcome.SKIPPED, "No match for \"${outcome.searched}\"")
             }
             is PcOutcome.Refused -> reported(
                 entry,
-                o.FAILED,
+                Outcome.FAILED,
                 if (outcome.asked) {
                     "${outcome.refusal.source} refused (HTTP ${outcome.refusal.httpStatus})" + (outcome.refusal.reason?.let { ": $it" } ?: "")
                 } else {
@@ -748,7 +750,7 @@ object PcScraper {
         dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] cover from ${won.source.label}")
     }
 
-    private suspend fun writePluginFields(context: Context, entry: LibraryEntry, found: List<dev.droidtop.pluginhost.MetadataFields>) {
+    private suspend fun writePluginFields(context: Context, entry: LibraryEntry, found: List<MetadataFields>) {
         if (found.isEmpty()) return
         val dao = RomDatabase.get(context).romDao()
         val row = dao.getGameMetadataSingle(entry.id) ?: GameMetadataEntity(id = entry.id)
@@ -759,7 +761,7 @@ object PcScraper {
     /** A metadata plugin's candidate for the picker: which source offered it, and its ids to fetch it by. */
     data class PluginPick(
         val source: dev.droidtop.library.integrations.PluginMetadataSources.Source,
-        val candidate: dev.droidtop.pluginhost.PluginMetadataProtocol.Candidate,
+        val candidate: PluginMetadataProtocol.Candidate,
     ) {
         val name: String get() = candidate.title ?: entryIdText()
         private fun entryIdText(): String = candidate.ids.keys().asSequence().joinToString(", ") { "$it ${candidate.ids.opt(it)}" }
@@ -969,7 +971,7 @@ object PcScraper {
         )
         reported(
             entry,
-            if (sources.isEmpty()) dev.droidtop.pluginhost.Outcome.SKIPPED else dev.droidtop.pluginhost.Outcome.DONE,
+            if (sources.isEmpty()) Outcome.SKIPPED else Outcome.DONE,
             wroteLine(sources),
         )
     }
