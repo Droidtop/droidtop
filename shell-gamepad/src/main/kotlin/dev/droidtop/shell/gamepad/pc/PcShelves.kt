@@ -1,7 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.library.originLabel
-import dev.droidtop.library.engineFamily
+import dev.droidtop.library.runsInEnginehost
 import dev.droidtop.library.CapsuleBadgeStyle
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
@@ -262,9 +262,9 @@ internal class ViewBadges(badges: Collection<KindBadge?>) {
     }
 }
 
-/** The kinds that are no engine (a Windows or Linux program, a remote PC, an app, a console ROM): the one rule, [engineFamily]. */
+/** The kinds badged "PC", not "Engine": every kind Enginehost does not run, Wine-run engines included (#603). The one rule, [runsInEnginehost]. */
 internal val NON_ENGINE_KINDS: Set<LibraryEntryKind> =
-    LibraryEntryKind.entries.filterTo(HashSet()) { it.engineFamily() == null }
+    LibraryEntryKind.entries.filterTo(HashSet()) { !it.runsInEnginehost() }
 
 /**
  * The [KindBadge] of [entry], from fields the entry already carries and
