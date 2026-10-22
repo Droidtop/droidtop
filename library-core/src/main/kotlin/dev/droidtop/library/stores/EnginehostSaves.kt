@@ -23,6 +23,7 @@ object EnginehostSaves {
     private const val FOLDER_PREFIX = "folder:"
     private const val PASSED_PREFIX = "passed:"
     private const val KNOWN_PREFIX = "known:"
+    private const val PENDING_PREFIX = "pending:"
 
     /** Steam Auto-Cloud searches at most this deep; saves adopted after a fallback are copied to the same depth. */
     private const val MAX_DEPTH = 5
@@ -62,9 +63,13 @@ object EnginehostSaves {
     suspend fun saveRoot(context: Context, storeKey: String): File? {
         val folder = (storeFolder(context, storeKey) ?: knownFolder(context, storeKey))
             ?.takeIf { acceptablePath(it.absolutePath) && writable(it) }
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(PASSED_PREFIX + storeKey, folder?.absolutePath)
-            .apply()
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        // Saves a past run left in the person's own location when no folder was known yet come in now.
+        val pending = prefs.getString(PENDING_PREFIX + storeKey, null)
+        val adopted = folder != null && pending != null && adopt(File(pending), folder) >= 0
+        val edit = prefs.edit().putString(PASSED_PREFIX + storeKey, folder?.absolutePath)
+        if (adopted) edit.remove(PENDING_PREFIX + storeKey)
+        edit.apply()
         return folder
     }
 
@@ -98,7 +103,8 @@ object EnginehostSaves {
      * engine that saves beside the game) or none: nothing. Any other folder is the person's own location, where
      * Enginehost saved because it did not take droidtop's folder or none was passed (owner, 2026-10-22: "enginehost
      * should write saves to the user folder, and tell droidtop when it doesn't work. That's not the user's problem"):
-     * its saves are copied into the game's synced folder, newer files winning, and uploaded from there.
+     * its saves are copied into the game's synced folder, newer files winning, and uploaded from there. When no
+     * synced folder is known yet, that folder is kept and the next launch brings its saves in.
      */
     suspend fun afterGameEnded(context: Context, storeKey: String, gameFolder: String, saveFolder: String?): Boolean {
         val passed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PASSED_PREFIX + storeKey, null)
@@ -106,7 +112,13 @@ object EnginehostSaves {
         val used = saveFolder?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory } ?: return false
         if (inside(used, File(gameFolder))) return false
         val into = (storeFolder(context, storeKey) ?: knownFolder(context, storeKey))?.takeIf { it.isDirectory || it.mkdirs() }
-            ?: return false
+        if (into == null) {
+            // No folder known yet (the store cannot be asked now): the next launch brings these saves in ([saveRoot]).
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(PENDING_PREFIX + storeKey, used.absolutePath)
+                .apply()
+            return false
+        }
         if (sameFolder(into.absolutePath, used.absolutePath)) return true
         return adopt(used, into) >= 0
     }

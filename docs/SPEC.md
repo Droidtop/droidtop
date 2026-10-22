@@ -13306,7 +13306,9 @@ follows:
     droidtop passed, which is what Enginehost reports whenever it took it, starts the upload job
     (`StoreSaves.afterExit`); a `saveFolder` in the game's own folder (an engine that saves beside the game) uploads
     nothing; any other folder is the person's own location, whose save files are copied into the game's synced
-    folder (missing or older ones, as deep as Steam Auto-Cloud looks, `adopt`) and then uploaded.
+    folder (missing or older ones, as deep as Steam Auto-Cloud looks, `adopt`) and then uploaded. Steam is asked
+    for the game's save list when none is kept (`SteamStore.saveFolder`, at most 15 s); when it still cannot be
+    named (offline), the folder is kept and the next launch brings its saves in before the game starts.
 
   A refused path is accepted from any app the person allowed in App launch access, droidtop with no standing of its
   own.
