@@ -36,6 +36,8 @@ runtime-windows/prebuilt/
 runtime-windows/lsfg/
 # droidtop-agent's Android library (build-scripts/fetch-agent-lib.sh).
 net-core/agent/
+# The aria2 download engine's AAR as a local Maven repository (build-scripts/fetch-aria2-engine.sh).
+net-core/aria2-engine/
 
 # Signing (real release key + passwords — never commit these; CI reads
 # them from repo secrets instead, see .github/workflows/android-build.yml)

@@ -43,7 +43,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // no preferences, no network and no permissions, and the plugin in it reaches droidtop only through its broker.
         // Nor does a gpu.render plugin's graphics process, which has droidtop's UID: nothing of droidtop's is kept in
         // memory beside the plugin's code there.
-        if (dev.droidtop.runtime.util.IsolatedProcess.runsPluginCode()) return
+        // The download engine's process (docs/SPEC.md 12a "One download engine") is the same: libaria2 reads untrusted
+        // network data there, so droidtop starts nothing beside it, and in the default `:aria2_open` process the UID is droidtop's.
+        if (dev.droidtop.runtime.util.IsolatedProcess.runsPluginCode() || dev.droidtop.runtime.util.IsolatedProcess.runsDownloadEngine()) return
         // The scan log goes to logcat AND to a file droidtop owns, and
         // says which build is writing it -- shared core, every mode, so
         // a scan is diagnosable from a rig whatever the device's logcat

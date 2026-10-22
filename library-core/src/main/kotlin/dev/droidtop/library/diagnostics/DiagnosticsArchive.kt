@@ -33,7 +33,7 @@ object DiagnosticsArchive {
     private const val OUT_DIR = "diagnostics"
 
     /** Per-file cap on what goes in. The log files roll well below this; it bounds a stray file someone put in the folder. */
-    private const val MAX_FILE_BYTES = 1024L * 1024L
+    internal const val MAX_FILE_BYTES = 1024L * 1024L
 
     /**
      * Whether a settings key holds a credential (or the identity that goes

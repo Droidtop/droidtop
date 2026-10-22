@@ -45,6 +45,13 @@ dependencyResolutionManagement {
         // bucket (flutter_infra_release), verified against
         // plugin-host/src/main/assets/flutter-runtimes.json.
         maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
+        // Needed by :net-core (docs/SPEC.md 12a, "One download engine"): the aria2 download engine's AAR, released
+        // by bi0shacker001/aria2-engine and put here, checked against net-core/aria2-engine.pin, by
+        // build-scripts/fetch-aria2-engine.sh (CI runs it before Gradle). A local repository that holds only that group.
+        exclusiveContent {
+            forRepository { maven { url = uri(File(settingsDir, "net-core/aria2-engine/repo")) } }
+            filter { includeGroup("io.github.bi0shacker001") }
+        }
     }
     // gradle/libs.versions.toml is picked up by convention -- do not also
     // declare it via versionCatalogs { create("libs") { from(...) } },

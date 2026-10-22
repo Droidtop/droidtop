@@ -7,19 +7,21 @@ import java.io.File
 /**
  * Cloud saves for a store game that Enginehost runs (docs/SPEC.md 7g, "Stores", "A game Enginehost runs";
  * Droidtop/tracker#580). droidtop owns the save folder: each such game gets a folder of its own in shared storage,
- * shaped like a Wine prefix ([prefix]: `drive_c/users/<user>/...`), so a store's sync writes into it exactly as it
+ * shaped like a Wine prefix ([prefixFor]: `drive_c/users/<user>/...`), so a store's sync writes into it exactly as it
  * writes into a real prefix and needs no second mapping. The launch hands Enginehost [saveRoot] as the inline
- * `saveRoot` key: the folder an engine's system save location means for that launch, chosen in that prefix's
- * `AppData/Roaming` so the engine's own layout lands where the Windows build keeps its saves ([saveRootIn],
- * [toWindowsLayout]). Engines that save beside the game ignore it, and their saves stay where they are.
+ * `saveRoot` key: the folder in it that directly holds the game's save files, as the store's cloud names it
+ * ([StoreLibrary.saveFolder]), unchanged. The owner, 2026-10-18: "What we provide is a link to the saves, as they are
+ * provided to us. This SHOULD be an exact mapping of whatever the save root for a game is." Enginehost and its cores
+ * use that folder as the game's save folder as it is, so droidtop needs no engine knowledge.
  *
- * A game is recorded here when Enginehost launches it ([remember]), by its store key and its folder, so the sync
+ * A game is recorded here when Enginehost launches it ([prepare]), by its store key and its folder, so the sync
  * after Enginehost reports the game ended ([keyForFolder]) and every later sync of that key ([prefixFor]) find
- * the same folder. Preferences reads and writes, and the folder is made on [saveRoot]: off the main thread.
+ * the same folder. Preferences reads and writes, and folders are made: off the main thread.
  */
 object EnginehostSaves {
     private const val PREFS = "droidtop_enginehost_saves"
     private const val FOLDER_PREFIX = "folder:"
+    private const val PASSED_PREFIX = "passed:"
 
     /** The Windows user inside the folder; Steam's cloud paths never name it. */
     const val USER = "droidtop"
@@ -32,51 +34,34 @@ object EnginehostSaves {
     fun folderFor(storeKey: String): File =
         File(File(File(Environment.getExternalStorageDirectory(), "droidtop"), "saves"), storeKey.replace(':', '-'))
 
-    /** The pseudo-prefix's `AppData/Roaming`, the folder Windows calls `%APPDATA%`. */
-    fun roamingOf(prefixDir: File): File = File(prefixDir, "drive_c/users/$USER/AppData/Roaming")
-
     /**
-     * The folder to name as [engine]'s save root inside [roaming], so the engine's own layout lands where the game's
-     * Windows build keeps its saves and Steam Cloud's paths line up (Droidtop/tracker#580, read from Enginehost's
-     * cores): Ren'Py saves straight under its root (`<root>/<save_directory>`) where Windows has
-     * `%APPDATA%/RenPy/<save_directory>`, so it is given `RenPy` inside it; Godot already writes
-     * `<root>/godot/app_userdata/<project>` (lowercase, see [toWindowsLayout]) or a custom user dir, so it is given
-     * `%APPDATA%` itself, as is every other engine. Pure.
+     * Makes [storeKey]'s folder and records that Enginehost runs its game from [gameFolder], so the sync before the
+     * launch finds the folder ([prefixFor]). False when the folder cannot be made.
      */
-    fun saveRootIn(roaming: File, engine: dev.droidtop.library.GameEngine): File =
-        if (engine == dev.droidtop.library.GameEngine.RENPY) File(roaming, "RenPy") else roaming
-
-    /** The save folder for this launch of an [engine] game, made when missing; null when it cannot be. */
-    fun saveRoot(storeKey: String, engine: dev.droidtop.library.GameEngine): File? =
-        saveRootIn(roamingOf(folderFor(storeKey)), engine).takeIf { it.isDirectory || it.mkdirs() }
-
-    /**
-     * Godot names its user folder `godot` on Android and Linux and `Godot` on Windows, where Steam Cloud's files come
-     * from. Before a sync the folder takes the Windows name, after it the engine's ([toEngineLayout]), so the two
-     * meet whichever way the files travel. A folder already named the target, or both present on a case-sensitive
-     * card, is left as it is.
-     */
-    fun toWindowsLayout(roaming: File): Boolean = renameCase(roaming, "godot", "Godot")
-
-    fun toEngineLayout(roaming: File): Boolean = renameCase(roaming, "Godot", "godot")
-
-    /**
-     * Renames [parent]'s entry named exactly [from] to [to], through a third name so it works on a card that folds
-     * case too. False when there is no [from], or a [to] already stands beside it.
-     */
-    internal fun renameCase(parent: File, from: String, to: String): Boolean {
-        val names = parent.list()?.toSet() ?: return false
-        if (from !in names || to in names) return false
-        val step = File(parent, "$to.droidtop-renaming")
-        return File(parent, from).renameTo(step) && step.renameTo(File(parent, to))
-    }
-
-    /** Records that Enginehost runs [storeKey]'s game from [gameFolder]. */
-    fun remember(context: Context, storeKey: String, gameFolder: File) {
+    fun prepare(context: Context, storeKey: String, gameFolder: File): Boolean {
+        val drive = File(folderFor(storeKey), "drive_c")
+        if (!drive.isDirectory && !drive.mkdirs()) return false
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
             .putBoolean(storeKey, true)
             .putString(FOLDER_PREFIX + gameFolder.absolutePath, storeKey)
             .apply()
+        return true
+    }
+
+    /**
+     * The folder to name as [storeKey]'s game's `saveRoot` for this launch: the folder of its saves in its prefix,
+     * as the store names it, made when missing. Asked after the sync before the launch, which reads what the store
+     * says. Null when the store names none or it cannot be made; the game then saves to the person's own location
+     * and nothing is uploaded when it ends. The folder is recorded, so [usedOurFolder] compares with it.
+     */
+    suspend fun saveRoot(context: Context, storeKey: String): File? {
+        val prefix = prefixFor(context, storeKey)
+        val folder = prefix?.let { StoreLibraries.forKey(storeKey)?.saveFolder(context, storeKey.substringAfter(':'), it) }
+            ?.takeIf { it.isDirectory || it.mkdirs() }
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(PASSED_PREFIX + storeKey, folder?.absolutePath)
+            .apply()
+        return folder
     }
 
     /** The store key of the game Enginehost ran from [gameFolder], or null when droidtop did not launch it there. */
@@ -91,14 +76,16 @@ object EnginehostSaves {
     }
 
     /**
-     * Whether the folder the engine actually used ([saveFolder], from Enginehost's report) is under the [storeKey]
-     * game's save folder: when Enginehost refused the path it used the person's own location, and droidtop's folder
-     * then holds nothing new to upload. Pure but for the path it builds.
+     * Whether the folder the engine used ([saveFolder], from Enginehost's report) is the one droidtop named for
+     * [storeKey]'s last launch. Enginehost reports exactly that folder when it took it; anything else (a refused
+     * path, an engine that saves beside the game) leaves droidtop's folder with nothing new to upload.
      */
-    fun usedOurFolder(storeKey: String, saveFolder: String?): Boolean {
-        if (saveFolder.isNullOrBlank()) return false
-        val root = folderFor(storeKey).absolutePath
-        val used = File(saveFolder).absolutePath
-        return used == root || used.startsWith("$root/")
+    fun usedOurFolder(context: Context, storeKey: String, saveFolder: String?): Boolean {
+        val passed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PASSED_PREFIX + storeKey, null)
+        return sameFolder(passed, saveFolder)
     }
+
+    /** Whether [passed] and [reported] name the same folder, path for path. Pure but for the paths it builds. */
+    internal fun sameFolder(passed: String?, reported: String?): Boolean =
+        !passed.isNullOrBlank() && !reported.isNullOrBlank() && File(passed).absolutePath == File(reported).absolutePath
 }

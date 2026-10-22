@@ -85,6 +85,14 @@ internal class SaveLayout(
     }
 
     /**
+     * The folder on this device that directly holds the game's save files, as its first `savefiles` entry names it
+     * (root and path, after a `rootoverrides` move, with the account's ids put in), or null when no entry has a root
+     * here. What droidtop names to Enginehost as a game's save folder, unchanged (docs/SPEC.md 7g, "A game Enginehost
+     * runs", Droidtop/tracker#580). A game with entries in several folders is given the first.
+     */
+    fun saveFolder(): File? = ufs.patterns.firstOrNull { it.root in dirs }?.let { folderOf(it) }
+
+    /**
      * The file on this device a cloud file named [name] lives at, or null when
      * the name's root has no folder here. The pattern whose cloud path is the
      * longest start of the name decides where; with none, the root's folder

@@ -5875,6 +5875,7 @@ one:
   - **Status:** decided; being built this week. The component is `bi0shacker001/aria2-engine` (`docs/design.md` there). Its first release is posted on Droidtop/tracker#577 for the Enginehost lane, which moves Enginehost to the same component.
 
   **Downloads (Droidtop/tracker#181; reversed 2026-10-09 on the owner's "why can't we enable resuming?"):** every single-file HTTP(S) download droidtop itself makes is one native job of kind `download` (`DownloadJobs`, owner label "Downloads") in the same "Downloads and installs" list, and droidtop's own downloader does the transfer: `ResumableDownload` in `:net-core`, the one mechanism `Http.downloadTo` also goes through. Android's DownloadManager is not used for any of these (its path, `DownloadBackend` and the metered flag are deleted), and since 2026-10-14 not for droidtop's own APK update either: that is one of these jobs, with the post step `droidtop.self_update` (§10b). The file is fetched into `<name>.part` with a sidecar `<name>.part.meta` holding the server's `ETag`, `Last-Modified` and length, in droidtop's own external files directory (`downloads/<name>`, scoped storage needs no permission). A resume (after Pause, a lost connection, a network change or a restart) sends `Range: bytes=<have>-` with `If-Range` set to the strong ETag, else the `Last-Modified`: a `206` whose `Content-Range` starts at the byte asked for is appended; a `200` (the server does not do ranges, or the file changed) discards the partial file and starts from zero, which the job's status line says ("Started again: the server cannot resume."); a `416` on a partial file that is already the whole length finishes it, any other `416` starts again; with no validator at all a partial file is not trusted and starts again. A broken connection or a 5xx/429 is retried from the partial file with a backoff (1 s doubling to 30 s, up to six failures without progress, each saying "Waiting for the connection" or "Waiting to retry"); any other HTTP status fails the job with the server's answer. Redirects are followed by hand, and `Authorization`, `Proxy-Authorization`, `Cookie`, `Referer` and `Origin` go on only to the host the request was made to (a redirect to another host, or from https to http, drops them; Droidtop/tracker#417). Pause and Cancel cancel the job's coroutine, and a watcher closes the live connection at once so a blocked read does not hold the thread. Pause keeps the partial file; Cancel (the kind's `onCancel` hook, also for a restored job) deletes it and its sidecar. The checkpoint is `fetched`, reported once every byte is in the file: a restored job with that checkpoint goes straight to the post step, and one whose file was already moved into the game folder is finished and reported without downloading again (`registerNative(..., reattachOnRestart = true)`: a restored download runs again at once from its partial file, it is not left paused). Progress is reported at most once a second. The optional digest (SHA-256, SHA-1 or MD5, whichever the source publishes; the strongest given is checked, Droidtop/tracker#416) and size cap are checked (a file over the cap is refused as soon as its length is known, and nothing is kept), then the job's post-processing step (a name registered with `DownloadJobs.registerPost`, so a restored job finds it) moves, unpacks or installs the file and the runner deletes it. The step `keep` leaves the file for the caller. Android's own download notification is gone with its service: a download counts in the one summary notification below. **A download a sign-in site serves (2026-10-09, Droidtop/tracker#380):** a source plugin cannot open a web page (a contained one has no window or sockets), so a protected link is opened in droidtop's own web view with the plugin's signed-in session (docs/plugin-api.md 3 G3, `web.session open_in_session`); the first download the page starts is captured and the plugin's `acquire` reply names it by a one-use token (`download.session`), and droidtop adds the captured cookies, user agent and referrer itself. It is then the same Downloads job as any acquire download, its cookies held in memory like every credential header. **Opening a link in another app (Droidtop/tracker#418):** droidtop has no torrent client, so a source that finds a magnet link (or a page the person must use in a browser) calls the host op `apps.view` (docs/plugin-api.md 3 F2) from a button's job; droidtop builds the `ACTION_VIEW` intent itself and shows Android's chooser, for `https`, `http` and `magnet` links only, behind the normal permission "Open links in other apps". A `.torrent` file a site serves is deliberately not captured into a game folder; opening a file droidtop itself downloaded in another app is not built, because no plugin can name such a file and it would need a lifetime for files left in the downloads area. **Acquire reply extras (2026-10-09, Droidtop/tracker#417):** the file name is kept as the source gave it (only characters no file system takes are replaced; the downloads area itself names its file `acquire_<time>.<extension>`, so the display name never reaches a path there); `system` places the download in that system's games folder when the Get games screen is not already that system's (`AcquireSystemHint`; no such folder fails the job, nothing goes to another system's folder); `unpack: "archive"` makes the place step unpack a zip, 7z or rar with the one `ArchiveExtractor` (now in `:runtime-common`, shared with the itch.io store's installs) into a hidden `.<name>.unpacking` folder renamed to the archive's name less its extension when whole, then deletes the archive; a restored job whose folder is already there is finished without downloading again, an existing folder is never touched, and a failed unpack keeps the download. **Several files (Droidtop/tracker#417):** the acquire reply's `downloads` (1 to 16 descriptors) is one job and one entry in Downloads: the first file travels in the job's own arguments and the others in its `more` argument, each with its own name, digests and headers (the credential ones in memory only, keyed by the file's downloads-area name). The files are fetched and checked in turn, the checkpoint `fetched:<n>` counting the whole ones so a restart carries on with the next file from its partial file, and the post step (`DownloadMultiPost`, registered next to the single-file one) places them all or none; a job restored after the move finds every target in place and finishes without fetching. **Split releases (Droidtop/tracker#419):** several files with `unpack: "archive"` must be the numbered parts of one split archive (`SplitArchives`); byte-split parts (`.7z.001`, `.zip.001`, `.rar.001`) are concatenated in order after the last is checked, the parts deleted, and the joined file unpacked as a single archive (a failed unpack keeps the joined file). RAR volumes (`.partN.rar`) are placed together and not unpacked, deliberately: the libarchive binding the one `ArchiveExtractor` uses opens a single file, so extracting the first volume would drop the rest without an error.
+  **One download engine (2026-10-22):** the transfer described above is `ResumableDownload`, and it still does every download except a source's: acquire replies, web-session downloads, updates and BIOS through a source plugin now run on the download engine (12a, "One download engine"), with the same job, the same status lines and the same pause, resume and policy. The `.part` file and its sidecar belong to the earlier downloader; the engine's partial file is the file itself with aria2's `<name>.aria2` beside it. The rollout order there says when the earlier downloader is deleted.
   **A download pauses and resumes like any other job.** It is pausable and resumable (`startNative` defaults), so the jobs list shows Pause, Resume and Cancel for it, the Download rules policy can hold and release it (below), and a pause costs only the bytes in flight. The earlier decision not to offer Pause (DownloadManager has no public pause) is reversed by moving the transfer to droidtop's own downloader.
   **Download rules (decided 2026-10-09, Droidtop/tracker#226; Steam's Downloads settings are the reference).** One policy object, `DownloadPolicy` in `:net-core`, is read by every download job; no store or source has a network rule of its own. `DownloadPolicy.decide(settings, conditions, job)` is the whole rule set and is pure (unit tested): it answers Go or Hold with the line the job shows. The person's choices live in Settings, **Download rules** (`DownloadRulesCatalog`, reached from the Downloads place):
   - **Download over** (`NetworkRule`): *Wi-Fi only*; *Wi-Fi, and mobile data for small downloads* (the default; small is under 50 MB, and a download of unknown size counts as large, so an unsized install waits for Wi-Fi); *Any connection*. The network is what Android says about the active network: no internet holds with "Waiting for a network"; an internet network without `NOT_METERED` (mobile data, a hotspot, a Wi-Fi marked metered) is *metered*, which is what the rule restricts, holding with "Waiting for Wi-Fi". Unmetered Wi-Fi and ethernet always pass. The network rule governs every download.
@@ -5984,7 +5985,10 @@ source (now `:runtime-windows`, §9):
     (`launchWindows` takes the entry id; it used to launch every game in
     the shared prefix, so a game's own prefix was configurable but never
     used). Going back from an own prefix to the shared one (removing the
-    prefix and the saves in it) is not built. gamenative's full dialog
+    prefix and the saves in it) is not built; a list of managed prefixes
+    (any game or app in any of them, today's shared prefix one entry) and the
+    way back are decided in "Per-game prefixes, the way back, and what a game
+    can reach" below. gamenative's full dialog
     stays reachable as "All prefix settings" (for a game in the shared
     prefix, "All shared prefix settings", which apply to every game in it).
     One source of truth for the build a launch uses: the container
@@ -6142,6 +6146,212 @@ source (now `:runtime-windows`, §9):
     extension instead (`.x86_64`/`.x86` means x86), so an ARM64 build
     shipped under another name is not yet told apart from an x86 one.
 
+### Per-game prefixes, the way back, and what a game can reach (decided 2026-10-22, Droidtop/tracker#584)
+
+Design only; nothing in this subsection is built. Built state stays as the
+bullets above describe it until each part lands. The mechanism is 5b
+"Containment and copy-on-write layers for Wine"; the library side is the
+sandbox library's `docs/design.md`, "Layers, containment, and Wine and proot
+under the broker".
+
+Owner, 2026-10-17, on the shared prefix: "Yeah, that needs to be fixed. We
+also need some deduplication system for it, too." And on the broker: "using
+the sandbox broker actually isn't a bad idea. It gives us more containment
+as well. Something running in a wine or proot context couldn't, say,
+suddenly nuke the entire internal storage (still angry about that)."
+
+**The problem today (checked in code on 2026-10-22).** Every game starts in
+the one shared prefix (`PcContainers.forGame`,
+`DroidtopPcGameRuntime.kt:651-664`: the game's own container if there is
+one, else the first). A game gets its own only by choosing another Wine
+build (`PcContainers.createOwn`, `DroidtopPcGameRuntime.kt:685`), and there
+is no way back from it. A prefix is a full copy of Wine's own files, made
+when the container is created (5b), which is why droidtop avoids making one
+per game.
+
+**1. Managed prefixes, and any game or app in any of them (owner,
+2026-10-22).** "We can allow for shared prefixes as a system. We keep a list
+of managed prefixes, and can run applications in arbitrary ones. Our current
+shared one just gets moved to that system". So droidtop keeps a **list of
+managed prefixes** ("Windows games > Prefixes": name, Wine build, size, the
+games and apps in it). Today's shared prefix becomes one entry of the list
+(named "Shared"), made the default for a game that has no choice, exactly as
+it behaves now. Any game or app can be set to run in any entry: the game's
+"Wine and graphics" screen (`WineOptionsCatalog`) gets a row, "Prefix", whose
+values are the entries plus "New prefix for this game". A game's launch-time
+choices over its prefix (graphics driver, DXVK, emulator) are unchanged and
+cost no prefix. `PcContainers.forGame` resolves the game's entry from this
+choice (a stored prefix id per game) instead of "own id, else the first";
+the id scheme of today's own prefixes (`ownId`) is kept, so a prefix a game
+already has is simply an entry that game points at.
+
+A prefix has its own Wine build; a game moved to an entry runs on that
+entry's build, and the row says so in one line when the build differs from
+the one it ran on.
+
+**2. Making a prefix, and the way back.**
+
+- **A new prefix** ("New prefix for this game", or "New prefix" in the list)
+  is made from the Wine build's base prefix (5b), fresh, by one of two means,
+  chosen by what the device can do and never by the person (owner,
+  2026-10-22: "If we have CoW, it's a whole new prefix. If we don't, we want
+  a layer system"):
+  - **Real copy-on-write present** (the prefix's file system supports
+    reflinks, tested once by a clone of a small file at the prefix home; or
+    overlayfs on a device where droidtop already has root through Shizuku
+    or Sui): a whole new prefix, a full copy-on-write copy of the base.
+    Nothing in the broker is needed for dedup.
+  - **Otherwise** (the Retroid Pocket 5: ext4 and f2fs have no reflinks,
+    no user namespaces, no mount rights): a thin layer over the base, served
+    by the broker (5b).
+  The prefix list shows both the same way. "Start from a copy of another
+  prefix" is the other choice for a new prefix (a runtime installed in it).
+- **The way back is choosing another entry.** A game on a prefix made for
+  it goes back to "Shared" (or to any entry) by changing the "Prefix" row.
+  The confirmation names the one consequence: the game then runs on that
+  entry's Wine build. It offers, on by default, "Copy this game's saves
+  to the new prefix": the save locations (`drive_c/users/*/Documents`,
+  `AppData`, `Saved Games`) are copied, never overwriting a name that is
+  already there. Registry values are not carried across (said on the
+  confirmation).
+- **A prefix no game or app uses any more** is listed as "Not used" with
+  Remove beside it; nothing removes it by itself. Removal is two-step
+  (`docs/DESIGN-LANGUAGE.md`), by `SafeDelete.clearWithin` fenced to the
+  prefix home (5b), which never follows a link, and for a layer by the
+  library's `sbx_layer_forget`. Removing a prefix is the deliberate action
+  that went wrong on 2026-09-02, which is why nothing deletes one as a side
+  effect of changing a choice.
+
+**3. What a game can reach.** A Windows game, and a proot container, is
+confined by the sandbox library's broker (5b), and what the broker lets it
+reach is exactly this list and nothing else (owner, 2026-10-17: "Let's gate
+the root and internal storage maps behind a permission toggle. That way
+users can enable it if something fucky depends on it, but it's not normally
+there"; and: "it doesn't help if we allow it access to the entirety of the
+internal storage, but, like, at that point, we DID allow it complete access.
+it's on us"):
+
+| Reachable | Mode | Where the person sees it |
+| --- | --- | --- |
+| The game's prefix (the managed prefix it runs in) and the Wine build's base | prefix read-write, base read-only | "Prefix" row |
+| The Wine build, emulators and graphics drivers it loads, Android's system files | read-only; the guest's temporary folder, sockets and shader caches read-write | not shown (the runtime) |
+| The game's own folder | read-only, except a subfolder named `saves` or `savegames` (read-write) and the folders the person marks writable | game page, "Folders" |
+| Folders the person shared with it (a save folder on a card, a mod folder) | the mode the person chose | game page, "Folders" |
+| Nothing else | | |
+
+**The game's folder (owner, 2026-10-22).** "Determinant? A folder named
+'saves' or 'savegames', yes. Users can configure it otherwise". The folder is
+read-only by default; a subfolder named `saves` or `savegames` (any case,
+anywhere under it) is writable. The game's "Folders" page lists the writable
+folders and lets the person add or remove others per game. A game that
+writes elsewhere in its folder fails to write there and the audit log names
+the path, which is how a person finds the folder to add; no prompt appears
+in the middle of play.
+
+Not in the list, and so refused by the broker: droidtop's own private
+folders, every other game's prefix, other games' folders, and the rest of
+internal storage and the SD card. Deleting or rewriting any of it is refused
+(`EACCES`); that is the point.
+
+**4. Two wide grants, off by default (owner's decision, 2026-10-17).** The
+two maps that make a game see more than its list are permission toggles in
+the same Allow/Deny style as plugin permissions (12a, plugin permissions;
+7k "Asking before a change"), on the game, or on the managed prefix it runs in (a
+prefix's toggle covers every game and app in it; a game's page shows "Allowed by
+its prefix" so the source is visible). Both are off for every game and every
+prefix, including every existing one, until the person turns one on.
+
+| Toggle (title) | What it maps | Line under it |
+| --- | --- | --- |
+| "Device system folders" | Wine's Z: drive pointing at the device's own root `/`, and a proot container's view of `/` outside its rootfs | "Lets this game see and change everything on the device's storage" |
+| "All internal storage" | a drive letter (Wine) or a bind (proot) of the whole internal volume, and of the SD card and USB drives (`SharedVolume.mounted`) | "Lets this game see and change everything on the device's storage" |
+
+The owner's wording is the line; the titles avoid the banned words of the notices "Copy rules" (Droidtop/tracker#485)
+("root", "sandbox"). Each toggle can be turned off again and takes effect
+for the running game at once (the broker's decider consults the toggle,
+sandbox design.md "Wide grants"), not only at the next launch. A turned-on
+toggle is shown on the game's page and the prefix's as a grant, with Remove
+beside it. The broker enforces what is on and nothing more: a drive entry
+in a prefix with its toggle off exists in the prefix's drive list but
+grants nothing, and the game sees the drive as empty. Turning one on never
+widens past droidtop's own secrets: even with "All internal storage" on,
+droidtop's private folders and other games' prefixes stay refused (a longer
+`SBX_DENY` rule under the grant).
+
+What is "wide" is decided in one place, `WideAccess.classify(folder)` in
+`:runtime-common` (pure, unit-tested): a folder is wide when it is `/`, a
+volume root (`/storage/emulated/N`, `/sdcard`, any `SharedVolume` root), or
+an ancestor of one of those or of droidtop's private folder. A folder the
+person shares that is wide is handled as the matching toggle, not as an
+ordinary share, so "my games folder is `/storage/emulated/0`" asks for the
+toggle instead of slipping past it.
+
+**5. Audit of what droidtop creates today (2026-10-22, from the code; the
+list is re-run on the rig before any default changes).**
+
+Wine drive letters:
+
+- `C:` the prefix itself.
+- `D:` to `Y:`, one per games root, assigned by
+  `EnvironmentMounts.wineDrives` (`EnvironmentMounts.kt:52-55`) and written
+  by `DroidtopPcGameRuntime.drivesFor` (`DroidtopPcGameRuntime.kt:409-410`),
+  plus one per installer or game folder added by `PrefixDrives.withFolder`
+  (`PrefixDrives.kt:36-45`, used by `WindowsInstalls.kt:91-96`). A games
+  root is the person's own library folder and is a share; if it is a volume
+  root it is wide (4).
+- `Z:` is made by the vendored launcher (`WineUtils.createDosdevicesSymlinks`,
+  named in `EnvironmentMounts.kt:50` as the link to the image root). The
+  2026-09-02 incident records it as `dosdevices/z: -> /` (5b "Destructive-operation
+  audit", `DroidtopPcGameRuntime.kt:300-308`). **These two descriptions
+  disagree and the first rig step settles it** (`readlink dosdevices/z:` in a
+  prefix). Either way the result is: `Z:` points at the Wine runtime's own
+  read-only files, never at `/`, unless "Device system folders" is on.
+- The launcher is also handed every drive's folder as `bindingPaths`
+  (`WineXSession.kt:240`); that list is derived from the same toggles.
+- Not used: GameNative's `Container.DEFAULT_DRIVES`, which names another
+  package's storage (`DroidtopPcGameRuntime.kt:398-408`). A prefix created
+  by GameNative itself and adopted keeps its drive string; the audit lists
+  it and the toggles gate it the same way.
+
+proot binds (`ProotRuntime.startSession`,
+`ProotRuntime.kt:552-565`): `/dev`, `/proc`, `/sys` whole; the shm, sockets,
+resolv.conf, hosts and bwrap shim files; **`appStorageDir` (droidtop's whole
+private `files/` folder) at `/run/droidtop-app-storage`; every mounted
+volume (internal storage and any card or USB) at
+`/run/droidtop-shared-storage`**, for every container, by default; then the
+container's home and the person's extra folders. The last two lines are
+wide today. Decision: the shared-storage bind becomes the "All internal
+storage" toggle above and is off for a new container; the app-storage bind
+is removed from the default (it exists for
+`ContainerLayout.hostStorageToContainerPath`, which Windows launches do not
+use and which is given only the folders a container needs); existing
+containers get the same: the toggle is **off** for them too, not migrated as
+on (owner, 2026-10-22: "Nope, turn it off. If it breaks, we fix it then.").
+A container that relied on the bind loses it on its next start; the person
+turns the toggle on, and the audit log of the refused paths says what
+failed.
+
+**6. Running without the protection (owner, 2026-10-22).** "No, not
+prompted. It can be a presented toggle when 'risky actions' is enabled, but
+it's gated and never recommended." There is no prompt and no "run anyway"
+when protection fails to start: that launch is refused with the reason. A
+toggle, "Run without protection", appears on a game or prefix only while
+droidtop's risky-actions setting is on; it is off by default, never offered
+as a fix, and never suggested in text. It is the same kind of grant as the
+two above (shown, revocable).
+
+**7. Where the toggles are stored.** In the prefix's and the game's settings
+next to the other prefix settings (`WineGameOptionsPrefs` for a game,
+the container's own record for a prefix), read by `WineGrants` (5b), which
+turns toggles, shares and the game's folder into the broker's rules. There
+is no other copy of the list.
+
+Decided with the owner on 2026-10-22 (Droidtop/tracker#584): "All internal
+storage" and "Device system folders" exclude droidtop's private folders and
+other games' prefixes (a longer deny, "7: Yes"), and Wine uses the sandbox
+library's platform read-only preset shared with Enginehost ("8: Yes").
+Open: a stronger mechanism than the in-proot check for proot (5b).
+
 ### PC launch wiring: the `PcGameRuntime` seam (directed 2026-08-31)
 
 `WINE_PREFIX` and `LINUX_CONTAINER` were both dead `error()` stubs
@@ -6171,7 +6381,9 @@ picked it. They are now real launches, through a seam:
   game: an engine game should run in the environment the user already
   configured, and spawning multi-hundred-megabyte prefixes per title
   uninvited would be its own bug. A game gets a prefix of its own only
-  when the person picks a different Wine build for it; its other Wine
+  when the person picks a different Wine build for it (decided 2026-10-22: any
+  game or app can run in any managed prefix, made by copy-on-write where the
+  device has it and as a thin layer otherwise; 5a); its other Wine
   choices are laid over the shared prefix at launch (§5a).
 - Per-game choice is exposed as a "Runs with: <backend>" chip in the game
   detail screen, backed by `LaunchStrategyOverridePrefs`. Engine games
@@ -6451,6 +6663,224 @@ class -- a delete that can leave the tree it was pointed at:
   `BackupHelper` (entry names whitelisted to exact known filenames,
   staging dirs hold only droidtop-written flat files), and test-only
   temp dirs.
+
+### Containment and copy-on-write layers for Wine (decided 2026-10-22, Droidtop/tracker#584)
+
+Design only; nothing here is built. The choices and the grants a person
+sees are 5a "Per-game prefixes, the way back, and what a game can reach".
+The mechanism is the sandbox library's (`vendor/sandbox`, its `docs/design.md`
+section "Layers, containment, and Wine and proot under the broker"): one
+containment mechanism for plugins, Enginehost cores, Wine and proot, with no
+second one here. Kernel copy-on-write is not available without root on the
+Retroid Pocket 5 (ext4 and f2fs have no reflinks, overlayfs needs mount
+rights, no user namespaces), so there deduplication is the broker's. Where
+real copy-on-write exists (a file system with reflinks, or overlayfs on a
+device where droidtop already has root through Shizuku or Sui) a new prefix
+is a whole copy-on-write copy of the base and needs no layer (owner,
+2026-10-22: "If we have CoW, it's a whole new prefix. If we don't, we want a
+layer system"). The layer is therefore the case for devices without it,
+never required where the kernel does the job, and the broker's containment
+applies to both.
+
+**The shape.**
+
+- One **base prefix per Wine build** (and, later, per component set such as
+  a DXVK version): a fully initialised, then frozen, read-only prefix,
+  under `imagefs_shared/prefix-bases/<build id>/`, outside the prefix home
+  so `SafeDelete.clearWithin(homeRoot, ...)` cannot reach it. Made once, by
+  the same container creation that copies Wine's own DLLs into a new
+  prefix today (this section's "What the code did"), run into a scratch
+  directory, then marked (`0444`/`0555`) and recorded with a content hash.
+- One **managed prefix** is one entry in droidtop's list of prefixes (5a),
+  at the path a prefix has today (`imagefs_shared/home/xuser-<id>`, so
+  `ImageFsHome.root` and every fence keep their meaning). Without kernel
+  copy-on-write it is a **layer** over the base; with it, a full
+  copy-on-write copy (the probe is one `FICLONE` of a small file at the
+  prefix home, made once and remembered per volume). Today's shared prefix is
+  the entry "Shared"; a game's own prefix is another entry over the same
+  base. A layer holds only what the game or
+  droidtop wrote: registry hives, files installed, the drive links,
+  droidtop's DXVK and driver DLLs. The broker serves reads from the base,
+  copies a base file into the layer on its first write, truncate, rename or
+  delete, and records a delete of a base file as a whiteout.
+- Deduplication is by construction, not by hashing files: two prefixes on
+  one Wine build share the base and cost the size of their layers.
+- A layer whose base is missing or changed is not launched; the game's page
+  says "The Windows files for this Wine build need repairing" with a Repair
+  button that remakes the base. A base is never removed while a layer names
+  it.
+- Existing prefixes are not rewritten. A full prefix is a layer with no base
+  (the sandbox mount is a plain directory then), launches as it does today,
+  and is only confined, not thinned. Thinning an existing shared prefix (drop
+  the files identical to the base, one at a time, none followed) is an
+  offered action in "Windows games > Prefixes", never automatic.
+
+**Phase 0, the quick first step: symlinks to the base, no broker needed.**
+Before any of the above is built, a new prefix can already share the
+read-only parts (on a device without real copy-on-write): when droidtop
+creates a prefix on a Wine build that has a
+base, Wine's own DLLs and system files (the files the creation copies out of
+the build and that nothing rewrites) are symbolic links to the base's files
+instead of copies. Rules: only files droidtop and Wine never write are
+linked (a list in `WinePrefixPreparation`, tested: the DXVK, VKD3D and
+driver DLLs it writes at launch, the registry hives, `dosdevices` and the
+user profile are always real files in the prefix); the base's files are
+`0444`, so a write through a link by code that follows links (an
+`FileOutputStream`) gets `EACCES` and never changes the base, while a
+rename-over replaces only the link. When layers arrive, a prefix of links
+is converted by removing the links that point into its own base, one by one,
+leaving exactly the layer. Phase 0 also makes the disk saving real for
+droidtop's own users before any of the harder work. It does not contain
+anything; that is phase 2.
+
+**Phases.**
+
+1. **Phase 0**: the list of managed prefixes with today's shared prefix
+   moved into it, any game or app in any entry, base prefix per Wine build,
+   new prefix by reflink copy where the volume has it and symlinked
+   read-only parts otherwise, the way back (5a), `WideAccess.classify`, the
+   audit run on the rig. No library change.
+2. **Phase 1**: sandbox library layers, listing, rename, copy-up
+   (library tests), a benchmark on the rig. The prefix becomes a layer.
+3. **Phase 2**: Wine runs under the broker: `WineGrants`, the launch changes
+   below, the audit-only run to learn the granted set, then enforcing, then
+   the toggles live.
+4. **Phase 3**: proot under the broker (the ordering spike first, which the
+   owner approved on 2026-10-22; the in-proot check is only a stopgap if
+   it fails, and a stronger mechanism stays open), the shared-storage and
+   app-storage binds replaced by the toggles, off for existing containers
+   too.
+
+**What changes in how droidtop launches Wine.**
+
+- `WineXSession.start` (`WineXSession.kt:93` onward) prepares the prefix with
+  droidtop's own code, in droidtop's own process
+  (`WinePrefixPreparation.prepare`: drive links, DX wrapper DLLs, the Vulkan
+  driver, the audio registry value), then builds the launcher component with
+  `envVars` and `guestExecutable` (`WineXSession.kt:226-246`), which runs the
+  guest with `ProcessHelper.exec` against the ImageFs root (this section,
+  "The correction that matters most"). Nothing of Wine runs under the
+  library's filter today.
+- **Preparation writes through the library's host-side layer operations**,
+  not `java.io.File` on a layer: the code that edits the registry file or
+  copies a DLL asks `sbx_layer_open`/`copy_up` for the files it touches
+  first, so it edits the layer's copy and sees the merged view. A plain
+  `File` on a layer sees only the layer. Until Phase 1, preparation writes
+  into a real prefix (Phase 0), so this is a Phase 1 change. The list of
+  files preparation touches is made by running it under the audit.
+- **Wine is started under the broker without a change to the vendored
+  launcher component** (`vendor/` is upstream's: extend, do not rewrite):
+  droidtop adds three variables to the `envVars` the component already
+  accepts: `LD_PRELOAD` (appended to the redirect library's), `SBX_BROKER`
+  (the broker's socket path, in a directory only droidtop's UID can enter)
+  and `SBX_TOKEN` (random per launch). `libsbx_child.so` locks every
+  process of the tree down in its constructor, so the box64/FEX process
+  and each Wine process, including after `exec`. If a launcher edit turns
+  out to be needed (an `LD_PRELOAD` the component rewrites), it is one
+  `droidtop:` hook in the fork's `ProcessHelper.exec`, in the style of the
+  existing `droidtop:` edits (5a, "Any Wine build"), and proposed upstream.
+  To check first on the rig: that the component keeps `LD_PRELOAD` as given
+  and that the bionic loader runs the constructor before Box64's `main`.
+- **The broker is a thread pool in droidtop's process**, started by
+  `WineXSession` before the launcher and stopped in `stop()` after
+  `wineserver -k` (the teardown order of `WineXSession.stop`).
+  The JNI binding to the library is the plugin host's
+  (`plugin-host/.../SandboxBroker.kt`, whose native side is in
+  `plugin-host/native/src/plugin_broker.c`); Windows must not get a second
+  copy, so the generic part moves to one small module both depend on
+  (`:sandbox-host`, the Kotlin and JNI binding of `vendor/sandbox` and
+  nothing about plugins), with `SandboxBroker` keeping the plugin tiers.
+- **`WineGrants`** in `:runtime-windows` (pure, unit-tested like
+  `WineLaunchPlan`): from the managed prefix and its path, the Wine build's
+  base, the runtime set (the sandbox library's platform read-only preset,
+  shared with Enginehost, plus the Wine-specific writable parts), the
+  game's folder read-only with its `saves` and `savegames` subfolders and
+  the folders the person marked writable (5a), the shares and the two
+  toggles, it returns the rule list
+  and aliases for the library. This is the only place the granted set
+  exists. The tests state it: what is in it, that a wide folder without its
+  toggle is not, and that droidtop's private folders and other prefixes
+  are denied under every grant.
+- **If the protection cannot start** (the filter fails to install, the
+  broker's socket cannot be made) the launch does not run Wine and says so
+  (`PcLaunchResult(false, "...")`), the same refusal a missing Wine build
+  gets. There is no prompt and no "run anyway" (owner, 2026-10-22: "No, not
+  prompted. It can be a presented toggle when 'risky actions' is enabled,
+  but it's gated and never recommended."). The only way to run unprotected
+  is 5a's "Run without protection" toggle, shown while droidtop's
+  risky-actions setting is on; `WineGrants` returns "no broker" for a game
+  whose toggle is on and the launch then skips `LD_PRELOAD` and the broker.
+- `WineGameActivity` (`WineGameActivity.kt:265-269`) is unchanged: it makes
+  the session and starts it. Teardown (`ProcessHelper.killAllWineProcesses`,
+  `wineserver -k`) is unchanged; the broker ends when the last Wine process
+  closes its connection, and `stop()` closes it explicitly.
+- `PcContainers.forGame` and `createOwn` (`DroidtopPcGameRuntime.kt:651-685`)
+  gain the model of 5a: `forGame` reads the game's stored prefix id (a list
+  of managed prefixes, any game or app in any entry; the first-container
+  fallback becomes the entry "Shared"), and `createOwn` makes a new entry
+  from the build's base, by reflink copy where the volume has it, as a layer
+  over the base otherwise, and as a full prefix when no base exists yet.
+  Moving a game to another entry is a new function beside them. Both are
+  the one place that knows which prefix a game runs in.
+
+**What the broker adds to Wine's own file access** (the system calls and
+their cost are the library's section; the facts that matter here): the
+filter cannot read paths, so every `open`, `stat`, `rename`, `unlink` and the
+rest that names a path is one round trip to the broker, everything on an
+open descriptor is native speed. Expected, not measured: a prefix walk at
+first launch is the cost; frame time is untouched. The budget to hold is
+cold start no more than 10 percent slower, frame time unchanged, and the
+rig measures it before the broker is enforcing (benchmark in the library's
+`tests/`). Games that open or stat files every frame are looked at by name.
+
+**What does not go through the broker, and why it is accepted.** Directory
+change notifications (`inotify`) are refused (some launchers and editors in
+a prefix use them); a game's own GPU work in a Vortek or VirGL session runs
+in droidtop's renderer, behind a socket the rules grant. A Wrapper driver
+(Turnip, Qualcomm) runs in the Wine process and opens `/dev/kgsl-3d0`
+itself before the filter goes on (the library's `own_opens`). Wine does not
+use Android's isolated UID: it needs the GPU, and "our sandbox always
+applies" with Android's isolation as an extra layer where it can be had.
+
+**proot (Phase 3).** `ProotRuntime.startSession` (`ProotRuntime.kt:546-585`)
+starts proot with `ProcessBuilder`. The change is a patch in
+`build-scripts/proot-patches/` (each states its reason, as the fork patch
+does) so that the child proot forks for a traced program installs the
+library's filter before `execve`, with the broker's socket and token passed
+in proot's own environment (`prootEnvironment()`). The guest's granted set is
+the container's rootfs, the binds `EnvironmentMounts.binds` lists, the socket
+directory, and the device nodes; the whole-`files/` and shared-storage
+binds are replaced by 5a's toggles. proot's own path rewriting happens
+before the filter traps, so the broker sees the host path; this ordering is
+proved first on the emulator (API 28 and 34) and the rig, and the library's
+section states the fallback if it does not hold and the questions it leaves.
+Layers for container rootfs (one base per image, OCI layers as lowers) use
+the same library code and are a later step, not part of this.
+
+Owner, 2026-10-22, on the ordering spike and its fallback: "Yes, but we
+need a better solution". The spike goes ahead. The check inside proot
+(the sandbox library's policy evaluated by the patched proot after it
+translates a path) is a **stopgap**, weaker than the filter (it is as
+strong as proot's own call coverage and a multi-threaded guest can race
+it), and is not the answer. **Open item: a stronger mechanism for proot**
+than the spike's two outcomes; it stays on Droidtop/tracker#584 until one
+is found.
+
+**Needs a rig check** (each is a Phase 0-3 gate; steps are given in the
+commit that builds the phase):
+
+1. Phase 0: in Settings > Windows games, open a game's Wine and graphics, choose Prefix > This game's own, start
+   the game, then in the Prefixes list compare the sizes of the shared
+   prefix and the new one (expect: tens of megabytes, not the full prefix);
+   choose Use the shared prefix again and confirm the saves are in the
+   shared prefix and the old prefix is listed as set aside.
+2. The audit: read `dosdevices/z:` in the shared prefix on the console
+   (`readlink`), and note whether it names `/` or the image root.
+3. When the prefix list lands: make a new prefix on the console and read
+   whether it was made by a reflink copy or as a layer (the Prefixes list
+   says which); the expectation on the Retroid Pocket 5 is a layer.
+4. Phase 2: the benchmark in the library's `tests/`, cold-start and a
+   frame-time capture of one game on and off the broker.
 
 ### Presentation and input: gamenative's renderer, on droidtop's launch display
 
@@ -8999,6 +9429,34 @@ started, the exit code, how long it ran, whether it showed a window, and the las
 diagnostics packs the logs folder, so the record travels with it. Wine prints errors by default (`WINEDEBUG`
 `-all,err+all`, `WineLaunchPlan.DEFAULT_WINEDEBUG`), never the full trace, which would flood the kept tail; a
 prefix's own `WINEDEBUG` still wins.
+
+**The record holds what Wine printed, and what the game wrote** (Droidtop/tracker#601, console, 2026-10-22: Clover
+Days stayed black and the record said "Last 0 lines Wine printed"). Two defects made it empty. The guest's
+output was read back through the screen's reference to its session, and stopping a game (Quick Menu Stop, Back out)
+drops that reference before the kill is reported (`WineGameActivity` `ownScreen.stop`, `onDestroy`, `showFailure`), so
+every stopped run read nothing; and the end of the process is reported before the threads reading its pipes have
+delivered the last lines. Now `WineXSession` owns one `RunLogCollector` (library-core, `diagnostics/RunLog.kt`) per
+run, fed by gamenative's launcher from both the guest's stdout and stderr; it waits until the output has been quiet
+for a moment (at most 1.5 s) and hands the tail to the screen with the exit status, so no reference to the session
+is needed. Each line also goes to logcat under `droidtop.wine` as it arrives (the first 3000 lines of a run, then
+one notice). The collector keeps the last 200 lines, each cut at 600 characters.
+
+Beside Wine's output the record carries the game's own logs, which usually hold the real cause: after the run,
+`WineGameLogs` finds, and `RunRecords.attach` copies the last 64 KiB of, each of these (at most six files; each says
+when it was modified and whether that is during this run): a Unity game's `Player.log` and `Player-prev.log`
+(`<prefix>/drive_c/users/*/AppData/LocalLow/<Company>/<Product>/`, the company and product being the two lines of
+`<Product>_Data/app.info`, or any company's folder for the product when that file is missing), an older Unity game's
+`<Product>_Data/output_log.txt`, and common log names next to the executable (`output_log.txt`, `log.txt`,
+`debug.log`, `error.log`, `crash.log`, `game.log`, `stdout.txt`, `stderr.txt` and a few like them, and
+`<exe name>.log`; any case). Nothing else in the game's folder is searched.
+
+A short history is kept: the newest record is `logs/wine-last.log`, and each run is also its own file,
+`logs/wine-run-<game>-<time>.log`, with the last three runs of each game and twelve in all kept (`RunRecords.save`;
+the game is its library id, or the program's name). All of them sit directly in the logs folder, so Share
+diagnostics packs them (a record is at most `RunRecords.MAX_RECORD_BYTES`, under the per-file cap it applies). One
+collector and one record writer serve every kind of run: Wine's is the first user, and a "Report a problem" flow
+(Droidtop/tracker#601 asks for one for Wine's black screens) takes the same `RunLogCollector` for the output of what it
+runs and `RunRecords.save` with its own prefix, not a second mechanism.
 
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
@@ -12841,22 +13299,25 @@ follows:
   (`GameEngineDetector`, ENGINEHOST) makes the folder, records the game folder against the store key, runs
   `StoreSaves.beforeLaunch` (the same 45 s bound and the same conflict dialog), and sends the inline config key
   `saveRoot` (`EngineHost.launch`), whatever the game folder's own `enginehost.json` holds, since `saveRoot` is
-  never a folder key. Agreed with the Enginehost lane (tracker#580): `saveRoot` is exactly the folder an engine's
-  system save locations mean for that launch. **Which folder lines up with Steam Cloud** (read from Enginehost's
-  cores, tracker#580 comment 6235943189; Enginehost keeps its layout, since existing saves use it, so droidtop
-  adapts, `EnginehostSaves.saveRootIn`): Ren'Py writes `<saveRoot>/<config.save_directory>` with no `RenPy/`
-  segment, so a Ren'Py game is given the prefix's `AppData/Roaming/RenPy`, where Windows keeps
-  `%APPDATA%/RenPy/<dir>`; Godot writes `<saveRoot>/godot/app_userdata/<project>` (or a custom user dir
-  `<saveRoot>/<custom>`, which already matches Windows), so Godot and every other engine are given
-  `AppData/Roaming` itself. Godot's folder is lowercase on Android and Linux and `Godot` on Windows, so a sync
-  renames it to `Godot` first and back to `godot` after (`toWindowsLayout`, `toEngineLayout`, through a third
-  name so a case-folding card takes it too). A refused path (outside shared storage,
-  inside `Android/data`, not writable) falls back to the person's own location; it is accepted from any app the
-  person allowed in App launch access, droidtop with no standing of its own. When the game ends, Enginehost
-  sends droidtop's package `dev.enginehost.GAME_ENDED` (`path`, `saveFolder`, `reason`);
-  `EnginehostGameEndedReceiver` starts the upload job (`StoreSaves.afterExit`) for a folder droidtop launched,
-  and only when `saveFolder` is inside droidtop's folder: an engine that saves beside the game, or a refused
-  path, leaves nothing new there to upload.
+  never a folder key. **`saveRoot` is the game's own save folder, used as is** (owner, 2026-10-18: "What we
+  provide is a link to the saves, as they are provided to us. This SHOULD be an exact mapping of whatever the save
+  root for a game is."; Enginehost 0.1.5-dev.369, tracker#580 comment 6351390573). droidtop passes the folder in
+  its prefix that directly holds the game's save files, as the store's cloud names it, unchanged: for Steam, the
+  root and path of the game's first `ufs/savefiles` entry, after any `rootoverrides` move and with the account's
+  ids put in (`StoreLibrary.saveFolder`, `SaveLayout.saveFolder`), so a Ren'Py game gets its
+  `AppData/Roaming/RenPy/<dir>` folder itself. Enginehost and its cores use that folder as the game's save folder
+  without adding one of their own inside it, so droidtop has no engine knowledge and renames nothing. The folder
+  is read from the `ufs` section the sync before the launch cached, so the launch makes the prefix and records the
+  game (`EnginehostSaves.prepare`), syncs, then asks for the folder (`EnginehostSaves.saveRoot`); a game whose
+  cloud names no folder droidtop has (no sync has read it yet, or its only entries are for other systems) is
+  launched without `saveRoot` and saves to the person's own location. A game with entries in several folders is
+  given the first. A refused path (outside shared storage, inside `Android/data`, not writable) falls back to the
+  person's own location; it is accepted from any app the person allowed in App launch access, droidtop with no
+  standing of its own. When the game ends, Enginehost sends droidtop's package `dev.enginehost.GAME_ENDED`
+  (`path`, `saveFolder`, `reason`); `EnginehostGameEndedReceiver` starts the upload job (`StoreSaves.afterExit`)
+  for a folder droidtop launched, and only when `saveFolder` is exactly the folder droidtop passed, which is
+  what Enginehost reports whenever it took it: an engine that saves beside the game, or a refused path, leaves
+  nothing new there to upload.
 - **Steam Cloud saves** (`StoreLibrary.syncSaves`, `StoreSaves` in `:library-core`,
   `SteamCloudSync` in `:stores`; owner, 2026-10-08, Droidtop/tracker#313: "Steam
   Cloud saves: yes"). A game that has cloud saves syncs them into its Wine prefix
@@ -22295,6 +22756,39 @@ composition so neither API needs to know about the other:
   (recommendations paired with `lookup` results) is not called by a
   surface yet; it is for the catalog pool, whose games are not owned and
   so have somewhere to be got from.
+
+### 12a. One download engine (decided 2026-10-16 and 2026-10-17, Droidtop/tracker#577; first slice built 2026-10-22)
+
+**The decision.** The owner, 2026-10-16: "Yeah, let's use Aria2. It gets us torrents (such as for rpdl), other source grabs, and etc. We can centralize and control it." And: "We'll use the libaria2 library internally in droidtop AND in enginehost, and centralize downloads." So aria2 is droidtop's download engine, and the shared component is its own repository, `bi0shacker001/aria2-engine` (libaria2 built with the NDK for arm64-v8a and x86_64, an engine service, a broker, a JNI layer and a small Kotlin API), bundled by both apps and pinned by digest. The same repository's `docs/design.md` is the engine's own design; this section is what droidtop decides about using it.
+
+**How it gets into the build.** `net-core/aria2-engine.pin` holds the release tag and the AAR's SHA-256, as `net-core/agent-lib.pin` does for the agent library. `build-scripts/fetch-aria2-engine.sh`, which the `android-setup` action runs before Gradle, downloads `aria2-engine-<version>.aar`, fails unless the pin's digest matches and the release's own `SHA256SUMS` lists the same digest, and lays the AAR out as a local Maven repository under `net-core/aria2-engine/repo` (git-ignored). `settings.gradle.kts` reads that directory as a repository holding only the group `io.github.bi0shacker001`, and `:net-core` depends on `io.github.bi0shacker001:aria2-engine` at the version the pin's tag names, so the version is written once. No aria2 binary and no source of it is in this repository.
+
+**Where it runs.** The owner: "We have our own sandbox library, remember? That's the bare minimum. Isolate it as a separate process if we CAN, but if not, sandboxing it ourselves is better than nothing", and "all my devices run 11 or later, so once we've tested it with just our sandbox, we should build the android isolation path". So libaria2 always runs in a process of its own, `:aria2_open` (droidtop's UID), under the sandbox library's lockdown with droidtop's broker (`EngineHost` in `:net-core`, the engine's own `EngineBroker`), on every API level. The broker opens every file the engine touches (only its download folder) and makes every socket; the engine process can open nothing else. Android isolation (`:aria2`, a UID of its own, API 30 and later) is an option, off by default: Settings, Download rules, "Isolate the download engine with Android" (`EnginePrefs`); it stays off until it has passed its own rig check, and a change takes effect for the next download. Below Android 11 only the sandboxed engine exists. droidtop's `Application` starts nothing in either engine process (`IsolatedProcess.runsDownloadEngine`, beside `runsPluginCode`), since libaria2 reads untrusted network data there and the default process has droidtop's UID. The engine is started on the first download that needs it, not at app start, and started again when its process ended (`EngineHost`).
+
+**What the engine may do.** The engine refuses every option that runs a program (the `on-download-*` hooks, `on-bt-download-complete`) and every option that names a file outside its folder, from any caller, droidtop included; nothing it downloads is ever run. Certificate checks are forced on, with the platform's own CAs. A download's folder must be the engine's, which for droidtop is the downloads area (`downloads/` in droidtop's external files directory, `DownloadJobs.fileFor`). The engine writes a file under its final name there, with aria2's control file `<name>.aria2` beside it while it is partial, not a `<name>.part` file with a sidecar.
+
+**JSON-RPC is droidtop's alone.** The owner: "No, the Aria2 RPC port is still available to droidtop. We just don't let plugins access it directly, we broker it". aria2's RPC listens on loopback only, on a port chosen for each start and with a secret made for each start (`EngineHost.rpcEndpoint`, held in memory, never stored and never given to a plugin or shown). A plugin reaches downloads only through the plugin API's broker, which starts them as jobs; it never sees the port, the secret or a gid. Nothing in droidtop uses the RPC yet: the slice drives the engine through its typed binder interface, and the endpoint is there for the Downloads rework.
+
+**What it reports itself as.** The owner: "What if we just report a semi-sanitized android webview version?" and, for torrents, "The exception is for torrents (don't wanna be suspected of tracker rule evasion)". HTTP(S) and FTP downloads send the WebView's user agent in Chrome's reduced form (no `; wv`, `Linux; Android 10; K`, only Chrome's major version), recomputed when WebView updates; a request that carries its own user agent (a source's signed-in web session) keeps it, and `EngineOptions` moves it, and `Referer`, from the header list into aria2's own options so aria2 does not send a second one. BitTorrent, magnet and Metalink downloads keep aria2's own identity.
+
+**What a source's download is on the engine (the first slice).** A source plugin's acquire reply (docs/plugin-api.md 1.6), including a download the plugin's web session captured, an update, and a BIOS file, is still one `download` job in "Downloads and installs" with the same arguments, digests, size cap, post step and placement as before; the job carries `engine=aria2` (`AcquireDownload`), and `DownloadJobs` hands each of its files to `EngineFetch` instead of `ResumableDownload`. A job restored after a restart goes the way it started, because the mechanism is a job argument.
+- **Progress** is polled from the engine once a second and reported through the same `(percent, status line)` the Downloads screens already read: "Connecting…", "Downloading… 40 MB of 100 MB (2.1 MB/s)", "Waiting for the connection". The jobs list, its Pause, Resume and Cancel, the Download rules policy (`DownloadGate`) and the summary notification are unchanged.
+- **Pause and resume** are the job's, not aria2's: Pause cancels the job's coroutine, which removes the download from the engine and leaves the partial file and its control file; Resume (or a restart) adds the download again and aria2 carries on from them (`continue`). Cancel also deletes the control file. The download policy holding a job when the connection drops is therefore the same mechanism as before; the owner's "Downloads should pause on internet loss, and automatically continue when it returns" is `DownloadGate`'s, now over this transfer.
+- **A connection that fails mid-transfer** is asked again from the partial file with the earlier downloader's rules: a wait of 1 s doubling to 30 s, a failure that made progress not counting, six in a row without progress failing the job. A server that cannot resume (aria2 error 8) starts the file again and the status line says "Started again: the server cannot resume." A real refusal (not found, the credentials refused, no space, the disk) fails the job with a sentence (`EngineErrors`). If the engine cannot start, the job fails saying so; there is no second downloader to fall back to for these jobs.
+- **One connection per download.** aria2 would use four by default; the sources droidtop gets files from share a session or a single-use address between connections, and the earlier downloader used one. Splitting is a later, per-source option.
+- **Checks stay droidtop's.** The digest (the strongest of SHA-256, SHA-1 and MD5 given) is checked by `DownloadJobs.verifyDigest` after the engine reports the file whole, and the size cap is applied as soon as the engine reports a length (the download is removed and nothing is kept).
+- **Credentials stay on their site** (Droidtop/tracker#417). aria2 sends every `header` it is given to every address it is redirected to, so a request with `Authorization`, `Proxy-Authorization`, `Cookie`, `Referer` or `Origin` is first walked by hand (`RedirectGuard`, in the main process, `HEAD` then a one-byte `GET` where a server refuses `HEAD`, no body read): the engine is given the address that does not redirect, with those headers only if it is on the site they were made for (the same host, and not a step down from https). A request without them is not walked. A header that could carry another (a line break) is refused.
+
+**The rollout order.** No order was recorded before this slice, so this is the one the slice follows; the owner can reorder it.
+1. **Source downloads** (built): acquire replies, web-session downloads, updates and BIOS through sources.
+2. **The remaining single-file jobs:** the plugin catalog's bundle install and update, the Python and Flutter runtimes, the app catalogs' installs, and droidtop's own APK update (last of these, since it is the way out of a broken build), then every other caller of `Http.downloadTo` (the players database, themes). When the last has moved, `ResumableDownload`, `DownloadJobs.fetch` and the `.part` handling are deleted; until then they are the one other mechanism and the Downloads section above still describes them.
+3. **Torrents, magnets and Metalink** (`DownloadKind.TORRENT` and `METALINK`): what the `apps.view` hand-off of a magnet link does today (Droidtop/tracker#418) becomes a job, with the seeding rule (`seed-time=0` unless the person allows more) and peers, seeding and ratio in the Downloads place.
+4. **Store transfers that are single files or archives** (itch.io, GOG, Amazon installers). Steam depots keep their own chunked path, under the same queue and connectivity rules.
+5. **Android isolation** becomes the default on API 30 and later once the rig check passes (the owner's order: test with the sandbox alone first).
+6. **The Downloads UI rework** on aria2's model. The owner, 2026-10-17: "When we do the aria2 implementation, we also have to rework most, if not all, of the download UI." This slice changes no screen; the rework replaces them and deletes what it replaces.
+7. **Enginehost** embeds the same AAR for its core and catalog downloads.
+
+**Verified and not.** Verified by unit tests on the JVM: the transfer loop against a scripted engine (progress lines, pause removing the download and keeping the file, retry and its limit, restart, the size cap, refusals), the option building and error classification, and the redirect walk. Not verified until a rig run: the engine process starting under droidtop's own packaging (the engine's own CI covered API 28, 30 and 34 with its own test app), a real download through it from a source on the console, pause and resume of one, and the connection dropping. Those steps are in the commit message under "Needs a rig check".
 
 ## 13. UI v2 — end-user redesign direction (dtv2ui audit, 2026-09-28)
 

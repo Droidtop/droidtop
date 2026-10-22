@@ -3,6 +3,10 @@ plugins {
     alias(libs.plugins.kotlin.android)
 }
 
+// The engine's version is the pin's tag (aria2-engine.pin), the one place it is written.
+val aria2EngineVersion: String = file("aria2-engine.pin").readLines()
+    .first { it.startsWith("tag=") }.removePrefix("tag=").trim().removePrefix("v")
+
 android {
     namespace = "dev.droidtop.net"
     compileSdk = 36
@@ -27,6 +31,9 @@ android {
 
 dependencies {
     implementation(libs.kotlinx.coroutines)
+    // The download engine (docs/SPEC.md 12a): aria2-engine.pin, fetched by build-scripts/fetch-aria2-engine.sh.
+    implementation("io.github.bi0shacker001:aria2-engine:${aria2EngineVersion}")
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
