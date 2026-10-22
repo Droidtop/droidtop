@@ -28,6 +28,13 @@ typealias SizeFormat = (bytes: Long) -> String
 /** One download as the engine reports it: aria2's own state names (`active`, `waiting`, `paused`, `complete`, `error`, `removed`). */
 data class Transfer(val state: String, val totalLength: Long, val completedLength: Long, val downloadSpeed: Long, val errorCode: Int)
 
+/**
+ * One report of a transfer: [percent] (-1 when the length is not known), the status line, the engine's numbers
+ * ([transfer], null while there is no download in the engine), and whether the transfer is waiting for the connection.
+ * The job turns it into its line, its numbers and its wait (docs/SPEC.md "Jobs and their results").
+ */
+data class EngineProgress(val percent: Int, val line: String, val transfer: Transfer? = null, val waiting: Boolean = false)
+
 /** The engine cannot be reached (its process ended, or it is not started): the transfer waits and asks again. */
 class EngineGoneException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
@@ -134,7 +141,7 @@ object EngineFetch {
     suspend fun fetch(
         engine: TransferEngine,
         request: TransferRequest,
-        report: (percent: Int, statusLine: String) -> Unit,
+        report: (EngineProgress) -> Unit,
         size: SizeFormat,
         resolve: (String, Map<String, String>) -> RedirectGuard.Resolved = { url, headers -> RedirectGuard.resolve(url, headers) },
         io: CoroutineDispatcher = Dispatchers.IO,
@@ -165,7 +172,7 @@ object EngineFetch {
                     failures = if (end.completed > lastCompleted) 1 else failures + 1
                     lastCompleted = maxOf(lastCompleted, end.completed)
                     if (failures > MAX_FAILURES) throw TransferException("the download failed: the connection kept failing")
-                    report(-1, "Waiting for the connection")
+                    report(EngineProgress(-1, "Waiting for the connection", waiting = true))
                     delay(backoff(failures))
                 }
             }
@@ -179,7 +186,7 @@ object EngineFetch {
         engine: TransferEngine,
         request: TransferRequest,
         restarted: Boolean,
-        report: (Int, String) -> Unit,
+        report: (EngineProgress) -> Unit,
         size: SizeFormat,
         resolve: (String, Map<String, String>) -> RedirectGuard.Resolved,
         io: CoroutineDispatcher,
@@ -214,7 +221,8 @@ object EngineFetch {
                 }
                 stalledPolls = if (transfer.completedLength > completed || transfer.downloadSpeed > 0) 0 else stalledPolls + 1
                 completed = transfer.completedLength
-                report(percentOf(transfer), line(transfer, restarted, stalledPolls >= STALL_POLLS, size))
+                val stalled = stalledPolls >= STALL_POLLS
+                report(EngineProgress(percentOf(transfer), line(transfer, restarted, stalled, size), transfer, waiting = stalled))
             }
         } finally {
             // A pause or a cancel ends the coroutine here: the engine stops the transfer, the partial file stays.

@@ -635,4 +635,16 @@ class DownloadJobsTest {
         assertEquals("1 job running", JobsSummary.text(1))
         assertEquals("3 jobs running", JobsSummary.text(3))
     }
+
+    @Test
+    fun openGoesToWhatTheDownloadBecameInTheGameFolder() {
+        val games = "/sdcard/Games/PC"
+        val file = mapOf("targetName" to "Game.exe", "destinationPath" to games)
+        assertEquals(File(games, "Game.exe") to false, DownloadJobs.placedTarget(file))
+        val archive = file + ("targetName" to "Game-1.2.zip") + ("unpack" to DownloadJobs.UNPACK_ARCHIVE)
+        assertEquals(File(games, "Game-1.2") to true, DownloadJobs.placedTarget(archive))
+        val version = file + (DownloadJobs.ARG_VERSION_FOLDER to "v1.2")
+        assertEquals(File(games, "v1.2") to true, DownloadJobs.placedTarget(version))
+        assertNull(DownloadJobs.placedTarget(mapOf("targetName" to "Game.exe")))
+    }
 }
