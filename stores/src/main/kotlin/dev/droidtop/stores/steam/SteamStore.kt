@@ -32,6 +32,7 @@ import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 /**
@@ -199,11 +200,12 @@ class SteamStore : StoreLibrary {
 
     /**
      * The folder of [gameId]'s first `ufs/savefiles` entry in [prefix] ([SaveLayout.saveFolder]), from the `ufs`
-     * section the last sync cached; null before any sync read it, or when the game has no entry with a root there.
+     * section kept when product info was last read; asked of Steam when none is kept, for at most [UFS_WAIT_MS].
+     * Null when Steam cannot be asked, or the game has no entry with a root there.
      */
     override suspend fun saveFolder(context: Context, gameId: String, prefix: WinePrefixLocation): File? = withContext(Dispatchers.IO) {
         val appId = gameId.toIntOrNull() ?: return@withContext null
-        val ufs = SteamUfsCache.load(context, appId)?.takeUnless { it.isEmpty } ?: return@withContext null
+        val ufs = (SteamUfsCache.load(context, appId) ?: fetchUfs(context, appId))?.takeUnless { it.isEmpty } ?: return@withContext null
         val steamId64 = SteamCredentials.load(context)?.steamId64 ?: 0L
         // The Steam3 account id is the low half of the 64-bit id.
         val accountId = steamId64 and 0xFFFFFFFFL
@@ -211,6 +213,21 @@ class SteamStore : StoreLibrary {
         val dirs = SaveLayout.windowsDirs(prefix.prefixDir, prefix.user, install ?: prefix.prefixDir, accountId, appId)
             .let { if (install == null) it - SaveRoot.GameInstall else it }
         SaveLayout(dirs, steamId64, accountId, ufs).saveFolder()
+    }
+
+    /** [appId]'s `ufs` section, read from Steam and kept; null when nobody is signed in or Steam does not answer in time. */
+    private suspend fun fetchUfs(context: Context, appId: Int): SteamUfs? {
+        if (!signedIn(context)) return null
+        withTimeoutOrNull(UFS_WAIT_MS) {
+            runCatching {
+                SteamSession.use(context) {
+                    SteamSession.logOn(context).getOrThrow()
+                    val apps = SteamSession.apps ?: error("Steam is not connected")
+                    SteamLibrarySync.refreshApp(db(context), apps, appId) { SteamUfsCache.save(context, appId, it) }
+                }
+            }.onFailure { Timber.tag(TAG).w(it, "Could not read the save list of $appId") }
+        }
+        return SteamUfsCache.load(context, appId)
     }
 
     /**
@@ -474,5 +491,8 @@ class SteamStore : StoreLibrary {
 
     private companion object {
         const val TAG = "SteamStore"
+
+        /** How long a launch or a game's end waits for Steam to name a game's save folder when none is kept. */
+        const val UFS_WAIT_MS = 15_000L
     }
 }
