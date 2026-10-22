@@ -5890,6 +5890,13 @@ one:
   ... looks for", "No match for ..."), what needs a pick, and what failed with the reason, each line opening the
   game's page; the same facts as its `scan.log` lines, written where they are, and its numbers count the games. A
   cloud-save sync reports its game: done, nothing to sync, failed, or a conflict nobody settled (needs your pick).
+  **Rescans are jobs (Droidtop/tracker#595).** "Rescan library" and "Rescan PC game folders" run as the one
+  `library_rescan` job (`LibraryRescanJob`), so a walk of a slow card shows under Downloads and installs and on the
+  Home strip with Cancel, and its progress stays when the menu that started it closes. The rows that start one
+  (Settings, Game folders, the Games options) keep their status line by following the job, and selecting one again
+  while it runs still cancels it; starting a rescan while one runs follows the running one. `LibraryRescan` in
+  `:runtime-common` cannot see the jobs center, so library-core sets its `asJob`, `cancelJob` and `jobRunning`
+  hooks at start; the job walks through `LibraryRescan.walk`. A rescan a restart interrupted walks again.
 
   **Pausable jobs (Droidtop/tracker#174):** a runner opts into checkpoint resume, and only jobs that declare resumability and have reported a checkpoint expose Pause. `PluginJobProgress.checkpoint` reports progress plus a bounded opaque payload; Pause asks the runner to cancel at its cooperative boundary and retains the last payload. Resume starts the same job again with that payload under `droidtop.resume_payload` in its arguments. DataStore persists resumable job identity, arguments and checkpoint off the main thread; restored work is paused and can be restarted if its plugin and capability are still available. Jobs without runner support or a checkpoint remain non-pausable.
 
