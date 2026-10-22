@@ -21,6 +21,15 @@ interface TransferEngine {
     /** Stops the download and drops it from the queue. Its partial file and aria2's control file stay, so a new `add` carries on. */
     fun remove(gid: String)
 
+    /**
+     * Lets the engine reach [address] at [port] on the local network for an HTTP download droidtop sent there itself, and
+     * takes that back ([LocalAddresses]). Counted. Without them a local address is refused, which is what a torrent's
+     * peers always get.
+     */
+    fun allowLocal(address: java.net.InetAddress, port: Int) {}
+
+    fun revokeLocal(address: java.net.InetAddress, port: Int) {}
+
     /** Adds a torrent, magnet or Metalink download whose files land in [folder], under the engine's folder; returns its gid. */
     fun addSwarm(source: SwarmSource, folder: File, options: Map<String, String>): String =
         throw TransferException("this download engine cannot fetch torrents")
@@ -180,10 +189,12 @@ object EngineFetch {
         size: SizeFormat,
         resolve: (String, Map<String, String>) -> RedirectGuard.Resolved = { url, headers -> RedirectGuard.resolve(url, headers) },
         io: CoroutineDispatcher = Dispatchers.IO,
+        /** A host's addresses, for the local-network pass ([LocalAddresses.passesFor]). */
+        lookup: (String) -> List<java.net.InetAddress> = { java.net.InetAddress.getAllByName(it).toList() },
     ) {
         var restarted = false
         retrying(
-            attempt = { attempt(engine, request, restarted, report, size, resolve, io) },
+            attempt = { attempt(engine, request, restarted, report, size, resolve, io, lookup) },
             restart = {
                 withContext(io) { request.files().forEach { it.delete() } }
                 restarted = true
@@ -260,18 +271,25 @@ object EngineFetch {
         size: SizeFormat,
         resolve: (String, Map<String, String>) -> RedirectGuard.Resolved,
         io: CoroutineDispatcher,
+        lookup: (String) -> List<java.net.InetAddress>,
     ): End {
         val resolved = withContext(io) { resolve(request.url, request.headers) }
         val options = EngineOptions.forRequest(request.destination.name, resolved.headers)
         request.destination.parentFile?.let { withContext(io) { it.mkdirs() } }
-        val gid = withContext(io) { engine.add(resolved.url, options) }
+        // The address droidtop sends this download to may be the person's own server (a NAS, a tailnet machine): the
+        // engine gets a pass for exactly it while the download runs. Nothing else local is reachable, torrents included.
+        val passes = withContext(io) { LocalAddresses.passesFor(resolved.url, lookup) }
+        val opened = mutableListOf<Pair<java.net.InetAddress, Int>>()
+        var gid: String? = null
         var settled = false
         try {
+            withContext(io) { passes.forEach { pass -> engine.allowLocal(pass.first, pass.second).also { opened += pass } } }
+            gid = withContext(io) { engine.add(resolved.url, options) }
             var completed = 0L
             var stalledPolls = 0
             while (true) {
                 delay(POLL_MS)
-                val transfer = withContext(io) { engine.status(gid) } ?: throw EngineGoneException("the engine no longer knows the download")
+                val transfer = withContext(io) { engine.status(gid!!) } ?: throw EngineGoneException("the engine no longer knows the download")
                 when (transfer.state) {
                     "complete" -> {
                         settled = true
@@ -284,7 +302,7 @@ object EngineFetch {
                     "removed" -> throw EngineGoneException("the engine dropped the download")
                 }
                 if (request.maxBytes > 0 && transfer.totalLength > request.maxBytes) {
-                    withContext(io) { engine.remove(gid) }
+                    withContext(io) { engine.remove(gid!!) }
                     settled = true
                     withContext(io) { request.files().forEach { it.delete() } }
                     throw TransferException("the file is larger than the ${request.maxBytes / 1024 / 1024} MiB cap")
@@ -295,8 +313,11 @@ object EngineFetch {
                 report(EngineProgress(percentOf(transfer), line(transfer, restarted, stalled, size), transfer, waiting = stalled))
             }
         } finally {
-            // A pause or a cancel ends the coroutine here: the engine stops the transfer, the partial file stays.
-            if (!settled) withContext(NonCancellable + io) { runCatching { engine.remove(gid) } }
+            withContext(NonCancellable + io) {
+                // A pause or a cancel ends the coroutine here: the engine stops the transfer, the partial file stays.
+                if (!settled) gid?.let { runCatching { engine.remove(it) } }
+                opened.forEach { (address, port) -> runCatching { engine.revokeLocal(address, port) } }
+            }
         }
     }
 

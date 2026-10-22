@@ -130,6 +130,14 @@ object EngineHost {
             }
         }
 
+        override fun allowLocal(address: java.net.InetAddress, port: Int) {
+            guarded { current().allowLocal(address, port) }
+        }
+
+        override fun revokeLocal(address: java.net.InetAddress, port: Int) {
+            guarded { current().revokeLocal(address, port) }
+        }
+
         override fun status(gid: String): Transfer? = guarded {
             current().status(gid)?.let { Transfer(it.state, it.totalLength, it.completedLength, it.downloadSpeed.toLong(), it.errorCode, it.followedBy) }
         }
