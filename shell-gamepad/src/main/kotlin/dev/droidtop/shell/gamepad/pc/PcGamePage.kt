@@ -1399,7 +1399,10 @@ private fun pageRows(
     // 7n): the raw name is never altered, only parsed.
     folderPath?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != GameNaming.displayName(entry.title) }
         ?.let { add(PageFact("Folder name", it)) }
-    entry.engineLabel()?.let { add(PageFact("Engine", it)) }
+    // A Wine-run engine says so: what it was built with, and how it runs here (#603).
+    entry.engineLabel()?.let { label ->
+        add(PageFact("Engine", if (entry.kind in dev.droidtop.library.WINE_ENGINE_KINDS) "$label, runs in Wine" else label))
+    }
     // The play state's own line (a store game's "Downloads 590 MB", an install step) is the action band's
     // and is not a statement about the runner, so it is never drawn under this label; a store stage with
     // no runner worked out leaves the row out (Droidtop/tracker#371).

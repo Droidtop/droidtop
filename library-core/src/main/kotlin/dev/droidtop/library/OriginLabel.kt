@@ -8,6 +8,17 @@ import dev.droidtop.library.stores.StoreHolding
  * program, a remote PC, an app, a console ROM). The Kind facet's Engine
  * value and the capsule badge read this one answer (docs/SPEC.md 7i).
  */
+/**
+ * Engines no Enginehost plugin runs (docs/SPEC.md 7e2b's table): their games are Windows builds, run in Wine (or a
+ * native Linux build in a container), so they are PC games, store or local (Droidtop/tracker#603: a local Unity
+ * folder was badged "Engine" though it ran in Wine). The engine they are built on stays a fact on the game's page.
+ */
+val WINE_ENGINE_KINDS: Set<LibraryEntryKind> =
+    setOf(LibraryEntryKind.UNITY, LibraryEntryKind.UNREAL, LibraryEntryKind.AGS, LibraryEntryKind.LOVE2D)
+
+/** Whether Enginehost runs games of this kind: the one rule for the "Engine" badge and the Kind filter. */
+fun LibraryEntryKind.runsInEnginehost(): Boolean = engineFamily() != null && this !in WINE_ENGINE_KINDS
+
 fun LibraryEntryKind.engineFamily(): String? = when (this) {
     LibraryEntryKind.RENPY -> "Ren'Py"
     LibraryEntryKind.KIRIKIRI -> "KiriKiri"
@@ -78,8 +89,8 @@ fun originLabel(
     roots: List<String> = emptyList(),
     via: String? = null,
 ): OriginLabel {
-    val family = entry.kind.engineFamily()
-    val kind = if (family != null) "Engine" else "PC"
+    // "Engine" is how a game runs, not what it was built with (#603): a Unity build runs in Wine, so it is PC.
+    val kind = if (entry.kind.runsInEnginehost()) "Engine" else "PC"
     val source = PcSource.of(entry, roots)
     val detail = when {
         style != CapsuleBadgeStyle.FULL || origins <= 1 -> null

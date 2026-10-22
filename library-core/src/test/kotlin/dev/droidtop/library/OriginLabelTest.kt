@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import dev.droidtop.library.stores.StoreHolding
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -38,6 +39,9 @@ class OriginLabelTest {
         Row(store("steam:9", kind = LibraryEntryKind.RENPY), 1, "Engine", steam, null),
         Row(store("steam:8", kind = LibraryEntryKind.RENPY), 2, "Engine · $steam", steam, null),
         Row(folder("/sd/Games/Some VN", LibraryEntryKind.RPG_MAKER_MZ), 3, "Engine", "Folder: Games", null),
+        // A Unity (or Unreal, AGS, LOVE) build runs in Wine: it is a PC game, store or local (#603).
+        Row(folder("/sd/Games/Clover Days", LibraryEntryKind.UNITY), 1, "PC", "Folder: Games", null),
+        Row(store("steam:13", kind = LibraryEntryKind.UNREAL), 1, "PC", steam, null),
         // Ownership is never text on the capsule: a glyph, and the words on the focus line.
         Row(store("steam:10", StoreHolding.FAMILY), 1, "PC", "$steam · Shared with you", OwnershipMark.SHARED),
         Row(store("steam:11", StoreHolding.NOT_OWNED), 2, "PC · $steam", "$steam · No longer in your library", OwnershipMark.LEFT),
@@ -77,5 +81,15 @@ class OriginLabelTest {
             LibraryEntryKind.REMOTE_STREAM, LibraryEntryKind.COMPUTER_GAME, LibraryEntryKind.CONSOLE_ROM,
         )
         for (kind in LibraryEntryKind.entries) assertEquals(kind.name, kind !in programs, kind.engineFamily() != null)
+    }
+
+    @Test
+    fun `engine means Enginehost runs it, and every Wine-run engine is PC`() {
+        assertTrue(LibraryEntryKind.RENPY.runsInEnginehost())
+        assertTrue(LibraryEntryKind.GODOT.runsInEnginehost())
+        assertTrue(LibraryEntryKind.HTML.runsInEnginehost())
+        WINE_ENGINE_KINDS.forEach { assertTrue("$it has an engine family", it.engineFamily() != null) }
+        WINE_ENGINE_KINDS.forEach { org.junit.Assert.assertFalse("$it runs in Wine", it.runsInEnginehost()) }
+        org.junit.Assert.assertFalse(LibraryEntryKind.WINE_PROFILE.runsInEnginehost())
     }
 }

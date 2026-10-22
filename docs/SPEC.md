@@ -9058,6 +9058,13 @@ The table is the design; a row's `strategies` list carries it as data.
 | Unity, Unreal, WOLF RPG, Artemis/Live2D, GameMaker, Siglus, LiveMaker, RAGS and the other Windows-only engines in the registry | Wine (§5b), a native Linux build in a container where one exists (§5a) | none: no portable interpreter exists, and Enginehost's rule is that a plugin embeds a real implementation of its engine, never a Wine hand-off |
 | DOS, ScummVM engines, J2ME, and every other emulated platform | an emulator from the players database (§7e2) | not engine games |
 
+**The "Engine" badge follows how a game runs (decided 2026-10-22, Droidtop/tracker#603).** The owner, on a local
+Unity build badged "Engine" though it ran in Wine: "I think because it was provided locally, not through a store".
+"Engine" on a capsule and in the Kind filter means Enginehost runs the game (`runsInEnginehost`); the engines no
+Enginehost plugin runs, Unity, Unreal, AGS and LOVE (`WINE_ENGINE_KINDS`), are Windows builds run in Wine, so they
+are "PC", store or local alike. The engine stays a fact: the game page's Engine row reads "Unity, runs in Wine".
+A game whose runner the person changed by hand keeps its kind's badge.
+
 "Complete" for coverage means: on an unrooted arm64 handheld every
 engine game in a real library has a runner whose row reads Ready or
 Needs setup with a named action, and a game whose only route needs
