@@ -298,13 +298,10 @@ object PluginRepoUpdates {
             val address = if (token != null && asset.apiUrl.isNotBlank()) asset.apiUrl else asset.downloadUrl
             if (address.isBlank()) return Processed.Failure("it has no download address", transient = false)
             val (url, headers) = GitHubAuth.downloadRequestFor(address, token)
-            try {
-                Http.downloadTo(url, file, expectedSha256 = asset.sha256, headers = headers)
-            } catch (failure: Http.HttpException) {
-                return Processed.Failure("GitHub answered HTTP ${failure.status}", transient = failure.status >= 500 || failure.status == 429)
-            } catch (failure: java.io.IOException) {
-                val mismatch = failure.message?.contains("SHA-256") == true
-                return Processed.Failure(if (mismatch) "the download doesn't match GitHub's checksum" else "the download failed", transient = !mismatch)
+            val fetched = download(context, url, headers, asset.sha256, file, asset.name)
+            if (!fetched.ok) {
+                val mismatch = fetched.error == dev.droidtop.pluginhost.DownloadJobs.DIGEST_MISMATCH
+                return Processed.Failure(if (mismatch) "the download doesn't match GitHub's checksum" else "the download failed: ${fetched.error}", transient = !mismatch)
             }
             val peeked = PluginRepos.peek(file) ?: return Processed.Failure("not a plugin bundle", transient = false)
             val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
@@ -328,6 +325,27 @@ object PluginRepoUpdates {
         }
     }
 
+    /**
+     * One bundle as a Downloads job (docs/SPEC.md 12a, "One download engine"): droidtop's one download path fetches it,
+     * checks it against GitHub's [sha256] and moves it to [file]. The token header is held in memory by Downloads, never
+     * written down. Not an automatic download yet: the pass waits on the job, and the update window could hold it for hours, so
+     * the window applies once the pass hands its bundles over instead of waiting. Blocks: these passes run off the main
+     * thread.
+     */
+    private fun download(context: Context, url: String, headers: Map<String, String>, sha256: String?, file: File, assetName: String) =
+        kotlinx.coroutines.runBlocking {
+            dev.droidtop.pluginhost.DownloadJobs.run(
+                context = context,
+                title = "Plugin update: $assetName",
+                post = dev.droidtop.pluginhost.DownloadJobs.POST_MOVE_TO,
+                url = url,
+                name = "bundle_${System.nanoTime()}.droidplugin.tar.xz",
+                sha256 = sha256,
+                headers = headers,
+                extra = mapOf(dev.droidtop.pluginhost.DownloadJobs.ARG_TARGET_PATH to file.absolutePath),
+            )
+        }
+
     /** Installs one bundle of the repository's latest release by hand (a plugin not installed yet); it arrives unapproved, like any new plugin. */
     fun installFromRepo(context: Context, entry: UserOriginKey, assetName: String): String {
         val repo = entry.repo ?: return "Not a repository."
@@ -339,7 +357,8 @@ object PluginRepoUpdates {
         try {
             val address = if (token != null && asset.apiUrl.isNotBlank()) asset.apiUrl else asset.downloadUrl
             val (url, headers) = GitHubAuth.downloadRequestFor(address, token)
-            Http.downloadTo(url, file, expectedSha256 = asset.sha256, headers = headers)
+            val fetched = download(context, url, headers, asset.sha256, file, asset.name)
+            if (!fetched.ok) return "Couldn't download it: ${fetched.error}"
             val peeked = PluginRepos.peek(file) ?: return "That is not a plugin bundle."
             if (peeked.manifest.origin != entry.origin) return "That bundle is for another origin than this repository is trusted for."
             val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))

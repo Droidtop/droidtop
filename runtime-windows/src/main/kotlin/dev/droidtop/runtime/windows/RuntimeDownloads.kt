@@ -1,10 +1,10 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.windows.utils.ComponentCatalog
 import java.io.File
 import java.io.IOException
-import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,8 +37,8 @@ internal object RuntimeDownloads {
     }
 
     /** Downloads [url] into [dest], checked against [sha256] when given; [onProgress] gets 0 to 1. */
-    suspend fun fetchUrl(url: String, dest: File, sha256: String? = null, onProgress: (Float) -> Unit) =
-        fetchUrls(listOf(url), dest, sha256, onProgress)
+    suspend fun fetchUrl(context: Context, url: String, dest: File, sha256: String? = null, onProgress: (Float) -> Unit) =
+        fetchUrls(context, listOf(url), dest, sha256, onProgress)
 
     /**
      * Downloads the first of [urls] that answers with the right bytes into
@@ -46,14 +46,14 @@ internal object RuntimeDownloads {
      * (droidtop's copy, then its makers' copies). A location that fails or
      * serves bytes that do not match [sha256] is skipped for the next.
      */
-    suspend fun fetchUrls(urls: List<String>, dest: File, sha256: String? = null, onProgress: (Float) -> Unit) =
-        withContext(Dispatchers.IO) { firstThatWorks(urls) { url -> fetchFrom(url, dest, sha256, onProgress) } }
+    suspend fun fetchUrls(context: Context, urls: List<String>, dest: File, sha256: String? = null, onProgress: (Float) -> Unit) =
+        firstThatWorks(urls) { url -> fetchFrom(context, url, dest, sha256, onProgress) }
 
     /** Downloads the base-system file [fileName] into [dest]; [onProgress] gets 0 to 1. */
-    suspend fun fetch(context: Context, fileName: String, dest: File, onProgress: (Float) -> Unit) = withContext(Dispatchers.IO) {
-        val file = ComponentCatalog.file(context, fileName)
+    suspend fun fetch(context: Context, fileName: String, dest: File, onProgress: (Float) -> Unit) {
+        val file = withContext(Dispatchers.IO) { ComponentCatalog.file(context, fileName) }
         try {
-            firstThatWorks(file.downloadUrls()) { url -> fetchFrom(url, dest, file.sha256, onProgress) }
+            fetchUrls(context, file.downloadUrls(), dest, file.sha256, onProgress)
         } catch (e: Exception) {
             dest.delete()
             throw IOException("Failed to download $fileName. Check the network connection and try again.", e)
@@ -69,7 +69,7 @@ internal object RuntimeDownloads {
     }
 
     /** [attempt] on each of [urls] in order until one returns; the last failure when none does. */
-    internal fun <T> firstThatWorks(urls: List<String>, attempt: (String) -> T): T {
+    internal inline fun <T> firstThatWorks(urls: List<String>, attempt: (String) -> T): T {
         var last: Exception? = null
         for (url in urls) {
             try {
@@ -82,43 +82,28 @@ internal object RuntimeDownloads {
         throw last ?: IOException("no download location")
     }
 
-    private fun fetchFrom(url: String, dest: File, sha256: String?, onProgress: (Float) -> Unit) {
-        val partial = File(dest.absolutePath + ".part")
-        try {
-            val digest = MessageDigest.getInstance("SHA-256")
-            http.newCall(Request.Builder().url(url).build()).execute().use { response ->
-                check(response.isSuccessful) { "HTTP ${response.code}" }
-                val body = response.body ?: error("empty body")
-                val total = body.contentLength()
-                partial.outputStream().use { out ->
-                    body.byteStream().use { input ->
-                        val buffer = ByteArray(64 * 1024)
-                        var read = 0L
-                        while (true) {
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            out.write(buffer, 0, count)
-                            digest.update(buffer, 0, count)
-                            read += count
-                            if (total > 0) onProgress(read.toFloat() / total)
-                        }
-                    }
-                }
-                if (total > 0 && partial.length() != total) error("incomplete download")
-            }
-            if (sha256 != null) {
-                val actual = digest.digest().joinToString("") { "%02x".format(it) }
-                if (!actual.equals(sha256, ignoreCase = true)) {
-                    throw IOException("${dest.name} did not match its published checksum")
-                }
-            }
-            if (!partial.renameTo(dest)) {
-                partial.copyTo(dest, overwrite = true)
-                partial.delete()
-            }
-        } catch (e: Exception) {
-            partial.delete()
-            throw e
+    /**
+     * One location as a Downloads job (docs/SPEC.md 12a, "One download engine"): droidtop's one download path fetches
+     * it, checks it against [sha256] and moves it to [dest] ([DownloadJobs.POST_MOVE_TO]), so the Windows runtime's
+     * files are listed in Downloads, follow the Download rules and move to the download engine with every other file.
+     */
+    private suspend fun fetchFrom(context: Context, url: String, dest: File, sha256: String?, onProgress: (Float) -> Unit) {
+        val result = DownloadJobs.run(
+            context = context,
+            title = "Windows support: ${dest.name}",
+            post = DownloadJobs.POST_MOVE_TO,
+            url = url,
+            name = areaName(dest.name),
+            sha256 = sha256,
+            extra = mapOf(DownloadJobs.ARG_TARGET_PATH to dest.absolutePath),
+            onPercent = { if (it in 0..100) onProgress(it / 100f) },
+        )
+        if (!result.ok) {
+            throw IOException(if (result.error == DownloadJobs.DIGEST_MISMATCH) "${dest.name} did not match its published checksum" else result.error ?: "the download failed")
         }
     }
+
+    /** The downloads area's name for [fileName]: a bare, unique name, whatever the component is called. */
+    internal fun areaName(fileName: String): String =
+        "runtime_${System.nanoTime()}_" + fileName.replace(Regex("[^A-Za-z0-9._-]+"), "_").trimStart('.', '_', '-').take(80).ifEmpty { "file" }
 }

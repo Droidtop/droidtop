@@ -108,7 +108,7 @@ object ContainerFilesDownloader {
 
         try {
             if (component.external) {
-                RuntimeDownloads.fetchUrl(component.url, destFile, onProgress = onProgress)
+                RuntimeDownloads.fetchUrl(context, component.url, destFile, onProgress = onProgress)
             } else {
                 RuntimeDownloads.fetch(context, "container_files/${component.name}", destFile, onProgress)
             }
