@@ -1,6 +1,7 @@
 package dev.droidtop.library.integrations
 
 import dev.droidtop.pluginhost.DownloadJobs
+import dev.droidtop.pluginhost.WebSessionDownload
 import java.io.File
 import java.nio.file.Files
 import org.json.JSONObject
@@ -77,5 +78,53 @@ class UpdatePlacementTest {
         assertEquals(120, record.votes)
         assertNull("another record's page is refused", PluginUpdateSources.parseRecord(reply, "77"))
         assertTrue(PluginUpdateSources.parseRecord(JSONObject(), "5")!!.downloads.isEmpty())
+    }
+
+    @Test
+    fun whatTheWebViewCapturedIsDownloadedWithItsHeadersAndUnpackedWhenAnArchive() {
+        val one = UpdateLinks.descriptorsFor(
+            listOf(WebSessionDownload("https://dl.host/f/1", "UA/1", "attachment; filename=\"Game 0.6.zip\"", null, 1234L, "https://host/f", "sid=1")),
+        ).single()
+        assertEquals("Game_0.6.zip", one.fileName)
+        assertEquals(mapOf("Cookie" to "sid=1", "User-Agent" to "UA/1", "Referer" to "https://host/f"), one.headers)
+        assertTrue(one.unpack)
+        assertEquals(1234L, one.size)
+        val parts = UpdateLinks.descriptorsFor(
+            listOf(
+                WebSessionDownload("https://a/Game.7z.001", null, null, null, null, null, "bad\r\nX-Injected: 1"),
+                WebSessionDownload("https://a/Game.7z.002", null, null, null, null, null, null),
+            ),
+        )
+        assertTrue("the numbered parts of one archive are unpacked together", parts.all { it.unpack })
+        assertTrue("a value with a line break is dropped", parts.first().headers.isEmpty())
+        val exe = UpdateLinks.descriptorsFor(listOf(WebSessionDownload("https://a/setup.exe", null, null, null, null, null, null))).single()
+        assertFalse(exe.unpack)
+    }
+
+    @Test
+    fun aRecordIsSavedWholeAndRefusesAPathForAName() {
+        val cache = RecordCache(File(dir, "records"))
+        cache.save("f95zone", "18978", JSONObject().put("title", "Sample"), nowMs = 42L)
+        val saved = cache.load("f95zone", "18978")!!
+        assertEquals("Sample", saved.record.getString("title"))
+        assertEquals(42L, saved.savedAtMs)
+        cache.save("../evil", "1", JSONObject())
+        assertFalse(File(dir, "evil").exists())
+        assertNull(cache.load("f95zone", "77"))
+    }
+
+    @Test
+    fun aDownloadMayBeAnAddressDroidtopOpensItself() {
+        val reply = JSONObject().put(
+            "downloads",
+            org.json.JSONArray()
+                .put(JSONObject().put("section", "Win").put("host", "MEGA").put("url", "https://mega.nz/file/abc"))
+                .put(JSONObject().put("section", "Win").put("host", "X").put("url", "http://plain.example/f"))
+                .put(JSONObject().put("section", "Win").put("host", "Y").put("link", "1:Y")),
+        )
+        val downloads = PluginUpdateSources.parseRecord(reply, "5")!!.downloads
+        assertEquals(listOf("https://mega.nz/file/abc", null), downloads.map { it.url })
+        assertEquals("a link that is not https and has no token is dropped", 2, downloads.size)
+        assertEquals("1:Y", downloads.last().link)
     }
 }

@@ -1752,7 +1752,15 @@ Risk —.
     words it ("MEGA"), `label` what the link says, and `link` an opaque
     string at most 2,048 characters long that droidtop only hands back to
     `download`; at most 200 downloads. Asked when the page opens, never
-    in the update round.
+    in the update round. A download may instead, or as well, carry `url`
+    (2026-10-22, Droidtop/tracker#599): the https address of the link
+    itself, as the source's page has it. droidtop keeps the record, and
+    picking that download opens `url` in droidtop's web view with the
+    plugin's session (G3): the person starts the download there, droidtop
+    takes over what the page downloads (up to 16 files) and places it as
+    `download`'s result is placed. Nothing is fetched again to download. A
+    link that starts nothing opens the record's own `url` next. A download
+    with only `link` still goes to the `download` job.
   - `download {id, link, version?}`, a **job** (the person picked a link on
     the record page): its result is an A2 `acquire` reply (`download`,
     `downloads`, `unpack`, `engine`; a captured `download.session` from
