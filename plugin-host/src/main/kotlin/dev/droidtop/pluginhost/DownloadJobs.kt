@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
 import dev.droidtop.net.DownloadCategory
 import dev.droidtop.net.DownloadPools
 import dev.droidtop.net.engine.EngineFetch
+import dev.droidtop.net.engine.RedirectGuard
 import dev.droidtop.net.engine.EngineHost
 import dev.droidtop.net.engine.EnginePrefs
 import dev.droidtop.net.engine.TransferException
@@ -76,6 +77,13 @@ object DownloadJobs {
      * files, so they move to the download engine with every other download (docs/SPEC.md 12a, "One download engine").
      */
     const val POST_MOVE_TO = "move_to"
+
+    /**
+     * The job argument holding the only sites a download may reach (a JSON array of `net.domains` entries): a plugin's
+     * own, for a picture or a file a plugin names. Every address, the redirects included, must be https on one of them
+     * ([RedirectGuard], docs/SPEC.md 12a). It is a job argument, so a restored job keeps it.
+     */
+    const val ARG_ALLOW_SITES = "allowSites"
 
     /** [POST_MOVE_TO]'s argument: the absolute path the file is moved to. */
     const val ARG_TARGET_PATH = "targetPath"
@@ -228,7 +236,7 @@ object DownloadJobs {
      * only then is [from] deleted, so a failure leaves the download where it was and no half file under [to]'s name.
      * Throws with [to]'s path when it cannot be done. [rename] is [File.renameTo] (a test refuses it).
      */
-    internal fun moveFile(from: File, to: File, rename: (File, File) -> Boolean = { a, b -> a.renameTo(b) }) {
+    fun moveFile(from: File, to: File, rename: (File, File) -> Boolean = { a, b -> a.renameTo(b) }) {
         if (rename(from, to)) return
         val folder = to.parentFile ?: throw IllegalStateException("${to.absolutePath} has no folder")
         val staged = File(folder, ".${to.name}.placing")
@@ -406,6 +414,8 @@ object DownloadJobs {
         onPercent: (Int) -> Unit = {},
         /** Which pool the download runs in (docs/SPEC.md 12a); null works it out from [post] and [extra] ([categoryFor]). */
         category: DownloadCategory? = null,
+        /** The only sites the download may reach, redirects included ([ARG_ALLOW_SITES]); null for any. */
+        allowSites: List<String>? = null,
     ): PluginResult {
         require(more.size < MAX_FILES) { "a download has at most $MAX_FILES files" }
         val plain = holdSecrets(name, headers)
@@ -434,6 +444,7 @@ object DownloadJobs {
                 }).toString())
             }
             put(DownloadPools.ARG_CATEGORY, (category ?: categoryFor(post, extra)).key)
+            allowSites?.let { put(ARG_ALLOW_SITES, JSONArray(it).toString()) }
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
             if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
         }
@@ -534,7 +545,7 @@ object DownloadJobs {
         val file = fileFor(context, name)
         placedBeforeTheProcessEnded(file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
         if (!(checkpoint == FETCHED && file.isFile)) {
-            transfer(context, url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report)
+            transfer(context, args, url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report)
             report(100, "Checking the download…", FETCHED)
         }
         verifyDigest(file, args)
@@ -564,7 +575,7 @@ object DownloadJobs {
             if (index < done && files[index].isFile) continue
             val url = requireNotNull(part[ARG_URL]) { "the download has no address" }
             val prefix = "File ${index + 1} of ${parts.size}. "
-            transfer(context, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L) { percent, line, _ ->
+            transfer(context, part, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L) { percent, line, _ ->
                 report(if (percent < 0) -1 else (index * 100 + percent) / parts.size, prefix + line, null)
             }
             verifyDigest(files[index], part)
@@ -628,12 +639,29 @@ object DownloadJobs {
     /** One file of a job: every download is the download engine's (docs/SPEC.md 12a "One download engine"). */
     private suspend fun transfer(
         context: Context,
+        args: Map<String, String>,
         url: String,
         headers: Map<String, String>,
         destination: File,
         maxBytes: Long,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
-    ) = fetchWithEngine(context, url, headers, destination, maxBytes, report)
+    ) = fetchWithEngine(context, url, headers, destination, maxBytes, report, sitesGuard(args[ARG_ALLOW_SITES]))
+
+    /**
+     * The check every address of a download limited to [sites] (a JSON array, [ARG_ALLOW_SITES]) is put to: https, on one
+     * of them. Null when the download is not limited. A list droidtop cannot read allows nothing.
+     */
+    internal fun sitesGuard(sites: String?): ((String) -> Unit)? {
+        sites ?: return null
+        val domains = runCatching { JSONArray(sites).let { a -> (0 until a.length()).map { a.getString(it) } } }.getOrDefault(emptyList())
+        return { address ->
+            val host = NetScope.hostOf(address)
+            if (!NetScope.isHttps(address) || host == null || domains.none { NetScope.matches(host, it) }) {
+                // Not an IOException: the engine's fetch would take that for a lost connection and ask again.
+                throw TransferException("${host ?: address} is not one of the sites this download may reach")
+            }
+        }
+    }
 
     /**
      * Gets [url] into [destination] with the download engine (docs/SPEC.md 12a "One download engine"): libaria2 in its own
@@ -648,6 +676,8 @@ object DownloadJobs {
         destination: File,
         maxBytes: Long,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+        /** Put to every address before the engine is given one ([RedirectGuard.resolve]); throws to refuse it. */
+        allow: ((String) -> Unit)? = null,
     ) {
         val folder = requireNotNull(destination.parentFile) { "the download has no folder" }
         val engine = try {
@@ -665,7 +695,11 @@ object DownloadJobs {
             throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
         }
         try {
-            EngineFetch.fetch(engine, TransferRequest(url, headers, destination, maxBytes), report = { percent, line -> report(percent, line, null) }, size = ValueFormat::size)
+            EngineFetch.fetch(
+                engine, TransferRequest(url, headers, destination, maxBytes),
+                report = { percent, line -> report(percent, line, null) }, size = ValueFormat::size,
+                resolve = { u, h -> RedirectGuard.resolve(u, h, allow = allow) },
+            )
         } catch (e: TransferException) {
             throw IllegalStateException(e.message)
         }
