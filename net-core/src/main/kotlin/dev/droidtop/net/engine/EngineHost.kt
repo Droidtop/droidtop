@@ -3,6 +3,8 @@ package dev.droidtop.net.engine
 import android.content.Context
 import android.os.DeadObjectException
 import android.os.RemoteException
+import dev.droidtop.net.DownloadCategory
+import dev.droidtop.net.DownloadPools
 import io.github.bi0shacker001.aria2engine.DownloadEngine
 import io.github.bi0shacker001.aria2engine.DownloadKind
 import io.github.bi0shacker001.aria2engine.DownloadRequest
@@ -29,6 +31,12 @@ import kotlinx.coroutines.withContext
  * a UID of its own, API 30 and later) is [androidIsolation], off unless the person turned it on.
  */
 object EngineHost {
+    /**
+     * How many downloads aria2 runs at once: every pool full at its highest limit. The pools ([DownloadPools]) decide
+     * what runs; aria2's own default of 3 would leave a download the pools started waiting in aria2's queue, "Connecting…".
+     */
+    val ENGINE_SLOTS = DownloadCategory.entries.size * DownloadPools.MAX_LIMIT
+
     private val lock = Mutex()
     private var running: DownloadEngine? = null
     private var root: File? = null
@@ -63,7 +71,8 @@ object EngineHost {
         running = null
         rpcEndpoint = null
         val port = freeLoopbackPort()
-        val started = DownloadEngine(wanted.context, wanted.root, rpc = true, rpcPort = port, androidIsolation = wanted.androidIsolation).start()
+        val started = DownloadEngine(wanted.context, wanted.root, rpc = true, rpcPort = port, androidIsolation = wanted.androidIsolation)
+            .start(mapOf("max-concurrent-downloads" to ENGINE_SLOTS.toString()))
         running = started
         root = wanted.root
         isolated = wanted.androidIsolation
@@ -101,20 +110,28 @@ object EngineHost {
             throw EngineGoneException(e.message ?: "the download engine is not running", e)
         }
 
-        private fun addOnce(url: String, options: Map<String, String>): String = guarded {
-            current().add(DownloadRequest(DownloadKind.URI, uris = listOf(url), options = options))
-        }
-
         /** A new download is the moment to bring a dead engine back; a call on a download of the old process is not. */
-        override fun add(url: String, options: Map<String, String>): String = try {
-            addOnce(url, options)
+        private fun addOnce(request: (DownloadEngine) -> DownloadRequest): String = try {
+            guarded { current().let { it.add(request(it)) } }
         } catch (e: EngineGoneException) {
             runBlocking { lock.withLock { startIfNeeded() } }
-            addOnce(url, options)
+            guarded { current().let { it.add(request(it)) } }
+        }
+
+        override fun add(url: String, options: Map<String, String>): String =
+            addOnce { DownloadRequest(DownloadKind.URI, uris = listOf(url), options = options) }
+
+        override fun addSwarm(source: SwarmSource, folder: File, options: Map<String, String>): String = addOnce { engine ->
+            val placed = options + ("dir" to engine.enginePath(folder))
+            when (source) {
+                is SwarmSource.Magnet -> DownloadRequest(DownloadKind.URI, uris = listOf(source.uri), options = placed)
+                is SwarmSource.Torrent -> DownloadRequest(DownloadKind.TORRENT, metadata = source.bytes, options = placed)
+                is SwarmSource.Metalink -> DownloadRequest(DownloadKind.METALINK, metadata = source.bytes, options = placed)
+            }
         }
 
         override fun status(gid: String): Transfer? = guarded {
-            current().status(gid)?.let { Transfer(it.state, it.totalLength, it.completedLength, it.downloadSpeed.toLong(), it.errorCode) }
+            current().status(gid)?.let { Transfer(it.state, it.totalLength, it.completedLength, it.downloadSpeed.toLong(), it.errorCode, it.followedBy) }
         }
 
         override fun remove(gid: String) {
