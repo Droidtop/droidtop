@@ -61,7 +61,7 @@ internal object AcquireDownload {
         }
         // A BIOS file goes to the games folder's bios folder under the database's name, not among the games (#558).
         val systemId = systemHint ?: hostContext.optJSONObject("system")?.optString("id")?.takeIf { it.isNotBlank() }
-        val bios = descriptors.singleOrNull()?.takeIf { !it.unpack && systemId != null && update == null }?.let { only ->
+        val bios = descriptors.singleOrNull()?.takeIf { !it.unpack && it.swarm == null && systemId != null && update == null }?.let { only ->
             withContext(Dispatchers.IO) {
                 val files = BiosDatabase.forSystem(context, systemId!!)?.files.orEmpty()
                 val provides = ExtensionPoints.declares(record.manifest, PluginBios.POINT)
@@ -74,6 +74,27 @@ internal object AcquireDownload {
             (!descriptors.all { it.unpack } || SplitArchives.detect(descriptors.map { it.fileName }) == null)
         ) {
             return PluginResult.failure("${record.manifest.label} asked to unpack files that are not the parts of one split archive")
+        }
+        descriptors.singleOrNull()?.takeIf { it.swarm != null }?.let { swarm ->
+            // A torrent or a magnet: its files arrive as one folder, placed as one entry (or as the update's version folder).
+            return DownloadJobs.run(
+                context = context,
+                title = title,
+                post = DownloadJobs.POST_PLACE_IN_FOLDER,
+                url = swarm.url,
+                name = AcquireFileName.areaName(now, ""),
+                maxBytes = swarm.size ?: 0L,
+                headers = swarm.headers,
+                extra = buildMap {
+                    put("destinationPath", destination)
+                    put("targetName", swarm.fileName)
+                    AcquireEngineHint.valid(values[AcquireEngineHint.KEY])?.let { put(AcquireEngineHint.KEY, it) }
+                    update?.let { putAll(it) }
+                },
+                onStatus = onStatus,
+                swarm = swarm.swarm,
+                torrent = swarm.torrent,
+            )
         }
         val parts = descriptors.mapIndexed { index, descriptor ->
             DownloadPart(

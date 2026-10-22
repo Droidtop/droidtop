@@ -744,7 +744,7 @@ no destination, such as the PC library). Ops:
   file is placed under, kept as given (see "File names" below); `sha256` is 64, `sha1` 40 and `md5` 32 hexadecimal characters (a
   source gives whichever it publishes; when several are given droidtop checks
   the strongest, and a mismatch deletes the file and fails the job) and
-  `size` is a positive byte count used as a size cap. droidtop's own resumable downloader fetches it
+  `size` is a positive byte count used as a size cap. droidtop's download engine (aria2) fetches it
   into its own downloads area, then places it in `context.destination` and
   indexes that file, from the download job, so the game appears even if the
   page that started it was closed or droidtop restarted meanwhile. Credential headers (Authorization, cookies, token and key
@@ -796,6 +796,34 @@ no destination, such as the PC library). Ops:
   or nothing: if any name exists, or two share a name, nothing is placed. This
   is for a release that is several files (a cue sheet and its tracks). Parts
   of one split archive are handled as in the next paragraph.
+  **Torrents and magnets** (2026-10-22, Droidtop/tracker#577). The owner:
+  "magnet or torrents. Ideally the data itself, but a URL will be downloaded
+  sandboxed, checked, then added". A `download` descriptor may name one of
+  three things:
+  - a magnet link as its `url` (`magnet:?xt=urn:btih:...` or `btmh`, at most
+    8,192 characters);
+  - a `.torrent` by its address, `"kind": "torrent"` with an HTTP(S) `url`. It
+    is fetched like any download, with the descriptor's headers, its redirects
+    walked, at most 4 MiB, and checked to be a torrent before the engine is
+    given it;
+  - the `.torrent` itself, `"torrent": "<base64>"` with no `url`, checked the
+    same way when the reply arrives.
+
+  Either way the download is a whole folder, not a file. The engine fetches
+  it into a folder of droidtop's downloads area, and the job's post step is
+  given that folder. In a games folder it is placed as one entry named
+  `fileName` ("Name (2)" beside one of that name). As an update
+  (`library.updates` `download`) it is the new version folder. Either way,
+  the one top folder a torrent makes is unwrapped. The person's update
+  manager, the library or a later step reads the folder as they read any
+  game folder, so a source that fetches a torrent elsewhere and hands over
+  its files (a debrid service) can produce the same thing.
+
+  A torrent or magnet carries no digests (its pieces are checked), no
+  `unpack`, no web-session token and no `auth`, and a magnet carries no
+  headers. It is a download of its own, never one of `downloads`. Seeding
+  ends when the download does (`seed-time` 0). A download of a whole folder
+  is not offered to the app-catalog or BIOS replies, which take one file.
   **Split releases** (Droidtop/tracker#419): with `downloads` and
   `unpack: "archive"` on every descriptor, the files must be the parts of one
   split archive, numbered 1 to N without a gap, in any order; otherwise the
