@@ -255,7 +255,8 @@ internal object SteamLibrarySync {
     /**
      * Fresh product info for one app (an install, an update check, a save
      * sync), stored over the old row; the stored row when Steam does not
-     * answer. [onUfs] gets the app's Auto-Cloud save locations from the same answer.
+     * answer. [onUfs] gets the app's Auto-Cloud save locations from the same answer; every caller keeps them
+     * ([SteamUfsCache]), so a game's save folder is known before its first launch (tracker#580).
      */
     suspend fun refreshApp(db: SteamDatabase, apps: SteamApps, appId: Int, onUfs: (SteamUfs) -> Unit = {}): SteamApp? {
         val known = db.apps().find(appId)
