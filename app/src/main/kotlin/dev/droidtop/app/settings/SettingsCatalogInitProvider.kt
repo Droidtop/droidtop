@@ -166,6 +166,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
             val seconds = (android.os.SystemClock.elapsedRealtime() - started + 500) / 1000
             "Rescan of PC game folders finished in $seconds s: " + if (added == 0) "nothing new." else "$added new."
         }
+        // Rescans run as a job in the one jobs center (Droidtop/tracker#595), once both walks are registered.
+        dev.droidtop.library.LibraryRescanJob.register(appContext)
         // "These files changed" (docs/SPEC.md 7g, "Targeted indexing"): a finished download, a store install or
         // removal and a plugin's `library.files` report all end here, and the library looks at exactly those paths.
         // Reports left by a process that ended before it indexed them, or made before this ran, are indexed now.
