@@ -9,8 +9,6 @@ import dev.droidtop.library.settings.PathChange
 import dev.droidtop.runtime.util.ArchiveExtractor
 import dev.droidtop.runtime.util.Sha256
 import java.util.concurrent.ConcurrentHashMap
-import dev.droidtop.net.Http
-import dev.droidtop.net.ResumableDownload
 import dev.droidtop.net.engine.EngineFetch
 import dev.droidtop.net.engine.EngineHost
 import dev.droidtop.net.engine.EnginePrefs
@@ -20,7 +18,6 @@ import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
@@ -59,10 +56,9 @@ class DownloadPart(
 
 /**
  * The one runner for a HTTP(S) download of one file, or of several as one entry (docs/SPEC.md 12a "Downloads", Droidtop/tracker#181):
- * droidtop's own downloader ([ResumableDownload], the one that store installs' sibling jobs share the policy with)
- * does the transfer into a `.part` file and carries on from it with a Range request, so the job is a native job in
- * the one [PluginJobsCenter] list that can Pause and Resume, and survives a lost connection, a network change or
- * a restart. Callers register a post-processing step under a name ([registerPost]) and run a job with [run].
+ * the download engine (libaria2 in its own process, docs/SPEC.md 12a "One download engine") does the transfer and
+ * carries on from aria2's control file, so the job is a native job in the one [PluginJobsCenter] list that can Pause
+ * and Resume, and survives a lost connection, a network change or a restart. Callers register a post-processing step under a name ([registerPost]) and run a job with [run].
  */
 object DownloadJobs {
     const val KIND = "download"
@@ -94,14 +90,6 @@ object DownloadJobs {
     private const val ARG_UNPACK = "unpack"
     private const val ARG_MORE = "more"
     private const val ARG_TARGET = "targetName"
-
-    /**
-     * The job argument that names the transfer mechanism. [ENGINE_ARIA2] hands the file to the download engine (docs/SPEC.md
-     * 12a "One download engine"); a job without it is fetched by [ResumableDownload] until its caller has moved
-     * (the rollout order lists who is left). It is a job argument, so a restored job goes the way it started.
-     */
-    const val ARG_ENGINE = "engine"
-    const val ENGINE_ARIA2 = "aria2"
 
     /**
      * The job argument naming the new version folder an update lands in (docs/SPEC.md 7g, "Getting an update"):
@@ -499,7 +487,6 @@ object DownloadJobs {
 
     /** The checkpoint once every byte is in the file: a restart then goes on to the post step and never downloads again. */
     private const val FETCHED = "fetched"
-    private const val REPORT_EVERY_NS = 1_000_000_000L
 
     private fun cancelDownload(context: Context, args: Map<String, String>, checkpoint: String?) {
         partsOf(args).forEach { part ->
@@ -507,8 +494,10 @@ object DownloadJobs {
                 runCatching {
                     val file = fileFor(context, name)
                     file.delete()
-                    ResumableDownload.discard(file)
                     TransferRequest.controlFile(file).delete()
+                    // What the downloader before the engine left beside a file a job restored from then still holds.
+                    File(file.path + ".part").delete()
+                    File(file.path + ".part.meta").delete()
                 }
             }
         }
@@ -530,7 +519,7 @@ object DownloadJobs {
         val file = fileFor(context, name)
         placedBeforeTheProcessEnded(file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
         if (!(checkpoint == FETCHED && file.isFile)) {
-            transfer(context, args, url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report)
+            transfer(context, url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report)
             report(100, "Checking the download…", FETCHED)
         }
         verifyDigest(file, args)
@@ -560,7 +549,7 @@ object DownloadJobs {
             if (index < done && files[index].isFile) continue
             val url = requireNotNull(part[ARG_URL]) { "the download has no address" }
             val prefix = "File ${index + 1} of ${parts.size}. "
-            transfer(context, part, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L) { percent, line, _ ->
+            transfer(context, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L) { percent, line, _ ->
                 report(if (percent < 0) -1 else (index * 100 + percent) / parts.size, prefix + line, null)
             }
             verifyDigest(files[index], part)
@@ -621,22 +610,15 @@ object DownloadJobs {
         }
     }
 
-    /** One file of a job, by the mechanism the job names ([ARG_ENGINE]). */
+    /** One file of a job: every download is the download engine's (docs/SPEC.md 12a "One download engine"). */
     private suspend fun transfer(
         context: Context,
-        args: Map<String, String>,
         url: String,
         headers: Map<String, String>,
         destination: File,
         maxBytes: Long,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
-    ) {
-        if (args[ARG_ENGINE] == ENGINE_ARIA2) {
-            fetchWithEngine(context, url, headers, destination, maxBytes, report)
-        } else {
-            withContext(Dispatchers.IO) { fetch(url, headers, destination, maxBytes, report) }
-        }
-    }
+    ) = fetchWithEngine(context, url, headers, destination, maxBytes, report)
 
     /**
      * Gets [url] into [destination] with the download engine (docs/SPEC.md 12a "One download engine"): libaria2 in its own
@@ -672,64 +654,6 @@ object DownloadJobs {
         } catch (e: TransferException) {
             throw IllegalStateException(e.message)
         }
-    }
-
-    /**
-     * Gets [url] downloaded into [destination] with [ResumableDownload]: a partial file from an earlier run, a
-     * pause or a lost connection carries on with a Range request, and a server that cannot resume starts the file
-     * again, which the status line says. Progress is reported at most once a second. Pause and Cancel cancel the
-     * coroutine, which closes the connection at once. Blocking: callers run it on the IO dispatcher.
-     */
-    internal suspend fun fetch(
-        url: String,
-        headers: Map<String, String>,
-        destination: File,
-        maxBytes: Long,
-        report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
-        retrySleep: ((Long) -> Unit)? = null,
-    ) {
-        val handle = ResumableDownload.Handle()
-        var lastReport = 0L
-        try {
-            coroutineScope {
-                // The transfer blocks its thread: this watcher closes the connection the moment the job is cancelled.
-                val watcher = launch(Dispatchers.Default) {
-                    try {
-                        awaitCancellation()
-                    } finally {
-                        handle.cancel()
-                    }
-                }
-                try {
-                    ResumableDownload.fetch(
-                        url, destination, headers, maxBytes = maxBytes, handle = handle, sleep = retrySleep,
-                        waiting = { report(-1, it, null) },
-                        onProgress = { p ->
-                            val now = System.nanoTime()
-                            if (now - lastReport >= REPORT_EVERY_NS || (p.total > 0 && p.bytes == p.total)) {
-                                lastReport = now
-                                report(if (p.total > 0) (p.bytes * 100 / p.total).toInt().coerceIn(0, 100) else -1, downloadingLine(p), null)
-                            }
-                        },
-                    )
-                } finally {
-                    watcher.cancel()
-                }
-            }
-        } catch (e: ResumableDownload.TooLargeException) {
-            throw IllegalStateException(e.message)
-        } catch (e: Http.HttpException) {
-            throw IllegalStateException("the server answered HTTP ${e.status}")
-        } catch (e: IOException) {
-            // Pause and Cancel close the connection under the transfer: that is a cancellation, not a failure.
-            coroutineContext.ensureActive()
-            throw IllegalStateException("the download failed: ${e.message}")
-        }
-    }
-
-    internal fun downloadingLine(p: ResumableDownload.Progress): String {
-        val sizes = if (p.total > 0) "${p.bytes / 1024 / 1024} MB of ${p.total / 1024 / 1024} MB" else "${p.bytes / 1024 / 1024} MB"
-        return (if (p.restarted) "Started again: the server cannot resume. " else "") + "Downloading… $sizes"
     }
 
     /** Checks [file] against the strongest digest [args] carry; a mismatch deletes the file and fails the job with a plain sentence. */
