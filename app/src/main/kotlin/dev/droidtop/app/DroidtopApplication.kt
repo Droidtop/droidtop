@@ -125,6 +125,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // the Shizuku app (or Sui) or the Shizuku plugin, whichever the user picked; with none, it says what to
         // enable (docs/SPEC.md "The task manager"). Runs in every process: the binder is shared across them.
         dev.droidtop.pluginhost.ElevatedAccessHost.install(this)
+        // Open on a finished job and on a line of its report (docs/SPEC.md "Jobs and their results").
+        JobOpener.install()
         // Typing on the add-on display (SPEC 4c, tracker#314): with elevated access Android's own keyboard is set to
         // show on each second display; without it droidtop draws its own keyboard over an app there. Main process only.
         AddonKeyboardHost.install(this)

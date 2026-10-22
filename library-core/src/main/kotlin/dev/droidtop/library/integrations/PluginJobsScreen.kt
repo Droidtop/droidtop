@@ -1,5 +1,6 @@
 package dev.droidtop.library.integrations
 
+import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -7,7 +8,12 @@ import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.pluginhost.DownloadJobs
+import dev.droidtop.pluginhost.JobNumbers
+import dev.droidtop.pluginhost.JobReport
+import dev.droidtop.pluginhost.JobState
+import dev.droidtop.pluginhost.Outcome
 import dev.droidtop.pluginhost.PluginJobsCenter
+import dev.droidtop.pluginhost.ReportItem
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -21,12 +27,15 @@ import java.util.concurrent.ConcurrentHashMap
  * itself.
  *
  * Laid out as Steam's downloads page (docs/SPEC.md 7j "Places", Droidtop/
- * tracker#363 slice 9): the jobs fall into Current, Paused and Completed,
- * each headed with its count; a job is ONE row with its name, a progress
- * bar, how far it has got and roughly how long is left ([JobEta]), and what
- * its status line says (a download's size); A opens the job's own page with
- * Pause or Resume and Cancel. The screen is live ([CatalogScreen.live]): it is
- * read again whenever a job moves, so nothing on it polls.
+ * tracker#363 slice 9): the jobs fall into Current, Waiting (held by the
+ * download rules), Paused and Finished, each headed with its count; a job is
+ * ONE row with its name, a progress bar, how far it has got from its numbers
+ * ([amountLine]) and roughly how long is left ([JobEta]). A opens the job's
+ * own page: Pause or Resume and Cancel while it runs; once it has finished,
+ * what it did, line by line ([JobReport]), with Open, Retry and Clear
+ * (docs/SPEC.md "Jobs and their results", Droidtop/tracker#577). The screen is
+ * live ([CatalogScreen.live]): it is read again whenever a job moves, so
+ * nothing on it polls.
  *
  * Registered once (in `:app`'s `AppSettingsCatalogs`) and reached from
  * the "Downloads and installs" entry of Settings and, in the Gaming
@@ -54,7 +63,7 @@ object PluginJobsScreen {
         live = PluginJobsCenter.entries(),
     )
 
-    /** The screen's sections for [snapshot]: Current, Paused, Completed, each only when it has a job. */
+    /** The screen's sections for [snapshot]: Current, Waiting, Paused, Finished, each only when it has a job. */
     internal fun groupsFor(snapshot: List<PluginJobsCenter.Entry>, nowMs: Long): List<CatalogGroup> {
         JobEta.forget(snapshot.mapTo(HashSet()) { it.jobId })
         if (snapshot.isEmpty()) {
@@ -67,12 +76,24 @@ object PluginJobsScreen {
                 ),
             )
         }
+        val finished = snapshot.filter { it.done }.sortedByDescending { it.finishedAtMs ?: it.startedAtMs }
         return listOfNotNull(
-            section("plugin_jobs_current", "Current", snapshot.filter { !it.done && !it.paused }, nowMs),
-            section("plugin_jobs_paused", "Paused", snapshot.filter { !it.done && it.paused }, nowMs),
-            section("plugin_jobs_done", "Completed", snapshot.filter { it.done }, nowMs),
+            section("plugin_jobs_current", "Current", snapshot.filter { it.state == JobState.RUNNING }, nowMs),
+            section("plugin_jobs_waiting", "Waiting", snapshot.filter { it.state == JobState.HELD }, nowMs),
+            section("plugin_jobs_paused", "Paused", snapshot.filter { it.state == JobState.PAUSED }, nowMs),
+            section("plugin_jobs_done", "Finished", finished, nowMs)?.let { group ->
+                group.copy(items = group.items + clearFinishedItem())
+            },
         )
     }
+
+    private fun clearFinishedItem(): CatalogItem = ActionItem(
+        id = "plugin_jobs_clear_finished",
+        title = "Clear finished",
+        subtitle = "Forgets every finished job and what it did",
+        confirmTitle = "Clear every finished job from this list?",
+        run = { PluginJobsCenter.clearFinished() },
+    )
 
     /** The way to the download rules (network, update window, automatic updates), from the place where downloads are seen. */
     private fun rulesGroup() = CatalogGroup(
@@ -103,7 +124,46 @@ object PluginJobsScreen {
     private fun jobSource(entry: PluginJobsCenter.Entry): String = entry.pluginLabel + (entry.via?.let { " (via $it)" } ?: "")
 
     private fun outcome(entry: PluginJobsCenter.Entry): String =
-        if (entry.result?.ok == true) entry.result?.values?.get("summary") ?: "Done" else (entry.result?.error ?: "Failed")
+        if (entry.state != JobState.FAILED) entry.result?.values?.get("summary") ?: "Done" else (entry.result?.error ?: "Failed")
+
+    /**
+     * How far a job has got, in its own numbers: "120 MB of 300 MB, 4.2 MB/s" for a transfer, "12 of 40" for work
+     * counted in things; null when the job reports only a percent. Pure.
+     */
+    internal fun amountLine(numbers: JobNumbers?): String? {
+        numbers ?: return null
+        val bytes = when {
+            numbers.bytesDone >= 0 && numbers.bytesTotal > 0 -> "${ValueFormat.size(numbers.bytesDone)} of ${ValueFormat.size(numbers.bytesTotal)}"
+            numbers.bytesDone >= 0 -> ValueFormat.size(numbers.bytesDone)
+            else -> null
+        }
+        val speed = numbers.downloadBps.takeIf { it > 0 }?.let { "${ValueFormat.size(it)}/s" }
+        val items = if (numbers.itemsDone >= 0 && numbers.itemsTotal > 0) "${numbers.itemsDone} of ${numbers.itemsTotal}" else null
+        return listOfNotNull(bytes, speed, items).joinToString(", ").ifEmpty { null }
+    }
+
+    /** What a report holds, counted: "3 done, 1 skipped, 2 failed". Null for an empty report. Pure. */
+    internal fun reportCounts(report: JobReport?): String? {
+        report ?: return null
+        return OUTCOME_ORDER.mapNotNull { outcome -> report.count(outcome).takeIf { it > 0 }?.let { "$it ${outcomeWord(outcome)}" } }
+            .joinToString(", ").ifEmpty { null }
+    }
+
+    private val OUTCOME_ORDER = listOf(Outcome.FAILED, Outcome.NEEDS_PICK, Outcome.DONE, Outcome.SKIPPED)
+
+    private fun outcomeWord(outcome: Outcome): String = when (outcome) {
+        Outcome.DONE -> "done"
+        Outcome.SKIPPED -> "skipped"
+        Outcome.NEEDS_PICK -> "need your pick"
+        Outcome.FAILED -> "failed"
+    }
+
+    private fun outcomeHeading(outcome: Outcome): String = when (outcome) {
+        Outcome.DONE -> "Done"
+        Outcome.SKIPPED -> "Skipped"
+        Outcome.NEEDS_PICK -> "Needs your pick"
+        Outcome.FAILED -> "Failed"
+    }
 
     /**
      * What a running job's row says in its value column: how far it has got ("42%", "Paused", or
@@ -117,6 +177,11 @@ object PluginJobsScreen {
             entry.percent >= 0 -> listOfNotNull("${entry.percent}%", timeLeft).joinToString(" · ")
             else -> entry.statusLine
         }
+        // The job's own numbers say how far it has got better than its line does; the line stays for what they cannot say.
+        amountLine(entry.numbers)?.takeIf { !entry.paused }?.let { amount ->
+            val status = entry.statusLine.takeIf { it.isNotBlank() && !it.equals(first, ignoreCase = true) }
+            return listOfNotNull(first, amount, status).joinToString("\n")
+        }
         // The status line is said once: a paused job whose status is "Paused" read "Paused Paused" (tracker#85).
         val second = entry.statusLine.takeIf { it.isNotBlank() && !it.equals(first, ignoreCase = true) }
         return if ((entry.percent >= 0 || entry.paused) && second != null) "$first\n$second" else first
@@ -129,12 +194,14 @@ object PluginJobsScreen {
      */
     fun jobRow(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): CatalogItem {
         if (entry.done) {
-            return ActionItem(
+            // A finished job opens what it did (its report), with Open, Retry and Clear.
+            val said = reportCounts(entry.report) ?: outcome(entry).lineSequence().first()
+            return NestedScreenItem(
                 id = "plugin_job_${entry.jobId}",
                 title = entry.title,
-                subtitle = "${jobSource(entry)} · ${outcome(entry)}",
-                value = if (entry.result?.ok == true) "Done" else "Failed",
-                run = {},
+                subtitle = "${jobSource(entry)} · $said",
+                inline = jobPage(entry.jobId, jobTitle(entry)),
+                valueLabel = { if (entry.state == JobState.FAILED) "Failed" else "Done" },
             )
         }
         val line = progressLine(entry, JobEta.line(entry, nowMs))
@@ -165,9 +232,7 @@ object PluginJobsScreen {
         if (entry == null) {
             return listOf(ActionItem(id = "plugin_job_${jobId}_gone", title = "This job is no longer tracked", run = {}))
         }
-        if (entry.done) {
-            return listOf(ActionItem(id = "plugin_job_${jobId}_outcome", title = "Finished", subtitle = outcome(entry), value = outcome(entry), run = {}))
-        }
+        if (entry.done) return finishedControls(jobId, entry)
         return buildList {
             add(
                 ActionItem(
@@ -203,6 +268,7 @@ object PluginJobsScreen {
                     ),
                 )
             }
+            reportItems(jobId, entry.report).forEach(::add)
             add(
                 ActionItem(
                     id = "plugin_job_${jobId}_cancel",
@@ -218,6 +284,65 @@ object PluginJobsScreen {
                 ),
             )
         }
+    }
+
+    /**
+     * A finished job's page: how it ended, then Open (what it made), Retry (a native job, with the same arguments)
+     * and Clear, then what it did, a section per outcome, failures first (docs/SPEC.md "Jobs and their results").
+     */
+    private fun finishedControls(jobId: String, entry: PluginJobsCenter.Entry): List<CatalogItem> = buildList {
+        add(
+            ActionItem(
+                id = "plugin_job_${jobId}_outcome",
+                title = if (entry.state == JobState.FAILED) "Failed" else "Finished",
+                subtitle = listOfNotNull(outcome(entry), reportCounts(entry.report)).joinToString("\n"),
+                run = {},
+            ),
+        )
+        entry.open?.takeIf { JobOpen.available }?.let { target ->
+            add(ActionItem(id = "plugin_job_${jobId}_open", title = JobOpen.label(target), run = { ctx -> JobOpen.open(ctx, target) }))
+        }
+        if (entry.retryable) {
+            add(
+                ActionItem(
+                    id = "plugin_job_${jobId}_retry",
+                    title = "Retry",
+                    subtitle = "Runs it again the same way",
+                    run = { ctx -> PluginJobsCenter.retry(ctx, jobId) },
+                ),
+            )
+        }
+        add(
+            ActionItem(
+                id = "plugin_job_${jobId}_clear",
+                title = "Clear",
+                subtitle = "Forgets this job and what it did",
+                run = { PluginJobsCenter.clear(jobId) },
+            ),
+        )
+        reportItems(jobId, entry.report).forEach(::add)
+    }
+
+    /** A report's lines, grouped by outcome with a heading row each; a line with somewhere to go opens it. */
+    private fun reportItems(jobId: String, report: JobReport?): List<CatalogItem> {
+        report ?: return emptyList()
+        return OUTCOME_ORDER.flatMap { outcome ->
+            val lines = report.items.filter { it.outcome == outcome }
+            if (lines.isEmpty()) return@flatMap emptyList()
+            listOf<CatalogItem>(
+                ActionItem(id = "plugin_job_${jobId}_head_${outcome.name}", title = "${outcomeHeading(outcome)} (${lines.size})", run = {}),
+            ) + lines.mapIndexed { index, line -> reportRow(jobId, outcome, index, line) }
+        }
+    }
+
+    private fun reportRow(jobId: String, outcome: Outcome, index: Int, line: ReportItem): CatalogItem {
+        val target = line.open?.takeIf { JobOpen.available }
+        return ActionItem(
+            id = "plugin_job_${jobId}_${outcome.name}_$index",
+            title = line.title,
+            subtitle = line.detail,
+            run = { ctx -> target?.let { JobOpen.open(ctx, it) } },
+        )
     }
 }
 
