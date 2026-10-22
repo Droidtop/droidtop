@@ -337,6 +337,7 @@ object PluginRepoUpdates {
             dev.droidtop.pluginhost.DownloadJobs.run(
                 context = context,
                 title = "Plugin update: $assetName",
+                category = dev.droidtop.net.DownloadCategory.PLUGINS,
                 post = dev.droidtop.pluginhost.DownloadJobs.POST_MOVE_TO,
                 url = url,
                 name = "bundle_${System.nanoTime()}.droidplugin.tar.xz",

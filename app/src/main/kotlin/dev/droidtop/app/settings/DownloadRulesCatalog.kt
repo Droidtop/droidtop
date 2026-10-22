@@ -6,7 +6,9 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.net.DownloadCategory
 import dev.droidtop.net.DownloadPolicy
+import dev.droidtop.net.DownloadPools
 import dev.droidtop.net.NetworkRule
 import dev.droidtop.net.engine.EnginePrefs
 import kotlinx.coroutines.Dispatchers
@@ -47,6 +49,26 @@ object DownloadRulesCatalog {
                         onSelect = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(network = NetworkRule.fromKey(value)) } },
                     ),
                 ),
+            ),
+            // The pools (docs/SPEC.md 12a, "One download engine"): the owner, "Configurable, intelligent".
+            CatalogGroup(
+                id = "download_rules_pools",
+                title = "How many at once",
+                items = DownloadCategory.entries.map { category ->
+                    ChoiceItem(
+                        id = "download_rules_pool_${category.key}",
+                        title = category.label,
+                        subtitle = POOL_SUBTITLES.getValue(category),
+                        options = POOL_OPTIONS,
+                        current = s.poolLimits[category.key]?.toString() ?: AUTOMATIC,
+                        onSelect = { ctx, value ->
+                            DownloadPolicy.update(ctx) { settings ->
+                                val chosen = value.toIntOrNull()?.takeIf { it in 1..DownloadPools.MAX_LIMIT }
+                                settings.copy(poolLimits = if (chosen == null) settings.poolLimits - category.key else settings.poolLimits + (category.key to chosen))
+                            }
+                        },
+                    )
+                },
             ),
             CatalogGroup(
                 id = "download_rules_engine",
@@ -106,4 +128,18 @@ object DownloadRulesCatalog {
     }
 
     private val HOURS = (0..23).map { ChoiceOption(it.toString(), DownloadPolicy.clock(it * 60)) }
+
+    private const val AUTOMATIC = "auto"
+
+    private val POOL_OPTIONS = listOf(ChoiceOption(AUTOMATIC, "Automatic")) +
+        (1..DownloadPools.MAX_LIMIT).map { ChoiceOption(it.toString(), it.toString()) }
+
+    /** What each pool holds, and what Automatic does for it ([DownloadPools.automaticLimit]). */
+    private val POOL_SUBTITLES = mapOf(
+        DownloadCategory.GAMES to "Games from your sources. Automatic: one at a time",
+        DownloadCategory.UPDATES to "New versions of games, and droidtop's own update. Automatic: one at a time",
+        DownloadCategory.PLUGINS to "Plugins and their updates. Automatic: two, one while you play or in battery saver",
+        DownloadCategory.SYSTEM to "Windows support, runtimes, apps and BIOS files. Automatic: two, one while you play or in battery saver",
+        DownloadCategory.ART to "Covers, screenshots and game details. Automatic: six on Wi-Fi, two on mobile data, one while you play or in battery saver",
+    )
 }

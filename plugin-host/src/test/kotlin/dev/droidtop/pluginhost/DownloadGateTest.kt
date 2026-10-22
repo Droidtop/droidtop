@@ -78,6 +78,40 @@ class DownloadGateTest {
     }
 
     @Test
+    fun `a second game download waits for the first, and an art download is not held by the games' pool`() {
+        val first = entry("g1").copy(startedAtMs = 1)
+        val second = entry("g2").copy(startedAtMs = 2)
+        val art = entry("a1").copy(startedAtMs = 3)
+        val category = { e: PluginJobsCenter.Entry -> if (e.jobId.startsWith("a")) dev.droidtop.net.DownloadCategory.ART else dev.droidtop.net.DownloadCategory.GAMES }
+        assertEquals(
+            listOf<DownloadGate.Move>(DownloadGate.Move.Hold("g2", "Queued: one game download at a time")),
+            DownloadGate.plan(listOf(first, second, art), facts, settings, wifi, category),
+        )
+        val queued = second.copy(paused = true, hold = "Queued: one game download at a time")
+        assertEquals(
+            "the slot frees when the first finishes",
+            listOf<DownloadGate.Move>(DownloadGate.Move.Release("g2")),
+            DownloadGate.plan(listOf(first.copy(done = true), queued), facts, settings, wifi, category),
+        )
+        assertEquals(
+            "while the policy holds, the policy's line wins",
+            listOf<DownloadGate.Move>(DownloadGate.Move.Hold("g2", "Waiting for a network")),
+            DownloadGate.plan(listOf(queued), facts, settings, offline, category),
+        )
+    }
+
+    @Test
+    fun `a new download is admitted, or queued when its pool is full of running ones`() {
+        val running = listOf(entry("g1"))
+        val games = mapOf("category" to "games", "bytes" to "1")
+        val category = { _: PluginJobsCenter.Entry -> dev.droidtop.net.DownloadCategory.GAMES }
+        assertEquals("Queued: one game download at a time", DownloadGate.admit(games, running, category, settings, wifi))
+        assertEquals(null, DownloadGate.admit(mapOf("category" to "art"), running, category, settings, wifi))
+        assertEquals("Waiting for a network", DownloadGate.admit(games, emptyList(), category, settings, offline))
+        assertEquals(dev.droidtop.net.DownloadCategory.GAMES, DownloadGate.categoryOf(mapOf()))
+    }
+
+    @Test
     fun `size and automatic come from the job's arguments and default to large and asked for`() {
         assertEquals(JobFacts(123L, true), DownloadGate.factsOf(mapOf("bytes" to "123", "automatic" to "1")))
         assertEquals(JobFacts(0L, false), DownloadGate.factsOf(mapOf("bytes" to "junk")))
