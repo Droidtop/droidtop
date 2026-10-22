@@ -185,13 +185,26 @@ object StoreSaves {
         PluginJobsCenter.startNative(context, JOB_KIND, "Saves: $title", mapOf(ARG_KEY to entryId, ARG_TITLE to title), owner = owner, pausable = false)
     }
 
+    /** How a sync reads in its job's report: a conflict nobody settled waits for the person's pick. Pure. */
+    internal fun reportOutcome(result: SaveSyncResult?): dev.droidtop.pluginhost.Outcome = when {
+        result == null -> dev.droidtop.pluginhost.Outcome.SKIPPED
+        result.failed -> dev.droidtop.pluginhost.Outcome.FAILED
+        result.unresolved -> dev.droidtop.pluginhost.Outcome.NEEDS_PICK
+        result.uploaded + result.downloaded + result.removed == 0 -> dev.droidtop.pluginhost.Outcome.SKIPPED
+        else -> dev.droidtop.pluginhost.Outcome.DONE
+    }
+
     /** Registers the job runner; called once at process start with the store jobs. */
     fun register(context: Context) {
         val app = context.applicationContext
         PluginJobsCenter.registerNative(JOB_KIND) { args, _, report ->
             val key = args[ARG_KEY] ?: error("This save sync names no game")
             report(-1, "Syncing saves", key)
-            sync(app, key, args[ARG_TITLE] ?: key.substringAfter(':'), SaveSyncPhase.AFTER_EXIT)?.line ?: "No saves to sync"
+            val title = args[ARG_TITLE] ?: key.substringAfter(':')
+            val result = sync(app, key, title, SaveSyncPhase.AFTER_EXIT)
+            // What the sync did, kept in the job's report after it ends (docs/SPEC.md "Jobs and their results").
+            dev.droidtop.pluginhost.JobHandle.current()?.item(title, reportOutcome(result), result?.line ?: "No saves to sync")
+            result?.line ?: "No saves to sync"
         }
     }
 }

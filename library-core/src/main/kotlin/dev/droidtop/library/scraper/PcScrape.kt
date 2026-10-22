@@ -521,6 +521,7 @@ object PcScraper {
         // filter passed over too, so a folder game missing from the log is a game the library never handed over.
         for (entry in passedOver) {
             dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc]: not asked, it already has what the \"${filter.label}\" filter looks for")
+            reported(entry, dev.droidtop.pluginhost.Outcome.SKIPPED, "Already has what \"${filter.label}\" looks for")
         }
         if (targets.isEmpty()) {
             return@withContext if (resumeAfter != null && candidates.isEmpty()) {
@@ -547,10 +548,12 @@ object PcScraper {
             if (refusedInARow >= REFUSAL_ABORT_THRESHOLD) {
                 for (left in targets.drop(index)) {
                     dev.droidtop.library.ScanLog.write("scrape: ${left.title} [pc] via ${source.label}: not asked, ${source.label} refused $REFUSAL_ABORT_THRESHOLD in a row")
+                    reported(left, dev.droidtop.pluginhost.Outcome.FAILED, "Not asked: ${source.label} refused $REFUSAL_ABORT_THRESHOLD times in a row")
                 }
                 break
             }
             onProgress(index, targets.size)
+            dev.droidtop.pluginhost.JobHandle.current()?.numbers(dev.droidtop.pluginhost.JobNumbers(itemsDone = index, itemsTotal = targets.size))
             // The sources are public services with their own limits (the Steam store allows about
             // 200 requests in five minutes) and one game can ask several of them: games are spaced.
             if (index > 0) kotlinx.coroutines.delay(GAME_PACE_MS)
@@ -592,11 +595,13 @@ object PcScraper {
                     }
                     is PcOutcome.Refused -> counts.refused++
                 }
+                reportOutcome(entry, outcome, pluginTie)
             } catch (t: Exception) {
                 if (t is kotlinx.coroutines.CancellationException) throw t
                 counts.failed++
                 refusedInARow = 0
                 counts.misses.add(ScrapeMisses.Kind.FAILED, entry.title, t.message)
+                reported(entry, dev.droidtop.pluginhost.Outcome.FAILED, t.message ?: "Failed")
                 dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] via ${source.label}: failed: ${t.message}")
                 android.util.Log.e("droidtop.Scraper", "Failed to scrape ${entry.title}", t)
             }
@@ -607,6 +612,37 @@ object PcScraper {
         counts.flavourNotes = flavour.notes()
         formatPcScrapeSummary(source.label, counts).also {
             dev.droidtop.library.ScanLog.write("scrape: PC and engine games summary: ${it.replace('\n', ' ')}")
+        }
+    }
+
+    /**
+     * One line of the scrape job's report (docs/SPEC.md "Jobs and their results"): the game, what happened to it in
+     * plain words, and its page to open. The same facts as its scan.log line, said for a person; nothing outside a job.
+     */
+    private suspend fun reported(entry: LibraryEntry, outcome: dev.droidtop.pluginhost.Outcome, detail: String) {
+        dev.droidtop.pluginhost.JobHandle.current()?.item(entry.title, outcome, detail, dev.droidtop.pluginhost.OpenTarget.Game(entry.id))
+    }
+
+    /** The report line for a game that was not written; a written game reports itself in [write]. */
+    private suspend fun reportOutcome(entry: LibraryEntry, outcome: PcOutcome, pluginTie: Boolean) {
+        val o = dev.droidtop.pluginhost.Outcome
+        when (outcome) {
+            PcOutcome.ByStoreId, PcOutcome.ByName -> Unit
+            is PcOutcome.NeedsPicking -> reported(entry, o.NEEDS_PICK, "${outcome.candidates} possible matches, none exact")
+            is PcOutcome.NoMatch -> if (pluginTie) {
+                reported(entry, o.NEEDS_PICK, "A source's possible matches tie")
+            } else {
+                reported(entry, o.SKIPPED, "No match for \"${outcome.searched}\"")
+            }
+            is PcOutcome.Refused -> reported(
+                entry,
+                o.FAILED,
+                if (outcome.asked) {
+                    "${outcome.refusal.source} refused (HTTP ${outcome.refusal.httpStatus})" + (outcome.refusal.reason?.let { ": $it" } ?: "")
+                } else {
+                    "Not asked: ${outcome.refusal.source} refused $REFUSAL_ABORT_THRESHOLD times in a row"
+                },
+            )
         }
     }
 
@@ -931,6 +967,27 @@ object PcScraper {
             "scrape: ${entry.title} [pc] ($confidence): " +
                 "wrote ${sources.entries.joinToString(",") { "${it.key}=${it.value}" }.ifEmpty { "nothing" }}",
         )
+        reported(
+            entry,
+            if (sources.isEmpty()) dev.droidtop.pluginhost.Outcome.SKIPPED else dev.droidtop.pluginhost.Outcome.DONE,
+            wroteLine(sources),
+        )
+    }
+
+    /**
+     * What a scrape wrote for a game, for a person: "Cover and description from Steam store; genre from IGDB", or
+     * "Nothing new" when every field was already there. [sources] is field to source, as the per-field record keeps it.
+     * Pure.
+     */
+    internal fun wroteLine(sources: Map<String, String>): String {
+        if (sources.isEmpty()) return "Nothing new"
+        val words = mapOf(FieldSources.RELEASE_DATE to "release date")
+        return sources.entries.groupBy({ it.value }, { words[it.key] ?: it.key })
+            .entries.joinToString("; ") { (source, fields) ->
+                val list = if (fields.size == 1) fields.single() else fields.dropLast(1).joinToString(", ") + " and " + fields.last()
+                "$list from $source"
+            }
+            .replaceFirstChar { it.uppercase() }
     }
 
     /**
