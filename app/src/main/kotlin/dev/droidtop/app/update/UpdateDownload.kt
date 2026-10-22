@@ -102,6 +102,7 @@ internal object UpdateDownload {
             context,
             title = "droidtop ${info.versionName}",
             post = POST,
+            category = dev.droidtop.net.DownloadCategory.UPDATES,
             url = info.apkUrl,
             name = fileName(info.versionCode),
             sha256 = info.apkSha256,
