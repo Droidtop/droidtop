@@ -151,9 +151,10 @@ class DownloadJobsTest {
     @Test
     fun aDownloadLimitedToAPluginsSitesRefusesEveryOtherAddress() {
         val guard = DownloadJobs.sitesGuard("""["f95zone.to", "*.example.org"]""")!!
-        guard("https://attachments.f95zone.to/a.png")
+        guard("https://f95zone.to/a.png")
         guard("https://cdn.example.org/b.jpg")
-        for (refused in listOf("http://f95zone.to/a", "https://evil.test/x", "https://f95zone.to.evil.test/x")) {
+        // As net.domains: a bare domain is that host alone; `*.` covers the subdomains.
+        for (refused in listOf("http://f95zone.to/a", "https://attachments.f95zone.to/a.png", "https://evil.test/x", "https://f95zone.to.evil.test/x")) {
             try {
                 guard(refused)
                 fail("$refused is not one of the download's sites")
