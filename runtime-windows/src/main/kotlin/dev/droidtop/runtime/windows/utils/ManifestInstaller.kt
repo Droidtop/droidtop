@@ -37,7 +37,7 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrls(entry.downloadUrls(), destFile, entry.sha256, onProgress)
+            RuntimeDownloads.fetchUrls(context, entry.downloadUrls(), destFile, entry.sha256, onProgress)
             val uri = Uri.fromFile(destFile)
             val name = AdrenotoolsManager(context).installDriver(uri)
             if (name.isEmpty()) {
@@ -101,7 +101,7 @@ object ManifestInstaller {
             val cacheDir = File(context.filesDir, "assets/dxwrapper")
             cacheDir.mkdirs()
             val dest = File(cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrls(entry.downloadUrls(), dest, entry.sha256, onProgress)
+            RuntimeDownloads.fetchUrls(context, entry.downloadUrls(), dest, entry.sha256, onProgress)
             if (!dest.exists() || dest.length() == 0L) {
                 dest.delete()
                 return@withContext ManifestInstallResult(
@@ -134,7 +134,7 @@ object ManifestInstaller {
         var destFile: File? = null
         try {
             destFile = File(context.cacheDir, entry.url.substringAfterLast("/"))
-            RuntimeDownloads.fetchUrls(entry.downloadUrls(), destFile, entry.sha256, onProgress)
+            RuntimeDownloads.fetchUrls(context, entry.downloadUrls(), destFile, entry.sha256, onProgress)
             val mgr = ContentsManager(context)
 
             var (profile, _) = extract(mgr, Uri.fromFile(destFile))

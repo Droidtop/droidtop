@@ -77,7 +77,7 @@ object WineBuilds {
         val file = File(context.cacheDir, "wine-build-download")
         try {
             onStatus("Downloading…")
-            RuntimeDownloads.fetchUrl(trimmed, file) { onStatus("Downloading… ${(it.coerceIn(0f, 1f) * 100).toInt()}%") }
+            RuntimeDownloads.fetchUrl(context, trimmed, file) { onStatus("Downloading… ${(it.coerceIn(0f, 1f) * 100).toInt()}%") }
             add(context, file, trimmed, onStatus)
         } catch (e: Exception) {
             "Couldn't add it: ${e.message ?: e}"
