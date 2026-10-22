@@ -94,14 +94,52 @@ runs:
         set -x
         sudo systemctl stop apt-daily.timer apt-daily-upgrade.timer 2>/dev/null || true
         sudo systemctl stop apt-daily.service apt-daily-upgrade.service 2>/dev/null || true
-        timeout 120 sudo apt-get update -o DPkg::Lock::Timeout=300
-        timeout 300 sudo apt-get install -y -o DPkg::Lock::Timeout=300 \
-          build-essential cmake ninja-build meson pkg-config git python3 \
-          autoconf automake libtool libltdl-dev texinfo \
-          libexpat1-dev libffi-dev libxml2-utils \
-          wayland-protocols libwayland-bin glslang-tools \
-          autopoint gettext patchelf zstd \
-          unzip curl
+        # The runner's Azure apt mirror sometimes serves a single package at a
+        # few KB/s (runs 39857810117, 39852414045, 39848809325 stalled five
+        # minutes on the 11 MB cmake .deb until the step timeout fired). Each
+        # attempt therefore has its own short timeout and a low network
+        # timeout, and retries; cmake is not fetched through apt at all (the
+        # next step installs a pinned, checksummed release).
+        apt_try() {
+          for attempt in 1 2 3 4; do
+            if timeout 150 sudo "$@" -o DPkg::Lock::Timeout=300                  -o Acquire::http::Timeout=20 -o Acquire::Retries=3; then
+              return 0
+            fi
+            echo "apt attempt $attempt failed, retrying"
+            sleep 5
+          done
+          return 1
+        }
+        apt_try apt-get update
+        apt_try apt-get install -y           build-essential ninja-build meson pkg-config git python3           autoconf automake libtool libltdl-dev texinfo           libexpat1-dev libffi-dev libxml2-utils           wayland-protocols libwayland-bin glslang-tools           autopoint gettext patchelf zstd           unzip curl
+
+    - name: Cache CMake
+      id: cmake-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: ${{ github.workspace }}/.cmake
+        key: cmake-3.31.6-linux-x86_64
+
+    - name: Install CMake
+      # A pinned upstream release instead of the apt package (see the apt
+      # step above); verified by sha256 and put first on PATH.
+      if: steps.cmake-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -eu
+        v=3.31.6
+        t="cmake-$v-linux-x86_64.tar.gz"
+        curl -fsSL --retry 4 --retry-all-errors --max-time 120           "https://github.com/Kitware/CMake/releases/download/v$v/$t" -o "/tmp/$t"
+        echo "5a1133ff103c71eb5120e2cc3de922733e7d8a26a98ae716397e8676adb367bf  /tmp/$t" | sha256sum -c -
+        mkdir -p "$GITHUB_WORKSPACE/.cmake"
+        tar -xzf "/tmp/$t" -C "$GITHUB_WORKSPACE/.cmake" --strip-components=1
+        rm "/tmp/$t"
+
+    - name: Put CMake on PATH
+      shell: bash
+      run: |
+        echo "$GITHUB_WORKSPACE/.cmake/bin" >> "$GITHUB_PATH"
+        "$GITHUB_WORKSPACE/.cmake/bin/cmake" --version
 
     - name: Cache Android SDK/NDK
       id: sdk-cache
