@@ -25,6 +25,21 @@ class RedirectGuardTest {
     private fun redirect(to: String, status: Int = 302) = RedirectGuard.Answer(status, to)
 
     @Test
+    fun aPluginsDownloadIsWalkedAndEveryHopMustBeOnItsSites() {
+        val net = Net("https://a.test/f" to redirect("https://cdn.a.test/f"), "https://cdn.a.test/f" to redirect("https://evil.test/x"))
+        val allowed = { url: String -> if (!java.net.URL(url).host.endsWith("a.test")) throw java.io.IOException("not on the plugin's sites: $url") }
+        try {
+            RedirectGuard.resolve("https://a.test/f", emptyMap(), net::ask, allowed)
+            org.junit.Assert.fail("a hop off the plugin's sites must be refused")
+        } catch (e: java.io.IOException) {
+            assertTrue(e.message!!.contains("evil.test"))
+        }
+        assertTrue("the refused address is never asked", net.asked.none { it.first.contains("evil.test") })
+        val ok = Net("https://a.test/f" to redirect("https://cdn.a.test/f"))
+        assertEquals("https://cdn.a.test/f", RedirectGuard.resolve("https://a.test/f", emptyMap(), ok::ask, allowed).url)
+    }
+
+    @Test
     fun aRequestWithNothingToKeepBackIsNotWalked() {
         val net = Net()
         val resolved = RedirectGuard.resolve("https://a.test/f", mapOf("Accept" to "*/*"), net::ask)

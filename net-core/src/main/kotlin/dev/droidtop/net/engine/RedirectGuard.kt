@@ -43,13 +43,21 @@ object RedirectGuard {
     /**
      * Walks [url]'s redirects with [ask] (the network, or a test's own answers) and returns where the engine may go.
      * A status that is neither a success nor a redirect ends the walk at that address: the engine will meet the same
-     * answer and report it.
+     * answer and report it. With [allow] (a plugin's download, which may reach only its own sites), every address of the
+     * walk, the first included, is put to it before it is asked, and the walk is made whatever the headers; [allow]
+     * throws to refuse one, and the engine is never given an address it refused.
      */
-    fun resolve(url: String, headers: Map<String, String>, ask: (url: String, headers: Map<String, String>, method: String) -> Answer = { u, h, m -> network(u, h, m) }): Resolved {
-        if (!needsWalk(headers)) return Resolved(url, headers)
+    fun resolve(
+        url: String,
+        headers: Map<String, String>,
+        ask: (url: String, headers: Map<String, String>, method: String) -> Answer = { u, h, m -> network(u, h, m) },
+        allow: ((String) -> Unit)? = null,
+    ): Resolved {
+        if (allow == null && !needsWalk(headers)) return Resolved(url, headers)
         var current = url
         var sent = headers
         repeat(MAX_REDIRECTS + 1) {
+            allow?.invoke(current)
             var answer = ask(current, sent, "HEAD")
             if (!isSuccess(answer) && !isRedirect(answer)) answer = ask(current, sent, "GET")
             if (!isRedirect(answer)) return Resolved(current, sent)
