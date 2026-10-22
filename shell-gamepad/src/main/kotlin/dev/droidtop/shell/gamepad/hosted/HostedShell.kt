@@ -127,8 +127,28 @@ private fun flatten(rows: List<HostedRow>): Pair<List<HostedItem>, IntArray> {
 }
 
 /**
+ * Where Left or Right takes the cursor at [from] in a list whose rows are in [sections] (each row's section, in
+ * order): the first row of the previous or next section ([forward]); at the first or last section it stays. Left
+ * inside a section first goes to that section's own first row, as a shelf's Left does. Pure.
+ */
+internal fun sectionJump(sections: List<String?>, from: Int, forward: Boolean): Int {
+    if (sections.isEmpty()) return 0
+    val at = from.coerceIn(0, sections.size - 1)
+    val starts = sections.indices.filter { it == 0 || sections[it] != sections[it - 1] }
+    val own = starts.last { it <= at }
+    return if (forward) {
+        starts.firstOrNull { it > at } ?: at
+    } else if (at > own) {
+        own
+    } else {
+        starts.lastOrNull { it < own } ?: at
+    }
+}
+
+/**
  * A list sheet the pad drives the way it drives every Gaming menu (docs/SPEC.md 6e): Up and Down step the
- * cursor and stop at the ends, A takes [HostedRow.onSelect], X [HostedRow.onToggle], Y [HostedRow.onDetail],
+ * cursor and stop at the ends, Left and Right jump between sections when the list has them ([sectionJump]; the
+ * Start menu's Pinned, Recent and All, gap review 2026-10-17), A takes [HostedRow.onSelect], X [HostedRow.onToggle], Y [HostedRow.onDetail],
  * B closes, Start closes too (the button that opened it). It is a window of its own (a Dialog), so the
  * one input pipeline runs inside it; the rows are [MenuRow]s under the window's sliding focus ring; the
  * list is lazy and keeps the cursor on screen, so a library of hundreds costs what is on show.
@@ -203,6 +223,13 @@ fun HostedListSheet(
                     repeating = press.repeat
                     when (press.action) {
                         GamepadAction.UP, GamepadAction.DOWN -> selected = menuMove(selected, rows.size, press)
+                        // Section jumps only where there are sections; otherwise the caller may use Left and Right.
+                        GamepadAction.LEFT, GamepadAction.RIGHT ->
+                            if (currentRows.mapTo(HashSet()) { it.section }.size > 1) {
+                                selected = sectionJump(currentRows.map { it.section }, selected, forward = press.action == GamepadAction.RIGHT)
+                            } else {
+                                onExtraPad(press)
+                            }
                         GamepadAction.A -> currentRows.getOrNull(selected)?.onSelect?.invoke()
                         GamepadAction.X -> currentRows.getOrNull(selected)?.onToggle?.invoke()
                         GamepadAction.Y -> currentRows.getOrNull(selected)?.onDetail?.invoke()
