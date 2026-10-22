@@ -104,8 +104,6 @@ internal object AcquireDownload {
             extra = buildMap {
                 put("destinationPath", bios?.parentFile?.absolutePath ?: destination)
                 put("targetName", bios?.name ?: first.targetName)
-                // A source's file is the download engine's: libaria2 in its own process, fetched there and never in this one.
-                put(DownloadJobs.ARG_ENGINE, DownloadJobs.ENGINE_ARIA2)
                 AcquireEngineHint.valid(values[AcquireEngineHint.KEY])?.let { put(AcquireEngineHint.KEY, it) }
                 update?.let { putAll(it) }
             },
