@@ -5885,6 +5885,13 @@ one:
   section with the download rules' holds. Agreed with the engine side: the download rules (`DownloadGate`) stay the
   one policy and pause and unpause the aria2 engine; a job may hold several aria2 transfers (a multi-part archive),
   its numbers their sum; Steam depots keep their own transfer and report the same states and numbers.
+  **A download's numbers.** A download job's transfer fills its numbers on the one progress path: the aria2 engine's
+  poll (`EngineFetch`, one `EngineProgress` a second: percent, line, the engine's completed and total length and
+  download speed, and whether it waits for the connection) and the older `ResumableDownload` both go through
+  `DownloadJobs.TransferNumbers`, which sets the job's bytes and speed and its wait. A job of several files counts
+  the whole files before the one in progress in its bytes and says which file it is on; its total bytes are shown only
+  for one file. Upload speed comes when the engine reports it (torrents). Open on a finished download goes to what it
+  became: the game folder's new file or folder (`placedTarget`), or the kept file.
   **What fills a report.** The PC and engine scrape (`PcScraper`) says, per game, what it wrote and from where ("Cover
   and description from Steam store; genre from IGDB", `wroteLine`), what it skipped and why ("Already has what
   ... looks for", "No match for ..."), what needs a pick, and what failed with the reason, each line opening the

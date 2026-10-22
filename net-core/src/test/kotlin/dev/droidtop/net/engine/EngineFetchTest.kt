@@ -70,7 +70,7 @@ class EngineFetchTest {
     fun aWholeFileReportsItsProgressAndReturns() = runTest {
         val engine = FakeEngine(listOf(listOf(active(0, 100 * mib, 0), active(40 * mib, 100 * mib), complete(100 * mib))))
         val reports = mutableListOf<Pair<Int, String>>()
-        EngineFetch.fetch(engine, request(), { p, line -> reports += p to line }, size, passThrough, Dispatchers.Unconfined)
+        EngineFetch.fetch(engine, request(), { reports += it.percent to it.line }, size, passThrough, Dispatchers.Unconfined)
         assertEquals(listOf(0, 40), reports.map { it.first })
         assertEquals("Connecting…", reports[0].second)
         assertEquals("Downloading… 40 MB of 100 MB (976 KB/s)", reports[1].second)
@@ -83,10 +83,24 @@ class EngineFetchTest {
     }
 
     @Test
+    fun eachReportCarriesTheEnginesNumbersAndAWaitIsMarked() = runTest {
+        val engine = FakeEngine(listOf(listOf(active(40 * mib, 100 * mib), failed(6, 40 * mib)), listOf(complete(100 * mib))))
+        val reports = mutableListOf<EngineProgress>()
+        EngineFetch.fetch(engine, request(), { reports += it }, size, passThrough, Dispatchers.Unconfined)
+        val moving = reports.first()
+        assertEquals(40 * mib, moving.transfer?.completedLength)
+        assertEquals(100 * mib, moving.transfer?.totalLength)
+        assertTrue(!moving.waiting)
+        val waiting = reports.last()
+        assertTrue(waiting.waiting)
+        assertEquals(null, waiting.transfer)
+    }
+
+    @Test
     fun aPauseRemovesTheDownloadFromTheEngineAndKeepsTheFile() = runTest {
         val engine = FakeEngine(listOf(listOf(active(1 * mib, 100 * mib))))
         target.writeBytes(ByteArray(10))
-        val job = launch(start = CoroutineStart.UNDISPATCHED) { EngineFetch.fetch(engine, request(), { _, _ -> }, size, passThrough, Dispatchers.Unconfined) }
+        val job = launch(start = CoroutineStart.UNDISPATCHED) { EngineFetch.fetch(engine, request(), {}, size, passThrough, Dispatchers.Unconfined) }
         advanceTimeBy(2_500)
         runCurrent()
         assertTrue(engine.removed.isEmpty())
@@ -100,7 +114,7 @@ class EngineFetchTest {
     fun aLostConnectionWaitsAndThenAsksAgain() = runTest {
         val engine = FakeEngine(listOf(listOf(failed(6)), listOf(complete(100 * mib))))
         val reports = mutableListOf<Pair<Int, String>>()
-        EngineFetch.fetch(engine, request(), { p, line -> reports += p to line }, size, passThrough, Dispatchers.Unconfined)
+        EngineFetch.fetch(engine, request(), { reports += it.percent to it.line }, size, passThrough, Dispatchers.Unconfined)
         assertEquals(2, engine.added.size)
         assertEquals(-1 to "Waiting for the connection", reports.single())
     }
@@ -108,7 +122,7 @@ class EngineFetchTest {
     @Test
     fun theEnginesProcessEndingIsAskedAgainToo() = runTest {
         val engine = FakeEngine(listOf(listOf(EngineGoneException("gone")), listOf(complete(100 * mib))))
-        EngineFetch.fetch(engine, request(), { _, _ -> }, size, passThrough, Dispatchers.Unconfined)
+        EngineFetch.fetch(engine, request(), {}, size, passThrough, Dispatchers.Unconfined)
         assertEquals(2, engine.added.size)
     }
 
@@ -116,7 +130,7 @@ class EngineFetchTest {
     fun sixFailuresWithoutProgressFailTheTransfer() = runTest {
         val engine = FakeEngine(List(20) { listOf(failed(6)) })
         try {
-            EngineFetch.fetch(engine, request(), { _, _ -> }, size, passThrough, Dispatchers.Unconfined)
+            EngineFetch.fetch(engine, request(), {}, size, passThrough, Dispatchers.Unconfined)
             fail()
         } catch (e: TransferException) {
             assertEquals("the download failed: the connection kept failing", e.message)
@@ -128,7 +142,7 @@ class EngineFetchTest {
     fun aFailureThatMadeProgressDoesNotCountAgainstTheLimit() = runTest {
         val scripts = List(10) { listOf(failed(2, done = (it + 1) * mib)) } + listOf(listOf(complete(100 * mib)))
         val engine = FakeEngine(scripts)
-        EngineFetch.fetch(engine, request(), { _, _ -> }, size, passThrough, Dispatchers.Unconfined)
+        EngineFetch.fetch(engine, request(), {}, size, passThrough, Dispatchers.Unconfined)
         assertEquals(11, engine.added.size)
     }
 
@@ -136,7 +150,7 @@ class EngineFetchTest {
     fun aRefusalEndsTheTransferWithASentence() = runTest {
         val engine = FakeEngine(listOf(listOf(failed(3))))
         try {
-            EngineFetch.fetch(engine, request(), { _, _ -> }, size, passThrough, Dispatchers.Unconfined)
+            EngineFetch.fetch(engine, request(), {}, size, passThrough, Dispatchers.Unconfined)
             fail()
         } catch (e: TransferException) {
             assertEquals("the server does not have that file", e.message)
@@ -150,7 +164,7 @@ class EngineFetchTest {
         target.writeBytes(ByteArray(10))
         TransferRequest.controlFile(target).writeBytes(ByteArray(10))
         try {
-            EngineFetch.fetch(engine, request(maxBytes = 2 * mib), { _, _ -> }, size, passThrough, Dispatchers.Unconfined)
+            EngineFetch.fetch(engine, request(maxBytes = 2 * mib), {}, size, passThrough, Dispatchers.Unconfined)
             fail()
         } catch (e: TransferException) {
             assertEquals("the file is larger than the 2 MiB cap", e.message)
@@ -165,7 +179,7 @@ class EngineFetchTest {
         val engine = FakeEngine(listOf(listOf(failed(8)), listOf(active(1 * mib, 100 * mib), complete(100 * mib))))
         target.writeBytes(ByteArray(10))
         val reports = mutableListOf<String>()
-        EngineFetch.fetch(engine, request(), { _, line -> reports += line }, size, passThrough, Dispatchers.Unconfined)
+        EngineFetch.fetch(engine, request(), { reports += it.line }, size, passThrough, Dispatchers.Unconfined)
         assertEquals(2, engine.added.size)
         assertFalse("the stale partial file was dropped", target.exists())
         assertEquals("Started again: the server cannot resume. Downloading… 1 MB of 100 MB (976 KB/s)", reports.single())
@@ -175,7 +189,7 @@ class EngineFetchTest {
     fun theWalkedAddressAndItsHeadersAreWhatTheEngineGets() = runTest {
         val engine = FakeEngine(listOf(listOf(complete(100 * mib))))
         val request = TransferRequest("http://a.test/f", mapOf("Cookie" to "s=1", "Referer" to "http://a.test/"), target)
-        EngineFetch.fetch(engine, request, { _, _ -> }, size, { _, _ -> RedirectGuard.Resolved("http://cdn.test/f?sig=1", mapOf("Accept" to "*/*")) }, Dispatchers.Unconfined)
+        EngineFetch.fetch(engine, request, {}, size, { _, _ -> RedirectGuard.Resolved("http://cdn.test/f?sig=1", mapOf("Accept" to "*/*")) }, Dispatchers.Unconfined)
         assertEquals("http://cdn.test/f?sig=1", engine.added.single().first)
         val options = engine.added.single().second
         assertEquals("Accept: */*", options["header"])

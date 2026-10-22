@@ -490,14 +490,26 @@ object DownloadJobs {
         val url = requireNotNull(args[ARG_URL]) { "the download has no address" }
         val file = fileFor(context, name)
         placedBeforeTheProcessEnded(file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
+        val job = JobHandle.current()
         if (!(checkpoint == FETCHED && file.isFile)) {
-            transfer(context, args, url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report)
+            transfer(context, args, url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, TransferNumbers(job), report)
             report(100, "Checking the download…", FETCHED)
         }
         verifyDigest(file, args)
         report(100, "Finishing…", null)
         val summary = post.process(context, file, args)
-        if (postName != POST_KEEP && postName !in keptPosts) withContext(Dispatchers.IO) { file.delete() }
+        val kept = postName == POST_KEEP || postName in keptPosts
+        if (!kept) withContext(Dispatchers.IO) { file.delete() }
+        // Open on the finished job goes to what the download became: the game folder's new file or folder, or the kept file.
+        job?.open(
+            when {
+                postName == POST_PLACE_IN_FOLDER -> placedTarget(args)?.let { (target, folder) ->
+                    if (folder) OpenTarget.Folder(target.absolutePath) else OpenTarget.File(target.absolutePath)
+                }
+                kept -> OpenTarget.File(file.absolutePath)
+                else -> null
+            },
+        )
         return summary
     }
 
@@ -517,11 +529,15 @@ object DownloadJobs {
         val files = parts.map { fileFor(context, requireNotNull(it[ARG_NAME]) { "the download has no file name" }) }
         val done = checkpoint?.takeIf { it.startsWith("$FETCHED:") }?.substringAfter(':')?.toIntOrNull() ?: 0
         placedManyBeforeTheProcessEnded(files, parts, postName, done) { LibraryPaths.report(context, PathChange(added = it.map(File::getAbsolutePath))) }?.let { return it }
+        val job = JobHandle.current()
         for ((index, part) in parts.withIndex()) {
             if (index < done && files[index].isFile) continue
             val url = requireNotNull(part[ARG_URL]) { "the download has no address" }
             val prefix = "File ${index + 1} of ${parts.size}. "
-            transfer(context, part, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L) { percent, line, _ ->
+            // The job's bytes are the sum of its files: the whole ones before this one, and this one so far.
+            val before = withContext(Dispatchers.IO) { files.take(index).sumOf { it.length() } }
+            val numbers = TransferNumbers(job, before, index, parts.size)
+            transfer(context, part, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, numbers) { percent, line, _ ->
                 report(if (percent < 0) -1 else (index * 100 + percent) / parts.size, prefix + line, null)
             }
             verifyDigest(files[index], part)
@@ -530,6 +546,12 @@ object DownloadJobs {
         report(100, "Finishing…", null)
         val summary = multi.process(context, files, parts)
         withContext(Dispatchers.IO) { files.forEach { it.delete() } }
+        if (postName == POST_PLACE_IN_FOLDER) {
+            parts.first()["destinationPath"]?.let { games ->
+                val folder = parts.first()[ARG_VERSION_FOLDER]?.let { File(games, it) } ?: File(games)
+                job?.open(OpenTarget.Folder(folder.absolutePath))
+            }
+        }
         return summary
     }
 
@@ -567,18 +589,27 @@ object DownloadJobs {
         reportPlaced: (File) -> Unit,
     ): String? {
         if (postName != POST_PLACE_IN_FOLDER || checkpoint != FETCHED) return null
+        val (target, folder) = placedTarget(args) ?: return null
         return withContext(Dispatchers.IO) {
-            val targetName = args["targetName"] ?: return@withContext null
-            val unpacked = args[ARG_UNPACK] == UNPACK_ARCHIVE
-            val games = args["destinationPath"] ?: return@withContext null
-            val version = args[ARG_VERSION_FOLDER]
-            val target = when {
-                version != null -> File(games, version)
-                else -> File(games, if (unpacked) (archiveStem(targetName) ?: return@withContext null) else targetName)
-            }
-            if (file.exists() || !(if (unpacked || version != null) target.isDirectory else target.isFile)) return@withContext null
+            if (file.exists() || !(if (folder) target.isDirectory else target.isFile)) return@withContext null
             reportPlaced(target)
             "Added ${target.name}"
+        }
+    }
+
+    /**
+     * Where a place-in-folder job puts what it downloaded, and whether that is a folder (an unpacked archive or a
+     * version folder) rather than a file; null when its arguments do not say. Pure.
+     */
+    internal fun placedTarget(args: Map<String, String>): Pair<File, Boolean>? {
+        val targetName = args["targetName"] ?: return null
+        val unpacked = args[ARG_UNPACK] == UNPACK_ARCHIVE
+        val games = args["destinationPath"] ?: return null
+        val version = args[ARG_VERSION_FOLDER]
+        return when {
+            version != null -> File(games, version) to true
+            unpacked -> File(games, archiveStem(targetName) ?: return null) to true
+            else -> File(games, targetName) to false
         }
     }
 
@@ -590,12 +621,44 @@ object DownloadJobs {
         headers: Map<String, String>,
         destination: File,
         maxBytes: Long,
+        numbers: TransferNumbers,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
     ) {
         if (args[ARG_ENGINE] == ENGINE_ARIA2) {
-            fetchWithEngine(context, url, headers, destination, maxBytes, report)
+            fetchWithEngine(context, url, headers, destination, maxBytes, numbers, report)
         } else {
-            withContext(Dispatchers.IO) { fetch(url, headers, destination, maxBytes, report) }
+            withContext(Dispatchers.IO) { fetch(url, headers, destination, maxBytes, report, numbers) }
+        }
+    }
+
+    /**
+     * What a transfer tells its job besides its line (docs/SPEC.md "Jobs and their results"): its bytes and speed, and
+     * that it is waiting for the connection, which is a wait and never a failure. A job of several files counts the
+     * whole files before this one ([before]) in its bytes and says which file it is on; its total bytes are known only
+     * for a job of one file. Outside a job ([job] null) nothing is told.
+     */
+    internal class TransferNumbers(
+        private val job: JobHandle?,
+        private val before: Long = 0L,
+        private val item: Int = 0,
+        private val items: Int = 1,
+    ) {
+        fun bytes(done: Long, total: Long, bps: Long) {
+            val handle = job ?: return
+            handle.waiting(null)
+            handle.numbers(
+                JobNumbers(
+                    bytesDone = before + done,
+                    bytesTotal = if (items == 1 && total > 0) total else -1,
+                    downloadBps = bps,
+                    itemsDone = if (items > 1) item else -1,
+                    itemsTotal = if (items > 1) items else -1,
+                ),
+            )
+        }
+
+        fun waiting() {
+            job?.waiting(JobWait(WaitReason.NETWORK))
         }
     }
 
@@ -611,6 +674,7 @@ object DownloadJobs {
         headers: Map<String, String>,
         destination: File,
         maxBytes: Long,
+        numbers: TransferNumbers,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
     ) {
         val folder = requireNotNull(destination.parentFile) { "the download has no folder" }
@@ -629,7 +693,19 @@ object DownloadJobs {
             throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
         }
         try {
-            EngineFetch.fetch(engine, TransferRequest(url, headers, destination, maxBytes), report = { percent, line -> report(percent, line, null) }, size = ValueFormat::size)
+            EngineFetch.fetch(
+                engine,
+                TransferRequest(url, headers, destination, maxBytes),
+                report = { progress ->
+                    report(progress.percent, progress.line, null)
+                    val transfer = progress.transfer
+                    when {
+                        progress.waiting -> numbers.waiting()
+                        transfer != null -> numbers.bytes(transfer.completedLength, transfer.totalLength, transfer.downloadSpeed)
+                    }
+                },
+                size = ValueFormat::size,
+            )
         } catch (e: TransferException) {
             throw IllegalStateException(e.message)
         }
@@ -647,6 +723,7 @@ object DownloadJobs {
         destination: File,
         maxBytes: Long,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+        numbers: TransferNumbers = TransferNumbers(null),
         retrySleep: ((Long) -> Unit)? = null,
     ) {
         val handle = ResumableDownload.Handle()
@@ -664,12 +741,16 @@ object DownloadJobs {
                 try {
                     ResumableDownload.fetch(
                         url, destination, headers, maxBytes = maxBytes, handle = handle, sleep = retrySleep,
-                        waiting = { report(-1, it, null) },
+                        waiting = {
+                            report(-1, it, null)
+                            numbers.waiting()
+                        },
                         onProgress = { p ->
                             val now = System.nanoTime()
                             if (now - lastReport >= REPORT_EVERY_NS || (p.total > 0 && p.bytes == p.total)) {
                                 lastReport = now
                                 report(if (p.total > 0) (p.bytes * 100 / p.total).toInt().coerceIn(0, 100) else -1, downloadingLine(p), null)
+                                numbers.bytes(p.bytes, p.total, -1)
                             }
                         },
                     )
