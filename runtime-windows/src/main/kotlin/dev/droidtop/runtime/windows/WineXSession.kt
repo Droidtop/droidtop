@@ -1,6 +1,7 @@
 package dev.droidtop.runtime.windows
 
 import android.content.Context
+import android.util.Log
 import com.winlator.alsaserver.ALSAClient
 import com.winlator.container.Container
 import com.winlator.contents.ContentsManager
@@ -23,8 +24,9 @@ import com.winlator.xenvironment.components.VirGLRendererComponent
 import com.winlator.xenvironment.components.VortekRendererComponent
 import com.winlator.xenvironment.components.XServerComponent
 import com.winlator.xserver.XServer
+import dev.droidtop.library.diagnostics.RunLogCollector
 import java.io.File
-import java.util.ArrayDeque
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -69,28 +71,31 @@ class WineXSession(
 ) {
 
     private var environment: XEnvironment? = null
-    private val tail = ArrayDeque<String>()
 
-    private val outputCollector = Callback<String> { line ->
-        synchronized(tail) {
-            tail.addLast(line)
-            while (tail.size > OUTPUT_TAIL_LINES) tail.removeFirst()
-        }
-    }
+    /**
+     * Everything the guest prints on stdout and stderr, from the process droidtop starts (gamenative's launcher
+     * reads both streams of it and hands each line to this). Owned by the session for the run, and handed to
+     * [start]'s callback when the guest ends: the screen drops its reference to the session the moment a person
+     * stops the game, and reading the output through that reference after the kill found nothing, so a stopped
+     * run's record said "Last 0 lines" (Droidtop/tracker#601). Each line also goes to logcat under `droidtop.wine`.
+     */
+    private val collector = RunLogCollector(echo = { line -> Log.i(WinePresentation.LOG_TAG, line) })
 
-    /** The tail of whatever Wine and box64 printed, for a failure the user has to be told about. */
-    fun output(): String = synchronized(tail) { tail.joinToString("\n") }
+    private val outputCollector = Callback<String> { line -> collector.add(line) }
+
+    /** Counted down when the guest's end has been reported; the teardown waits for it before it stops listening. */
+    private val ended = CountDownLatch(1)
 
     /**
      * Prepares the prefix, builds the environment and starts the guest.
-     * [onTerminated] fires with the guest's exit status when it ends, on
+     * [onTerminated] fires with the guest's exit status and the tail of what it printed when it ends, on
      * whatever thread gamenative's launcher reports on.
      *
      * Throws if the preparation or the environment itself refuses to
      * start; the caller reports that rather than an exit code that never
      * happened.
      */
-    fun start(onTerminated: (Int) -> Unit) {
+    fun start(onTerminated: (Int, String) -> Unit) {
         // A wineserver left behind by a previous launch owns the prefix
         // and will refuse this one's; killing stale guests first is what
         // gamenative does before every launch, for the same reason.
@@ -241,7 +246,14 @@ class WineXSession(
             this.envVars = envVars
             setWorkingDir(WineWorkingDirectory.resolve(workingDir, imageFs.rootDir))
             guestExecutable = WineLaunchPlan.guestExecutable(xServer.screenInfo.toString(), target, prefix.execArgs, arguments)
-            setTerminationCallback { code -> onTerminated(code ?: EXEC_FAILED) }
+            setTerminationCallback { code ->
+                // The end of the process is reported before the threads reading its pipes have always
+                // delivered the last lines; wait for them (bounded) so the record has the end.
+                collector.awaitQuiet()
+                ProcessHelper.removeDebugCallback(outputCollector)
+                ended.countDown()
+                onTerminated(code ?: EXEC_FAILED, collector.text())
+            }
         }
         environment.addComponent(launcher)
 
@@ -288,9 +300,11 @@ class WineXSession(
             // anyway, so a stopped session does not wait for one (Droidtop/tracker#249, rig on 1894).
             runCatching { ProcessHelper.resumeAllWineProcesses() }
             runCatching { winHandler?.stop() }
-            ProcessHelper.removeDebugCallback(outputCollector)
             runCatching { environment.stopEnvironmentComponents() }
             runCatching { ProcessHelper.killAllWineProcesses() }
+            // Keep listening until the end is reported (it carries the last lines), but not for ever.
+            runCatching { ended.await(ENDED_WAIT_SECONDS, TimeUnit.SECONDS) }
+            ProcessHelper.removeDebugCallback(outputCollector)
         }
     }
 
@@ -306,7 +320,7 @@ class WineXSession(
         }
 
         const val TEARDOWN_WAIT_SECONDS = 20L
-        const val OUTPUT_TAIL_LINES = 40
+        const val ENDED_WAIT_SECONDS = 4L
         const val EXEC_FAILED = -1
 
         /** Container graphics-driver values that all resolve to the Vortek Vulkan renderer. */
