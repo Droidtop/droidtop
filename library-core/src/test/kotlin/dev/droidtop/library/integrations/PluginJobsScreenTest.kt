@@ -105,7 +105,8 @@ class PluginJobsScreenTest {
         assertEquals("GOG", running.subtitle)
         val done = PluginJobsScreen.jobRow(job("d", 100, done = true).copy(title = "Theme pack"), nowMs = 0L)
         assertEquals("Theme pack", done.title)
-        assertEquals("GOG · Failed", done.subtitle)
+        // A finished job with no error is done; only an error makes it a failure.
+        assertEquals("GOG · Done", done.subtitle)
     }
 
     @Test
