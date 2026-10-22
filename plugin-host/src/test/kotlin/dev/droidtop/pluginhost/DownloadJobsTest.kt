@@ -149,6 +149,25 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun aDownloadLimitedToAPluginsSitesRefusesEveryOtherAddress() {
+        val guard = DownloadJobs.sitesGuard("""["f95zone.to", "*.example.org"]""")!!
+        guard("https://attachments.f95zone.to/a.png")
+        guard("https://cdn.example.org/b.jpg")
+        for (refused in listOf("http://f95zone.to/a", "https://evil.test/x", "https://f95zone.to.evil.test/x")) {
+            try {
+                guard(refused)
+                fail("$refused is not one of the download's sites")
+            } catch (e: dev.droidtop.net.engine.TransferException) {
+                assertTrue(e.message!!.contains("not one of the sites"))
+            }
+        }
+        assertNull("a download not limited has no guard", DownloadJobs.sitesGuard(null))
+        assertEquals(dev.droidtop.net.DownloadCategory.SYSTEM, DownloadJobs.categoryFor(DownloadJobs.POST_KEEP, emptyMap()))
+        assertEquals(dev.droidtop.net.DownloadCategory.GAMES, DownloadJobs.categoryFor(DownloadJobs.POST_PLACE_IN_FOLDER, emptyMap()))
+        assertEquals(dev.droidtop.net.DownloadCategory.UPDATES, DownloadJobs.categoryFor(DownloadJobs.POST_PLACE_IN_FOLDER, mapOf(DownloadJobs.ARG_VERSION_FOLDER to "G v2")))
+    }
+
+    @Test
     fun aDownloadOfDroidtopsOwnIsMovedOnlyIntoItsOwnStorage() {
         val files = File(dir, "files").apply { mkdirs() }
         assertEquals(File(files, "imagefs.txz").canonicalFile, DownloadJobs.ownTarget(listOf(files), File(files, "imagefs.txz").path))

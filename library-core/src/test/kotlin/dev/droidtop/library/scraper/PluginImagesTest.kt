@@ -28,4 +28,23 @@ class PluginImagesTest {
         assertNull(PluginImages.kindOf("<html><body>Just a moment".toByteArray()))
         assertNull(PluginImages.kindOf(ByteArray(0)))
     }
+
+    @Test
+    fun `what the engine fetched is moved into place only when it is a picture`() {
+        val dir = java.nio.file.Files.createTempDirectory("plugin-images").toFile()
+        val fetched = java.io.File(dir, "downloads/art_1.img").apply { parentFile.mkdirs(); writeBytes(byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte(), 1, 2, 3)) }
+        val destination = java.io.File(dir, "media/covers/Game.jpg")
+        PluginImages.place(fetched, destination)
+        assertTrue(destination.isFile)
+        assertFalse(fetched.exists())
+        val page = java.io.File(dir, "downloads/art_2.img").apply { writeText("<html>Just a moment</html>") }
+        val other = java.io.File(dir, "media/covers/Other.jpg")
+        try {
+            PluginImages.place(page, other)
+            org.junit.Assert.fail("a page is not a picture")
+        } catch (e: java.io.IOException) {
+            assertEquals("not a picture droidtop shows", e.message)
+        }
+        assertFalse(other.exists())
+    }
 }
