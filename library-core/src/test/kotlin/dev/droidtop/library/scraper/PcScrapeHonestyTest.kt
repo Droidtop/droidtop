@@ -237,4 +237,18 @@ class PcScrapeHonestyTest {
         assertEquals("Eternum-0.9.5-pc", PcMediaLayout.fileSafe("Eternum-0.9.5-pc"))
         assertEquals("game", PcMediaLayout.fileSafe("???"))
     }
+
+    @Test
+    fun `what a scrape wrote reads by source, for a person`() {
+        assertEquals("Nothing new", PcScraper.wroteLine(emptyMap()))
+        assertEquals(
+            "Cover and description from Steam store; genre from IGDB",
+            PcScraper.wroteLine(linkedMapOf("cover" to "Steam store", "description" to "Steam store", "genre" to "IGDB")),
+        )
+        assertEquals("Release date from Lutris", PcScraper.wroteLine(mapOf("releaseDate" to "Lutris")))
+        assertEquals(
+            "Developer, publisher and genre from Steam store",
+            PcScraper.wroteLine(linkedMapOf("developer" to "Steam store", "publisher" to "Steam store", "genre" to "Steam store")),
+        )
+    }
 }

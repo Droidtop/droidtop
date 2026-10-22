@@ -104,6 +104,8 @@ object PluginJobsCenter {
         val finishedAtMs: Long? = null,
         /** A finished native job can be run again with its arguments ([retry]). */
         val retryable: Boolean = false,
+        /** Why a running job is not moving right now; null while it moves ([JobWait]). */
+        val wait: JobWait? = null,
     ) {
         /** Where the job stands, from its flags. */
         val state: JobState
@@ -112,6 +114,8 @@ object PluginJobsCenter {
                 done -> JobState.DONE
                 paused && hold != null -> JobState.HELD
                 paused -> JobState.PAUSED
+                wait?.reason == WaitReason.NETWORK -> JobState.WAITING_FOR_NETWORK
+                wait?.reason == WaitReason.RETRY -> JobState.WAITING_TO_RETRY
                 else -> JobState.RUNNING
             }
     }
@@ -476,7 +480,7 @@ object PluginJobsCenter {
         nativeSpecs[jobId]?.let { finishedSpecs[jobId] = it }
         update(jobId) {
             it.copy(
-                done = true, result = result, percent = 100, finishedAtMs = System.currentTimeMillis(), retryable = true,
+                done = true, result = result, percent = 100, finishedAtMs = System.currentTimeMillis(), retryable = true, wait = null,
                 statusLine = if (result.ok) result.values["summary"] ?: "Done" else (result.error ?: "Failed"),
             )
         }
@@ -560,7 +564,7 @@ object PluginJobsCenter {
         if (nativeSpecs.containsKey(jobId)) {
             // No checkpoint yet only means a resume starts from the beginning.
             if (entry.done || entry.paused || !entry.pausable) return false
-            update(jobId) { it.copy(paused = true, statusLine = "Paused") }
+            update(jobId) { it.copy(paused = true, wait = null, statusLine = "Paused") }
             nativeJobs[jobId]?.cancel()
             return true
         }
@@ -671,6 +675,12 @@ object PluginJobsCenter {
                 entry.copy(report = JobReport(items))
             }
         }
+    }
+
+    internal fun setWait(jobId: String, wait: JobWait?) {
+        val now = find(jobId) ?: return
+        if (now.done || now.wait == wait) return
+        state.update { current -> current.map { if (it.jobId == jobId) it.copy(wait = wait) else it } }
     }
 
     internal fun setOpen(jobId: String, target: OpenTarget?) {
