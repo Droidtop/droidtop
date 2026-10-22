@@ -379,7 +379,7 @@ internal fun PcGamePage(
             onScrape = {
                 scope.launch {
                     scrapeStatus = "Looking it up..."
-                    scrapeStatus = PcScraper.scrape(context, listOf(entry))
+                    scrapeStatus = PcScraper.scrape(context, listOf(entry), filter = dev.droidtop.library.scraper.ScrapeFilter.ALL)
                 }
             },
         )

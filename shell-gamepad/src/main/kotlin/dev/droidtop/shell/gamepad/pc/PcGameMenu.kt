@@ -703,7 +703,7 @@ internal fun PcGameMenu(
         media = media.size,
         onScrape = {
             status = "Scraping ${entry.title}…"
-            scope.launch { status = PcScraper.scrape(context, listOf(entry)) }
+            scope.launch { status = PcScraper.scrape(context, listOf(entry), filter = dev.droidtop.library.scraper.ScrapeFilter.ALL) }
         },
         onChooseMatch = { pickingMatch = true },
         onViewMedia = { viewingMedia = true },

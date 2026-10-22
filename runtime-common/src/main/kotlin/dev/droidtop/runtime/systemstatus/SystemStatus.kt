@@ -364,15 +364,51 @@ object SystemControls {
 
     enum class Radio(val label: String) { WIFI("Wi-Fi"), BLUETOOTH("Bluetooth"), AIRPLANE("Airplane mode") }
 
-    /** The shell command that switches [radio], for a `priv.shell` provider. */
-    fun radioCommand(radio: Radio, on: Boolean): List<String> {
+    /**
+     * The shell commands that switch [radio], for a `priv.shell` provider, the one each Android version answers
+     * first (Droidtop/tracker#581): `svc bluetooth` is gone from Android 13, where `cmd bluetooth_manager` does it, and
+     * `cmd wifi set-wifi-enabled` is Android 11's own form of `svc wifi`. Tried in order until one exits 0.
+     */
+    fun radioCommands(radio: Radio, on: Boolean): List<List<String>> {
         val verb = if (on) "enable" else "disable"
         return when (radio) {
-            Radio.WIFI -> listOf("svc", "wifi", verb)
-            Radio.BLUETOOTH -> listOf("svc", "bluetooth", verb)
-            Radio.AIRPLANE -> listOf("cmd", "connectivity", "airplane-mode", verb)
+            Radio.WIFI -> listOf(listOf("cmd", "wifi", "set-wifi-enabled", if (on) "enabled" else "disabled"), listOf("svc", "wifi", verb))
+            Radio.BLUETOOTH -> listOf(listOf("cmd", "bluetooth_manager", verb), listOf("svc", "bluetooth", verb))
+            Radio.AIRPLANE -> listOf(listOf("cmd", "connectivity", "airplane-mode", verb))
         }
     }
+
+    /**
+     * Switches [radio] through [shell] and waits up to [settleMs] for Android to say it is [on]. True only when it
+     * did: a command that exits 0 and changes nothing is a failure too, so the caller can open Android's own screen
+     * rather than leave a switch that silently does nothing. Blocks: off the main thread.
+     */
+    fun switchRadio(
+        context: Context,
+        shell: dev.droidtop.runtime.tasks.PrivilegedShell,
+        radio: Radio,
+        on: Boolean,
+        settleMs: Long = 4_000,
+    ): Boolean {
+        if (radioOn(context, radio) == on) return true
+        val ran = radioCommands(radio, on).any { argv -> shell.exec(argv)?.exit == 0 }
+        if (!ran) return false
+        val until = System.currentTimeMillis() + settleMs
+        while (System.currentTimeMillis() < until) {
+            if (radioOn(context, radio) == on) return true
+            Thread.sleep(200)
+        }
+        return radioOn(context, radio) == on
+    }
+
+    /** Android's own screen for [radio], opened when it cannot be switched in place. */
+    fun radioSettingsIntent(radio: Radio): Intent = Intent(
+        when (radio) {
+            Radio.WIFI -> Settings.ACTION_WIFI_SETTINGS
+            Radio.BLUETOOTH -> Settings.ACTION_BLUETOOTH_SETTINGS
+            Radio.AIRPLANE -> Settings.ACTION_AIRPLANE_MODE_SETTINGS
+        },
+    ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
     /** Whether [radio] is on; null when the platform does not say. No permission beyond what droidtop holds. */
     fun radioOn(context: Context, radio: Radio): Boolean? = runCatching {

@@ -140,6 +140,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
             dev.droidtop.library.stores.StoreAutoUpdates.requestLater(this)
             // PC and engine games get their details by themselves (docs/SPEC.md 7h, Droidtop/tracker#568).
             dev.droidtop.library.scraper.PcAutoScrape.requestLater(this)
+            // With Shizuku, the grants the system controls need are taken now, so they switch in place rather than
+            // opening Android's screens (docs/SPEC.md "Privileged actions", tracker#581).
+            val app = this
+            Thread { dev.droidtop.runtime.tasks.ElevatedGrants.takeAll(app, dev.droidtop.runtime.tasks.TaskManager.shell) }
+                .apply { name = "droidtop-elevated-grants"; isDaemon = true; start() }
         }
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).

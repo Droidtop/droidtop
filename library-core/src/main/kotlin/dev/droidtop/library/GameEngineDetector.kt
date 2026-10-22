@@ -7,9 +7,11 @@ import dev.droidtop.library.consoles.resolveSystemFolder
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.concurrent.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.withContext
 
 /** Which engine a game folder was built with — decoupled from how it gets launched (see [GameLaunchStrategy]/[GameLaunchStrategyResolver]): several launch paths can exist for the same engine. */
 enum class GameEngine {
@@ -1681,6 +1683,9 @@ class EngineGameProvider(
                 // longer exists, so without this fallback the scrape would
                 // look like it had been thrown away.
                 alsoUnderId = { it.pcInfo?.storeId },
+                // A scraped cover beats what the folder brought: an engine game's own picture is often its
+                // engine's icon or splash (a Ren'Py logo), not its cover (docs/SPEC.md 7h, "What counts as art").
+                scrapedArtworkFirst = true,
             )
 
     /**
@@ -1784,14 +1789,22 @@ class EngineGameProvider(
                 // enginehost.json doesn't need one) -- EngineHost.launch
                 // itself only requires it when actually building a config
                 // extra, and fails loudly then, not before.
-                EngineHost.launch(
-                    context,
-                    gameRoot,
-                    resolved.enginehostTarget
-                        ?: error("engines-database has no enginehost mapping for ${resolved.detectedEngine}"),
-                    resolved.engineVersion,
-                    title = entry.title,
-                )
+                val target = resolved.enginehostTarget
+                    ?: error("engines-database has no enginehost mapping for ${resolved.detectedEngine}")
+                // A store game whose cloud keeps its saves (tracker#580): droidtop's folder for it is synced down
+                // first and named to Enginehost as the save folder; Enginehost's game-ended report uploads it.
+                val storeKey = dev.droidtop.library.stores.EnginehostSaves.storeKeyOf(entry.id, entry.pcInfo?.storeId)
+                val saveRoot = storeKey?.let { key ->
+                    withContext(Dispatchers.IO) {
+                        dev.droidtop.library.stores.EnginehostSaves.saveRoot(key, resolved.detectedEngine)?.also {
+                            dev.droidtop.library.stores.EnginehostSaves.remember(context, key, gameRoot)
+                        }
+                    }?.also {
+                        dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, key, GameNaming.displayName(entry.title))
+                            ?.let { line -> android.util.Log.i("droidtop.GameEngineDetector", line) }
+                    }
+                }
+                EngineHost.launch(context, gameRoot, target, resolved.engineVersion, title = entry.title, saveRoot = saveRoot)
             }
             GameLaunchStrategy.KIRIKIROID2 -> Kirikiroid2.open(context)
             // Both PC strategies go through the PcGameRuntime seam that

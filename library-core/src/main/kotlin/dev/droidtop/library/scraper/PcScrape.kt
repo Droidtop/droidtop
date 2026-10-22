@@ -310,19 +310,20 @@ object PcScraper {
     internal fun orderKey(entry: LibraryEntry): String = "1|" + entry.id
 
     /**
-     * Whether [filter] picks [entry] for a pass, given its metadata [row] and whether a scraped cover is on disk.
-     * Pure, for the JVM tests.
+     * Whether [filter] picks a game for a pass, given its metadata [row] and whether it has a cover ([hasCover]
+     * decides). Pure, for the JVM tests.
      *
      * A PC or engine game has its details when it has a description: an engine's detection or a store install fills
      * a developer or a genre on its own, and a game with those and no description is a game nobody has looked up
-     * (a Ren'Py folder game skipped as "already has details" is how folder games went unscraped). What a PC
-     * provider brings as a picture is a store's icon or the icon inside an .exe, not a cover: only a scraped cover
-     * counts as art for one (see withScrapedMetadata's scrapedArtworkFirst). An engine game's art is what its
-     * folder or downloaded_media holds, which does count.
+     * (a Ren'Py folder game skipped as "already has details" is how folder games went unscraped). It has its art
+     * when it has a cover, nothing less: the picture a game shows without one (an .exe's icon, a store's icon, a
+     * screenshot or miximage in downloaded_media) is not what "Games missing artwork" asks about (console,
+     * 2026-10-17: the filter said "nothing matches" while F95 folder games had no cover, because any picture
+     * counted).
      */
-    internal fun picked(entry: LibraryEntry, row: GameMetadataEntity?, scrapedCover: Boolean, filter: ScrapeFilter): Boolean {
+    internal fun picked(row: GameMetadataEntity?, hasCover: Boolean, filter: ScrapeFilter): Boolean {
         val noMeta = row?.description.isNullOrBlank()
-        val noArt = !scrapedCover && (entry.kind == LibraryEntryKind.WINE_PROFILE || entry.artworkUri == null)
+        val noArt = !hasCover
         return when (filter) {
             ScrapeFilter.MISSING_ANY -> noArt || noMeta
             ScrapeFilter.MISSING_ARTWORK -> noArt
@@ -491,6 +492,9 @@ object PcScraper {
         // Told when the source refused every request this pass made, so a combined run does not go on asking.
         onRefusedEverything: () -> Unit = {},
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> },
+        // A game the person asked to scrape by name (its page or menu) is scraped whatever the library filter says;
+        // the filter is for passes over the library (docs/SPEC.md 7h).
+        filter: ScrapeFilter? = null,
     ): String = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext it }
@@ -507,11 +511,11 @@ object PcScraper {
         val ordered = entries.sortedBy(::orderKey)
         val existing = ordered.map { it.id }.chunked(METADATA_READ_CHUNK)
             .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
-        val filter = ScrapeOptionsPrefs.filter(context)
+        val filter = filter ?: ScrapeOptionsPrefs.filter(context)
         val candidates = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
         val (targets, passedOver) = candidates.partition { entry ->
             val row = existing[entry.id]
-            picked(entry, row, scrapedCover = row?.artworkPath?.let { File(it).isFile } == true, filter = filter)
+            picked(row, hasCover = hasCover(context, entry, row), filter = filter)
         }
         // Every game the pass was given leaves a line (docs/SPEC.md 7h, "Names and reasons"), the ones the
         // filter passed over too, so a folder game missing from the log is a game the library never handed over.
@@ -949,6 +953,28 @@ object PcScraper {
             PcScrapeTitle.clean(baseNameFor(entry))
         }
     }
+
+    /**
+     * Whether [entry] has a real cover (docs/SPEC.md 7h, "What counts as art"): one a scrape filed ([row]'s
+     * artwork path, on disk), a `covers` image for it in downloaded_media, or a `cover` or `coverv` image in the
+     * game's own folder (what the folder scanner takes as the person's cover). Disk reads: off the main thread.
+     */
+    internal fun hasCover(context: Context, entry: LibraryEntry, row: GameMetadataEntity?): Boolean {
+        if (row?.artworkPath?.let { File(it).isFile } == true) return true
+        val system = PcMediaLayout.systemFolderFor(entry)
+        val root = mediaRootFor(context, entry)
+        if (system != null && root != null &&
+            dev.droidtop.library.EsDeArtwork.resolve(root, system, baseNameFor(entry), listOf("cover"))
+                ?.takeIf { it.contains("/covers/") } != null
+        ) {
+            return true
+        }
+        val folder = File(entry.id).takeIf { it.isDirectory } ?: entry.groupingPath()?.let(::File)?.takeIf { it.isDirectory }
+        return folder != null && FOLDER_COVER_NAMES.any { name -> COVER_EXTENSIONS.any { File(folder, "$name.$it").isFile } }
+    }
+
+    private val FOLDER_COVER_NAMES = listOf("cover", "coverv")
+    private val COVER_EXTENSIONS = listOf("png", "jpg", "jpeg", "webp")
 
     internal fun baseNameFor(entry: LibraryEntry): String {
         val path = File(entry.id)

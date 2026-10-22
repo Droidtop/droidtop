@@ -3778,9 +3778,22 @@ a close path of its own. Every call works off the main thread.
     harmless.
 
 **Privileged actions go through Shizuku or Sui, from one of two backends (Droidtop/tracker#262, #72).** With a provider
-running, Wi-Fi, Bluetooth and airplane mode are switches in the catalog (the shell's own `svc` and `cmd
-connectivity` commands, `SystemControls.radioCommand`), on the Quick Menu and the companion alike; without one
-they are rows that open Android's own panel. Location, Mute microphone (AudioManager) and the flashlight (the
+running, Wi-Fi, Bluetooth and airplane mode are switches in the catalog, on the Quick Menu and the companion alike;
+without one they are rows that open Android's own panel. **A control never silently does nothing (decided
+2026-10-17, Droidtop/tracker#581).** The owner: "let's try to get shizuku-backed permissions working again", and
+the controls "fail to change. Shizuku should be able to make these changes, especially since on my device it's
+backed by root." Three causes, all fixed: the Bluetooth command was `svc bluetooth`, gone from Android 13 (now
+`SystemControls.radioCommands`: each Android version's own command first, `cmd bluetooth_manager`, `cmd wifi
+set-wifi-enabled`, `cmd connectivity airplane-mode`, then the older `svc` form); the switch ignored the command's
+answer (now `SystemControls.switchRadio`: a command that exits 0 and then waits up to 4 s for Android to report the
+state asked for, and anything short of that opens the radio's own Android screen with a notice); and the catalog
+asked about Shizuku before its binder reached the process, so the first menu after a start had links only (it now
+waits up to 1.5 s for the binder, `PrivilegedShell.connect`). At start (main process) `ElevatedGrants` takes,
+through Shizuku and only while droidtop lacks them, the grants the controls need, each checked again after: modify
+system settings (`appops set ... WRITE_SETTINGS allow`; brightness, auto-rotate and screen timeout), Bluetooth access
+(`pm grant ... BLUETOOTH_CONNECT`) and Do Not Disturb access (`cmd notification allow_dnd`). Each names droidtop's
+own package, so they are plain commands, not "Give another app access" (that switch stays for emulators). VPN has
+no shell switch and opens Android's VPN screen. Location, Mute microphone (AudioManager) and the flashlight (the
 camera torch) need no provider (Droidtop/tracker#414, slice C5).
 `PrivilegedShell` in `:runtime-common` is the only privileged boundary used by task management and the
 companion's controls; its capability snapshot names listing tasks, force-stop, shell commands (appops,
@@ -12807,6 +12820,33 @@ follows:
   reads the branch's real manifests with `picsGetPrivateBeta`
   (`SteamBranches.resolve`) so its sizes and depots are known before the
   download, and the install and the update check follow the chosen branch.
+- **A game Enginehost runs keeps its Steam Cloud saves too (decided 2026-10-17, Droidtop/tracker#580).** The
+  owner: "We have to get cloud saves working, at least, since I can't play games without it", and on the design,
+  "we'll pass the save folder to the game using the normal config syntax, so the game can load from and save to
+  it". droidtop owns the folder: a store game with cloud saves that Enginehost runs (its id or its `pcInfo`
+  store id names a store with cloud saves) gets `droidtop/saves/<store>-<id>` in shared storage
+  (`EnginehostSaves`), laid out as a Wine prefix (`drive_c/users/droidtop/...`), so the store's sync and
+  `SaveLayout.windowsDirs` treat it as one and nothing about the Steam mapping changes. `StoreSaves` asks that
+  folder before the Wine runtime's locator, for a game recorded as launched through Enginehost. The launch
+  (`GameEngineDetector`, ENGINEHOST) makes the folder, records the game folder against the store key, runs
+  `StoreSaves.beforeLaunch` (the same 45 s bound and the same conflict dialog), and sends the inline config key
+  `saveRoot` (`EngineHost.launch`), whatever the game folder's own `enginehost.json` holds, since `saveRoot` is
+  never a folder key. Agreed with the Enginehost lane (tracker#580): `saveRoot` is exactly the folder an engine's
+  system save locations mean for that launch. **Which folder lines up with Steam Cloud** (read from Enginehost's
+  cores, tracker#580 comment 6235943189; Enginehost keeps its layout, since existing saves use it, so droidtop
+  adapts, `EnginehostSaves.saveRootIn`): Ren'Py writes `<saveRoot>/<config.save_directory>` with no `RenPy/`
+  segment, so a Ren'Py game is given the prefix's `AppData/Roaming/RenPy`, where Windows keeps
+  `%APPDATA%/RenPy/<dir>`; Godot writes `<saveRoot>/godot/app_userdata/<project>` (or a custom user dir
+  `<saveRoot>/<custom>`, which already matches Windows), so Godot and every other engine are given
+  `AppData/Roaming` itself. Godot's folder is lowercase on Android and Linux and `Godot` on Windows, so a sync
+  renames it to `Godot` first and back to `godot` after (`toWindowsLayout`, `toEngineLayout`, through a third
+  name so a case-folding card takes it too). A refused path (outside shared storage,
+  inside `Android/data`, not writable) falls back to the person's own location; it is accepted from any app the
+  person allowed in App launch access, droidtop with no standing of its own. When the game ends, Enginehost
+  sends droidtop's package `dev.enginehost.GAME_ENDED` (`path`, `saveFolder`, `reason`);
+  `EnginehostGameEndedReceiver` starts the upload job (`StoreSaves.afterExit`) for a folder droidtop launched,
+  and only when `saveFolder` is inside droidtop's folder: an engine that saves beside the game, or a refused
+  path, leaves nothing new there to upload.
 - **Steam Cloud saves** (`StoreLibrary.syncSaves`, `StoreSaves` in `:library-core`,
   `SteamCloudSync` in `:stores`; owner, 2026-10-08, Droidtop/tracker#313: "Steam
   Cloud saves: yes"). A game that has cloud saves syncs them into its Wine prefix
@@ -13202,6 +13242,21 @@ the same care as the art.
     plugin declares one) are asked with the game's title, folder name and source links for every game the
     pass reaches, after the built-in sources, filling only what those left empty; that is unchanged, and
     now reaches the engine games the old "has details" rule passed over.
+- **What counts as art (decided 2026-10-17).** The owner, from the console: "Games missing artwork" always said
+  `nothing matches the "Games missing artwork" scrape filter`, because a folder or engine game counted as having
+  art when it showed any picture (its .exe's icon, a store's icon, a screenshot in downloaded_media). For every PC
+  and engine game only a real cover counts (`PcScraper.hasCover`): a cover a scrape filed (the row's artwork path,
+  on disk), a `covers` image for it in downloaded_media, or a `cover` or `coverv` image in the game's own folder.
+  "Games missing artwork" and "Games missing artwork or metadata" both read it (`PcScraper.picked`).
+- **A scraped cover is what shows (decided 2026-10-17).** The owner, from the console: Bare Witness got its box art
+  from a scrape but still showed its Ren'Py image. An engine game's own picture is often its engine's icon or
+  splash, so for engine games, as for PC store and Wine games, a scraped cover on disk is shown before the picture the
+  folder brought (`withScrapedMetadata(scrapedArtworkFirst = true)` in `GameEngineDetector`). Console ROMs keep their
+  ES-DE art first.
+- **One game asked for is scraped (decided 2026-10-17).** The owner, from the console, after the art fix: a
+  single game's Scrape (its page, or its options menu) still said `nothing matches the "Games missing artwork" scrape
+  filter`. The filter is for passes over the library; a game the person picks by name is scraped whatever it says
+  (`PcScraper.scrape(filter = ScrapeFilter.ALL)` from `PcGameMenu` and `PcGamePage`).
 - **Games that need your pick (directed 2026-10-17).** The coordinator's direction: "A game left at 'needs a
   pick' appears in a list the person can work through with the pad, not only in the log." A pass that gets
   candidates with none exact stores `scrape_confidence = "needs_pick"` on the game's row (`PcScraper.NEEDS_PICK`;
