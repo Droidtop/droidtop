@@ -1132,6 +1132,148 @@ of surfaces of their own.
   Each is a catalogue row already; they come after
   Gaming's surfaces are complete.
 
+### 1.10 Facets: typed information a plugin gives about an item (proposed 2026-10-22, contract 3, Droidtop/tracker#602)
+
+**Status: proposal for the owner's review. Nothing here is built.**
+
+*The owner: "The facets system would benefit from being standardized as a system for presenting small surfaces to
+the droidtop frontend to provide specific information."; "We can provide a set of 'facets' a plugin can surface for
+things (download, metadata, store, description, etc), which lets us surface and attach data to."; "Rather than a
+plugin having to draw and provide large surfaces, it gives it a granular method to provide sets of information."*
+
+**What a facet is.** One typed set of information about one **item**, from one plugin. The vocabulary is fixed and
+droidtop's: a plugin picks types from it and fills their fields, and never draws anything. droidtop caches each
+facet with the item, attaches it to the library game the item is linked to, and draws each type one way everywhere it
+appears. A type droidtop does not know is ignored, as an unknown field is (§7).
+
+**Items.** An item is what a plugin knows about: `{source, id}`, where `source` is one of the plugin's `provides`
+entry ids (a `library.updates` or `library.sources` source key, a `library.metadata` id) and `id` is the plugin's own
+id for the thing (a forum thread, a store product, a release feed). A library game is attached to an item by a
+source link (docs/SPEC.md 7g, "A source link"), so a game's facets are those of the items it is linked to, and of
+the items a metadata match linked it to.
+
+**The envelope.** Every facet is an object `{type, v, ...fields}`. `v` is the type's version (each type starts at
+1, and an additive change does not move it); fields follow that type's shape below. Texts are plain text, one
+language, cut by droidtop beyond the limits given. Addresses are `https` unless a type says otherwise.
+
+**The types (version 1):**
+
+| Type | Fields | What droidtop does with it |
+|---|---|---|
+| `metadata` | `title?`, `version?`, `developer?`, `publisher?`, `engine?` (an engines-database id), `status?` (`ongoing`, `completed`, `onhold`, `abandoned`), `released?` (`YYYY-MM-DD`), `updated?` (epoch ms), `rating?` (0 to 1), `votes?`, `tags?` (at most 64 strings of 40 characters), `genres?` (at most 16) | The game page's facts and Info tab, the list rows' second line, and the PC Games filter facets (Release status, Tags, Rating, Developer, Genre). `version` is the source's newest version: it is what an update is compared with (docs/SPEC.md 7g "When it is an update") |
+| `description` | `overview?`, `changelog?` (each at most 20,000 characters) | The game page's About and the record page's Overview and Changelog tabs |
+| `image` | `role` (`cover`, `wide`, `hero`, `logo`, `icon`, `screenshot`, `banner`), `url`, `width?`, `height?` | Fetched by droidtop itself (PluginImages: on the plugin's `net.domains`, checked by type and size) and filed by role (Droidtop/tracker#585). Only for a role the game has no picture for, unless the person chose this source's art. A facet set may carry several `image` facets; at most 32 |
+| `download` | `entries: [{section, host, label, url?, link?, size?, kind?}]`, at most 200. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file` (fetched directly), `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands | The record page's Downloads tab, grouped by section and then by host. Picking one opens or fetches it through droidtop's Downloads and the download engine, and places it (a new game, or a new version folder, docs/SPEC.md 7g "Getting an update"). Kept with the item, so a download is never preceded by another fetch of the item (Droidtop/tracker#599) |
+| `links` | `entries: [{kind, label?, url}]`, at most 32. `kind`: `source` (the item's own page), `homepage`, `store`, `forum`, `wiki`, `discord`, `support`, `other` | The game page's Links row and Open the source's page. Opened in droidtop's web view or another app, never fetched |
+| `store` | `store` (a droidtop store id or the plugin's own name), `url`, `price?` (a decimal string), `currency?` (ISO 4217), `owned?`, `free?`, `onSale?` | Where to get the game, on the game page and in the Wishlist shelf. droidtop never buys anything; `url` opens the store's own page |
+| `update` | `version?`, `url?`, `gone?` | The update check's answer: the Update available badge and shelf, Updates, and the record page's version line (docs/SPEC.md 7g "One wording") |
+| `identity` | `ids: {key: id}`: other sources' ids for the same game (`steam`, `gog`, `igdb`, `vndb`, or another plugin's source key) | Linking: droidtop links the game to those records when the person has that source, as `sourceLinks` does today. Only ids of the plugin's own `library.updates` keys are taken without asking; other keys are offered as matches |
+
+**How a plugin declares them.** A `provides` entry may list the types it gives: `"facets": ["metadata",
+"description", "image", "download"]`. droidtop asks only for declared types and drops any other a reply carries.
+Declaring a type adds no permission by itself; what a type needs is in **Permissions** below.
+
+**How a plugin returns them: per item, per point.**
+- **The facets point**, EP `items.facets@1` (risk medium), for any plugin that knows items:
+  - `get {items: [{source, id}], types: [type]}` returns `{items: [{source, id, facets: [facet], ttl?}]}`. At most
+    20 items per call, 15 s. An item left out keeps what droidtop has; an item with `gone: true` is private,
+    moved or deleted.
+  - Asked when an item's page opens and its cached facets are stale, by the update round for `update` and
+    `metadata`, and by the scrape pass for `metadata`, `description`, `image` and `identity`. Never from list
+    rendering.
+- **Riding on a point's own replies.** A reply of another point may carry `facets` for the item it is about,
+  instead of that point's own fields: a `library.sources` search row or `detail`, a `library.metadata` `fetch`, a
+  `library.updates` `check` answer or `match` candidate. droidtop takes them as if `get` had answered them.
+- **Changed by the plugin.** The event `items.facets.changed {items: [{source, id}]}` marks those items stale.
+  droidtop asks for them again when they are next needed, not at once.
+
+**Caching and refresh.**
+- droidtop keeps each item's facets per type, with when they were fetched, in its own store (the library's
+  database, beside `source_answers`). They are library facts: never written into a game's file, and kept when the
+  plugin is updated. They are deleted with the plugin, and with the item when no game is linked to it any more and
+  it has not been looked at for 30 days.
+- A facet is fresh for its `ttl` (seconds, from the reply; bounded to between 1 hour and 30 days). The defaults are:
+  `update` 6 hours, `download` 1 day, `metadata` and `store` 7 days, `description`, `image`, `links` and `identity`
+  30 days.
+- **Stale while asking:** a page shows what droidtop has at once and says when it was fetched; a stale facet is
+  asked for in the background and replaced when the answer comes. A plugin that cannot answer leaves the cached
+  facets in place.
+- **Never fetched to act:** picking a download, opening a link or comparing a version uses the cached facet. A
+  `download` entry whose page no longer works opens the item's `links` `source` page instead (Droidtop/tracker#599).
+
+**Several plugins about one game.** A game linked to several items has facets from each. For each type, the first
+source in the person's source order wins (Settings, "Metadata sources"; by default a game's own linked update
+source, then metadata plugins in install order). Exceptions: `tags` and `genres` are joined, `image` is per role,
+`download` and `store` list every source's entries under that source's name, and `update` follows docs/SPEC.md 7g
+("the first in source-key order that gives a version speaks for the game").
+
+**Where droidtop shows them.** droidtop alone draws them, the same way on every surface (docs/SPEC.md, "Facets"):
+
+| Surface | Types |
+|---|---|
+| The game page (Overview, Versions and updates, Details) | `metadata`, `description`, `image`, `links`, `store`, `update` |
+| The record page (Overview, Changelog, Downloads, Info) | `description`, `metadata`, `image` (cover), `download`, `links` |
+| List rows and capsules | `metadata` (version, status), `image` (cover), `update` |
+| PC Games filters | `metadata` (status, tags, rating, developer, genres), `update`, the item's source (Linked to) |
+| Home shelves, Updates, Wishlist | `update`, `store`, `image` |
+| Downloads | `download` (where a file came from: source and host) |
+
+**Permissions, per call type.** Enforcement is droidtop's, at the API (docs/SPEC.md 12a). A manifest only asks:
+- `get`, and facets riding on other replies, need `provide:items.facets` or the point they ride on.
+- droidtop fetches an `image` URL only on the plugin's `net.domains`.
+- A `download` entry of `kind` `page` opens in droidtop's web view with the plugin's session only when `web.session`
+  is allowed; otherwise it opens signed out. `file`, `torrent` and `magnet` downloads run under the plugin's
+  `net.domains` in the download engine, which refuses connections to other hosts.
+- `links` open only on the person's tap, and never carry the plugin's session.
+- A refused call is answered with `PERMISSION_DENIED`, and the type stays as droidtop last had it.
+
+**Versioning.** Facets are contract 3 (§7). A contract 3 plugin returns facets wherever contract 2 had one-off
+fields. Each type has its own version `v`: an additive field does not move it, and a removed or retyped field is
+`v: 2`, served beside `v: 1` under §7's deprecation rules. droidtop advertises the types and versions it reads in
+`host.info().facets` (`{metadata: [1], ...}`).
+
+**Compatibility: contract 2 replies are read as facets.** No contract 2 plugin has to change. droidtop maps its
+replies:
+- `library.updates` `record` (A6) becomes `description` (`overview`, `changelog`), `metadata` (`version`,
+  `developer`, `status`, `rating`, `votes`, `tags`, `updated`), `image` (`cover` as role `cover`), `download`
+  (`downloads`, with `url` as a `page` entry and `link` kept as the token) and `links` (`url` as `source`).
+- `library.updates` `check` answers become `update` (`version`, `url`, `gone`); their `facts` become `metadata`.
+- `library.metadata` `fetch` fields: `description` becomes `description.overview`; `developer`, `publisher`,
+  `genre`, `releaseDate` and `rating` become `metadata`; `cover` becomes `image` (role `cover`); `sourceLinks`
+  becomes `identity`.
+- `library.sources` `detail` views stay views. A contract 3 source returns facets for `detail` instead, and droidtop
+  draws its page from them.
+
+**Worked example: the F95zone plugin's record (0.4.9), as contract 3:**
+
+```json
+{"items": [{"source": "f95zone", "id": "93340", "ttl": 86400, "facets": [
+  {"type": "metadata", "v": 1, "title": "Eternum", "version": "0.9.5 Public", "developer": "Caribdis",
+   "engine": "renpy", "status": "ongoing", "rating": 0.96, "votes": 310, "tags": ["3dcg", "male protagonist"],
+   "updated": 1700000000000},
+  {"type": "description", "v": 1, "overview": "You are moving with your best friend to the city of Kredon.",
+   "changelog": "v0.9.5: ..."},
+  {"type": "image", "v": 1, "role": "cover", "url": "https://attachments.f95zone.to/2023/10/3018543_f95zone_banner.png"},
+  {"type": "download", "v": 1, "entries": [
+    {"section": "Win/Linux", "host": "DATANODES", "label": "DATANODES", "url": "https://datanodes.to/f/2", "kind": "page"},
+    {"section": "Win/Linux", "host": "AKIRABOX", "label": "AKIRABOX", "link": "0:AKIRABOX"}]},
+  {"type": "links", "v": 1, "entries": [{"kind": "source", "url": "https://f95zone.to/threads/93340/"}]}
+]}]}
+```
+
+**What it replaces.** The A6 `record` and `check`'s `facts` (2026-10-17), library.metadata's one-off fields, the
+filter facets' own data (docs/SPEC.md 7i), the `cover` field (A3), and #599's saved records (`RecordCache`, which
+becomes the facet store). Each stays readable through the compatibility path above until contract 2 is retired
+under §7.
+
+**Questions for the owner:**
+1. Is `store` a facet of any plugin's item, or only of store plugins'? As written, any plugin may say where a game is
+   sold.
+2. The source order for several plugins about one game: one order for every type, or one per type (for example,
+   art from SteamGridDB first, text from the linked source first)?
+3. Should `download` entries carry a size and a version of their own, so one item can offer several versions
+   (F95 threads list only the newest)?
+
 ---
 
 ## 2. Plugin-provided APIs
@@ -1604,7 +1746,8 @@ Names elsewhere in this document that predate 2.1 mean the op in this table.
     than a file deep inside a folder droidtop has never seen.
 
 **A3 Metadata providers and scrapers.** EP `library.metadata@1`. Risk
-medium. The owner, 2026-10-16: "can we add an automatic scraping system?
+medium. *(Proposed 2026-10-22: `fetch`'s fields become facets in contract 3,
+§1.10; they are read as facets meanwhile.)* The owner, 2026-10-16: "can we add an automatic scraping system?
 We have LOTS of games with no metadata" (Droidtop/tracker#568), and on
 the same issue: "That's fine for plugins, but our built-in scrapers don't
 talk over the API".
@@ -1780,6 +1923,9 @@ Risk —.
   page for that source (`record`); a source that does not answer `record`
   (`UNSUPPORTED`) keeps today's sheet.
 - **Permission:** `provide:library.updates`, `net.domains`.
+- **Facets (proposed 2026-10-22, §1.10):** in contract 3, `record` and
+  `check`'s `facts` become facets (`items.facets` `get`, or facets on
+  `check` answers); contract 2's replies are read as facets meanwhile.
 - **Status:** built 2026-10-08 (`PluginUpdateSources`,
   `SourceUpdateCheck`, `SourceLinkRows.kt`); replaces droidtop's built-in
   F95zone update check and F95Checker import.
@@ -4229,6 +4375,13 @@ version was bumped.
 - A `provides` entry for a major the host no longer serves is listed as
   "Not supported by this version" and never called, but the rest of the
   plugin still works.
+
+**Contract 3 (proposed 2026-10-22, Droidtop/tracker#602, not built).**
+Facets (§1.10): a fixed, typed vocabulary of information a plugin gives
+about an item, which droidtop caches and draws. A contract 3 plugin
+returns facets wherever contract 2 had one-off fields (A3 `fetch`, A6
+`record` and `facts`). Contract 2 plugins keep working: droidtop reads
+their replies as facets, and contract 2 is retired under the rules above.
 
 **Changelog (additive changes; no version moved).**
 
