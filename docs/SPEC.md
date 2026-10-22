@@ -5871,6 +5871,14 @@ one:
   arguments it had (`retry`), replacing its row. The Downloads widget and the Home strip read a job's kind from
   `nativeKind`, as the download rules do; they read `kind`, which is "native" for every job droidtop runs itself,
   so no native download showed in either.
+  **The Downloads place reads it (2026-10-22).** Its sections are Current, Waiting (held by the download rules),
+  Paused and Finished, each with its count, and Finished ends with "Clear finished". A running row says how far
+  from the job's numbers ("120 MB of 300 MB, 4 MB/s", "12 of 40"), then the time left (`JobEta`), then the job's
+  line for what the numbers cannot say. A finished row says what it did counted ("1 failed, 2 done, 1 skipped") or
+  how it ended, and opens the job's page: how it ended, then Open (what it made, `JobOpen`), Retry and Clear, then
+  its report, a section per outcome, failures first, each line opening its own target. Open is :app's
+  (`JobOpener`): a game opens its page, a place opens where the person is, a folder or file on shared storage opens
+  in Android's files app; a path outside shared storage is not offered.
 
   **Pausable jobs (Droidtop/tracker#174):** a runner opts into checkpoint resume, and only jobs that declare resumability and have reported a checkpoint expose Pause. `PluginJobProgress.checkpoint` reports progress plus a bounded opaque payload; Pause asks the runner to cancel at its cooperative boundary and retains the last payload. Resume starts the same job again with that payload under `droidtop.resume_payload` in its arguments. DataStore persists resumable job identity, arguments and checkpoint off the main thread; restored work is paused and can be restarted if its plugin and capability are still available. Jobs without runner support or a checkpoint remain non-pausable.
 
