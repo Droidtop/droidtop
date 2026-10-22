@@ -175,8 +175,8 @@ object EngineHost {
         target: EnginehostTarget,
         engineVersion: String?,
         title: String? = null,
-        // The folder the engine's system save locations mean for this launch (the contract's inline `saveRoot`,
-        // tracker#580): a store game's cloud-synced folder. An inline key only, so it is sent whatever the folder's
+        // The game's own save folder for this launch, used as is (the contract's inline `saveRoot`, tracker#580):
+        // the folder of a store game's cloud saves, as the store names it. An inline key only, so it is sent whatever the folder's
         // own enginehost.json says; Enginehost uses the person's own location when it refuses the path.
         saveRoot: File? = null,
     ) {

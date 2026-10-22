@@ -1792,17 +1792,17 @@ class EngineGameProvider(
                 val target = resolved.enginehostTarget
                     ?: error("engines-database has no enginehost mapping for ${resolved.detectedEngine}")
                 // A store game whose cloud keeps its saves (tracker#580): droidtop's folder for it is synced down
-                // first and named to Enginehost as the save folder; Enginehost's game-ended report uploads it.
+                // first, then the folder in it holding the game's saves, as the store names it, is named to
+                // Enginehost as the save folder; Enginehost's game-ended report uploads it.
                 val storeKey = dev.droidtop.library.stores.EnginehostSaves.storeKeyOf(entry.id, entry.pcInfo?.storeId)
                 val saveRoot = storeKey?.let { key ->
-                    withContext(Dispatchers.IO) {
-                        dev.droidtop.library.stores.EnginehostSaves.saveRoot(key, resolved.detectedEngine)?.also {
-                            dev.droidtop.library.stores.EnginehostSaves.remember(context, key, gameRoot)
-                        }
-                    }?.also {
-                        dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, key, GameNaming.displayName(entry.title))
-                            ?.let { line -> android.util.Log.i("droidtop.GameEngineDetector", line) }
+                    val prepared = withContext(Dispatchers.IO) {
+                        dev.droidtop.library.stores.EnginehostSaves.prepare(context, key, gameRoot)
                     }
+                    if (!prepared) return@let null
+                    dev.droidtop.library.stores.StoreSaves.beforeLaunch(context, key, GameNaming.displayName(entry.title))
+                        ?.let { line -> android.util.Log.i("droidtop.GameEngineDetector", line) }
+                    withContext(Dispatchers.IO) { dev.droidtop.library.stores.EnginehostSaves.saveRoot(context, key) }
                 }
                 EngineHost.launch(context, gameRoot, target, resolved.engineVersion, title = entry.title, saveRoot = saveRoot)
             }

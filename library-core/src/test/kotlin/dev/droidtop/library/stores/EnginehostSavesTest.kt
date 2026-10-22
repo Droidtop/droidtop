@@ -1,65 +1,35 @@
 package dev.droidtop.library.stores
 
-import dev.droidtop.library.GameEngine
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 
-/** Droidtop/tracker#580: the folder named to Enginehost lines its engine's saves up with the game's Windows build. */
+/**
+ * Droidtop/tracker#580: droidtop names the game's own save folder to Enginehost, and Enginehost reports exactly that
+ * folder when it took it, so the upload after the game ends is decided by equality.
+ */
 class EnginehostSavesTest {
 
-    @get:Rule
-    val temp = TemporaryFolder()
+    private val passed = "/storage/emulated/0/droidtop/saves/steam-698780/drive_c/users/droidtop/AppData/Roaming/RenPy/DDLC-1454445547"
 
     @Test
-    fun renpyIsGivenItsWindowsFolderSoItsSaveDirectoryLandsUnderRenPy() {
-        val prefix = temp.newFolder("steam-698780")
-        val roaming = EnginehostSaves.roamingOf(prefix)
-        assertEquals(File(prefix, "drive_c/users/droidtop/AppData/Roaming"), roaming)
-        // Ren'Py writes <saveRoot>/<save_directory>; Steam Cloud has %APPDATA%/RenPy/<save_directory>.
-        val root = EnginehostSaves.saveRootIn(roaming, GameEngine.RENPY)
-        assertEquals(File(roaming, "RenPy"), root)
-        assertEquals(File(roaming, "RenPy/DDLC-1454445547"), File(root, "DDLC-1454445547"))
+    fun theFolderDroidtopPassedIsOurs() {
+        assertTrue(EnginehostSaves.sameFolder(passed, passed))
+        assertTrue(EnginehostSaves.sameFolder(passed, "$passed/"))
     }
 
     @Test
-    fun godotAndEveryOtherEngineAreGivenAppDataItself() {
-        val roaming = EnginehostSaves.roamingOf(temp.newFolder("steam-1"))
-        assertEquals(roaming, EnginehostSaves.saveRootIn(roaming, GameEngine.GODOT))
-        assertEquals(roaming, EnginehostSaves.saveRootIn(roaming, GameEngine.RPG_MAKER_MV))
+    fun aFolderInsideOrAboveIsNotTheOnePassed() {
+        // Before tracker#580's correction an engine added its own folder inside; that is no longer droidtop's folder.
+        assertFalse(EnginehostSaves.sameFolder(passed, "$passed/DDLC-1454445547"))
+        assertFalse(EnginehostSaves.sameFolder(passed, passed.substringBeforeLast('/')))
     }
 
     @Test
-    fun godotsLowercaseFolderTakesTheWindowsNameForASyncAndGoesBackAfter() {
-        val roaming = temp.newFolder("Roaming")
-        File(roaming, "godot/app_userdata/MyGame").mkdirs()
-        File(roaming, "godot/app_userdata/MyGame/save.dat").writeText("slot 1")
-
-        assertTrue(EnginehostSaves.toWindowsLayout(roaming))
-        assertTrue(File(roaming, "Godot/app_userdata/MyGame/save.dat").isFile)
-        assertEquals(setOf("Godot"), roaming.list()!!.toSet())
-
-        assertTrue(EnginehostSaves.toEngineLayout(roaming))
-        assertEquals(setOf("godot"), roaming.list()!!.toSet())
-        assertEquals("slot 1", File(roaming, "godot/app_userdata/MyGame/save.dat").readText())
-    }
-
-    @Test
-    fun nothingToRenameOrBothNamesPresentLeavesTheFolderAlone() {
-        val roaming = temp.newFolder("Roaming")
-        assertFalse(EnginehostSaves.toWindowsLayout(roaming))
-        File(roaming, "Godot").mkdirs()
-        // Already in Windows' name: nothing to do.
-        assertFalse(EnginehostSaves.toWindowsLayout(roaming))
-        // A case-sensitive card holding both: neither is moved over the other.
-        File(roaming, "godot").mkdirs()
-        if (roaming.list()!!.size == 2) {
-            assertFalse(EnginehostSaves.toWindowsLayout(roaming))
-            assertFalse(EnginehostSaves.toEngineLayout(roaming))
-        }
+    fun aRefusedPathOrAGameSavingBesideItselfUploadsNothing() {
+        assertFalse(EnginehostSaves.sameFolder(passed, "/storage/emulated/0/Games/DDLC"))
+        assertFalse(EnginehostSaves.sameFolder(passed, null))
+        assertFalse(EnginehostSaves.sameFolder(null, passed))
+        assertFalse(EnginehostSaves.sameFolder("", ""))
     }
 }

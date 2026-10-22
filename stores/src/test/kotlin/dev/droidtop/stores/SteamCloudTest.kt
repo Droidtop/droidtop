@@ -154,6 +154,26 @@ class SteamCloudTest {
         assertFalse(SaveLayout.glob("a.b").matches("axb"))
     }
 
+    @Test
+    fun `the save folder is the first entry's own folder, nothing added`() {
+        val (layout, prefix) = layout(
+            SavePattern(SaveRoot.WinAppDataRoaming, "RenPy/DDLC-1454445547", "*.save"),
+            SavePattern(SaveRoot.WinMyDocuments, "Other", "*"),
+        )
+        assertEquals(File(prefix, "drive_c/users/xuser/AppData/Roaming/RenPy/DDLC-1454445547"), layout.saveFolder())
+    }
+
+    @Test
+    fun `the save folder has the account's ids put in`() {
+        val (layout, prefix) = layout(SavePattern(SaveRoot.WinAppDataLocal, "Game/{Steam3AccountID}", "*"))
+        assertEquals(File(prefix, "drive_c/users/xuser/AppData/Local/Game/42"), layout.saveFolder())
+    }
+
+    @Test
+    fun `a game whose entries have no root here has no save folder`() {
+        assertNull(layout(SavePattern(SaveRoot.LinuxHome, ".game", "*")).first.saveFolder())
+    }
+
     private fun write(file: File, text: String = "x"): File {
         file.parentFile?.mkdirs()
         file.writeText(text)
