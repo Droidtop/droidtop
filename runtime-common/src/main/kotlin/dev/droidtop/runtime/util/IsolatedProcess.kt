@@ -23,6 +23,15 @@ object IsolatedProcess {
     @JvmStatic
     fun runsPluginCode(): Boolean = isIsolated() || processName()?.substringAfter(':', "")?.startsWith("plugin_open") == true
 
+    /**
+     * Whether this is the download engine's process (docs/SPEC.md 12a "One download engine"): `:aria2`, isolated under a UID
+     * of its own when Android isolation is on, or `:aria2_open`, which has droidtop's UID and is the default. libaria2
+     * runs there and reads untrusted network data, so droidtop's application classes start nothing in it either: no
+     * crash reporter, no databases, no sign-ins kept in memory beside it.
+     */
+    @JvmStatic
+    fun runsDownloadEngine(): Boolean = processName()?.substringAfter(':', "").let { it == "aria2" || it == "aria2_open" }
+
     private fun processName(): String? =
         if (Build.VERSION.SDK_INT >= 28) {
             android.app.Application.getProcessName()

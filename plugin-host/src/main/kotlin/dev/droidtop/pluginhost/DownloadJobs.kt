@@ -3,6 +3,7 @@ package dev.droidtop.pluginhost
 import android.content.Context
 import java.io.File
 import java.net.URI
+import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
 import dev.droidtop.runtime.util.ArchiveExtractor
@@ -10,11 +11,17 @@ import dev.droidtop.runtime.util.Sha256
 import java.util.concurrent.ConcurrentHashMap
 import dev.droidtop.net.Http
 import dev.droidtop.net.ResumableDownload
+import dev.droidtop.net.engine.EngineFetch
+import dev.droidtop.net.engine.EngineHost
+import dev.droidtop.net.engine.EnginePrefs
+import dev.droidtop.net.engine.TransferException
+import dev.droidtop.net.engine.TransferRequest
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -77,6 +84,14 @@ object DownloadJobs {
     private const val ARG_UNPACK = "unpack"
     private const val ARG_MORE = "more"
     private const val ARG_TARGET = "targetName"
+
+    /**
+     * The job argument that names the transfer mechanism. [ENGINE_ARIA2] hands the file to the download engine (docs/SPEC.md
+     * 12a "One download engine"); a job without it is fetched by [ResumableDownload] until its caller has moved
+     * (the rollout order lists who is left). It is a job argument, so a restored job goes the way it started.
+     */
+    const val ARG_ENGINE = "engine"
+    const val ENGINE_ARIA2 = "aria2"
 
     /**
      * The job argument naming the new version folder an update lands in (docs/SPEC.md 7g, "Getting an update"):
@@ -454,6 +469,7 @@ object DownloadJobs {
                     val file = fileFor(context, name)
                     file.delete()
                     ResumableDownload.discard(file)
+                    TransferRequest.controlFile(file).delete()
                 }
             }
         }
@@ -475,7 +491,7 @@ object DownloadJobs {
         val file = fileFor(context, name)
         placedBeforeTheProcessEnded(file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
         if (!(checkpoint == FETCHED && file.isFile)) {
-            withContext(Dispatchers.IO) { fetch(url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report) }
+            transfer(context, args, url, headers, file, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, report)
             report(100, "Checking the download…", FETCHED)
         }
         verifyDigest(file, args)
@@ -505,10 +521,8 @@ object DownloadJobs {
             if (index < done && files[index].isFile) continue
             val url = requireNotNull(part[ARG_URL]) { "the download has no address" }
             val prefix = "File ${index + 1} of ${parts.size}. "
-            withContext(Dispatchers.IO) {
-                fetch(url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, { percent, line, _ ->
-                    report(if (percent < 0) -1 else (index * 100 + percent) / parts.size, prefix + line, null)
-                })
+            transfer(context, part, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L) { percent, line, _ ->
+                report(if (percent < 0) -1 else (index * 100 + percent) / parts.size, prefix + line, null)
             }
             verifyDigest(files[index], part)
             report((index + 1) * 100 / parts.size, "Checking the download…", "$FETCHED:${index + 1}")
@@ -565,6 +579,59 @@ object DownloadJobs {
             if (file.exists() || !(if (unpacked || version != null) target.isDirectory else target.isFile)) return@withContext null
             reportPlaced(target)
             "Added ${target.name}"
+        }
+    }
+
+    /** One file of a job, by the mechanism the job names ([ARG_ENGINE]). */
+    private suspend fun transfer(
+        context: Context,
+        args: Map<String, String>,
+        url: String,
+        headers: Map<String, String>,
+        destination: File,
+        maxBytes: Long,
+        report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+    ) {
+        if (args[ARG_ENGINE] == ENGINE_ARIA2) {
+            fetchWithEngine(context, url, headers, destination, maxBytes, report)
+        } else {
+            withContext(Dispatchers.IO) { fetch(url, headers, destination, maxBytes, report) }
+        }
+    }
+
+    /**
+     * Gets [url] into [destination] with the download engine (docs/SPEC.md 12a "One download engine"): libaria2 in its own
+     * process, its files and sockets opened by droidtop's broker. [destination]'s folder is the engine's download folder.
+     * Pause and Cancel cancel the job's coroutine, which removes the download from the engine and keeps the partial file
+     * and aria2's control file beside it; Resume (or a restart) adds it again and aria2 carries on from them.
+     */
+    internal suspend fun fetchWithEngine(
+        context: Context,
+        url: String,
+        headers: Map<String, String>,
+        destination: File,
+        maxBytes: Long,
+        report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+    ) {
+        val folder = requireNotNull(destination.parentFile) { "the download has no folder" }
+        val engine = try {
+            val isolated = withContext(Dispatchers.IO) { EnginePrefs.androidIsolation(context) }
+            EngineHost.engine(context, folder, isolated)
+        } catch (e: TimeoutCancellationException) {
+            coroutineContext.ensureActive()
+            throw IllegalStateException("the download engine did not start in time")
+        } catch (e: IOException) {
+            coroutineContext.ensureActive()
+            throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
+        } catch (e: IllegalStateException) {
+            // DownloadEngine.start says why in its message, with the end of libaria2's log after the first line.
+            coroutineContext.ensureActive()
+            throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
+        }
+        try {
+            EngineFetch.fetch(engine, TransferRequest(url, headers, destination, maxBytes), report = { percent, line -> report(percent, line, null) }, size = ValueFormat::size)
+        } catch (e: TransferException) {
+            throw IllegalStateException(e.message)
         }
     }
 

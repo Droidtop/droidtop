@@ -293,6 +293,18 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun theTransferMechanismIsTheJobsAndEveryFileOfItFollowsIt() {
+        val args = mapOf(
+            "url" to "https://h.example/1", "name" to "acquire_1.bin", "targetName" to "Disc 1.bin",
+            "more" to """[{"url":"https://h.example/2","name":"acquire_2.bin","targetName":"Disc 2.bin"}]""",
+            DownloadJobs.ARG_ENGINE to DownloadJobs.ENGINE_ARIA2,
+        )
+        val parts = DownloadJobs.partsOf(args)
+        assertEquals(listOf(DownloadJobs.ENGINE_ARIA2, DownloadJobs.ENGINE_ARIA2), parts.map { it[DownloadJobs.ARG_ENGINE] })
+        assertNull("a job that never named an engine keeps the earlier downloader", DownloadJobs.partsOf(mapOf("url" to "u")).single()[DownloadJobs.ARG_ENGINE])
+    }
+
+    @Test
     fun severalFilesArePlacedTogetherAndAnExistingNameStopsAllOfThem() {
         val games = File(dir, "games/psx")
         val a = File(dir, "downloads/acquire_1.bin").also { it.parentFile.mkdirs(); it.writeText("a") }
