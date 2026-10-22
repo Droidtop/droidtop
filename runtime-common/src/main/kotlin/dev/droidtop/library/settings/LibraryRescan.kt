@@ -33,6 +33,11 @@ import kotlinx.coroutines.isActive
  * the same action over the PC walks only (PC and engine games, never the ROM
  * walk): Game sources > Folders and PC Games' list options offer it. One
  * rescan runs at a time, whichever it is, and either row cancels it.
+ *
+ * A rescan is a job (Droidtop/tracker#595): with [asJob] set (library-core's `LibraryRescanJob`, at start) every
+ * [run] and [runPcFolders] starts or joins the one rescan job in the jobs center, so its progress shows under
+ * Downloads and on the Home strip and stays when the menu that started it closes; the row still hears its status
+ * while it is open. The job's runner walks through [walk], the handlers themselves.
  */
 object LibraryRescan {
     @Volatile
@@ -42,13 +47,29 @@ object LibraryRescan {
     @Volatile
     var pcFoldersHandler: (suspend (Context, (String) -> Unit) -> String)? = null
 
+    /**
+     * Runs a rescan ([pcOnly] for the PC folders alone) as the one rescan job, following its status into the
+     * caller's row; set by library-core at start. Without it a rescan runs in the caller, as before.
+     */
+    @Volatile
+    var asJob: (suspend (Context, pcOnly: Boolean, (String) -> Unit) -> String)? = null
+
+    /** Cancels the rescan job, when [asJob] runs rescans; true when one was running. Set beside it. */
+    @Volatile
+    var cancelJob: (() -> Boolean)? = null
+
+    /** Whether the rescan job is running, when [asJob] runs rescans. Set beside it. */
+    @Volatile
+    var jobRunning: (() -> Boolean)? = null
+
     private val active = AtomicReference<Deferred<String>?>(null)
 
-    /** Whether a rescan started by [run] is in flight. */
-    val isRunning: Boolean get() = active.get()?.isActive == true
+    /** Whether a rescan is in flight. */
+    val isRunning: Boolean get() = jobRunning?.invoke() ?: (active.get()?.isActive == true)
 
     /** Stops the rescan in flight; false when there was none. [run] then returns "Rescan cancelled.". */
     fun cancel(): Boolean {
+        cancelJob?.let { return it() }
         val running = active.get()?.takeIf { it.isActive } ?: return false
         running.cancel()
         return true
@@ -68,10 +89,16 @@ object LibraryRescan {
         detached.launch { runCatching { run(app) {} } }
     }
 
-    suspend fun run(context: Context, onStatus: (String) -> Unit): String = runWith(handler, context, onStatus)
+    suspend fun run(context: Context, onStatus: (String) -> Unit): String =
+        asJob?.invoke(context, false, onStatus) ?: walk(context, pcOnly = false, onStatus = onStatus)
 
     /** Walks the PC game folders only (and reads the stores' rows again), never a ROM folder. */
-    suspend fun runPcFolders(context: Context, onStatus: (String) -> Unit): String = runWith(pcFoldersHandler, context, onStatus)
+    suspend fun runPcFolders(context: Context, onStatus: (String) -> Unit): String =
+        asJob?.invoke(context, true, onStatus) ?: walk(context, pcOnly = true, onStatus = onStatus)
+
+    /** The walk itself, through the handlers: what the rescan job runs. */
+    suspend fun walk(context: Context, pcOnly: Boolean, onStatus: (String) -> Unit): String =
+        runWith(if (pcOnly) pcFoldersHandler else handler, context, onStatus)
 
     private suspend fun runWith(
         handler: (suspend (Context, (String) -> Unit) -> String)?,
