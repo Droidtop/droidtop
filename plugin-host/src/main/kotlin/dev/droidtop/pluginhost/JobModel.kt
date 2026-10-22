@@ -14,8 +14,18 @@ import kotlin.coroutines.CoroutineContext
  * numbers and outcomes, not prose about them.
  */
 
-/** Where a job stands. Derived from [PluginJobsCenter.Entry] by [PluginJobsCenter.Entry.state]. */
-enum class JobState { RUNNING, HELD, PAUSED, DONE, FAILED }
+/**
+ * Where a job stands. Derived from [PluginJobsCenter.Entry] by [PluginJobsCenter.Entry.state]. A job that lost its
+ * connection waits for it ([WAITING_FOR_NETWORK]) and carries on by itself when it is back; a lost connection is
+ * never [FAILED] (Droidtop/tracker#577).
+ */
+enum class JobState { RUNNING, WAITING_FOR_NETWORK, WAITING_TO_RETRY, HELD, PAUSED, DONE, FAILED }
+
+/** Why a running job is not moving right now, set and cleared by the job ([JobHandle.waiting]). */
+enum class WaitReason { NETWORK, RETRY }
+
+/** A running job's wait: why, and for a retry when it tries again (epoch ms, null when not known). */
+data class JobWait(val reason: WaitReason, val untilMs: Long? = null)
 
 /** A job's numbers, each -1 when the job does not know it. Bytes for a transfer, items for work counted in things. */
 data class JobNumbers(
@@ -127,4 +137,7 @@ class JobHandle internal constructor(val jobId: String) : AbstractCoroutineConte
         item(ReportItem(title, outcome, detail, open))
 
     fun open(target: OpenTarget?) = PluginJobsCenter.setOpen(jobId, target)
+
+    /** The job is waiting ([wait]), or moving again (null). */
+    fun waiting(wait: JobWait?) = PluginJobsCenter.setWait(jobId, wait)
 }

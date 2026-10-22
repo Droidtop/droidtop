@@ -79,13 +79,16 @@ object PluginJobsScreen {
         val finished = snapshot.filter { it.done }.sortedByDescending { it.finishedAtMs ?: it.startedAtMs }
         return listOfNotNull(
             section("plugin_jobs_current", "Current", snapshot.filter { it.state == JobState.RUNNING }, nowMs),
-            section("plugin_jobs_waiting", "Waiting", snapshot.filter { it.state == JobState.HELD }, nowMs),
+            // Held by the download rules, or waiting for the connection or for a retry: none of them is the person's pause.
+            section("plugin_jobs_waiting", "Waiting", snapshot.filter { it.state in WAITING }, nowMs),
             section("plugin_jobs_paused", "Paused", snapshot.filter { it.state == JobState.PAUSED }, nowMs),
             section("plugin_jobs_done", "Finished", finished, nowMs)?.let { group ->
                 group.copy(items = group.items + clearFinishedItem())
             },
         )
     }
+
+    private val WAITING = setOf(JobState.HELD, JobState.WAITING_FOR_NETWORK, JobState.WAITING_TO_RETRY)
 
     private fun clearFinishedItem(): CatalogItem = ActionItem(
         id = "plugin_jobs_clear_finished",
@@ -174,6 +177,8 @@ object PluginJobsScreen {
         val first = when {
             entry.hold != null -> entry.hold!!
             entry.paused -> "Paused"
+            entry.state == JobState.WAITING_FOR_NETWORK -> "Waiting for the connection"
+            entry.state == JobState.WAITING_TO_RETRY -> "Waiting to try again"
             entry.percent >= 0 -> listOfNotNull("${entry.percent}%", timeLeft).joinToString(" · ")
             else -> entry.statusLine
         }

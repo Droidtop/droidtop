@@ -427,4 +427,15 @@ class PluginJobsCenterTest {
         assertNull(OpenTarget.decode("nonsense"))
         assertNull(OpenTarget.decode(null))
     }
+
+    @Test
+    fun aLostConnectionIsAWaitNeverAFailure() {
+        val running = PluginJobsCenter.Entry("w", "droidtop", "Downloads", null, "A file", 0L)
+        assertEquals(JobState.WAITING_FOR_NETWORK, running.copy(wait = JobWait(WaitReason.NETWORK)).state)
+        assertEquals(JobState.WAITING_TO_RETRY, running.copy(wait = JobWait(WaitReason.RETRY, 5_000L)).state)
+        // The person's pause and the download rules' hold say more than a wait does.
+        assertEquals(JobState.PAUSED, running.copy(paused = true, wait = JobWait(WaitReason.NETWORK)).state)
+        assertEquals(JobState.HELD, running.copy(paused = true, hold = "Waiting for Wi-Fi").state)
+        assertEquals(JobState.RUNNING, running.state)
+    }
 }

@@ -5879,6 +5879,17 @@ one:
   its report, a section per outcome, failures first, each line opening its own target. Open is :app's
   (`JobOpener`): a game opens its page, a place opens where the person is, a folder or file on shared storage opens
   in Android's files app; a path outside shared storage is not offered.
+  **Waiting is a state (2026-10-22).** A running job that lost its connection is waiting for it
+  (`WAITING_FOR_NETWORK`), and one between attempts is waiting to try again (`WAITING_TO_RETRY`), set by the job
+  through `JobHandle.waiting`; a lost connection is never a failure (Droidtop/tracker#577). Both sit in the Waiting
+  section with the download rules' holds. Agreed with the engine side: the download rules (`DownloadGate`) stay the
+  one policy and pause and unpause the aria2 engine; a job may hold several aria2 transfers (a multi-part archive),
+  its numbers their sum; Steam depots keep their own transfer and report the same states and numbers.
+  **What fills a report.** The PC and engine scrape (`PcScraper`) says, per game, what it wrote and from where ("Cover
+  and description from Steam store; genre from IGDB", `wroteLine`), what it skipped and why ("Already has what
+  ... looks for", "No match for ..."), what needs a pick, and what failed with the reason, each line opening the
+  game's page; the same facts as its `scan.log` lines, written where they are, and its numbers count the games. A
+  cloud-save sync reports its game: done, nothing to sync, failed, or a conflict nobody settled (needs your pick).
 
   **Pausable jobs (Droidtop/tracker#174):** a runner opts into checkpoint resume, and only jobs that declare resumability and have reported a checkpoint expose Pause. `PluginJobProgress.checkpoint` reports progress plus a bounded opaque payload; Pause asks the runner to cancel at its cooperative boundary and retains the last payload. Resume starts the same job again with that payload under `droidtop.resume_payload` in its arguments. DataStore persists resumable job identity, arguments and checkpoint off the main thread; restored work is paused and can be restarted if its plugin and capability are still available. Jobs without runner support or a checkpoint remain non-pausable.
 
