@@ -1223,9 +1223,31 @@ the information means and can use it beyond drawing (filters, updates, linking, 
 | `image` | as `media` | Filed by role; only for a role the game has no picture for, unless the person chose this source's art |
 | `download` | `entries: [{section, host, label, url?, link?, size?, version?, kind?}]`, at most 200. `version` lets one item offer several versions; an entry without one is the item's `metadata.version`. `kind`: `page` (default: opened in droidtop's web view, where the person starts the download), `file`, `torrent`, `magnet`. `link` is a token only the plugin's `download` job understands | A `list` of `action` entries on the record page's Downloads tab, grouped by section and then host. Picking one goes through droidtop's Downloads and the download engine and places the result (a new game, or a new version folder, docs/SPEC.md 7g). Kept, so nothing is fetched again to download (Droidtop/tracker#599) |
 | `links` | `entries: [link]`, at most 32 | `link` facets: the game page's Links, Open the source's page |
-| `store` | `store`, `url`, `price?` (a decimal string), `currency?` (ISO 4217), `owned?`, `free?`, `onSale?` | An `info` and a `link`: where to get the game, the Wishlist shelf. Any plugin may give it, guarded: it is always labelled "from <plugin>", its `url` must be on the plugin's `net.domains`, droidtop never buys anything, and `owned` is a store plugin's word only (another plugin's is ignored) |
+| `store` | `store`, `url`, `price?` (a decimal string), `currency?` (ISO 4217), `owned?`, `free?`, `onSale?` | An `info` and a `link`: where to get the game, the Wishlist shelf. Only store and source plugins may give it, under the guards in "Store information" below |
 | `update` | `version?`, `url?`, `gone?` | A `badge` and an `info`: the Update available badge and shelf, Updates, the record page's version line |
 | `identity` | `ids: {key: id}` | Not drawn: linking. Only ids of the plugin's own `library.updates` keys are taken without asking; others are offered as matches |
+
+#### Store information: who may give it, and its guards
+
+The owner: "Any store OR SOURCE plugin can provide that information. There has to be some guards on that."
+- **Who.** A **store plugin** (one providing a store point; droidtop's own stores are built in today) or a **source
+  plugin** (one providing `library.sources` or `library.updates`). A `store` facet from any other plugin is dropped
+  and logged as a plugin message.
+- **About what.** Only an item the plugin itself knows: its own item, or a game linked to its own item. A plugin
+  cannot say where some other game is sold.
+- **Where it points.** `url` is https on the plugin's own `net.domains`: a source points at its own site, and a store
+  plugin at its store. It opens only on the person's press, in droidtop's web view or the store's own app. A `store`
+  facet carries no other action, droidtop never buys anything, and no payment detail ever passes through droidtop.
+- **What it may claim.** `price` is a decimal of at most 1,000,000 with an ISO 4217 `currency`; `onSale` counts
+  only with a price; `free` and a price together drop the price. droidtop writes the price itself, labelled "from
+  <plugin>" with when it was fetched ("$4.99 at itch.io, 2 days ago"), and never sums, converts or compares
+  plugins' prices as if they were droidtop's own.
+- **Ownership.** `owned` is taken only from a store plugin whose account is signed in (G3's account row), and only
+  for items in that store; from a source plugin it is ignored. It never changes droidtop's own ownership facts (the
+  Ownership facet, 7g's store rows); it shows as "In your <plugin> library".
+- **How much.** One `store` facet per plugin per item, refreshed by its TTL (7 days by default) like any bundle.
+- **The person's say.** Each plugin's store information is its own switch under the plugin's "Where it appears", and
+  a store or source the person hides is hidden on every game.
 
 #### Targets: where a facet can appear
 
@@ -1412,8 +1434,10 @@ The F95zone plugin's record (0.4.9), as contract 3 (`item.page`, kept per item):
 
 The owner, on this proposal's questions: "the system should be as extensible as possible, but remember to guard it."
 So:
-1. **Any plugin may give `store`**, guarded: labelled with the plugin, on its own sites, never a purchase, and
-   `owned` taken only from store plugins.
+1. **Store and source plugins may give `store`** (the owner: "Any store OR SOURCE plugin can provide that
+   information. There has to be some guards on that."), under the guards in "Store information": only about the
+   plugin's own items, on its own sites, never a purchase, prices labelled and dated, and `owned` only from a
+   signed-in store plugin.
 2. **A source order per bundle**, all starting from one default order.
 3. **`download` entries carry their own `version` and `size`**, so one item may offer several versions.
 4. **The desktop tray, file-manager actions, the app drawer and onboarding are targets now**, each with its own
