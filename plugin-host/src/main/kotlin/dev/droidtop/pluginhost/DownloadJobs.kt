@@ -12,6 +12,11 @@ import java.util.concurrent.ConcurrentHashMap
 import dev.droidtop.net.DownloadCategory
 import dev.droidtop.net.DownloadPools
 import dev.droidtop.net.engine.EngineFetch
+import dev.droidtop.net.engine.SwarmRequest
+import dev.droidtop.net.engine.SwarmSource
+import dev.droidtop.net.engine.TransferEngine
+import dev.droidtop.runtime.SafeDelete
+import java.nio.file.Files
 import dev.droidtop.net.engine.RedirectGuard
 import dev.droidtop.net.engine.EngineHost
 import dev.droidtop.net.engine.EnginePrefs
@@ -85,6 +90,18 @@ object DownloadJobs {
      */
     const val ARG_ALLOW_SITES = "allowSites"
 
+    /**
+     * Job argument: the download is a whole folder from a swarm, [SWARM_MAGNET] (the `url` is the magnet) or
+     * [SWARM_TORRENT] (the `.torrent` given, kept beside the folder, or fetched from the `url`), not one file
+     * (docs/SPEC.md 12a). Its post step is given the folder.
+     */
+    const val ARG_SWARM = "swarm"
+    const val SWARM_MAGNET = "magnet"
+    const val SWARM_TORRENT = "torrent"
+
+    /** The largest `.torrent` droidtop takes, given or fetched. */
+    const val TORRENT_MAX_BYTES = 4L * 1024 * 1024
+
     /** [POST_MOVE_TO]'s argument: the absolute path the file is moved to. */
     const val ARG_TARGET_PATH = "targetPath"
 
@@ -138,7 +155,11 @@ object DownloadJobs {
         val appContext = context.applicationContext
         registerPost(POST_PLACE_IN_FOLDER) { jobContext, file, args ->
             withContext(Dispatchers.IO) {
-                val target = if (args[ARG_UNPACK] == UNPACK_ARCHIVE) unpackIntoFolder(file, args) else placeInFolder(file, args)
+                val target = when {
+                    file.isDirectory -> placeFolder(file, args)
+                    args[ARG_UNPACK] == UNPACK_ARCHIVE -> unpackIntoFolder(file, args)
+                    else -> placeInFolder(file, args)
+                }
                 // What the job carries about the placed file beyond its bytes (a source's engine hint, an update's
                 // saves), applied before the library looks at it, so the first index already reads it.
                 val note = runCatching { onPlaced(jobContext, target, args) }.getOrNull()
@@ -213,6 +234,65 @@ object DownloadJobs {
         moveFile(file, target)
         return target
     }
+
+    /**
+     * A swarm download's folder placed as one entry of the game folder, under `targetName` ("Name (2)" beside one of
+     * that name), or as an update's new version folder. The one top folder a torrent makes is unwrapped, so the game is
+     * not a level further down than its other versions. Returns where it went.
+     */
+    internal fun placeFolder(folder: File, args: Map<String, String>): File {
+        val games = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
+        require(games.isDirectory || games.mkdirs()) { "the game folder ${games.absolutePath} is not available" }
+        val version = args[ARG_VERSION_FOLDER]
+        val target = if (version != null) newVersionFolder(games, version) else freeName(games, requireNotNull(args["targetName"]) { "the folder name is missing" })
+        val inner = folder.listFiles()?.singleOrNull()?.takeIf { it.isDirectory && !Files.isSymbolicLink(it.toPath()) }
+        moveFolder(inner ?: folder, target)
+        if (inner != null) folder.delete()
+        return target
+    }
+
+    /**
+     * [moveFile] for a folder: renamed when it can be, else copied whole under a hidden name beside [to], renamed into
+     * place on that volume, and only then is [from] deleted, so a failure leaves the download where it was. A link in
+     * the folder is not copied: a download makes none.
+     */
+    fun moveFolder(from: File, to: File, rename: (File, File) -> Boolean = { a, b -> a.renameTo(b) }) {
+        if (rename(from, to)) return
+        val parent = to.parentFile ?: throw IllegalStateException("${to.absolutePath} has no folder")
+        val staged = File(parent, ".${to.name}.placing")
+        try {
+            copyTree(from, staged)
+            check(rename(staged, to)) { "the copy could not be renamed into place" }
+        } catch (e: Exception) {
+            SafeDelete.deleteWithin(parent, staged)
+            throw IllegalStateException("the download could not be placed at ${to.absolutePath}: ${e.message ?: e.javaClass.simpleName}", e)
+        }
+        from.parentFile?.let { SafeDelete.deleteWithin(it, from) }
+    }
+
+    private fun copyTree(from: File, to: File) {
+        check(to.isDirectory || to.mkdirs()) { "${to.name} could not be made" }
+        for (child in from.listFiles().orEmpty()) {
+            val target = File(to, child.name)
+            when {
+                Files.isSymbolicLink(child.toPath()) -> Unit
+                child.isDirectory -> copyTree(child, target)
+                else -> child.inputStream().use { input ->
+                    java.io.FileOutputStream(target).use { output ->
+                        input.copyTo(output, 1 shl 16)
+                        output.fd.sync()
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Whether [bytes] can be a `.torrent`: within [TORRENT_MAX_BYTES], a bencoded dictionary with an `info` dictionary.
+     * A check of its shape only; the engine reads the rest.
+     */
+    fun looksLikeTorrent(bytes: ByteArray): Boolean =
+        bytes.size in 1..TORRENT_MAX_BYTES && bytes[0] == 'd'.code.toByte() && String(bytes, Charsets.ISO_8859_1).contains("4:infod")
 
     /**
      * [name] in [folder], or the first of "Name (2).ext", "Name (3).ext", ... that is free, so a download never replaces
@@ -416,8 +496,17 @@ object DownloadJobs {
         category: DownloadCategory? = null,
         /** The only sites the download may reach, redirects included ([ARG_ALLOW_SITES]); null for any. */
         allowSites: List<String>? = null,
+        /** [SWARM_MAGNET] or [SWARM_TORRENT] for a download of a whole folder ([ARG_SWARM]); [url] is then the magnet, or the `.torrent`'s address. */
+        swarm: String? = null,
+        /** The `.torrent` itself, for [SWARM_TORRENT] with no [url]. */
+        torrent: ByteArray? = null,
     ): PluginResult {
         require(more.size < MAX_FILES) { "a download has at most $MAX_FILES files" }
+        require(swarm == null || more.isEmpty()) { "a torrent is one download of its own" }
+        torrent?.let { bytes ->
+            require(swarm == SWARM_TORRENT && looksLikeTorrent(bytes)) { "that is not a torrent file" }
+            withContext(Dispatchers.IO) { torrentFileFor(fileFor(context, name)).let { it.parentFile?.mkdirs(); it.writeBytes(bytes) } }
+        }
         val plain = holdSecrets(name, headers)
         val morePlain = more.map { holdSecrets(it.name, it.headers) }
         val args = buildMap {
@@ -445,6 +534,7 @@ object DownloadJobs {
             }
             put(DownloadPools.ARG_CATEGORY, (category ?: categoryFor(post, extra)).key)
             allowSites?.let { put(ARG_ALLOW_SITES, JSONArray(it).toString()) }
+            swarm?.let { put(ARG_SWARM, it) }
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
             if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
         }
@@ -515,6 +605,16 @@ object DownloadJobs {
     private const val FETCHED = "fetched"
 
     private fun cancelDownload(context: Context, args: Map<String, String>, checkpoint: String?) {
+        if (args[ARG_SWARM] != null) {
+            args[ARG_NAME]?.let { name ->
+                runCatching {
+                    val folder = fileFor(context, name)
+                    folder.parentFile?.let { SafeDelete.deleteWithin(it, folder) }
+                    torrentFileFor(folder).let { it.delete(); TransferRequest.controlFile(it).delete() }
+                }
+            }
+            return
+        }
         partsOf(args).forEach { part ->
             part[ARG_NAME]?.let { name ->
                 runCatching {
@@ -537,6 +637,7 @@ object DownloadJobs {
     ): String {
         val parts = partsOf(args)
         if (parts.size > 1) return executeMany(context, parts, checkpoint, report)
+        if (args[ARG_SWARM] != null) return executeSwarm(context, args, checkpoint, report)
         val name = requireNotNull(args[ARG_NAME]) { "the download has no file name" }
         val postName = args[ARG_POST] ?: POST_KEEP
         val post = posts[postName] ?: throw IllegalStateException("this version of droidtop cannot finish that download")
@@ -565,6 +666,92 @@ object DownloadJobs {
             },
         )
         return summary
+    }
+
+    /**
+     * A swarm job ([ARG_SWARM]): the torrent's or magnet's files are fetched into a folder of the downloads area, the
+     * checkpoint [FETCHED] once all are whole, and the post step is given the folder.
+     */
+    private suspend fun executeSwarm(
+        context: Context,
+        args: Map<String, String>,
+        checkpoint: String?,
+        report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+    ): String {
+        val name = requireNotNull(args[ARG_NAME]) { "the download has no name" }
+        val postName = args[ARG_POST] ?: POST_KEEP
+        val post = posts[postName] ?: throw IllegalStateException("this version of droidtop cannot finish that download")
+        val folder = fileFor(context, name)
+        val area = requireNotNull(folder.parentFile)
+        placedBeforeTheProcessEnded(folder, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
+        val job = JobHandle.current()
+        val numbers = TransferNumbers(job)
+        if (!(checkpoint == FETCHED && folder.isDirectory)) {
+            val source = swarmSource(context, args, folder, numbers, report)
+            try {
+                EngineFetch.fetchSwarm(
+                    engineFor(context, area), SwarmRequest(source, folder, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L),
+                    report = { progress ->
+                        report(progress.percent, progress.line, null)
+                        val transfer = progress.transfer
+                        when {
+                            progress.waiting -> numbers.waiting()
+                            transfer != null -> numbers.bytes(transfer.completedLength, transfer.totalLength, transfer.downloadSpeed)
+                        }
+                    },
+                    size = ValueFormat::size,
+                )
+            } catch (e: TransferException) {
+                throw IllegalStateException(e.message)
+            }
+            withContext(Dispatchers.IO) { torrentFileFor(folder).delete() }
+            report(100, "Checking the download…", FETCHED)
+        }
+        report(100, "Finishing…", null)
+        val summary = post.process(context, folder, args)
+        val kept = postName == POST_KEEP || postName in keptPosts
+        if (!kept) withContext(Dispatchers.IO) { SafeDelete.deleteWithin(area, folder) }
+        // Open goes to the folder the download became: placed in the game folder, or kept.
+        job?.open(
+            when {
+                postName == POST_PLACE_IN_FOLDER -> placedTarget(args)?.let { OpenTarget.Folder(it.first.absolutePath) }
+                kept -> OpenTarget.Folder(folder.absolutePath)
+                else -> null
+            },
+        )
+        return summary
+    }
+
+    /** Where a swarm job keeps its `.torrent` while it runs: beside its folder. */
+    private fun torrentFileFor(folder: File) = File(folder.path + ".torrent")
+
+    /** What a swarm job starts from; a `.torrent` named by an address is fetched first, as any file is, and checked. */
+    private suspend fun swarmSource(
+        context: Context,
+        args: Map<String, String>,
+        folder: File,
+        numbers: TransferNumbers,
+        report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
+    ): SwarmSource {
+        val url = args[ARG_URL].orEmpty()
+        return when (args[ARG_SWARM]) {
+            SWARM_MAGNET -> SwarmSource.Magnet(url)
+            SWARM_TORRENT -> {
+                val file = torrentFileFor(folder)
+                if (!file.isFile) {
+                    require(url.isNotEmpty()) { "the torrent is missing" }
+                    report(-1, "Fetching the torrent…", null)
+                    fetchWithEngine(context, url, headersOf(args), file, TORRENT_MAX_BYTES, numbers, { _, _, _ -> }, sitesGuard(args[ARG_ALLOW_SITES]))
+                }
+                val bytes = withContext(Dispatchers.IO) { file.readBytes() }
+                if (!looksLikeTorrent(bytes)) {
+                    withContext(Dispatchers.IO) { file.delete() }
+                    throw IllegalStateException("that is not a torrent file")
+                }
+                SwarmSource.Torrent(bytes)
+            }
+            else -> throw IllegalStateException("this version of droidtop cannot run that download")
+        }
     }
 
     /**
@@ -663,7 +850,8 @@ object DownloadJobs {
         return when {
             version != null -> File(games, version) to true
             unpacked -> File(games, archiveStem(targetName) ?: return null) to true
-            else -> File(games, targetName) to false
+            // A torrent's download is a folder of its own.
+            else -> File(games, targetName) to (args[ARG_SWARM] != null)
         }
     }
 
@@ -743,21 +931,7 @@ object DownloadJobs {
         /** Put to every address before the engine is given one ([RedirectGuard.resolve]); throws to refuse it. */
         allow: ((String) -> Unit)? = null,
     ) {
-        val folder = requireNotNull(destination.parentFile) { "the download has no folder" }
-        val engine = try {
-            val isolated = withContext(Dispatchers.IO) { EnginePrefs.androidIsolation(context) }
-            EngineHost.engine(context, folder, isolated)
-        } catch (e: TimeoutCancellationException) {
-            coroutineContext.ensureActive()
-            throw IllegalStateException("the download engine did not start in time")
-        } catch (e: IOException) {
-            coroutineContext.ensureActive()
-            throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
-        } catch (e: IllegalStateException) {
-            // DownloadEngine.start says why in its message, with the end of libaria2's log after the first line.
-            coroutineContext.ensureActive()
-            throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
-        }
+        val engine = engineFor(context, requireNotNull(destination.parentFile) { "the download has no folder" })
         try {
             EngineFetch.fetch(
                 engine,
@@ -777,6 +951,23 @@ object DownloadJobs {
             throw IllegalStateException(e.message)
         }
     }
+
+    /** The download engine for the downloads area [folder], started if it is not running; a start that fails is a sentence. */
+    private suspend fun engineFor(context: Context, folder: File): TransferEngine =
+        try {
+            val isolated = withContext(Dispatchers.IO) { EnginePrefs.androidIsolation(context) }
+            EngineHost.engine(context, folder, isolated)
+        } catch (e: TimeoutCancellationException) {
+            coroutineContext.ensureActive()
+            throw IllegalStateException("the download engine did not start in time")
+        } catch (e: IOException) {
+            coroutineContext.ensureActive()
+            throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
+        } catch (e: IllegalStateException) {
+            // DownloadEngine.start says why in its message, with the end of libaria2's log after the first line.
+            coroutineContext.ensureActive()
+            throw IllegalStateException("the download engine could not start: ${e.message?.lineSequence()?.first().orEmpty()}")
+        }
 
     /** Checks [file] against the strongest digest [args] carry; a mismatch deletes the file and fails the job with a plain sentence. */
     internal suspend fun verifyDigest(file: File, args: Map<String, String>) {
@@ -860,7 +1051,8 @@ object AcquireDownloads {
         return runCatching {
             val array = JSONArray(many)
             require(array.length() in 1..DownloadJobs.MAX_FILES)
-            List(array.length()) { requireNotNull(AcquireDownloadDescriptor.parse(array.getJSONObject(it).toString())) }
+            // A torrent or a magnet is a download of its own, never one file of several.
+            List(array.length()) { requireNotNull(AcquireDownloadDescriptor.parse(array.getJSONObject(it).toString())?.takeIf { d -> d.swarm == null }) }
         }.getOrDefault(emptyList())
     }
 }
@@ -909,15 +1101,42 @@ data class AcquireDownloadDescriptor(
      * plugin granted `github.api` (docs/plugin-api.md 3 G4).
      */
     val auth: String? = null,
+    /**
+     * [DownloadJobs.SWARM_MAGNET] when [url] is a magnet link, [DownloadJobs.SWARM_TORRENT] for a torrent (`"kind":
+     * "torrent"` with [url] its https address, or [torrent], the file itself); null for one file. A swarm download is a
+     * whole folder (docs/plugin-api.md 1.6).
+     */
+    val swarm: String? = null,
+    /** The `.torrent` the reply gave as data (`torrent`, base64); [url] is then empty. */
+    val torrent: ByteArray? = null,
 ) {
     companion object {
         const val AUTH_GITHUB = "github"
 
+        /** The longest magnet link taken. */
+        const val MAGNET_MAX_CHARS = 8192
+
         fun parse(json: String?): AcquireDownloadDescriptor? = runCatching {
             val value = JSONObject(requireNotNull(json))
-            val url = value.getString("url")
-            val parsedUrl = URI(url)
-            require(parsedUrl.scheme in setOf("http", "https") && !parsedUrl.host.isNullOrBlank())
+            val inline = value.optString("torrent").takeIf { it.isNotEmpty() }
+            val kind = value.optString("kind", "file")
+            require(kind == "file" || kind == DownloadJobs.SWARM_TORRENT)
+            val url = if (inline != null) value.optString("url") else value.getString("url")
+            val swarm = when {
+                inline != null || kind == DownloadJobs.SWARM_TORRENT -> DownloadJobs.SWARM_TORRENT
+                url.startsWith("magnet:", ignoreCase = true) -> DownloadJobs.SWARM_MAGNET
+                else -> null
+            }
+            when {
+                inline != null -> require(url.isEmpty())
+                swarm == DownloadJobs.SWARM_MAGNET -> require(url.length <= MAGNET_MAX_CHARS && SwarmSource.isMagnet(url))
+                else -> {
+                    val parsedUrl = URI(url)
+                    require(parsedUrl.scheme in setOf("http", "https") && !parsedUrl.host.isNullOrBlank())
+                }
+            }
+            // The file itself is checked here and again by the job; one fetched from an address only by the job.
+            val torrent = inline?.let { java.util.Base64.getDecoder().decode(it) }?.also { require(DownloadJobs.looksLikeTorrent(it)) }
             val fileName = requireNotNull(AcquireFileName.clean(value.getString("fileName")))
             val unpackWord = value.optString("unpack", "none")
             require(unpackWord == "none" || unpackWord == DownloadJobs.UNPACK_ARCHIVE)
@@ -941,7 +1160,12 @@ data class AcquireDownloadDescriptor(
             require(session == null || session.matches(Regex("w-[0-9a-f-]{36}")))
             val auth = value.optString("auth").takeIf { it.isNotEmpty() }
             require(auth == null || auth == AUTH_GITHUB)
-            AcquireDownloadDescriptor(url, headers, fileName, digest, size, sha1, md5, unpackWord == DownloadJobs.UNPACK_ARCHIVE, session, auth)
+            if (swarm != null) {
+                // A swarm checks its own pieces, is a folder already, and is reached by no web session or token.
+                require(digest == null && sha1 == null && md5 == null && unpackWord == "none" && session == null && auth == null)
+                require(swarm == DownloadJobs.SWARM_TORRENT || headers.isEmpty())
+            }
+            AcquireDownloadDescriptor(url, headers, fileName, digest, size, sha1, md5, unpackWord == DownloadJobs.UNPACK_ARCHIVE, session, auth, swarm, torrent)
         }.getOrNull()
     }
 }

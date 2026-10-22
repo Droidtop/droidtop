@@ -70,7 +70,7 @@ class EngineSwarmTest {
             mapOf("t1" to listOf(active(30 * mib, 100 * mib), complete(100 * mib))),
         )
         val reports = mutableListOf<Pair<Int, String>>()
-        EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Magnet(magnet), folder), { p, line -> reports += p to line }, size, Dispatchers.Unconfined)
+        EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Magnet(magnet), folder), { reports += it.percent to it.line }, size, Dispatchers.Unconfined)
         assertEquals("Fetching the torrent's details…", reports.first().second)
         assertEquals(30 to "Downloading… 30 MB of 100 MB (976 KB/s)", reports.last())
         assertEquals(folder, engine.added.single().second)
@@ -88,7 +88,7 @@ class EngineSwarmTest {
             ),
         )
         val reports = mutableListOf<Int>()
-        EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Metalink(ByteArray(4)), folder), { p, _ -> reports += p }, size, Dispatchers.Unconfined)
+        EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Metalink(ByteArray(4)), folder), { reports += it.percent }, size, Dispatchers.Unconfined)
         assertEquals("the two files' progress is summed", 50, reports.first())
         assertEquals(87, reports.last())
     }
@@ -97,7 +97,7 @@ class EngineSwarmTest {
     fun aPauseRemovesEveryLiveDownloadAndKeepsTheFiles() = runTest {
         val engine = FakeEngine(listOf(listOf(complete(1024, followedBy = listOf("t1")))), mapOf("t1" to listOf(active(5 * mib, 100 * mib))))
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
-            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Magnet(magnet), folder), { _, _ -> }, size, Dispatchers.Unconfined)
+            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Magnet(magnet), folder), { }, size, Dispatchers.Unconfined)
         }
         advanceTimeBy(EngineFetch.POLL_MS * 3)
         runCurrent()
@@ -111,7 +111,7 @@ class EngineSwarmTest {
     fun aDownloadOverTheCapIsRefused() = runTest {
         val engine = FakeEngine(listOf(listOf(active(0, 900 * mib))))
         try {
-            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Torrent(ByteArray(4)), folder, maxBytes = 512 * mib), { _, _ -> }, size, Dispatchers.Unconfined)
+            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Torrent(ByteArray(4)), folder, maxBytes = 512 * mib), { }, size, Dispatchers.Unconfined)
             fail("over the cap")
         } catch (e: TransferException) {
             assertEquals("the download is larger than the 512 MiB cap", e.message)
@@ -126,7 +126,7 @@ class EngineSwarmTest {
             mapOf("a" to listOf(Transfer("error", 10 * mib, 0, 0, 9)), "b" to listOf(active(1 * mib, 10 * mib))),
         )
         try {
-            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Metalink(ByteArray(4)), folder), { _, _ -> }, size, Dispatchers.Unconfined)
+            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Metalink(ByteArray(4)), folder), { }, size, Dispatchers.Unconfined)
             fail("a full disk fails the download")
         } catch (e: TransferException) {
             assertEquals("there is not enough space for this download", e.message)
@@ -138,7 +138,7 @@ class EngineSwarmTest {
     fun onlyAMagnetNamingItsTorrentIsTaken() = runTest {
         val engine = FakeEngine(emptyList())
         try {
-            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Magnet("magnet:?dn=just+a+name"), folder), { _, _ -> }, size, Dispatchers.Unconfined)
+            EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Magnet("magnet:?dn=just+a+name"), folder), { }, size, Dispatchers.Unconfined)
             fail("not a torrent's magnet")
         } catch (e: TransferException) {
             assertEquals("that is not a magnet link", e.message)
