@@ -30,7 +30,6 @@ class LibraryRescanJobTest {
 
     @Test
     fun aRescanRunsAsOneJobAndItsRowHearsItsLines() = runBlocking {
-        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
         val gate = CompletableDeferred<Unit>()
         LibraryRescan.handler = { _, onStatus ->
             onStatus("Looking at your games")
