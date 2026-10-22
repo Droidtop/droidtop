@@ -132,17 +132,10 @@ object StoreSaves {
                 .getOrElse { SaveSyncResult("Saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
         }
         val prefix = prefixOf(context, entryId) ?: return@withContext null
-        // A folder droidtop names to Enginehost is in the engine's layout at rest and in Windows' while it syncs.
-        val engineFolder = EnginehostSaves.prefixFor(context, entryId)?.let { EnginehostSaves.roamingOf(it.prefixDir) }
-        engineFolder?.let { EnginehostSaves.toWindowsLayout(it) }
-        try {
-            runCatching { store.syncSaves(context, entryId.substringAfter(':'), phase, prefix, title, resolver) }
-                .onFailure { Log.w(TAG, "Cloud save sync failed for $entryId", it) }
-                .getOrElse { SaveSyncResult("Cloud saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
-                ?.also { result -> if (!result.unresolved) record(context, entryId, failed = result.failed) }
-        } finally {
-            engineFolder?.let { EnginehostSaves.toEngineLayout(it) }
-        }
+        runCatching { store.syncSaves(context, entryId.substringAfter(':'), phase, prefix, title, resolver) }
+            .onFailure { Log.w(TAG, "Cloud save sync failed for $entryId", it) }
+            .getOrElse { SaveSyncResult("Cloud saves: ${it.message ?: it.javaClass.simpleName}", failed = true) }
+            ?.also { result -> if (!result.unresolved) record(context, entryId, failed = result.failed) }
     }
 
     /** Where [entryId]'s saves are synced: the folder droidtop gives Enginehost for it, else the Wine runtime's prefix. */

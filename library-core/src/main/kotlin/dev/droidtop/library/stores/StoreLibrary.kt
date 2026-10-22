@@ -423,6 +423,14 @@ interface StoreLibrary {
     ): SaveSyncResult? = null
 
     /**
+     * The folder in [prefix] that directly holds [gameId]'s save files, as the store's cloud names it, or null when
+     * the store does not know one. Read from what the last [syncSaves] learned, so it is asked after the sync before
+     * a launch; what droidtop names to Enginehost as the game's save folder (docs/SPEC.md 7g, "A game Enginehost
+     * runs"). Disk work; the caller dispatches off the main thread.
+     */
+    suspend fun saveFolder(context: Context, gameId: String, prefix: WinePrefixLocation): File? = null
+
+    /**
      * A number that changes whenever [games] would answer differently: the
      * PC library's store part is walked again only when it moves
      * (docs/SPEC.md 7g). One stat per file, never a query.

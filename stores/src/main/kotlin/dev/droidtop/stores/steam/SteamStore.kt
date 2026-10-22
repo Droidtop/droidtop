@@ -195,6 +195,22 @@ class SteamStore : StoreLibrary {
     override val hasCloudSaves = true
 
     /**
+     * The folder of [gameId]'s first `ufs/savefiles` entry in [prefix] ([SaveLayout.saveFolder]), from the `ufs`
+     * section the last sync cached; null before any sync read it, or when the game has no entry with a root there.
+     */
+    override suspend fun saveFolder(context: Context, gameId: String, prefix: WinePrefixLocation): File? = withContext(Dispatchers.IO) {
+        val appId = gameId.toIntOrNull() ?: return@withContext null
+        val ufs = SteamUfsCache.load(context, appId)?.takeUnless { it.isEmpty } ?: return@withContext null
+        val steamId64 = SteamCredentials.load(context)?.steamId64 ?: 0L
+        // The Steam3 account id is the low half of the 64-bit id.
+        val accountId = steamId64 and 0xFFFFFFFFL
+        val install = runCatching { installOf(context, gameId).second }.getOrNull()
+        val dirs = SaveLayout.windowsDirs(prefix.prefixDir, prefix.user, install ?: prefix.prefixDir, accountId, appId)
+            .let { if (install == null) it - SaveRoot.GameInstall else it }
+        SaveLayout(dirs, steamId64, accountId, ufs).saveFolder()
+    }
+
+    /**
      * Steam Cloud saves of [gameId], synced into the game's Wine prefix
      * (docs/SPEC.md 7g, "Stores"). Needs the sign-in and the game's folder;
      * null when either is missing or the prefix has no `drive_c` yet (a prefix

@@ -13274,22 +13274,25 @@ follows:
   (`GameEngineDetector`, ENGINEHOST) makes the folder, records the game folder against the store key, runs
   `StoreSaves.beforeLaunch` (the same 45 s bound and the same conflict dialog), and sends the inline config key
   `saveRoot` (`EngineHost.launch`), whatever the game folder's own `enginehost.json` holds, since `saveRoot` is
-  never a folder key. Agreed with the Enginehost lane (tracker#580): `saveRoot` is exactly the folder an engine's
-  system save locations mean for that launch. **Which folder lines up with Steam Cloud** (read from Enginehost's
-  cores, tracker#580 comment 6235943189; Enginehost keeps its layout, since existing saves use it, so droidtop
-  adapts, `EnginehostSaves.saveRootIn`): Ren'Py writes `<saveRoot>/<config.save_directory>` with no `RenPy/`
-  segment, so a Ren'Py game is given the prefix's `AppData/Roaming/RenPy`, where Windows keeps
-  `%APPDATA%/RenPy/<dir>`; Godot writes `<saveRoot>/godot/app_userdata/<project>` (or a custom user dir
-  `<saveRoot>/<custom>`, which already matches Windows), so Godot and every other engine are given
-  `AppData/Roaming` itself. Godot's folder is lowercase on Android and Linux and `Godot` on Windows, so a sync
-  renames it to `Godot` first and back to `godot` after (`toWindowsLayout`, `toEngineLayout`, through a third
-  name so a case-folding card takes it too). A refused path (outside shared storage,
-  inside `Android/data`, not writable) falls back to the person's own location; it is accepted from any app the
-  person allowed in App launch access, droidtop with no standing of its own. When the game ends, Enginehost
-  sends droidtop's package `dev.enginehost.GAME_ENDED` (`path`, `saveFolder`, `reason`);
-  `EnginehostGameEndedReceiver` starts the upload job (`StoreSaves.afterExit`) for a folder droidtop launched,
-  and only when `saveFolder` is inside droidtop's folder: an engine that saves beside the game, or a refused
-  path, leaves nothing new there to upload.
+  never a folder key. **`saveRoot` is the game's own save folder, used as is** (owner, 2026-10-18: "What we
+  provide is a link to the saves, as they are provided to us. This SHOULD be an exact mapping of whatever the save
+  root for a game is."; Enginehost 0.1.5-dev.369, tracker#580 comment 6351390573). droidtop passes the folder in
+  its prefix that directly holds the game's save files, as the store's cloud names it, unchanged: for Steam, the
+  root and path of the game's first `ufs/savefiles` entry, after any `rootoverrides` move and with the account's
+  ids put in (`StoreLibrary.saveFolder`, `SaveLayout.saveFolder`), so a Ren'Py game gets its
+  `AppData/Roaming/RenPy/<dir>` folder itself. Enginehost and its cores use that folder as the game's save folder
+  without adding one of their own inside it, so droidtop has no engine knowledge and renames nothing. The folder
+  is read from the `ufs` section the sync before the launch cached, so the launch makes the prefix and records the
+  game (`EnginehostSaves.prepare`), syncs, then asks for the folder (`EnginehostSaves.saveRoot`); a game whose
+  cloud names no folder droidtop has (no sync has read it yet, or its only entries are for other systems) is
+  launched without `saveRoot` and saves to the person's own location. A game with entries in several folders is
+  given the first. A refused path (outside shared storage, inside `Android/data`, not writable) falls back to the
+  person's own location; it is accepted from any app the person allowed in App launch access, droidtop with no
+  standing of its own. When the game ends, Enginehost sends droidtop's package `dev.enginehost.GAME_ENDED`
+  (`path`, `saveFolder`, `reason`); `EnginehostGameEndedReceiver` starts the upload job (`StoreSaves.afterExit`)
+  for a folder droidtop launched, and only when `saveFolder` is exactly the folder droidtop passed, which is
+  what Enginehost reports whenever it took it: an engine that saves beside the game, or a refused path, leaves
+  nothing new there to upload.
 - **Steam Cloud saves** (`StoreLibrary.syncSaves`, `StoreSaves` in `:library-core`,
   `SteamCloudSync` in `:stores`; owner, 2026-10-08, Droidtop/tracker#313: "Steam
   Cloud saves: yes"). A game that has cloud saves syncs them into its Wine prefix
