@@ -1,6 +1,5 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.net.ResumableDownload
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.CopyOnWriteArrayList
@@ -21,69 +20,15 @@ import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * The download runner's rules (docs/SPEC.md 12a "Downloads", Droidtop/tracker#181) against a local server: the file
- * lands whole, a pause keeps the partial file and the next run carries on with a Range request, the ways a download
- * fails, and what a restart does with a job whose bytes had all arrived.
+ * The download runner's rules (docs/SPEC.md 12a "Downloads", Droidtop/tracker#181): placing, unpacking and moving what a
+ * job fetched, its arguments, and what a restart does with a job whose bytes had all arrived. The transfer itself is
+ * the download engine's, tested with the engine (net-core's EngineFetchTest, and aria2-engine's on-device tests).
  */
 class DownloadJobsTest {
     private val dir: File = Files.createTempDirectory("download-jobs").toFile()
     private val data = ByteArray(200_000) { (it * 7 % 253).toByte() }
-    private val ranges = CopyOnWriteArrayList<String?>()
-    private var server: java.net.ServerSocket? = null
-    @Volatile private var honourRanges = true
-
-    /** A bare-bones HTTP/1.0 server on a socket (the unit-test classpath here has no com.sun.net.httpserver). */
-    private fun serve(slow: Boolean = false): String {
-        val s = java.net.ServerSocket(0, 5, java.net.InetAddress.getByName("127.0.0.1"))
-        server = s
-        Thread {
-            while (!s.isClosed) {
-                val socket = try { s.accept() } catch (_: java.io.IOException) { return@Thread }
-                Thread { handle(socket, slow) }.start()
-            }
-        }.start()
-        return "http://127.0.0.1:${s.localPort}"
-    }
-
-    private fun handle(socket: java.net.Socket, slow: Boolean) {
-        socket.use {
-            val input = socket.getInputStream().bufferedReader()
-            val path = input.readLine()?.split(" ")?.getOrNull(1) ?: return
-            var range: String? = null
-            while (true) {
-                val line = input.readLine() ?: return
-                if (line.isEmpty()) break
-                if (line.startsWith("Range:", ignoreCase = true)) range = line.substringAfter(":").trim()
-            }
-            val out = socket.getOutputStream()
-            if (path == "/gone") {
-                out.write("HTTP/1.0 404 Not Found\r\nContent-Length: 0\r\n\r\n".toByteArray())
-                return
-            }
-            ranges += range
-            val partial = range != null && honourRanges
-            val from = if (partial) range!!.removePrefix("bytes=").removeSuffix("-").toInt() else 0
-            val head = StringBuilder(if (partial) "HTTP/1.0 206 Partial Content\r\n" else "HTTP/1.0 200 OK\r\n")
-            head.append("ETag: \"e1\"\r\nContent-Length: ${data.size - from}\r\n")
-            if (partial) head.append("Content-Range: bytes $from-${data.size - 1}/${data.size}\r\n")
-            out.write((head.toString() + "\r\n").toByteArray())
-            try {
-                var at = from
-                while (at < data.size) {
-                    val n = minOf(10_000, data.size - at)
-                    out.write(data, at, n)
-                    out.flush()
-                    at += n
-                    if (slow) Thread.sleep(50)
-                }
-            } catch (_: java.io.IOException) {
-            }
-        }
-    }
-
     @After
     fun cleanUp() {
-        server?.close()
         dir.deleteRecursively()
         PluginJobsCenter.nativeDispatcher = Dispatchers.IO
     }
@@ -307,18 +252,6 @@ class DownloadJobsTest {
     }
 
     @Test
-    fun theTransferMechanismIsTheJobsAndEveryFileOfItFollowsIt() {
-        val args = mapOf(
-            "url" to "https://h.example/1", "name" to "acquire_1.bin", "targetName" to "Disc 1.bin",
-            "more" to """[{"url":"https://h.example/2","name":"acquire_2.bin","targetName":"Disc 2.bin"}]""",
-            DownloadJobs.ARG_ENGINE to DownloadJobs.ENGINE_ARIA2,
-        )
-        val parts = DownloadJobs.partsOf(args)
-        assertEquals(listOf(DownloadJobs.ENGINE_ARIA2, DownloadJobs.ENGINE_ARIA2), parts.map { it[DownloadJobs.ARG_ENGINE] })
-        assertNull("a job that never named an engine keeps the earlier downloader", DownloadJobs.partsOf(mapOf("url" to "u")).single()[DownloadJobs.ARG_ENGINE])
-    }
-
-    @Test
     fun severalFilesArePlacedTogetherAndAnExistingNameStopsAllOfThem() {
         val games = File(dir, "games/psx")
         val a = File(dir, "downloads/acquire_1.bin").also { it.parentFile.mkdirs(); it.writeText("a") }
@@ -417,73 +350,6 @@ class DownloadJobsTest {
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"../game.zip"}"""))
         assertNull(AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a","fileName":"game.zip","size":0}"""))
         assertNull(AcquireDownloadDescriptor.parse("not json"))
-    }
-
-    @Test
-    fun aFreshDownloadLandsWholeAndReportsItsProgress() = runBlocking {
-        val base = serve()
-        val reports = CopyOnWriteArrayList<Pair<Int, String>>()
-        val file = File(dir, "a.bin")
-        DownloadJobs.fetch("$base/f", emptyMap(), file, 0L, { percent, line, _ -> reports += percent to line })
-        assertArrayEquals(data, file.readBytes())
-        assertTrue(reports.any { it.first == 100 })
-        assertTrue(reports.all { it.second.startsWith("Downloading… ") })
-        assertFalse(ResumableDownload.partOf(file).exists())
-    }
-
-    @Test
-    fun aPausedDownloadKeepsItsPartialFileAndCarriesOnWithARangeRequest() = runBlocking {
-        val base = serve(slow = true)
-        val file = File(dir, "b.bin")
-        val running = launch(Dispatchers.IO) { DownloadJobs.fetch("$base/f", emptyMap(), file, 0L, { _, _, _ -> }) }
-        withTimeout(10_000) { while (ResumableDownload.partOf(file).length() < 20_000) delay(10) }
-        running.cancel()
-        withTimeout(10_000) { running.join() }
-        val kept = ResumableDownload.partOf(file).length()
-        assertTrue("the partial file survives a pause", kept in 1 until data.size)
-        assertFalse(file.exists())
-
-        DownloadJobs.fetch("$base/f", emptyMap(), file, 0L, { _, _, _ -> })
-        assertArrayEquals(data, file.readBytes())
-        assertNull(ranges.first())
-        assertEquals("bytes=$kept-", ranges.last())
-    }
-
-    @Test
-    fun aServerThatCannotResumeStartsAgainAndTheLineSays() = runBlocking {
-        honourRanges = false
-        val base = serve()
-        val file = File(dir, "c.bin")
-        ResumableDownload.partOf(file).writeBytes(data.copyOf(50_000))
-        ResumableDownload.metaOf(file).writeText(ResumableDownload.Meta("\"e1\"", null, data.size.toLong()).encode())
-        val lines = CopyOnWriteArrayList<String>()
-        DownloadJobs.fetch("$base/f", emptyMap(), file, 0L, { _, line, _ -> lines += line })
-        assertArrayEquals(data, file.readBytes())
-        assertTrue(lines.any { it.startsWith("Started again: the server cannot resume. Downloading") })
-    }
-
-    @Test
-    fun aMissingFileFailsWithTheServersAnswer() = runBlocking {
-        val base = serve()
-        try {
-            DownloadJobs.fetch("$base/gone", emptyMap(), File(dir, "d.bin"), 0L, { _, _, _ -> })
-            fail("a 404 must throw")
-        } catch (e: IllegalStateException) {
-            assertEquals("the server answered HTTP 404", e.message)
-        }
-    }
-
-    @Test
-    fun aFileOverTheCapIsRefusedAndNothingIsKept() = runBlocking {
-        val base = serve()
-        val file = File(dir, "e.bin")
-        try {
-            DownloadJobs.fetch("$base/f", emptyMap(), file, 1024L * 1024 / 1024, { _, _, _ -> })
-            fail("a file over the cap must throw")
-        } catch (e: IllegalStateException) {
-            assertEquals("the file is larger than the 0 MiB cap", e.message)
-        }
-        assertFalse(ResumableDownload.partOf(file).exists())
     }
 
     @Test
