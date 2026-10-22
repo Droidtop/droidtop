@@ -169,13 +169,9 @@ class WineLaunchPlanTest {
     }
 
     @Test
-    fun `every run leaves a record of how it ended and what Wine printed`() {
-        val record = WinePresentation.lastRunLog("/sd/Games/LoSeSb/LoSeSb.exe", 3, 4_200, showedWindow = false, output = "one\n\ntwo\n", nowMs = 0)
-        assertTrue(record.contains("Started: /sd/Games/LoSeSb/LoSeSb.exe"))
-        assertTrue(record.contains("Exit code: 3"))
-        assertTrue(record.contains("Showed a window: no"))
-        assertTrue(record.trimEnd().endsWith("one\ntwo"))
+    fun `Wine prints errors by default`() {
         assertEquals("-all,err+all", WineLaunchPlan.DEFAULT_WINEDEBUG)
+        assertEquals("wine", WinePresentation.RUN_RECORD_PREFIX)
     }
 
     @Test

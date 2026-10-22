@@ -9415,6 +9415,34 @@ diagnostics packs the logs folder, so the record travels with it. Wine prints er
 `-all,err+all`, `WineLaunchPlan.DEFAULT_WINEDEBUG`), never the full trace, which would flood the kept tail; a
 prefix's own `WINEDEBUG` still wins.
 
+**The record holds what Wine printed, and what the game wrote** (Droidtop/tracker#601, console, 2026-10-22: Clover
+Days stayed black and the record said "Last 0 lines Wine printed"). Two defects made it empty. The guest's
+output was read back through the screen's reference to its session, and stopping a game (Quick Menu Stop, Back out)
+drops that reference before the kill is reported (`WineGameActivity` `ownScreen.stop`, `onDestroy`, `showFailure`), so
+every stopped run read nothing; and the end of the process is reported before the threads reading its pipes have
+delivered the last lines. Now `WineXSession` owns one `RunLogCollector` (library-core, `diagnostics/RunLog.kt`) per
+run, fed by gamenative's launcher from both the guest's stdout and stderr; it waits until the output has been quiet
+for a moment (at most 1.5 s) and hands the tail to the screen with the exit status, so no reference to the session
+is needed. Each line also goes to logcat under `droidtop.wine` as it arrives (the first 3000 lines of a run, then
+one notice). The collector keeps the last 200 lines, each cut at 600 characters.
+
+Beside Wine's output the record carries the game's own logs, which usually hold the real cause: after the run,
+`WineGameLogs` finds, and `RunRecords.attach` copies the last 64 KiB of, each of these (at most six files; each says
+when it was modified and whether that is during this run): a Unity game's `Player.log` and `Player-prev.log`
+(`<prefix>/drive_c/users/*/AppData/LocalLow/<Company>/<Product>/`, the company and product being the two lines of
+`<Product>_Data/app.info`, or any company's folder for the product when that file is missing), an older Unity game's
+`<Product>_Data/output_log.txt`, and common log names next to the executable (`output_log.txt`, `log.txt`,
+`debug.log`, `error.log`, `crash.log`, `game.log`, `stdout.txt`, `stderr.txt` and a few like them, and
+`<exe name>.log`; any case). Nothing else in the game's folder is searched.
+
+A short history is kept: the newest record is `logs/wine-last.log`, and each run is also its own file,
+`logs/wine-run-<game>-<time>.log`, with the last three runs of each game and twelve in all kept (`RunRecords.save`;
+the game is its library id, or the program's name). All of them sit directly in the logs folder, so Share
+diagnostics packs them (a record is at most `RunRecords.MAX_RECORD_BYTES`, under the per-file cap it applies). One
+collector and one record writer serve every kind of run: Wine's is the first user, and a "Report a problem" flow
+(Droidtop/tracker#601 asks for one for Wine's black screens) takes the same `RunLogCollector` for the output of what it
+runs and `RunRecords.save` with its own prefix, not a second mechanism.
+
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
 on screens of its own (its failure screen, its crash watch, its problem report). So an Enginehost launch that

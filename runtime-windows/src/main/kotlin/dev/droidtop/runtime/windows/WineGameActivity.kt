@@ -16,6 +16,7 @@ import android.widget.TextView
 import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.PadMouse
 import dev.droidtop.library.PadMousePrefs
+import dev.droidtop.library.diagnostics.RunRecords
 import dev.droidtop.runtime.windows.data.TouchGestureConfig
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
@@ -96,6 +97,13 @@ class WineGameActivity : Activity() {
 
     /** What this run started, for its record in logs/wine-last.log. */
     private var launchTarget: String? = null
+
+    /** Where this run's game and prefix are, for finding the logs the game wrote itself (WineGameLogs). */
+    private var gameWorkingDir: File? = null
+    private var prefixRoot: File? = null
+
+    /** When the run started, on the wall clock (startedAtMs is the monotonic one): to tell a log this run wrote. */
+    private var startedAtWallMs = 0L
 
     /** What the Quick Menu's Game section reaches this screen through (Resume is a relaunch, Stop is [stop]). */
     private val ownScreen = object : OwnGameScreens.Screen {
@@ -201,6 +209,8 @@ class WineGameActivity : Activity() {
         // File(...).name would keep the whole of one on Android.
         WinePresentation.fullscreenWMClass(target)?.let { renderer.forceFullscreenWMClass = it }
         launchTarget = target
+        gameWorkingDir = workingDir
+        prefixRoot = File(prefix.rootDir, ".wine")
 
         winHandler = WinHandler(xServer, view).also { handler ->
             xServer.winHandler = handler
@@ -265,6 +275,7 @@ class WineGameActivity : Activity() {
         val session = WineXSession(this, prefix, target, workingDir, xServer, arguments)
         this.session = session
         startedAtMs = SystemClock.elapsedRealtime()
+        startedAtWallMs = System.currentTimeMillis()
         startupExecutor.execute {
             runCatching { session.start(::onGuestTerminated) }
                 .onFailure { failure ->
@@ -283,26 +294,55 @@ class WineGameActivity : Activity() {
      * started" named droidtop and gave emulator advice for a Windows game
      * (Droidtop/tracker#302).
      */
-    private fun onGuestTerminated(status: Int) {
+    private fun onGuestTerminated(status: Int, output: String) {
         val ranMs = SystemClock.elapsedRealtime() - startedAtMs
-        val output = session?.output().orEmpty()
         val report = WinePresentation.exitReport(status, ranMs, guestShowedWindow, output, tool = tool != null)
         Timber.i("Wine exited %d after %d ms", status, ranMs)
         // Every run leaves a trace (console, 2026-10-17: three failed launches of one game and none could be read
-        // afterwards): one logcat line, and the run's record in droidtop's logs folder, which Share diagnostics packs.
+        // afterwards): one logcat line (the output itself went to logcat as it was printed), and the run's record
+        // in droidtop's logs folder with the logs the game wrote itself, which Share diagnostics packs.
         android.util.Log.i(WinePresentation.LOG_TAG, "Wine exited $status after $ranMs ms, window shown: $guestShowedWindow")
-        val record = WinePresentation.lastRunLog(launchTarget ?: tool, status, ranMs, guestShowedWindow, output, System.currentTimeMillis())
-        val logs = dev.droidtop.library.ScanLog.logsDir(applicationContext)
-        Thread {
-            runCatching { logs.mkdirs(); java.io.File(logs, WinePresentation.LAST_RUN_LOG).writeText(record) }
-                .onFailure { android.util.Log.w(WinePresentation.LOG_TAG, "could not write ${WinePresentation.LAST_RUN_LOG}", it) }
-        }.start()
+        writeRunRecord(status, ranMs, output)
         runOnUiThread {
             // The person left the game (Back): stopping the session killed
             // Wine (code 137), which is the quit itself, not a failure to report.
             if (isFinishing || isDestroyed) return@runOnUiThread
             if (report != null) showFailure(report.detail, title = report.title) else finish()
         }
+    }
+
+    /**
+     * Writes the run's record off the main thread: how it ended, the last lines Wine printed and the game's own
+     * logs ([WineGameLogs]), as `logs/wine-last.log` and the game's short history ([RunRecords.save]).
+     */
+    private fun writeRunRecord(status: Int, ranMs: Long, output: String) {
+        val context = applicationContext
+        val target = launchTarget ?: tool
+        val key = entryId ?: target?.let(WinePresentation::fullscreenWMClass) ?: "unknown"
+        val dirs = WineGameLogs.gameDirs(launchTarget, gameWorkingDir)
+        val prefixDir = prefixRoot
+        val shownWindow = guestShowedWindow
+        val startedWall = startedAtWallMs
+        Thread({
+            runCatching {
+                val attachments = WineGameLogs.find(dirs, prefixDir, launchTarget).mapNotNull { RunRecords.attach(it.label, it.file, startedWall) }
+                val now = System.currentTimeMillis()
+                val record = RunRecords.render(
+                    heading = "Wine run",
+                    facts = listOf(
+                        "Started" to (target ?: "unknown"),
+                        "Exit code" to status.toString(),
+                        "Ran" to "$ranMs ms",
+                        "Showed a window" to if (shownWindow) "yes" else "no",
+                    ),
+                    outputLabel = "Wine printed",
+                    output = output,
+                    attachments = attachments,
+                    nowMs = now,
+                )
+                RunRecords.save(dev.droidtop.library.ScanLog.logsDir(context), WinePresentation.RUN_RECORD_PREFIX, key, record, now)
+            }.onFailure { android.util.Log.w(WinePresentation.LOG_TAG, "could not write the run's record", it) }
+        }, "droidtop-wine-record").start()
     }
 
     /**
@@ -583,25 +623,11 @@ object WinePresentation {
 
     const val LOG_TAG = "droidtop.wine"
 
-    /** The last Wine run's record, in droidtop's logs folder (ScanLog.logsDir), so Share diagnostics carries it. */
-    const val LAST_RUN_LOG = "wine-last.log"
-
-    /** How many of Wine's last lines the record keeps. */
-    const val LAST_RUN_LINES = 200
-
-    /** The record of one Wine run: what it started, how it ended, and the tail of what Wine printed. Pure. */
-    fun lastRunLog(target: String?, status: Int, ranMs: Long, showedWindow: Boolean, output: String, nowMs: Long): String {
-        val lines = output.lines().map(String::trimEnd).filter(String::isNotBlank).takeLast(LAST_RUN_LINES)
-        return buildString {
-            appendLine("Wine run ended at ${java.time.Instant.ofEpochMilli(nowMs)}")
-            appendLine("Started: ${target ?: "unknown"}")
-            appendLine("Exit code: $status")
-            appendLine("Ran: $ranMs ms")
-            appendLine("Showed a window: ${if (showedWindow) "yes" else "no"}")
-            appendLine("Last ${lines.size} lines Wine printed:")
-            lines.forEach { appendLine(it) }
-        }
-    }
+    /**
+     * The newest Wine run's record, in droidtop's logs folder (ScanLog.logsDir), so Share diagnostics carries it;
+     * the last few runs of each game stay beside it as `wine-run-<game>-<time>.log` ([RunRecords.save]).
+     */
+    const val RUN_RECORD_PREFIX = "wine"
 
     /** Wine ending this soon after it started means the game did not really run. */
     const val EXITED_AT_ONCE_MS = 10_000L
