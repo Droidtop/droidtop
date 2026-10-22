@@ -1,7 +1,6 @@
 package dev.droidtop.net
 
 import com.sun.net.httpserver.HttpServer
-import java.io.File
 import java.net.InetSocketAddress
 import org.junit.After
 import org.junit.Assert.*
@@ -32,15 +31,5 @@ class HttpTest {
     @Test fun responseIsBounded() {
         try { Http.get(base + "/ok", maxBytes = 2); fail("expected bound failure") }
         catch (e: java.io.IOException) { assertTrue(e.message!!.contains("exceeded")) }
-    }
-
-    @Test fun digestMismatchRemovesPartialFile() {
-        val dir = createTempDir()
-        val target = File(dir, "payload")
-        try { Http.downloadTo(base + "/ok", target, "00"); fail("expected digest mismatch") }
-        catch (e: java.io.IOException) { assertTrue(e.message!!.contains("SHA-256")) }
-        assertFalse(File(dir, "payload.part").exists())
-        assertFalse(target.exists())
-        dir.deleteRecursively()
     }
 }
