@@ -98,6 +98,31 @@ object PluginWebAccount {
         return true
     }
 
+    /**
+     * Opens [url] (any https page: the plugin's own site, or a file host its page links to) in droidtop's web view with
+     * [record]'s session, for the person to start the download there (docs/SPEC.md 7g, "Getting an update";
+     * Droidtop/tracker#599): droidtop opens the link the source gave, the person passes whatever the page asks
+     * (a masked link, a captcha, the host's own button) and every download the page starts, up to [max], is handed
+     * back to droidtop with the cookies, user agent and referrer it needs. The session's cookies go only to the
+     * plugin's declared sites; a session the site renewed meanwhile is kept. Nothing when `web.session` is turned off.
+     * Blocks until the view closes: never on the main thread.
+     */
+    fun openForDownloads(context: Context, record: PluginRecord, url: String, max: Int): List<WebSessionDownload> {
+        if (!NetScope.isHttps(url) || NetScope.hostOf(url) == null) return emptyList()
+        val domains = WebSessions.declaredDomains(record.manifest.v2.permissions)
+        val snapshot = PluginGrants.forContext(context).read(record.manifest.id)
+        val grant = PluginGrants.stateOf(record, snapshot, WebSessions.PERMISSION)
+        val vault = PluginVault.forContext(context)
+        // Without the permission the page still opens, signed out: the person may still start a public download.
+        val stored = if (grant == GrantState.GRANTED) WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY)) else null
+        val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (stored != null) domains else emptyList(), stored, null, maxDownloads = max.coerceIn(1, 16))
+        val result = WebSessionActivity.show(context, request)
+        result.session?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {
+            vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, it.copy(account = stored?.account).toJson())
+        }
+        return result.downloads.take(max)
+    }
+
     /** The line shown when [open] kept no session: the person backed out, or the permission is off. */
     fun notKept(pluginLabel: String, need: Need): String = when (need) {
         Need.SIGN_IN -> "Not signed in. If $pluginLabel's sign-in is turned off, turn it on in its Permissions"

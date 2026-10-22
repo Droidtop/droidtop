@@ -480,18 +480,72 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         return (0 until minOf(rows.length(), MAX_CANDIDATES)).mapNotNull { rows.optJSONObject(it)?.let(::found) }
     }
 
+    // The last page each source gave for a record (Droidtop/tracker#599): shown at once, and its links are the ones
+    // the person picks from.
+    private val records = RecordCache(java.io.File(app.filesDir, "source-records"))
+
+    override fun savedRecord(source: String, externalId: String): dev.droidtop.library.UpdateSources.RecordAnswer? {
+        val saved = records.load(source, externalId) ?: return null
+        val parsed = parseRecord(saved.record, externalId) ?: return null
+        return dev.droidtop.library.UpdateSources.RecordAnswer(parsed, savedAtMs = saved.savedAtMs)
+    }
+
     override suspend fun record(source: String, externalId: String): dev.droidtop.library.UpdateSources.RecordAnswer {
         val reply = call(source, "record", JSONObject().put("id", externalId), QUICK_BUDGET_MS, userInitiated = true)
-            ?: return dev.droidtop.library.UpdateSources.RecordAnswer(null, "The source $source is not installed or not running")
-        if (!reply.ok) {
-            return dev.droidtop.library.UpdateSources.RecordAnswer(
-                null,
-                reply.message ?: "The source did not answer",
-                unsupported = reply.code == dev.droidtop.pluginhost.PluginErrorCode.UNSUPPORTED,
-            )
+        if (reply == null || !reply.ok) {
+            val failure = reply?.message ?: if (reply == null) "The source $source is not installed or not running" else "The source did not answer"
+            // A source that cannot answer now: droidtop's saved copy, which says when it was saved.
+            savedRecord(source, externalId)?.let { return it.copy(failure = failure) }
+            return dev.droidtop.library.UpdateSources.RecordAnswer(null, failure, unsupported = reply?.code == dev.droidtop.pluginhost.PluginErrorCode.UNSUPPORTED)
         }
-        val parsed = reply.data.optJSONObject("record")?.let { parseRecord(it, externalId) }
+        val raw = reply.data.optJSONObject("record")
+        val parsed = raw?.let { parseRecord(it, externalId) }
+        if (raw != null && parsed != null) runCatching { records.save(source, externalId, raw) }
         return dev.droidtop.library.UpdateSources.RecordAnswer(parsed, if (parsed == null) "The source sent no page for this record" else null)
+    }
+
+    override suspend fun openDownload(
+        source: String,
+        externalId: String,
+        url: String,
+        fallbackUrl: String?,
+        version: String?,
+        gameName: String,
+        newest: dev.droidtop.library.LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String {
+        val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
+        val label = entry.label ?: record.manifest.label
+        val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
+        onStatus("Start the download on the page that opens")
+        // The link the record gave, opened as it is: the person starts the download there (Droidtop/tracker#599). A link
+        // that no longer works starts nothing, so the record's own page opens next for the person to pick again.
+        var captured = dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(app, record, url, dev.droidtop.pluginhost.DownloadJobs.MAX_FILES)
+        if (captured.isEmpty() && fallbackUrl != null && fallbackUrl != url) {
+            onStatus("That link started nothing. Pick the download again on ${label}'s page")
+            captured = dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(app, record, fallbackUrl, dev.droidtop.pluginhost.DownloadJobs.MAX_FILES)
+        }
+        if (captured.isEmpty()) return "Nothing was downloaded from that page"
+        val descriptors = UpdateLinks.descriptorsFor(captured)
+        val title = "Download $name"
+        val done = AcquireDownload.run(app, record, title, JSONObject(), emptyMap(), descriptors, onStatus, update = placement)
+        return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
+    }
+
+    /**
+     * Where an update of the game whose newest version is [newest] lands (7m): the job arguments of its new version folder
+     * beside that version's, with the saves to bring along, and the folder's name. A failure says why in one sentence.
+     */
+    private fun placementFor(label: String, gameName: String, version: String?, newest: dev.droidtop.library.LibraryEntry): Result<Pair<Map<String, String>, String>> {
+        val folder = dev.droidtop.library.PcRunnerOptions.gameFolderFor(newest) ?: return Result.failure(IllegalStateException("The game's newest version has no folder on this device"))
+        val games = folder.parentFile ?: return Result.failure(IllegalStateException("The game's folder has no folder above it"))
+        val name = UpdatePlacement.folderName(gameName, version) ?: return Result.failure(IllegalStateException("$label gave no version to name the new folder by"))
+        if (java.io.File(games, name).exists()) return Result.failure(IllegalStateException("$name is already in ${games.name}"))
+        val engine = dev.droidtop.library.GameEngine.entries.firstOrNull { it.toLibraryEntryKind() == newest.kind }
+        val beside = engine?.let { dev.droidtop.library.EnginesDatabase.defFor(app, it)?.saves?.beside }.orEmpty()
+        val placement = mapOf("destinationPath" to games.absolutePath, dev.droidtop.pluginhost.DownloadJobs.ARG_VERSION_FOLDER to name) +
+            UpdatePlacement.savesArgs(folder, beside)
+        return Result.success(placement to name)
     }
 
     override suspend fun download(
@@ -506,14 +560,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
         val label = entry.label ?: record.manifest.label
         // 7m: the new version is a folder beside the game's newest one; nothing that is there is touched.
-        val folder = dev.droidtop.library.PcRunnerOptions.gameFolderFor(newest) ?: return "The game's newest version has no folder on this device"
-        val games = folder.parentFile ?: return "The game's folder has no folder above it"
-        val name = UpdatePlacement.folderName(gameName, version) ?: return "$label gave no version to name the new folder by"
-        if (java.io.File(games, name).exists()) return "$name is already in ${games.name}"
-        val engine = dev.droidtop.library.GameEngine.entries.firstOrNull { it.toLibraryEntryKind() == newest.kind }
-        val beside = engine?.let { dev.droidtop.library.EnginesDatabase.defFor(app, it)?.saves?.beside }.orEmpty()
-        val placement = mapOf("destinationPath" to games.absolutePath, dev.droidtop.pluginhost.DownloadJobs.ARG_VERSION_FOLDER to name) +
-            UpdatePlacement.savesArgs(folder, beside)
+        val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
         val args = JSONObject().put("source", source).put("id", externalId).put("link", link).apply { version?.let { put("version", it) } }
         val title = "Download $name"
         val result = PluginViews.runJob(app, record, POINT, "download", args, title, onStatus)
@@ -566,12 +613,16 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
             val downloads = row.optJSONArray("downloads")?.let { array ->
                 (0 until minOf(array.length(), MAX_DOWNLOADS)).mapNotNull { i ->
                     val d = array.optJSONObject(i) ?: return@mapNotNull null
-                    val link = d.optString("link").takeIf { it.isNotBlank() && it.length <= MAX_LINK } ?: return@mapNotNull null
+                    // A download is the address droidtop opens itself (Droidtop/tracker#599), the source's token, or both.
+                    val url = d.optString("url").trim().takeIf { it.startsWith("https://") && it.length <= MAX_LINK }
+                    val link = d.optString("link").takeIf { it.isNotBlank() && it.length <= MAX_LINK }
+                    if (url == null && link == null) return@mapNotNull null
                     dev.droidtop.library.UpdateSources.Download(
                         section = d.optString("section").trim().take(80).ifEmpty { "Downloads" },
                         host = d.optString("host").trim().take(80).ifEmpty { "Link" },
                         label = d.optString("label").trim().take(200).ifEmpty { d.optString("host").trim().take(80).ifEmpty { "Download" } },
-                        link = link,
+                        link = link.orEmpty(),
+                        url = url,
                     )
                 }
             }.orEmpty()

@@ -325,7 +325,7 @@ object DownloadJobs {
     }
 
     /** The name of an archive less its extension, or null when [name] is not a zip, 7z or rar file. */
-    internal fun archiveStem(name: String): String? =
+    fun archiveStem(name: String): String? =
         Regex("(?i)^(.+)\\.(zip|7z|rar)$").matchEntire(name)?.groupValues?.get(1)
 
     /** Names the post step that finishes a download of several files, as [registerPost] names one for a single file. */

@@ -12159,6 +12159,16 @@ reimplemented it as my own f95seeker code." So:
   opened the game page before) opens the record of the source that named the
   update; a linked source's row on the game page opens it too. With one source
   linked there is no choice; with several, the one that named the update.
+- **Links are kept and opened, never fetched again (2026-10-22, Droidtop/tracker#599).** The owner: "We shouldn't be
+  fetching links again ... we should cache links as well, and then use the webview to open them. The user can start
+  the download, and it'll be kicked over automatically." droidtop saves each record the source gives
+  (`RecordCache`, one file per record) and shows the saved copy at once, saying when it was saved, while the source
+  is asked again; a source that cannot answer leaves the saved copy on screen. A download that carries its address
+  (`url`) is opened in droidtop's web view with the source's session: the person passes whatever the page asks (a
+  masked link, a captcha, the host's button) and starts the download, and every file the page starts (up to 16, the
+  parts of a split archive among them) is taken into droidtop's Downloads with the cookies, user agent and referrer it
+  needs (`UpdateLinks`), unpacked when it is an archive, and placed as below. A link that starts nothing opens the
+  record's own page next, so the person can pick again; it is never an error with no way forward.
 - **Picking a link downloads that version for droidtop to place.** It is the
   source's `download` job (A6), whose reply is an `acquire` reply (A2: one
   file, several, captured in the signed-in web view, `unpack`), so it is one

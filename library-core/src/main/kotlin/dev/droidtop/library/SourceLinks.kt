@@ -70,8 +70,12 @@ interface UpdateSources {
     /** Records that may be the game called [title] with [versions], best first, for a person to pick from. */
     suspend fun match(source: String, title: String, versions: List<String>): List<Found>
 
-    /** One link of a record's Downloads tab: the source's heading, the file host, what the link says, and its token. */
-    data class Download(val section: String, val host: String, val label: String, val link: String)
+    /**
+     * One link of a record's Downloads tab: the source's heading, the file host, what the link says, and either the
+     * address droidtop opens itself in its web view ([url], Droidtop/tracker#599) or the token the source's `download`
+     * job takes ([link]).
+     */
+    data class Download(val section: String, val host: String, val label: String, val link: String, val url: String? = null)
 
     /**
      * A record's page, as the source tells it (docs/plugin-api.md 3 A6 `record`); droidtop draws it (docs/SPEC.md 7g,
@@ -94,11 +98,33 @@ interface UpdateSources {
         val downloads: List<Download> = emptyList(),
     )
 
-    /** What a record page asks for: the record, or why there is none ([unsupported] when the source has no `record`). */
-    data class RecordAnswer(val record: Record?, val failure: String? = null, val unsupported: Boolean = false)
+    /**
+     * What a record page asks for: the record, or why there is none ([unsupported] when the source has no `record`).
+     * [savedAtMs] is set when the record is droidtop's saved copy, not the source's answer just now.
+     */
+    data class RecordAnswer(val record: Record?, val failure: String? = null, val unsupported: Boolean = false, val savedAtMs: Long? = null)
 
-    /** The record's page; a source that cannot answer says why. */
+    /** The record's page; a source that cannot answer says why, and droidtop's saved copy stands in when it has one. */
     suspend fun record(source: String, externalId: String): RecordAnswer = RecordAnswer(null, unsupported = true)
+
+    /** droidtop's saved copy of the record's page, shown at once while the source is asked; null when it has none. */
+    fun savedRecord(source: String, externalId: String): RecordAnswer? = null
+
+    /**
+     * Opens [url], a download link the record gave, in droidtop's web view with the source's session; the person starts
+     * the download there and droidtop takes it over and places it as [download] does. When the page starts nothing (an
+     * expired link), [fallbackUrl], the record's own page, is opened for the person to pick again. Returns the last line.
+     */
+    suspend fun openDownload(
+        source: String,
+        externalId: String,
+        url: String,
+        fallbackUrl: String?,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = "This source cannot open a download"
 
     /**
      * Downloads the version [link] names (the person picked it on the record page) as the source's `download` job and
