@@ -5855,6 +5855,22 @@ one:
 - **Now playing** (Spotify/Discord ambient presence, §7e) -- that section is scoped, not
   built; there is no now-playing store this screen could read.
 - **Running jobs and downloads** -- no second mechanism; the visible download/install queue uses `PluginJobsCenter` / the Jobs screen (`plugin_jobs`) directly (`GamingSettingsCatalog` exposes it as "Downloads and installs", `Droidtop/tracker#85`; it is the only entry, the screen carries that title). No `ScanProgress`/download-queue store is invented -- the existing registry (`entries(): StateFlow<List<Entry>>`) is the one surface every caller reads, controller-first (`CatalogNavigator`'s own `LazyColumn` focus and touch dispatch), with end-user wording ("Downloading…" / "Done" / "Failed", progress % and status line, cancel best-effort). A row's title is the job's own name and its second line who runs it (the plugin, "via" its launcher); the job's page keeps "<plugin>: <name>". Led by the plugin's name, a list from one plugin was ten rows reading "Downloads: ..." once cut to the row (Droidtop/tracker#85, rig 2026-10-14). The value column says how far, then the status line, said once: a paused job whose status is "Paused" read "Paused Paused". No main-thread file/database work: all reads go through the flow, writes stay in the plugin runtime.
+- **Jobs and their results (decided 2026-10-22, Droidtop/tracker#577).** The owner: "we need better informational
+  displays ... per-game scrape results and stuff will need to be handled", kept "after the toast is gone". The jobs
+  center keeps one model for every job, a download or not (`JobModel.kt` in `:plugin-host`): its state
+  (`JobState`: running, held by the download rules, paused, done, failed, read from the entry), its numbers
+  (`JobNumbers`: bytes done and total, download and upload speed, items done and total, each -1 when unknown), where
+  Open goes (`OpenTarget`: a game's page, a folder, a file, or a place), and what it did (`JobReport`: one
+  `ReportItem` per thing it worked on, with its outcome, done, skipped, needs your pick or failed, a detail saying
+  why or where, and its own Open). The screens write every line from these values. A native job reports its
+  numbers and report lines through `JobHandle.current()`, found in its coroutine, so no runner signature changed.
+  **Finished jobs are kept:** the newest 200 (`FINISHED_KEPT`), with their result and report, across restarts,
+  until the person clears one (`clear`) or all (`clearFinished`); before this a finished job left the list after
+  15 seconds and never reached storage. The list is written at most once a second (`PERSIST_INTERVAL_MS`), so
+  keeping reports does not bring back the progress lag. **Retry** runs a finished native job again with the
+  arguments it had (`retry`), replacing its row. The Downloads widget and the Home strip read a job's kind from
+  `nativeKind`, as the download rules do; they read `kind`, which is "native" for every job droidtop runs itself,
+  so no native download showed in either.
 
   **Pausable jobs (Droidtop/tracker#174):** a runner opts into checkpoint resume, and only jobs that declare resumability and have reported a checkpoint expose Pause. `PluginJobProgress.checkpoint` reports progress plus a bounded opaque payload; Pause asks the runner to cancel at its cooperative boundary and retains the last payload. Resume starts the same job again with that payload under `droidtop.resume_payload` in its arguments. DataStore persists resumable job identity, arguments and checkpoint off the main thread; restored work is paused and can be restarted if its plugin and capability are still available. Jobs without runner support or a checkpoint remain non-pausable.
 

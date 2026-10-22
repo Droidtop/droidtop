@@ -53,19 +53,14 @@ private val Context.pluginJobsStore by preferencesDataStore(name = "plugin_jobs"
  * filters on `eventJobId == jobId` -- a plain `val` comparison, no race,
  * since [jobId] is fixed before any call that could produce a callback.
  *
- * Process-lifetime only, deliberately -- a job is already bounded by
- * :pluginhost's own process lifetime (docs/SPEC.md 12a: a job's plugin
- * process dying takes the job with it), so nothing here claims to
- * survive :app's own process death either. A finished job's [Entry]
- * stays in [entries] until the next call touches this object (another
- * job starting or finishing), then anything older than
- * [FINISHED_RETENTION_MS] is dropped -- no background timer for a
- * launcher-scale job count; a Jobs screen already re-reads on every
- * (re)entry per [dev.droidtop.library.settings.CatalogScreen]'s own
- * contract, which is enough to keep this feeling live.
+ * Kept across restarts ([encodeEntries]): an unfinished resumable job comes back paused (a reattaching kind runs
+ * again), and the newest [FINISHED_KEPT] finished jobs come back with their results and reports, so what a job did
+ * stays readable after its toast (docs/SPEC.md "Jobs and their results", Droidtop/tracker#577) until the person
+ * clears it ([clear], [clearFinished]).
  */
 object PluginJobsCenter {
-    private const val FINISHED_RETENTION_MS = 15_000L
+    /** How many finished jobs are kept, newest first, with their reports, across restarts. */
+    internal const val FINISHED_KEPT = 200
     private const val NATIVE_OWNER_ID = "droidtop"
     private const val NATIVE_OWNER_LABEL = "Library"
 
@@ -99,7 +94,27 @@ object PluginJobsCenter {
          * running when droidtop stopped (a restart, a self-update) is not this, and a reattaching kind resumes it.
          */
         val pausedByPerson: Boolean = false,
-    )
+        /** The job's numbers ([JobNumbers]); null when it reports only a percent and a line. */
+        val numbers: JobNumbers? = null,
+        /** What the job did, line by line, kept after it ends ([JobReport]). */
+        val report: JobReport? = null,
+        /** Where Open on the job goes: the game it installed, the folder it filled. */
+        val open: OpenTarget? = null,
+        /** When it ended; null while it runs. */
+        val finishedAtMs: Long? = null,
+        /** A finished native job can be run again with its arguments ([retry]). */
+        val retryable: Boolean = false,
+    ) {
+        /** Where the job stands, from its flags. */
+        val state: JobState
+            get() = when {
+                done && result?.ok == false -> JobState.FAILED
+                done -> JobState.DONE
+                paused && hold != null -> JobState.HELD
+                paused -> JobState.PAUSED
+                else -> JobState.RUNNING
+            }
+    }
 
     /**
      * How a job's own [PluginJobRunner] is built. Production code never
@@ -132,6 +147,8 @@ object PluginJobsCenter {
     private data class NativeSpec(val kind: String, val args: Map<String, String>)
     private val nativeRunners = ConcurrentHashMap<String, NativeJobRunner>()
     private val nativeSpecs = ConcurrentHashMap<String, NativeSpec>()
+    // A finished native job's kind and arguments, for Retry; kept as long as its row is.
+    private val finishedSpecs = ConcurrentHashMap<String, NativeSpec>()
     private val nativeJobs = ConcurrentHashMap<String, Job>()
     private val nativeCompletions = ConcurrentHashMap<String, (PluginResult) -> Unit>()
     private val nativeCancelHooks = ConcurrentHashMap<String, (args: Map<String, String>, checkpoint: String?) -> Unit>()
@@ -186,11 +203,24 @@ object PluginJobsCenter {
         }
     }
 
+    private val writeQueued = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * Writes the list at most once per [PERSIST_INTERVAL_MS]: with finished jobs and their reports kept, encoding it
+     * on every progress tick would bring back the lag the progress throttle removed. The last state always lands.
+     */
     private fun persist() {
         val context = persistenceContext ?: return
-        val snapshot = encodeEntries(state.value)
-        persistenceScope.launch { context.pluginJobsStore.edit { it[persistedKey] = snapshot } }
+        if (!writeQueued.compareAndSet(false, true)) return
+        persistenceScope.launch {
+            delay(PERSIST_INTERVAL_MS)
+            writeQueued.set(false)
+            val snapshot = encodeEntries(state.value)
+            context.pluginJobsStore.edit { it[persistedKey] = snapshot }
+        }
     }
+
+    internal const val PERSIST_INTERVAL_MS = 1_000L
 
     /** Live, ordered (newest first) view of every tracked job, running or recently finished -- what the Jobs screen and any inline progress row both read. */
     fun entries(): StateFlow<List<Entry>> = state
@@ -245,7 +275,7 @@ object PluginJobsCenter {
             { _, eventJobId, result ->
                 if (eventJobId == jobId) {
                     PluginBrokers.jobEnded(jobId)
-                    update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
+                    update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100, finishedAtMs = System.currentTimeMillis()) }
                     if (!deferred.isCompleted) deferred.complete(result)
                     onComplete(result)
                     runners.remove(jobId)?.shutdown()
@@ -414,7 +444,7 @@ object PluginJobsCenter {
             if (now.paused || now.done) return
             update(jobId) { it.copy(percent = report.percent, statusLine = report.status, resumePayload = report.checkpoint ?: it.resumePayload) }
         }
-        nativeJobs[jobId] = nativeScope.launch(nativeDispatcher) {
+        nativeJobs[jobId] = nativeScope.launch(nativeDispatcher + JobHandle(jobId)) {
             // A paused run may still be reaching its next boundary; never two at once.
             previous?.join()
             try {
@@ -443,9 +473,10 @@ object PluginJobsCenter {
     internal const val PROGRESS_INTERVAL_MS = 250L
 
     private fun finishNative(jobId: String, result: PluginResult) {
+        nativeSpecs[jobId]?.let { finishedSpecs[jobId] = it }
         update(jobId) {
             it.copy(
-                done = true, result = result, percent = 100,
+                done = true, result = result, percent = 100, finishedAtMs = System.currentTimeMillis(), retryable = true,
                 statusLine = if (result.ok) result.values["summary"] ?: "Done" else (result.error ?: "Failed"),
             )
         }
@@ -484,7 +515,7 @@ object PluginJobsCenter {
             } else {
                 PluginResult.failure(reply.message ?: "failed")
             }
-            update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100) }
+            update(jobId) { it.copy(done = true, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), percent = 100, finishedAtMs = System.currentTimeMillis()) }
             brokeredJobs.remove(jobId)
             prune()
         }
@@ -569,7 +600,7 @@ object PluginJobsCenter {
             }
             val runner = runners[jobId] ?: runnerFactory(context, { _, _, _, _, payload ->
                 if (payload != null) update(jobId) { it.copy(resumePayload = payload) }
-            }, { _, _, result -> update(jobId) { it.copy(done = true, paused = false, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed")) } }).also { runners[jobId] = it }
+            }, { _, _, result -> update(jobId) { it.copy(done = true, paused = false, result = result, statusLine = if (result.ok) "Done" else (result.error ?: "Failed"), finishedAtMs = System.currentTimeMillis()) } }).also { runners[jobId] = it }
             val accepted = runner.resumeJob(record, capability, spec.args, jobId, checkpoint)
             if (!accepted) update(jobId) { it.copy(paused = true, statusLine = "Resume failed") }
         }
@@ -584,41 +615,128 @@ object PluginJobsCenter {
         persist()
     }
 
+    /** Keeps the newest [FINISHED_KEPT] finished jobs; the rest are forgotten. */
     private fun prune() {
-        val cutoff = System.currentTimeMillis() - FINISHED_RETENTION_MS
-        state.update { current -> current.filter { !it.done || it.startedAtMs > cutoff } }
+        state.update { current -> keepFinished(current, FINISHED_KEPT) }
         persist()
     }
 
+    /** [entries] with only the newest [keep] finished jobs among them, running and paused ones untouched. Pure. */
+    internal fun keepFinished(entries: List<Entry>, keep: Int): List<Entry> {
+        val finished = entries.filter { it.done }.sortedByDescending { it.finishedAtMs ?: it.startedAtMs }.take(keep).map { it.jobId }.toSet()
+        return entries.filter { !it.done || it.jobId in finished }
+    }
+
+    /** Forgets a finished job and its report (the row's Clear). False for a job still running or paused. */
+    fun clear(jobId: String): Boolean {
+        val entry = find(jobId) ?: return false
+        if (!entry.done) return false
+        state.update { list -> list.filterNot { it.jobId == jobId } }
+        finishedSpecs.remove(jobId)
+        persist()
+        return true
+    }
+
+    /** Forgets every finished job (Clear finished). */
+    fun clearFinished() {
+        state.update { list -> list.filterNot { it.done } }
+        finishedSpecs.clear()
+        persist()
+    }
+
+    /**
+     * Runs a finished native job again with the arguments it had (Retry). Its own row is replaced by the new run.
+     * Null when the job is not one droidtop can run again (a plugin's job, or one from before this was kept).
+     */
+    fun retry(context: Context?, jobId: String): String? {
+        val entry = find(jobId) ?: return null
+        if (!entry.done) return null
+        val spec = finishedSpecs[jobId] ?: return null
+        val started = startNative(context, spec.kind, entry.title, spec.args, owner = entry.pluginLabel, pausable = entry.pausable) ?: return null
+        clear(jobId)
+        return started
+    }
+
+    internal fun setNumbers(jobId: String, numbers: JobNumbers) {
+        val now = find(jobId) ?: return
+        if (now.done || now.paused) return
+        state.update { current -> current.map { if (it.jobId == jobId) it.copy(numbers = numbers) else it } }
+    }
+
+    internal fun addReportItem(jobId: String, item: ReportItem) {
+        state.update { current ->
+            current.map { entry ->
+                if (entry.jobId != jobId) return@map entry
+                val items = (entry.report?.items.orEmpty() + item).takeLast(JobReport.MAX_ITEMS)
+                entry.copy(report = JobReport(items))
+            }
+        }
+    }
+
+    internal fun setOpen(jobId: String, target: OpenTarget?) {
+        update(jobId) { it.copy(open = target) }
+    }
+
+    /**
+     * What survives a restart: every unfinished resumable job, restored paused, and the newest [FINISHED_KEPT]
+     * finished jobs with their results and reports, so what a job did is still there after the toast and the restart.
+     */
     internal fun encodeEntries(entries: List<Entry>): String = JSONArray().apply {
-        entries.filter { it.resumable && !it.done }.forEach { e ->
+        entries.filter { (it.resumable && !it.done) || it.done }.forEach { e ->
             val spec = resumeSpecs[e.jobId]
-            val nativeSpec = nativeSpecs[e.jobId]
+            val nativeSpec = nativeSpecs[e.jobId] ?: finishedSpecs[e.jobId]
             put(JSONObject().put("id", e.jobId).put("plugin", e.pluginId).put("label", e.pluginLabel).put("title", e.title)
                 .put("started", e.startedAtMs).put("percent", e.percent).put("status", e.statusLine).put("kind", e.kind)
-                .put("pausable", e.pausable).put("resumable", e.resumable).put("payload", e.resumePayload).put("paused", true)
+                .put("pausable", e.pausable).put("resumable", e.resumable).put("payload", e.resumePayload).put("paused", !e.done)
                 .put("pausedByPerson", e.paused && e.hold == null)
                 .put("native", e.nativeKind).put("hold", e.hold).put("capability", spec?.capability?.id ?: e.capability?.id)
-                .put("args", JSONObject().apply { (spec?.args ?: nativeSpec?.args)?.forEach { (k, v) -> put(k, v) } }))
+                .put("args", JSONObject().apply { (spec?.args ?: nativeSpec?.args)?.forEach { (k, v) -> put(k, v) } })
+                .apply {
+                    if (e.done) {
+                        put("done", true).put("ok", e.result?.ok != false).put("error", e.result?.error)
+                            .put("summary", e.result?.values?.get("summary")).put("finished", e.finishedAtMs ?: e.startedAtMs)
+                            .put("retryable", e.retryable)
+                    }
+                    e.report?.let { put("report", it.encode()) }
+                    put("open", OpenTarget.encode(e.open))
+                })
         }
     }.toString()
 
     internal fun decodeEntries(encoded: String): List<Entry> = try {
         val array = JSONArray(encoded)
-        (0 until array.length()).map { i -> array.getJSONObject(i).let { o -> Entry(
-            jobId = o.getString("id"), pluginId = o.getString("plugin"), pluginLabel = o.getString("label"), capability = null,
-            title = o.getString("title"), startedAtMs = o.getLong("started"), percent = o.optInt("percent", -1),
-            statusLine = o.optString("hold").takeIf { it.isNotEmpty() && it != "null" } ?: "Paused", kind = o.optString("kind", "plugin"), pausable = o.optBoolean("pausable"),
-            resumable = o.optBoolean("resumable"), resumePayload = o.optString("payload").takeIf { it.isNotEmpty() && it != "null" }, paused = true,
-            nativeKind = o.optString("native").takeIf { it.isNotEmpty() && it != "null" },
-            hold = o.optString("hold").takeIf { it.isNotEmpty() && it != "null" },
-            // An entry saved before this was recorded reads as running when droidtop stopped, as restore treated it.
-            pausedByPerson = o.optBoolean("pausedByPerson", false),
-        ).also { entry ->
-            val cap = PluginCapability.fromId(o.optString("capability"))
-            val args = buildMap { o.optJSONObject("args")?.let { a -> a.keys().forEach { put(it, a.optString(it)) } } }
-            if (entry.nativeKind != null) nativeSpecs[entry.jobId] = NativeSpec(entry.nativeKind, args)
-            else if (entry.pausable && entry.resumable && cap != null) resumeSpecs[entry.jobId] = ResumeSpec(null, cap, args)
-        } } }
+        fun JSONObject.text(key: String): String? = optString(key).takeIf { it.isNotEmpty() && it != "null" }
+        (0 until array.length()).map { i -> array.getJSONObject(i).let { o ->
+            val done = o.optBoolean("done", false)
+            val result = if (!done) null else if (o.optBoolean("ok", true)) {
+                PluginResult.success(o.text("summary")?.let { mapOf("summary" to it) }.orEmpty())
+            } else {
+                PluginResult.failure(o.text("error") ?: "Failed")
+            }
+            Entry(
+                jobId = o.getString("id"), pluginId = o.getString("plugin"), pluginLabel = o.getString("label"), capability = null,
+                title = o.getString("title"), startedAtMs = o.getLong("started"), percent = o.optInt("percent", -1),
+                statusLine = if (done) o.text("status") ?: "Done" else o.text("hold") ?: "Paused",
+                kind = o.optString("kind", "plugin"), pausable = o.optBoolean("pausable"),
+                resumable = o.optBoolean("resumable"), resumePayload = o.text("payload"), paused = !done,
+                nativeKind = o.text("native"),
+                hold = if (done) null else o.text("hold"),
+                // An entry saved before this was recorded reads as running when droidtop stopped, as restore treated it.
+                pausedByPerson = !done && o.optBoolean("pausedByPerson", false),
+                done = done, result = result,
+                finishedAtMs = if (done) o.optLong("finished") else null,
+                retryable = done && o.optBoolean("retryable", false),
+                report = JobReport.decode(o.text("report")),
+                open = OpenTarget.decode(o.text("open")),
+            ).also { entry ->
+                val cap = PluginCapability.fromId(o.optString("capability"))
+                val args = buildMap { o.optJSONObject("args")?.let { a -> a.keys().forEach { put(it, a.optString(it)) } } }
+                when {
+                    entry.nativeKind != null && done -> finishedSpecs[entry.jobId] = NativeSpec(entry.nativeKind, args)
+                    entry.nativeKind != null -> nativeSpecs[entry.jobId] = NativeSpec(entry.nativeKind, args)
+                    !done && entry.pausable && entry.resumable && cap != null -> resumeSpecs[entry.jobId] = ResumeSpec(null, cap, args)
+                }
+            }
+        } }
     } catch (_: Exception) { emptyList() }
 }

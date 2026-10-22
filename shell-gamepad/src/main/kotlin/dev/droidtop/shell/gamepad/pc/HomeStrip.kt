@@ -143,7 +143,7 @@ internal fun rememberHomeStrip(all: List<LibraryEntry>, systemNames: Map<String,
                 systemOf = { it.systemId },
             )
             val whatsNew = HomeModel.whatsNew(HomeModel.updates(all), added, pluginUpdates = pluginUpdates, attention = attention.size)
-            val downloads = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.kind) }.map { job ->
+            val downloads = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.nativeKind) }.map { job ->
                 HomeCard.Download(job.jobId, job.title, job.percent, remainingSeconds = 0L, paused = job.paused)
             }
             val running = jobs.firstOrNull { !it.done && !it.paused }
