@@ -11,9 +11,12 @@ import dev.droidtop.library.consoles.RomDatabase
 import dev.droidtop.library.esDeSystemName
 import dev.droidtop.library.groupingPath
 import dev.droidtop.library.toLibraryEntryKind
-import JobHandle
-import OpenTarget
-import Outcome
+import dev.droidtop.pluginhost.JobHandle
+import dev.droidtop.pluginhost.JobNumbers
+import dev.droidtop.pluginhost.MetadataFields
+import dev.droidtop.pluginhost.OpenTarget
+import dev.droidtop.pluginhost.Outcome
+import dev.droidtop.pluginhost.PluginMetadataProtocol
 import dev.droidtop.runtime.prefs.PrefsFile
 import java.io.File
 import kotlinx.coroutines.Dispatchers
