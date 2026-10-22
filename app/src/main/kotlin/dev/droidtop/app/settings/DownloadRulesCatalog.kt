@@ -8,6 +8,7 @@ import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.net.NetworkRule
+import dev.droidtop.net.engine.EnginePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -27,7 +28,10 @@ object DownloadRulesCatalog {
     )
 
     private suspend fun groups(context: Context): List<CatalogGroup> {
-        withContext(Dispatchers.IO) { DownloadPolicy.load(context) }
+        val isolated = withContext(Dispatchers.IO) {
+            DownloadPolicy.load(context)
+            EnginePrefs.androidIsolation(context)
+        }
         val s = DownloadPolicy.settings.value
         return listOf(
             CatalogGroup(
@@ -41,6 +45,19 @@ object DownloadRulesCatalog {
                         options = NetworkRule.values().map { ChoiceOption(it.key, it.label) },
                         current = s.network.key,
                         onSelect = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(network = NetworkRule.fromKey(value)) } },
+                    ),
+                ),
+            ),
+            CatalogGroup(
+                id = "download_rules_engine",
+                title = "Download engine",
+                items = listOf(
+                    ToggleItem(
+                        id = "download_rules_engine_isolation",
+                        title = "Isolate the download engine with Android",
+                        subtitle = "Android 11 and later. The engine always runs in a process of its own with no access to your files; this also gives it a user of its own. Off until it has been checked on the console",
+                        current = isolated,
+                        onToggle = { ctx, value -> withContext(Dispatchers.IO) { EnginePrefs.setAndroidIsolation(ctx, value) } },
                     ),
                 ),
             ),
