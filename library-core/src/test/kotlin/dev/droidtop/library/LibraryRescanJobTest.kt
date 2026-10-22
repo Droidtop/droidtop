@@ -43,9 +43,12 @@ class LibraryRescanJobTest {
         withTimeout(5_000) { while (!LibraryRescan.isRunning) kotlinx.coroutines.delay(10) }
         val job = PluginJobsCenter.entries().value.single { it.nativeKind == LibraryRescanJob.KIND && !it.done }
         assertEquals("Rescan library", job.title)
+        // The row hears the walk's line while it runs; a line is published at most every 250 ms, so it is waited for.
+        withTimeout(5_000) {
+            while (!synchronized(heard) { heard.toList() }.contains("Looking at your games")) kotlinx.coroutines.delay(10)
+        }
         gate.complete(Unit)
         assertEquals("Rescan finished: 3 games.", withTimeout(5_000) { answer.await() })
-        assertTrue(synchronized(heard) { heard.toList() }.contains("Looking at your games"))
         assertTrue(PluginJobsCenter.find(job.jobId)!!.done)
     }
 
