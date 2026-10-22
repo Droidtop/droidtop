@@ -116,7 +116,9 @@ internal fun SourceRecordPage(
     onClose: () -> Unit,
     startTab: RecordTab = RecordTab.OVERVIEW,
 ) {
+    // droidtop's saved copy first, so the page shows at once, then the source's answer (Droidtop/tracker#599).
     val answer by produceState<UpdateSources.RecordAnswer?>(null, source.key, externalId) {
+        value = library.savedSourceRecord(source.key, externalId)
         value = library.sourceRecord(source.key, externalId)
     }
     // A source with no `record` keeps the sheet it had (docs/plugin-api.md 3 A6).
@@ -143,8 +145,17 @@ internal fun SourceRecordPage(
                 val version = record?.version
                 onClose()
                 say("Getting ${version?.let { "v" + it.removePrefix("v") } ?: "the new version"} from ${action.download.host}...")
+                val url = action.download.url
                 scope.launch {
-                    say(library.downloadUpdate(source.key, externalId, action.download.link, version, gameName, newest) { status -> say(status) })
+                    // A link the source gave is opened in droidtop's web view, where the person starts the download and
+                    // droidtop takes it over (Droidtop/tracker#599); a token only the source understands goes to its job.
+                    say(
+                        if (url != null) {
+                            library.openUpdateLink(source.key, externalId, url, record?.url, version, gameName, newest) { status -> say(status) }
+                        } else {
+                            library.downloadUpdate(source.key, externalId, action.download.link, version, gameName, newest) { status -> say(status) }
+                        },
+                    )
                 }
             }
         }
@@ -197,18 +208,24 @@ internal fun SourceRecordPage(
             when {
                 answer == null -> MenuRow(title = "Asking ${source.label}...")
                 record == null -> MenuRow(title = "${source.label} has no page for #$externalId", subtitle = answer?.failure)
-                else -> rows.forEachIndexed { index, row ->
-                    MenuRow(
-                        title = row.title,
-                        value = row.value,
-                        subtitle = if (armed == index) "Press again to download this version. It lands beside your other versions" else row.subtitle,
-                        selected = index == focusIndex,
-                        chevron = row.action != null,
-                        onClick = {
-                            focusIndex = index
-                            act(index)
-                        },
-                    )
+                else -> {
+                    // A saved copy says so: its links are the ones droidtop kept, and the source may have newer ones.
+                    answer?.savedAtMs?.let { saved ->
+                        MenuRow(title = "Saved ${dateFormat.format(Date(saved))}", subtitle = answer?.failure ?: "Asking ${source.label} for the page as it is now...")
+                    }
+                    rows.forEachIndexed { index, row ->
+                        MenuRow(
+                            title = row.title,
+                            value = row.value,
+                            subtitle = if (armed == index) "Press again to download this version. It lands beside your other versions" else row.subtitle,
+                            selected = index == focusIndex,
+                            chevron = row.action != null,
+                            onClick = {
+                                focusIndex = index
+                                act(index)
+                            },
+                        )
+                    }
                 }
             }
         }

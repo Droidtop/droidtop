@@ -1410,6 +1410,29 @@ class Library(
             .getOrElse { UpdateSources.RecordAnswer(null, it.message ?: "The source did not answer") }
     }
 
+    /** droidtop's saved copy of [source]'s record [externalId], for the record page to show at once; null when there is none. */
+    suspend fun savedSourceRecord(source: String, externalId: String): UpdateSources.RecordAnswer? = withContext(Dispatchers.IO) {
+        runCatching { updateSources.savedRecord(source, externalId) }.getOrNull()
+    }
+
+    /**
+     * Opens the download link [url] of [source]'s record in droidtop's web view; what the person downloads there is
+     * placed as a new version folder beside [newest] (docs/SPEC.md 7g, "Getting an update"; Droidtop/tracker#599).
+     */
+    suspend fun openUpdateLink(
+        source: String,
+        externalId: String,
+        url: String,
+        fallbackUrl: String?,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = withContext(Dispatchers.IO) {
+        runCatching { updateSources.openDownload(source, externalId, url, fallbackUrl, version, gameName, newest, onStatus) }
+            .getOrElse { it.message ?: "The download failed" }
+    }
+
     /**
      * Downloads the version [link] of [source]'s record names and places it as a new version folder beside [newest]
      * (docs/SPEC.md 7g, "Getting an update"). Returns the job's last line; the library learns of the folder from the job.
