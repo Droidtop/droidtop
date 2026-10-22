@@ -184,7 +184,10 @@ class SteamStore : StoreLibrary {
             SteamSession.logOn(context).getOrThrow()
             val apps = SteamSession.apps ?: error("Steam is not connected")
             val db = db(context)
-            val fresh = withContext(Dispatchers.IO) { SteamLibrarySync.refreshApp(db, apps, appId) } ?: error("Steam no longer lists this game")
+            // The save list comes in the same answer; kept now so a game's first launch knows its save folder (tracker#580).
+            val fresh = withContext(Dispatchers.IO) {
+                SteamLibrarySync.refreshApp(db, apps, appId) { SteamUfsCache.save(context, appId, it) }
+            } ?: error("Steam no longer lists this game")
             // The branch and the DLC the person chose for this game (DLC and versions); the default is the public branch with every owned DLC.
             val choice = withContext(Dispatchers.IO) { SteamChoices.get(context, appId) }
             val app = SteamBranches.resolve(apps, fresh, choice.branch, choice.password)
@@ -408,7 +411,9 @@ class SteamStore : StoreLibrary {
             SteamSession.use(context) {
                 SteamSession.logOn(context).getOrThrow()
                 val apps = SteamSession.apps ?: return@use null
-                val fresh = withContext(Dispatchers.IO) { SteamLibrarySync.refreshApp(db(context), apps, appId) } ?: return@use null
+                val fresh = withContext(Dispatchers.IO) {
+                    SteamLibrarySync.refreshApp(db(context), apps, appId) { SteamUfsCache.save(context, appId, it) }
+                } ?: return@use null
                 val branch = install.branch.ifBlank { SteamDownload.BRANCH }
                 // A locked branch's manifests are encrypted until its password has opened them.
                 val password = withContext(Dispatchers.IO) { SteamChoices.get(context, appId).branchPasswords[branch] }

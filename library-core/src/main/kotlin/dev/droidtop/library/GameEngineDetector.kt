@@ -1804,7 +1804,7 @@ class EngineGameProvider(
                         ?.let { line -> android.util.Log.i("droidtop.GameEngineDetector", line) }
                     withContext(Dispatchers.IO) { dev.droidtop.library.stores.EnginehostSaves.saveRoot(context, key) }
                 }
-                EngineHost.launch(context, gameRoot, target, resolved.engineVersion, title = entry.title, saveRoot = saveRoot)
+                EngineHost.launch(context, gameRoot, target, resolved.engineVersion, title = entry.title, saveRoot = saveRoot, savesSynced = storeKey != null)
             }
             GameLaunchStrategy.KIRIKIROID2 -> Kirikiroid2.open(context)
             // Both PC strategies go through the PcGameRuntime seam that

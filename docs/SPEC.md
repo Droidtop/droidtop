@@ -13281,18 +13281,35 @@ follows:
   root and path of the game's first `ufs/savefiles` entry, after any `rootoverrides` move and with the account's
   ids put in (`StoreLibrary.saveFolder`, `SaveLayout.saveFolder`), so a Ren'Py game gets its
   `AppData/Roaming/RenPy/<dir>` folder itself. Enginehost and its cores use that folder as the game's save folder
-  without adding one of their own inside it, so droidtop has no engine knowledge and renames nothing. The folder
-  is read from the `ufs` section the sync before the launch cached, so the launch makes the prefix and records the
-  game (`EnginehostSaves.prepare`), syncs, then asks for the folder (`EnginehostSaves.saveRoot`); a game whose
-  cloud names no folder droidtop has (no sync has read it yet, or its only entries are for other systems) is
-  launched without `saveRoot` and saves to the person's own location. A game with entries in several folders is
-  given the first. A refused path (outside shared storage, inside `Android/data`, not writable) falls back to the
-  person's own location; it is accepted from any app the person allowed in App launch access, droidtop with no
-  standing of its own. When the game ends, Enginehost sends droidtop's package `dev.enginehost.GAME_ENDED`
-  (`path`, `saveFolder`, `reason`); `EnginehostGameEndedReceiver` starts the upload job (`StoreSaves.afterExit`)
-  for a folder droidtop launched, and only when `saveFolder` is exactly the folder droidtop passed, which is
-  what Enginehost reports whenever it took it: an engine that saves beside the game, or a refused path, leaves
-  nothing new there to upload.
+  without adding one of their own inside it, so droidtop has no engine knowledge and renames nothing. A single
+  folder with folders nested in it is passed whole and the game maps into it; a game whose entries name several
+  separate folders is given the first, a known gap (owner, 2026-10-22: "if steam provides multiple folders as
+  separate paths, this is a gap. if steam provides a single path that has nested folders, then that's fine. We map
+  into it, as appropriate. It's droidtop's responsibility to provide whatever application we're hooking into the
+  required information to save, but it's that application's responsibility to handle it appropriately"). An entry
+  whose root is the game's own folder is passed like any other (owner: "That's the correct decision"). The launch
+  makes the prefix and records the game (`EnginehostSaves.prepare`), syncs, then asks for the folder
+  (`EnginehostSaves.saveRoot`). **Saves never quietly go unsynced** (owner, 2026-10-22: "we need an intelligent
+  system to make sure that that doesn't HAPPEN. But yeah, enginehost should write saves to the user folder, and
+  tell droidtop when it doesn't work. That's not the user's problem"). Nothing is asked of the person; droidtop
+  prevents the cases where its folder cannot be used, and handles the rest after the game ends:
+  - Steam's save list is kept whenever its product info is read (an install, an update check, a sync:
+    `SteamUfsCache`), so a game's folder is known before its first launch, and the folder the store last named is
+    remembered, so a launch while the store cannot be asked still has it.
+  - droidtop checks the folder against Enginehost's rules before passing it (`acceptablePath`: shared storage or a
+    removable volume, not a volume's root, not `Android/data` or `Android/obb`; `writable`: a file is made in it).
+  - The launch carries the inline key `savesSynced: true` for every game whose saves droidtop syncs, so Enginehost
+    reports in `GAME_ENDED` why it did not take `saveRoot` (`saveRootRefused`, asked of the Enginehost lane on
+    tracker#580). Without a usable `saveRoot`, Enginehost saves to the person's own location, as for any caller.
+  - When the game ends (`dev.enginehost.GAME_ENDED`: `path`, `saveFolder`, `reason`),
+    `EnginehostGameEndedReceiver` decides through `EnginehostSaves.afterGameEnded`: `saveFolder` exactly the folder
+    droidtop passed, which is what Enginehost reports whenever it took it, starts the upload job
+    (`StoreSaves.afterExit`); a `saveFolder` in the game's own folder (an engine that saves beside the game) uploads
+    nothing; any other folder is the person's own location, whose save files are copied into the game's synced
+    folder (missing or older ones, as deep as Steam Auto-Cloud looks, `adopt`) and then uploaded.
+
+  A refused path is accepted from any app the person allowed in App launch access, droidtop with no standing of its
+  own.
 - **Steam Cloud saves** (`StoreLibrary.syncSaves`, `StoreSaves` in `:library-core`,
   `SteamCloudSync` in `:stores`; owner, 2026-10-08, Droidtop/tracker#313: "Steam
   Cloud saves: yes"). A game that has cloud saves syncs them into its Wine prefix
