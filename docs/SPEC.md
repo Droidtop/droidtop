@@ -5970,9 +5970,10 @@ source (now `:runtime-windows`, §9):
     (`launchWindows` takes the entry id; it used to launch every game in
     the shared prefix, so a game's own prefix was configurable but never
     used). Going back from an own prefix to the shared one (removing the
-    prefix and the saves in it) is not built; a prefix of its own on any build, and
-    the way back, are decided in "Per-game prefixes, the way back, and what a
-    game can reach" below. gamenative's full dialog
+    prefix and the saves in it) is not built; a list of managed prefixes
+    (any game or app in any of them, today's shared prefix one entry) and the
+    way back are decided in "Per-game prefixes, the way back, and what a game
+    can reach" below. gamenative's full dialog
     stays reachable as "All prefix settings" (for a game in the shared
     prefix, "All shared prefix settings", which apply to every game in it).
     One source of truth for the build a launch uses: the container
@@ -6153,38 +6154,58 @@ is no way back from it. A prefix is a full copy of Wine's own files, made
 when the container is created (5b), which is why droidtop avoids making one
 per game.
 
-**1. A prefix of its own is a choice, on any Wine build.** The game's "Wine
-and graphics" screen (`WineOptionsCatalog`) gets a row, "Prefix", with two
-values: "Shared with other games" (the default, as now) and "This game's
-own". Choosing the second makes the game's prefix on the Wine build it is
-already using (`PcContainers.createOwn`, no longer only when the build
-differs). The row says in one line what changes: own prefix, own settings
-and registry, its own copy of whatever the game installs; the saves in it
-stay with the game. Starting state: fresh from the Wine build's base prefix
-(5b), not a copy of the shared one; "Start from a copy of the shared prefix"
-is a second choice on the same row for a game that needs something the
-shared prefix already has (a runtime installed in it). A game's launch-time
-choices over the shared prefix (graphics driver, DXVK, emulator) are
-unchanged and still cost no prefix.
+**1. Managed prefixes, and any game or app in any of them (owner,
+2026-10-22).** "We can allow for shared prefixes as a system. We keep a list
+of managed prefixes, and can run applications in arbitrary ones. Our current
+shared one just gets moved to that system". So droidtop keeps a **list of
+managed prefixes** ("Windows games > Prefixes": name, Wine build, size, the
+games and apps in it). Today's shared prefix becomes one entry of the list
+(named "Shared"), made the default for a game that has no choice, exactly as
+it behaves now. Any game or app can be set to run in any entry: the game's
+"Wine and graphics" screen (`WineOptionsCatalog`) gets a row, "Prefix", whose
+values are the entries plus "New prefix for this game". A game's launch-time
+choices over its prefix (graphics driver, DXVK, emulator) are unchanged and
+cost no prefix. `PcContainers.forGame` resolves the game's entry from this
+choice (a stored prefix id per game) instead of "own id, else the first";
+the id scheme of today's own prefixes (`ownId`) is kept, so a prefix a game
+already has is simply an entry that game points at.
 
-**2. The way back.** "Use the shared prefix again" on the same row.
-Confirmation names the one real consequence: the game then runs on the
-shared prefix's Wine build (which may differ). It then:
+A prefix has its own Wine build; a game moved to an entry runs on that
+entry's build, and the row says so in one line when the build differs from
+the one it ran on.
 
-- copies the game's save locations from its prefix into the shared prefix's
-  user folder (`drive_c/users/*/Documents`, `AppData`, `Saved Games`),
-  never overwriting a name that is already there;
-- does **not** carry registry values across (stated on the confirmation);
-- sets the game's prefix aside, renaming its directory to a name beginning
-  `retired-` in the same folder, and keeps it until the person removes it
-  from "Windows games > Prefixes" (a plain list: name, size, Remove, with a
-  two-step confirmation, `docs/DESIGN-LANGUAGE.md`). Removal is
-  `SafeDelete.clearWithin` fenced to the prefix home (5b), which never
-  follows a link, and for a layer is the library's `sbx_layer_forget`.
+**2. Making a prefix, and the way back.**
 
-Setting aside rather than deleting is deliberate: a delete of a prefix is
-what went wrong on 2026-09-02, and the person can lose the registry of a
-game they configured for a long time.
+- **A new prefix** ("New prefix for this game", or "New prefix" in the list)
+  is made from the Wine build's base prefix (5b), fresh, by one of two means,
+  chosen by what the device can do and never by the person (owner,
+  2026-10-22: "If we have CoW, it's a whole new prefix. If we don't, we want
+  a layer system"):
+  - **Real copy-on-write present** (the prefix's file system supports
+    reflinks, tested once by a clone of a small file at the prefix home; or
+    overlayfs on a device where droidtop already has root through Shizuku
+    or Sui): a whole new prefix, a full copy-on-write copy of the base.
+    Nothing in the broker is needed for dedup.
+  - **Otherwise** (the Retroid Pocket 5: ext4 and f2fs have no reflinks,
+    no user namespaces, no mount rights): a thin layer over the base, served
+    by the broker (5b).
+  The prefix list shows both the same way. "Start from a copy of another
+  prefix" is the other choice for a new prefix (a runtime installed in it).
+- **The way back is choosing another entry.** A game on a prefix made for
+  it goes back to "Shared" (or to any entry) by changing the "Prefix" row.
+  The confirmation names the one consequence: the game then runs on that
+  entry's Wine build. It offers, on by default, "Copy this game's saves
+  to the new prefix": the save locations (`drive_c/users/*/Documents`,
+  `AppData`, `Saved Games`) are copied, never overwriting a name that is
+  already there. Registry values are not carried across (said on the
+  confirmation).
+- **A prefix no game or app uses any more** is listed as "Not used" with
+  Remove beside it; nothing removes it by itself. Removal is two-step
+  (`docs/DESIGN-LANGUAGE.md`), by `SafeDelete.clearWithin` fenced to the
+  prefix home (5b), which never follows a link, and for a layer by the
+  library's `sbx_layer_forget`. Removing a prefix is the deliberate action
+  that went wrong on 2026-09-02, which is why nothing deletes one as a side
+  effect of changing a choice.
 
 **3. What a game can reach.** A Windows game, and a proot container, is
 confined by the sandbox library's broker (5b), and what the broker lets it
@@ -6197,11 +6218,20 @@ it's on us"):
 
 | Reachable | Mode | Where the person sees it |
 | --- | --- | --- |
-| The game's prefix (its own, or the shared one it runs in) and the Wine build's base | prefix read-write, base read-only | "Prefix" row |
+| The game's prefix (the managed prefix it runs in) and the Wine build's base | prefix read-write, base read-only | "Prefix" row |
 | The Wine build, emulators and graphics drivers it loads, Android's system files | read-only; the guest's temporary folder, sockets and shader caches read-write | not shown (the runtime) |
-| The game's own folder | read-write | game page, "Folders" |
+| The game's own folder | read-only, except a subfolder named `saves` or `savegames` (read-write) and the folders the person marks writable | game page, "Folders" |
 | Folders the person shared with it (a save folder on a card, a mod folder) | the mode the person chose | game page, "Folders" |
 | Nothing else | | |
+
+**The game's folder (owner, 2026-10-22).** "Determinant? A folder named
+'saves' or 'savegames', yes. Users can configure it otherwise". The folder is
+read-only by default; a subfolder named `saves` or `savegames` (any case,
+anywhere under it) is writable. The game's "Folders" page lists the writable
+folders and lets the person add or remove others per game. A game that
+writes elsewhere in its folder fails to write there and the audit log names
+the path, which is how a person finds the folder to add; no prompt appears
+in the middle of play.
 
 Not in the list, and so refused by the broker: droidtop's own private
 folders, every other game's prefix, other games' folders, and the rest of
@@ -6211,8 +6241,8 @@ internal storage and the SD card. Deleting or rewriting any of it is refused
 **4. Two wide grants, off by default (owner's decision, 2026-10-17).** The
 two maps that make a game see more than its list are permission toggles in
 the same Allow/Deny style as plugin permissions (12a, plugin permissions;
-7k "Asking before a change"), on the game, or on the prefix it runs in (a
-prefix's toggle covers every game in it; a game's page shows "Allowed by
+7k "Asking before a change"), on the game, or on the managed prefix it runs in (a
+prefix's toggle covers every game and app in it; a game's page shows "Allowed by
 its prefix" so the source is visible). Both are off for every game and every
 prefix, including every existing one, until the person turns one on.
 
@@ -6279,20 +6309,33 @@ wide today. Decision: the shared-storage bind becomes the "All internal
 storage" toggle above and is off for a new container; the app-storage bind
 is removed from the default (it exists for
 `ContainerLayout.hostStorageToContainerPath`, which Windows launches do not
-use and which is given only the folders a container needs); containers that
-exist keep working because their toggle is created in the state their bind
-is in now, **on**, shown as a grant, with a notice (7k) the first time the
-person opens the container saying so and offering Turn off. That keeps the
-owner's "nothing is allowed without a user-revocable entry" without
-breaking what exists silently.
+use and which is given only the folders a container needs); existing
+containers get the same: the toggle is **off** for them too, not migrated as
+on (owner, 2026-10-22: "Nope, turn it off. If it breaks, we fix it then.").
+A container that relied on the bind loses it on its next start; the person
+turns the toggle on, and the audit log of the refused paths says what
+failed.
 
-**6. Where the toggles are stored.** In the prefix's and the game's settings
+**6. Running without the protection (owner, 2026-10-22).** "No, not
+prompted. It can be a presented toggle when 'risky actions' is enabled, but
+it's gated and never recommended." There is no prompt and no "run anyway"
+when protection fails to start: that launch is refused with the reason. A
+toggle, "Run without protection", appears on a game or prefix only while
+droidtop's risky-actions setting is on; it is off by default, never offered
+as a fix, and never suggested in text. It is the same kind of grant as the
+two above (shown, revocable).
+
+**7. Where the toggles are stored.** In the prefix's and the game's settings
 next to the other prefix settings (`WineGameOptionsPrefs` for a game,
 the container's own record for a prefix), read by `WineGrants` (5b), which
 turns toggles, shares and the game's folder into the broker's rules. There
 is no other copy of the list.
 
-Open items for the owner are on Droidtop/tracker#584.
+Decided with the owner on 2026-10-22 (Droidtop/tracker#584): "All internal
+storage" and "Device system folders" exclude droidtop's private folders and
+other games' prefixes (a longer deny, "7: Yes"), and Wine uses the sandbox
+library's platform read-only preset shared with Enginehost ("8: Yes").
+Open: a stronger mechanism than the in-proot check for proot (5b).
 
 ### PC launch wiring: the `PcGameRuntime` seam (directed 2026-08-31)
 
@@ -6323,8 +6366,9 @@ picked it. They are now real launches, through a seam:
   game: an engine game should run in the environment the user already
   configured, and spawning multi-hundred-megabyte prefixes per title
   uninvited would be its own bug. A game gets a prefix of its own only
-  when the person picks a different Wine build for it (decided 2026-10-22: it
-  is the person's choice on any build, thin once layers exist; 5a); its other Wine
+  when the person picks a different Wine build for it (decided 2026-10-22: any
+  game or app can run in any managed prefix, made by copy-on-write where the
+  device has it and as a thin layer otherwise; 5a); its other Wine
   choices are laid over the shared prefix at launch (§5a).
 - Per-game choice is exposed as a "Runs with: <backend>" chip in the game
   detail screen, backed by `LaunchStrategyOverridePrefs`. Engine games
@@ -6614,9 +6658,14 @@ section "Layers, containment, and Wine and proot under the broker"): one
 containment mechanism for plugins, Enginehost cores, Wine and proot, with no
 second one here. Kernel copy-on-write is not available without root on the
 Retroid Pocket 5 (ext4 and f2fs have no reflinks, overlayfs needs mount
-rights, no user namespaces), so deduplication is the broker's. overlayfs is
-an optional speed-up on a device where droidtop already has root through
-Shizuku or Sui, never required.
+rights, no user namespaces), so there deduplication is the broker's. Where
+real copy-on-write exists (a file system with reflinks, or overlayfs on a
+device where droidtop already has root through Shizuku or Sui) a new prefix
+is a whole copy-on-write copy of the base and needs no layer (owner,
+2026-10-22: "If we have CoW, it's a whole new prefix. If we don't, we want a
+layer system"). The layer is therefore the case for devices without it,
+never required where the kernel does the job, and the broker's containment
+applies to both.
 
 **The shape.**
 
@@ -6627,10 +6676,14 @@ Shizuku or Sui, never required.
   the same container creation that copies Wine's own DLLs into a new
   prefix today (this section's "What the code did"), run into a scratch
   directory, then marked (`0444`/`0555`) and recorded with a content hash.
-- One **layer per prefix**, at the path the prefix has today
-  (`imagefs_shared/home/xuser-<id>`, so `ImageFsHome.root` and every fence
-  keep their meaning). The shared prefix is a layer; a game's own prefix is
-  another layer over the same base. A layer holds only what the game or
+- One **managed prefix** is one entry in droidtop's list of prefixes (5a),
+  at the path a prefix has today (`imagefs_shared/home/xuser-<id>`, so
+  `ImageFsHome.root` and every fence keep their meaning). Without kernel
+  copy-on-write it is a **layer** over the base; with it, a full
+  copy-on-write copy (the probe is one `FICLONE` of a small file at the
+  prefix home, made once and remembered per volume). Today's shared prefix is
+  the entry "Shared"; a game's own prefix is another entry over the same
+  base. A layer holds only what the game or
   droidtop wrote: registry hives, files installed, the drive links,
   droidtop's DXVK and driver DLLs. The broker serves reads from the base,
   copies a base file into the layer on its first write, truncate, rename or
@@ -6648,8 +6701,9 @@ Shizuku or Sui, never required.
   offered action in "Windows games > Prefixes", never automatic.
 
 **Phase 0, the quick first step: symlinks to the base, no broker needed.**
-Before any of the above is built, a new own prefix can already share the
-read-only parts: when droidtop creates a prefix on a Wine build that has a
+Before any of the above is built, a new prefix can already share the
+read-only parts (on a device without real copy-on-write): when droidtop
+creates a prefix on a Wine build that has a
 base, Wine's own DLLs and system files (the files the creation copies out of
 the build and that nothing rewrites) are symbolic links to the base's files
 instead of copies. Rules: only files droidtop and Wine never write are
@@ -6666,16 +6720,21 @@ anything; that is phase 2.
 
 **Phases.**
 
-1. **Phase 0**: base prefix per Wine build, per-game prefix as a choice,
-   the way back (5a), `WideAccess.classify`, the audit run on the rig,
-   symlinked read-only parts. No library change.
+1. **Phase 0**: the list of managed prefixes with today's shared prefix
+   moved into it, any game or app in any entry, base prefix per Wine build,
+   new prefix by reflink copy where the volume has it and symlinked
+   read-only parts otherwise, the way back (5a), `WideAccess.classify`, the
+   audit run on the rig. No library change.
 2. **Phase 1**: sandbox library layers, listing, rename, copy-up
    (library tests), a benchmark on the rig. The prefix becomes a layer.
 3. **Phase 2**: Wine runs under the broker: `WineGrants`, the launch changes
    below, the audit-only run to learn the granted set, then enforcing, then
    the toggles live.
-4. **Phase 3**: proot under the broker (the ordering spike first), the
-   shared-storage and app-storage binds replaced by the toggles.
+4. **Phase 3**: proot under the broker (the ordering spike first, which the
+   owner approved on 2026-10-22; the in-proot check is only a stopgap if
+   it fails, and a stronger mechanism stays open), the shared-storage and
+   app-storage binds replaced by the toggles, off for existing containers
+   too.
 
 **What changes in how droidtop launches Wine.**
 
@@ -6717,9 +6776,12 @@ anything; that is phase 2.
   (`:sandbox-host`, the Kotlin and JNI binding of `vendor/sandbox` and
   nothing about plugins), with `SandboxBroker` keeping the plugin tiers.
 - **`WineGrants`** in `:runtime-windows` (pure, unit-tested like
-  `WineLaunchPlan`): from the prefix and its layer path, the Wine build's
-  base, the runtime set, the game's folder (`workingDir` and the entry's
-  folder), the shares (5a) and the two toggles, it returns the rule list
+  `WineLaunchPlan`): from the managed prefix and its path, the Wine build's
+  base, the runtime set (the sandbox library's platform read-only preset,
+  shared with Enginehost, plus the Wine-specific writable parts), the
+  game's folder read-only with its `saves` and `savegames` subfolders and
+  the folders the person marked writable (5a), the shares and the two
+  toggles, it returns the rule list
   and aliases for the library. This is the only place the granted set
   exists. The tests state it: what is in it, that a wide folder without its
   toggle is not, and that droidtop's private folders and other prefixes
@@ -6727,17 +6789,24 @@ anything; that is phase 2.
 - **If the protection cannot start** (the filter fails to install, the
   broker's socket cannot be made) the launch does not run Wine and says so
   (`PcLaunchResult(false, "...")`), the same refusal a missing Wine build
-  gets. There is no "run anyway" for Wine in this design; see the owner's
-  question on the issue.
+  gets. There is no prompt and no "run anyway" (owner, 2026-10-22: "No, not
+  prompted. It can be a presented toggle when 'risky actions' is enabled,
+  but it's gated and never recommended."). The only way to run unprotected
+  is 5a's "Run without protection" toggle, shown while droidtop's
+  risky-actions setting is on; `WineGrants` returns "no broker" for a game
+  whose toggle is on and the launch then skips `LD_PRELOAD` and the broker.
 - `WineGameActivity` (`WineGameActivity.kt:265-269`) is unchanged: it makes
   the session and starts it. Teardown (`ProcessHelper.killAllWineProcesses`,
   `wineserver -k`) is unchanged; the broker ends when the last Wine process
   closes its connection, and `stop()` closes it explicitly.
 - `PcContainers.forGame` and `createOwn` (`DroidtopPcGameRuntime.kt:651-685`)
-  gain the choice of 5a: `createOwn` makes a layer over the build's base
-  when one exists (a thin prefix), and a full prefix otherwise. The way back
-  is a new function beside them. Both are the one place that knows which
-  prefix a game runs in.
+  gain the model of 5a: `forGame` reads the game's stored prefix id (a list
+  of managed prefixes, any game or app in any entry; the first-container
+  fallback becomes the entry "Shared"), and `createOwn` makes a new entry
+  from the build's base, by reflink copy where the volume has it, as a layer
+  over the base otherwise, and as a full prefix when no base exists yet.
+  Moving a game to another entry is a new function beside them. Both are
+  the one place that knows which prefix a game runs in.
 
 **What the broker adds to Wine's own file access** (the system calls and
 their cost are the library's section; the facts that matter here): the
@@ -6773,6 +6842,15 @@ section states the fallback if it does not hold and the questions it leaves.
 Layers for container rootfs (one base per image, OCI layers as lowers) use
 the same library code and are a later step, not part of this.
 
+Owner, 2026-10-22, on the ordering spike and its fallback: "Yes, but we
+need a better solution". The spike goes ahead. The check inside proot
+(the sandbox library's policy evaluated by the patched proot after it
+translates a path) is a **stopgap**, weaker than the filter (it is as
+strong as proot's own call coverage and a multi-threaded guest can race
+it), and is not the answer. **Open item: a stronger mechanism for proot**
+than the spike's two outcomes; it stays on Droidtop/tracker#584 until one
+is found.
+
 **Needs a rig check** (each is a Phase 0-3 gate; steps are given in the
 commit that builds the phase):
 
@@ -6783,7 +6861,10 @@ commit that builds the phase):
    shared prefix and the old prefix is listed as set aside.
 2. The audit: read `dosdevices/z:` in the shared prefix on the console
    (`readlink`), and note whether it names `/` or the image root.
-3. Phase 2: the benchmark in the library's `tests/`, cold-start and a
+3. When the prefix list lands: make a new prefix on the console and read
+   whether it was made by a reflink copy or as a layer (the Prefixes list
+   says which); the expectation on the Retroid Pocket 5 is a layer.
+4. Phase 2: the benchmark in the library's `tests/`, cold-start and a
    frame-time capture of one game on and off the broker.
 
 ### Presentation and input: gamenative's renderer, on droidtop's launch display
