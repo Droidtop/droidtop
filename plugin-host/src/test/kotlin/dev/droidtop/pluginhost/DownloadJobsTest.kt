@@ -534,4 +534,81 @@ class DownloadJobsTest {
         assertEquals("1 job running", JobsSummary.text(1))
         assertEquals("3 jobs running", JobsSummary.text(3))
     }
+
+    // Torrents and magnets (docs/plugin-api.md 1.6, SPEC 12a): a download of a whole folder.
+
+    private val torrent = "d8:announce14:http://t.test/4:infod6:lengthi1e4:name1:a12:piece lengthi16384e6:pieces20:aaaaaaaaaaaaaaaaaaaaee".toByteArray()
+    private val magnet = "magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&dn=Some+Game"
+
+    @Test
+    fun aMagnetOrATorrentIsADownloadOfAFolder() {
+        val byMagnet = AcquireDownloadDescriptor.parse("""{"url":"$magnet","fileName":"Some Game"}""")!!
+        assertEquals(DownloadJobs.SWARM_MAGNET, byMagnet.swarm)
+        val byAddress = AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/g.torrent","kind":"torrent","fileName":"Some Game","headers":{"Cookie":"a=b"}}""")!!
+        assertEquals(DownloadJobs.SWARM_TORRENT, byAddress.swarm)
+        assertNull(byAddress.torrent)
+        val encoded = java.util.Base64.getEncoder().encodeToString(torrent)
+        val given = AcquireDownloadDescriptor.parse("""{"torrent":"$encoded","fileName":"Some Game"}""")!!
+        assertEquals(DownloadJobs.SWARM_TORRENT, given.swarm)
+        assertArrayEquals(torrent, given.torrent)
+        assertEquals("", given.url)
+        assertNull("a plain file is no swarm", AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/a.zip","fileName":"a.zip"}""")!!.swarm)
+    }
+
+    @Test
+    fun aSwarmDescriptorThatCouldNotBeOneIsRefused() {
+        val encoded = java.util.Base64.getEncoder().encodeToString("not a torrent".toByteArray())
+        assertNull("not a torrent's bytes", AcquireDownloadDescriptor.parse("""{"torrent":"$encoded","fileName":"G"}"""))
+        assertNull("a magnet naming no torrent", AcquireDownloadDescriptor.parse("""{"url":"magnet:?dn=G","fileName":"G"}"""))
+        assertNull("a digest of a folder", AcquireDownloadDescriptor.parse("""{"url":"$magnet","fileName":"G","md5":"d41d8cd98f00b204e9800998ecf8427e"}"""))
+        assertNull("unpacking a folder", AcquireDownloadDescriptor.parse("""{"url":"$magnet","fileName":"G","unpack":"archive"}"""))
+        assertNull("headers on a magnet", AcquireDownloadDescriptor.parse("""{"url":"$magnet","fileName":"G","headers":{"Cookie":"a=b"}}"""))
+        assertNull("an unknown kind", AcquireDownloadDescriptor.parse("""{"url":"https://example.invalid/g","kind":"metalink","fileName":"G"}"""))
+        assertNull("a torrent among several files", AcquireDownloads.parse(mapOf("downloads" to """[{"url":"$magnet","fileName":"G"},{"url":"https://example.invalid/a","fileName":"a"}]"""))?.takeIf { it.isNotEmpty() })
+    }
+
+    @Test
+    fun onlyABencodedDictionaryWithAnInfoDictionaryLooksLikeATorrent() {
+        assertTrue(DownloadJobs.looksLikeTorrent(torrent))
+        assertFalse(DownloadJobs.looksLikeTorrent("<html>4:infod</html>".toByteArray()))
+        assertFalse(DownloadJobs.looksLikeTorrent(ByteArray(0)))
+        assertFalse(DownloadJobs.looksLikeTorrent(ByteArray((DownloadJobs.TORRENT_MAX_BYTES + 1).toInt()) { 'd'.code.toByte() }))
+    }
+
+    @Test
+    fun aTorrentsFolderIsPlacedAsOneEntryWithItsTopFolderUnwrapped() {
+        val games = File(dir, "games").apply { mkdirs() }
+        File(games, "Some Game").mkdirs()
+        val fetched = File(dir, "acquire_1")
+        File(fetched, "Some.Game.v1/data").mkdirs()
+        File(fetched, "Some.Game.v1/data/a.bin").writeBytes(data)
+        val placed = DownloadJobs.placeFolder(fetched, mapOf("destinationPath" to games.path, "targetName" to "Some Game"))
+        assertEquals("a folder of that name is kept", File(games, "Some Game (2)"), placed)
+        assertArrayEquals(data, File(placed, "data/a.bin").readBytes())
+        assertFalse(fetched.exists())
+    }
+
+    @Test
+    fun anUpdatesTorrentIsItsNewVersionFolder() {
+        val games = File(dir, "games").apply { mkdirs() }
+        val fetched = File(dir, "acquire_2").apply { mkdirs() }
+        File(fetched, "a.bin").writeBytes(data)
+        File(fetched, "b.bin").writeBytes(data)
+        val placed = DownloadJobs.placeFolder(fetched, mapOf("destinationPath" to games.path, "targetName" to "G", DownloadJobs.ARG_VERSION_FOLDER to "G v2"))
+        assertEquals(File(games, "G v2"), placed)
+        assertEquals(setOf("a.bin", "b.bin"), placed.list()!!.toSet())
+    }
+
+    @Test
+    fun aFolderIsCopiedWholeWhenItCannotBeRenamedAndOnlyThenRemoved() {
+        val from = File(dir, "from").apply { mkdirs() }
+        File(from, "sub").mkdirs()
+        File(from, "sub/a.bin").writeBytes(data)
+        val to = File(dir, "elsewhere/to").apply { parentFile!!.mkdirs() }
+        var refusedOnce = false
+        DownloadJobs.moveFolder(from, to) { a, b -> if (!refusedOnce) { refusedOnce = true; false } else a.renameTo(b) }
+        assertArrayEquals(data, File(to, "sub/a.bin").readBytes())
+        assertFalse(from.exists())
+        assertFalse(File(to.parentFile, ".to.placing").exists())
+    }
 }
