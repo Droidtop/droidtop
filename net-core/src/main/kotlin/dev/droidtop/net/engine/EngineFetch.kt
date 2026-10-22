@@ -20,13 +20,41 @@ interface TransferEngine {
 
     /** Stops the download and drops it from the queue. Its partial file and aria2's control file stay, so a new `add` carries on. */
     fun remove(gid: String)
+
+    /** Adds a torrent, magnet or Metalink download whose files land in [folder], under the engine's folder; returns its gid. */
+    fun addSwarm(source: SwarmSource, folder: File, options: Map<String, String>): String =
+        throw TransferException("this download engine cannot fetch torrents")
+}
+
+/** What a download of several files starts from. The engine reads the bytes; droidtop never parses them. */
+sealed interface SwarmSource {
+    class Magnet(val uri: String) : SwarmSource
+
+    class Torrent(val bytes: ByteArray) : SwarmSource
+
+    class Metalink(val bytes: ByteArray) : SwarmSource
+
+    companion object {
+        private val MAGNET = Regex("(?i)^magnet:\\?(.*&)?xt=urn:bt(ih|mh):[^&]+")
+
+        /** Whether [uri] is a BitTorrent magnet link (one naming its torrent), not just any `magnet:`. */
+        fun isMagnet(uri: String): Boolean = MAGNET.containsMatchIn(uri)
+    }
 }
 
 /** How a byte count reads in a status line; :net-core cannot reach the one formatter (ValueFormat, in :runtime-common), so the caller gives it. */
 typealias SizeFormat = (bytes: Long) -> String
 
 /** One download as the engine reports it: aria2's own state names (`active`, `waiting`, `paused`, `complete`, `error`, `removed`). */
-data class Transfer(val state: String, val totalLength: Long, val completedLength: Long, val downloadSpeed: Long, val errorCode: Int)
+data class Transfer(
+    val state: String,
+    val totalLength: Long,
+    val completedLength: Long,
+    val downloadSpeed: Long,
+    val errorCode: Int,
+    /** The downloads this one became when it finished: a magnet's torrent, a Metalink's files. */
+    val followedBy: List<String> = emptyList(),
+)
 
 /**
  * One report of a transfer: [percent] (-1 when the length is not known), the status line, the engine's numbers
@@ -59,6 +87,13 @@ class TransferRequest(
         fun controlFile(file: File) = File(file.parentFile, file.name + ".aria2")
     }
 }
+
+/**
+ * A download of several files: [source]'s files land in [folder], a folder of their own in the engine's download folder,
+ * which is the download's whole: moving [folder] moves it, and a new fetch into it carries on from what is there.
+ * [maxBytes] above 0 refuses a larger download as soon as its length is known.
+ */
+class SwarmRequest(val source: SwarmSource, val folder: File, val maxBytes: Long = 0L)
 
 /** What aria2 is told for a download, from the request. Pure. */
 object EngineOptions {
@@ -146,13 +181,49 @@ object EngineFetch {
         resolve: (String, Map<String, String>) -> RedirectGuard.Resolved = { url, headers -> RedirectGuard.resolve(url, headers) },
         io: CoroutineDispatcher = Dispatchers.IO,
     ) {
+        var restarted = false
+        retrying(
+            attempt = { attempt(engine, request, restarted, report, size, resolve, io) },
+            restart = {
+                withContext(io) { request.files().forEach { it.delete() } }
+                restarted = true
+            },
+            report = report,
+        )
+    }
+
+    /**
+     * The runner for a torrent, a magnet or a Metalink ([SwarmRequest]): the same three endings and the same patience
+     * with the network as [fetch]. A magnet's first download is only the torrent's details, and a Metalink's names its
+     * files; the engine then names the downloads it became ([Transfer.followedBy]), and the transfer is whole when
+     * every one of those is. A pause or a cancel removes them all; their files stay in the folder, so the next call
+     * carries on. Nothing here walks redirects: the engine reaches the peers and the Metalink's mirrors itself.
+     */
+    suspend fun fetchSwarm(
+        engine: TransferEngine,
+        request: SwarmRequest,
+        report: (percent: Int, statusLine: String) -> Unit,
+        size: SizeFormat,
+        io: CoroutineDispatcher = Dispatchers.IO,
+    ) {
+        val source = request.source
+        if (source is SwarmSource.Magnet && !SwarmSource.isMagnet(source.uri)) throw TransferException("that is not a magnet link")
+        retrying(
+            attempt = { swarmAttempt(engine, request, report, size, io) },
+            // aria2's "cannot resume" is about one server's file; a torrent's pieces are checked, not restarted.
+            restart = { throw TransferException("the download could not carry on from what was already fetched") },
+            report = report,
+        )
+    }
+
+    /** Runs [attempt] until the file is whole, asking again after a network failure with a backoff. */
+    private suspend fun retrying(attempt: suspend () -> End, restart: suspend () -> Unit, report: (Int, String) -> Unit) {
         var failures = 0
         var lastCompleted = -1L
-        var restarted = false
         while (true) {
             currentCoroutineContext().ensureActive()
             val end = try {
-                attempt(engine, request, restarted, report, size, resolve, io)
+                attempt()
             } catch (e: IOException) {
                 // The engine's process ended, or the redirect walk found no network: ask again.
                 currentCoroutineContext().ensureActive()
@@ -163,8 +234,7 @@ object EngineFetch {
             when (verdict) {
                 is EngineErrors.Verdict.Fail -> throw TransferException(verdict.message)
                 EngineErrors.Verdict.Restart -> {
-                    withContext(io) { request.files().forEach { it.delete() } }
-                    restarted = true
+                    restart()
                     failures = 0
                     lastCompleted = -1L
                 }
@@ -227,6 +297,66 @@ object EngineFetch {
         } finally {
             // A pause or a cancel ends the coroutine here: the engine stops the transfer, the partial file stays.
             if (!settled) withContext(NonCancellable + io) { runCatching { engine.remove(gid) } }
+        }
+    }
+
+    /** One add and watch of a swarm download, following what it became. Null code: every file is whole. */
+    private suspend fun swarmAttempt(
+        engine: TransferEngine,
+        request: SwarmRequest,
+        report: (Int, String) -> Unit,
+        size: SizeFormat,
+        io: CoroutineDispatcher,
+    ): End {
+        withContext(io) { request.folder.mkdirs() }
+        // On a new attempt the pieces already in the folder are checked and kept, not fetched again.
+        val options = mapOf("check-integrity" to "true")
+        val live = mutableListOf(withContext(io) { engine.addSwarm(request.source, request.folder, options) })
+        var settled = false
+        try {
+            var completed = 0L
+            var stalledPolls = 0
+            while (true) {
+                delay(POLL_MS)
+                val now = live.toList().map { gid -> gid to (withContext(io) { engine.status(gid) } ?: throw EngineGoneException("the engine no longer knows the download")) }
+                now.firstOrNull { it.second.state == "error" }?.let { (failedGid, failed) ->
+                    settled = true
+                    withContext(io) { live.filter { it != failedGid }.forEach { runCatching { engine.remove(it) } } }
+                    return End(failed.errorCode, maxOf(completed, now.sumOf { it.second.completedLength }))
+                }
+                if (now.any { it.second.state == "removed" }) throw EngineGoneException("the engine dropped the download")
+                for ((gid, transfer) in now) {
+                    if (transfer.state == "complete" && transfer.followedBy.isNotEmpty()) {
+                        live.remove(gid)
+                        live.addAll(transfer.followedBy.filter { it !in live })
+                    }
+                }
+                val leaves = now.filter { it.first in live }.map { it.second }
+                // The poll a download became others: they are asked about on the next one.
+                if (leaves.isEmpty()) continue
+                if (leaves.size == live.size && leaves.all { it.state == "complete" }) {
+                    settled = true
+                    return End(null, leaves.sumOf { it.completedLength })
+                }
+                val total = Transfer(
+                    "active",
+                    leaves.sumOf { it.totalLength },
+                    leaves.sumOf { it.completedLength },
+                    leaves.sumOf { it.downloadSpeed },
+                    0,
+                )
+                if (request.maxBytes > 0 && total.totalLength > request.maxBytes) {
+                    settled = true
+                    withContext(io) { live.forEach { runCatching { engine.remove(it) } } }
+                    throw TransferException("the download is larger than the ${request.maxBytes / 1024 / 1024} MiB cap")
+                }
+                stalledPolls = if (total.completedLength > completed || total.downloadSpeed > 0) 0 else stalledPolls + 1
+                completed = total.completedLength
+                val waitingForDetails = request.source is SwarmSource.Magnet && live.size == 1 && leaves.singleOrNull()?.totalLength == 0L
+                report(percentOf(total), if (waitingForDetails) "Fetching the torrent's details…" else line(total, false, stalledPolls >= STALL_POLLS, size))
+            }
+        } finally {
+            if (!settled) withContext(NonCancellable + io) { live.forEach { runCatching { engine.remove(it) } } }
         }
     }
 
