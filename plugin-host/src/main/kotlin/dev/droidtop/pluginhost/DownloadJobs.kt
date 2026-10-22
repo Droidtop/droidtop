@@ -72,6 +72,16 @@ object DownloadJobs {
     const val POST_KEEP = "keep"
     const val POST_PLACE_IN_FOLDER = "place_in_folder"
 
+    /**
+     * The post step that moves the verified file to `targetPath`, a file in droidtop's own storage (a runtime's
+     * component, a plugin repository's bundle), replacing what is there. The one download path for droidtop's own
+     * files, so they move to the download engine with every other download (docs/SPEC.md 12a, "One download engine").
+     */
+    const val POST_MOVE_TO = "move_to"
+
+    /** [POST_MOVE_TO]'s argument: the absolute path the file is moved to. */
+    const val ARG_TARGET_PATH = "targetPath"
+
     const val DIGEST_MISMATCH = "the downloaded file does not match its published digest"
 
     private const val ARG_URL = "url"
@@ -158,6 +168,18 @@ object DownloadJobs {
             }
             summary
         }
+        registerPost(POST_MOVE_TO) { jobContext, file, args ->
+            withContext(Dispatchers.IO) {
+                val target = ownTarget(jobContext, requireNotNull(args[ARG_TARGET_PATH]) { "the target is missing" })
+                target.parentFile?.mkdirs()
+                // The new file replaces the old one only once it is whole in place: moved beside it first, then renamed.
+                val staged = File(target.parentFile, ".${target.name}.new")
+                staged.delete()
+                moveFile(file, staged)
+                check(staged.renameTo(target) || (target.delete() && staged.renameTo(target))) { "${target.name} could not be put in place" }
+                "Downloaded ${target.name}"
+            }
+        }
         FlutterRuntimeManager.registerDownloadPost()
         PythonRuntimeManager.registerDownloadPost()
         PluginJobsCenter.registerNative(
@@ -166,6 +188,20 @@ object DownloadJobs {
             reattachOnRestart = true,
             download = true,
         ) { args, checkpoint, report -> execute(appContext, args, checkpoint, report) }
+    }
+
+    /**
+     * [path] when it is inside droidtop's own storage (its files, cache or external files folder), never anywhere else:
+     * [POST_MOVE_TO] writes only droidtop's own files. Throws otherwise.
+     */
+    internal fun ownTarget(context: Context, path: String): File =
+        ownTarget(listOfNotNull(context.filesDir, context.cacheDir, context.getExternalFilesDir(null), context.noBackupFilesDir), path)
+
+    /** [path] when it is inside one of [roots] once `..` and links are resolved; throws otherwise. */
+    internal fun ownTarget(roots: List<File>, path: String): File {
+        val target = File(path).canonicalFile
+        require(roots.map { it.canonicalFile }.any { root -> target.path.startsWith(root.path + File.separator) }) { "a download is moved only into droidtop's own storage" }
+        return target
     }
 
     /** Moves [file] to `targetName` in `destinationPath`; the one place a download is placed in a game folder. Returns where it went. */
@@ -376,6 +412,8 @@ object DownloadJobs {
         /** True for a download nobody just asked for: the policy's update window and "while playing" apply to it too. */
         automatic: Boolean = false,
         onStatus: (String) -> Unit = {},
+        /** The job's percent each time it changes (0 to 100; -1 while the size is not known). */
+        onPercent: (Int) -> Unit = {},
     ): PluginResult {
         require(more.size < MAX_FILES) { "a download has at most $MAX_FILES files" }
         val plain = holdSecrets(name, headers)
@@ -415,6 +453,7 @@ object DownloadJobs {
                 PluginJobsCenter.entries().collect { list ->
                     list.firstOrNull { it.jobId == jobId }?.takeIf { !it.done }?.let { entry ->
                         onStatus(if (entry.percent in 0..99) "${entry.statusLine} (${entry.percent}%)" else entry.statusLine)
+                        onPercent(entry.percent)
                     }
                 }
             }

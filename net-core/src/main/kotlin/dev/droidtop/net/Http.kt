@@ -1,11 +1,9 @@
 package dev.droidtop.net
 
 import org.json.JSONObject
-import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 
 /** Shared bounded HTTP and single-file download transport. Call from an IO dispatcher. */
 object Http {
@@ -95,24 +93,5 @@ object Http {
             }
         }
         throw IOException("more than $maxRedirects redirects from $url")
-    }
-
-    /** A whole file from the start, through [ResumableDownload] (the one downloader); [file] appears only when complete and, if given, matching [expectedSha256]. */
-    fun downloadTo(url: String, file: File, expectedSha256: String? = null, onProgress: (Long, Long) -> Unit = { _, _ -> }, isCancelled: () -> Boolean = { false }, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = BigFile.timeouts) {
-        val handle = ResumableDownload.Handle()
-        try {
-            ResumableDownload.fetch(
-                url, file, headers, timeouts, resume = false, handle = handle, retries = 0,
-                onProgress = { if (isCancelled()) handle.cancel(); onProgress(it.bytes, it.total) },
-            )
-            if (expectedSha256 != null) {
-                val digest = MessageDigest.getInstance("SHA-256")
-                file.inputStream().use { input -> val b = ByteArray(64 * 1024); while (true) { val n = input.read(b); if (n < 0) break; digest.update(b, 0, n) } }
-                if (!digest.digest().joinToString("") { "%02x".format(it) }.equals(expectedSha256, true)) { file.delete(); throw IOException("SHA-256 mismatch") }
-            }
-        } catch (t: Throwable) {
-            ResumableDownload.discard(file)
-            throw t
-        }
     }
 }

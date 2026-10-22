@@ -204,6 +204,20 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun aDownloadOfDroidtopsOwnIsMovedOnlyIntoItsOwnStorage() {
+        val files = File(dir, "files").apply { mkdirs() }
+        assertEquals(File(files, "imagefs.txz").canonicalFile, DownloadJobs.ownTarget(listOf(files), File(files, "imagefs.txz").path))
+        for (outside in listOf(File(dir, "elsewhere/x").path, File(files, "../escape").path, files.path)) {
+            try {
+                DownloadJobs.ownTarget(listOf(files), outside)
+                fail("$outside is not inside droidtop's storage")
+            } catch (e: IllegalArgumentException) {
+                assertTrue(e.message!!.contains("own storage"))
+            }
+        }
+    }
+
+    @Test
     fun anUpdateUnpacksIntoItsVersionFolderLiftingTheReleasesOneFolder() = runBlocking {
         val archive = zipOf(File(dir, "downloads/acquire_4.zip").also { it.parentFile.mkdirs() }, "Game-0.6-pc/game/script.rpy" to "new", "Game-0.6-pc/Game.exe" to "exe")
         val games = File(dir, "games/renpy")
