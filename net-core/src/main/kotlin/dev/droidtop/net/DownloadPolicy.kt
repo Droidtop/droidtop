@@ -39,6 +39,8 @@ data class DownloadSettings(
     val whilePlaying: Boolean = false,
     /** The default for a game that follows it: keep installed store games up to date by themselves. */
     val autoUpdateDefault: Boolean = false,
+    /** How many downloads of each category run at once, by [DownloadCategory.key]; a category not listed is automatic ([DownloadPools]). */
+    val poolLimits: Map<String, Int> = emptyMap(),
 )
 
 enum class NetworkClass { OFFLINE, UNMETERED, METERED }
@@ -46,7 +48,7 @@ enum class NetworkClass { OFFLINE, UNMETERED, METERED }
 /** What the policy needs to know about one job. [sizeBytes] is 0 when nobody knows. */
 data class JobFacts(val sizeBytes: Long = 0, val automatic: Boolean = false)
 
-data class Conditions(val network: NetworkClass, val minuteOfDay: Int, val gameRunning: Boolean)
+data class Conditions(val network: NetworkClass, val minuteOfDay: Int, val gameRunning: Boolean, val batterySaver: Boolean = false)
 
 sealed interface Verdict {
     object Go : Verdict
@@ -71,6 +73,7 @@ object DownloadPolicy {
     private const val KEY_WHILE_PLAYING = "while_playing"
     private const val KEY_AUTO_DEFAULT = "auto_default"
     private const val GAME_PREFIX = "auto."
+    private const val POOL_PREFIX = "pool."
 
     /** Mobile data is allowed under this size when the rule is [NetworkRule.SMALL_ON_MOBILE]. */
     const val SMALL_BYTES = 50L * 1024 * 1024
@@ -94,6 +97,9 @@ object DownloadPolicy {
             windowEndMinute = p.getInt(KEY_WINDOW_END, defaults.windowEndMinute),
             whilePlaying = p.getBoolean(KEY_WHILE_PLAYING, defaults.whilePlaying),
             autoUpdateDefault = p.getBoolean(KEY_AUTO_DEFAULT, defaults.autoUpdateDefault),
+            poolLimits = DownloadCategory.entries.mapNotNull { c ->
+                p.getInt(POOL_PREFIX + c.key, 0).takeIf { it in 1..DownloadPools.MAX_LIMIT }?.let { c.key to it }
+            }.toMap(),
         )
         gamesFlow.value = p.all.entries
             .filter { it.key.startsWith(GAME_PREFIX) }
@@ -112,6 +118,12 @@ object DownloadPolicy {
             .putInt(KEY_WINDOW_END, next.windowEndMinute)
             .putBoolean(KEY_WHILE_PLAYING, next.whilePlaying)
             .putBoolean(KEY_AUTO_DEFAULT, next.autoUpdateDefault)
+            .apply {
+                // A category set back to automatic is removed, so a later droidtop's own limit applies to it.
+                DownloadCategory.entries.forEach { c ->
+                    next.poolLimits[c.key]?.let { putInt(POOL_PREFIX + c.key, it) } ?: remove(POOL_PREFIX + c.key)
+                }
+            }
             .apply()
     }
 

@@ -339,6 +339,7 @@ object PluginCatalog {
             context = context,
             title = "${plugin.label} ${release.version}",
             post = DOWNLOAD_POST,
+            category = dev.droidtop.net.DownloadCategory.PLUGINS,
             url = url,
             name = "plugin-" + "${plugin.id}-${release.version}".replace(Regex("[^A-Za-z0-9._-]"), "_") + ".droidplugin.tar.xz",
             sha256 = release.bundle.sha256,

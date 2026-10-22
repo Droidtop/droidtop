@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import dev.droidtop.net.Conditions
+import dev.droidtop.net.DownloadCategory
+import dev.droidtop.net.DownloadPools
 import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.net.DownloadSettings
 import dev.droidtop.net.JobFacts
@@ -60,25 +62,66 @@ object DownloadGate {
     fun factsOf(args: Map<String, String>?): JobFacts =
         JobFacts(args?.get(ARG_BYTES)?.toLongOrNull() ?: 0L, args?.get(ARG_AUTOMATIC) == "1")
 
+    /** A download's category ([DownloadPools.ARG_CATEGORY]); a job from before categories is a game's, as source downloads were. */
+    fun categoryOf(args: Map<String, String>?): DownloadCategory =
+        DownloadCategory.fromKey(args?.get(DownloadPools.ARG_CATEGORY)) ?: DownloadCategory.GAMES
+
     /**
-     * What to do with [entries] under [settings] and [conditions]. A running download that gets a hold is held; a
-     * held one whose verdict is go is released; a held one that is still held takes the new reason; a job the person
-     * paused, resumed or finished is left alone. Pure.
+     * What to do with [entries] under [settings] and [conditions]: the download policy first, then the pools
+     * ([DownloadPools], docs/SPEC.md 12a). A running download the policy holds is held; one the policy lets run takes a
+     * slot of its category's pool, or waits queued when the pool is full, and a queued one starts when a slot frees, in
+     * the order they were started. A download the person resumed themselves is left alone and keeps its slot; one the
+     * person paused, or that finished, is left alone and takes none. Pure.
      */
     fun plan(
         entries: List<PluginJobsCenter.Entry>,
         facts: (PluginJobsCenter.Entry) -> JobFacts,
         settings: DownloadSettings,
         conditions: Conditions,
-    ): List<Move> = entries.mapNotNull { entry ->
-        if (entry.done || entry.policyOverride || !PluginJobsCenter.isDownloadKind(entry.nativeKind)) return@mapNotNull null
-        val verdict = DownloadPolicy.decide(settings, conditions, facts(entry))
-        when {
-            !entry.paused && verdict is Verdict.Hold -> Move.Hold(entry.jobId, verdict.reason)
-            entry.paused && entry.hold != null && verdict is Verdict.Hold -> Move.Hold(entry.jobId, verdict.reason).takeIf { entry.hold != verdict.reason }
-            entry.paused && entry.hold != null && verdict == Verdict.Go -> Move.Release(entry.jobId)
-            else -> null
+        category: (PluginJobsCenter.Entry) -> DownloadCategory = { DownloadCategory.GAMES },
+    ): List<Move> {
+        val moves = ArrayList<Move>()
+        val pooled = ArrayList<DownloadPools.Entry>()
+        for (entry in entries) {
+            if (entry.done || !PluginJobsCenter.isDownloadKind(entry.nativeKind)) continue
+            if (entry.paused && entry.hold == null) continue
+            if (entry.policyOverride) {
+                if (!entry.paused) pooled += DownloadPools.Entry(entry.jobId, category(entry), entry.startedAtMs, running = true, pinned = true)
+                continue
+            }
+            val verdict = DownloadPolicy.decide(settings, conditions, facts(entry))
+            if (verdict is Verdict.Hold) {
+                if (!entry.paused || entry.hold != verdict.reason) moves += Move.Hold(entry.jobId, verdict.reason)
+                continue
+            }
+            pooled += DownloadPools.Entry(entry.jobId, category(entry), entry.startedAtMs, running = !entry.paused)
         }
+        val holds = entries.associate { it.jobId to it.hold }
+        DownloadPools.plan(pooled, { DownloadPools.limit(settings, it, conditions) }, { holds[it] }).forEach { move ->
+            moves += when (move) {
+                is DownloadPools.Move.Queue -> Move.Hold(move.id, move.line)
+                is DownloadPools.Move.Start -> Move.Release(move.id)
+            }
+        }
+        return moves
+    }
+
+    /**
+     * The line to hold a new download with, or null to start it: the policy's, else its pool's when the pool is full
+     * of downloads already running.
+     */
+    fun admit(
+        args: Map<String, String>,
+        entries: List<PluginJobsCenter.Entry>,
+        categoryOfEntry: (PluginJobsCenter.Entry) -> DownloadCategory,
+        settings: DownloadSettings,
+        conditions: Conditions,
+    ): String? {
+        (DownloadPolicy.decide(settings, conditions, factsOf(args)) as? Verdict.Hold)?.let { return it.reason }
+        val category = categoryOf(args)
+        val limit = DownloadPools.limit(settings, category, conditions)
+        val running = entries.count { !it.done && !it.paused && PluginJobsCenter.isDownloadKind(it.nativeKind) && categoryOfEntry(it) == category }
+        return if (running >= limit) DownloadPools.queuedLine(category, limit) else null
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -91,12 +134,13 @@ object DownloadGate {
         val app = context.applicationContext
         scope.launch(Dispatchers.IO) {
             DownloadPolicy.load(app)
+            val categoryOfEntry = { e: PluginJobsCenter.Entry -> categoryOf(PluginJobsCenter.argsOf(e.jobId)) }
             PluginJobsCenter.admission = { _, args ->
-                (DownloadPolicy.decide(DownloadPolicy.settings.value, conditions(app, gameRunning), factsOf(args)) as? Verdict.Hold)?.reason
+                admit(args, PluginJobsCenter.entries().value, categoryOfEntry, DownloadPolicy.settings.value, conditions(app, gameRunning))
             }
             merge(networkChanges(app), DownloadPolicy.settings.map { }, runningDownloads(), ticks()).conflate().collect {
                 val entries = PluginJobsCenter.entries().value
-                plan(entries, { factsOf(PluginJobsCenter.argsOf(it.jobId)) }, DownloadPolicy.settings.value, conditions(app, gameRunning)).forEach { move ->
+                plan(entries, { factsOf(PluginJobsCenter.argsOf(it.jobId)) }, DownloadPolicy.settings.value, conditions(app, gameRunning), categoryOfEntry).forEach { move ->
                     when (move) {
                         is Move.Hold -> PluginJobsCenter.holdByPolicy(move.jobId, move.reason)
                         is Move.Release -> PluginJobsCenter.releaseHold(move.jobId)
@@ -111,7 +155,8 @@ object DownloadGate {
 
     private fun conditions(app: Context, gameRunning: () -> Boolean): Conditions {
         val now = Calendar.getInstance()
-        return Conditions(DownloadPolicy.networkNow(app), now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE), gameRunning())
+        val saver = runCatching { app.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode == true }.getOrDefault(false)
+        return Conditions(DownloadPolicy.networkNow(app), now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE), gameRunning(), saver)
     }
 
     private fun ticks(): Flow<Unit> = flow {

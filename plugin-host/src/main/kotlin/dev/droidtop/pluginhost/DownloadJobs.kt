@@ -9,6 +9,8 @@ import dev.droidtop.library.settings.PathChange
 import dev.droidtop.runtime.util.ArchiveExtractor
 import dev.droidtop.runtime.util.Sha256
 import java.util.concurrent.ConcurrentHashMap
+import dev.droidtop.net.DownloadCategory
+import dev.droidtop.net.DownloadPools
 import dev.droidtop.net.engine.EngineFetch
 import dev.droidtop.net.engine.EngineHost
 import dev.droidtop.net.engine.EnginePrefs
@@ -402,6 +404,8 @@ object DownloadJobs {
         onStatus: (String) -> Unit = {},
         /** The job's percent each time it changes (0 to 100; -1 while the size is not known). */
         onPercent: (Int) -> Unit = {},
+        /** Which pool the download runs in (docs/SPEC.md 12a); null works it out from [post] and [extra] ([categoryFor]). */
+        category: DownloadCategory? = null,
     ): PluginResult {
         require(more.size < MAX_FILES) { "a download has at most $MAX_FILES files" }
         val plain = holdSecrets(name, headers)
@@ -429,6 +433,7 @@ object DownloadJobs {
                     }
                 }).toString())
             }
+            put(DownloadPools.ARG_CATEGORY, (category ?: categoryFor(post, extra)).key)
             if (sizeBytes > 0) put(DownloadGate.ARG_BYTES, sizeBytes.toString())
             if (automatic) put(DownloadGate.ARG_AUTOMATIC, "1")
         }
@@ -453,6 +458,16 @@ object DownloadJobs {
                 more.forEach { secretHeaders.remove(it.name) }
             }
         }
+    }
+
+    /**
+     * The pool of a download whose caller named none: an update's new version folder is an update, a file placed in a
+     * game folder is a game's, and anything droidtop keeps for itself is a system download.
+     */
+    internal fun categoryFor(post: String, extra: Map<String, String>): DownloadCategory = when {
+        extra.containsKey(ARG_VERSION_FOLDER) -> DownloadCategory.UPDATES
+        post == POST_PLACE_IN_FOLDER -> DownloadCategory.GAMES
+        else -> DownloadCategory.SYSTEM
     }
 
     /** Splits [headers] of the download file [name]: the credential ones stay in memory, the rest are returned to be persisted. */
