@@ -742,7 +742,7 @@ object PcScraper {
         val gamesRoot = mediaRootFor(context, entry) ?: return
         val destination = PcMediaLayout.mediaFile(gamesRoot, systemFolder, "covers", PcMediaLayout.fileSafe(baseNameFor(entry)))
         val won = offered.firstOrNull { answer ->
-            runCatching { PluginImages.download(answer.cover!!, answer.source.netDomains, destination) }
+            runCatching { PluginImages.download(context, answer.cover!!, answer.source.netDomains, destination) }
                 .onFailure { dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] cover from ${answer.source.label} not kept: ${it.message}") }
                 .isSuccess
         } ?: return

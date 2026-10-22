@@ -416,48 +416,31 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
     override fun startDownload(record: PluginRecord, url: String, file: java.io.File, store: PluginDataStore, allow: (String) -> Unit): String {
         val name = file.relativeTo(store.root).path.replace(java.io.File.separatorChar, '/')
         return PluginJobsCenter.startBrokered(record.manifest.id, record.manifest.label, "droidtop", "Download $name") { jobId ->
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                val part = java.io.File(file.parentFile, ".${file.name}.part")
-                try {
-                    val connection = dev.droidtop.net.Http.openGuarded("GET", url, emptyMap(), null, dev.droidtop.net.Http.BigFile.timeouts, allow = allow)
-                    try {
-                        val status = connection.responseCode
-                        if (status !in 200..299) return@withContext PluginReply.error(PluginErrorCode.FAILED, "HTTP $status from ${NetScope.hostOf(connection.url.toString())}")
-                        val total = connection.contentLengthLong
-                        if (total > 0) store.requireRoom(total, file)
-                        file.parentFile?.mkdirs()
-                        var count = 0L
-                        var reported = 0L
-                        connection.inputStream.use { input ->
-                            part.outputStream().use { out ->
-                                val buffer = ByteArray(64 * 1024)
-                                while (true) {
-                                    ensureActive()
-                                    val n = input.read(buffer)
-                                    if (n < 0) break
-                                    count += n
-                                    if (total <= 0 && count > PluginDataStore.LIMIT_BYTES) store.requireRoom(count, file)
-                                    out.write(buffer, 0, n)
-                                    if (count - reported >= PROGRESS_STEP) {
-                                        reported = count
-                                        val percent = if (total > 0) (count * 100 / total).toInt() else -1
-                                        PluginJobsCenter.progressBrokered(jobId, percent, "${count / (1024 * 1024)} MiB")
-                                    }
-                                }
-                            }
-                        }
-                        if (!part.renameTo(file)) return@withContext PluginReply.error(PluginErrorCode.FAILED, "$name could not be moved into place")
-                        PluginReply.ok(JSONObject().put("name", name).put("size", count))
-                    } finally {
-                        connection.disconnect()
-                    }
-                } catch (e: BrokerException) {
-                    PluginReply.error(e.code, e.message.orEmpty())
-                } catch (e: java.io.IOException) {
-                    PluginReply.error(PluginErrorCode.FAILED, e.message ?: "the download failed")
-                } finally {
-                    part.delete()
+            // The download engine fetches it like every other download (docs/SPEC.md 12a "One download engine"), into
+            // droidtop's downloads area, and only a whole file is moved into the plugin's data. Every address, the
+            // redirects included, is put to the plugin's `net.domains` check before the engine is given it.
+            val area = DownloadJobs.fileFor(appContext, "plugin_${System.nanoTime()}_" + file.name.replace(Regex("[^A-Za-z0-9._-]+"), "_").trimStart('.', '_', '-').take(80).ifEmpty { "file" })
+            try {
+                DownloadJobs.fetchWithEngine(
+                    appContext, url, emptyMap(), area, PluginDataStore.LIMIT_BYTES, DownloadJobs.TransferNumbers(JobHandle.current()),
+                    { percent, line, _ -> PluginJobsCenter.progressBrokered(jobId, percent, line) },
+                    allow,
+                )
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    store.requireRoom(area.length(), file)
+                    file.parentFile?.mkdirs()
+                    DownloadJobs.moveFile(area, file)
                 }
+                PluginReply.ok(JSONObject().put("name", name).put("size", file.length()))
+            } catch (e: BrokerException) {
+                PluginReply.error(e.code, e.message.orEmpty())
+            } catch (e: IllegalStateException) {
+                PluginReply.error(PluginErrorCode.FAILED, e.message ?: "the download failed")
+            } catch (e: java.io.IOException) {
+                PluginReply.error(PluginErrorCode.FAILED, e.message ?: "the download failed")
+            } finally {
+                area.delete()
+                dev.droidtop.net.engine.TransferRequest.controlFile(area).delete()
             }
         }
     }
@@ -628,8 +611,6 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
         /** A job has no per-call bound (docs/plugin-api.md 8); this is the ceiling that still catches a provider that never answers. */
         const val JOB_CALL_TIMEOUT_MS = 30L * 60 * 1000
 
-        /** How often a download says how far it is. */
-        const val PROGRESS_STEP = 1024L * 1024
     }
 }
 
