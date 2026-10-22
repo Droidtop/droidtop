@@ -202,7 +202,7 @@ object EngineFetch {
     suspend fun fetchSwarm(
         engine: TransferEngine,
         request: SwarmRequest,
-        report: (percent: Int, statusLine: String) -> Unit,
+        report: (EngineProgress) -> Unit,
         size: SizeFormat,
         io: CoroutineDispatcher = Dispatchers.IO,
     ) {
@@ -217,7 +217,7 @@ object EngineFetch {
     }
 
     /** Runs [attempt] until the file is whole, asking again after a network failure with a backoff. */
-    private suspend fun retrying(attempt: suspend () -> End, restart: suspend () -> Unit, report: (Int, String) -> Unit) {
+    private suspend fun retrying(attempt: suspend () -> End, restart: suspend () -> Unit, report: (EngineProgress) -> Unit) {
         var failures = 0
         var lastCompleted = -1L
         while (true) {
@@ -304,7 +304,7 @@ object EngineFetch {
     private suspend fun swarmAttempt(
         engine: TransferEngine,
         request: SwarmRequest,
-        report: (Int, String) -> Unit,
+        report: (EngineProgress) -> Unit,
         size: SizeFormat,
         io: CoroutineDispatcher,
     ): End {
@@ -353,7 +353,9 @@ object EngineFetch {
                 stalledPolls = if (total.completedLength > completed || total.downloadSpeed > 0) 0 else stalledPolls + 1
                 completed = total.completedLength
                 val waitingForDetails = request.source is SwarmSource.Magnet && live.size == 1 && leaves.singleOrNull()?.totalLength == 0L
-                report(percentOf(total), if (waitingForDetails) "Fetching the torrent's details…" else line(total, false, stalledPolls >= STALL_POLLS, size))
+                val stalled = stalledPolls >= STALL_POLLS
+                val line = if (waitingForDetails) "Fetching the torrent's details…" else line(total, false, stalled, size)
+                report(EngineProgress(percentOf(total), line, total, waiting = stalled && !waitingForDetails))
             }
         } finally {
             if (!settled) withContext(NonCancellable + io) { live.forEach { runCatching { engine.remove(it) } } }

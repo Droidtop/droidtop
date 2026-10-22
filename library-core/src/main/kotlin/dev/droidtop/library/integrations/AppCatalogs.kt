@@ -470,7 +470,7 @@ object AppCatalogs {
         if (!job.ok) return PluginResult.failure("${record.manifest.label}: ${job.error ?: "it failed"}")
         val descriptor = AcquireDownloads.parse(job.values)?.singleOrNull()
             ?: return PluginResult.failure("${record.manifest.label} returned no usable download")
-        if (descriptor.session != null || descriptor.unpack) return PluginResult.failure("an app download is one plain APK file")
+        if (descriptor.session != null || descriptor.unpack || descriptor.swarm != null) return PluginResult.failure("an app download is one plain APK file")
         val expected = Expected.fromArgs(
             mapOf(
                 ARG_PACKAGE to (job.values["packageName"] ?: ""),

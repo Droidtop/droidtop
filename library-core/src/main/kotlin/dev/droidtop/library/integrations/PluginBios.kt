@@ -184,6 +184,7 @@ object PluginBios {
         val descriptor = AcquireDownloads.parse(job.values)?.singleOrNull()
             ?: return PluginResult.failure("${record.manifest.label} returned no usable download")
         if (descriptor.session != null) return PluginResult.failure("a BIOS download cannot use a web session")
+        if (descriptor.swarm != null) return PluginResult.failure("a BIOS download is one file, not a torrent")
         if (descriptor.sha256 == null && descriptor.sha1 == null && descriptor.md5 == null && offer.entry.md5.isEmpty()) {
             return PluginResult.failure("${record.manifest.label} gave no digest to check the file with")
         }
