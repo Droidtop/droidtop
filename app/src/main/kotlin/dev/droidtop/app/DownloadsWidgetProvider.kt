@@ -52,7 +52,7 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
             }
         }
 
-        private fun downloads(jobs: List<PluginJobsCenter.Entry>) = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.kind) }
+        private fun downloads(jobs: List<PluginJobsCenter.Entry>) = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.nativeKind) }
 
         private suspend fun render(context: Context, widgetId: Int): RemoteViews {
             val open = DroidtopWidgets.activity(context, widgetId, "downloads", CatalogScreenLink.intent(context, DOWNLOADS_SCREEN))

@@ -350,4 +350,81 @@ class PluginJobsCenterTest {
         PluginJobsCenter.cancel(other)
         assertNull(PluginJobsCenter.startNative(null, "test_native_unregistered", "Nobody runs this"))
     }
+
+    // Jobs and their results (Droidtop/tracker#577): a finished job and what it did outlive the toast and the restart.
+
+    @Test
+    fun aFinishedJobComesBackAfterARestartWithItsResultAndReport() {
+        val report = JobReport(
+            listOf(
+                ReportItem("Doki Doki Literature Club", Outcome.DONE, "cover and description from Steam store", OpenTarget.Game("/g/DDLC")),
+                ReportItem("Some VN", Outcome.SKIPPED, "already has a cover"),
+                ReportItem("Other VN", Outcome.FAILED, "IGDB refused, HTTP 429"),
+            ),
+        )
+        val finished = PluginJobsCenter.Entry(
+            "finished-id", "droidtop", "Library", null, "Scrape PC and engine games", 100L,
+            done = true, result = PluginResult.success(mapOf("summary" to "1 matched")), kind = "native",
+            nativeKind = "library_scrape", resumable = true, finishedAtMs = 200L, retryable = true,
+            report = report, open = OpenTarget.Place("plugin_jobs"),
+        )
+        val restored = PluginJobsCenter.decodeEntries(PluginJobsCenter.encodeEntries(listOf(finished))).single()
+        assertTrue(restored.done)
+        assertFalse(restored.paused)
+        assertEquals(JobState.DONE, restored.state)
+        assertEquals("1 matched", restored.result?.values?.get("summary"))
+        assertEquals(200L, restored.finishedAtMs)
+        assertEquals(report, restored.report)
+        assertEquals(OpenTarget.Place("plugin_jobs"), restored.open)
+        assertTrue(restored.retryable)
+
+        val failed = finished.copy(jobId = "failed-id", result = PluginResult.failure("Steam refused"), report = null)
+        val back = PluginJobsCenter.decodeEntries(PluginJobsCenter.encodeEntries(listOf(failed))).single()
+        assertEquals(JobState.FAILED, back.state)
+        assertEquals("Steam refused", back.result?.error)
+    }
+
+    @Test
+    fun onlyTheNewestFinishedJobsAreKeptAndRunningOnesAlwaysAre() {
+        fun job(id: String, done: Boolean, at: Long) =
+            PluginJobsCenter.Entry(id, "droidtop", "Library", null, id, at, done = done, finishedAtMs = if (done) at else null)
+        val entries = listOf(job("running", false, 1), job("old", true, 10), job("new", true, 30), job("mid", true, 20))
+        assertEquals(setOf("running", "new", "mid"), PluginJobsCenter.keepFinished(entries, 2).map { it.jobId }.toSet())
+    }
+
+    @Test
+    fun aNativeJobReportsItsLinesAndRetryRunsItAgainWithItsArguments() = runBlocking {
+        PluginJobsCenter.nativeDispatcher = Dispatchers.Default
+        val runs = CopyOnWriteArrayList<Map<String, String>>()
+        PluginJobsCenter.registerNative("test_native_report") { args, _, _ ->
+            runs += args
+            JobHandle.current()!!.apply {
+                numbers(JobNumbers(itemsDone = 1, itemsTotal = 1))
+                item("A game", Outcome.DONE, "cover", OpenTarget.Game("/g/A"))
+            }
+            "one game"
+        }
+        val finished = CompletableDeferred<PluginResult>()
+        val id = PluginJobsCenter.startNative(null, "test_native_report", "Report job", mapOf("only" to "A"), onComplete = { finished.complete(it) })!!
+        withTimeout(5_000) { finished.await() }
+        val done = PluginJobsCenter.find(id)!!
+        assertEquals(listOf(ReportItem("A game", Outcome.DONE, "cover", OpenTarget.Game("/g/A"))), done.report?.items)
+        assertTrue(done.retryable)
+        assertNotNull(done.finishedAtMs)
+
+        val again = PluginJobsCenter.retry(null, id)!!
+        withTimeout(5_000) { while (PluginJobsCenter.find(again)?.done != true) kotlinx.coroutines.delay(10) }
+        assertNull("the retried row is replaced by the new run", PluginJobsCenter.find(id))
+        assertEquals(listOf(mapOf("only" to "A"), mapOf("only" to "A")), runs.toList())
+        assertTrue(PluginJobsCenter.clear(again))
+        assertNull(PluginJobsCenter.find(again))
+    }
+
+    @Test
+    fun anOpenTargetSurvivesItsTextForm() {
+        listOf(OpenTarget.Game("/g/A Game"), OpenTarget.Folder("/storage/x"), OpenTarget.File("/storage/x/a.zip"), OpenTarget.Place("plugin_jobs"))
+            .forEach { assertEquals(it, OpenTarget.decode(OpenTarget.encode(it))) }
+        assertNull(OpenTarget.decode("nonsense"))
+        assertNull(OpenTarget.decode(null))
+    }
 }
