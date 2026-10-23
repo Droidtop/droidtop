@@ -88,7 +88,10 @@ object PluginPanels {
     fun panelsFor(context: Context, mode: String? = null): List<Panel> {
         val declared = providersOf(context, POINT, mode).distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
         val faceted = providersOf(context, PluginFacets.POINT, mode)
-            .filter { (_, entry) -> PluginFacets.QUICK_MENU in dev.droidtop.pluginhost.FacetGuards.declaredTargets(listOf(entry)) }
+            .filter { (record, entry) ->
+                PluginFacets.QUICK_MENU in dev.droidtop.pluginhost.FacetGuards.declaredTargets(listOf(entry)) &&
+                    PluginFacets.shows(context, record, PluginFacets.QUICK_MENU)
+            }
             .distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
         val tiles = PluginTiles.tilesFor(context, mode = mode).groupBy { it.record.manifest.id }
         return (declared.keys + faceted.keys + tiles.keys).map { id ->

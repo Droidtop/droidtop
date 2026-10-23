@@ -187,4 +187,14 @@ class FacetsTest {
         assertTrue(info.getJSONObject("targets").has("quickmenu"))
         assertTrue(info.getJSONObject("targets").has("game.page"))
     }
+
+    @Test
+    fun `the person's switches are per declared target, and the plugin's own pages have none`() {
+        val provides = listOf(ProvidedPoint(point = FacetGuards.POINT, extra = """{"targets":["settings.page","game.page","quickmenu","plugin.page","romgi:addons"]}"""))
+        assertEquals(listOf("game.page", "quickmenu", "romgi:addons"), FacetGuards.switchable(provides))
+        val off = PluginGrants.Snapshot(states = mapOf(FacetGuards.targetKey("quickmenu") to GrantState.DENIED, FacetGuards.targetKey("plugin.page") to GrantState.DENIED))
+        assertFalse(FacetGuards.targetOn(off, "quickmenu"))
+        assertTrue("on unless switched off", FacetGuards.targetOn(off, "game.page"))
+        assertTrue("its own page cannot be switched off", FacetGuards.targetOn(off, "plugin.page"))
+    }
 }

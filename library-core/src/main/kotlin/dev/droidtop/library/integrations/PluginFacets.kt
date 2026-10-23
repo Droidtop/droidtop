@@ -1,10 +1,12 @@
 package dev.droidtop.library.integrations
 
+import android.content.Context
 import dev.droidtop.pluginhost.FacetGuards
 import dev.droidtop.pluginhost.FacetSubject
 import dev.droidtop.pluginhost.FacetViews
 import dev.droidtop.pluginhost.Facets
 import dev.droidtop.pluginhost.NetScope
+import dev.droidtop.pluginhost.PluginGrants
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginView
 import org.json.JSONObject
@@ -28,6 +30,13 @@ object PluginFacets {
     fun declares(record: PluginRecord, target: String): Boolean =
         target in FacetGuards.declaredTargets(record.manifest.v2.provides)
 
+    /**
+     * True when [record] declares [target] and the person has not switched that target off under its "Where it appears".
+     * A target switched off is not asked for (docs/plugin-api.md 1.10, "The person arranges them"). Reads files only.
+     */
+    fun shows(context: Context, record: PluginRecord, target: String): Boolean =
+        declares(record, target) && FacetGuards.targetOn(PluginGrants.forContext(context).read(record.manifest.id), target)
+
     /** What the guards know of [record]: its declared targets, its sites, whether it may give store information. */
     fun guardsFor(record: PluginRecord): FacetGuards.Plugin {
         val v2 = record.manifest.v2
@@ -41,6 +50,17 @@ object PluginFacets {
             permissions = v2.permissions.map { it.id }.toSet(),
         )
     }
+
+    /** The plugin's own page (`plugin.page`): its facets, drawn by the one renderer, about the plugin itself. */
+    fun pageScreen(record: PluginRecord): dev.droidtop.library.settings.CatalogScreen = PluginViews.screen(
+        record = record,
+        point = POINT,
+        op = OP_GET,
+        id = "plugin_facets_page_${record.manifest.id}",
+        title = record.manifest.label,
+        args = getArgs(PLUGIN_PAGE),
+        hostContext = JSONObject().put("target", "plugin"),
+    )
 
     /** The subject of a game page's `get`: the game by droidtop's id, when [targetArg] carries its identity. */
     fun gameSubject(targetArg: JSONObject): JSONObject? =
