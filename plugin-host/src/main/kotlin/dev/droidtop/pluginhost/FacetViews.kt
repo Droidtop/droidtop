@@ -59,7 +59,7 @@ object FacetViews {
             is FacetBody.Action -> ViewNode.Button(id, b.label, b.sub, null, if (b.confirm == "none") null else b.label, action(b.call, id, null))
             is FacetBody.Toggle -> ViewNode.Toggle(id, b.label, b.sub, b.value, action(b.call, id, "bool"))
             is FacetBody.Choice -> ViewNode.Choice(id, b.label, b.sub, b.options, b.value, action(b.call, id, "string"))
-            is FacetBody.Slider -> ViewNode.Slider(id, b.label, b.sub, b.min.toInt(), b.max.toInt(), b.value.toInt(), action(b.call, id, "number"))
+            is FacetBody.Slider -> ViewNode.Slider(id, b.label, b.unit, b.min.toInt(), b.max.toInt(), b.value.toInt(), action(b.call, id, "number"))
             is FacetBody.Input -> ViewNode.Text(id, b.label, b.hint, b.value, action(b.call, id, "string"))
             is FacetBody.Text -> ViewNode.Info(id, b.body.lineSequence().first().take(PluginView.MAX_TITLE), b.body, null)
             is FacetBody.Notice -> ViewNode.Notice(
