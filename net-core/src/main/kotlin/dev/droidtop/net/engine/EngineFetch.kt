@@ -30,6 +30,15 @@ interface TransferEngine {
 
     fun revokeLocal(address: java.net.InetAddress, port: Int) {}
 
+    /**
+     * The addresses the engine read from a torrent or Metalink droidtop added: each file's web seeds or mirrors and a
+     * torrent's trackers. droidtop never reads those files itself; it vouches for the local ones ([allowLocal]).
+     */
+    fun reported(gid: String): List<String> = emptyList()
+
+    /** Starts a download added with aria2's `pause` option, once droidtop has given its passes. */
+    fun resume(gid: String) {}
+
     /** Adds a torrent, magnet or Metalink download whose files land in [folder], under the engine's folder; returns its gid. */
     fun addSwarm(source: SwarmSource, folder: File, options: Map<String, String>): String =
         throw TransferException("this download engine cannot fetch torrents")
@@ -218,11 +227,13 @@ object EngineFetch {
         report: (EngineProgress) -> Unit,
         size: SizeFormat,
         io: CoroutineDispatcher = Dispatchers.IO,
+        /** A host's addresses, for the local-network passes ([LocalAddresses.passesFor]). */
+        lookup: (String) -> List<java.net.InetAddress> = { java.net.InetAddress.getAllByName(it).toList() },
     ) {
         val source = request.source
         if (source is SwarmSource.Magnet && !SwarmSource.isMagnet(source.uri)) throw TransferException("that is not a magnet link")
         retrying(
-            attempt = { swarmAttempt(engine, request, report, size, io) },
+            attempt = { swarmAttempt(engine, request, report, size, io, lookup) },
             // aria2's "cannot resume" is about one server's file; a torrent's pieces are checked, not restarted.
             restart = { throw TransferException("the download could not carry on from what was already fetched") },
             report = report,
@@ -353,13 +364,33 @@ object EngineFetch {
         report: (EngineProgress) -> Unit,
         size: SizeFormat,
         io: CoroutineDispatcher,
+        lookup: (String) -> List<java.net.InetAddress>,
     ): End {
         withContext(io) { request.folder.mkdirs() }
+        // droidtop vouches for every address it handed the engine (the owner: "droidtop can vouch for all local links"):
+        // a magnet's own trackers and web seeds before it is added; a torrent's or Metalink's, which only the engine
+        // reads, while it waits added but paused. What the swarm itself brings (DHT, PEX, a tracker's peers) gets none.
+        val source = request.source
+        val readByEngine = source !is SwarmSource.Magnet
         // On a new attempt the pieces already in the folder are checked and kept, not fetched again.
-        val options = mapOf("check-integrity" to "true")
-        val live = mutableListOf(withContext(io) { engine.addSwarm(request.source, request.folder, options) })
+        val options = mapOf("check-integrity" to "true") + if (readByEngine) mapOf("pause" to "true") else emptyMap()
+        val opened = mutableListOf<Pair<java.net.InetAddress, Int>>()
+        val live = mutableListOf<String>()
         var settled = false
         try {
+            suspend fun vouch(addresses: List<String>) = withContext(io) {
+                addresses.flatMap { LocalAddresses.passesFor(it, lookup) }.distinct().filter { it !in opened }.forEach { pass ->
+                    engine.allowLocal(pass.first, pass.second)
+                    opened += pass
+                }
+            }
+            if (source is SwarmSource.Magnet) vouch(LocalAddresses.magnetAddresses(source.uri))
+            val gid = withContext(io) { engine.addSwarm(source, request.folder, options) }
+            live += gid
+            if (readByEngine) {
+                vouch(withContext(io) { engine.reported(gid) })
+                withContext(io) { engine.resume(gid) }
+            }
             var completed = 0L
             var stalledPolls = 0
             while (true) {
@@ -404,7 +435,10 @@ object EngineFetch {
                 report(EngineProgress(percentOf(total), line, total, waiting = stalled && !waitingForDetails))
             }
         } finally {
-            if (!settled) withContext(NonCancellable + io) { live.forEach { runCatching { engine.remove(it) } } }
+            withContext(NonCancellable + io) {
+                if (!settled) live.forEach { runCatching { engine.remove(it) } }
+                opened.forEach { (address, port) -> runCatching { engine.revokeLocal(address, port) } }
+            }
         }
     }
 

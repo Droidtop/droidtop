@@ -27,19 +27,33 @@ object LocalAddresses {
 
     /**
      * The local addresses and port [url] reaches, to give the engine a pass for: empty for a public server, an address
-     * that does not resolve, or anything but HTTP(S).
+     * that does not resolve, or a scheme the engine does not fetch from (HTTP(S), FTP, and a tracker's `udp://` with
+     * its port).
      */
     fun passesFor(url: String, lookup: (String) -> List<InetAddress>): List<Pair<InetAddress, Int>> {
         val uri = runCatching { URI(url) }.getOrNull() ?: return emptyList()
         val scheme = uri.scheme?.lowercase()
+        if (scheme !in setOf("http", "https", "ftp", "udp")) return emptyList()
         val host = uri.host?.removePrefix("[")?.removeSuffix("]") ?: return emptyList()
         val port = when {
             uri.port > 0 -> uri.port
             scheme == "https" -> 443
             scheme == "http" -> 80
+            scheme == "ftp" -> 21
             else -> return emptyList()
         }
         val addresses = runCatching { lookup(host) }.getOrDefault(emptyList())
         return addresses.filter(::isLocal).distinct().map { it to port }
     }
+
+    /**
+     * The addresses a magnet link names itself: its trackers (`tr`), web seeds (`ws`) and sources (`xs`, `as`). droidtop
+     * vouches for these because they came with the link it was given, not from the swarm. Pure.
+     */
+    fun magnetAddresses(magnet: String): List<String> =
+        magnet.substringAfter('?', "").split('&').mapNotNull { pair ->
+            val key = pair.substringBefore('=').lowercase()
+            if (key !in setOf("tr", "ws", "xs", "as") || '=' !in pair) return@mapNotNull null
+            runCatching { java.net.URLDecoder.decode(pair.substringAfter('='), "UTF-8") }.getOrNull()?.takeIf { it.isNotBlank() }
+        }
 }
