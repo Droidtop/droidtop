@@ -1,13 +1,13 @@
 package dev.droidtop.stores.itch
 
+import android.content.Context
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.stores.data.DownloadInfo
 import dev.droidtop.stores.data.ItchUpload
 import dev.droidtop.runtime.util.ArchiveExtractor
-import dev.droidtop.stores.util.StoreHttp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import timber.log.Timber
 import java.io.File
 
@@ -25,15 +25,21 @@ import java.io.File
  */
 internal object ItchDownloadManager {
     private const val TAG = "ItchDownloadManager"
-    private val httpClient get() = StoreHttp.http
 
     /**
-     * Downloads [upload] to a temp file, then extracts it into
-     * [installPath]. Reports progress and honours cancellation through
-     * [downloadInfo], the same shared progress/cancel object every other
-     * store service here uses.
+     * The downloads-area name of [gameId]'s upload while it downloads: one per game, so a paused or restarted install
+     * carries on from its partial file ([DownloadJobs.fetchForJob]) and Cancel finds it ([ItchStore.discardPartial]).
+     */
+    fun areaName(gameId: String): String = "itch_" + gameId.replace(Regex("[^A-Za-z0-9]"), "_") + ".download"
+
+    /**
+     * Downloads [upload] on droidtop's download engine (docs/SPEC.md 12a, rollout step 4) into the downloads area as
+     * [areaName], then extracts it into [installPath]. Progress and the line go to [downloadInfo], the shared object
+     * every store service here reports through; the bytes and waits go to the install's own job.
      */
     suspend fun downloadAndInstall(
+        context: Context,
+        areaName: String,
         apiKey: String,
         downloadKeyId: String,
         upload: ItchUpload,
@@ -47,44 +53,20 @@ internal object ItchDownloadManager {
 
             val installDir = File(installPath)
             installDir.mkdirs()
-            val tempFile = File(installDir.parentFile ?: installDir, "${installDir.name}.download.tmp")
-            tempFile.parentFile?.mkdirs()
-
             downloadInfo.setTotalExpectedBytes(upload.sizeBytes)
             downloadInfo.updateStatusMessage("Downloading ${upload.filename}...")
 
-            val request = Request.Builder().url(url).get().build()
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(Exception("Download failed: HTTP ${response.code}"))
-                }
-                val body = response.body ?: return@withContext Result.failure(Exception("Empty download response"))
-                body.byteStream().use { input ->
-                    tempFile.outputStream().use { output ->
-                        val buffer = ByteArray(64 * 1024)
-                        var bytesSinceEmit = 0L
-                        while (true) {
-                            if (!downloadInfo.isActive()) {
-                                throw CancellationException("Download cancelled")
-                            }
-                            val read = input.read(buffer)
-                            if (read == -1) break
-                            output.write(buffer, 0, read)
-                            downloadInfo.updateBytesDownloaded(read.toLong())
-                            bytesSinceEmit += read
-                            if (bytesSinceEmit >= 512 * 1024L) {
-                                bytesSinceEmit = 0L
-                                downloadInfo.emitProgressChange()
-                                downloadInfo.persistProgressSnapshot()
-                            }
-                        }
-                    }
-                }
+            // The link itch.io resolves is short-lived, so it is asked for again on each try; the engine carries on
+            // from the partial file under the same name whatever the link.
+            val downloaded = DownloadJobs.fetchForJob(context, url, areaName) { percent, line ->
+                if (percent >= 0) downloadInfo.setProgress(percent / 100f)
+                downloadInfo.updateStatusMessage(line)
+                downloadInfo.emitProgressChange()
             }
 
             downloadInfo.updateStatusMessage("Installing...")
-            installDownloadedFile(tempFile, upload, installDir)
-            tempFile.delete()
+            installDownloadedFile(downloaded, upload, installDir)
+            DownloadJobs.discardForJob(context, areaName)
 
             downloadInfo.setProgress(1f)
             downloadInfo.setActive(false)

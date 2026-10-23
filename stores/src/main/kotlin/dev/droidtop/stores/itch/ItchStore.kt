@@ -120,7 +120,7 @@ class ItchStore : StoreLibrary {
         if (game.installPath != installPath) withContext(Dispatchers.IO) { dao.update(game.copy(installPath = installPath)) }
         val info = newDownloadInfo()
         runJobDownload(info, progress) {
-            ItchDownloadManager.downloadAndInstall(apiKey, game.downloadKeyId, upload, installPath, info)
+            ItchDownloadManager.downloadAndInstall(context, ItchDownloadManager.areaName(gameId), apiKey, game.downloadKeyId, upload, installPath, info)
         }.getOrElse { throw it }
         withContext(Dispatchers.IO) {
             dao.update(
@@ -143,6 +143,8 @@ class ItchStore : StoreLibrary {
             if (game.isInstalled || game.installPath.isBlank()) return@withContext
             val dir = File(game.installPath)
             val parent = dir.parentFile ?: return@withContext
+            // The engine's partial file in the downloads area, and the temp file droidtop's own transfer used to leave.
+            dev.droidtop.pluginhost.DownloadJobs.discardForJob(context, ItchDownloadManager.areaName(gameId))
             File(parent, "${dir.name}.download.tmp").delete()
             SafeDelete.deleteWithin(parent, dir)
             dao.update(game.copy(installPath = ""))
