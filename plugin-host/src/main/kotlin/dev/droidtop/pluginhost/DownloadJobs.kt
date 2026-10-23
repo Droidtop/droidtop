@@ -961,12 +961,14 @@ object DownloadJobs {
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
         /** Put to every address before the engine is given one ([RedirectGuard.resolve]); throws to refuse it. */
         allow: ((String) -> Unit)? = null,
+        /** Only these bytes of the remote file, first to last ([TransferRequest.range]). */
+        range: LongRange? = null,
     ) {
         val engine = engineFor(context, requireNotNull(destination.parentFile) { "the download has no folder" })
         try {
             EngineFetch.fetch(
                 engine,
-                TransferRequest(url, headers, destination, maxBytes),
+                TransferRequest(url, headers, destination, maxBytes, range),
                 report = { progress ->
                     report(progress.percent, progress.line, null)
                     val transfer = progress.transfer
@@ -1017,11 +1019,13 @@ object DownloadJobs {
         maxBytes: Long = 0L,
         /** False for one file of many: the caller counts the job's bytes itself, and one file's would read as the job's. */
         tellJob: Boolean = true,
+        /** Only these bytes of the remote file, first to last: a store's file that is a part of a bigger one. */
+        range: LongRange? = null,
         report: (percent: Int, statusLine: String) -> Unit = { _, _ -> },
     ): File {
         val file = fileFor(context, name)
         val numbers = TransferNumbers(if (tellJob) JobHandle.current() else null)
-        fetchWithEngine(context, url, headers, file, maxBytes, numbers, { percent, line, _ -> report(percent, line) })
+        fetchWithEngine(context, url, headers, file, maxBytes, numbers, { percent, line, _ -> report(percent, line) }, range = range)
         return file
     }
 

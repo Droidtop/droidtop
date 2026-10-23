@@ -23,14 +23,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import java.io.ByteArrayOutputStream
-import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.nio.ByteBuffer
 import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
-import java.security.DigestOutputStream
 import java.security.MessageDigest
 import java.util.zip.Inflater
 import java.util.concurrent.CopyOnWriteArrayList
@@ -43,9 +40,13 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
-import okhttp3.Request
 import timber.log.Timber
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -677,15 +678,18 @@ internal class GOGDownloadManager(
             downloadInfo.setActive(true)
             downloadInfo.emitProgressChange()
 
-            val totalFiles = gameFiles.size + if (supportDir != null) supportFiles.size else 0
-            var doneFiles = 0
-
-            // Gen 1: one main.bin URL per product; each file is fetched with Range: bytes=offset-(offset+size-1)
+            // Gen 1: one main.bin URL per product; each file is the bytes offset..offset+size-1 of it.
             val mainBinUrlByProduct = productUrlMap.mapValues { (_, urls) ->
                 buildGen1MainBinUrl(urls.firstOrNull())
             }
+            // Named under the game's chunk cache key, so Discard clears these with the Gen 2 chunks.
+            val areaPrefix = areaPrefix(File(context.cacheDir, "gog_chunks/$gameId"))
 
-            fun downloadOneFile(f: FileWithProduct, baseDir: File): Result<Unit> {
+            /**
+             * One file on droidtop's download engine (docs/SPEC.md 12a, rollout step 4): its range of main.bin fetched
+             * whole into the downloads area (the engine's byte-range), checked by size and MD5, then moved into place.
+             */
+            suspend fun downloadOneFile(f: FileWithProduct, baseDir: File): Result<Unit> {
                 val file = f.file
                 val outFile = File(baseDir, file.path)
                 outFile.parentFile?.mkdirs()
@@ -699,81 +703,52 @@ internal class GOGDownloadManager(
                     ?: return Result.failure(Exception("No main.bin URL for product ${f.productId}"))
 
                 val offset = file.offset
-                if (offset == null) {
-                    return Result.failure(Exception("Gen 1 file ${file.path} has no offset (main.bin range request required)"))
+                    ?: return Result.failure(Exception("Gen 1 file ${file.path} has no offset (main.bin range request required)"))
+
+                val areaName = "${areaPrefix}v1_${f.productId}_$offset"
+                val fetched = try {
+                    DownloadJobs.fetchForJob(
+                        context, mainBinUrl, areaName,
+                        headers = mapOf("User-Agent" to USER_AGENT),
+                        tellJob = false,
+                        range = offset..(offset + file.size - 1),
+                    )
+                } catch (e: IllegalStateException) {
+                    return Result.failure(Exception("${file.path}: ${e.message}", e))
                 }
-
-                val rangeHeader = "bytes=$offset-${offset + file.size - 1}"
-                val request = Request.Builder()
-                    .url(mainBinUrl)
-                    .header("User-Agent", "GOG Galaxy")
-                    .header("Range", rangeHeader)
-                    .build()
-
                 return try {
-                    StoreHttp.http.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) return Result.failure(Exception("HTTP ${response.code} for ${file.path}"))
-                        val body = response.body ?: return Result.failure(Exception("Empty response"))
-                        val md = MessageDigest.getInstance("MD5")
-                        val buffer = ByteArray(256 * 1024) // 256KB
-                        val progressInterval = 512L * 1024 // emit progress every 512KB
-                        var copiedInFile = 0L
-                        DigestOutputStream(
-                            BufferedOutputStream(FileOutputStream(outFile)),
-                            md
-                        ).use { out ->
-                            body.byteStream().use { input ->
-                                var n: Int
-                                while (input.read(buffer).also { n = it } != -1) {
-                                    if (!downloadInfo.isActive()) {
-                                        outFile.delete()
-                                        return Result.failure(Exception("Download cancelled"))
-                                    }
-                                    out.write(buffer, 0, n)
-                                    copiedInFile += n
-                                    downloadInfo.updateBytesDownloaded(n.toLong())
-                                    if (copiedInFile >= progressInterval || downloadInfo.getBytesDownloaded() >= totalSize) {
-                                        copiedInFile = 0L
-                                        downloadInfo.setProgress(
-                                            (downloadInfo.getBytesDownloaded().toFloat() / totalSize).coerceIn(0f, 1f)
-                                        )
-                                        downloadInfo.emitProgressChange()
-                                    }
-                                }
-                            }
-                        }
-                        val bytesWritten = outFile.length()
-                        if (bytesWritten != file.size) return Result.failure(Exception("Size mismatch ${file.path}"))
-                        val md5 = md.digest().joinToString("") { "%02x".format(it) }
-                        if (file.hash.isNotEmpty() && md5 != file.hash) return Result.failure(Exception("MD5 mismatch ${file.path}"))
-                        // bytes already reported during copy; ensure final progress is exact
-                        downloadInfo.setProgress(
-                            (downloadInfo.getBytesDownloaded().toFloat() / totalSize).coerceIn(0f, 1f)
-                        )
-                        downloadInfo.emitProgressChange()
-                        Result.success(Unit)
+                    if (fetched.length() != file.size) return Result.failure(Exception("Size mismatch ${file.path}"))
+                    if (file.hash.isNotEmpty() && calculateMd5File(fetched) != file.hash) {
+                        return Result.failure(Exception("MD5 mismatch ${file.path}"))
                     }
-                } catch (e: Exception) {
-                    Result.failure(e)
+                    DownloadJobs.moveFile(fetched, outFile)
+                    downloadInfo.updateBytesDownloaded(file.size)
+                    downloadInfo.setProgress((downloadInfo.getBytesDownloaded().toFloat() / totalSize).coerceIn(0f, 1f))
+                    downloadInfo.emitProgressChange()
+                    Result.success(Unit)
+                } finally {
+                    // Moved, or spent: a bad copy is fetched again, not checked again.
+                    DownloadJobs.discardForJob(context, areaName)
                 }
             }
 
-            for (f in gameFiles) {
-                if (!downloadInfo.isActive()) return@withContext Result.failure(Exception("Download cancelled"))
-                downloadInfo.updateStatusMessage("Downloading ${f.file.path}")
-                val res = downloadOneFile(f, installPath)
-                if (res.isFailure) return@withContext res
-                doneFiles++
+            // Several files at once, each a transfer of its own, as the other stores' pools run.
+            val gate = Semaphore(DownloadSpeedConfig().maxDownloads)
+            suspend fun downloadAll(files: List<FileWithProduct>, baseDir: File): Result<Unit> = coroutineScope {
+                files.map { f ->
+                    async {
+                        gate.withPermit {
+                            if (!downloadInfo.isActive()) Result.failure(Exception("Download cancelled")) else downloadOneFile(f, baseDir)
+                        }
+                    }
+                }.awaitAll().firstOrNull { it.isFailure } ?: Result.success(Unit)
             }
+
+            downloadAll(gameFiles, installPath).let { if (it.isFailure) return@withContext it }
             if (supportDir != null) {
                 supportDir.mkdirs()
-                for (f in supportFiles) {
-                    if (!downloadInfo.isActive()) return@withContext Result.failure(Exception("Download cancelled"))
-                    downloadInfo.updateStatusMessage("Downloading support ${f.file.path}")
-                    val res = downloadOneFile(f, supportDir)
-                    if (res.isFailure) return@withContext res
-                    doneFiles++
-                }
+                downloadInfo.updateStatusMessage("Downloading support files")
+                downloadAll(supportFiles, supportDir).let { if (it.isFailure) return@withContext it }
             }
 
             saveManifestToGameDir(installPath, gameManifest, selectedBuild.buildId, selectedBuild.versionName, effectiveLang)

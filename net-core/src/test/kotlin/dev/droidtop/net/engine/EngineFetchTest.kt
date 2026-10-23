@@ -195,6 +195,21 @@ class EngineFetchTest {
     }
 
     @Test
+    fun aRangeTheServerWillNotSendFailsRatherThanStartingAgain() = runTest {
+        // GOG's Gen 1 main.bin: a server that ignores the range would send the whole file every time.
+        val engine = FakeEngine(listOf(listOf(failed(8))))
+        try {
+            EngineFetch.fetch(engine, TransferRequest("http://example.test/main.bin", emptyMap(), target, range = 10L..20L), { }, size, passThrough, Dispatchers.Unconfined)
+            fail("a range the server will not send")
+        } catch (e: TransferException) {
+            assertEquals("the server did not send that part of the file", e.message)
+            assertEquals(8, e.code)
+        }
+        assertEquals("asked once, not again", 1, engine.added.size)
+        assertEquals("10-20", engine.added.single().second["byte-range"])
+    }
+
+    @Test
     fun aServerThatCannotResumeStartsTheFileAgainAndSaysSo() = runTest {
         val engine = FakeEngine(listOf(listOf(failed(8)), listOf(active(1 * mib, 100 * mib), complete(100 * mib))))
         target.writeBytes(ByteArray(10))
