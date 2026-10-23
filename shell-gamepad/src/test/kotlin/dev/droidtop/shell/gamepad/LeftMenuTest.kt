@@ -15,7 +15,8 @@ class LeftMenuTest {
     fun `every destination the mode allows is a row, named as the top bar names it`() {
         assertEquals(menuSectionsFor(UiMode.FULL), all.map { it.section })
         assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.map { it.label })
-        assertEquals(GamingSection.entries.toSet(), all.map { it.section }.toSet())
+        // No section is unreachable: each is a row, or a page of one (Get new games, of Updates).
+        assertEquals(GamingSection.entries.map { it.menuSection }.toSet(), all.map { it.section }.toSet())
     }
 
     @Test
