@@ -109,6 +109,8 @@ class TransferRequest(
     val headers: Map<String, String>,
     val destination: File,
     val maxBytes: Long = 0L,
+    /** The bytes of the remote file this download is, first to last, or null for all of it (the engine's `byte-range`). */
+    val range: LongRange? = null,
 ) {
     /** The file the engine writes and the control file beside it. */
     fun files(): List<File> = listOf(destination, controlFile(destination))
@@ -135,8 +137,10 @@ object EngineOptions {
      *
      * @throws TransferException when a header could carry another one (a line break) or has no usable name.
      */
-    fun forRequest(fileName: String, headers: Map<String, String>): Map<String, String> {
+    fun forRequest(fileName: String, headers: Map<String, String>, range: LongRange? = null): Map<String, String> {
         val options = linkedMapOf("out" to fileName, "split" to "1", "max-connection-per-server" to "1")
+        // A part of a bigger remote file (GOG's Gen 1 main.bin): the engine asks for only those bytes and takes only them.
+        if (range != null) options["byte-range"] = "${range.first}-${range.last}"
         val lines = mutableListOf<String>()
         for ((name, value) in headers) {
             if (name.isBlank() || ':' in name || name.any { it.isISOControl() || it == ' ' } || value.any { it == '\r' || it == '\n' }) {
@@ -227,6 +231,9 @@ object EngineFetch {
         retrying(
             attempt = { attempt(engine, request, restarted, report, size, resolve, io, lookup, follow) },
             restart = {
+                // A range the server would not send as asked is not a file to start again: the whole remote file would
+                // come back the same way every time.
+                if (request.range != null) throw TransferException("the server did not send that part of the file", CANNOT_RESUME)
                 withContext(io) { request.files().forEach { it.delete() } }
                 restarted = true
             },
@@ -295,6 +302,9 @@ object EngineFetch {
 
     private const val RETRY_NETWORK = -1
 
+    /** aria2's "cannot resume": the server would not send the part of the file asked for. */
+    private const val CANNOT_RESUME = 8
+
     /** aria2's "unknown error", which is also what a connect the engine's broker refused comes back as. */
     private const val UNKNOWN_ERROR = 1
 
@@ -327,7 +337,7 @@ object EngineFetch {
         follow: (String) -> String,
     ): End {
         val resolved = withContext(io) { resolve(request.url, request.headers) }
-        val options = EngineOptions.forRequest(request.destination.name, resolved.headers)
+        val options = EngineOptions.forRequest(request.destination.name, resolved.headers, request.range)
         request.destination.parentFile?.let { withContext(io) { it.mkdirs() } }
         // The address droidtop sends this download to may be the person's own server (a NAS, a tailnet machine): the
         // engine gets a pass for exactly it while the download runs. Nothing else local is reachable, torrents included.

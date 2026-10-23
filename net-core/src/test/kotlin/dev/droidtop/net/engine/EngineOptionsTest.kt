@@ -17,6 +17,12 @@ class EngineOptionsTest {
     }
 
     @Test
+    fun aPartOfABiggerFileIsTheEnginesByteRange() {
+        assertEquals("1000-2999", EngineOptions.forRequest("f", emptyMap(), 1000L..2999L)["byte-range"])
+        assertEquals(null, EngineOptions.forRequest("f", emptyMap())["byte-range"])
+    }
+
+    @Test
     fun aSessionsUserAgentAndRefererBecomeAria2sOwnOptions() {
         val options = EngineOptions.forRequest(
             "f",
