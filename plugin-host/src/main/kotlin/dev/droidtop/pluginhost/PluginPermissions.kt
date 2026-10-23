@@ -47,6 +47,7 @@ object PluginPermissions {
         PluginPermission("library.folders.write", PermissionTier.DANGEROUS, "Add files to your game folders"),
         PluginPermission("saves.read", PermissionTier.DANGEROUS, "Read save data of your games"),
         PluginPermission("saves.write", PermissionTier.DANGEROUS, "Replace save data of your games"),
+        PluginPermission("saves.exchange", PermissionTier.NORMAL, "Ask where your games' saves go, and tell droidtop when it saved"),
         PluginPermission("media.read", PermissionTier.DANGEROUS, "See your music, videos and pictures"),
         PluginPermission("perf.read", PermissionTier.NORMAL, "See performance readings (CPU, temperature, battery)"),
         PluginPermission("perf.profile.set", PermissionTier.DANGEROUS, "Change performance and fan settings"),

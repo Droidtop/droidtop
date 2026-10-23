@@ -88,6 +88,17 @@ interface BrokerEnvironment {
      */
     fun librarySystems(): JSONObject
 
+    /**
+     * `saves` `where` and `changed` and `library.read` `list_engine_games` (docs/plugin-api.md 3 A7a), answered by the
+     * library's save model in :library-core. [args] are checked already. Called on a binder thread; may block for the
+     * sync before a game starts.
+     */
+    fun savesWhere(pluginId: String, args: JSONObject): JSONObject = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no saves for games")
+
+    fun savesChanged(pluginId: String, args: JSONObject): JSONObject = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no saves for games")
+
+    fun libraryEngineGames(args: JSONObject): JSONObject = throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop lists no engine games")
+
     /** The folders a `library.files` `changed` report may name, as absolute paths: the person's game folders. */
     fun gamesRoots(): List<String> = emptyList()
 
@@ -558,6 +569,30 @@ object HostApis {
         },
         // docs/plugin-api.md 3 A1: the user's systems and each one's chosen emulator, so a panel can list every system, not only those it heard about.
         HostOp("library.read", "list_systems", permission = "library.read") { env, _, _ -> env.librarySystems() },
+        // docs/plugin-api.md 3 A7a: the library's engine games for an app to register, the whole list each time. No configs:
+        // those are the person's, made in the app.
+        HostOp("library.read", "list_engine_games", permission = "library.read") { env, _, args ->
+            val engines = args.optJSONArray("engines")
+            if (engines != null && (engines.length() > MAX_ENGINES || (0 until engines.length()).any { engines.opt(it) !is String })) {
+                invalid("engines must be at most $MAX_ENGINES engine names")
+            }
+            env.libraryEngineGames(args)
+        },
+        // docs/plugin-api.md 3 A7a: an app's plugin asks where a game's saves belong before the game starts, whoever starts it,
+        // and says where the game saved after. Only an app interface plugin: it is the app that runs games.
+        HostOp("saves", "where", permission = "saves.exchange", target = { it.optString("path") }) { env, record, args ->
+            appOnly(record)
+            gamePath(args, "path")
+            env.savesWhere(record.manifest.id, args)
+        },
+        HostOp("saves", "report_changed", permission = "saves.exchange", alwaysAudit = true, target = { "${it.optString("path")} saved in ${it.optString("saveFolder")}" }) { env, record, args ->
+            appOnly(record)
+            gamePath(args, "path")
+            gamePath(args, "saveFolder")
+            if (args.has("endedAtMs") && args.optLong("endedAtMs", -1L) <= 0L) invalid("endedAtMs must be a time in milliseconds")
+            if (args.optString("reason").length > MAX_REASON) invalid("reason must be at most $MAX_REASON characters")
+            env.savesChanged(record.manifest.id, args)
+        },
         // docs/plugin-api.md 3 G1: the caller's own secrets. The broker names the caller, so a plugin can only ever reach its own;
         // the audit and every log carry the key's name at most, never a value.
         HostOp("vault", "put", permission = "vault.own", target = { it.optString("key") }) { env, record, args ->
@@ -599,6 +634,25 @@ object HostApis {
 
     /** Every host op: the core ones above, and the groups that live in their own files (docs/plugin-api.md 3 D, H). */
     val ops: List<HostOp> by lazy { core + HostNetApis.ops + HostDataApis.ops + HostFileApis.ops + HostContextApis.ops + HostWebApis.ops + HostDevicesApis.ops + HostPowerApis.ops }
+
+    const val MAX_ENGINES = 50
+    const val MAX_PATH = 4096
+    const val MAX_REASON = 200
+
+    private fun appOnly(record: PluginRecord) {
+        if (record.manifest.kind != PluginKind.APP_INTERFACE) {
+            throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "only an app's plugin exchanges saves with droidtop")
+        }
+    }
+
+    /** [key] of [args]: an absolute path, without `..`, or the call is refused. */
+    private fun gamePath(args: JSONObject, key: String): String {
+        val path = args.optString(key)
+        if (!path.startsWith("/") || path.length > MAX_PATH || path.split('/').any { it == ".." } || '\u0000' in path) {
+            invalid("$key must be an absolute path")
+        }
+        return path
+    }
 
     private fun vaultOf(env: BrokerEnvironment): PluginVault =
         env.vault() ?: throw BrokerException(PluginErrorCode.UNSUPPORTED, "this droidtop keeps no plugin secrets")

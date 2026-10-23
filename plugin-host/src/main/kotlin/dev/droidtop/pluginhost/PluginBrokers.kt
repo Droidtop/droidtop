@@ -247,6 +247,15 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun librarySystems(): JSONObject = PluginBrokers.librarySystemsProvider()
 
+    override fun savesWhere(pluginId: String, args: JSONObject): JSONObject =
+        PluginBrokers.saves?.where(pluginId, args) ?: super.savesWhere(pluginId, args)
+
+    override fun savesChanged(pluginId: String, args: JSONObject): JSONObject =
+        PluginBrokers.saves?.changed(pluginId, args) ?: super.savesChanged(pluginId, args)
+
+    override fun libraryEngineGames(args: JSONObject): JSONObject =
+        PluginBrokers.saves?.engineGames(args) ?: super.libraryEngineGames(args)
+
     private val pluginVault by lazy { PluginVault.forContext(appContext) }
 
     override fun vault(): PluginVault = pluginVault
@@ -634,6 +643,12 @@ object PluginBrokers {
     @Volatile var librarySystemsProvider: () -> JSONObject = { JSONObject().put("ready", false).put("systems", JSONArray()) }
 
     /**
+     * :app sets this at start: the library's save model and engine games for an app interface plugin (docs/plugin-api.md
+     * 3 A7a), which live in :library-core above this module. Called on a binder thread, never the main thread.
+     */
+    @Volatile var saves: SavesExchange? = null
+
+    /**
      * :app sets this at start: a social provider's `social.changed` (docs/plugin-api.md 3 C19), handed to the library's
      * social hub, which lives in :library-core above this module. Called on a binder thread; it must not block.
      */
@@ -723,3 +738,12 @@ object PluginBrokers {
 
 /** How long a plugin's confirm waits for the person before it counts as Cancel. */
 private const val CONFIRM_TIMEOUT_MS = 120_000L
+
+/** What :library-core answers for `saves` and `library.read` `list_engine_games` (docs/plugin-api.md 3 A7a). */
+interface SavesExchange {
+    fun where(pluginId: String, args: JSONObject): JSONObject
+
+    fun changed(pluginId: String, args: JSONObject): JSONObject
+
+    fun engineGames(args: JSONObject): JSONObject
+}
