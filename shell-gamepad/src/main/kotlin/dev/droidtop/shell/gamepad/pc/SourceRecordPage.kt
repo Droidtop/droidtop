@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -13,6 +14,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -99,6 +101,10 @@ internal fun downloadRows(record: UpdateSources.Record, picked: String?): List<R
     return head + links.ifEmpty { listOf(RecordRow("No links for ${DownloadSystems.LABELS[system] ?: system}")) }
 }
 
+/** Where the record page keeps the system last picked per source. */
+private const val RECORD_PREFS = "source_record_page"
+private const val SYSTEM_KEY_PREFIX = "system:"
+
 /** The system [step] away from [picked] among [offered], wrapping round. */
 internal fun nextSystem(offered: List<String>, picked: String?, step: Int): String? {
     if (offered.isEmpty()) return null
@@ -161,7 +167,10 @@ internal fun SourceRecordPage(
     var armed by remember(source.key, externalId, tab) { mutableStateOf<Int?>(null) }
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
     val record = answer?.record
-    var picked by remember(source.key, externalId) { mutableStateOf<String?>(null) }
+    // The system last picked on this source's pages is picked again (Droidtop/tracker#617).
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences(RECORD_PREFS, Context.MODE_PRIVATE) }
+    var picked by remember(source.key, externalId) { mutableStateOf(prefs.getString(SYSTEM_KEY_PREFIX + source.key, null)) }
     val rows = remember(record, tab, picked) { record?.let { recordRows(it, tab, picked) { ms -> dateFormat.format(Date(ms)) } }.orEmpty() }
 
     fun pickSystem(step: Int) {
@@ -169,6 +178,7 @@ internal fun SourceRecordPage(
         val next = nextSystem(downloadSystems(r), picked, step) ?: return
         if (next != picked) {
             picked = next
+            prefs.edit().putString(SYSTEM_KEY_PREFIX + source.key, next).apply()
             armed = null
             EsDeNavigationSounds.play(UiSound.MOVE)
         }

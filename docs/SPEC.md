@@ -12290,9 +12290,9 @@ reimplemented it as my own f95seeker code." So:
     and have the download links for it. Make sure to flag when "android" is
     selected, saying "this will not be trackable by us. Windows or Linux is
     recommended"". When the links are for more than one system, the tab's
-    first row is System (Windows, then Linux, picked first; Left, Right and A
-    change it) and only that system's links show, with the ones for any
-    system. Android picked (or the only system there is), droidtop's line
+    first row is System (the system last picked on that source's pages, else
+    Windows, then Linux; Left, Right and A change it) and only that system's
+    links show, with the ones for any system. Android picked (or the only system there is), droidtop's line
     says "This will not be trackable by us. Windows or Linux is
     recommended." A link's systems are the ones the source names on it
     (`systems`), else the ones its heading names; a heading naming none
