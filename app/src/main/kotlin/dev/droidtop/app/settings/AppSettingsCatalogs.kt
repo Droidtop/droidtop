@@ -236,6 +236,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.AppCatalogScreen.reviewScreen())
         SettingsScreenRegistry.register(PluginJobsScreen.screen())
         SettingsScreenRegistry.register(DownloadRulesCatalog.screen())
+        SettingsScreenRegistry.register(MeteredConnectionCatalog.screen())
         SettingsScreenRegistry.register(windowsGamesScreen())
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(WindowsInstallCatalog.screen())

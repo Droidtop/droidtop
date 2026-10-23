@@ -7,6 +7,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.JobNumbers
 import dev.droidtop.pluginhost.JobReport
@@ -49,6 +50,9 @@ object PluginJobsScreen {
 
     /** The Download rules screen's registry id, registered by :app (`DownloadRulesCatalog`). */
     const val RULES_SCREEN_ID = "download_rules"
+
+    /** What a download held for Wi-Fi offers, registered by :app (`MeteredConnectionCatalog`). */
+    const val METERED_SCREEN_ID = "metered_connection"
 
     /**
      * The one place the list of "what is running" is reached; every store's installs are jobs in
@@ -261,8 +265,20 @@ object PluginJobsScreen {
                 ),
             )
             // A native job with no checkpoint yet pauses to a fresh start, so it may always be paused.
-            // A download the policy holds can always be started anyway, even a single file that has no Pause.
-            if (entry.hold != null || (entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null || entry.nativeKind != null))) {
+            // A download the policy holds can be started anyway, even a single file that has no Pause, except past the
+            // connection: on a metered one the person allows the connection, never this one download (docs/SPEC.md 12a).
+            val networkHold = DownloadPolicy.isNetworkHold(entry.hold)
+            if (entry.hold == DownloadPolicy.WAITING_FOR_WIFI) {
+                add(
+                    NestedScreenItem(
+                        id = "plugin_job_${jobId}_metered",
+                        title = "Downloads on this connection",
+                        subtitle = "This connection is metered. You can allow it for every download, never for one",
+                        registryId = METERED_SCREEN_ID,
+                    ),
+                )
+            }
+            if ((entry.hold != null && !networkHold) || (entry.hold == null && entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null || entry.nativeKind != null))) {
                 add(
                     ActionItem(
                         id = "plugin_job_${jobId}_${if (entry.paused) "resume" else "pause"}",

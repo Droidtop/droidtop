@@ -67,14 +67,39 @@ class DownloadGateTest {
     }
 
     @Test
-    fun `a download the person paused or resumed themselves, a finished one and another kind of job are left alone`() {
+    fun `a download the person paused, a finished one and another kind of job are left alone`() {
         val entries = listOf(
             entry("paused", paused = true),
-            entry("overridden", override = true),
             entry("done", done = true),
             entry("plugin", nativeKind = "something_else"),
         )
         assertTrue(DownloadGate.plan(entries, facts, settings, offline).isEmpty())
+    }
+
+    @Test
+    fun `a download the person resumed is left alone by the update window and a running game but not by the connection`() {
+        val automatic = { _: PluginJobsCenter.Entry -> JobFacts(10L * 1024 * 1024, automatic = true) }
+        val playing = Conditions(NetworkClass.UNMETERED, 12 * 60, gameRunning = true)
+        assertTrue(DownloadGate.plan(listOf(entry("a", override = true)), automatic, settings, playing).isEmpty())
+        assertEquals(
+            listOf<DownloadGate.Move>(DownloadGate.Move.Hold("a", "Waiting for a network")),
+            DownloadGate.plan(listOf(entry("a", override = true)), facts, settings, offline),
+        )
+        val big = { _: PluginJobsCenter.Entry -> JobFacts(900L * 1024 * 1024) }
+        val mobile = Conditions(NetworkClass.METERED, 12 * 60, false)
+        assertEquals(
+            listOf<DownloadGate.Move>(DownloadGate.Move.Hold("a", "Waiting for Wi-Fi")),
+            DownloadGate.plan(listOf(entry("a", override = true)), big, settings, mobile),
+        )
+    }
+
+    @Test
+    fun `a metered connection the person allowed releases every download held for Wi-Fi`() {
+        val big = { _: PluginJobsCenter.Entry -> JobFacts(900L * 1024 * 1024) }
+        val allowed = Conditions(NetworkClass.METERED, 12 * 60, false, meteredAllowed = true)
+        val held = listOf(entry("a", paused = true, hold = "Waiting for Wi-Fi"), entry("b", paused = true, hold = "Waiting for Wi-Fi"))
+        val released = DownloadGate.plan(held, big, settings.copy(poolLimits = mapOf("games" to 2)), allowed)
+        assertEquals(setOf("a", "b"), released.filterIsInstance<DownloadGate.Move.Release>().map { it.jobId }.toSet())
     }
 
     @Test
