@@ -360,7 +360,9 @@ private class PluginPage(
         errorReply = if (reply.ok) null else reply
         if (reply.ok) {
             val messages = mutableListOf<String>()
-            val parsed = PluginView.parse(reply.data, messages)
+            // A target's facets go through the guards for that target (docs/plugin-api.md 1.10); any other reply is a view.
+            val parsed = (if (point == PluginFacets.POINT && op == PluginFacets.OP_GET) PluginFacets.view(record, args, reply.data, messages) else null)
+                ?: PluginView.parse(reply.data, messages)
             PluginMessages.record(context, record.manifest.id, "$point/$op", messages)
             if (parsed == null) {
                 error = "${record.manifest.label} sent a page droidtop cannot draw"

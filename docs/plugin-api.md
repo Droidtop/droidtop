@@ -1165,8 +1165,11 @@ of surfaces of their own.
 **Status: approved by the owner (2026-10-23: "Facets is really useful"); being built in pieces.** Built: the model and
 its guards (`Facets`, `FacetGuards` in `:plugin-host`: reading a reply, templates, the target list with the kinds and
 subjects each takes, the per-target caps from the limits file's `facets`, the store and media guards, the `ui.facets`
-point and `host.info().facets`). Next, the targets one at a time, starting with the Quick Menu's plugin section and the
-game page.
+point and `host.info().facets`); the renderer (facets become the view model the one renderer draws, `FacetViews`: a
+group is a section, a list's entries are rows, a `page` call opens a page whose reply is facets, and an input's value
+goes back as `args.value`, typed); and the Quick Menu's plugin section (a plugin whose `ui.facets` entry declares
+`quickmenu` gets its panel from `get {target: "quickmenu"}`, through `FacetGuards.admit`, in place of its old
+`ui.panel`). Next, the game page, then the plugin's own page and settings.
 
 **Facets first (the owner, 2026-10-23: "While plugins CAN present a whole UI, we really want them to use Facets.
 Small snippets to mix their functions into droidtop").** Facets are the default way a plugin shows anything. A
