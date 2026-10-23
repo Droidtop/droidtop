@@ -23205,6 +23205,17 @@ without its runtime said "Running". Decisions:
   empty-library states) keeps a "Get games" entry, and it opens the one search, empty and ready for typing,
   scoped as that place is (a system's entry searches that system and downloads to its folder; PC Games searches
   PC). It is still not in the Quick Menu or any System group (owner, 2026-10-01).
+  **Get new games: under the results, and a place of its own (owner, 2026-10-23, Droidtop/tracker#612).** "Get new
+  games should be presented under the search results, presenting matches that are relevant (so roms from romgi, abd
+  etc). Also add a 'get new games' under 'updates' that's its own UI." Earlier the same day: Get More Games "is
+  supposed to be transparently exposed in the search". So the one search lists what is here first (the device's games
+  and apps, and a game the library has that a source also offers, merged as before), then the games found only on the
+  download sources and the sites to search on, under the heading **Get new games** (`SearchRow.isNew`). The left menu
+  has **Get new games** right under Updates (`GamingSection.NEW_GAMES`; Kid and Kiosk hide it with the places, since
+  it downloads): the same search over every source, empty and ready for typing. The "Get games" rows of the game menu,
+  the Select menus (All games, a system, PC Games) and a console game's details are gone with that: a system's own
+  search ("Search SNES") shows that system's new games under the same heading. The chips in the empty states and the
+  Apps section stay, since an empty place needs a way to fill it.
   A source's own filters (its `form` view) and its full browse are its page under Game sources (Places), the
   per-source place that already exists (`SourceScreens`), not a step on the way to a download.
   No sources installed, or none ready, is one line in the search with the way to Plugins (it replaces the Get

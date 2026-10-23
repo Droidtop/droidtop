@@ -60,6 +60,13 @@ class SearchRow(
 ) {
     /** The places a pick offers: every row merged into this one, or this row alone. */
     val choices: List<SearchRow> get() = others.ifEmpty { listOf(this) }
+
+    /**
+     * A game the person does not have yet: no place it is found is on the device, or it is a site to search on. Such
+     * rows go under "Get new games", after what is here (owner, 2026-10-23, Droidtop/tracker#612: "Get new games should
+     * be presented under the search results, presenting matches that are relevant").
+     */
+    val isNew: Boolean get() = kind == SearchRowKind.WEB || choices.none { it.open != null }
 }
 
 /** Where one source stands in the current search. */
