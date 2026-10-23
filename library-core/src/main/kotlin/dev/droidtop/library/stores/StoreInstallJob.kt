@@ -2,18 +2,21 @@ package dev.droidtop.library.stores
 
 import android.content.Context
 import android.util.Log
-import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
 import dev.droidtop.pluginhost.DownloadGate
+import dev.droidtop.pluginhost.JobState
 import dev.droidtop.pluginhost.PluginJobsCenter
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -28,15 +31,14 @@ import kotlinx.coroutines.withContext
  * The job's checkpoint is the store row's key ("gog:1207658691") and
  * nothing else: the stores resume from what is on disk (each download
  * manager skips the files it already has), so there is no byte offset to
- * carry. The key is also what [StoreDownloads] files the job's progress
- * under, which is how a capsule and the game page say Downloading.
+ * carry. The key is also what [live] files the job under, which is how a
+ * capsule, the game page and its menu say what the download is doing.
  */
 object StoreInstallJob {
     const val KIND = "store_install"
     private const val ARG_KEY = "key"
     private const val ARG_ROOT = "root"
     private const val TAG = "droidtop.StoreInstall"
-    private const val PUBLISHER = "store_jobs"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -69,20 +71,30 @@ object StoreInstallJob {
             onCancel = { args, _ -> discard(app, args[ARG_KEY]) },
             download = true,
         ) { args, _, report -> execute(app, args, report) }
-        scope.launch {
-            PluginJobsCenter.entries()
-                .map { entries ->
-                    entries.filter { it.nativeKind == KIND && !it.done }
-                        .mapNotNull { entry ->
-                            entry.resumePayload?.let { key ->
-                                key to StoreDownloads.Progress((entry.percent.coerceAtLeast(0)) / 100f, paused = entry.paused)
-                            }
-                        }.toMap()
-                }
-                .distinctUntilChanged()
-                .collect { StoreDownloads.publish(PUBLISHER, it) }
-        }
     }
+
+    /**
+     * Each store game's install or update job, by its key ("gog:1207658691"): the one running, paused or held, or the
+     * last one if it failed; a game whose newest job finished well is not listed. The jobs list's own entries, read as
+     * they are (docs/SPEC.md 12a "Jobs and their results"), so a capsule, the game page and its menu say what the
+     * Downloads place says: "Waiting for Wi-Fi", how far in bytes, or why it failed. In memory, derived from
+     * [PluginJobsCenter.entries]; nothing else publishes it.
+     */
+    val live: StateFlow<Map<String, PluginJobsCenter.Entry>> = PluginJobsCenter.entries()
+        .map(::byGame)
+        .distinctUntilChanged()
+        .stateIn(scope, SharingStarted.Eagerly, emptyMap())
+
+    /** [live] from [entries]: the newest store job per game, kept while it runs, waits, or failed. Pure. */
+    fun byGame(entries: List<PluginJobsCenter.Entry>, keyOf: (PluginJobsCenter.Entry) -> String? = ::keyOf): Map<String, PluginJobsCenter.Entry> =
+        entries.filter { it.nativeKind == KIND }
+            .mapNotNull { entry -> keyOf(entry)?.let { it to entry } }
+            .groupBy({ it.first }, { it.second })
+            .mapNotNull { (key, jobs) ->
+                jobs.maxBy { it.startedAtMs }.takeIf { !it.done || it.state == JobState.FAILED }?.let { key to it }
+            }.toMap()
+
+    private fun keyOf(entry: PluginJobsCenter.Entry): String? = PluginJobsCenter.argsOf(entry.jobId)?.get(ARG_KEY) ?: entry.resumePayload
 
     /**
      * Starts installing (or updating) the store row [key] under [root], or

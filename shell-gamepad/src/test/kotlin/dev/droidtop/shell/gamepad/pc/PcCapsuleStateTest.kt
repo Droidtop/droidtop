@@ -3,7 +3,8 @@ package dev.droidtop.shell.gamepad.pc
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcInfo
-import dev.droidtop.library.StoreDownloads
+import dev.droidtop.pluginhost.PluginJobsCenter
+import dev.droidtop.pluginhost.PluginResult
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryQuery
@@ -69,16 +70,16 @@ class PcCapsuleStateTest {
 
     @Test
     fun `a running download beats install and update`() {
-        val running = StoreDownloads.Progress(0.4f, paused = false)
+        val running = job(40)
         assertEquals(StoreStage.DOWNLOADING, storeStageOf(store(installed = false), running))
         assertEquals(StoreStage.DOWNLOADING, storeStageOf(store(update = StoreUpdate.AVAILABLE), running))
-        assertEquals(StoreStage.PAUSED, storeStageOf(store(installed = false), StoreDownloads.Progress(0.4f, paused = true)))
+        assertEquals(StoreStage.PAUSED, storeStageOf(store(installed = false), job(40, paused = true)))
     }
 
     @Test
     fun `a folder game and a Wine shortcut have no store stage`() {
         assertNull(storeStageOf(folder(), null))
-        assertNull(storeStageOf(folder(), StoreDownloads.Progress(0.5f, paused = false)))
+        assertNull(storeStageOf(folder(), job(50)))
     }
 
     @Test
@@ -93,16 +94,38 @@ class PcCapsuleStateTest {
         assertEquals("Update", update.verb)
         assertTrue(update.detail.startsWith("A newer build is available"))
 
-        val running = playStateOf(null, store(installed = false), StoreDownloads.Progress(0.42f, paused = false))
+        val running = playStateOf(null, store(installed = false), job(42))
         assertEquals("Downloading", running.verb)
         assertEquals(StoreStage.DOWNLOADING, running.store)
         assertEquals(0.42f, running.progress)
-        assertTrue(running.detail.startsWith("42%"))
+        assertTrue(running.detail, running.detail.startsWith("42%"))
 
-        val paused = playStateOf(null, store(installed = false), StoreDownloads.Progress(0.42f, paused = true))
+        val paused = playStateOf(null, store(installed = false), job(42, paused = true))
         assertEquals("Resume", paused.verb)
         assertEquals(StoreStage.PAUSED, paused.store)
     }
+
+    @Test
+    fun `the game page says what the Downloads place says about a held or failed download`() {
+        val held = playStateOf(null, store(installed = false), job(42, paused = true, hold = "Waiting for Wi-Fi"))
+        assertEquals("Download now", held.verb)
+        assertEquals(StoreStage.WAITING, held.store)
+        assertTrue(held.detail, held.detail.startsWith("Waiting for Wi-Fi"))
+        assertEquals(CapsuleStatus.WAITING, capsuleStatusOf(store(installed = false), job(42, paused = true, hold = "Waiting for Wi-Fi")))
+
+        val failed = job(42, failed = "The store refused the download")
+        val state = playStateOf(null, store(installed = false), failed)
+        assertEquals("Try again", state.verb)
+        assertEquals(StoreStage.FAILED, state.store)
+        assertEquals("The store refused the download", state.detail)
+        assertEquals(CapsuleStatus.FAILED, capsuleStatusOf(store(installed = false), failed))
+    }
+
+    private fun job(percent: Int, paused: Boolean = false, hold: String? = null, failed: String? = null) = PluginJobsCenter.Entry(
+        jobId = "j", pluginId = "droidtop", pluginLabel = "GOG", capability = null, title = "t", startedAtMs = 0,
+        percent = percent, paused = paused, hold = hold, statusLine = hold ?: "Downloading",
+        done = failed != null, result = failed?.let { PluginResult.failure(it) },
+    )
 
     @Test
     fun `a game no runner offers gets a Choose a runner button that opens the engine picker`() {
@@ -117,8 +140,8 @@ class PcCapsuleStateTest {
     fun `the capsule badge reads the same stage as the button`() {
         assertEquals(CapsuleStatus.NOT_INSTALLED, capsuleStatusOf(store(installed = false), null))
         assertEquals(CapsuleStatus.UPDATE, capsuleStatusOf(store(update = StoreUpdate.AVAILABLE), null))
-        assertEquals(CapsuleStatus.DOWNLOADING, capsuleStatusOf(store(installed = false), StoreDownloads.Progress(0.1f, false)))
-        assertEquals(CapsuleStatus.PAUSED, capsuleStatusOf(store(installed = false), StoreDownloads.Progress(0.1f, true)))
+        assertEquals(CapsuleStatus.DOWNLOADING, capsuleStatusOf(store(installed = false), job(10)))
+        assertEquals(CapsuleStatus.PAUSED, capsuleStatusOf(store(installed = false), job(10, paused = true)))
         assertEquals(CapsuleStatus.INSTALLED, capsuleStatusOf(store(), null))
     }
 
@@ -255,7 +278,7 @@ class PcCapsuleStateTest {
         )
         assertEquals(StoreStage.WISHLIST, storeStageOf(wished, null))
         // a download cannot be running for a game that is not owned, but the wishlist wins over it anyway
-        assertEquals(StoreStage.WISHLIST, storeStageOf(wished, StoreDownloads.Progress(0.4f, paused = false)))
+        assertEquals(StoreStage.WISHLIST, storeStageOf(wished, job(40)))
         assertEquals(CapsuleStatus.WISHLIST, capsuleStatusOf(wished, null))
         val state = playStateOf(null, wished)
         assertTrue(state.verb.startsWith("Find on"))

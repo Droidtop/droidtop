@@ -2,7 +2,8 @@ package dev.droidtop.library.stores
 
 import android.content.Context
 import dev.droidtop.library.ScanPrune
-import dev.droidtop.library.StoreDownloads
+import dev.droidtop.pluginhost.PluginJobsCenter
+import dev.droidtop.pluginhost.PluginResult
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -82,15 +83,24 @@ class StoreLibrariesTest {
     }
 
     @Test
-    fun `two publishers share the downloads map and clearing one keeps the other`() {
-        val steam = mapOf("steam:440" to StoreDownloads.Progress(0.5f, paused = false))
-        val jobs = mapOf("gog:1" to StoreDownloads.Progress(0.1f, paused = true))
-        StoreDownloads.publish("test_a", steam)
-        StoreDownloads.publish("test_b", jobs)
-        assertEquals(steam + jobs, StoreDownloads.active.value.filterKeys { it in setOf("steam:440", "gog:1") })
-
-        StoreDownloads.publish("test_a", emptyMap())
-        assertEquals(jobs, StoreDownloads.active.value.filterKeys { it in setOf("steam:440", "gog:1") })
-        StoreDownloads.publish("test_b", emptyMap())
+    fun `each game shows its newest store job while it runs, waits or failed, and nothing once it finished well`() {
+        fun job(id: String, key: String, at: Long, done: Boolean = false, ok: Boolean = true) = PluginJobsCenter.Entry(
+            jobId = id, pluginId = "droidtop", pluginLabel = "GOG", capability = null, title = "t", startedAtMs = at,
+            nativeKind = StoreInstallJob.KIND, resumePayload = key, done = done,
+            result = if (!done) null else if (ok) PluginResult.success() else PluginResult.failure("failed"),
+        )
+        val keys = mapOf("a" to "gog:1", "b" to "gog:1", "c" to "gog:2", "d" to "gog:3", "e" to "gog:3")
+        val live = StoreInstallJob.byGame(
+            listOf(
+                job("a", "gog:1", at = 1, done = true, ok = false),
+                job("b", "gog:1", at = 2),
+                job("c", "gog:2", at = 1, done = true, ok = false),
+                job("d", "gog:3", at = 1, done = true, ok = false),
+                job("e", "gog:3", at = 2, done = true),
+            ),
+        ) { keys[it.jobId] }
+        assertEquals("b", live["gog:1"]?.jobId)
+        assertEquals("c", live["gog:2"]?.jobId)
+        assertNull("a later install that finished well hides the old failure", live["gog:3"])
     }
 }

@@ -47,7 +47,7 @@ import coil3.request.ImageRequest
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.library.StoreDownloads
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.library.kindLine
 import androidx.compose.ui.layout.onGloballyPositioned
 import dev.droidtop.shell.gamepad.Corners
@@ -119,14 +119,16 @@ internal const val CAPSULE_TIER_WIDE_MIN_DP = 1280f
  * folder that went missing, or a store game that is installed. Null for the
  * rest (a folder game on this device needs no badge).
  */
-internal enum class CapsuleStatus { DOWNLOADING, PAUSED, UPDATE, NOT_INSTALLED, MISSING, INSTALLED, WISHLIST }
+internal enum class CapsuleStatus { DOWNLOADING, WAITING, PAUSED, FAILED, UPDATE, NOT_INSTALLED, MISSING, INSTALLED, WISHLIST }
 
 /** The [CapsuleStatus] of [entry]; pure, and built on the same [storeStageOf] the primary button reads. */
-internal fun capsuleStatusOf(entry: LibraryEntry, download: StoreDownloads.Progress?): CapsuleStatus? {
+internal fun capsuleStatusOf(entry: LibraryEntry, download: PluginJobsCenter.Entry?): CapsuleStatus? {
     if (entry.missing) return CapsuleStatus.MISSING
     return when (storeStageOf(entry, download)) {
         StoreStage.DOWNLOADING -> CapsuleStatus.DOWNLOADING
+        StoreStage.WAITING -> CapsuleStatus.WAITING
         StoreStage.PAUSED -> CapsuleStatus.PAUSED
+        StoreStage.FAILED -> CapsuleStatus.FAILED
         StoreStage.UPDATE -> CapsuleStatus.UPDATE
         StoreStage.INSTALL -> CapsuleStatus.NOT_INSTALLED
         StoreStage.WISHLIST -> CapsuleStatus.WISHLIST
@@ -179,7 +181,7 @@ internal fun PcCapsule(
     onTap: () -> Unit,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier,
-    download: StoreDownloads.Progress? = null,
+    download: PluginJobsCenter.Entry? = null,
     parts: Int = 1,
     hero: Boolean = false,
     badge: KindBadge? = null,
@@ -403,12 +405,14 @@ private const val SOFT_ART_DARKEN = 0.45f
 
 /** The top-left badge: the game's [CapsuleStatus], on a chip that stays legible over any art. */
 @Composable
-internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDownloads.Progress? = null) {
+internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: PluginJobsCenter.Entry? = null) {
     val status = capsuleStatusOf(entry, download) ?: return
     val (text, fill, ink) = when (status) {
         CapsuleStatus.UPDATE -> Triple("Update", MenuTokens.Affirmative, MenuTokens.OnSelected)
-        CapsuleStatus.DOWNLOADING -> Triple("${download?.percent ?: 0}%", MenuTokens.Selected, MenuTokens.OnSelected)
+        CapsuleStatus.DOWNLOADING -> Triple("${download?.percent?.coerceIn(0, 100) ?: 0}%", MenuTokens.Selected, MenuTokens.OnSelected)
+        CapsuleStatus.WAITING -> Triple("Waiting", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.PAUSED -> Triple("Paused", MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.FAILED -> Triple("Failed", MenuTokens.Scrim, MenuTokens.Danger)
         CapsuleStatus.NOT_INSTALLED -> Triple("Not installed", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.WISHLIST -> Triple("Wishlist", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.MISSING -> Triple("Missing", MenuTokens.Scrim, MenuTokens.Danger)
@@ -425,7 +429,7 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: StoreDow
  * it stands for when more than one, and a thin bar while a download runs.
  */
 @Composable
-private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownloads.Progress?, parts: Int, badge: KindBadge?) {
+private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: PluginJobsCenter.Entry?, parts: Int, badge: KindBadge?) {
     if (badge != null) KindMark(badge, Modifier.align(Alignment.BottomStart))
     val glyph = ownershipGlyph(entry)
     val copies = if (parts > 1) "\u00d7$parts" else null
@@ -433,7 +437,7 @@ private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: StoreDownload
         CapsuleChip(it, MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomEnd))
     }
     // The shell's one progress bar, the same a download's row in the Downloads place draws.
-    if (download != null) ShellProgressBar(download.fraction.coerceIn(0f, 1f), Modifier.align(Alignment.BottomStart).fillMaxWidth())
+    download?.takeIf { !it.done }?.fraction()?.let { ShellProgressBar(it, Modifier.align(Alignment.BottomStart).fillMaxWidth()) }
 }
 
 /**

@@ -85,7 +85,8 @@ internal object UpdateDownload {
             entry.nativeKind == DownloadJobs.KIND && !entry.done &&
                 PluginJobsCenter.argsOf(entry.jobId)?.get("name")?.let { UpdateFiles.buildOf(it) } != null
         } ?: return null
-        return if (entry.percent in 0..99) "${entry.statusLine} (${entry.percent}%)" else entry.statusLine
+        // The job's own words, as the Downloads place says them (docs/SPEC.md 12a, "Jobs and their results").
+        return dev.droidtop.library.integrations.PluginJobsScreen.oneLine(entry)
     }
 
     /** The id of the running download job for the file [name], or null. */
