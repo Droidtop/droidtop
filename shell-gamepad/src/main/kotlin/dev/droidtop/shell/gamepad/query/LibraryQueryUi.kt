@@ -653,6 +653,20 @@ internal fun LibrarySearchDialog(
                 hit != null -> openHit(hit)
             }
         }
+        // One result as one line. A source's row says what pressing it does: Get when it can be fetched from here, else
+        // it opens; a game from several places asks where from.
+        fun rowLine(row: SearchRow): SearchLine = SearchLine.Entry(
+            "row:${row.kind}:${row.key}",
+            row.title,
+            subtitle = row.detail,
+            value = when {
+                row.others.isNotEmpty() -> "${row.choices.size} places"
+                else -> row.hit?.let { if (it.source.canGet(it.result)) "Get" else null }
+            },
+            icon = row.icon,
+        ) {
+            if (row.others.isNotEmpty()) choosing = row.key else pick(row)
+        }
         val choosingRow = choosing?.let { picked -> state.rows.firstOrNull { it.key == picked } }
         if (choosingRow != null) {
             // The same game from several places: where from, then that one's page (owner, 2026-10-16). B goes back.
@@ -671,23 +685,13 @@ internal fun LibrarySearchDialog(
                 )
             }
         } else if (text.isNotBlank()) {
-            state.rows.forEach { row ->
-                add(
-                    SearchLine.Entry(
-                        "row:${row.kind}:${row.key}",
-                        row.title,
-                        subtitle = row.detail,
-                        // A source's row says what pressing it does: Get when it can be fetched from here, else it opens;
-                        // a game from several places asks where from.
-                        value = when {
-                            row.others.isNotEmpty() -> "${row.choices.size} places"
-                            else -> row.hit?.let { if (it.source.canGet(it.result)) "Get" else null }
-                        },
-                        icon = row.icon,
-                    ) {
-                        if (row.others.isNotEmpty()) choosing = row.key else pick(row)
-                    },
-                )
+            // What is here first, then the matches from the download sources under their own heading (owner, 2026-10-23:
+            // "Get new games should be presented under the search results", Droidtop/tracker#612).
+            val (here, new) = state.rows.partition { !it.isNew }
+            here.forEach { row -> add(rowLine(row)) }
+            if (new.isNotEmpty()) {
+                add(SearchLine.Header(dev.droidtop.library.integrations.GetGamesEntry.NEW_GAMES))
+                new.forEach { row -> add(rowLine(row)) }
             }
             // Settings are a different thing being searched (docs/SPEC.md 7k), so they are a section of their own after the
             // rows, a few at most; the full list is the Settings page's own search.
