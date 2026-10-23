@@ -90,8 +90,10 @@ class PluginCall(
             )
         }.getOrNull()
 
-        /** The `host` object every call carries. */
-        fun hostInfo(): JSONObject = JSONObject().put("viewFeatures", org.json.JSONArray(PluginViewCall.VIEW_FEATURES))
+        /** The `host` object every call carries: the view features and, since contract 3, the facet kinds and targets it draws. */
+        fun hostInfo(): JSONObject = JSONObject()
+            .put("viewFeatures", org.json.JSONArray(PluginViewCall.VIEW_FEATURES))
+            .put("facets", FacetGuards.hostInfo())
     }
 }
 

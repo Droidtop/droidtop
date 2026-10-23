@@ -46,5 +46,60 @@
     "Needs full access to work",
     "Notice from the list",
     "The list's notice changed"
-  ]
+  ],
+  "facets": {
+    "$comment": "Facets (docs/plugin-api.md 1.10). Lengths are characters, counts are entries. perTarget is how many facets one plugin may have on one target; what is over is dropped and logged.",
+    "lengths": {
+      "id": 64,
+      "label": 60,
+      "value": 200,
+      "sub": 200,
+      "badge": 16,
+      "textBody": 20000,
+      "url": 2048,
+      "tag": 40,
+      "alt": 200,
+      "price": 16
+    },
+    "counts": {
+      "facetsPerReply": 200,
+      "groupFacets": 40,
+      "options": 100,
+      "listEntries": 200,
+      "collectionEntries": 60,
+      "chartPoints": 60,
+      "chartBars": 12,
+      "downloadEntries": 200,
+      "linksEntries": 32,
+      "tags": 64,
+      "genres": 16,
+      "identityIds": 16,
+      "templates": 16,
+      "listBadges": 4
+    },
+    "perTarget": {
+      "game.page": 12,
+      "game.row": 1,
+      "game.tile": 1,
+      "item.page": 16,
+      "library.filter": 16,
+      "library.sort": 8,
+      "search.result": 2,
+      "home.shelf": 2,
+      "home.card": 2,
+      "quickmenu": 4,
+      "companion.tab": 1,
+      "companion.card": 4,
+      "settings.page": 40,
+      "notification": 1,
+      "status.area": 1,
+      "widget": 6,
+      "plugin.page": 40,
+      "desktop.tray": 2,
+      "files.action": 4,
+      "launcher.drawer": 4,
+      "onboarding.step": 1,
+      "slot": 8
+    }
+  }
 }

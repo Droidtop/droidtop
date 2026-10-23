@@ -22,6 +22,16 @@ object PluginViewLimits {
 
     fun copyWarning(name: String): Int = json.getJSONObject("copyWarnings").getInt(name)
 
+    /** A facet length (docs/plugin-api.md 1.10), from the file's `facets.lengths`. */
+    fun facetLength(name: String): Int = json.getJSONObject("facets").getJSONObject("lengths").getInt(name)
+
+    /** A facet count, from `facets.counts`. */
+    fun facetCount(name: String): Int = json.getJSONObject("facets").getJSONObject("counts").getInt(name)
+
+    /** How many facets one plugin may have on [target] (a `<plugin>:<slot>` target counts as `slot`); 0 for an unknown one. */
+    fun facetsPerTarget(target: String): Int =
+        json.getJSONObject("facets").getJSONObject("perTarget").optInt(if (':' in target) "slot" else target, 0)
+
     val tones: Set<String> by lazy { strings("tones").toSet() }
 
     val placements: Set<String> by lazy { strings("placements").toSet() }

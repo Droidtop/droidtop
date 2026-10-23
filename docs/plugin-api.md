@@ -1162,8 +1162,10 @@ of surfaces of their own.
 
 ### 1.10 Facets: small, typed pieces of UI any plugin puts where droidtop has a place (proposed 2026-10-22, approved 2026-10-23, contract 3, Droidtop/tracker#602)
 
-**Status: approved by the owner (2026-10-23: "Facets is really useful"); not built yet.** It is built in pieces:
-the model and its guards first, then the targets one at a time, starting with the Quick Menu's plugin section and the
+**Status: approved by the owner (2026-10-23: "Facets is really useful"); being built in pieces.** Built: the model and
+its guards (`Facets`, `FacetGuards` in `:plugin-host`: reading a reply, templates, the target list with the kinds and
+subjects each takes, the per-target caps from the limits file's `facets`, the store and media guards, the `ui.facets`
+point and `host.info().facets`). Next, the targets one at a time, starting with the Quick Menu's plugin section and the
 game page.
 
 **Facets first (the owner, 2026-10-23: "While plugins CAN present a whole UI, we really want them to use Facets.
