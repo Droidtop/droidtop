@@ -104,6 +104,12 @@ object PluginJobsScreen {
         title = null,
         items = listOf(
             NestedScreenItem(
+                id = "plugin_jobs_add_link",
+                title = "Add download",
+                subtitle = "An https link, a magnet link, or a .torrent or .metalink file",
+                registryId = ManualDownloads.SCREEN_ID,
+            ),
+            NestedScreenItem(
                 id = "plugin_jobs_rules_link",
                 title = "Download rules",
                 subtitle = "Which network downloads use, when updates may run, and which games keep themselves up to date",
