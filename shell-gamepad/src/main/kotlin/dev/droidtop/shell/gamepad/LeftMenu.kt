@@ -63,32 +63,27 @@ import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
 
 /**
- * One place the left menu can take the user. Home is the PC Games section
- * showing recent activity across every library ([home]); the "PC Games" row
- * is the same section showing the PC library's own Overview shelves and its
- * grid views (docs/SPEC.md 7i, "Home art").
+ * One place the left menu can take the user: a section, Home included, which is a section of its own since
+ * 2026-10-23 (Droidtop/tracker#611; it was PC Games in another view).
  */
-internal data class LeftMenuEntry(val section: GamingSection, val label: String, val home: Boolean = false) {
-    val key: String get() = if (home) "home" else section.name
+internal data class LeftMenuEntry(val section: GamingSection, val label: String) {
+    val key: String get() = section.name
 
-    /** Whether this row is where the user is: [atHome] tells Home from PC Games. */
-    fun isAt(current: GamingSection, atHome: Boolean): Boolean =
-        section == current && (section != GamingSection.PC_GAMES || home == atHome)
+    /** Whether this row is where the user is. */
+    fun isAt(current: GamingSection): Boolean = section == current
 }
 
 /** The left menu's rows for the sections this UI mode allows (Kiosk and Kid hide Settings), Home first. */
-internal fun leftMenuEntries(sections: List<GamingSection>): List<LeftMenuEntry> = buildList {
-    if (GamingSection.PC_GAMES in sections) add(LeftMenuEntry(GamingSection.PC_GAMES, "Home", home = true))
-    sections.forEach { add(LeftMenuEntry(it, it.displayName())) }
-}
+internal fun leftMenuEntries(sections: List<GamingSection>): List<LeftMenuEntry> =
+    sections.map { LeftMenuEntry(it, it.displayName()) }
 
 /**
  * The row the cursor starts on: where the user is now (focus memory). A
  * destination the mode hides falls to the top rather than to nothing.
  * [rowsAbove] is how many rows sit above the destinations (the Resume row).
  */
-internal fun leftMenuStartIndex(entries: List<LeftMenuEntry>, current: GamingSection, atHome: Boolean = false, rowsAbove: Int = 0): Int =
-    rowsAbove + entries.indexOfFirst { it.isAt(current, atHome) }.coerceAtLeast(0)
+internal fun leftMenuStartIndex(entries: List<LeftMenuEntry>, current: GamingSection, rowsAbove: Int = 0): Int =
+    rowsAbove + entries.indexOfFirst { it.isAt(current) }.coerceAtLeast(0)
 
 /** What a row of the left menu is, by its place in the list: the running game's Resume, Search, then the destinations. */
 internal sealed interface LeftMenuRow {
@@ -155,7 +150,6 @@ internal fun leftMenuAttention(runningJobs: Int, unreadMessages: Int): Set<Gamin
 internal fun LeftMenu(
     entries: List<LeftMenuEntry>,
     current: GamingSection,
-    atHome: Boolean,
     runningTitle: String?,
     onResume: () -> Unit,
     onSelect: (LeftMenuEntry) -> Unit,
@@ -199,7 +193,7 @@ internal fun LeftMenu(
         val press = rememberGamepadTouch()
         // Keyed on where the person is: the cursor starts on the row the "you are here" pill marks, even when the
         // place changes while the menu is composed (Droidtop/tracker#493: the pill on Apps, the cursor on Plugins).
-        var focusIndex by remember(current, atHome, rowsAbove) { mutableIntStateOf(leftMenuStartIndex(entries, current, atHome, rowsAbove)) }
+        var focusIndex by remember(current, rowsAbove) { mutableIntStateOf(leftMenuStartIndex(entries, current, rowsAbove)) }
         var heldStep by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
         val focusRequester = remember { FocusRequester() }
@@ -268,8 +262,8 @@ internal fun LeftMenu(
                 itemsIndexed(entries, key = { _, entry -> entry.key }) { index, entry ->
                     SideMenuRow(
                         entry = entry,
-                        isCurrent = entry.isAt(current, atHome),
-                        waiting = entry.section in attention && !entry.home,
+                        isCurrent = entry.isAt(current),
+                        waiting = entry.section in attention,
                         selected = index + rowsAbove == focusIndex,
                         onClick = {
                             focusIndex = index + rowsAbove
