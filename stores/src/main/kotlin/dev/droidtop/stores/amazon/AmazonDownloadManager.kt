@@ -1,6 +1,7 @@
 package dev.droidtop.stores.amazon
 
 import android.content.Context
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.stores.data.AmazonGame
 import dev.droidtop.stores.data.DownloadInfo
 import dev.droidtop.stores.util.Marker
@@ -33,7 +34,6 @@ internal class AmazonDownloadManager(
         private const val MAX_PARALLEL_DOWNLOADS = 6
         private const val MAX_RETRIES = 3
         private const val RETRY_DELAY_MS = 1000L
-        private const val PROGRESS_EMIT_INTERVAL = 512 * 1024L // Emit UI progress every 512 KB
         private const val TAG = "Amazon"
     }
 
@@ -124,6 +124,7 @@ internal class AmazonDownloadManager(
                 val results = batch.map { file ->
                     async {
                         downloadFileWithRetry(
+                            context = context,
                             baseUrl = baseUrl,
                             file = file,
                             installDir = installDir,
@@ -194,6 +195,7 @@ internal class AmazonDownloadManager(
     // ── Private helpers ──────────────────────────────────────────────────────
 
     private suspend fun downloadFileWithRetry(
+        context: Context,
         baseUrl: String,
         file: AmazonManifest.ManifestFile,
         installDir: File,
@@ -205,7 +207,7 @@ internal class AmazonDownloadManager(
                 throw CancellationException("Download cancelled")
             }
 
-            val result = downloadFile(baseUrl, file, installDir, downloadInfo)
+            val result = downloadFile(context, baseUrl, file, installDir, downloadInfo)
             if (result.isSuccess) return result
 
             lastException = result.exceptionOrNull() as? Exception
@@ -223,7 +225,13 @@ internal class AmazonDownloadManager(
         )
     }
 
+    /**
+     * One manifest file on droidtop's download engine (docs/SPEC.md 12a, rollout step 4): fetched into the downloads area
+     * under its hash, checked against its SHA-256, then moved into place, so a stopped install carries on from the
+     * partial file next time. The job's bytes are counted here, across all the files.
+     */
     private suspend fun downloadFile(
+        context: Context,
         baseUrl: String,
         file: AmazonManifest.ManifestFile,
         installDir: File,
@@ -253,40 +261,23 @@ internal class AmazonDownloadManager(
             // nile uses /files/{hash_hex} per downloading/manager.py, NOT the unix path
             val hashHex = file.hashBytes.joinToString("") { "%02x".format(it) }
             val url = appendPath(baseUrl, "files/$hashHex")
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "nile/0.1 Amazon")
-                .build()
-
-            okHttpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    return@withContext Result.failure(
-                        Exception("HTTP ${response.code} for ${file.unixPath}")
-                    )
-                }
-
-                response.body.byteStream().use { input ->
-                    tmpFile.outputStream().use { output ->
-                        val buf = ByteArray(8192)
-                        var read: Int
-                        var bytesSinceLastEmit = 0L
-                        while (input.read(buf).also { read = it } != -1) {
-                                    if (!downloadInfo.isActive()) {
-                                        throw CancellationException("Download cancelled")
-                                    }
-                            output.write(buf, 0, read)
-                            downloadInfo.updateBytesDownloaded(read.toLong())
-                            bytesSinceLastEmit += read
-                            // Emit progress every ~512 KB so UI updates smoothly during large files
-                            if (bytesSinceLastEmit >= PROGRESS_EMIT_INTERVAL) {
-                                bytesSinceLastEmit = 0L
-                                downloadInfo.emitProgressChange()
-                                downloadInfo.persistProgressSnapshot()
-                            }
-                        }
-                    }
+            val areaName = "amazon_$hashHex"
+            var counted = 0L
+            val fetched = DownloadJobs.fetchForJob(
+                context, url, areaName, headers = mapOf("User-Agent" to "nile/0.1 Amazon"), tellJob = false,
+            ) { percent, _ ->
+                // The engine reports a percent; the job's byte count is this file's share of it.
+                if (percent < 0) return@fetchForJob
+                val now = file.size * percent / 100
+                if (now > counted) {
+                    downloadInfo.updateBytesDownloaded(now - counted)
+                    counted = now
+                    downloadInfo.emitProgressChange()
                 }
             }
+            if (counted < file.size) downloadInfo.updateBytesDownloaded(file.size - counted)
+            DownloadJobs.moveFile(fetched, tmpFile)
+            DownloadJobs.discardForJob(context, areaName)
 
             // Verify SHA-256 hash (algorithm 0) when present
             if (file.hashAlgorithm == 0 && file.hashBytes.isNotEmpty()) {
