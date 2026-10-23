@@ -1160,9 +1160,19 @@ of surfaces of their own.
   Each is a catalogue row already; they come after
   Gaming's surfaces are complete.
 
-### 1.10 Facets: small, typed pieces of UI any plugin puts where droidtop has a place (proposed 2026-10-22, contract 3, Droidtop/tracker#602)
+### 1.10 Facets: small, typed pieces of UI any plugin puts where droidtop has a place (proposed 2026-10-22, approved 2026-10-23, contract 3, Droidtop/tracker#602)
 
-**Status: proposal for the owner's review. Nothing here is built.**
+**Status: approved by the owner (2026-10-23: "Facets is really useful"); not built yet.** It is built in pieces:
+the model and its guards first, then the targets one at a time, starting with the Quick Menu's plugin section and the
+game page.
+
+**Facets first (the owner, 2026-10-23: "While plugins CAN present a whole UI, we really want them to use Facets.
+Small snippets to mix their functions into droidtop").** Facets are the default way a plugin shows anything. A
+plugin's own full UI (a `ui.settings` page, a view of its own, a Flutter screen) stays allowed, but only for what
+facets cannot express, and a plugin's catalog listing says which of its surfaces are its own. When a plugin needs
+something no facet kind or target can do, that need is droidtop's work first: it is raised on Droidtop/tracker#602
+as a candidate kind or target before the plugin falls back to a full UI. Every gamegrab-sources plugin moves its
+bespoke UI onto facets wherever they cover it, and its old path is deleted, not kept beside the facets.
 
 *The owner: "The facets system would benefit from being standardized as a system for presenting small surfaces to
 the droidtop frontend to provide specific information."; "We can provide a set of 'facets' a plugin can surface for
