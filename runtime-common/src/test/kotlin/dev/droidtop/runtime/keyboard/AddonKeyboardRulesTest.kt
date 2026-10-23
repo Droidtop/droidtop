@@ -16,11 +16,28 @@ class AddonKeyboardRulesTest {
     }
 
     @Test
-    fun `droidtop's own fields draw their keyboard only where Android will not`() {
-        assertFalse(AddonKeyboardRules.ownFieldNeedsKeyboard(0, emptySet()))
-        assertTrue(AddonKeyboardRules.ownFieldNeedsKeyboard(15, emptySet()))
-        assertFalse(AddonKeyboardRules.ownFieldNeedsKeyboard(15, setOf(15)))
-        assertFalse(AddonKeyboardRules.ownFieldNeedsKeyboard(null, emptySet()))
+    fun `droidtop serves its own fields where Android draws no keyboard`() {
+        val same = KeyboardPlacement.SAME_SCREEN
+        assertFalse(AddonKeyboardRules.droidtopServesField(0, emptySet(), same))
+        assertTrue(AddonKeyboardRules.droidtopServesField(15, emptySet(), same))
+        assertFalse(AddonKeyboardRules.droidtopServesField(15, setOf(15), same))
+        assertFalse(AddonKeyboardRules.droidtopServesField(null, emptySet(), same))
+    }
+
+    @Test
+    fun `with a companion, typing goes there even for a field on the built-in screen`() {
+        // Owner, 2026-10-23 (Droidtop/tracker#612): typing "should always land on the lowest screen".
+        assertTrue(AddonKeyboardRules.droidtopServesField(0, emptySet(), KeyboardPlacement.COMPANION))
+        assertTrue(AddonKeyboardRules.droidtopServesField(15, setOf(15), KeyboardPlacement.COMPANION))
+        assertFalse(AddonKeyboardRules.droidtopServesField(0, emptySet(), KeyboardPlacement.NOT_CONTROLLED))
+    }
+
+    @Test
+    fun `a keyboard comes up by itself only on one touch-only screen`() {
+        assertTrue(AddonKeyboardRules.raisesOnOwnFocus(twoScreens = false, padOrKeyboard = false))
+        assertFalse(AddonKeyboardRules.raisesOnOwnFocus(twoScreens = false, padOrKeyboard = true))
+        assertFalse(AddonKeyboardRules.raisesOnOwnFocus(twoScreens = true, padOrKeyboard = false))
+        assertFalse(AddonKeyboardRules.raisesOnOwnFocus(twoScreens = true, padOrKeyboard = true))
     }
 
     @Test

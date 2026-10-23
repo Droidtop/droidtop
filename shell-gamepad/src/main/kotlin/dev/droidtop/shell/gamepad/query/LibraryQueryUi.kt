@@ -42,7 +42,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -511,6 +514,14 @@ internal fun LibrarySearchDialog(
     // The merged row whose places are being chosen from (its key), or null for the result list.
     var choosing by remember { mutableStateOf<String?>(null) }
     var firstShow by remember { mutableStateOf(true) }
+    // Whether the person chose to type (A or a tap on the field, or a key typed). Putting the cursor in the field is
+    // droidtop's doing, not a choice, so no keyboard comes up for it, except on one touch-only screen (owner,
+    // 2026-10-23, Droidtop/tracker#612; AddonKeyboardRules.raisesOnOwnFocus).
+    var typing by remember { mutableStateOf(dev.droidtop.shell.gamepad.KeyboardTargets.raisesOnOwnFocus()) }
+    // Android's keyboard, where it is the one that types here; droidtop's own (the companion's Keys) follows [typing].
+    fun androidKeyboard() {
+        if (!dev.droidtop.shell.gamepad.KeyboardTargets.servesField(view.display?.displayId)) keyboard?.show()
+    }
     LaunchedEffect(activeCatalog == null) {
         if (activeCatalog != null) return@LaunchedEffect
         // The field lives in the dialog's own composition, which attaches a frame or more after this
@@ -520,9 +531,10 @@ internal fun LibrarySearchDialog(
         // Back from a page the soft keyboard stays away: the pad is on a row, not typing.
         if (!firstShow) return@LaunchedEffect
         firstShow = false
-        // Explicit, not implicit: Compose's own request on focus is dropped while a pad or keyboard is attached.
+        if (!typing) return@LaunchedEffect
+        // Explicit, not implicit: Compose's own request on focus is not reliable on a first show.
         delay(120)
-        keyboard?.show()
+        androidKeyboard()
         val imm = view.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
         android.util.Log.i(
             "droidtop.search",
@@ -846,7 +858,7 @@ internal fun LibrarySearchDialog(
                             at == 0 -> {
                                 moveCue(true, press.repeat)
                                 focusKey = null
-                                keyboard?.show()
+                                if (typing) androidKeyboard()
                                 true
                             }
                             else -> {
@@ -858,7 +870,10 @@ internal fun LibrarySearchDialog(
                             entries[at].onPick()
                             true
                         } else {
-                            false
+                            // A on the field is choosing to type.
+                            typing = true
+                            androidKeyboard()
+                            true
                         }
                         else -> false
                     }
@@ -881,6 +896,7 @@ internal fun LibrarySearchDialog(
                 value = field,
                 onValueChange = {
                     val changed = it.text != field.text
+                    if (changed) typing = true
                     field = it
                     if (changed) onTextChange(it.text)
                 },
@@ -896,14 +912,22 @@ internal fun LibrarySearchDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
+                    // A tap on the field is choosing to type.
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            typing = true
+                        }
+                    }
                     .focusRequester(fieldFocus)
                     .clip(dev.droidtop.shell.gamepad.Corners.Crisp)
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
-            // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314), only
-            // while the cursor is in the field: on the rows it closes, the companion's included (#485 rig step 1).
-            dev.droidtop.shell.gamepad.OwnFieldKeyboard(active = focusKey == null)
+            // droidtop's own keyboard where it serves the field (the companion's Keys, or a screen Android draws none
+            // on; SPEC 4c), once the person chose to type and while the cursor is in the field: on the rows it closes,
+            // the companion's included (#485 rig step 1).
+            dev.droidtop.shell.gamepad.OwnFieldKeyboard(active = typing && focusKey == null)
             Column(modifier = Modifier.padding(top = 8.dp)) {
                 lines.forEach { line ->
                     when (line) {

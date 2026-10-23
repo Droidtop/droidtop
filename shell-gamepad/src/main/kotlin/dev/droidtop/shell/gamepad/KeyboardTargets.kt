@@ -56,6 +56,18 @@ object KeyboardTargets {
 
     private fun companionDisplays(): Set<Int> = companions.value.values.mapNotNull { it() }.toSet()
 
+    /** Whether droidtop's keyboard, not Android's, serves a droidtop field on [fieldDisplay] right now (Droidtop/tracker#612). */
+    fun servesField(fieldDisplay: Int?, assistive: Boolean = false): Boolean =
+        fieldDisplay != null &&
+            AddonKeyboardRules.droidtopServesField(fieldDisplay, AddonKeyboard.localDisplays.value, placement(fieldDisplay, assistive))
+
+    /**
+     * Whether a keyboard comes up when droidtop itself puts the cursor in a field: only with one screen and no
+     * controller or keyboard attached (Droidtop/tracker#612). Otherwise it waits for the person to choose to type.
+     */
+    fun raisesOnOwnFocus(): Boolean =
+        AddonKeyboardRules.raisesOnOwnFocus(companionDisplays().isNotEmpty(), dev.droidtop.shell.gamepad.input.ControllerLayouts.padOrKeyboard.value)
+
     /** Where the keyboard for a field on [fieldDisplay] goes right now. */
     fun placement(fieldDisplay: Int, assistive: Boolean = false): KeyboardPlacement = AddonKeyboardRules.keyboardPlacement(
         AddonKeyboard.placement.value,
