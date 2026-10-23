@@ -12,15 +12,16 @@ class LeftMenuTest {
     private val all = leftMenuEntries(menuSectionsFor(UiMode.FULL))
 
     @Test
-    fun `every destination the mode allows is a row after Home, named as the top bar names it`() {
-        assertEquals(menuSectionsFor(UiMode.FULL), all.drop(1).map { it.section })
-        assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.drop(1).map { it.label })
+    fun `every destination the mode allows is a row, named as the top bar names it`() {
+        assertEquals(menuSectionsFor(UiMode.FULL), all.map { it.section })
+        assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.map { it.label })
         assertEquals(GamingSection.entries.toSet(), all.map { it.section }.toSet())
     }
 
     @Test
-    fun `Home is the first row and opens the PC section's shelves`() {
-        assertEquals(LeftMenuEntry(GamingSection.PC_GAMES, "Home", home = true), all.first())
+    fun `Home is the first row and a section of its own`() {
+        // Owner, 2026-10-23: "Home should NOT be the same section" (Droidtop/tracker#611).
+        assertEquals(LeftMenuEntry(GamingSection.HOME, "Home"), all.first())
         assertEquals(listOf("Home", "PC Games", "Retro Games", "Apps"), all.take(4).map { it.label })
         assertEquals(all.size, all.map { it.key }.toSet().size)
     }
@@ -29,7 +30,7 @@ class LeftMenuTest {
     fun `the tabs come first, then the places, and Settings is last`() {
         assertEquals(
             listOf(
-                GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
+                GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
                 GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS, GamingSection.UPDATES,
                 // Get new games, right under Updates (Droidtop/tracker#612).
                 GamingSection.NEW_GAMES,
@@ -43,7 +44,7 @@ class LeftMenuTest {
     @Test
     fun `the places are not tabs`() {
         assertEquals(
-            listOf(GamingSection.GAMES, GamingSection.PC_GAMES, GamingSection.APPS, GamingSection.SETTINGS),
+            listOf(GamingSection.HOME, GamingSection.GAMES, GamingSection.PC_GAMES, GamingSection.APPS, GamingSection.SETTINGS),
             sectionsFor(UiMode.FULL),
         )
     }
@@ -60,7 +61,7 @@ class LeftMenuTest {
         listOf(UiMode.KIOSK, UiMode.KID).forEach { mode ->
             val rows = menuSectionsFor(mode)
             assertFalse(rows.any { it.managesDevice })
-            assertEquals(listOf(GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS), rows)
+            assertEquals(listOf(GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS), rows)
             assertEquals(rows.toSet(), sectionsFor(mode).toSet())
         }
     }
@@ -68,14 +69,8 @@ class LeftMenuTest {
     @Test
     fun `the cursor opens on the destination the user is on`() {
         all.forEachIndexed { index, entry ->
-            assertEquals(index, leftMenuStartIndex(all, entry.section, atHome = entry.home))
+            assertEquals(index, leftMenuStartIndex(all, entry.section))
         }
-    }
-
-    @Test
-    fun `Home and PC Games are told apart by which view the PC section shows`() {
-        assertEquals(0, leftMenuStartIndex(all, GamingSection.PC_GAMES, atHome = true))
-        assertEquals(1, leftMenuStartIndex(all, GamingSection.PC_GAMES, atHome = false))
     }
 
     @Test
@@ -88,7 +83,7 @@ class LeftMenuTest {
     @Test
     fun `with a game running the Resume row leads and the cursor still opens on where the user is`() {
         all.forEachIndexed { index, entry ->
-            assertEquals(index + 1, leftMenuStartIndex(all, entry.section, atHome = entry.home, rowsAbove = 1))
+            assertEquals(index + 1, leftMenuStartIndex(all, entry.section, rowsAbove = 1))
         }
     }
 
@@ -126,7 +121,7 @@ class LeftMenuTest {
         assertEquals(2, leftMenuRowsAbove(running = true, searchable = true))
         assertEquals(0, leftMenuRowsAbove(running = false, searchable = false))
         all.forEachIndexed { index, entry ->
-            assertEquals(index + 2, leftMenuStartIndex(all, entry.section, atHome = entry.home, rowsAbove = leftMenuRowsAbove(true, true)))
+            assertEquals(index + 2, leftMenuStartIndex(all, entry.section, rowsAbove = leftMenuRowsAbove(true, true)))
         }
     }
 

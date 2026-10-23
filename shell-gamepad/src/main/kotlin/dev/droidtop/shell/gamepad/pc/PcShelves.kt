@@ -60,6 +60,15 @@ internal val HOME_SHELF_IDS = setOf(SHELF_CONTINUE, SHELF_RECENTLY_ADDED)
 /** The id of Home's one games row, whichever shelf fills it. */
 internal const val SHELF_RECENT_GAMES = "recent-games"
 
+/** Home's row of the games played most often (owner, 2026-10-23: Home shows "the user's most common games", #611). */
+internal const val SHELF_MOST_PLAYED = "most-played"
+
+/** Home's row of droidtop's own recommendations (docs/SPEC.md 12a "Recommendations API", #611). */
+internal const val SHELF_RECOMMENDED = "recommended"
+
+/** How many times a game must have been played to be one of the most common: once is a try, not a habit. */
+internal const val MOST_PLAYED_MIN = 2
+
 /**
  * Home's games row, "Recent games": [pcShelves] over the PC fold with [others] (Retro games and game apps)
  * merged in, Continue playing when anything was played, else Recently added. One shelf builder for both
@@ -75,7 +84,35 @@ internal fun homeShelves(
 ): List<PcShelf> {
     val shelves = pcShelves(games, now, others, options, isRecentlyAdded)
     val recent = shelves.firstOrNull { it.id == SHELF_CONTINUE } ?: shelves.firstOrNull { it.id == SHELF_RECENTLY_ADDED }
-    return listOfNotNull(recent?.copy(id = SHELF_RECENT_GAMES, title = "Recent games"))
+    return listOfNotNull(recent?.copy(id = SHELF_RECENT_GAMES, title = "Recent games"), mostPlayedShelf(games + others, options))
+}
+
+/**
+ * "Most played": every game played at least [MOST_PLAYED_MIN] times, most played first, then the most recent, then
+ * by name; none until two games qualify, since one card is not a row. Hidden games and what the ownership options keep
+ * out of activity stay out, as on Continue playing. Pure.
+ */
+internal fun mostPlayedShelf(all: List<LibraryEntry>, options: OwnershipOptions = OwnershipOptions()): PcShelf? {
+    val played = all.filter { it.playCount >= MOST_PLAYED_MIN && listExclusion(it, ListPlace.ACTIVITY, options) == null }
+        .sortedWith(
+            compareByDescending<LibraryEntry> { it.playCount }
+                .thenByDescending { it.lastPlayedEpochMs ?: 0L }
+                .thenBy { it.title.lowercase() },
+        )
+    if (played.size < 2) return null
+    return PcShelf(SHELF_MOST_PLAYED, "Most played", played.take(SHELF_LIMIT), played.size)
+}
+
+/**
+ * "Recommended for you": [recommended] titles (droidtop's own recommender, best first) matched to the library's
+ * entries by title, as the recommender names only games the person already has and has not played. None when nothing
+ * matched. Pure.
+ */
+internal fun recommendedShelf(recommended: List<String>, all: List<LibraryEntry>): PcShelf? {
+    val byTitle = all.groupBy { it.title.lowercase() }
+    val rows = recommended.mapNotNull { byTitle[it.lowercase()]?.firstOrNull() }.distinctBy { it.id }
+    if (rows.isEmpty()) return null
+    return PcShelf(SHELF_RECOMMENDED, "Recommended for you", rows.take(SHELF_LIMIT), rows.size)
 }
 
 /**

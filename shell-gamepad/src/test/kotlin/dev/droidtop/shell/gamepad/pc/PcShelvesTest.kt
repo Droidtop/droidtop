@@ -399,4 +399,22 @@ class PcShelvesTest {
         // and Home never carries it
         assertTrue(homeShelves(listOf(owned, wished("1")), emptyList(), now).none { it.id == SHELF_WISHLIST })
     }
+
+    @Test
+    fun `Home's most played row takes games played at least twice, most first, and needs two of them`() {
+        // Owner, 2026-10-23: Home shows "the user's most common games" (Droidtop/tracker#611).
+        val a = game("/a", lastPlayed = now - 10).copy(playCount = 5)
+        val b = game("/b", lastPlayed = now - 5).copy(playCount = 2)
+        val once = game("/once", lastPlayed = now - 1).copy(playCount = 1)
+        assertEquals(listOf("/a", "/b"), mostPlayedShelf(listOf(b, once, a))?.entries?.map { it.id })
+        assertEquals(null, mostPlayedShelf(listOf(a, once)))
+        assertEquals(listOf(SHELF_RECENT_GAMES, SHELF_MOST_PLAYED), homeShelves(listOf(a, b, once), emptyList(), now).map { it.id })
+    }
+
+    @Test
+    fun `Home's recommended row is the recommender's titles matched to the library, in its order`() {
+        val all = listOf(game("Alpha"), game("Beta"), game("Gamma"))
+        assertEquals(listOf("Gamma", "Alpha"), recommendedShelf(listOf("gamma", "Missing", "Alpha"), all)?.entries?.map { it.id })
+        assertEquals(null, recommendedShelf(listOf("Missing"), all))
+    }
 }

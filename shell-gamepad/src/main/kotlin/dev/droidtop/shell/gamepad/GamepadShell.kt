@@ -331,9 +331,11 @@ private fun GamepadShellBody(
     // here for the same reason the back stack is: the tab is rebuilt
     // whenever another tab is shown (docs/SPEC.md 7i).
     val pcGames = rememberSaveable(saver = sessionOnly(dev.droidtop.shell.gamepad.pc.PcGamesState.Saver)) {
-        dev.droidtop.shell.gamepad.pc.PcGamesState().apply {
-            if (GamingPrefs.opensOnPcGames(context)) view = dev.droidtop.shell.gamepad.pc.PcView.OVERVIEW
-        }
+        dev.droidtop.shell.gamepad.pc.PcGamesState().apply { view = dev.droidtop.shell.gamepad.pc.PcView.OVERVIEW }
+    }
+    // Home's own place (its strip, its cursor), apart from PC Games' (Droidtop/tracker#611).
+    val homeGames = rememberSaveable(saver = sessionOnly(dev.droidtop.shell.gamepad.pc.PcGamesState.Saver)) {
+        dev.droidtop.shell.gamepad.pc.PcGamesState()
     }
     // Bumps whenever a real "Browse themes" deep-link arrives (see
     // deepLinkToken's own doc comment) -- SettingsCatalogView opens its
@@ -805,7 +807,6 @@ private fun GamepadShellBody(
         LeftMenu(
             entries = leftMenuEntries(menuSectionsFor(uiMode)),
             current = section,
-            atHome = pcGames.home,
             runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
             // The Quick Menu Game section's Resume: the one launch path, reused.
             onResume = {
@@ -814,8 +815,6 @@ private fun GamepadShellBody(
             },
             onSelect = { entry ->
                 leftMenuOpen = false
-                // Home and PC Games are one section: the row says which view.
-                if (entry.section == GamingSection.PC_GAMES) pcGames.open(entry.home)
                 selectSection(entry.section)
             },
             onOpenQuickMenu = {
@@ -983,9 +982,8 @@ private fun GamepadShellBody(
         // Home is the hub and the top of the shell, where back goes nowhere
         // (as on any Android home screen). From any other section whose own
         // handlers have nothing left to close, back returns to Home.
-        if (GamingSection.PC_GAMES in menuSectionsFor(uiMode) && !(section == GamingSection.PC_GAMES && pcGames.home)) {
-            pcGames.open(home = true)
-            selectSection(GamingSection.PC_GAMES)
+        if (GamingSection.HOME in menuSectionsFor(uiMode) && section != GamingSection.HOME) {
+            selectSection(GamingSection.HOME)
         }
     }
     // Real dispatcher-route for closing the detail screen with B/back --
@@ -1251,7 +1249,7 @@ private fun GamepadShellBody(
             GamingSection.GAMES -> canGoBack
             // The PC Games tab draws its own row (HelpRowClaim.SCREEN);
             // the shell's bar shows there only over its setup screen.
-            GamingSection.PC_GAMES -> false
+            GamingSection.HOME, GamingSection.PC_GAMES -> false
             GamingSection.APPS -> !appEntries.isNullOrEmpty()
             GamingSection.SETTINGS,
             GamingSection.STORES,
@@ -1407,7 +1405,7 @@ private fun GamepadShellBody(
                         // gameEntries/appEntries' own comment) -- Games' spinner no
                         // longer has anything to do with whether Apps is ready, and
                         // vice versa.
-                        (shownSection == GamingSection.GAMES || shownSection == GamingSection.PC_GAMES) &&
+                        (shownSection == GamingSection.GAMES || shownSection == GamingSection.PC_GAMES || shownSection == GamingSection.HOME) &&
                             (gameEntries == null || foldedGameEntries == null) -> CircularProgressIndicator(color = MenuTokens.OnSurface)
                         shownSection == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = MenuTokens.OnSurface)
                         else -> when (shownSection) {
@@ -1437,7 +1435,9 @@ private fun GamepadShellBody(
                                 onToggleFavorite = onToggleFavorite,
                                 onRequestRescan = { rescanTrigger++ },
                             )
-                            GamingSection.PC_GAMES -> dev.droidtop.shell.gamepad.pc.PcGamesSection(
+                            // Home and PC Games draw the same shelves surface, each with its own state; keyed, so
+                            // nothing one remembers inside it leaks into the other.
+                            GamingSection.HOME, GamingSection.PC_GAMES -> androidx.compose.runtime.key(shownSection) { dev.droidtop.shell.gamepad.pc.PcGamesSection(
                                 entries = foldedGameEntries.orEmpty().let { all ->
                                     if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
                                 }.filter { it.onPcGamesTab },
@@ -1451,7 +1451,7 @@ private fun GamepadShellBody(
                                 apps = if (uiMode.kidGamesOnly) emptyList() else appEntries.orEmpty(),
                                 library = library,
                                 onHomeActivityChanged = onHomeActivityChanged,
-                                state = pcGames,
+                                state = if (shownSection == GamingSection.HOME) homeGames else pcGames,
                                 onLaunch = onLaunch,
                                 onToggleFavorite = onToggleFavorite,
                                 onShowDetail = { nav.openDetail(it.id) },
@@ -1463,12 +1463,9 @@ private fun GamepadShellBody(
                                 },
                                 onCanGoBackChanged = { canGoBack = it },
                                 onRequestRescan = { rescanTrigger++ },
-                                onOpenSection = { target ->
-                                    if (target == GamingSection.PC_GAMES) pcGames.open(home = false)
-                                    selectSection(target)
-                                },
+                                onOpenSection = { target -> selectSection(target) },
                                 onOpenQuickMenu = { quickMenuOpen = true },
-                            )
+                            ) }
                             GamingSection.APPS -> {
                                 canGoBack = false
                                 AppsSection(
@@ -1517,7 +1514,7 @@ private fun GamepadShellBody(
             // On Retro Games it yields to a theme that draws its own clock
             // or system status (docs/SPEC.md 7k2), so the two never overlap.
             // Home's top band draws the status facts itself (docs/SPEC.md 7i, "Home"; Droidtop/tracker#494, #485 F7a).
-            val homeBand = section == GamingSection.PC_GAMES && pcGames.home && nav.place is ShellPlace.Section
+            val homeBand = section == GamingSection.HOME && nav.place is ShellPlace.Section
             if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
                 FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
             }
@@ -1615,17 +1612,14 @@ private fun <T : Any> sessionOnly(inner: Saver<T, Any>): Saver<T, Any> = Saver(
 private object GamingPrefs {
     private fun prefs(context: Context) = CatalogPrefs.prefs(context)
 
-    /** Home (the default) and "pc" both start in PC Games; [opensOnPcGames] tells them apart. */
+    /** The section Gaming opens on: Home (the default), PC Games ("pc"), Retro Games or Apps. */
     fun defaultSection(context: Context): GamingSection =
         when (prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "home")) {
             "apps" -> GamingSection.APPS
             "games" -> GamingSection.GAMES
-            else -> GamingSection.PC_GAMES
+            "pc" -> GamingSection.PC_GAMES
+            else -> GamingSection.HOME
         }
-
-    /** "pc": open on PC Games' Overview rather than Home (docs/SPEC.md 7i). */
-    fun opensOnPcGames(context: Context): Boolean =
-        prefs(context).getString(GamingSettingsCatalog.ID_DEFAULT_SECTION, "home") == "pc"
 
     fun showHints(context: Context): Boolean =
         prefs(context).getBoolean(GamingSettingsCatalog.ID_SHOW_HINTS, true)
@@ -2062,6 +2056,13 @@ private fun ButtonHintFooter(
  * Settings deep link that name it keep working.
  */
 internal enum class GamingSection(val place: dev.droidtop.library.settings.Place? = null) {
+    /**
+     * Home, a section of its own (owner, 2026-10-23: "Home should NOT be the same section. Home should be dynamic",
+     * Droidtop/tracker#611). It was PC Games in another view, sharing one state, so visiting Home threw away where
+     * PC Games was (its grid view, its cursor) and the other way round. It draws the same shelves surface with a
+     * state of its own.
+     */
+    HOME,
     GAMES, PC_GAMES, APPS, SETTINGS,
 
     /**
@@ -2125,8 +2126,14 @@ internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<G
     val tabs = sectionsFor(mode)
     // The places, with Get new games right under Updates; Kiosk and Kid hide them all, since they manage the device or download.
     val places = GamingSection.entries.filter { (it.isPlace || it == GamingSection.NEW_GAMES) && !mode.hidesSettings }
-    // PC Games leads (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
-    val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy { if (it == GamingSection.PC_GAMES) 0 else 1 }
+    // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
+    val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
+        when (it) {
+            GamingSection.HOME -> 0
+            GamingSection.PC_GAMES -> 1
+            else -> 2
+        }
+    }
     return main + places + tabs.filter { it == GamingSection.SETTINGS }
 }
 
@@ -2137,6 +2144,7 @@ private val APP_KINDS = LibraryKinds.APPS
 private val GAME_KINDS = LibraryKinds.GAMES
 
 internal fun GamingSection.displayName(): String = when (this) {
+    GamingSection.HOME -> "Home"
     GamingSection.GAMES -> "Retro Games"
     GamingSection.PC_GAMES -> "PC Games"
     GamingSection.APPS -> "Apps"
