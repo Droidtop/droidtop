@@ -321,6 +321,8 @@ object PluginBundleInstaller {
      * the bounded legacy path ([LegacyBundleSignature]) until it updates.
      */
     fun verifyInstalled(pluginsRoot: File, record: PluginRecord, userKeys: Map<String, String> = emptyMap()): PluginInstallError? {
+        // An installed app's plugin is its app's signature and manifest asset, checked again ([AppInterfaces.verifyRecord]).
+        if (record.manifest.kind == PluginKind.APP_INTERFACE) return AppInterfaces.verifyAttached(record)
         val dir = installedDir(pluginsRoot, record)
         val manifestFile = File(dir, "manifest.json")
         val jwsFile = File(dir, BundleSignature.FILE_NAME)

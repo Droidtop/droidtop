@@ -17,7 +17,10 @@ import java.io.File
  * (docs/SPEC.md 12a "The catalog").
  */
 object PluginStore {
-    fun root(context: Context): File = File(context.filesDir, "plugins")
+    fun root(context: Context): File {
+        AppInterfaces.attach(context)
+        return File(context.filesDir, "plugins")
+    }
 
     fun dataDirFor(context: Context, pluginId: String): File =
         File(root(context), "$pluginId/data").apply { mkdirs() }

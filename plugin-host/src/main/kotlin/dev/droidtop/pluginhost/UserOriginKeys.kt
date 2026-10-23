@@ -95,8 +95,69 @@ object UserOriginKeys {
     /** The same store as verification consumes it: origin -> SPKI base64, passed as [PluginOriginKeys.anchorFor]'s `userKeys`. */
     fun loadBase64(file: File): Map<String, String> = load(file).mapValues { it.value.keyBase64 }
 
+    /** The prefix of an app certificate's entry in the same store (docs/plugin-api.md 1.3), beside the origin keys. */
+    private const val APP_PREFIX = "app:"
+
+    /** The app certificates the person trusts for [packageName]: SHA-256s of signing certificates, lowercase hex. */
+    fun appCerts(file: File, packageName: String): Set<String> {
+        if (!file.isFile) return emptySet()
+        val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return emptySet()
+        val entry = json.optJSONObject(APP_PREFIX + packageName)?.optJSONObject("app") ?: return emptySet()
+        return setOfNotNull(entry.optString("certSha256").lowercase().takeIf { it.matches(HEX64) && entry.optString("package") == packageName })
+    }
+
+    /** Every app certificate entry, package to certificate, for the "Keys you trust" screen. */
+    fun appEntries(file: File): Map<String, String> {
+        if (!file.isFile) return emptyMap()
+        val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return emptyMap()
+        return buildMap {
+            for (key in json.keys()) {
+                if (!key.startsWith(APP_PREFIX)) continue
+                val entry = json.optJSONObject(key)?.optJSONObject("app") ?: continue
+                val cert = entry.optString("certSha256").lowercase().takeIf { it.matches(HEX64) } ?: continue
+                put(key.removePrefix(APP_PREFIX), cert)
+            }
+        }
+    }
+
+    /**
+     * Trusts [certSha256] as [packageName]'s signing certificate, the person's own decision on the confirmation that
+     * shows its fingerprint. One certificate per app: a different one replaces it, as only the person can decide that.
+     */
+    fun trustApp(file: File, packageName: String, certSha256: String) {
+        val cert = certSha256.lowercase()
+        require(cert.matches(HEX64)) { "not a SHA-256 certificate fingerprint" }
+        val json = (if (file.isFile) runCatching { JSONObject(file.readText()) }.getOrNull() else null) ?: JSONObject()
+        json.put(APP_PREFIX + packageName, JSONObject().put("app", JSONObject().put("package", packageName).put("certSha256", cert)))
+        writeWhole(file, json)
+    }
+
+    /** Stops trusting [packageName]'s certificate. */
+    fun forgetApp(file: File, packageName: String) {
+        if (!file.isFile) return
+        val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return
+        json.remove(APP_PREFIX + packageName)
+        writeWhole(file, json)
+    }
+
+    private fun writeWhole(file: File, json: JSONObject) {
+        file.parentFile?.mkdirs()
+        val tmp = File(file.parentFile, "${file.name}.tmp")
+        tmp.writeText(json.toString())
+        if (!tmp.renameTo(file)) {
+            tmp.delete()
+            throw java.io.IOException("couldn't replace ${file.name}")
+        }
+    }
+
     private fun save(file: File, keys: Map<String, UserOriginKey>) {
         val json = JSONObject()
+        // The app certificates share the store (docs/plugin-api.md 1.3) and are not origin keys: kept as they are.
+        if (file.isFile) {
+            runCatching { JSONObject(file.readText()) }.getOrNull()?.let { old ->
+                for (key in old.keys()) if (key.startsWith(APP_PREFIX)) json.put(key, old.get(key))
+            }
+        }
         for ((origin, entry) in keys) {
             json.put(
                 origin,

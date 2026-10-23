@@ -81,6 +81,7 @@ data class PluginRecord(
         // Contract 2 fields: the same keys the manifest uses, so PluginManifest and the record share one parser (V2Declarations).
         manifest.v2.putInto(this)
         manifest.presentation.putInto(this)
+        manifest.app?.let { put("app", it.toJson()) }
         put(
             "payload",
             JSONArray(
@@ -160,6 +161,7 @@ data class PluginRecord(
                 subscribedEvents = subscribedEvents,
                 v2 = V2Declarations.fromJson(json),
                 presentation = PluginPresentation.fromJson(json, payload.map { it.path }.toSet()),
+                app = AppTarget.fromJson(json.optJSONObject("app")),
             ).withDerivedV2()
             val trust = runCatching { PluginTrustState.valueOf(json.optString("trust")) }.getOrNull() ?: PluginTrustState.PENDING
             return PluginRecord(

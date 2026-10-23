@@ -81,6 +81,8 @@ open class PluginSandboxService : PluginProcessService() {
             PluginKind.NATIVE_BUNDLE -> loadDex(pluginId, manifest, files, context)
             PluginKind.PYTHON -> loadPython(pluginId, manifest, files, context)
             PluginKind.FLUTTER_EMBED -> loadFlutter(pluginId, manifest, files, context)
+            // Its code is its own app, bound by AppInterfaces; it never loads in a droidtop process.
+            PluginKind.APP_INTERFACE -> failLoad(pluginId, "an app's plugin runs in its own app, not in a droidtop process")
         }
     }
 
