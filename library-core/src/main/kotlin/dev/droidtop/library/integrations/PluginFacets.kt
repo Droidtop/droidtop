@@ -42,6 +42,10 @@ object PluginFacets {
         )
     }
 
+    /** The subject of a game page's `get`: the game by droidtop's id, when [targetArg] carries its identity. */
+    fun gameSubject(targetArg: JSONObject): JSONObject? =
+        targetArg.optString("id").takeIf { it.isNotBlank() }?.let { JSONObject().put("type", "game").put("gameId", it) }
+
     /** The args of a `get` for [target], about [subject] when the target has one. */
     fun getArgs(target: String, subject: JSONObject? = null): JSONObject =
         JSONObject().put("target", target).also { a -> subject?.let { a.put("subject", it) } }
@@ -53,7 +57,8 @@ object PluginFacets {
     fun view(record: PluginRecord, args: JSONObject, data: JSONObject, messages: MutableList<String>): PluginView? {
         if (data.optJSONArray("facets") == null) return null
         val target = args.optString("target")
-        val subject = Facets.subjectOf(args.optJSONObject("subject")) ?: FacetSubject.Plugin
+        // A game page's facets are about its game even when the plugin may not learn which one it is (library.read).
+        val subject = Facets.subjectOf(args.optJSONObject("subject")) ?: if (target == GAME_PAGE) FacetSubject.Game("") else FacetSubject.Plugin
         val reading = Facets.read(data, subject)
         messages += reading.messages
         val admitted = FacetGuards.admit(reading.facets, target, guardsFor(record), messages)

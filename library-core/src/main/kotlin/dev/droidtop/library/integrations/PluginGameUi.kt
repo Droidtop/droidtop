@@ -5,6 +5,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.pluginhost.ContextActionFilter
 import dev.droidtop.pluginhost.ContextTarget
+import dev.droidtop.pluginhost.FacetGuards
 import dev.droidtop.pluginhost.GameSectionProtocol
 import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.PluginCrashPolicy
@@ -27,8 +28,10 @@ import kotlinx.coroutines.coroutineScope
 import org.json.JSONObject
 
 /**
- * Rows a plugin adds to a game's page (`ui.game_section@1`, docs/plugin-api.md 3 C18). Which games a section is
- * for comes from its manifest's static filter, so a page never loads a plugin to learn whether to ask it; the
+ * Rows a plugin adds to a game's page (`ui.game_section@1`, docs/plugin-api.md 3 C18), and the facets a plugin gives
+ * for the `game.page` target (`ui.facets`, docs/plugin-api.md 1.10), which take the same place: a plugin on facets is
+ * asked `get {target: "game.page", subject}` and its reply goes through the guards before it is drawn. Which games a
+ * section is for comes from its manifest's static filter, so a page never loads a plugin to learn whether to ask it; the
  * section's view is asked for once, when the page opens, never while drawing. The page draws the view's nodes as
  * its own rows ([rows]); anything that needs a form (an input, a page of its own) opens the section as a catalog
  * page through the one renderer ([screenFor], [PluginViews]).
@@ -40,6 +43,9 @@ object PluginGameSections {
     const val BUDGET_MS = 5_000L
 
     data class Section(val record: PluginRecord, val entry: ProvidedPoint) {
+        /** A plugin on facets (`ui.facets` declaring `game.page`) rather than `ui.game_section`. */
+        val facets: Boolean get() = entry.point == PluginFacets.POINT
+        val point: String get() = entry.point
         val id: String get() = entry.id ?: "default"
         val label: String get() = entry.label ?: record.manifest.label
         val pluginLabel: String get() = record.manifest.label
@@ -54,31 +60,41 @@ object PluginGameSections {
     /** The sections whose static filter matches [target]. Reads manifests only; call it off the main thread. */
     fun sectionsFor(context: Context, target: ContextTarget): List<Section> =
         // A game's page is Gaming's (docs/plugin-api.md 1.9): Standard and Desktop have no game page yet.
-        providersOf(context, POINT, PluginModes.GAMING)
-            .filter { (_, entry) -> ContextActionFilter.matches(entry, target) }
-            .map { (record, entry) -> Section(record, entry) }
+        (
+            providersOf(context, POINT, PluginModes.GAMING)
+                .filter { (_, entry) -> ContextActionFilter.matches(entry, target) } +
+                providersOf(context, PluginFacets.POINT, PluginModes.GAMING)
+                    .filter { (_, entry) -> target.kind == "game" && PluginFacets.GAME_PAGE in FacetGuards.declaredTargets(listOf(entry)) }
+        ).map { (record, entry) -> Section(record, entry) }
 
     /** The `context` every call of a section carries: which game, under the `library.read` rule, and which section. */
     private fun hostContext(context: Context, section: Section, target: ContextTarget): JSONObject =
         JSONObject().put("target", targetArg(context, section.record, target)).put("sectionId", section.id)
 
+    /** A facets section's `get` args: the game page, about this game when the plugin may know which one it is. */
+    private fun facetArgs(context: Context, section: Section, target: ContextTarget): JSONObject =
+        PluginFacets.getArgs(PluginFacets.GAME_PAGE, PluginFacets.gameSubject(targetArg(context, section.record, target)))
+
     /** Asks every section for its view, in parallel, each within [BUDGET_MS]. Off the main thread. */
     suspend fun load(context: Context, sections: List<Section>, target: ContextTarget): List<Loaded> = coroutineScope {
         sections.map { section ->
             async {
+                val args = if (section.facets) facetArgs(context, section, target) else JSONObject()
                 val reply = PluginViews.call(
                     context,
                     section.record,
-                    POINT,
-                    "section",
-                    PluginViewCall.args(JSONObject(), emptyMap(), hostContext(context, section, target)),
+                    section.point,
+                    if (section.facets) PluginFacets.OP_GET else "section",
+                    PluginViewCall.args(args, emptyMap(), hostContext(context, section, target)),
                     timeoutMs = BUDGET_MS,
                 )
                 when {
                     !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED ->
                         Loaded(section, null, "${section.pluginLabel} is not allowed to show this")
                     !reply.ok -> Loaded(section, null, reply.message?.takeIf { it.isNotBlank() } ?: "${section.pluginLabel} did not answer")
-                    else -> PluginView.parse(reply.data)?.let { Loaded(section, it, null) }
+                    else -> (if (section.facets) PluginFacets.view(section.record, args, reply.data, mutableListOf()) else null)
+                        ?.let { Loaded(section, it, null) }
+                        ?: PluginView.parse(reply.data)?.let { Loaded(section, it, null) }
                         ?: Loaded(section, null, "${section.pluginLabel} sent rows droidtop cannot draw")
                 }
             }
@@ -89,11 +105,12 @@ object PluginGameSections {
     fun screenFor(context: Context, section: Section, target: ContextTarget, op: String = "section", args: JSONObject = JSONObject(), title: String = section.label): CatalogScreen =
         PluginViews.screen(
             record = section.record,
-            point = POINT,
-            op = op,
+            point = section.point,
+            // A facets section opens as its whole get; a view action of it opens its own op.
+            op = if (section.facets && op == "section") PluginFacets.OP_GET else op,
             id = "game_section_${section.record.manifest.id}_${section.id}_$op",
             title = title,
-            args = args,
+            args = if (section.facets && op == "section") facetArgs(context, section, target) else args,
             hostContext = hostContext(context, section, target),
         )
 
@@ -156,7 +173,7 @@ object PluginGameSections {
 
     /** Runs a row's `call` or `job` and returns the sentence to show on it. Off the main thread. */
     suspend fun run(context: Context, section: Section, target: ContextTarget, action: ViewAction, label: String, onStatus: (String) -> Unit): String =
-        PluginViews.runAction(context, section.record, POINT, action, emptyMap(), hostContext(context, section, target), label, onStatus).message
+        PluginViews.runAction(context, section.record, section.point, action, emptyMap(), hostContext(context, section, target), label, onStatus).message
 }
 
 /**
