@@ -8,10 +8,17 @@ import dev.droidtop.net.DownloadPools
 import io.github.bi0shacker001.aria2engine.DownloadEngine
 import io.github.bi0shacker001.aria2engine.DownloadKind
 import io.github.bi0shacker001.aria2engine.DownloadRequest
+import io.github.bi0shacker001.aria2engine.EngineEvent
 import java.io.File
 import java.net.InetAddress
 import java.net.ServerSocket
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -153,5 +160,13 @@ object EngineHost {
         override fun remove(gid: String) {
             guarded { current().remove(gid, force = true) }
         }
+
+        /** The running engine's ends; none while it is not running (the poll then finds it gone). */
+        override val ended: Flow<String> = flow {
+            val engine = running ?: awaitCancellation()
+            emitAll(engine.events.filter { it.first in ENDS }.map { it.second })
+        }
+
+        private val ENDS = setOf(EngineEvent.COMPLETE, EngineEvent.ERROR, EngineEvent.STOP, EngineEvent.BT_COMPLETE)
     }
 }

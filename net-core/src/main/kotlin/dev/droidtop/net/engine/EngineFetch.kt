@@ -8,7 +8,12 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 /** The part of the download engine one transfer needs. [EngineHost] implements it over aria2; tests give it a fake. Blocking. */
 interface TransferEngine {
@@ -42,6 +47,13 @@ interface TransferEngine {
     /** Adds a torrent, magnet or Metalink download whose files land in [folder], under the engine's folder; returns its gid. */
     fun addSwarm(source: SwarmSource, folder: File, options: Map<String, String>): String =
         throw TransferException("this download engine cannot fetch torrents")
+
+    /**
+     * The gid of each download as the engine says it ended (complete, failed or stopped), so a transfer is read at once
+     * rather than at its next poll: a store's chunk of a megabyte is done well inside one. An engine that cannot say
+     * never emits, and the poll reads every end.
+     */
+    val ended: Flow<String> get() = flow { awaitCancellation() }
 }
 
 /** What a download of several files starts from. The engine reads the bytes; droidtop never parses them. */
@@ -186,6 +198,14 @@ object EngineFetch {
     const val POLL_MS = 1_000L
     const val MAX_FAILURES = 6
 
+    /**
+     * Waits until the engine says one of [gids] ended, or [POLL_MS] at most: the poll is what reads an end the engine
+     * never told (one before the wait began, or an engine that lost its events) and what reports progress meanwhile.
+     */
+    private suspend fun turn(engine: TransferEngine, gids: Collection<String>) {
+        withTimeoutOrNull(POLL_MS) { engine.ended.first { it in gids } }
+    }
+
     /** Polls without a byte after which the status line says the connection is being waited for. */
     const val STALL_POLLS = 3
 
@@ -321,7 +341,7 @@ object EngineFetch {
             var completed = 0L
             var stalledPolls = 0
             while (true) {
-                delay(POLL_MS)
+                turn(engine, listOf(gid!!))
                 val transfer = withContext(io) { engine.status(gid!!) } ?: throw EngineGoneException("the engine no longer knows the download")
                 when (transfer.state) {
                     "complete" -> {
@@ -394,7 +414,7 @@ object EngineFetch {
             var completed = 0L
             var stalledPolls = 0
             while (true) {
-                delay(POLL_MS)
+                turn(engine, live.toList())
                 val now = live.toList().map { gid -> gid to (withContext(io) { engine.status(gid) } ?: throw EngineGoneException("the engine no longer knows the download")) }
                 now.firstOrNull { it.second.state == "error" }?.let { (failedGid, failed) ->
                     settled = true
