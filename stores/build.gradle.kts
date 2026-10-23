@@ -56,9 +56,9 @@ dependencies {
     // Steam (dev.droidtop.stores.steam): JavaSteam for the connection, the
     // sign-in and product info, its depot downloader for installs, and the
     // full protobuf runtime its messages are built on (a kept licence is
-    // rebuilt from its protobuf). Snapshots: re-resolved like :runtime-windows'.
-    implementation(libs.javasteam) { isChanging = true }
-    implementation(libs.javasteam.depotdownloader) { isChanging = true }
+    // rebuilt from its protobuf). Built from vendor/javasteam (settings.gradle.kts).
+    implementation(libs.javasteam)
+    implementation(libs.javasteam.depotdownloader)
     // JavaSteam's crypto (CryptoHelper, which DepotManifest.decryptFilenames uses) names
     // org.bouncycastle.jce.provider.BouncyCastleProvider but leaves the library to the app. Without it every Steam
     // download died decrypting the manifest's file names (console, build 1767; Droidtop/tracker#313).

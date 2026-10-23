@@ -271,10 +271,11 @@ internal object SteamSession {
                     .writeTimeout(30, TimeUnit.SECONDS)
                     // Keeps the web socket alive while nothing is said.
                     .pingInterval(15, TimeUnit.SECONDS)
-                    // A depot chunk is a download: the engine fetches it (docs/SPEC.md 12a, "Everything moves").
-                    .addInterceptor(SteamChunkFetch(context.applicationContext))
                     .build(),
             )
+            // Depot chunks, web files and Workshop files are downloads: the engine fetches them (docs/SPEC.md 12a,
+            // "Everything moves").
+            it.withFetcher(SteamFetcher(context.applicationContext))
         }
         val steam = SteamClient(configuration).apply {
             removeHandler(SteamGameServer::class.java)
