@@ -12,6 +12,7 @@ import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.library.stores.Wishlist
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.db.StoresDatabase
 import dev.droidtop.stores.gog.api.GOGApiClient
@@ -195,6 +196,8 @@ class GOGStore : StoreLibrary {
     private fun dropChunkCache(context: Context, gameId: String) {
         val chunks = File(context.cacheDir, "gog_chunks/$gameId")
         chunks.parentFile?.let { SafeDelete.deleteWithin(it, chunks) }
+        // And the chunks the download engine had begun in the downloads area, this game's only.
+        DownloadJobs.discardAllForJob(context, GOGDownloadManager.areaPrefix(chunks))
     }
 
     internal companion object {

@@ -15,7 +15,10 @@ import dev.droidtop.stores.gog.HttpStatusException
 import dev.droidtop.stores.util.DownloadSpeedConfig
 import dev.droidtop.stores.util.StoreHttp
 import dev.droidtop.stores.util.StoreDiskSpace
+import dev.droidtop.pluginhost.DownloadJobs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
@@ -40,7 +43,6 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flatMapMerge
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
-import okhttp3.Request
 import org.json.JSONObject
 import timber.log.Timber
 import java.io.IOException
@@ -72,6 +74,14 @@ internal class EpicDownloadManager(
             val key = Integer.toHexString(dir.absolutePath.hashCode())
             return File(context.cacheDir, "epic_chunks/$key-${dir.name}")
         }
+
+        /**
+         * The start of the downloads-area names of the chunks the engine fetches for [installPath], keyed as
+         * [chunkCacheDirFor] is, so discarding one install deletes its own partial chunks and no other's. Pure.
+         */
+        fun areaPrefix(installPath: String): String = "epic_" + Integer.toHexString(File(installPath).absolutePath.hashCode()) + "_"
+
+        private const val USER_AGENT = "UELauncher/11.0.1-14907503+++Portal+Release-Live Windows/10.0.19041.1.256.64bit"
 
         private const val CHUNK_BUFFER_SIZE = 1024 * 1024 // 1MB buffer for decompression
         private const val MAX_CHUNK_RETRIES = 3 // Maximum retries per chunk
@@ -464,12 +474,12 @@ internal class EpicDownloadManager(
         chunkDir: String,
         cdnUrls: List<EpicManager.CdnUrl>,
         downloadInfo: DownloadInfo,
-        downloadHttpClient: okhttp3.OkHttpClient,
+        areaPrefix: String,
     ): Result<File> = withContext(Dispatchers.IO) {
         var lastException: Exception? = null
 
         repeat(MAX_CHUNK_RETRIES) { attempt ->
-            val result = downloadChunk(chunk, chunkCacheDir, chunkDir, cdnUrls, downloadInfo, downloadHttpClient)
+            val result = downloadChunk(chunk, chunkCacheDir, chunkDir, cdnUrls, downloadInfo, areaPrefix)
 
             if (result.isSuccess) {
                 if (attempt > 0) {
@@ -497,7 +507,7 @@ internal class EpicDownloadManager(
         val rankedBaseUrls = CdnRankingUtils.rankBaseUrlsByHeadProbe(
             cdnUrls.map { it.baseUrl },
             StoreHttp.http,
-            "UELauncher/11.0.1-14907503+++Portal+Release-Live Windows/10.0.19041.1.256.64bit",
+            USER_AGENT,
         )
         val rankIndex = rankedBaseUrls.withIndex().associate { it.value to it.index }
 
@@ -505,7 +515,9 @@ internal class EpicDownloadManager(
     }
 
     /**
-     * Download a single chunk from Epic CDN with decompression
+     * One chunk on droidtop's download engine (docs/SPEC.md 12a, rollout step 4): fetched whole into the downloads area,
+     * then decompressed and checked into the chunk cache as before. Each CDN is tried in its ranked order; the engine
+     * carries a chunk on from its partial bytes, and each of the pool's chunks is a transfer of its own.
      */
     private suspend fun downloadChunk(
         chunk: dev.droidtop.stores.epic.manifest.ChunkInfo,
@@ -513,7 +525,7 @@ internal class EpicDownloadManager(
         chunkDir: String,
         cdnUrls: List<EpicManager.CdnUrl>,
         downloadInfo: DownloadInfo,
-        downloadHttpClient: okhttp3.OkHttpClient,
+        areaPrefix: String,
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
             val decompressedFile = File(chunkCacheDir, chunk.guidStr)
@@ -531,8 +543,8 @@ internal class EpicDownloadManager(
                 }
             }
 
-            // Get chunk path for downloading
             val chunkPath = chunk.getPath(chunkDir)
+            val areaName = areaPrefix + chunk.guidStr
 
             // Try each CDN base URL until one succeeds
             var lastException: Exception? = null
@@ -540,34 +552,19 @@ internal class EpicDownloadManager(
                 try {
                     // Build full URL: baseUrl + cloudDir + chunkPath
                     val url = "${cdnUrl.baseUrl}${cdnUrl.cloudDir}/$chunkPath"
-
-                    val request = Request.Builder()
-                        .url(url)
-                        .header("User-Agent", "UELauncher/11.0.1-14907503+++Portal+Release-Live Windows/10.0.19041.1.256.64bit")
-                        .build()
-
-                    // Use .use {} to ensure response is always closed, even on exception
-                    downloadHttpClient.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) {
-                            lastException = Exception("HTTP ${response.code} downloading chunk from ${cdnUrl.baseUrl}")
-                            return@use // Exit use block, response will be closed automatically
-                        }
-
-                        // Download and decompress Epic chunk file using streaming to avoid OOM exceptions
-                        val responseBody = response.body!!
-                        responseBody.byteStream().use { input ->
-                            // Stream directly from network into chunk parser/decompressor.
-                            // This removes an extra temp compressed-file write/read cycle.
+                    // The job counts a chunk's bytes as it is decompressed, so one chunk's never read as the job's.
+                    val fetched = DownloadJobs.fetchForJob(context, url, areaName, headers = mapOf("User-Agent" to USER_AGENT), tellJob = false)
+                    try {
+                        fetched.inputStream().buffered().use { input ->
                             decompressStreamingChunkToFile(input, decompressedFile, chunk.windowSize.toLong(), chunk.shaHash, downloadInfo)
                         }
-
-                        return@withContext Result.success(decompressedFile)
+                    } finally {
+                        // Whole or not, the fetched copy is spent: a bad one is fetched again, not decompressed again.
+                        DownloadJobs.discardForJob(context, areaName)
                     }
-
-                    // If we get here, response was unsuccessful, try next CDN
-                    if (lastException != null) {
-                        continue
-                    }
+                    return@withContext Result.success(decompressedFile)
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     if (cdnIndex < cdnUrls.size - 1) {
                         Timber.tag("Epic").w(e, "Failed to download from ${cdnUrl.baseUrl}, trying next...")
@@ -578,6 +575,8 @@ internal class EpicDownloadManager(
 
             // All URLs failed
             return@withContext Result.failure(lastException ?: Exception("All CDN URLs failed for chunk ${chunk.guidStr}"))
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.tag("Epic").e(e, "Failed to download chunk ${chunk.guidStr}")
             Result.failure(e)
@@ -843,12 +842,12 @@ internal class EpicDownloadManager(
         chunkQueue: List<dev.droidtop.stores.epic.manifest.ChunkInfo>,
         chunkDir: String,
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        val scope = CoroutineScope(Dispatchers.IO)
         try {
-            val scope = CoroutineScope(Dispatchers.IO)
             val speedConfig = DownloadSpeedConfig()
             val parallelDownloads = speedConfig.maxDownloads
             val parallelAssemble = speedConfig.maxDecompress
-            val downloadHttpClient = StoreHttp.httpForParallelDownloads(parallelDownloads)
+            val areaPrefix = areaPrefix(installDir.absolutePath)
 
             val totalChunks = chunkQueue.size
             val totalFiles = files.size
@@ -936,7 +935,7 @@ internal class EpicDownloadManager(
                                 chunkDir,
                                 cdnUrls,
                                 downloadInfo,
-                                downloadHttpClient,
+                                areaPrefix,
                             )
 
                             // Always emit result to assembleFlow for processing (success or failure)
@@ -1130,6 +1129,10 @@ internal class EpicDownloadManager(
         } catch (e: Exception) {
             Timber.tag("EPIC").e(e, "Failed to download and assemble")
             Result.failure(e)
+        } finally {
+            // A pause cancels this call while it waits: the chunks still on the engine stop with it (their partial
+            // files stay for the next run), rather than running on in a scope nothing else ends.
+            scope.cancel()
         }
     }
 
