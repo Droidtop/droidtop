@@ -105,6 +105,12 @@ class SettingsCatalogInitProvider : ContentProvider() {
             dev.droidtop.library.integrations.AppCatalogs.POINT,
             dev.droidtop.library.integrations.AppCatalogScreen.linkHandler,
         )
+        // A magnet link can go to droidtop's own Downloads (Add download), beside any plugin that takes magnets.
+        dev.droidtop.library.integrations.LinkRouter.registerKind(
+            dev.droidtop.library.integrations.ManualDownloads.LINK_KIND,
+            dev.droidtop.library.integrations.ManualDownloads.linkKind,
+        )
+        dev.droidtop.library.integrations.LinkRouter.registerSource(dev.droidtop.library.integrations.ManualDownloads.linkSource)
         dev.droidtop.app.LinkSchemes.start(appContext)
         // The installed build's own APK and older partial updates are dead weight, and a restored job
         // must not fetch an old build again (tracker#445); runs once the jobs are restored.
