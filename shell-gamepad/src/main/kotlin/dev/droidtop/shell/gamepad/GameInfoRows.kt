@@ -5,6 +5,12 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.GameNaming
@@ -46,7 +52,12 @@ internal data class GameInfoRow(
     val url: String? = null,
     /** The chip's label on the detail screen, which draws no chip for a row without one. */
     val chip: String? = null,
+    /** A step A or the chip takes in place (the guided key setup of the sign-in row); before [screen] and [url]. */
+    val run: ((Context) -> Unit)? = null,
 )
+
+/** The row a game RetroAchievements knows gets while no key is stored: A opens the guided key setup in place. */
+internal const val ACHIEVEMENTS_SIGN_IN = "Show your achievements: sign in to RetroAchievements"
 
 /**
  * The rows for [entry], each filled in off the main thread as its source answers: RetroAchievements (a console
@@ -58,7 +69,11 @@ internal data class GameInfoRow(
 @Composable
 internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true): List<GameInfoRow> {
     val context = LocalContext.current.applicationContext
-    val rows by produceState(emptyList<GameInfoRow>(), entry.id, enabled) {
+    // Back from the guided key setup with a key stored: the rows are asked again, so the sign-in row becomes the
+    // achievements. Checked only while that row shows; the key store is read off the main thread.
+    var signedIn by remember(entry.id) { mutableIntStateOf(0) }
+    val scope = rememberCoroutineScope()
+    val rows by produceState(emptyList<GameInfoRow>(), entry.id, enabled, signedIn) {
         if (!enabled) return@produceState
         var achievements = emptyList<GameInfoRow>()
         var playTime = emptyList<GameInfoRow>()
@@ -81,6 +96,11 @@ internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true):
                 saves = saveRows(context, entry)
                 value = saves + achievements + playTime + compatibility
             }
+        }
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        if (rows.any { it.subtitle == ACHIEVEMENTS_SIGN_IN }) {
+            scope.launch { if (withContext(Dispatchers.IO) { RetroAchievements.isConfigured(context) }) signedIn++ }
         }
     }
     return rows
@@ -152,8 +172,22 @@ internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long): 
 private fun offline(message: String) = message.startsWith("No connection")
 
 internal fun achievementRows(context: Context, entry: LibraryEntry): List<GameInfoRow> =
-    when (val result = RetroAchievements.lookup(context, entry)) {
-        RaResult.NotSignedIn, RaResult.Unsupported -> emptyList()
+    achievementRowsFor(RetroAchievements.lookup(context, entry))
+
+/** The rows for what RetroAchievements said about a game. Pure, for the tests. */
+internal fun achievementRowsFor(result: RaResult): List<GameInfoRow> =
+    when (result) {
+        RaResult.Unsupported -> emptyList()
+        // A console RetroAchievements covers, and no key yet: the feature says it is there (Droidtop/tracker#143).
+        RaResult.NotSignedIn -> listOf(
+            GameInfoRow(
+                "Achievements",
+                "Sign in",
+                ACHIEVEMENTS_SIGN_IN,
+                chip = "Sign in for achievements",
+                run = { ctx -> dev.droidtop.library.scraper.ScraperKeySetupLink.open(ctx, dev.droidtop.library.scraper.ScraperKeyService.RETROACHIEVEMENTS) },
+            ),
+        )
         is RaResult.NotFound -> listOf(GameInfoRow("Achievements", "None listed", result.why))
         is RaResult.Failed ->
             if (offline(result.message)) emptyList() else listOf(GameInfoRow("Achievements", "Not loaded", result.message))

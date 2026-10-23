@@ -1142,7 +1142,10 @@ private fun dev.droidtop.shell.gamepad.GameInfoRow.toPageFact(
 ): PageFact {
     val page = screen
     val address = url
-    val action: (() -> Unit)? = if (page != null) {
+    val step = this.run
+    val action: (() -> Unit)? = if (step != null) {
+        ({ step(context) })
+    } else if (page != null) {
         ({ openScreen(page) })
     } else if (address != null) {
         ({ dev.droidtop.shell.gamepad.openAddress(context, address) })
