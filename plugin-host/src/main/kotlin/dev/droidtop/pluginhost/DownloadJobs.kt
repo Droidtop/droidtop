@@ -983,6 +983,36 @@ object DownloadJobs {
         }
     }
 
+    /**
+     * One file for a job that is already running, a store's install (docs/SPEC.md 12a, rollout step 4): fetched on the
+     * engine into the downloads area as [name], its bytes and waits told to that job ([JobHandle]). It is never a second
+     * job in Downloads, which would wait in the same pool behind the job that started it. [report] gets the percent (-1
+     * while the size is not known) and the line. Pause and cancel are the job's: the partial file and aria2's control
+     * file stay, and the next call with the same [name] carries on from them. Returns the whole file; failures are
+     * sentences (IllegalStateException).
+     */
+    suspend fun fetchForJob(
+        context: Context,
+        url: String,
+        name: String,
+        headers: Map<String, String> = emptyMap(),
+        maxBytes: Long = 0L,
+        report: (percent: Int, statusLine: String) -> Unit = { _, _ -> },
+    ): File {
+        val file = fileFor(context, name)
+        fetchWithEngine(context, url, headers, file, maxBytes, TransferNumbers(JobHandle.current()), { percent, line, _ -> report(percent, line) })
+        return file
+    }
+
+    /** Deletes what [fetchForJob] left under [name]: the partial file and aria2's control file beside it. */
+    fun discardForJob(context: Context, name: String) {
+        runCatching {
+            val file = fileFor(context, name)
+            file.delete()
+            TransferRequest.controlFile(file).delete()
+        }
+    }
+
     /** The download engine for the downloads area [folder], started if it is not running; a start that fails is a sentence. */
     private suspend fun engineFor(context: Context, folder: File): TransferEngine =
         try {
