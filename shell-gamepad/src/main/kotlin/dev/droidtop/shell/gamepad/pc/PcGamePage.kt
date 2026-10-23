@@ -367,9 +367,17 @@ internal fun PcGamePage(
                     null
                 },
             ),
-            // The update's row opens the record of the source that named it, at Downloads.
-            onOpenUpdate = updateSourceOf(updateSources, links, entry.availableUpdate)?.let { (source, id) ->
-                { viewingRecord = Triple(source, id, RecordTab.DOWNLOADS) }
+            // The update's row opens the record of the source that named it, at Downloads; when that cannot be told, the
+            // first linked source's, and with none linked, the sheet that links one. It never does nothing.
+            onOpenUpdate = entry.availableUpdate?.let {
+                val named = updateSourceOf(updateSources, links, entry.availableUpdate)
+                    ?: updateSources.firstNotNullOfOrNull { source -> links?.link(source.key)?.let { source to it.externalId } }
+                val open: (() -> Unit)? = when {
+                    named != null -> fun() { viewingRecord = Triple(named.first, named.second, RecordTab.DOWNLOADS) }
+                    updateSources.isNotEmpty() && isFolder -> fun() { editingSource = updateSources.first() }
+                    else -> null
+                }
+                open
             },
             updateStatus = updateStatus,
             onGetInstaller = { marker ->
@@ -1666,12 +1674,15 @@ internal fun elsewhereRows(
 
 /**
  * The source that named [update], and its record, for the update row: the first linked source (in the sources' order)
- * whose last answer is that version. Null when no linked source named it (a paired computer's version, a store's build).
+ * whose last answer is that version, compared without case, spaces or a leading "v" ("v0.37.dv" is "0.37.DV"); or the
+ * only linked source, which named it whatever it wrote. Null when several are linked and none named it (a paired
+ * computer's version, a store's build), or none is.
  */
 internal fun updateSourceOf(sources: List<UpdateSources.Source>, links: GameLinks?, update: String?): Pair<UpdateSources.Source, String>? {
     update ?: return null
-    val wanted = update.trim().removePrefix("v")
-    return sources.firstNotNullOfOrNull { source ->
-        links?.link(source.key)?.takeIf { it.answer?.version?.trim()?.removePrefix("v") == wanted }?.let { source to it.externalId }
-    }
+    fun plain(version: String) = version.trim().lowercase().removePrefix("v").filterNot { it.isWhitespace() }
+    val wanted = plain(update)
+    val linked = sources.mapNotNull { source -> links?.link(source.key)?.let { source to it } }
+    linked.firstOrNull { (_, link) -> link.answer?.version?.let(::plain) == wanted }?.let { (source, link) -> return source to link.externalId }
+    return linked.singleOrNull()?.let { (source, link) -> source to link.externalId }
 }
