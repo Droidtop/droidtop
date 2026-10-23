@@ -201,6 +201,50 @@ object FacetGuards {
 
     const val POINT = "ui.facets"
 
+    /**
+     * The grant-file key of the person's switch for one target under the plugin's "Where it appears" (docs/plugin-api.md
+     * 1.10, "The person arranges them"). On unless switched off; kept across updates like the mode switches.
+     */
+    const val TARGET_KEY_PREFIX = "facets:"
+
+    /** The plugin's own pages: they are where its switches are, so they have none of their own. */
+    val OWN_PAGES: Set<String> = setOf("plugin.page", "settings.page")
+
+    /** What the person reads for each target on "Where it appears". */
+    val TARGET_LABELS: Map<String, String> = mapOf(
+        "game.page" to "Game pages",
+        "game.row" to "Game lists",
+        "game.tile" to "Game tiles",
+        "item.page" to "Update pages",
+        "library.filter" to "Library filters",
+        "library.sort" to "Library sorting",
+        "search.result" to "Search results",
+        "home.shelf" to "Home shelves",
+        "home.card" to "Home cards",
+        "quickmenu" to "Quick Menu",
+        "companion.tab" to "Companion tabs",
+        "companion.card" to "Companion cards",
+        "notification" to "Notifications",
+        "status.area" to "Status bar",
+        "widget" to "Home-screen widgets",
+        "desktop.tray" to "Desktop tray",
+        "files.action" to "Files",
+        "launcher.drawer" to "App drawer",
+        "onboarding.step" to "Setup",
+    )
+
+    fun targetKey(target: String): String = TARGET_KEY_PREFIX + target
+
+    /** The person's switch for [target]: on unless they turned it off, and always on for the plugin's own pages. */
+    fun targetOn(snapshot: PluginGrants.Snapshot, target: String): Boolean =
+        target in OWN_PAGES || snapshot.states[targetKey(target)] != GrantState.DENIED
+
+    /** The targets "Where it appears" offers a switch for: the declared ones, in droidtop's order, without its own pages. */
+    fun switchable(provides: List<ProvidedPoint>): List<String> {
+        val declared = declaredTargets(provides)
+        return TARGETS.keys.filter { it in declared && it !in OWN_PAGES } + declared.filter { ':' in it }.sorted()
+    }
+
     private fun drop(messages: MutableList<String>, facet: Facet, why: String): Boolean {
         messages += "facet \"${facet.id}\" was not drawn: $why"
         return false

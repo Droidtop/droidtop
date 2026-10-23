@@ -64,7 +64,10 @@ object PluginGameSections {
             providersOf(context, POINT, PluginModes.GAMING)
                 .filter { (_, entry) -> ContextActionFilter.matches(entry, target) } +
                 providersOf(context, PluginFacets.POINT, PluginModes.GAMING)
-                    .filter { (_, entry) -> target.kind == "game" && PluginFacets.GAME_PAGE in FacetGuards.declaredTargets(listOf(entry)) }
+                    .filter { (record, entry) ->
+                        target.kind == "game" && PluginFacets.GAME_PAGE in FacetGuards.declaredTargets(listOf(entry)) &&
+                            PluginFacets.shows(context, record, PluginFacets.GAME_PAGE)
+                    }
         ).map { (record, entry) -> Section(record, entry) }
 
     /** The `context` every call of a section carries: which game, under the `library.read` rule, and which section. */

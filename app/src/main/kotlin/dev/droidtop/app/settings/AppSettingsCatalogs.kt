@@ -32,6 +32,7 @@ import dev.droidtop.library.integrations.PluginAppStatus
 import dev.droidtop.library.integrations.PluginCatalog
 import dev.droidtop.library.integrations.PluginCatalogScreen
 import dev.droidtop.library.integrations.PluginBackground
+import dev.droidtop.library.integrations.PluginFacets
 import dev.droidtop.library.integrations.PluginPanels
 import dev.droidtop.library.integrations.PluginSettingsRows
 import dev.droidtop.library.integrations.PluginJobsScreen
@@ -1930,6 +1931,17 @@ object AppSettingsCatalogs {
         // own app and the app it manages. The panel is the same screen the Quick Menu's Plugins section opens, so the
         // Standard and Desktop modes, which have no Quick Menu, reach it here.
         val useGroup = buildList<CatalogItem> {
+            // Its own page's facets (docs/plugin-api.md 1.10, target plugin.page), first: what it is for, drawn by droidtop.
+            if (record.runnable() && PluginFacets.declares(record, PluginFacets.PLUGIN_PAGE)) {
+                add(
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_facets_page",
+                        title = "Status and actions",
+                        subtitle = "What ${m.label} shows on its page",
+                        inline = PluginFacets.pageScreen(record),
+                    ),
+                )
+            }
             if (record.runnable()) {
                 PluginPanels.panelsFor(context).firstOrNull { it.pluginId == m.id }?.let { panel ->
                     add(
@@ -2576,6 +2588,19 @@ object AppSettingsCatalogs {
                 },
             )
         }
+        // And one switch per facet target it declares (docs/plugin-api.md 1.10, "The person arranges them"): off, that
+        // place no longer asks the plugin. Its own page and its settings have none; they are where these switches are.
+        val targetItems = dev.droidtop.pluginhost.FacetGuards.switchable(record.manifest.v2.provides).map { target ->
+            ToggleItem(
+                id = "plugin_${pluginId}_target_$target",
+                title = dev.droidtop.pluginhost.FacetGuards.TARGET_LABELS[target] ?: target,
+                current = dev.droidtop.pluginhost.FacetGuards.targetOn(snap, target),
+                onToggle = { ctx, on ->
+                    PluginGrants.forContext(ctx).set(pluginId, dev.droidtop.pluginhost.FacetGuards.targetKey(target), if (on) GrantState.GRANTED else GrantState.DENIED)
+                    pluginsChanged(ctx)
+                },
+            )
+        }
         // Each background service and schedule has its own switch (docs/plugin-api.md 3 E8, E9), under the point's.
         val backgroundItems = record.manifest.v2.provides
             .filter { it.point == BackgroundProtocol.SERVICE_POINT || it.point == BackgroundProtocol.SCHEDULE_POINT }
@@ -2611,7 +2636,7 @@ object AppSettingsCatalogs {
         }
         return listOfNotNull(
             accessRow?.let { CatalogGroup(id = "plugin_permissions_access", title = "Access", items = listOf(it)) },
-            modeItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_modes", "Where it appears", it) },
+            (modeItems + targetItems).takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_modes", "Where it appears", it) },
             backgroundItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_background", "Background tasks", it) },
             rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
             rest.filter { it.tier == PermissionTier.DANGEROUS }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_dangerous", "Sensitive", it.map(::item)) },
