@@ -433,11 +433,11 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         )
     }
 
-    private suspend fun call(source: String, op: String, args: JSONObject, timeoutMs: Long, userInitiated: Boolean): dev.droidtop.pluginhost.PluginReply? {
+    private suspend fun call(source: String, op: String, args: JSONObject, timeoutMs: Long, userInitiated: Boolean, point: String = POINT): dev.droidtop.pluginhost.PluginReply? {
         val (record, _) = providers().firstOrNull { (_, entry) -> entry.id == source } ?: return null
         val policy = PluginCrashPolicy(app)
         return try {
-            policy.handle(record, newCall(POINT, op, "library.updates", args.put("source", source), timeoutMs), timeoutMs = timeoutMs, crashOnTimeout = false, userInitiated = userInitiated)
+            policy.handle(record, newCall(point, op, "library.updates", args.put("source", source), timeoutMs), timeoutMs = timeoutMs, crashOnTimeout = false, userInitiated = userInitiated)
         } finally {
             policy.shutdown()
         }
@@ -486,22 +486,44 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
 
     override fun savedRecord(source: String, externalId: String): dev.droidtop.library.UpdateSources.RecordAnswer? {
         val saved = records.load(source, externalId) ?: return null
-        val parsed = parseRecord(saved.record, externalId) ?: return null
+        val parsed = readRecord(source, externalId, saved.record) ?: return null
         return dev.droidtop.library.UpdateSources.RecordAnswer(parsed, savedAtMs = saved.savedAtMs)
     }
 
     override suspend fun record(source: String, externalId: String): dev.droidtop.library.UpdateSources.RecordAnswer {
-        val reply = call(source, "record", JSONObject().put("id", externalId), QUICK_BUDGET_MS, userInitiated = true)
+        // A source on facets that declares the item page is asked for it (docs/plugin-api.md 1.10); any other for its record.
+        val onFacets = providers().firstOrNull { (_, entry) -> entry.id == source }?.first?.let { PluginFacets.declares(it, PluginFacets.ITEM_PAGE) } == true
+        val reply = if (onFacets) {
+            val subject = JSONObject().put("type", "item").put("source", source).put("id", externalId)
+            call(source, PluginFacets.OP_GET, PluginFacets.getArgs(PluginFacets.ITEM_PAGE, subject), QUICK_BUDGET_MS, userInitiated = true, point = PluginFacets.POINT)
+        } else {
+            call(source, "record", JSONObject().put("id", externalId), QUICK_BUDGET_MS, userInitiated = true)
+        }
         if (reply == null || !reply.ok) {
             val failure = reply?.message ?: if (reply == null) "The source $source is not installed or not running" else "The source did not answer"
             // A source that cannot answer now: droidtop's saved copy, which says when it was saved.
             savedRecord(source, externalId)?.let { return it.copy(failure = failure) }
             return dev.droidtop.library.UpdateSources.RecordAnswer(null, failure, unsupported = reply?.code == dev.droidtop.pluginhost.PluginErrorCode.UNSUPPORTED)
         }
-        val raw = reply.data.optJSONObject("record")
-        val parsed = raw?.let { parseRecord(it, externalId) }
+        // Contract 3: the item's bundles (docs/plugin-api.md 1.10, item.page); contract 2: a record object.
+        val raw = ItemPageFacets.itemJson(reply.data, externalId) ?: reply.data.optJSONObject("record")
+        val parsed = raw?.let { readRecord(source, externalId, it) }
         if (raw != null && parsed != null) runCatching { records.save(source, externalId, raw) }
         return dev.droidtop.library.UpdateSources.RecordAnswer(parsed, if (parsed == null) "The source sent no page for this record" else null)
+    }
+
+    /**
+     * A record from what [source] gave (or droidtop saved) for [externalId]: its item bundles through the item page's
+     * guards when it carries facets, else the contract 2 record. A source's `record` is its declaration of the item page.
+     */
+    private fun readRecord(source: String, externalId: String, raw: JSONObject): dev.droidtop.library.UpdateSources.Record? {
+        if (raw.optJSONArray("facets") == null) return parseRecord(raw, externalId)
+        val (record, _) = providers().firstOrNull { (_, entry) -> entry.id == source } ?: return null
+        val messages = mutableListOf<String>()
+        val guards = PluginFacets.guardsFor(record).let { it.copy(declaredTargets = it.declaredTargets + PluginFacets.ITEM_PAGE) }
+        val parsed = ItemPageFacets.record(ItemPageFacets.admitted(raw, source, externalId, guards, messages), externalId)
+        dev.droidtop.pluginhost.PluginMessages.record(app, record.manifest.id, "$POINT/record", messages)
+        return parsed
     }
 
     override suspend fun openDownload(

@@ -1176,8 +1176,11 @@ declares `game.page` takes a section's place on every game's page in Gaming, ask
 with the game as its subject only when it holds `library.read`, its rows drawn as a section's are); the plugin's own page (`plugin.page`: a
 "Status and actions" row first on the plugin's page opens `get {target: "plugin.page"}`); and "Where it appears" (a
 switch per declared target beside the mode switches, kept in the grant file under `facets:<target>` across updates;
-a target switched off is not asked for; the plugin's own page and settings have none). Next, the item page bundles
-and "Hide this" on a facet.
+a target switched off is not asked for; the plugin's own page and settings have none). And the item page (`item.page`): a
+source's record page is drawn from the item's bundles (`metadata`, `description`, `image`, `download`, `links`)
+through the guards, from `ui.facets get {target: "item.page", subject: {type: "item", source, id}}` when the source
+declares that target, or from facets on its `record` reply (`items: [{id, facets}]`, which counts as declaring the item
+page); a contract 2 `record` is read as before (`ItemPageFacets`). Next, "Hide this" on a facet.
 
 **Facets first (the owner, 2026-10-23: "While plugins CAN present a whole UI, we really want them to use Facets.
 Small snippets to mix their functions into droidtop").** Facets are the default way a plugin shows anything. A
