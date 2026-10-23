@@ -36,9 +36,12 @@ internal object RuntimeDownloads {
             .build()
     }
 
-    /** Downloads [url] into [dest], checked against [sha256] when given; [onProgress] gets 0 to 1. */
-    suspend fun fetchUrl(context: Context, url: String, dest: File, sha256: String? = null, onProgress: (Float) -> Unit) =
-        fetchUrls(context, listOf(url), dest, sha256, onProgress)
+    /**
+     * Downloads [url] into [dest], checked against [sha256] when given; [onProgress] gets 0 to 1. [title] names the job in
+     * Downloads; by default it is the file's own name.
+     */
+    suspend fun fetchUrl(context: Context, url: String, dest: File, sha256: String? = null, title: String? = null, onProgress: (Float) -> Unit) =
+        firstThatWorks(listOf(url)) { fetchFrom(context, it, dest, sha256, title, onProgress) }
 
     /**
      * Downloads the first of [urls] that answers with the right bytes into
@@ -47,7 +50,7 @@ internal object RuntimeDownloads {
      * serves bytes that do not match [sha256] is skipped for the next.
      */
     suspend fun fetchUrls(context: Context, urls: List<String>, dest: File, sha256: String? = null, onProgress: (Float) -> Unit) =
-        firstThatWorks(urls) { url -> fetchFrom(context, url, dest, sha256, onProgress) }
+        firstThatWorks(urls) { url -> fetchFrom(context, url, dest, sha256, null, onProgress) }
 
     /** Downloads the base-system file [fileName] into [dest]; [onProgress] gets 0 to 1. */
     suspend fun fetch(context: Context, fileName: String, dest: File, onProgress: (Float) -> Unit) {
@@ -87,10 +90,10 @@ internal object RuntimeDownloads {
      * it, checks it against [sha256] and moves it to [dest] ([DownloadJobs.POST_MOVE_TO]), so the Windows runtime's
      * files are listed in Downloads, follow the Download rules and move to the download engine with every other file.
      */
-    private suspend fun fetchFrom(context: Context, url: String, dest: File, sha256: String?, onProgress: (Float) -> Unit) {
+    private suspend fun fetchFrom(context: Context, url: String, dest: File, sha256: String?, title: String?, onProgress: (Float) -> Unit) {
         val result = DownloadJobs.run(
             context = context,
-            title = "Windows support: ${dest.name}",
+            title = title ?: "Windows support: ${dest.name}",
             post = DownloadJobs.POST_MOVE_TO,
             url = url,
             name = areaName(dest.name),
