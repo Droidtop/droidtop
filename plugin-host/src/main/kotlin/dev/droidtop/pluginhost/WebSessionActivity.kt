@@ -172,6 +172,16 @@ class WebSessionActivity : Activity() {
             setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
                 if (asked.mode != WebSessionRequest.Mode.OPEN) return@setDownloadListener
                 if (captured.any { it.url == url }) return@setDownloadListener
+                // A file the page builds itself (MEGA decrypts in the page and hands over a blob: address) exists only
+                // inside this view: no download can fetch it from outside, so it is not taken, and the person is told.
+                if (!url.startsWith("https://", ignoreCase = true) && !url.startsWith("http://", ignoreCase = true)) {
+                    android.widget.Toast.makeText(
+                        this@WebSessionActivity,
+                        "This site builds the file inside the page, so droidtop cannot download it. Go back and pick another mirror.",
+                        android.widget.Toast.LENGTH_LONG,
+                    ).show()
+                    return@setDownloadListener
+                }
                 captured += WebSessionDownload(
                     url = url,
                     userAgent = userAgent,
