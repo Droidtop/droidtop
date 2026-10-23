@@ -114,6 +114,7 @@ class NativePluginRunner(
     suspend fun load(record: PluginRecord, installDir: String, tier: PluginTier): Boolean {
         val id = record.manifest.id
         loadFailures.remove(id)
+        if (record.manifest.kind == PluginKind.APP_INTERFACE) return loadApp(record)
         // An open plugin with only the network hole runs isolated, its sockets the broker's (docs/plugin-api.md 5.6).
         val grants = withContext(Dispatchers.IO) { PluginGrants.forContext(appContext).read(id) }
         val isolatedNet = tier == PluginTier.OPEN && PluginTiers.runsIsolated(PluginTiers.holes(record, grants))
@@ -209,6 +210,40 @@ class NativePluginRunner(
             return runtime.loadContained(id, manifest, opened.toTypedArray(), names.toTypedArray(), PluginBrokers.binderFor(appContext, id))
         } finally {
             opened.forEach { runCatching { it.close() } }
+        }
+    }
+
+    /**
+     * An app interface plugin (docs/plugin-api.md 1.3): its app's own service, bound by [AppInterfaceConnections], loaded
+     * the contained way with no files and the manifest droidtop verified itself, never one the app gives, and handed its
+     * broker. The app is in its own process with its own permissions; droidtop opens nothing for it.
+     */
+    private suspend fun loadApp(record: PluginRecord): Boolean {
+        val id = record.manifest.id
+        val runtime = AppInterfaceConnections.acquire(appContext, record)
+            ?: return failLoad(id, "its app's service could not be reached")
+        runtimes.put(id, runtime)?.let { if (it.asBinder() !== runtime.asBinder()) AppInterfaceConnections.release(appContext, id) }
+        val binder = runtime.asBinder()
+        if (registered.putIfAbsent(binder, runtime) == null) {
+            val callback = ProcessCallback(binder).also { callbacks[binder] = it }
+            runCatching { runtime.registerCallback(callback) }
+        }
+        return try {
+            val loaded = withTimeout(PluginRunner.CALL_TIMEOUT_MS) {
+                withContext(Dispatchers.IO) {
+                    val manifest = java.io.File(PluginStore.payloadDirFor(appContext, record), "manifest.json").readText()
+                    runtime.loadContained(id, manifest, emptyArray(), emptyArray(), PluginBrokers.binderFor(appContext, id))
+                }
+            }
+            if (!loaded) failLoad(id, runCatching { runtime.lastLoadError(id) }.getOrNull().orEmpty().ifBlank { "its app did not take the plugin" })
+            loaded
+        } catch (e: TimeoutCancellationException) {
+            failLoad(id, "its app did not answer in time; try again in a moment")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Its app is not droidtop's process: a failure there is reported, never counted as a droidtop plugin crash.
+            failLoad(id, e.message ?: "its app could not be reached")
         }
     }
 
@@ -331,7 +366,9 @@ class NativePluginRunner(
         registered.forEach { (binder, runtime) -> callbacks[binder]?.let { runCatching { runtime.unregisterCallback(it) } } }
         registered.clear()
         callbacks.clear()
-        runtimes.keys.toList().forEach { PluginProcesses.release(appContext, it) }
+        runtimes.keys.toList().forEach { id ->
+            if (AppInterfaceConnections.holds(id)) AppInterfaceConnections.release(appContext, id) else PluginProcesses.release(appContext, id)
+        }
         runtimes.clear()
     }
 }
