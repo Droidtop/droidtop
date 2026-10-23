@@ -4065,7 +4065,7 @@ A fixed orientation maps to Android's matching `SCREEN_ORIENTATION_*` value. A
 `Presentation` cannot request display orientation, so its content rotates inside the
 display when the display aspect conflicts with the selected orientation.
 
-The companion screen has its own **Lock to landscape** (Displays > Companion > Screen, off by
+The companion screen has its own **Lock to landscape** (Companion screen > Screen, off by
 default; owner, 2026-10-01: the Retroid add-on does not rotate, but other dual-screen systems
 may, "so we should include a 'lock to landscape' option in droidtop too"). On, it wins over the
 mode's choice for the companion only: `CompanionActivity` requests user landscape
@@ -4125,7 +4125,7 @@ droidtop 0.2.0-dev.1931).
   Input in Desktop (section 6c), any tab, or the last one used. When a game starts while Home shows, it turns
   to the runner's tab ("When a game starts": Game by default, Input for a runner that asks for it, any tab, or
   stay), announces the tab to TalkBack, and goes back to Home on quit. Started from another tab, nothing moves.
-- **The Companion group** of the catalog (Displays > Companion > Tabs, `CompanionPrefs` in `:runtime-common`)
+- **The Companion group** of the catalog (Companion screen > Tabs, `CompanionPrefs` in `:runtime-common`)
   holds these: per mode the four bar slots and the opening tab, When a game starts, and Reset the companion to
   defaults (asks first). There is no companion-only settings screen. The per-mode second-screen role ("Widgets
   and game info" or "Keyboard and trackpad") it replaces is migrated once into the opening tab where it differed
@@ -4176,7 +4176,7 @@ droidtop 0.2.0-dev.1931).
      time as the fallback, and leaves out rows with neither. Both rails draw from the list the shell's own Home
      shelves are built from (the folded PC games, the Retro library and the launcher apps that are games,
      published as `CompanionState.homeActivity`), not from the scanned games alone, which left out the apps and
-     so showed no Recently added where Home had items (rig 1523). The Displays > Companion > Home rows say a
+     so showed no Recently added where Home had items (rig 1523). The Companion screen > Home rows say a
      section appears only when it has something to show. Then **Recent apps** (`CompanionAppsSection`):
      up to twelve apps from the launcher's own launch history (`RecentAppsStore`, the drawer's Recent row),
      a tap opens one on the companion's screen; nothing recorded, no section. It re-reads when the launcher
@@ -4209,7 +4209,7 @@ droidtop 0.2.0-dev.1931).
   is fiddly (wireless debugging and a pairing code in Shizuku's own app) and that skipping it loses nothing
   important, with one button for the next step (Get Shizuku, Open Shizuku, Allow droidtop) and Don't show again.
   Each section's heading folds it (tap or A; the fold is remembered), a section with nothing to show draws
-  nothing, and Displays > Companion > Home turns any section off (`CompanionHomePrefs`). Defaults: every
+  nothing, and Companion screen > Home turns any section off (`CompanionHomePrefs`). Defaults: every
   section shown, Notifications folded, the rest open. Every tab scrolls with the same vertical scroll
   (`CompanionPanels` for Performance and System, the Tasks page, this Home); Input is the one fixed surface
   because a trackpad must not scroll.
@@ -5434,7 +5434,7 @@ above). droidtop has three modes and now three second-screen designs:
   it; a plugin status tile is an ordinary Android widget (PluginStatusWidgetProvider),
   already covered by the widget area.
 - **Desktop**: the companion opening on its Input tab (keyboard and trackpad,
-  SecondScreenInputSurface); its opening tab is the person's to change (Displays > Companion >
+  SecondScreenInputSurface); its opening tab is the person's to change (Companion screen >
   Tabs, "The companion's tabs", Droidtop/tracker#414).
 
 **One registry, one mechanism (fixed the same pass).** SecondaryDisplayContent (:display)
@@ -10363,7 +10363,7 @@ most one cue sounds per 50 ms, the launch cue excepted (`CueThrottle`); the
 direction roles (move, bump, tab, system, slider) are not played for a
 touch-driven move, as Steam plays nothing for a pointer hover; a direction held
 against an end does not keep bumping (`moveCue`). One switch silences every role,
-Settings > Home & modes > Shell > **Navigation sounds** (on by default;
+Settings > Shell behaviour > **Navigation sounds** (on by default;
 `SoundSync` observes it). The bundled set loads into the same SoundPool as the
 theme's samples, so the launch hand-off below releases and reloads it too.
 **Toasts** go through one helper (`shellToast`): the toast cue, then Android's
@@ -11519,7 +11519,7 @@ transitions": automatic, a declared profile, builtin-slide, builtin-fade
 or instant) and controller family (the `controller` badge and helpsystem
 glyphs). Each row is offered only when the active theme declares that
 axis, as ES-DE greys them out. Navigation sounds have one on/off row,
-Settings > Home & modes > Shell > Navigation sounds (see "Interface sounds"). The
+Settings > Shell behaviour > Navigation sounds (see "Interface sounds"). The
 two `ThemePrefs` writers that exist with no reader (transitions,
 controller family) are what these rows write, and the renderer reads
 them.
@@ -17418,15 +17418,21 @@ Settings tab, the left menu's places, Console systems and Containers.
   become the section labels of its pane (a title equal to the category's
   own name is dropped). The column's order is the root's `categoryOrder`,
   not the order the groups happen to be built in, because the screens merged
-  in (Global settings) contribute groups to several categories. The Gaming
-  Settings column is, in order: **Home & modes** (Home screen, Modes, Shell),
+  in (Global settings) contribute groups to several categories. **Reorganised into short categories, one home per
+  setting (owner, 2026-10-23, Droidtop/tracker#610: "Settings would be very wise to reconfigure, yes. But don't worry
+  about the single depth. Settings requires the complexity it deserves").** The Gaming Settings column is, in order:
+  **Modes** (Home screen, the modes, and Desktop's and Standard's own pages, which were "Other shells"),
+  **Kids and guests** (UI mode, the passkey, Kid's highest volume, Play time; out of the old Shell group),
   **Library** (Console systems, Emulators, Game folders, Windows games,
   Scraper as rows that open their screens; Downloads
   too in a mode with no left menu, see below),
   **Accounts and sources** (its screen drawn directly, a hub of one),
-  **Appearance** (theme rows and Accessibility), **Controls**, **Displays**
-  (orientation and the display roles), **System** (Updates, Android settings,
-  Data) and **Other shells**. Global settings is `merged`: its groups are
+  **Appearance** (theme rows, Light and dark), **Accessibility** (its own category, out of Appearance),
+  **Controls and keyboard** (the controller and every keyboard row, which were split over Controls and Displays),
+  **Displays** (orientation, the display roles and the screens' names), **Companion screen** (the companion's own
+  page drawn directly, a hub of one; it was about 28 rows under Displays), **Shell behaviour** (Default section,
+  Quick Menu order, hints, animations, sounds, screensaver, while a game runs) and **System** (Android settings,
+  Risky actions, Data, About). Global settings is `merged`: its groups are
   sections of those categories, not a column entry of its own, and every
   other surface still opens it as a screen. Eight Library entries and the
   Global settings entry left the column; no setting moved out of reach.
@@ -17447,7 +17453,10 @@ Settings tab, the left menu's places, Console systems and Containers.
   in Gaming's Settings (`withoutPlaceLinks`, fed by `menuSectionsFor`): in
   Gaming, Downloads is the left menu's place, so the Library category has no
   "Downloads and installs" row; Standard and Desktop, which have no left menu,
-  keep it, and Global settings keeps its Updates link for the same reason.
+  keep it, and Global settings keeps its Updates link for the same reason. Since 2026-10-23 the filter runs after
+  Global settings is merged in and on every screen Settings opens (Accounts and sources' Game sources and Plugins
+  links included): in Gaming a place has one way in, the left menu, and Settings no longer shows a second Updates,
+  Plugins or Game sources (Droidtop/tracker#610).
 - **Rows.** A row is its name and, right-aligned in the screen's one value
   column, what it is set to: a switch for a toggle, an inline track and the
   number for a slider, `‹ value ›` for a short choice, a chevron for a row
