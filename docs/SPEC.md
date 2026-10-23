@@ -12327,6 +12327,13 @@ reimplemented it as my own f95seeker code." So:
   parts of a split archive among them) is taken into droidtop's Downloads with the cookies, user agent and referrer it
   needs (`UpdateLinks`), unpacked when it is an archive, and placed as below. A link that starts nothing opens the
   record's own page next, so the person can pick again; it is never an error with no way forward.
+  A download with no address (the source could not read it when the record was made, or the copy on screen is a
+  saved one from before the source gave addresses) is a token only the source understands, and a saved record's
+  token goes stale when the source's page changes (a new version moves its mirrors: Bare Witness on the console,
+  "the thread no longer lists that link"). So droidtop asks the source for the record again first, never taking its
+  saved copy as the answer, and finds the same mirror in it (`RecordMirrors`: the same section, host and label; among
+  several alike, the same token, else the same place). That mirror's address is opened as above; only one that still
+  has none goes to the source's `download` job, with its fresh token.
 - **Picking a link downloads that version for droidtop to place.** It is the
   source's `download` job (A6), whose reply is an `acquire` reply (A2: one
   file, several, captured in the signed-in web view, `unpack`), so it is one

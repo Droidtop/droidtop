@@ -212,15 +212,20 @@ internal fun SourceRecordPage(
                 val version = record?.version
                 onClose()
                 say("Getting ${version?.let { "v" + it.removePrefix("v") } ?: "the new version"} from ${action.download.host}...")
-                val url = action.download.url
+                val picked = action.download
+                val pickedFrom = record?.downloads.orEmpty()
                 scope.launch {
                     // A link the source gave is opened in droidtop's web view, where the person starts the download and
-                    // droidtop takes it over (Droidtop/tracker#599); a token only the source understands goes to its job.
+                    // droidtop takes it over (Droidtop/tracker#599). A mirror with no link is looked up in the record asked
+                    // again first: the token of a saved record goes stale when the source's page changes. Only a mirror
+                    // that still has no link goes to the source's job, with the fresh token.
+                    val use = if (picked.url != null) picked else library.freshDownload(source.key, externalId, picked, pickedFrom) ?: picked
+                    val url = use.url
                     say(
                         if (url != null) {
                             library.openUpdateLink(source.key, externalId, url, record?.url, version, gameName, newest) { status -> say(status) }
                         } else {
-                            library.downloadUpdate(source.key, externalId, action.download.link, version, gameName, newest) { status -> say(status) }
+                            library.downloadUpdate(source.key, externalId, use.link, version, gameName, newest) { status -> say(status) }
                         },
                     )
                 }

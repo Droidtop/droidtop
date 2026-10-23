@@ -1410,6 +1410,22 @@ class Library(
             .getOrElse { UpdateSources.RecordAnswer(null, it.message ?: "The source did not answer") }
     }
 
+    /**
+     * The mirror [picked] (one of [pickedFrom]) in a copy of [source]'s record [externalId] asked of the source now, for
+     * a pick with no address: a saved record's token goes stale when the source's page changes (Droidtop/tracker#599).
+     * Null when the source cannot answer (droidtop's saved copy never stands in here) or no longer lists the mirror.
+     */
+    suspend fun freshDownload(
+        source: String,
+        externalId: String,
+        picked: UpdateSources.Download,
+        pickedFrom: List<UpdateSources.Download>,
+    ): UpdateSources.Download? = withContext(Dispatchers.IO) {
+        val answer = runCatching { updateSources.record(source, externalId) }.getOrNull()
+        val fresh = answer?.takeIf { it.failure == null }?.record ?: return@withContext null
+        RecordMirrors.sameIn(picked, pickedFrom, fresh.downloads)
+    }
+
     /** droidtop's saved copy of [source]'s record [externalId], for the record page to show at once; null when there is none. */
     suspend fun savedSourceRecord(source: String, externalId: String): UpdateSources.RecordAnswer? = withContext(Dispatchers.IO) {
         runCatching { updateSources.savedRecord(source, externalId) }.getOrNull()
