@@ -197,4 +197,13 @@ class FacetsTest {
         assertTrue("on unless switched off", FacetGuards.targetOn(off, "game.page"))
         assertTrue("its own page cannot be switched off", FacetGuards.targetOn(off, "plugin.page"))
     }
+
+    @Test
+    fun `a facet the person hid on a target is not drawn there, and only there`() {
+        val facets = read(vpn).facets
+        val hid = PluginGrants.Snapshot(states = mapOf(FacetGuards.facetKey("quickmenu", "vpn.state") to GrantState.DENIED))
+        assertFalse(FacetGuards.unhidden(facets, "quickmenu", hid).any { it.id == "vpn.state" })
+        assertTrue(FacetGuards.unhidden(facets, "status.area", hid).any { it.id == "vpn.state" })
+        assertEquals(facets, FacetGuards.unhidden(facets, "quickmenu", PluginGrants.Snapshot()))
+    }
 }

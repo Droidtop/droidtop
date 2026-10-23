@@ -2601,6 +2601,21 @@ object AppSettingsCatalogs {
                 },
             )
         }
+        // And the facets it has shown, a switch each, so one hidden is shown again here (the same section).
+        val facetItems = PluginFacets.Seen.read(context, pluginId).flatMap { (target, seen) ->
+            seen.map { (facetId, label) ->
+                ToggleItem(
+                    id = "plugin_${pluginId}_facet_${target}_$facetId",
+                    title = label,
+                    subtitle = dev.droidtop.pluginhost.FacetGuards.TARGET_LABELS[target] ?: if (target == PluginFacets.PLUGIN_PAGE) "Its page" else if (target == PluginFacets.SETTINGS_PAGE) "Its settings" else target,
+                    current = dev.droidtop.pluginhost.FacetGuards.facetOn(snap, target, facetId),
+                    onToggle = { ctx, on ->
+                        PluginGrants.forContext(ctx).set(pluginId, dev.droidtop.pluginhost.FacetGuards.facetKey(target, facetId), if (on) GrantState.GRANTED else GrantState.DENIED)
+                        pluginsChanged(ctx)
+                    },
+                )
+            }
+        }
         // Each background service and schedule has its own switch (docs/plugin-api.md 3 E8, E9), under the point's.
         val backgroundItems = record.manifest.v2.provides
             .filter { it.point == BackgroundProtocol.SERVICE_POINT || it.point == BackgroundProtocol.SCHEDULE_POINT }
@@ -2637,6 +2652,7 @@ object AppSettingsCatalogs {
         return listOfNotNull(
             accessRow?.let { CatalogGroup(id = "plugin_permissions_access", title = "Access", items = listOf(it)) },
             (modeItems + targetItems).takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_modes", "Where it appears", it) },
+            facetItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_facets", "What it shows", it) },
             backgroundItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_background", "Background tasks", it) },
             rest.filter { it.tier == PermissionTier.CRITICAL }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_critical", "Critical", it.map(::item)) },
             rest.filter { it.tier == PermissionTier.DANGEROUS }.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_dangerous", "Sensitive", it.map(::item)) },

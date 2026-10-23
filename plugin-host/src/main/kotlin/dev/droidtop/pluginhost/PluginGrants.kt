@@ -241,7 +241,7 @@ class PluginGrants(private val dir: File) {
         states.putAll(snap.states.filterKeys { it.startsWith(PluginPermissionPolicy.CATEGORY_PREFIX) || it.startsWith(PluginPermissionPolicy.CALL_PREFIX) })
         // So are "Where it appears" (docs/plugin-api.md 1.9, and its facet targets, 1.10) and each service's or schedule's own switch.
         states.putAll(snap.states.filterKeys { it.startsWith(PluginModes.KEY_PREFIX) || it.startsWith(BackgroundProtocol.ENTRY_PREFIX) ||
-            it.startsWith(FacetGuards.TARGET_KEY_PREFIX) })
+            it.startsWith(FacetGuards.TARGET_KEY_PREFIX) || it.startsWith(FacetGuards.FACET_KEY_PREFIX) })
         for (declared in new.manifest.v2.permissions) {
             if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX) || declared.id in states) continue
             states[declared.id] = if (declared.id in diff.permissions) GrantState.ASK else defaultFor(new, declared)

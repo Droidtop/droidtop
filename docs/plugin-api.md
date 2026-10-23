@@ -1180,7 +1180,11 @@ a target switched off is not asked for; the plugin's own page and settings have 
 source's record page is drawn from the item's bundles (`metadata`, `description`, `image`, `download`, `links`)
 through the guards, from `ui.facets get {target: "item.page", subject: {type: "item", source, id}}` when the source
 declares that target, or from facets on its `record` reply (`items: [{id, facets}]`, which counts as declaring the item
-page); a contract 2 `record` is read as before (`ItemPageFacets`). Next, "Hide this" on a facet.
+page); a contract 2 `record` is read as before (`ItemPageFacets`). Hiding one facet is a switch per facet under the
+plugin's "What it shows", beside "Where it appears": droidtop remembers what each plugin last showed on each target
+(`PluginFacets.Seen`), a facet switched off is not drawn there (`FacetGuards.unhidden`, kept under
+`facet:<target>/<id>`), and it is listed there to show again. Not built yet: "Hide this", "Move up" and "Move down" on
+Select of a facet itself, and the person's order of plugins per target.
 
 **Facets first (the owner, 2026-10-23: "While plugins CAN present a whole UI, we really want them to use Facets.
 Small snippets to mix their functions into droidtop").** Facets are the default way a plugin shows anything. A

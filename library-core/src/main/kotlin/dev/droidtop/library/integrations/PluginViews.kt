@@ -361,7 +361,7 @@ private class PluginPage(
         if (reply.ok) {
             val messages = mutableListOf<String>()
             // A target's facets go through the guards for that target (docs/plugin-api.md 1.10); any other reply is a view.
-            val parsed = (if (point == PluginFacets.POINT && op == PluginFacets.OP_GET) PluginFacets.view(record, args, reply.data, messages) else null)
+            val parsed = (if (point == PluginFacets.POINT && op == PluginFacets.OP_GET) PluginFacets.view(record, args, reply.data, messages, context) else null)
                 ?: PluginView.parse(reply.data, messages)
             PluginMessages.record(context, record.manifest.id, "$point/$op", messages)
             if (parsed == null) {

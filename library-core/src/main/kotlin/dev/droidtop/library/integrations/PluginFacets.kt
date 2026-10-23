@@ -74,7 +74,7 @@ object PluginFacets {
      * A `get` reply as the page droidtop draws: only what [args]' target takes from [record], in its order. Null when
      * the reply is not facets, so the caller reads it as a view.
      */
-    fun view(record: PluginRecord, args: JSONObject, data: JSONObject, messages: MutableList<String>): PluginView? {
+    fun view(record: PluginRecord, args: JSONObject, data: JSONObject, messages: MutableList<String>, context: Context? = null): PluginView? {
         if (data.optJSONArray("facets") == null) return null
         val target = args.optString("target")
         // A game page's facets are about its game even when the plugin may not learn which one it is (library.read).
@@ -82,6 +82,55 @@ object PluginFacets {
         val reading = Facets.read(data, subject)
         messages += reading.messages
         val admitted = FacetGuards.admit(reading.facets, target, guardsFor(record), messages)
-        return FacetViews.toView(admitted, data.optString("title").takeIf { it.isNotBlank() })
+        // What it gave is remembered for "Where it appears", hidden ones too, so they can be shown again there.
+        val shown = if (context == null) {
+            admitted
+        } else {
+            Seen.remember(context, record.manifest.id, target, admitted)
+            FacetGuards.unhidden(admitted, target, PluginGrants.forContext(context).read(record.manifest.id))
+        }
+        return FacetViews.toView(shown, data.optString("title").takeIf { it.isNotBlank() })
+    }
+
+    /**
+     * The facets droidtop last drew from each plugin, per target, by id and the words it showed: what "Where it
+     * appears" lists with a switch each (docs/plugin-api.md 1.10, "The person arranges them"). One small file per plugin.
+     */
+    object Seen {
+        private const val MAX_PER_TARGET = 40
+        private val SAFE = Regex("[A-Za-z0-9._-]{1,120}")
+
+        private fun file(context: Context, pluginId: String): java.io.File? =
+            pluginId.takeIf { SAFE.matches(it) && !it.startsWith(".") }?.let { java.io.File(java.io.File(context.filesDir, "plugin-facets-seen"), "$it.json") }
+
+        /** The words a facet shows, for its switch: its node's title, a group's title, or its id. */
+        fun labelOf(facet: dev.droidtop.pluginhost.Facet): String =
+            FacetViews.node(facet)?.title ?: (facet.body as? dev.droidtop.pluginhost.FacetBody.Group)?.title ?: facet.id
+
+        fun remember(context: Context, pluginId: String, target: String, facets: List<dev.droidtop.pluginhost.Facet>) {
+            val file = file(context, pluginId) ?: return
+            runCatching {
+                val root = if (file.isFile) JSONObject(file.readText()) else JSONObject()
+                val list = org.json.JSONArray()
+                facets.take(MAX_PER_TARGET).forEach { list.put(JSONObject().put("id", it.id).put("label", labelOf(it))) }
+                if (root.optJSONArray(target)?.toString() == list.toString()) return
+                root.put(target, list)
+                file.parentFile?.mkdirs()
+                val part = java.io.File(file.parentFile, "${file.name}.part")
+                part.writeText(root.toString())
+                if (!part.renameTo(file)) part.delete()
+            }
+        }
+
+        /** Per target, the facets last drawn there as (id, label), in drawing order. */
+        fun read(context: Context, pluginId: String): Map<String, List<Pair<String, String>>> {
+            val file = file(context, pluginId)?.takeIf { it.isFile } ?: return emptyMap()
+            val root = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return emptyMap()
+            return root.keys().asSequence().associateWith { target ->
+                val list = root.optJSONArray(target) ?: org.json.JSONArray()
+                (0 until list.length()).mapNotNull { i -> list.optJSONObject(i)?.let { it.optString("id") to it.optString("label") } }
+                    .filter { it.first.isNotBlank() }
+            }
+        }
     }
 }

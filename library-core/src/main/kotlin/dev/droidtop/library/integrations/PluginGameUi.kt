@@ -95,7 +95,7 @@ object PluginGameSections {
                     !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED ->
                         Loaded(section, null, "${section.pluginLabel} is not allowed to show this")
                     !reply.ok -> Loaded(section, null, reply.message?.takeIf { it.isNotBlank() } ?: "${section.pluginLabel} did not answer")
-                    else -> (if (section.facets) PluginFacets.view(section.record, args, reply.data, mutableListOf()) else null)
+                    else -> (if (section.facets) PluginFacets.view(section.record, args, reply.data, mutableListOf(), context) else null)
                         ?.let { Loaded(section, it, null) }
                         ?: PluginView.parse(reply.data)?.let { Loaded(section, it, null) }
                         ?: Loaded(section, null, "${section.pluginLabel} sent rows droidtop cannot draw")
