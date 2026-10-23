@@ -193,6 +193,8 @@ fun CatalogNavigator(
      * the host coming back to the front); the screen is re-read then.
      */
     refreshKey: Any? = null,
+    // The places the left menu already has (Settings only): a screen opened here leaves out its links to them.
+    placeScreenIds: Set<String> = emptySet(),
 ) {
     val context = LocalContext.current
     var version by remember { mutableStateOf(0) }
@@ -297,7 +299,8 @@ fun CatalogNavigator(
         // A linked category loads once the column's cursor rests on it, so
         // running down the column does not build every screen it passes.
         if (depth == 0) delay(PANE_LOAD_SETTLE_MS)
-        value = screen to mergeShortScreens(screen.groups(context)) { it.groups(context) }
+        // A screen inside Settings (Accounts and sources) does not repeat a place the left menu has either.
+        value = screen to withoutPlaceLinks(mergeShortScreens(screen.groups(context)) { it.groups(context) }, placeScreenIds)
     }
     // A screen still building (the stores' list, a plugin's panel, which asks the plugin when it opens)
     // shows a loading row from the first frame instead of its title on black, after a moment so a fast one
@@ -1465,6 +1468,7 @@ internal fun SettingsCatalogView(
             GamingSettingsCatalog.ID_BROWSE_THEMES to { browseThemes = true },
         ),
         showSearch = true,
+        placeScreenIds = placeScreenIds,
     )
 }
 
@@ -1477,7 +1481,11 @@ internal fun gamingSettingsRoot(placeScreenIds: Set<String> = emptySet()): Catal
     id = "gaming_settings",
     title = "Settings",
     categoryOrder = GamingSettingsCatalog.CATEGORY_ORDER,
-    groups = { ctx -> withoutPlaceLinks(GamingSettingsCatalog.settingsGroups(ctx), placeScreenIds) },
+    // Merged first, then filtered: the places Global settings links to (Updates) were merged in after the filter ran,
+    // so Settings kept a second Updates (Droidtop/tracker#610).
+    groups = { ctx ->
+        withoutPlaceLinks(mergeShortScreens(GamingSettingsCatalog.settingsGroups(ctx)) { it.groups(ctx) }, placeScreenIds)
+    },
 )
 
 /**

@@ -47,9 +47,14 @@ object GamingSettingsCatalog {
      * decide where its category sits.
      */
     val CATEGORY_ORDER = listOf(
-        "Home & modes", "Library", "Accounts and sources", "Appearance", "Controls", "Displays", "System",
-        "Other shells",
+        // Reorganised 2026-10-23 into short categories, one home per setting (Droidtop/tracker#610, the owner:
+        // "Settings would be very wise to reconfigure, yes").
+        "Modes", "Kids and guests", "Library", "Accounts and sources", "Appearance", "Accessibility",
+        "Controls and keyboard", "Displays", "Companion screen", "Shell behaviour", "System",
     )
+    const val GROUP_KIDS = "gaming_kids"
+    const val GROUP_KEYBOARD = "gaming_keyboard"
+    const val GROUP_COMPANION_SCREEN = "gaming_companion_screen"
     const val ID_CONTROLLER = "pref_gaming_controller"
     const val GROUP_OTHER_SHELLS = "other_shells"
 
@@ -197,7 +202,7 @@ object GamingSettingsCatalog {
             id = GROUP_GAMING,
             title = "Shell",
             icon = CatalogIcon.GAMING,
-            category = "Home & modes",
+            category = "Shell behaviour",
             items = buildList {
                 add(defaultSectionItem(context))
                 add(
@@ -211,15 +216,17 @@ object GamingSettingsCatalog {
                 add(showHintsItem(context))
                 add(animationsItem(context))
                 add(navigationSoundsItem(context))
-                // Nested catalog screens whose DATA lives in :app -- resolved
-                // through SettingsScreenRegistry (registered at process start
-                // by :app's SettingsCatalogInitProvider), so they render
-                // in-place in whichever surface is showing this catalog
-                // instead of bouncing to a differently-chromed activity.
-                // Scraper leads, its own row -- real ES-DE keeps the
-                // scraper on the MAIN menu (GuiMenu -> GuiScraperMenu),
-                // not buried under management screens, and the direction
-                // was explicit that droidtop matches that.
+                add(screensaverItem(context))
+                add(gameAwakeItem(context))
+            },
+        ),
+        // Kid, Kiosk and Guest: who the device is handed to, and the limits that go with it.
+        CatalogGroup(
+            id = GROUP_KIDS,
+            title = "Kids and guests",
+            icon = CatalogIcon.GAMING,
+            category = "Kids and guests",
+            items = buildList {
                 add(
                     ChoiceItem(
                         id = ID_UI_MODE,
@@ -264,41 +271,6 @@ object GamingSettingsCatalog {
                     ),
                 )
                 add(PlayTimeSettings.link())
-                add(
-                    ChoiceItem(
-                        id = ID_SCREENSAVER,
-                        title = "Screensaver",
-                        // Android's own screen timeout still turns the
-                        // panel off, and it wins when it is the shorter
-                        // (docs/SPEC.md 7f, "Screensaver").
-                        subtitle = "Library artwork",
-                        options = ScreensaverMode.entries.map { ChoiceOption(it.name, it.label) },
-                        current = ScreensaverPrefs.mode(context).name,
-                        onSelect = { ctx, value ->
-                            ScreensaverPrefs.setMode(
-                                ctx,
-                                runCatching { ScreensaverMode.valueOf(value) }.getOrDefault(ScreensaverMode.OFF),
-                            )
-                        },
-                    ),
-                )
-                // The Steam Deck's model (docs/SPEC.md 7f, "Sleep and return to game"): the console does not sleep
-                // on its own while a game runs, unless the person asks for Android's timer.
-                add(
-                    ChoiceItem(
-                        id = ID_GAME_AWAKE,
-                        title = "While a game runs",
-                        subtitle = null,
-                        options = GameAwakeMode.entries.map { ChoiceOption(it.name, it.label) },
-                        current = GameAwakePrefs.mode(context).name,
-                        onSelect = { ctx, value ->
-                            GameAwakePrefs.setMode(
-                                ctx,
-                                runCatching { GameAwakeMode.valueOf(value) }.getOrDefault(GameAwakeMode.NEVER_SLEEP),
-                            )
-                        },
-                    ),
-                )
             },
         ),
         CatalogGroup(
@@ -405,9 +377,24 @@ object GamingSettingsCatalog {
                 ))
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
-                addAll(secondScreenKeyboardItems(context))
                 addAll(screenNameItems(context))
             },
+        ),
+        // Every keyboard setting in one place, with the controls: they were split over Controls, Displays and the
+        // Companion screen (Droidtop/tracker#610).
+        CatalogGroup(
+            id = GROUP_KEYBOARD,
+            title = "Keyboard on the screens",
+            icon = CatalogIcon.INPUT,
+            category = "Controls and keyboard",
+            items = secondScreenKeyboardItems(context).filter { it.id != ID_DISPLAY_COMPANION },
+        ),
+        // The companion screen's own settings, a category of their own: they were about 28 rows under Displays. A
+        // group of one link is a hub, so its screen is drawn directly in the pane, named by the link.
+        CatalogGroup(
+            id = GROUP_COMPANION_SCREEN,
+            title = null,
+            items = secondScreenKeyboardItems(context).filter { it.id == ID_DISPLAY_COMPANION },
         ),
         CatalogGroup(
             id = GROUP_ANDROID,
@@ -426,7 +413,7 @@ object GamingSettingsCatalog {
         CatalogGroup(
             id = GROUP_INPUT,
             title = "Controls",
-            category = "Controls",
+            category = "Controls and keyboard",
             icon = CatalogIcon.INPUT,
             items = buildList {
                 // Onboarding's own Controller step, re-entered (docs/SPEC.md
@@ -946,6 +933,8 @@ object GamingSettingsCatalog {
             id = GROUP_OTHER_SHELLS,
             title = "Other shells",
             icon = CatalogIcon.MODES,
+            // With the modes: each mode's own settings page sits beside the modes themselves.
+            category = "Modes",
             items = listOf(
                 NestedScreenItem(
                     id = ID_DESKTOP_SETTINGS,
@@ -1434,6 +1423,39 @@ object GamingSettingsCatalog {
         }
     }
 
+    private fun screensaverItem(context: Context) = ChoiceItem(
+        id = ID_SCREENSAVER,
+        title = "Screensaver",
+        // Android's own screen timeout still turns the
+        // panel off, and it wins when it is the shorter
+        // (docs/SPEC.md 7f, "Screensaver").
+        subtitle = "Library artwork",
+        options = ScreensaverMode.entries.map { ChoiceOption(it.name, it.label) },
+        current = ScreensaverPrefs.mode(context).name,
+        onSelect = { ctx, value ->
+            ScreensaverPrefs.setMode(
+                ctx,
+                runCatching { ScreensaverMode.valueOf(value) }.getOrDefault(ScreensaverMode.OFF),
+            )
+        },
+    )
+
+    // The Steam Deck's model (docs/SPEC.md 7f, "Sleep and return to game"): the console does not sleep
+    // on its own while a game runs, unless the person asks for Android's timer.
+    private fun gameAwakeItem(context: Context) = ChoiceItem(
+        id = ID_GAME_AWAKE,
+        title = "While a game runs",
+        subtitle = null,
+        options = GameAwakeMode.entries.map { ChoiceOption(it.name, it.label) },
+        current = GameAwakePrefs.mode(context).name,
+        onSelect = { ctx, value ->
+            GameAwakePrefs.setMode(
+                ctx,
+                runCatching { GameAwakeMode.valueOf(value) }.getOrDefault(GameAwakeMode.NEVER_SLEEP),
+            )
+        },
+    )
+
     private fun secondScreenKeyboardItems(context: Context): List<CatalogItem> = buildList {
         val elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
         if (elevated) {
@@ -1461,7 +1483,8 @@ object GamingSettingsCatalog {
         add(
             NestedScreenItem(
                 id = ID_DISPLAY_COMPANION,
-                title = "Companion",
+                // Its category's name in the Settings column ("Companion screen", CATEGORY_ORDER).
+                title = "Companion screen",
                 inline = CatalogScreen(
                     id = ID_DISPLAY_COMPANION,
                     title = "Companion",

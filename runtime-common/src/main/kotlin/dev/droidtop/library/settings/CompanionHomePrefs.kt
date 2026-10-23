@@ -25,7 +25,7 @@ enum class CompanionHomeSection(val key: String, val label: String) {
     }
 }
 
-/** Which sections the person turned off (Displays > Companion) and which they folded on Home itself. */
+/** Which sections the person turned off (Companion screen) and which they folded on Home itself. */
 data class CompanionHomeLayout(
     val hidden: Set<CompanionHomeSection> = emptySet(),
     val collapsed: Set<CompanionHomeSection> = CompanionHomePrefs.DEFAULT_COLLAPSED,

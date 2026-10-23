@@ -43,7 +43,7 @@ import kotlinx.coroutines.withContext
  * Order, by relevance: the status line (and the last launch or quit error), Now (the running game, else the
  * game focused in the shell), Continue playing, Recently added, Downloads and updates, Social, the notification
  * group, System, then the user's widgets with Add widget and Remove widget. Each section after the status
- * line folds from its heading and can be turned off in Displays > Companion ([CompanionHomePrefs]); a section
+ * line folds from its heading and can be turned off in Companion screen ([CompanionHomePrefs]); a section
  * with nothing to show draws nothing. Both companion hosts draw this one composable (the second-screen host
  * and [CompanionActivity]).
  */
