@@ -497,6 +497,8 @@ internal fun LibrarySearchDialog(
     // The settings of this surface: matching ones follow the rows as a section called Settings, and a press opens the
     // screen the setting lives on. Null where the surface has no settings of its own to search.
     settingsRoot: CatalogScreen? = null,
+    // The person opened the search to type (a Search row they picked), so typing starts at once (Droidtop/tracker#612).
+    startTyping: Boolean = false,
 ) {
     // The field reopens with what was typed and the caret at its END, so Backspace deletes the last letter
     // (Droidtop/tracker#376: a plain String field put the caret at the start).
@@ -517,7 +519,7 @@ internal fun LibrarySearchDialog(
     // Whether the person chose to type (A or a tap on the field, or a key typed). Putting the cursor in the field is
     // droidtop's doing, not a choice, so no keyboard comes up for it, except on one touch-only screen (owner,
     // 2026-10-23, Droidtop/tracker#612; AddonKeyboardRules.raisesOnOwnFocus).
-    var typing by remember { mutableStateOf(dev.droidtop.shell.gamepad.KeyboardTargets.raisesOnOwnFocus()) }
+    var typing by remember { mutableStateOf(startTyping || dev.droidtop.shell.gamepad.KeyboardTargets.raisesOnOwnFocus()) }
     // Android's keyboard, where it is the one that types here; droidtop's own (the companion's Keys) follows [typing].
     fun androidKeyboard() {
         if (!dev.droidtop.shell.gamepad.KeyboardTargets.servesField(view.display?.displayId)) keyboard?.show()

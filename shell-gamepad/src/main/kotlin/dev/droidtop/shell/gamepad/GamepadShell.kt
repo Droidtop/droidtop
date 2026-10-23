@@ -1344,11 +1344,15 @@ private fun GamepadShellBody(
                             onClose = { nav.back() },
                             onPrimaryFocus = { detailPrimaryLabel = it },
                         )
-                        // Get new games (Droidtop/tracker#612, #621): the search over the download
-                        // sources, empty and ready for typing; a page of Updates, so leaving it goes back there.
+                        // Get new games (Droidtop/tracker#612, #621): a page of Updates that opens on what is
+                        // new for the person, with Search first, never on a blank search bar; leaving it goes back to Updates.
                         shownSection == GamingSection.NEW_GAMES -> {
                             canGoBack = true
-                            GetGamesSearch { nav.openSection(GamingSection.UPDATES) }
+                            GetNewGamesPage(
+                                entries = foldedGameEntries.orEmpty(),
+                                onOpenUpdates = { nav.openSection(GamingSection.UPDATES) },
+                                onBack = { nav.openSection(GamingSection.UPDATES) },
+                            )
                         }
                         // The left menu's places: a registered settings screen each,
                         // in place (docs/SPEC.md 7j "Places"). Back is always
