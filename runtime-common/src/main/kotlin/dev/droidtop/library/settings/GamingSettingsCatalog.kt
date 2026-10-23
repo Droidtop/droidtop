@@ -200,6 +200,14 @@ object GamingSettingsCatalog {
             category = "Home & modes",
             items = buildList {
                 add(defaultSectionItem(context))
+                add(
+                    NestedScreenItem(
+                        id = "pref_gaming_quick_menu_order",
+                        title = "Quick Menu order",
+                        subtitle = "Which section comes where on the Quick Menu's rail",
+                        inline = QuickMenuOrder.screen(),
+                    ),
+                )
                 add(showHintsItem(context))
                 add(animationsItem(context))
                 add(navigationSoundsItem(context))

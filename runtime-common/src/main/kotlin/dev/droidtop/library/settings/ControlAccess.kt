@@ -19,7 +19,7 @@ enum class ControlSurface { COMPANION, QUICK_MENU }
  * Display and Downloads). A surface maps its own tab or section onto one of these.
  */
 enum class ControlPanel {
-    HOME, GAME, SYSTEM, APPS, PERFORMANCE, INPUT, SOCIAL, PLUGINS, NOTIFICATIONS, AUDIO, DISPLAY, DOWNLOADS,
+    HOME, GAME, SYSTEM, APPS, PERFORMANCE, INPUT, SOCIAL, PLUGINS, NOTIFICATIONS, AUDIO, DISPLAY, DOWNLOADS, CONNECTIONS,
 }
 
 /**

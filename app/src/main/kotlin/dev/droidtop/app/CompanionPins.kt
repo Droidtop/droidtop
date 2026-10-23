@@ -81,7 +81,7 @@ internal fun CompanionPinsSection() {
     val pinnable by produceState<List<CatalogItem>?>(null, version, uiMode) {
         value = withContext(Dispatchers.IO) {
             val catalog = GamingSettingsCatalog.groups(context)
-            listOf(QuickSection.SYSTEM, QuickSection.DISPLAY, QuickSection.AUDIO)
+            listOf(QuickSection.SYSTEM, QuickSection.CONNECTIONS, QuickSection.DISPLAY, QuickSection.AUDIO)
                 .flatMap { section -> quickSectionGroups(catalog, section, uiMode).flatMap { it.items } }
                 .distinctBy { it.id }
         }

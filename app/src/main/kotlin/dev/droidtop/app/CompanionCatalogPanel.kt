@@ -86,7 +86,7 @@ internal fun companionSystemCards(
     SystemCard("display", "Display", section(QuickSection.DISPLAY), folded = true),
     SystemCard("sound", "Sound", section(QuickSection.AUDIO), folded = true),
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
-    SystemCard("connections", "Connections", emptyList(), folded = true),
+    SystemCard("connections", "Connections", section(QuickSection.CONNECTIONS), folded = true),
     SystemCard("power", "Power", listOfNotNull(performanceMode), folded = true),
     SystemCard("storage", "Storage", emptyList(), folded = true, storage = true),
     SystemCard("privacy", "Privacy", listOfNotNull(privacy), folded = true),

@@ -3450,15 +3450,24 @@ the `ContainerRuntime` interface that already exists (§3):
   tabs migrated into it, not a second one. Which sections a UI mode shows, and which catalog
   items inside them, is `ControlAccess`'s answer (see "UI modes and ControlAccess" in 7f); Kid and
   Kiosk keep every section Full has, without the items that control the restriction itself.
-  Sections, in rail order, and what each is:
-  - **Game** (only while a game is parked, first when present): the Game section below. Whether its Restart and
+  Sections, in droidtop's own rail order, and what each is. **The order is the person's (owner, 2026-10-23: "So long
+  as it's reorderable, the order is fine"; Droidtop/tracker#610):** Settings > Shell > Quick Menu order has one row per
+  place ("1st", "2nd"), and picking a section for a place swaps it with the one there (`QuickMenuOrder`, the one list in
+  preferences the rail and that screen both read, with the section names). A section droidtop adds later comes in at
+  its own place.
+  - **Game** (only while a game is parked, first when present): the Game section below. **Quit is back** beside
+    Restart (owner, 2026-10-23: "Quit still exists on the companion, so it should exist in the quick menu"): the gentle
+    end, asking first like Restart; Kill stays the header's force-stop. Whether its Quit, Restart and
     its Kill pill need the second A is `GameControls.needsSecondPress` (Droidtop/tracker#414, slice C8): the same
     decision the companion's Game tab asks by, so turning Ask before stopping off makes both act at once.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
-  - **System**: the quick-settings tile grid over the catalog's quick System group with its
-    status header: Network (Wi-Fi), Bluetooth, **Airplane mode**, VPN, Battery, **Power menu**,
-    Switch mode, Settings, updates and the Android settings index. Android gives an ordinary app
+  - **Connections** (split out of System, 2026-10-23, Droidtop/tracker#610: System had grown to about 20 tiles):
+    Network, Wi-Fi, Bluetooth, **Airplane mode**, VPN and Location (`QuickTiles.CONNECTION_IDS`). The companion's
+    Connections card shows the same items.
+  - **Power and mode** (was System): the quick-settings tile grid over the rest of the catalog's quick System group with
+    its status header: Battery, **Power menu**, Sleep, Restart, Power off, Switch mode, Screenshot, Stop the app in
+    front, updates and the Android settings index. Android gives an ordinary app
     no write to airplane mode and no call that opens the power menu, so Airplane mode shows the
     real state and opens the system screen, and Power menu is a tile marked "Needs privilege"
     that says so when pressed (a privilege helper plugin is the route that could do it); nothing
@@ -3478,7 +3487,7 @@ the `ContainerRuntime` interface that already exists (§3):
     shell's orientation (`GamingSettingsCatalog.ID_ORIENTATION`, the current mode's own per-mode
     setting; Standard and Desktop keep theirs on their own screens) and the screen assignment
     rows (shell display, game launch display, swap, reinitialize).
-  - **Downloads and jobs**: the one jobs screen (`PluginJobsScreen`, the same as Settings'
+  - **Downloads** (was "Downloads and jobs", one name with the left menu's place): the one jobs screen (`PluginJobsScreen`, the same as Settings'
     "Downloads and installs") hosted in the sheet by `CatalogNavigator`, without its own heading
     (`PluginJobsScreen.screen(headed = false)`: the rail header already names it). Its empty state is
     one short row, "Nothing running", with the longer sentence as its HintTip.
