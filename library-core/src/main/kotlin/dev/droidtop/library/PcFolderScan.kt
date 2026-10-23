@@ -411,7 +411,13 @@ object PcFolderScan {
      * thread ([load], [save]); it is safe to share between walks and
      * bounded like the listing cache.
      */
-    class EngineVerdicts private constructor(private val fingerprint: String) {
+    class EngineVerdicts private constructor(
+        private val fingerprint: String,
+        private val verdicts: ConcurrentHashMap<String, Verdict> = ConcurrentHashMap(),
+        private val dirty: java.util.concurrent.atomic.AtomicBoolean = java.util.concurrent.atomic.AtomicBoolean(false),
+        /** False for a [fresh] view: nothing kept is read, everything found is written. */
+        private val reads: Boolean = true,
+    ) {
         /** Null is "not asked yet"; for the engine slots the empty string is "no engine". */
         internal data class Verdict(
             val mtime: Long,
@@ -423,13 +429,16 @@ object PcFolderScan {
             val plain: Boolean? = null,
         )
 
-        private val verdicts = ConcurrentHashMap<String, Verdict>()
-
-        @Volatile
-        private var dirty = false
-
         internal fun lookup(folder: File, mtime: Long, entries: Int): Verdict? =
-            if (mtime == 0L) null else verdicts[folder.path]?.takeIf { it.mtime == mtime && it.entries == entries }
+            if (!reads || mtime == 0L) null else verdicts[folder.path]?.takeIf { it.mtime == mtime && it.entries == entries }
+
+        /**
+         * The same verdicts, for a walk that must not trust them: nothing kept is read, and every answer it finds is
+         * written over what was kept. "Rescan library" walks with it, so a verdict a folder's own stamp could not
+         * invalidate (a change further down, a share that does not move times) is asked of the disk again
+         * (docs/SPEC.md 7g; tracker#577, #604: Manual/love2d and Adult/godot stayed on stale verdicts).
+         */
+        fun fresh(): EngineVerdicts = EngineVerdicts(fingerprint, verdicts, dirty, reads = false)
 
         /** Applies [change] to the folder's verdict for this stamp, starting a fresh one when the kept one is for another stamp. */
         internal fun record(folder: File, mtime: Long, entries: Int, change: (Verdict) -> Verdict) {
@@ -438,7 +447,7 @@ object PcFolderScan {
             verdicts.compute(folder.path) { _, old ->
                 change(if (old != null && old.mtime == mtime && old.entries == entries) old else Verdict(mtime, entries))
             }
-            dirty = true
+            dirty.set(true)
         }
 
         internal fun get(folder: File, listing: Listing): Boolean? =
@@ -450,7 +459,7 @@ object PcFolderScan {
         /** Writes the verdicts when any were added since they were loaded; a failed write loses only the saving. */
         @Synchronized
         fun save(file: File) {
-            if (!dirty) return
+            if (!dirty.get()) return
             try {
                 val tmp = File(file.path + ".tmp")
                 tmp.bufferedWriter().use { out ->
@@ -470,7 +479,7 @@ object PcFolderScan {
                     file.delete()
                     tmp.renameTo(file)
                 }
-                dirty = false
+                dirty.set(false)
             } catch (_: java.io.IOException) {
                 // Nothing to keep; the next scan checks again.
             }

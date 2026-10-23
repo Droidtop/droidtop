@@ -1381,8 +1381,18 @@ class EngineGameProvider(
      * over budget says so in its own log line instead of silently taking
      * the library down with it.
      */
-    override fun scanProgressive(): Flow<ScanStep> = channelFlow {
+    override fun scanProgressive(): Flow<ScanStep> = scanRootsProgressive(fresh = false)
+
+    /**
+     * "Rescan library": the same walk as [scanProgressive], asking every engine question of the disk again instead of
+     * reading the verdicts kept from earlier walks, which a folder's own stamp cannot always invalidate (docs/SPEC.md
+     * 7g; tracker#577, #604).
+     */
+    override fun rescanProgressive(): Flow<ScanStep> = scanRootsProgressive(fresh = true)
+
+    private fun scanRootsProgressive(fresh: Boolean): Flow<ScanStep> = channelFlow {
         scanRootsByFolder(
+            fresh = fresh,
             publish = { root, folder, entries, stamp ->
                 send(
                     ScanStep.Segment(
@@ -1527,6 +1537,9 @@ class EngineGameProvider(
         // a removable root going away and coming back is a real event
         // rather than a one-off "look now" the user is present for.
         rootMounted: (root: File) -> Boolean = { true },
+        // "Rescan library": every engine question is asked of the disk again, and the answers replace what was kept
+        // (PcFolderScan.EngineVerdicts.fresh).
+        fresh: Boolean = false,
     ) {
         val systemsById = ConsoleSystemsRepository.allSystems(context).associateBy { it.id }
         val defs = EnginesDatabase.defs(context)
@@ -1542,7 +1555,7 @@ class EngineGameProvider(
         // checked by the PC walk or the last scan, is not checked again.
         val verdicts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             EngineVerdictStore.forRules(context, defs)
-        }
+        }.let { if (fresh) it.fresh() else it }
         // The Rescan row's line for this walk: where it is, and how many
         // engine checks it has finished of those it has planned so far.
         val enginePlanned = java.util.concurrent.atomic.AtomicInteger()
