@@ -9543,6 +9543,23 @@ collector and one record writer serve every kind of run: Wine's is the first use
 (Droidtop/tracker#601 asks for one for Wine's black screens) takes the same `RunLogCollector` for the output of what it
 runs and `RunRecords.save` with its own prefix, not a second mechanism.
 
+**A black screen is noticed** (Droidtop/tracker#601, item 4: the owner's order "Black-screen detection for Wine,
+with 'Report a problem'"). While a Wine game's screen is in front, `WineBlackScreen` copies a small frame (48 by 27) of
+what the screen shows every 2 s with Android's `PixelCopy`, on its own thread, so the GL and the Vulkan renderer are
+read alike and what is judged is what the person sees. Once the game has shown its own window, every frame flat dark
+(`FrameDarkness`: at most 2% of it brighter than a dark grey, so the pointer does not count) for 45 s
+(`BlackScreenWatch.HOLD_MS`) puts a notice over the game: "The game is showing a black screen", with **Report a
+problem** and **Keep waiting**. One bright frame starts the count again, so a fade or a short black loading screen
+says nothing; the notice never ends the game, and Keep waiting starts a new count. While it is up it takes the pad
+(Left and Right, A, B for Keep waiting). Report a problem writes the run's record as it stands, while the game still
+runs (Wine's output so far from the run's `RunLogCollector`, the run's setup, the game's own logs), as
+`wine-report-last.log` and a `wine-report-run-<game>-<time>.log` beside the frame that was shown as a PNG, then opens
+Share diagnostics (`DiagnosticsArchive.share`, the same step as Settings' row), so the person chooses where it goes;
+droidtop sends nothing itself. Every Wine record now also names the run's setup: the Wine build, Direct3D (DXVK or
+VKD3D and its version), the graphics driver and its version, and the emulator. Still to be decided by the owner
+(asked 2026-10-23): whether 45 s is right or a per-game setting, whether Report a problem is also in the Quick Menu
+for any running Wine game, and whether a report offers a link to open a tracker issue.
+
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
 on screens of its own (its failure screen, its crash watch, its problem report). So an Enginehost launch that

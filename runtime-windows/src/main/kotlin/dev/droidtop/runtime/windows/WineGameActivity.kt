@@ -82,6 +82,10 @@ class WineGameActivity : Activity() {
     private var keyboard: Keyboard? = null
     private var softKeyboard: WineKeyboard? = null
     private var winHandler: WinHandler? = null
+    private var blackScreen: WineBlackScreen? = null
+
+    /** The run's setup, said in its record and in a report: Wine, Direct3D, the graphics driver and the emulator. */
+    private var setupFacts: List<Pair<String, String>> = emptyList()
     private var failed = false
     private var startedAtMs = 0L
 
@@ -162,6 +166,12 @@ class WineGameActivity : Activity() {
         // Before anything reads the prefix: the game's own Wine choices, if it
         // has any, answer for its graphics driver, Direct3D and emulator.
         prefix.setLaunchOverrides(launchOverrides(intent))
+        setupFacts = listOf(
+            "Wine" to prefix.wineVersion.orEmpty(),
+            "Direct3D" to prefix.dxWrapper.orEmpty(),
+            "Graphics driver" to listOf(prefix.graphicsDriver, prefix.graphicsDriverVersion).filterNot { it.isNullOrBlank() }.joinToString(" "),
+            "Emulator" to prefix.emulator.orEmpty(),
+        ).filter { it.second.isNotBlank() }
 
         val xServer = XServer(ScreenInfo(prefix.screenSize), false)
         this.xServer = xServer
@@ -271,6 +281,14 @@ class WineGameActivity : Activity() {
         touchpad.setShowKeyboardCallback { soft.toggle() }
         touchpad.setKeyboardSwipeCallback { soft.show() }
         setContentView(root)
+        // A black screen is noticed and can be reported (docs/SPEC.md 7e2, Droidtop/tracker#601).
+        blackScreen = WineBlackScreen(
+            activity = this,
+            parent = root,
+            surface = { rendererView as? android.view.SurfaceView },
+            windowShown = { guestShowedWindow },
+            report = ::reportBlackScreen,
+        )
 
         val session = WineXSession(this, prefix, target, workingDir, xServer, arguments)
         this.session = session
@@ -334,7 +352,7 @@ class WineGameActivity : Activity() {
                         "Exit code" to status.toString(),
                         "Ran" to "$ranMs ms",
                         "Showed a window" to if (shownWindow) "yes" else "no",
-                    ),
+                    ) + setupFacts,
                     outputLabel = "Wine printed",
                     output = output,
                     attachments = attachments,
@@ -343,6 +361,57 @@ class WineGameActivity : Activity() {
                 RunRecords.save(dev.droidtop.library.ScanLog.logsDir(context), WinePresentation.RUN_RECORD_PREFIX, key, record, now)
             }.onFailure { android.util.Log.w(WinePresentation.LOG_TAG, "could not write the run's record", it) }
         }, "droidtop-wine-record").start()
+    }
+
+    /**
+     * Report a problem from the black-screen notice (docs/SPEC.md 7e2, "A black screen is noticed"): the run's record
+     * as it stands, made while the game still runs (Wine's output so far, the run's setup and the game's own logs), the
+     * frame that was shown beside it as a PNG, then Share diagnostics so the person chooses where it goes. Nothing is
+     * sent by droidtop. Off the main thread; [done] gets the line to say.
+     */
+    private fun reportBlackScreen(frame: android.graphics.Bitmap?, done: (String) -> Unit) {
+        val context = applicationContext
+        val target = launchTarget ?: tool
+        val key = entryId ?: target?.let(WinePresentation::fullscreenWMClass) ?: "unknown"
+        val dirs = WineGameLogs.gameDirs(launchTarget, gameWorkingDir)
+        val prefixDir = prefixRoot
+        val startedWall = startedAtWallMs
+        val ranMs = SystemClock.elapsedRealtime() - startedAtMs
+        val output = session?.outputSoFar().orEmpty()
+        Thread({
+            val said = runCatching {
+                val attachments = WineGameLogs.find(dirs, prefixDir, launchTarget).mapNotNull { RunRecords.attach(it.label, it.file, startedWall) }
+                val now = System.currentTimeMillis()
+                val record = RunRecords.render(
+                    heading = "Wine report: black screen",
+                    facts = listOf(
+                        "Started" to (target ?: "unknown"),
+                        "Running for" to "$ranMs ms",
+                        "Showed a window" to "yes",
+                        "Screen" to "flat dark for ${dev.droidtop.library.diagnostics.BlackScreenWatch.HOLD_MS / 1000} s",
+                    ) + setupFacts,
+                    outputLabel = "Wine printed so far",
+                    output = output,
+                    attachments = attachments,
+                    nowMs = now,
+                )
+                val logs = dev.droidtop.library.ScanLog.logsDir(context)
+                val saved = RunRecords.save(logs, WinePresentation.REPORT_RECORD_PREFIX, key, record, now)
+                frame?.let { shot ->
+                    File(logs, saved.nameWithoutExtension + ".png").outputStream().use { shot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                }
+                // A frame whose record was pruned goes with it.
+                logs.listFiles().orEmpty()
+                    .filter { it.name.startsWith(WinePresentation.REPORT_RECORD_PREFIX + "-run-") && it.extension == "png" }
+                    .filter { !File(logs, it.nameWithoutExtension + ".log").isFile }
+                    .forEach { it.delete() }
+                dev.droidtop.library.diagnostics.DiagnosticsArchive.share(context)
+            }.getOrElse {
+                android.util.Log.w(WinePresentation.LOG_TAG, "could not make the report", it)
+                "Couldn't save the report: ${it.message}"
+            }
+            done(said)
+        }, "droidtop-wine-report").start()
     }
 
     /**
@@ -362,6 +431,7 @@ class WineGameActivity : Activity() {
     ) {
         if (failed) return
         failed = true
+        blackScreen?.pause()
         if (cause == null) {
             Timber.e("Wine launch failed: %s", message)
         } else {
@@ -412,6 +482,8 @@ class WineGameActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP && WinePresentation.dismissesFailure(event.keyCode)) leaveFailure()
             return true
         }
+        // The black-screen notice takes the pad while it is up.
+        if (blackScreen?.onKey(event) == true) return true
         // Back with the soft keyboard up closes the keyboard, not the game.
         softKeyboard?.takeIf { it.shown && event.keyCode == KeyEvent.KEYCODE_BACK }?.let {
             if (event.action == KeyEvent.ACTION_UP) it.hide()
@@ -486,9 +558,11 @@ class WineGameActivity : Activity() {
         goFullscreen()
         rendererView?.onResume()
         session?.onResume()
+        blackScreen?.resume()
     }
 
     override fun onPause() {
+        blackScreen?.pause()
         session?.onPause()
         rendererView?.onPause()
         super.onPause()
@@ -500,6 +574,8 @@ class WineGameActivity : Activity() {
         if (isFinishing) entryId?.let { dev.droidtop.library.stores.StoreSaves.afterExit(applicationContext, it) }
         session?.stop()
         session = null
+        blackScreen?.stop()
+        blackScreen = null
         startupExecutor.shutdownNow()
         super.onDestroy()
     }
@@ -628,6 +704,9 @@ object WinePresentation {
      * the last few runs of each game stay beside it as `wine-run-<game>-<time>.log` ([RunRecords.save]).
      */
     const val RUN_RECORD_PREFIX = "wine"
+
+    /** A Report a problem made while a game runs: its record (`wine-report-last.log`, `wine-report-run-...`) and frame. */
+    const val REPORT_RECORD_PREFIX = "wine-report"
 
     /** Wine ending this soon after it started means the game did not really run. */
     const val EXITED_AT_ONCE_MS = 10_000L

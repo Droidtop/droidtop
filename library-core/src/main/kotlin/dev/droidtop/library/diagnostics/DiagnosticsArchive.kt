@@ -66,6 +66,28 @@ object DiagnosticsArchive {
         return json
     }
 
+    /**
+     * Builds the archive and opens the system share sheet with it, so the person chooses where it goes; answers the
+     * line to show. Settings' Share diagnostics and a game screen's Report a problem both use it (docs/SPEC.md 10c,
+     * 7e2). Blocking file work: call off the main thread.
+     */
+    fun share(context: Context): String = runCatching {
+        val file = build(context)
+        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+            .setType("application/zip")
+            .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            .putExtra(android.content.Intent.EXTRA_SUBJECT, "droidtop diagnostics")
+            .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        context.startActivity(
+            android.content.Intent.createChooser(send, "Share diagnostics").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        "Diagnostics packed (${file.length() / 1024} KB); choose where to send it"
+    }.getOrElse {
+        android.util.Log.w("droidtop.diagnostics", "Diagnostics archive failed", it)
+        "Couldn't pack diagnostics. Check there is space left on this device and try again."
+    }
+
     /** Builds the archive and answers the file. Blocking file work: call off the main thread. */
     fun build(context: Context): File {
         val dir = File(ScanLog.filesRoot(context), OUT_DIR).apply { mkdirs() }
