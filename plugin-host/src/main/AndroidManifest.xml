@@ -13,6 +13,19 @@
     -->
     <application>
         <!--
+          The door for app interface plugins (docs/plugin-api.md 1.3, Droidtop/tracker#547): exported so an approved
+          plugin's app can ask droidtop to connect it, and nothing else. It answers only an app whose plugin is
+          installed, approved, turned on and still verified, and carries no data: everything after it goes through the
+          plugin's broker.
+        -->
+        <service
+            android:name="dev.droidtop.pluginhost.AppInterfaceDoorService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.droidtop.plugin.APP_INTERFACE_DOOR" />
+            </intent-filter>
+        </service>
+        <!--
           Plugin processes (docs/plugin-api.md 5.3). Not exported: only :app
           binds to them, and only :app decides which plugin loads where.
 

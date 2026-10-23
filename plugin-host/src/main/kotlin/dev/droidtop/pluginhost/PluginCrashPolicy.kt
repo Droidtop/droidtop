@@ -79,6 +79,17 @@ class PluginCrashPolicy(
     }
 
     /**
+     * Connects an app interface plugin's app (docs/plugin-api.md 1.3, the door): checks it as a call would and loads it,
+     * which hands its app its broker. Null when it is connected, else why not.
+     */
+    suspend fun connectApp(record: PluginRecord): String? {
+        if (record.manifest.kind != PluginKind.APP_INTERFACE) return "not an app's plugin"
+        if (!record.runnable()) return "${record.manifest.label} is not approved and turned on"
+        gateOnVerification(record)?.let { return it.error ?: "${record.manifest.label} failed its check" }
+        return loadFor(record, userInitiated = false)
+    }
+
+    /**
      * Loads [record] for its own screen (a contained `ui.main`, [PluginScreenActivity]) the way a call the person started
      * would, and returns the process it runs in, or why it could not.
      */
@@ -341,7 +352,7 @@ class PluginCrashPolicy(
         // failed here with "no runner for kind flutter_embed yet" before
         // ever reaching the runner that would have worked. One list instead
         // of two separate != chains so a future kind only needs one edit.
-        private val RUNNABLE_KINDS = setOf(PluginKind.NATIVE_BUNDLE, PluginKind.PYTHON, PluginKind.FLUTTER_EMBED)
+        private val RUNNABLE_KINDS = setOf(PluginKind.NATIVE_BUNDLE, PluginKind.PYTHON, PluginKind.FLUTTER_EMBED, PluginKind.APP_INTERFACE)
 
         // Carries a paused job's checkpoint into resumeJob's startJob call.
         const val RESUME_PAYLOAD_ARG = "droidtop.resume_payload"
