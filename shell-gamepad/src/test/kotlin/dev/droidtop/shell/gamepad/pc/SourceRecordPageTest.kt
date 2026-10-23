@@ -63,5 +63,11 @@ class SourceRecordPageTest {
         assertEquals(feed to "9", updateSourceOf(listOf(forum, feed), links, "0.6"))
         assertNull(updateSourceOf(listOf(forum, feed), links, "0.7"))
         assertNull(updateSourceOf(listOf(forum, feed), links, null))
+        // The rig's row (Droidtop/tracker#577): the badge said "v0.37.dv" and the source wrote it otherwise.
+        val f95 = GameLinks(sources = listOf(SourceLink("forum", "18978", SourceAnswer("0.37.DV", 0L))))
+        assertEquals(forum to "18978", updateSourceOf(listOf(forum, feed), f95, "v0.37.dv"))
+        // The only linked source named the update, whatever it wrote.
+        val one = GameLinks(sources = listOf(SourceLink("forum", "18978", SourceAnswer("Episode 3", 0L))))
+        assertEquals(forum to "18978", updateSourceOf(listOf(forum, feed), one, "v0.37.dv"))
     }
 }
