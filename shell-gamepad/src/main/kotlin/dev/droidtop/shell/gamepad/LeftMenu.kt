@@ -69,8 +69,8 @@ import dev.droidtop.shell.gamepad.input.onPad
 internal data class LeftMenuEntry(val section: GamingSection, val label: String) {
     val key: String get() = section.name
 
-    /** Whether this row is where the user is. */
-    fun isAt(current: GamingSection): Boolean = section == current
+    /** Whether this row is where the user is: Updates also while its Get new games page is up. */
+    fun isAt(current: GamingSection): Boolean = section == current.menuSection
 }
 
 /** The left menu's rows for the sections this UI mode allows (Kiosk and Kid hide Settings), Home first. */

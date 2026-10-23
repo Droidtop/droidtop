@@ -1,7 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -174,7 +174,8 @@ private const val TILE_WIDTH_DP = 220
  * The Collections tab (docs/SPEC.md 7i): tiles in groups under their headings,
  * each with its name, its count and, when it is a tab, a mark, without
  * needing focus. The page owns the cursor ([selected]); a tap selects, a
- * second tap opens.
+ * second tap opens, and a long press opens the tile's menu, the one L2 and
+ * Select open (owner, 2026-10-23, Droidtop/tracker#621).
  */
 @Composable
 internal fun PcCollectionsView(
@@ -183,6 +184,7 @@ internal fun PcCollectionsView(
     columns: Int,
     state: LazyGridState,
     onTap: (Int) -> Unit,
+    onLongPress: (Int) -> Unit,
     empty: String,
 ) {
     val window = LocalShellWindow.current
@@ -207,14 +209,15 @@ internal fun PcCollectionsView(
             }
             group.tiles.forEach { tile ->
                 val at = index++
-                item(key = tile.key) { CollectionTileCard(tile, selected == at, onClick = { onTap(at) }) }
+                item(key = tile.key) { CollectionTileCard(tile, selected == at, onClick = { onTap(at) }, onLongClick = { onLongPress(at) }) }
             }
         }
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun CollectionTileCard(tile: CollectionTile, selected: Boolean, onClick: () -> Unit) {
+private fun CollectionTileCard(tile: CollectionTile, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
     Column(
         verticalArrangement = Arrangement.spacedBy(Space.Xs),
         modifier = Modifier
@@ -222,7 +225,7 @@ private fun CollectionTileCard(tile: CollectionTile, selected: Boolean, onClick:
             .heightIn(min = 88.dp)
             .clip(dev.droidtop.shell.gamepad.Corners.Crisp)
             .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(Space.Md),
     ) {
         Text(tile.name, color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, overflow = TextOverflow.Ellipsis)

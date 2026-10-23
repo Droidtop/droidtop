@@ -1,6 +1,8 @@
 package dev.droidtop.app.settings
 
 import android.content.Context
+import android.content.Intent
+import dev.droidtop.app.MainActivity
 import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.update.AppSelfUpdate
 import dev.droidtop.app.update.UpdateChecks
@@ -12,11 +14,15 @@ import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.library.integrations.AppCatalogs
+import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.PluginCatalog
+import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.Mode
+import dev.droidtop.library.settings.Modes
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.NestedScreenItem
@@ -25,6 +31,7 @@ import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.stores.StoreAutoUpdates
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.UserOriginKeys
+import dev.droidtop.shell.standard.BackButtonMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -115,6 +122,25 @@ object UpdatesPage {
                     inline = settingsScreen(),
                 ),
             )
+            // Get new games is a page of Updates (owner, 2026-10-23: "THe "get new games" menu needs to be UNDER
+            // Updates", Droidtop/tracker#621). The search is Gaming's, so outside Gaming the row opens Gaming on it.
+            if (Modes.isEnabled(Mode.GAMING)) {
+                add(
+                    ActionItem(
+                        id = GetGamesEntry.UPDATES_ROW_ID,
+                        title = GetGamesEntry.NEW_GAMES,
+                        subtitle = "Search the sources your plugins add for games to download",
+                        run = { ctx ->
+                            ctx.startActivity(
+                                Intent(ctx, MainActivity::class.java)
+                                    .putExtra(BackButtonMenu.EXTRA_MODE, Mode.GAMING.id)
+                                    .putExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION, GAMING_NEW_GAMES)
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            )
+                        },
+                    ),
+                )
+            }
             add(
                 NestedScreenItem(
                     id = "updates_get_apps",
@@ -127,6 +153,9 @@ object UpdatesPage {
     }
 
     private fun available(version: String): String = "$version available"
+
+    // Gaming's section name for Get new games (GamingSection is internal to the shell; its names are the deep link's).
+    private const val GAMING_NEW_GAMES = "NEW_GAMES"
 
     /** droidtop itself, while a check has seen a newer build: Update installs it (Android asks). */
     private fun droidtop(context: Context): List<Update> {
