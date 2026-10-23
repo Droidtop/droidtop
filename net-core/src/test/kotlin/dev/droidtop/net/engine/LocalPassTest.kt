@@ -99,4 +99,29 @@ class LocalPassTest {
         assertEquals(emptyList<Pair<InetAddress, Int>>(), LocalAddresses.passesFor("ftp://192.168.1.1/x", { listOf(InetAddress.getByName("192.168.1.1")) }))
         assertEquals(emptyList<Pair<InetAddress, Int>>(), LocalAddresses.passesFor("https://nowhere.invalid/x", { throw java.net.UnknownHostException(it) }))
     }
+
+    @Test
+    fun aRefusalIsSaidInWordsNotAsAnEngineErrorNumber() = runTest {
+        // The person's own server, given a pass, still refused: that server could not be reached.
+        val engine = Engine(Transfer("error", 0, 0, 0, 1))
+        try {
+            EngineFetch.fetch(engine, request("https://nas.tailnet.ts.net/a.zip"), { }, size, passThrough, Dispatchers.Unconfined, nas) { it }
+            org.junit.Assert.fail("refused")
+        } catch (e: TransferException) {
+            assertEquals("droidtop could not reach nas.tailnet.ts.net on your local network", e.message)
+        }
+        assertEquals("revoke 100.101.5.6:443", engine.calls.last())
+    }
+
+    @Test
+    fun aSiteThatSendsADownloadOntoTheLocalNetworkIsNamed() {
+        val lan: (String) -> List<InetAddress> = { host -> listOf(InetAddress.getByName(if (host == "cdn.example.org") "93.184.216.34" else "192.168.1.10")) }
+        assertEquals(
+            "cdn.example.org sent this download on to 192.168.1.10, an address on your local network, and droidtop does not follow a site onto your own network",
+            EngineFetch.refusal("https://cdn.example.org/a.zip", hadPass = false, lookup = lan, follow = { "https://192.168.1.10:8443/a.zip" }),
+        )
+        // An unknown error on the internet stays the engine's own: nothing local was involved.
+        assertEquals(null, EngineFetch.refusal("https://cdn.example.org/a.zip", hadPass = false, lookup = lan, follow = { it }))
+        assertEquals(null, EngineFetch.refusal("https://cdn.example.org/a.zip", hadPass = false, lookup = lan, follow = { throw java.io.IOException("offline") }))
+    }
 }
