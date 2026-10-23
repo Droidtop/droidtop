@@ -38,8 +38,9 @@ object ExtensionPoints {
         ExtensionPoint("library.artwork", "Artwork and media", PointRisk.MEDIUM, lets = "Lets it supply covers, screenshots and other media for your games."),
         ExtensionPoint("library.updates", "Update checks", PointRisk.MEDIUM, lets = "Lets it tell you when a game has a newer version."),
         ExtensionPoint("saves.sync", "Save sync", PointRisk.HIGH, lets = "Lets it copy your game saves to and from another place."),
-        // docs/plugin-api.md 3 A7a: an app interface plugin says where its app keeps a game's saves. Facts only; droidtop writes nothing for them.
-        ExtensionPoint("saves.locations", "Where your games' saves are", PointRisk.LOW, lets = "Lets it tell droidtop where its app keeps your games' saves."),
+        // docs/plugin-api.md 3 A7a, Droidtop/tracker#546 design v3 section 8: an app's plugin says where its app keeps
+        // saves, as roots, never files. Used only past the checks C10 and D12; droidtop writes nothing for them alone.
+        ExtensionPoint("saves.roots", "Where your games' saves are kept", PointRisk.MEDIUM, lets = "Lets it tell droidtop the folders its app keeps your games' saves in."),
         ExtensionPoint("achievements.provider", "Achievements", PointRisk.MEDIUM, lets = "Lets it show achievements for your games."),
         ExtensionPoint("launch.provider", "Launch games", PointRisk.HIGH, lets = "Lets it decide what runs when you launch a game."),
         ExtensionPoint("launch.game_settings", "Per-game settings", PointRisk.LOW, lets = "Lets it add settings to a game's own page."),

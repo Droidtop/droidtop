@@ -20759,8 +20759,8 @@ and work with each other over the plugin API so no matter what, saves go where t
   droidtop exports one service for this kind, the door (`dev.droidtop.plugin.APP_INTERFACE_DOOR`, one method
   `knock()`): an approved, verified app_interface plugin's app knocks when it needs droidtop and has no broker, and
   droidtop binds it and hands its broker over. It carries no data and answers no one else.
-- **Saves, both ways** (docs/plugin-api.md 3 A7a). droidtop asks the plugin where a game's saves are
-  (`saves.locations@1`); the plugin asks droidtop where a game's saves belong (`saves where`) before starting a game,
+- **Saves, both ways** (docs/plugin-api.md 3 A7a). droidtop asks the plugin where its app keeps saves
+  (`saves.roots@1`, Droidtop/tracker#546's point, with its checks); the plugin asks droidtop where a game's saves belong (`saves where`) before starting a game,
   and tells it when a game wrote saves (`saves report_changed`) after, whichever app launched the game. For a game whose
   saves droidtop syncs, `where` names the folder droidtop's own launch passes, after the same sync down, and a report
   adopts and uploads them as after a game it launched itself; for any other game, `where` leaves the folder to the app
