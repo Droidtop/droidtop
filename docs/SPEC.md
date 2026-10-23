@@ -12292,7 +12292,13 @@ reimplemented it as my own f95seeker code." So:
     recommended"". When the links are for more than one system, the tab's
     first row is System (the system last picked on that source's pages, else
     Windows, then Linux; Left, Right and A change it) and only that system's
-    links show, with the ones for any system. Android picked (or the only system there is), droidtop's line
+    links show. The links for any system follow whichever system is picked,
+    under their own heading (the owner: "It should show under every section,
+    but it should have the description with it, under an "extras" or "other"
+    section"): "Extras" for a walkthrough, a patch, a save file and the like,
+    "Other" for the rest, each with the source's heading for it under it
+    ("Walkthrough") as its description. Android picked (or the only system
+    there is), droidtop's line
     says "This will not be trackable by us. Windows or Linux is
     recommended." A link's systems are the ones the source names on it
     (`systems`), else the ones its heading names; a heading naming none

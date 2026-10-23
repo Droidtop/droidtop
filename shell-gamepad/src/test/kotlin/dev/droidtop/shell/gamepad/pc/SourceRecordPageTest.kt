@@ -40,17 +40,25 @@ class SourceRecordPageTest {
     @Test
     fun aSystemIsPickedAndOnlyItsLinksShowAndAndroidIsFlagged() {
         fun s(section: String, host: String, vararg systems: String) = UpdateSources.Download(section, host, host, "$section/$host", systems = systems.toList())
-        val tagged = record.copy(downloads = listOf(s("Win/Linux", "MEGA", "windows", "linux"), s("Mac", "PIXELDRAIN", "mac"), s("Android", "GOFILE", "android"), s("Extras", "WALKTHROUGH")))
+        val tagged = record.copy(
+            downloads = listOf(
+                s("Win/Linux", "MEGA", "windows", "linux"), s("Mac", "PIXELDRAIN", "mac"), s("Android", "GOFILE", "android"),
+                s("Walkthrough", "WALKTHROUGH"), s("Compressed", "MIXDROP"),
+            ),
+        )
         assertEquals(listOf("windows", "linux", "mac", "android"), downloadSystems(tagged))
         // Windows first; the links for it and the ones for any system.
         val first = recordRows(tagged, RecordTab.DOWNLOADS) { "" }
         assertEquals(RecordRow("System", "Windows", "Left and Right show another system's links", RecordAction.PickSystem), first.first())
-        assertEquals(listOf("MEGA", "WALKTHROUGH"), first.drop(1).map { it.title })
+        // The links for any system follow under their own headings, each with its description.
+        assertEquals(listOf("MEGA", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), first.drop(1).map { it.title })
+        assertEquals("Walkthrough", first.first { it.title == "WALKTHROUGH" }.subtitle)
+        assertNull(first.first { it.title == "Extras" }.action)
         // Android: droidtop's word first, then only Android's link.
         val android = recordRows(tagged, RecordTab.DOWNLOADS, "android") { "" }
         assertEquals("This will not be trackable by us. Windows or Linux is recommended.", android[1].title)
         assertNull(android[1].action)
-        assertEquals(listOf("GOFILE", "WALKTHROUGH"), android.drop(2).map { it.title })
+        assertEquals(listOf("GOFILE", "Extras", "WALKTHROUGH", "Other", "MIXDROP"), android.drop(2).map { it.title })
         assertEquals("windows", nextSystem(downloadSystems(tagged), "android", 1))
         assertEquals("android", nextSystem(downloadSystems(tagged), null, -1))
         // Links that are all for one system: no picker, but Android still says so.

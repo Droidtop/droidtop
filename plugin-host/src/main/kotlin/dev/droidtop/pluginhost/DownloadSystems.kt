@@ -58,9 +58,14 @@ object DownloadSystems {
         return ALL.filter { it in all }
     }
 
+    private val EXTRAS = Regex("""(?i)\b(extras?|walkthrough|guide|patch(es)?|fix(es)?|saves?|save ?files?|mods?|bonus|dlc|ost|soundtrack|art ?books?|gallery|cheats?|translation)\b""")
+
+    /**
+     * Whether a heading over links for any system names an extra (a walkthrough, a patch, a save file): those go under
+     * "Extras" on the Downloads tab, any other under "Other" (the owner, 2026-10-23, Droidtop/tracker#617).
+     */
+    fun isExtra(heading: String): Boolean = EXTRAS.containsMatchIn(heading)
+
     /** The system the picker starts on: Windows, then Linux, then the first offered. */
     fun first(offered: List<String>): String? = offered.firstOrNull { it == WINDOWS } ?: offered.firstOrNull { it == LINUX } ?: offered.firstOrNull()
-
-    /** Whether an entry for [systems] is shown with [picked]: one for no system in particular is shown with every system. */
-    fun shows(systems: List<String>, picked: String?): Boolean = picked == null || systems.isEmpty() || picked in systems
 }

@@ -79,13 +79,21 @@ internal fun groupedDownloads(downloads: List<UpdateSources.Download>): List<Upd
 /** The systems the record's links are for (Droidtop/tracker#617), in the order the Downloads tab's picker offers them. */
 internal fun downloadSystems(record: UpdateSources.Record): List<String> = DownloadSystems.offered(record.downloads.map { it.systems })
 
+/** One link's row: the host and its label, and under it the heading the source gave it, which says what it is. */
+private fun linkRow(d: UpdateSources.Download): RecordRow =
+    RecordRow("${d.host} · ${d.label}".takeIf { d.label != d.host } ?: d.host, subtitle = d.section, action = RecordAction.Download(d))
+
 /**
  * The Downloads tab's rows: when the links differ by system, a System row first, droidtop's word on the picked system
- * if it has one (Android: not trackable), then only the picked system's links, and the links for any system.
+ * if it has one (Android: not trackable), then only the picked system's links. The links for any system follow
+ * whichever system is picked, under their own heading (the owner, 2026-10-23, Droidtop/tracker#617): "Extras" for a
+ * walkthrough, a patch or a save file, "Other" for the rest, each with its own heading under it as its description.
  */
 internal fun downloadRows(record: UpdateSources.Record, picked: String?): List<RecordRow> {
     if (record.downloads.isEmpty()) return listOf(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"))
     val offered = downloadSystems(record)
+    // Links that do not differ by system: the source's own list, as it gives it.
+    if (offered.isEmpty()) return groupedDownloads(record.downloads).map(::linkRow)
     val system = picked?.takeIf { it in offered } ?: DownloadSystems.first(offered)
     val head = listOfNotNull(
         if (offered.size >= 2) {
@@ -95,10 +103,13 @@ internal fun downloadRows(record: UpdateSources.Record, picked: String?): List<R
         },
         system?.let { DownloadSystems.notice(it) }?.let { RecordRow(it) },
     )
-    val links = groupedDownloads(record.downloads.filter { DownloadSystems.shows(it.systems, system) }).map { d ->
-        RecordRow("${d.host} · ${d.label}".takeIf { d.label != d.host } ?: d.host, subtitle = d.section, action = RecordAction.Download(d))
-    }
-    return head + links.ifEmpty { listOf(RecordRow("No links for ${DownloadSystems.LABELS[system] ?: system}")) }
+    val label = DownloadSystems.LABELS[system] ?: system
+    val links = groupedDownloads(record.downloads.filter { it.systems.isNotEmpty() && system in it.systems }).map(::linkRow)
+    val anySystem = record.downloads.filter { it.systems.isEmpty() }
+    val (extras, other) = anySystem.partition { DownloadSystems.isExtra(it.section) || DownloadSystems.isExtra(it.label) }
+    fun group(title: String, list: List<UpdateSources.Download>): List<RecordRow> =
+        if (list.isEmpty()) emptyList() else listOf(RecordRow(title, subtitle = "For any system")) + groupedDownloads(list).map(::linkRow)
+    return head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + group("Extras", extras) + group("Other", other)
 }
 
 /** Where the record page keeps the system last picked per source. */
