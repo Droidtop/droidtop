@@ -2151,7 +2151,8 @@ Risk —.
   is not built.
   Tapping an update, or a linked source's row, opens droidtop's record
   page for that source (`record`); a source that does not answer `record`
-  (`UNSUPPORTED`) keeps today's sheet.
+  (`UNSUPPORTED`) gets a record page that says it has no update page, with
+  Change link under it (Droidtop/tracker#619).
 - **Permission:** `provide:library.updates`, `net.domains`.
 - **Facets (proposed 2026-10-22, §1.10):** in contract 3, `record` and
   `check`'s `facts` become `item.page` facets (`ui.facets` `get`, or
