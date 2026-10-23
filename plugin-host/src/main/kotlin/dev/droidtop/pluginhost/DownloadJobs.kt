@@ -987,7 +987,19 @@ object DownloadJobs {
      * A download the engine could not finish: its sentence, as every failure here is, and aria2's error number when the
      * engine gave one, for a store whose links expire to tell an expired link from a broken one ([fetchForJob]).
      */
-    class EngineFailure(val engineCode: Int?, message: String?) : IllegalStateException(message)
+    class EngineFailure(val engineCode: Int?, message: String?) : IllegalStateException(message) {
+        /**
+         * The HTTP status a server's refusal reads as (aria2's 3: 404, 22: 403, 24: 401), for a store that acts on it
+         * (an expired link fetched afresh, a CDN token asked for); null for any other failure.
+         */
+        val refusedStatus: Int?
+            get() = when (engineCode) {
+                3 -> 404
+                22 -> 403
+                24 -> 401
+                else -> null
+            }
+    }
 
     /**
      * One file for a job that is already running, a store's install (docs/SPEC.md 12a, rollout step 4): fetched on the

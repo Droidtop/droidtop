@@ -21,6 +21,7 @@ import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.library.stores.WinePrefixLocation
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.epic.EpicGameLauncher
 import dev.droidtop.stores.util.StoreFiles
@@ -369,6 +370,8 @@ class SteamStore : StoreLibrary {
             val db = db(context)
             val install = db.installs().find(appId) ?: return@withContext
             File(context.cacheDir, "steam_chunks/$appId").let { staging -> SafeDelete.deleteWithin(staging.parentFile ?: context.cacheDir, staging) }
+            // The chunks the engine had begun: Steam installs one game at a time, so every Steam chunk in the area is this one's.
+            DownloadJobs.discardAllForJob(context, SteamChunkFetch.AREA_PREFIX)
             if (install.isDownloaded || install.installPath.isBlank()) return@withContext
             val dir = File(install.installPath)
             dir.parentFile?.let { SafeDelete.deleteWithin(it, dir) }

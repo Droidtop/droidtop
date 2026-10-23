@@ -108,17 +108,6 @@ internal class GOGDownloadManager(
          * (one game's, or the dependencies'), so discarding one install deletes its own partial chunks and no other's. Pure.
          */
         fun areaPrefix(chunkCacheDir: File): String = "gog_" + Integer.toHexString(chunkCacheDir.absolutePath.hashCode()) + "_"
-
-        /**
-         * The HTTP status the chunk pipeline acts on for a chunk the engine could not fetch: a refusal from the CDN is
-         * what an expired secure link gets, and the pipeline asks GOG for fresh links on it. Null for other failures. Pure.
-         */
-        internal fun linkRefusal(engineCode: Int?): Int? = when (engineCode) {
-            3 -> 404
-            22 -> 403
-            24 -> 401
-            else -> null
-        }
     }
 
     /**
@@ -1428,7 +1417,7 @@ internal class GOGDownloadManager(
      * One chunk on droidtop's download engine (docs/SPEC.md 12a, rollout step 4): fetched whole into the downloads area,
      * checked against its compressed MD5 and moved into the chunk cache. Each of the pool's chunks is a transfer of its
      * own, and the engine carries one on from its partial bytes. A refusal from the CDN comes back as the
-     * [HttpStatusException] the pipeline refreshes expired secure links on ([linkRefusal]).
+     * [HttpStatusException] the pipeline refreshes expired secure links on ([DownloadJobs.EngineFailure.refusedStatus]).
      *
      * @param chunkMd5 Compressed MD5 hash (chunk identifier)
      * @param url Secure CDN URL (time-limited)
@@ -1471,7 +1460,7 @@ internal class GOGDownloadManager(
                 // The job counts the chunk's bytes once it is whole, so one chunk's are never read as the job's.
                 DownloadJobs.fetchForJob(context, url, areaName, headers = mapOf("User-Agent" to USER_AGENT), tellJob = false)
             } catch (e: DownloadJobs.EngineFailure) {
-                val status = linkRefusal(e.engineCode)
+                val status = e.refusedStatus
                 Timber.tag("GOG").e("Chunk $chunkMd5 failed from URL: $safeUrl: ${e.message}")
                 return@withContext Result.failure(
                     if (status != null) HttpStatusException(status, "HTTP $status downloading chunk $chunkMd5") else e,
