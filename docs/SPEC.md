@@ -14,7 +14,7 @@ its group, is placed in numeric order, and gets a line in the contents below.
 - [2c. Modes and what each contributes (directed 2026-09-11)](#2c-modes-and-what-each-contributes-directed-2026-09-11)
 - [3. Containers](#3-containers)
 - [3a. Image index — populated live, not a pinned/prepopulated catalog](#3a-image-index--populated-live-not-a-pinnedprepopulated-catalog)
-- [3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core](#3b-optional-other-architecturesoses-via-qemulibvirt--a-value-add-not-core)
+- [3b. Other architectures and OSes via QEMU, the one virtualization layer](#3b-other-architectures-and-oses-via-qemu-the-one-virtualization-layer)
 - [3c. FEX-Emu — x86/x86-64 emulation for Linux software in general, not just Wine](#3c-fex-emu--x86x86-64-emulation-for-linux-software-in-general-not-just-wine)
 - [3d. User-facing container/distro management (directed 2026-08-30)](#3d-user-facing-containerdistro-management-directed-2026-08-30)
 - [4. Display](#4-display)
@@ -2323,13 +2323,37 @@ stops at "which repositories," never "which versions."
   schema-1 manifest crane cannot read) and `debian:10` (rig
   dq-coordinator-23 F13). A tag picker in the creation flow remains open.
 
-## 3b. Optional: other architectures/OSes via QEMU/libvirt — a value-add, not core
+## 3b. Other architectures and OSes via QEMU, the one virtualization layer
+
+**Decided (owner, 2026-10-23, Droidtop/tracker#631): droidtop has one
+virtualization manager, QEMU-based and libvirt-style, for every guest OS.**
+A guest is a VM defined and managed in one place. There are no per-OS
+special cases and no separate emulator for the same job: classic Mac OS is
+not done through SheepShaver or Basilisk II. Classic Mac OS (PowerPC and
+68k), Haiku, ReactOS, x86 Windows or Linux, RISC-V and ARM64 guests are
+all the same goal, and the aim is to use QEMU to make *anything*
+compatible. This is a far-future task. Today the owner is comfortable using
+an emulator for the one thing that prompted it, a classic Mac game, and
+nothing here is built.
+
+The shape, from #631, still to be designed before it is built: VM
+definitions and per-guest-family templates (a user picks "Classic Mac OS
+(PowerPC)", not QEMU flags); a lifecycle (create, start, pause, snapshot,
+stop, delete, disks created and grown); the user's ROMs and install media
+supplied by them and never copied by droidtop, as with BIOS files; the
+guest's screen shown as a window through windowcast, which owns all
+streaming code (its SPICE backend, Droidtop/tracker#440, is not built);
+QEMU as its own process under the sandbox containment of
+Droidtop/tracker#584; and a game or app inside a VM as a library entry that
+starts the VM and the program.
+
+That decision settles *whether*, replacing this section's earlier framing as
+an optional value-add. The constraints below stand.
 
 `ContainerRuntime` (§3) covers droidtop's actual workflow — Linux
 containers and Wine/Box64 for Windows, both same-architecture (ARM64
 containers, x86 binaries translated, never a different-arch *guest
-kernel*). None of that requires this section. What this section adds is
-optional: let a user boot an **arbitrary-architecture VM** (x86_64,
+kernel*). None of that requires this section. What this section adds: let a user boot an **arbitrary-architecture VM** (x86_64,
 RISC-V, another ARM variant, etc.) via QEMU, with libvirt-style management
 around it if that proves worth building — genuinely useful (dev/testing
 an unrelated arch, running something Wine/Box64 can't cover), and another
@@ -2359,9 +2383,10 @@ droidtop's normal desktop/gaming workflow to work.
 - **Not designed in detail** — whether this is a third `ContainerRuntime`-
   adjacent backend, a fully separate `VmRuntime` construct, and how it
   surfaces in the container-creation UI (§7c) alongside the image catalog
-  (§3a) are all open. Flagging the shape and the constraints (acceleration
-  conditionality, root-when-helpful) now so it isn't designed blind later,
-  not committing to an implementation yet.
+  (§3a) are all open. The decision above makes it one layer for every guest
+  OS; how it is built is still open. Flagging the shape and the constraints
+  (acceleration conditionality, root-when-helpful) now so it isn't designed
+  blind later, not committing to an implementation yet.
 
 ## 3c. FEX-Emu — x86/x86-64 emulation for Linux software in general, not just Wine
 
