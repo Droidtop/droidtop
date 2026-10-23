@@ -269,9 +269,7 @@ object PluginPanels {
     private fun moreGroups(record: PluginRecord): List<CatalogGroup> {
         val m = record.manifest
         val items = buildList<CatalogItem> {
-            val hasSettings = (m.contractVersion >= 2 && m.v2.provides.any { it.point == PluginSettingsRows.UI_SETTINGS }) ||
-                PluginCapability.SETTINGS_ROWS in m.capabilities
-            if (hasSettings) {
+            if (PluginSettingsRows.has(record)) {
                 add(NestedScreenItem(id = "plugin_panel_${m.id}_settings", title = "Settings", inline = PluginSettingsRows.screenFor(record)))
             }
             if (PluginMainUi.offered(record)) {

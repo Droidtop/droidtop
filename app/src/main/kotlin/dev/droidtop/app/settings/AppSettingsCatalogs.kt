@@ -1942,7 +1942,7 @@ object AppSettingsCatalogs {
                     )
                 }
             }
-            if (record.runnable() && PluginCapability.SETTINGS_ROWS in m.capabilities) {
+            if (record.runnable() && dev.droidtop.library.integrations.PluginSettingsRows.has(record)) {
                 add(
                     NestedScreenItem(
                         id = "plugin_${m.id}_settings_rows",

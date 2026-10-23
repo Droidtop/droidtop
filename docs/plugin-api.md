@@ -1169,7 +1169,9 @@ point and `host.info().facets`); the renderer (facets become the view model the 
 group is a section, a list's entries are rows, a `page` call opens a page whose reply is facets, and an input's value
 goes back as `args.value`, typed); and the Quick Menu's plugin section (a plugin whose `ui.facets` entry declares
 `quickmenu` gets its panel from `get {target: "quickmenu"}`, through `FacetGuards.admit`, in place of its old
-`ui.panel`). Next, the game page, then the plugin's own page and settings.
+`ui.panel`); and the plugin's settings (`settings.page`: the Settings row on its page, its Quick Menu panel and
+its game-source page all open `get {target: "settings.page"}` when it declares that target, in place of its old
+`ui.settings` view, `PluginSettingsRows.has` being the one test). Next, the game page.
 
 **Facets first (the owner, 2026-10-23: "While plugins CAN present a whole UI, we really want them to use Facets.
 Small snippets to mix their functions into droidtop").** Facets are the default way a plugin shows anything. A
