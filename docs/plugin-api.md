@@ -2282,7 +2282,10 @@ difference:
     any other game it copies nothing (`accepted: true, synced: false`).
     `saveFolder` must be a folder in shared storage or on a card, whose
     real path is not droidtop's own: anything else is `accepted: false`
-    with the reason. Always in the activity log.
+    with the reason. Always in the activity log. Idempotent: the app sends
+    it for every game it ran, droidtop's launches included (alongside the
+    `GAME_ENDED` broadcast while that stays); a repeat copies only files
+    newer than droidtop's and joins the upload already running.
 - **droidtop offers its engine games (host API `library.read`, op
   `list_engine_games`, permission `library.read`):** the owner: "droidtop
   should also present games for enginehost to register, but not

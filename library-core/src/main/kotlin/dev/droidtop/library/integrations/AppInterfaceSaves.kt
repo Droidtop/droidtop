@@ -58,6 +58,11 @@ class AppInterfaceSaves(
         answer.put("saveRoot", saveRoot?.absolutePath ?: JSONObject.NULL)
     }
 
+    /**
+     * Idempotent, as the app sends it for droidtop's own launches too, beside the `GAME_ENDED` broadcast: adopting copies
+     * only files newer than droidtop's, and a second upload request joins the job already running
+     * ([dev.droidtop.pluginhost.PluginJobsCenter.startNative] keeps one job per game).
+     */
     override fun changed(pluginId: String, args: JSONObject): JSONObject = runBlocking {
         val entries = entries() ?: return@runBlocking refused("droidtop's library is not ready yet; tell it again in a moment")
         val path = args.optString("path")
