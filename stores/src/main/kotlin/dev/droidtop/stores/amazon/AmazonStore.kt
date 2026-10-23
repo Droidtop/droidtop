@@ -142,10 +142,7 @@ class AmazonStore : StoreLibrary {
             dir.parentFile?.let { SafeDelete.deleteWithin(it, dir) }
             dao.insertAll(listOf(game.copy(installPath = "")))
             // The files the download engine had begun in the downloads area, this game's only.
-            val prefix = AmazonDownloadManager.areaPrefix(gameId)
-            DownloadJobs.fileFor(context, "x").parentFile?.list()
-                ?.filter { it.startsWith(prefix) && !it.endsWith(".aria2") }
-                ?.forEach { DownloadJobs.discardForJob(context, it) }
+            DownloadJobs.discardAllForJob(context, AmazonDownloadManager.areaPrefix(gameId))
         }
     }
 

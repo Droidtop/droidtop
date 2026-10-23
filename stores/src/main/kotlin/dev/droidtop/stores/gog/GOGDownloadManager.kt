@@ -18,7 +18,10 @@ import dev.droidtop.stores.util.StoreDiskSpace
 import dev.droidtop.stores.util.StoreHttp
 import org.json.JSONArray
 import org.json.JSONObject
+import dev.droidtop.pluginhost.DownloadJobs
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import java.io.ByteArrayOutputStream
 import java.io.BufferedOutputStream
 import java.io.File
@@ -42,7 +45,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import timber.log.Timber
 import java.io.IOException
@@ -99,6 +101,24 @@ internal class GOGDownloadManager(
         private const val RETRY_DELAY_MS = 1000L // Initial retry delay in milliseconds
         private const val DEPENDENCY_URL = "https://content-system.gog.com/dependencies/repository?generation=2"
         private const val STREAM_PROGRESS_TIME_INTERVAL_MS = 200L
+        private const val USER_AGENT = "GOG Galaxy"
+
+        /**
+         * The start of the downloads-area names of the chunks the engine fetches for the chunk cache [chunkCacheDir]
+         * (one game's, or the dependencies'), so discarding one install deletes its own partial chunks and no other's. Pure.
+         */
+        fun areaPrefix(chunkCacheDir: File): String = "gog_" + Integer.toHexString(chunkCacheDir.absolutePath.hashCode()) + "_"
+
+        /**
+         * The HTTP status the chunk pipeline acts on for a chunk the engine could not fetch: a refusal from the CDN is
+         * what an expired secure link gets, and the pipeline asks GOG for fresh links on it. Null for other failures. Pure.
+         */
+        internal fun linkRefusal(engineCode: Int?): Int? = when (engineCode) {
+            3 -> 404
+            22 -> 403
+            24 -> 401
+            else -> null
+        }
     }
 
     /**
@@ -806,12 +826,12 @@ internal class GOGDownloadManager(
         secureLinkContext: SecureLinkContext?,
         chunkToProductMap: Map<String, String>,
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        val scope = CoroutineScope(Dispatchers.IO)
         try {
-            val scope = CoroutineScope(Dispatchers.IO)
             val speedConfig = DownloadSpeedConfig()
             val parallelDownloads = speedConfig.maxDownloads
             val parallelAssemble = speedConfig.maxDecompress
-            val downloadHttpClient = StoreHttp.httpForParallelDownloads(parallelDownloads)
+            val areaPrefix = areaPrefix(chunkCacheDir)
 
             val currentChunkUrlCandidates = ConcurrentHashMap(chunkUrlCandidates)
             val totalChunks = chunkHashes.size
@@ -919,7 +939,7 @@ internal class GOGDownloadManager(
                                 val urls = currentChunkUrlCandidates[chunkMd5] ?: return@run Result.failure<File>(
                                     Exception("No URL candidates found for chunk $chunkMd5"),
                                 )
-                                downloadChunkWithRetry(chunkMd5, urls, chunkCacheDir, downloadInfo, downloadHttpClient)
+                                downloadChunkWithRetry(chunkMd5, urls, chunkCacheDir, downloadInfo, areaPrefix)
                             }
 
                             // Always emit result to assembleFlow for processing (success or failure)
@@ -1128,6 +1148,10 @@ internal class GOGDownloadManager(
         } catch (e: Exception) {
             Timber.tag("GOG").e(e, "Failed to download and assemble")
             Result.failure(e)
+        } finally {
+            // A pause cancels this call while it waits: the chunks still on the engine stop with it (their partial
+            // files stay for the next run), rather than running on in a scope nothing else ends.
+            scope.cancel()
         }
     }
 
@@ -1361,7 +1385,7 @@ internal class GOGDownloadManager(
         urlCandidates: List<String>,
         chunkCacheDir: File,
         downloadInfo: DownloadInfo,
-        httpClient: OkHttpClient,
+        areaPrefix: String,
     ): Result<File> = withContext(Dispatchers.IO) {
         if (urlCandidates.isEmpty()) {
             return@withContext Result.failure(Exception("No URL candidates for chunk $chunkMd5"))
@@ -1375,7 +1399,7 @@ internal class GOGDownloadManager(
             }
 
             val url = urlCandidates[attempt % urlCandidates.size]
-            val result = downloadChunk(chunkMd5, url, chunkCacheDir, downloadInfo, httpClient)
+            val result = downloadChunk(chunkMd5, url, chunkCacheDir, downloadInfo, areaPrefix)
 
             if (result.isSuccess) {
                 if (attempt > 0) {
@@ -1401,19 +1425,23 @@ internal class GOGDownloadManager(
     }
 
     /**
-     * Download a single chunk from GOG CDN
+     * One chunk on droidtop's download engine (docs/SPEC.md 12a, rollout step 4): fetched whole into the downloads area,
+     * checked against its compressed MD5 and moved into the chunk cache. Each of the pool's chunks is a transfer of its
+     * own, and the engine carries one on from its partial bytes. A refusal from the CDN comes back as the
+     * [HttpStatusException] the pipeline refreshes expired secure links on ([linkRefusal]).
      *
      * @param chunkMd5 Compressed MD5 hash (chunk identifier)
      * @param url Secure CDN URL (time-limited)
      * @param chunkCacheDir Cache directory
      * @param downloadInfo Progress tracker
+     * @param areaPrefix The start of this cache's downloads-area names ([areaPrefix])
      */
     private suspend fun downloadChunk(
         chunkMd5: String,
         url: String,
         chunkCacheDir: File,
         downloadInfo: DownloadInfo,
-        httpClient: OkHttpClient,
+        areaPrefix: String,
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
             if (!downloadInfo.isActive()) {
@@ -1421,7 +1449,6 @@ internal class GOGDownloadManager(
             }
 
             val chunkFile = File(chunkCacheDir, "$chunkMd5.chunk")
-            val tempChunkFile = File(chunkCacheDir, "$chunkMd5.chunk.part")
 
             // Skip if already downloaded and verified
             if (chunkFile.exists()) {
@@ -1435,81 +1462,40 @@ internal class GOGDownloadManager(
                 }
             }
 
-            // Download compressed chunk (redact query params to avoid token leakage in logs)
+            // Redact query params to avoid token leakage in logs
             val safeUrl = url.substringBefore('?')
             Timber.tag("GOG").v("Downloading chunk $chunkMd5 from: $safeUrl")
 
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "GOG Galaxy")
-                .build()
+            val areaName = areaPrefix + chunkMd5
+            val fetched = try {
+                // The job counts the chunk's bytes once it is whole, so one chunk's are never read as the job's.
+                DownloadJobs.fetchForJob(context, url, areaName, headers = mapOf("User-Agent" to USER_AGENT), tellJob = false)
+            } catch (e: DownloadJobs.EngineFailure) {
+                val status = linkRefusal(e.engineCode)
+                Timber.tag("GOG").e("Chunk $chunkMd5 failed from URL: $safeUrl: ${e.message}")
+                return@withContext Result.failure(
+                    if (status != null) HttpStatusException(status, "HTTP $status downloading chunk $chunkMd5") else e,
+                )
+            }
 
-            httpClient.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) {
-                    Timber.tag("GOG").e("HTTP ${response.code} for chunk $chunkMd5 from URL: $safeUrl")
-                    return@withContext Result.failure(
-                        HttpStatusException(response.code, "HTTP ${response.code} downloading chunk $chunkMd5")
-                    )
-                }
-
-                val responseBody = response.body
-                    ?: return@withContext Result.failure(Exception("Empty response for chunk $chunkMd5"))
-
-                val md = MessageDigest.getInstance("MD5")
-                val buffer = ByteArray(64 * 1024) // 64KB - reduced from 256KB to minimize memory pressure during parallel downloads
-                var lastProgressEmitAt = System.currentTimeMillis()
-
-                if (tempChunkFile.exists()) tempChunkFile.delete()
-
-                try {
-                    BufferedOutputStream(FileOutputStream(tempChunkFile)).use { output ->
-                        responseBody.byteStream().use { input ->
-                            var bytesRead: Int
-                            while (input.read(buffer).also { bytesRead = it } != -1) {
-                                if (!downloadInfo.isActive()) {
-                                    tempChunkFile.delete()
-                                    return@withContext Result.failure(Exception("Download cancelled"))
-                                }
-                                md.update(buffer, 0, bytesRead)
-                                output.write(buffer, 0, bytesRead)
-                                downloadInfo.updateBytesDownloaded(bytesRead.toLong())
-
-                                val now = System.currentTimeMillis()
-                                if (now - lastProgressEmitAt >= STREAM_PROGRESS_TIME_INTERVAL_MS) {
-                                    downloadInfo.emitProgressChange()
-                                    lastProgressEmitAt = now
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) {
-                    tempChunkFile.delete()
-                    return@withContext Result.failure(
-                        Exception("Failed while streaming chunk $chunkMd5: ${e.message}")
-                    )
-                }
-
-                // Verify compressed MD5
-                val actualMd5 = md.digest().joinToString("") { "%02x".format(it) }
+            try {
+                val actualMd5 = calculateMd5File(fetched)
                 if (actualMd5 != chunkMd5) {
-                    tempChunkFile.delete()
                     return@withContext Result.failure(
                         Exception("Compressed MD5 mismatch for chunk: expected $chunkMd5, got $actualMd5"),
                     )
                 }
-
-                // Ensure UI receives final progress update for this chunk.
+                downloadInfo.updateBytesDownloaded(fetched.length())
                 downloadInfo.emitProgressChange()
-
-                // Atomically replace destination with verified temp chunk
-                if (chunkFile.exists()) chunkFile.delete()
-                if (!tempChunkFile.renameTo(chunkFile)) {
-                    tempChunkFile.copyTo(chunkFile, overwrite = true)
-                    tempChunkFile.delete()
-                }
-
-                Result.success(chunkFile)
+                DownloadJobs.moveFile(fetched, chunkFile)
+            } finally {
+                // Moved, or spent: a bad copy is fetched again, not checked again.
+                DownloadJobs.discardForJob(context, areaName)
             }
+
+            Result.success(chunkFile)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Timber.tag("GOG").e(e, "Failed to download chunk $chunkMd5")
             Result.failure(e)

@@ -96,8 +96,8 @@ data class EngineProgress(val percent: Int, val line: String, val transfer: Tran
 /** The engine cannot be reached (its process ended, or it is not started): the transfer waits and asks again. */
 class EngineGoneException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
-/** A transfer that failed for good; [message] is a sentence a person reads. */
-class TransferException(message: String) : Exception(message)
+/** A transfer that failed for good; [message] is a sentence a person reads, [code] aria2's error when the engine gave one. */
+class TransferException(message: String, val code: Int? = null) : Exception(message)
 
 /**
  * One file to fetch: [url] with [headers] into [destination], whose folder is the engine's download folder. The engine
@@ -276,7 +276,7 @@ object EngineFetch {
             if (end.code == null) return
             val verdict = if (end.code == RETRY_NETWORK) EngineErrors.Verdict.Retry else EngineErrors.classify(end.code)
             when (verdict) {
-                is EngineErrors.Verdict.Fail -> throw TransferException(verdict.message)
+                is EngineErrors.Verdict.Fail -> throw TransferException(verdict.message, end.code)
                 EngineErrors.Verdict.Restart -> {
                     restart()
                     failures = 0

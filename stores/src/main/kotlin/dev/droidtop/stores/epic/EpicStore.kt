@@ -11,6 +11,7 @@ import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreUpdateCheck
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.data.EpicGame
 import dev.droidtop.stores.db.StoresDatabase
@@ -223,6 +224,8 @@ class EpicStore : StoreLibrary {
     private fun dropChunkCache(context: Context, installPath: String) {
         val chunks = EpicDownloadManager.chunkCacheDirFor(context, installPath)
         chunks.parentFile?.let { SafeDelete.deleteWithin(it, chunks) }
+        // And the chunks the download engine had begun in the downloads area, this install's only.
+        DownloadJobs.discardAllForJob(context, EpicDownloadManager.areaPrefix(installPath))
     }
 
     internal companion object {

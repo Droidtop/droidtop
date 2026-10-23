@@ -979,9 +979,15 @@ object DownloadJobs {
                 resolve = { u, h -> RedirectGuard.resolve(u, h, allow = allow) },
             )
         } catch (e: TransferException) {
-            throw IllegalStateException(e.message)
+            throw EngineFailure(e.code, e.message)
         }
     }
+
+    /**
+     * A download the engine could not finish: its sentence, as every failure here is, and aria2's error number when the
+     * engine gave one, for a store whose links expire to tell an expired link from a broken one ([fetchForJob]).
+     */
+    class EngineFailure(val engineCode: Int?, message: String?) : IllegalStateException(message)
 
     /**
      * One file for a job that is already running, a store's install (docs/SPEC.md 12a, rollout step 4): fetched on the
@@ -1014,6 +1020,12 @@ object DownloadJobs {
             file.delete()
             TransferRequest.controlFile(file).delete()
         }
+    }
+
+    /** [discardForJob] for every name in the downloads area that starts with [prefix]: one store install's partial files. */
+    fun discardAllForJob(context: Context, prefix: String) {
+        val names = runCatching { fileFor(context, "x").parentFile?.list() }.getOrNull() ?: return
+        names.filter { it.startsWith(prefix) && !it.endsWith(".aria2") }.forEach { discardForJob(context, it) }
     }
 
     /** The download engine for the downloads area [folder], started if it is not running; a start that fails is a sentence. */
