@@ -74,7 +74,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_home",
                     title = "Home screen",
-                    category = "Home & modes",
+                    category = "Modes",
                     items = listOf(
                         // STANDARD <-> NONE only: a person on ALTERNATIVE
                         // (another launcher droidtop forwards to) chose that
@@ -106,7 +106,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_modes",
                     title = "Modes",
-                    category = "Home & modes",
+                    category = "Modes",
                     items = listOf(
                         defaultModeItem(context),
                         modeToggle(context, Mode.DESKTOP),
@@ -149,7 +149,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_accessibility",
                     title = "Accessibility",
-                    category = "Appearance",
+                    category = "Accessibility",
                     items = listOf(
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_COLOR_VISION,
