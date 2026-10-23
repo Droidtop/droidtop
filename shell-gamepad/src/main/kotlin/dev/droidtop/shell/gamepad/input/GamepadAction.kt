@@ -20,8 +20,9 @@ import dev.droidtop.library.controller.FaceRole
  * - [L]/[R] previous/next tab of the nearest tab strip, else of the top
  *   bar (a keyboard's Page Up/Page Down and Shift+Tab/Tab);
  * - [R2] the Quick Menu (a held Select is the same press, for pads whose
- *   triggers send no key), [START] the left menu, [SELECT] options for
- *   where you are, [L2] a PC game's own menu;
+ *   triggers send no key), [START] the left menu, [SELECT] the options of the
+ *   list or screen you are on, [L2] the focused thing's own menu (a held Start is the
+ *   same press, as a held Select is R2's);
  * - [BACK] the system back key. It belongs to the back dispatcher
  *   (`BackHandler`), never to a key handler, so a long press of it still
  *   reaches the activity.

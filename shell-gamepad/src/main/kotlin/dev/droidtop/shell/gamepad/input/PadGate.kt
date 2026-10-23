@@ -65,11 +65,14 @@ internal data class PadSyntheticKey(
  * - **Analog triggers are buttons.** Some pads report L2/R2 only as an
  *   axis; past the same threshold they press `BUTTON_L2`/`BUTTON_R2`, unless
  *   the device sends the key itself.
- * - **Holding Select is R2.** The shell's fallback route to the Quick Menu
- *   for a pad whose triggers send nothing at all. Select is held back until
- *   it is either released (a tap: one Select press is delivered) or held
- *   for the long-press timeout (one R2 press is delivered, and the release
- *   is dropped). No screen ever sees half of a hold.
+ * - **Holding Select is R2, holding Start is L2.** The shell's fallback
+ *   routes to the Quick Menu (R2, the global menu) and the focused thing's
+ *   menu (L2, the local one) for a pad whose triggers send nothing at all
+ *   (owner, 2026-10-23, Droidtop/tracker#621). The button is held back until
+ *   it is either released (a tap: one press of the button itself is
+ *   delivered) or held for the long-press timeout (one trigger press is
+ *   delivered, and the release is dropped). No screen ever sees half of a
+ *   hold.
  */
 internal class PadGateCore(
     private val scheduler: PadScheduler,
@@ -95,9 +98,17 @@ internal class PadGateCore(
     private val leftTrigger = Axis(0, KeyEvent.KEYCODE_BUTTON_L2)
     private val rightTrigger = Axis(0, KeyEvent.KEYCODE_BUTTON_R2)
 
-    private var selectDown = false
-    private var selectHoldFired = false
-    private var cancelSelectHold: (() -> Unit)? = null
+    /** A button whose hold is a trigger press: [key] tapped, [held] once held for the long-press timeout. */
+    private class Hold(val key: Int, val held: Int) {
+        var down = false
+        var fired = false
+        var cancel: (() -> Unit)? = null
+    }
+
+    private val holds = listOf(
+        Hold(KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BUTTON_R2),
+        Hold(KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_L2),
+    )
 
     /**
      * A key event from the device. Returns true to deliver it unchanged,
@@ -118,7 +129,7 @@ internal class PadGateCore(
         }
         if (!down) lastUp[keyCode] = now
         if (deviceId > 0 && !fallback && keyCode in TRANSLATED_KEYS) realKeys += pair(deviceId, keyCode)
-        if (keyCode == KeyEvent.KEYCODE_BUTTON_SELECT) return select(down, repeatCount, now)
+        holds.firstOrNull { it.key == keyCode }?.let { return hold(it, down, repeatCount, now) }
         return true
     }
 
@@ -150,9 +161,11 @@ internal class PadGateCore(
             axis.cancelRepeat = null
             axis.key = null
         }
-        cancelSelectHold?.invoke()
-        cancelSelectHold = null
-        selectDown = false
+        for (hold in holds) {
+            hold.cancel?.invoke()
+            hold.cancel = null
+            hold.down = false
+        }
     }
 
     private fun update(axis: Axis, deviceId: Int, value: Float, now: Long, repeats: Boolean) {
@@ -192,26 +205,26 @@ internal class PadGateCore(
         }
     }
 
-    private fun select(down: Boolean, repeatCount: Int, now: Long): Boolean {
+    private fun hold(hold: Hold, down: Boolean, repeatCount: Int, now: Long): Boolean {
         if (down && repeatCount == 0) {
-            selectDown = true
-            selectHoldFired = false
-            cancelSelectHold?.invoke()
-            cancelSelectHold = scheduler.after(longPressMs) {
-                cancelSelectHold = null
-                selectHoldFired = true
-                press(KeyEvent.KEYCODE_BUTTON_R2, scheduler.now())
+            hold.down = true
+            hold.fired = false
+            hold.cancel?.invoke()
+            hold.cancel = scheduler.after(longPressMs) {
+                hold.cancel = null
+                hold.fired = true
+                press(hold.held, scheduler.now())
             }
             return false
         }
         // A release (or a repeat) of a press that began before this window
         // was listening is not ours to reinterpret.
-        if (!selectDown) return true
+        if (!hold.down) return true
         if (down) return false
-        selectDown = false
-        cancelSelectHold?.invoke()
-        cancelSelectHold = null
-        if (!selectHoldFired) press(KeyEvent.KEYCODE_BUTTON_SELECT, now)
+        hold.down = false
+        hold.cancel?.invoke()
+        hold.cancel = null
+        if (!hold.fired) press(hold.key, now)
         return false
     }
 

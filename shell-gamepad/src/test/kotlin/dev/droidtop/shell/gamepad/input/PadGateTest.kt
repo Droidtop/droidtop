@@ -10,7 +10,7 @@ import org.junit.Test
 /**
  * The front of the input pipeline (docs/SPEC.md 6e): bounce, the stick and
  * hat as a held D-pad key with its deadzone, analog triggers, and a held
- * Select. Driven with a fake clock and scheduler, no device.
+ * Select or Start. Driven with a fake clock and scheduler, no device.
  */
 class PadGateTest {
 
@@ -196,6 +196,52 @@ class PadGateTest {
     fun `a Select release whose press this window never saw is passed on untouched`() {
         assertTrue(select(down = false, at = 10))
         assertTrue(emitted.isEmpty())
+    }
+
+    // ---- Start: the same rule, held to L2 (Droidtop/tracker#621) ----
+
+    private fun start(down: Boolean, repeat: Int = 0, at: Long) =
+        gate.onKey(KeyEvent.KEYCODE_BUTTON_START, down, repeat, pad, fallback = false, now = at)
+
+    @Test
+    fun `a tapped Start reaches the screen as one press, on release`() {
+        assertFalse(start(down = true, at = 0))
+        scheduler.advanceTo(120)
+        assertFalse(start(down = false, at = 120))
+        assertEquals(
+            listOf(KeyEvent.KEYCODE_BUTTON_START to true, KeyEvent.KEYCODE_BUTTON_START to false),
+            emitted.map { it.keyCode to it.down },
+        )
+    }
+
+    @Test
+    fun `a held Start is one L2 press, and nothing of the Start itself gets through`() {
+        assertFalse(start(down = true, at = 0))
+        scheduler.advanceTo(450)
+        assertFalse(start(down = true, repeat = 1, at = 450))
+        scheduler.advanceTo(600)
+        assertFalse(start(down = false, at = 900))
+        assertEquals(
+            listOf(KeyEvent.KEYCODE_BUTTON_L2 to true, KeyEvent.KEYCODE_BUTTON_L2 to false),
+            emitted.map { it.keyCode to it.down },
+        )
+    }
+
+    @Test
+    fun `Select and Start held together are each their own trigger`() {
+        assertFalse(select(down = true, at = 0))
+        assertFalse(start(down = true, at = 100))
+        scheduler.advanceTo(550)
+        assertFalse(select(down = false, at = 560))
+        scheduler.advanceTo(650)
+        assertFalse(start(down = false, at = 660))
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_BUTTON_R2 to true, KeyEvent.KEYCODE_BUTTON_R2 to false,
+                KeyEvent.KEYCODE_BUTTON_L2 to true, KeyEvent.KEYCODE_BUTTON_L2 to false,
+            ),
+            emitted.map { it.keyCode to it.down },
+        )
     }
 
     // ---- the axis rule itself (ported from the stick translator it replaces) ----
