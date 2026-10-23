@@ -161,6 +161,9 @@ internal fun PcGameMenu(
     var renaming by remember(entry) { mutableStateOf(false) }
     var progressToken by remember(entry) { mutableStateOf(0) }
     var editingSource by remember(entry) { mutableStateOf<UpdateSources.Source?>(null) }
+    // A linked source's row opens its record (at Downloads while an update waits); linking is only for a source not
+    // linked yet, or the record's own Change link (Droidtop/tracker#619).
+    var viewingRecord by remember(entry) { mutableStateOf<Triple<UpdateSources.Source, String, RecordTab>?>(null) }
     var pickingEngine by remember(entry) { mutableStateOf(openEnginePicker) }
     var engineChoice by remember(entry) { mutableStateOf(EngineChoice.NONE) }
     var importingLutris by remember(entry) { mutableStateOf(false) }
@@ -485,6 +488,32 @@ internal fun PcGameMenu(
             onClose = { editingSource = null },
         )
     }
+    val viewing = viewingRecord
+    if (viewing != null) {
+        SourceRecordPage(
+            library = library,
+            source = viewing.first,
+            externalId = viewing.second,
+            gameName = gameName,
+            newest = entry,
+            scope = scope,
+            say = { line -> status = line },
+            onRelink = {
+                viewingRecord = null
+                editingSource = viewing.first
+            },
+            onOpen = { url ->
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            },
+            onClose = { viewingRecord = null },
+            startTab = viewing.third,
+        )
+    }
 
     // The replacement row is only worth drawing when there is somebody to offer.
     val replacements = names.replacements
@@ -677,7 +706,17 @@ internal fun PcGameMenu(
             updateSources.flatMap { source ->
                 val link = links?.link(source.key)
                 listOfNotNull(
-                    PcActionRow(source.label, sourceLine(link, available, versions), { editingSource = source }),
+                    PcActionRow(
+                        source.label,
+                        sourceLine(link, available, versions),
+                        {
+                            if (link != null) {
+                                viewingRecord = Triple(source, link.externalId, if (available != null) RecordTab.DOWNLOADS else RecordTab.OVERVIEW)
+                            } else {
+                                editingSource = source
+                            }
+                        },
+                    ),
                     link?.let {
                         PcActionRow(
                             if (updateSources.size > 1) "Check ${source.label} now" else "Check for an update now",

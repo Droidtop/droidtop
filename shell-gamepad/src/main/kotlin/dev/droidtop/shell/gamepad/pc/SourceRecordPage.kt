@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -160,8 +159,6 @@ internal fun SourceRecordPage(
         value = library.savedSourceRecord(source.key, externalId)
         value = library.sourceRecord(source.key, externalId)
     }
-    // A source with no `record` keeps the sheet it had (docs/plugin-api.md 3 A6).
-    LaunchedEffect(answer) { if (answer?.unsupported == true) onRelink() }
     var tab by remember(source.key, externalId) { mutableStateOf(startTab) }
     var focusIndex by remember(source.key, externalId, tab) { mutableIntStateOf(0) }
     var armed by remember(source.key, externalId, tab) { mutableStateOf<Int?>(null) }
@@ -171,7 +168,11 @@ internal fun SourceRecordPage(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences(RECORD_PREFS, Context.MODE_PRIVATE) }
     var picked by remember(source.key, externalId) { mutableStateOf(prefs.getString(SYSTEM_KEY_PREFIX + source.key, null)) }
-    val rows = remember(record, tab, picked) { record?.let { recordRows(it, tab, picked) { ms -> dateFormat.format(Date(ms)) } }.orEmpty() }
+    // With no page to show, the one thing to do is Change link: the page never relinks by itself (Droidtop/tracker#619).
+    val rows = remember(record, tab, picked, answer) {
+        record?.let { recordRows(it, tab, picked) { ms -> dateFormat.format(Date(ms)) } }
+            ?: if (answer != null) listOf(RecordRow("Change link", "#$externalId", action = RecordAction.Relink)) else emptyList()
+    }
 
     fun pickSystem(step: Int) {
         val r = record ?: return
@@ -265,7 +266,25 @@ internal fun SourceRecordPage(
             )
             when {
                 answer == null -> MenuRow(title = "Asking ${source.label}...")
-                record == null -> MenuRow(title = "${source.label} has no page for #$externalId", subtitle = answer?.failure)
+                record == null -> {
+                    MenuRow(
+                        title = if (answer?.unsupported == true) "${source.label} has no update page" else "${source.label} has no page for #$externalId",
+                        subtitle = answer?.failure,
+                    )
+                    rows.forEachIndexed { index, row ->
+                        MenuRow(
+                            title = row.title,
+                            value = row.value,
+                            subtitle = row.subtitle,
+                            selected = index == focusIndex,
+                            chevron = row.action != null,
+                            onClick = {
+                                focusIndex = index
+                                act(index)
+                            },
+                        )
+                    }
+                }
                 else -> {
                     // A saved copy says so: its links are the ones droidtop kept, and the source may have newer ones.
                     answer?.savedAtMs?.let { saved ->

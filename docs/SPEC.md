@@ -12302,8 +12302,15 @@ reimplemented it as my own f95seeker code." So:
 - **Where it opens:** tapping an update wherever it shows (the game page's
   update line, the Update available shelf, a row of Settings > Updates, which
   opened the game page before) opens the record of the source that named the
-  update; a linked source's row on the game page opens it too. With one source
-  linked there is no choice; with several, the one that named the update.
+  update; a linked source's row on the game page, and in the game's L2 menu,
+  opens it too (at Downloads while an update waits). With one source linked
+  there is no choice; with several, the one that named the update. **Linking
+  is only ever asked for (2026-10-23, Droidtop/tracker#619):** the owner: "the
+  L2 menu for Bare Witness displays the update is available, but clicking
+  through just relinks the game". The link sheet opens for a source not yet
+  linked, or from the record's own Change link; a source with no update page
+  says so on the record page, with Change link under it, and never relinks
+  by itself.
 - **Links are kept and opened, never fetched again (2026-10-22, Droidtop/tracker#599).** The owner: "We shouldn't be
   fetching links again ... we should cache links as well, and then use the webview to open them. The user can start
   the download, and it'll be kicked over automatically." droidtop saves each record the source gives
