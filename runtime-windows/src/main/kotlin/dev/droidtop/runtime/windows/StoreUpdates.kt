@@ -2,7 +2,7 @@ package dev.droidtop.runtime.windows
 
 import android.content.Context
 import android.util.Log
-import dev.droidtop.library.StoreDownloads
+import dev.droidtop.library.stores.StoreInstallJob
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.stores.StoreLibraries
 import java.io.File
@@ -160,8 +160,8 @@ internal object StoreUpdates {
 /**
  * Asks [StoreUpdates] again about a game whose download just ended, so an
  * update that finished stops being offered (docs/SPEC.md 7i). It follows
- * [StoreDownloads], which the store install jobs publish (docs/SPEC.md 7g,
- * "Stores"): a key that leaves it is a download that ended. Memory only; the
+ * the store install jobs ([StoreInstallJob.live], docs/SPEC.md 7g, "Stores"):
+ * a key whose job stops running is a download that ended. Memory only; the
  * answer is asked off the main thread.
  */
 internal object StoreDownloadWatch {
@@ -172,9 +172,10 @@ internal object StoreDownloadWatch {
         val app = context.applicationContext
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             var before = emptySet<String>()
-            StoreDownloads.active.collect { now ->
-                (before - now.keys).forEach { id -> StoreUpdates.recheck(app, id) }
-                before = now.keys
+            StoreInstallJob.live.collect { now ->
+                val running = now.filterValues { !it.done }.keys
+                (before - running).forEach { id -> StoreUpdates.recheck(app, id) }
+                before = running
             }
         }
     }
