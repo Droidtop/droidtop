@@ -1,6 +1,7 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
+import android.util.Log
 import dev.droidtop.pluginhost.ContextActionFilter
 import dev.droidtop.pluginhost.ContextTarget
 import dev.droidtop.pluginhost.ExtensionPoints
@@ -490,6 +491,17 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         return dev.droidtop.library.UpdateSources.RecordAnswer(parsed, savedAtMs = saved.savedAtMs)
     }
 
+    override fun signedOut(source: String): Boolean {
+        val (record, _) = providers().firstOrNull { (_, e) -> e.id == source } ?: return false
+        val account = dev.droidtop.pluginhost.PluginWebAccount.of(app, record) ?: return false
+        return account.allowed && !account.signedIn
+    }
+
+    override fun signIn(source: String): Boolean {
+        val (record, _) = providers().firstOrNull { (_, e) -> e.id == source } ?: return false
+        return dev.droidtop.pluginhost.PluginWebAccount.open(app, record, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN)
+    }
+
     override suspend fun record(source: String, externalId: String): dev.droidtop.library.UpdateSources.RecordAnswer {
         // A source on facets that declares the item page is asked for it (docs/plugin-api.md 1.10); any other for its record.
         val onFacets = providers().firstOrNull { (_, entry) -> entry.id == source }?.first?.let { PluginFacets.declares(it, PluginFacets.ITEM_PAGE) } == true
@@ -501,6 +513,7 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         }
         if (reply == null || !reply.ok) {
             val failure = reply?.message ?: if (reply == null) "The source $source is not installed or not running" else "The source did not answer"
+            Log.w(TAG, "record $source/$externalId: ${reply?.code ?: "no reply"}: $failure")
             // A source that cannot answer now: droidtop's saved copy, which says when it was saved.
             savedRecord(source, externalId)?.let { return it.copy(failure = failure) }
             return dev.droidtop.library.UpdateSources.RecordAnswer(null, failure, unsupported = reply?.code == dev.droidtop.pluginhost.PluginErrorCode.UNSUPPORTED)
@@ -547,10 +560,14 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
             onStatus("That link started nothing. Pick the download again on ${label}'s page")
             captured = dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(app, record, fallbackUrl, dev.droidtop.pluginhost.DownloadJobs.MAX_FILES)
         }
-        if (captured.isEmpty()) return "Nothing was downloaded from that page"
+        if (captured.isEmpty()) {
+            Log.w(TAG, "update $source/$externalId: the web view started no download from ${dev.droidtop.pluginhost.NetScope.hostOf(url)}")
+            return "Nothing was downloaded from that page"
+        }
         val descriptors = UpdateLinks.descriptorsFor(captured)
         val title = "Download $name"
         val done = AcquireDownload.run(app, record, title, JSONObject(), emptyMap(), descriptors, onStatus, update = placement)
+        if (!done.ok) Log.w(TAG, "update $source/$externalId: the download from the web view failed: ${done.error}")
         return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
     }
 
@@ -586,9 +603,16 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val args = JSONObject().put("source", source).put("id", externalId).put("link", link).apply { version?.let { put("version", it) } }
         val title = "Download $name"
         val result = PluginViews.runJob(app, record, POINT, "download", args, title, onStatus)
-        if (!result.ok) return "${record.manifest.label}: ${result.error ?: "the download did not start"}"
-        val descriptors = dev.droidtop.pluginhost.AcquireDownloads.parse(result.values) ?: return "$label named no file to download"
+        if (!result.ok) {
+            Log.w(TAG, "update $source/$externalId: the source's download job for $link failed: ${result.error}")
+            return "${record.manifest.label}: ${result.error ?: "the download did not start"}"
+        }
+        val descriptors = dev.droidtop.pluginhost.AcquireDownloads.parse(result.values) ?: run {
+            Log.w(TAG, "update $source/$externalId: the source's download job for $link named no file")
+            return "$label named no file to download"
+        }
         val done = AcquireDownload.run(app, record, title, JSONObject(), result.values, descriptors, onStatus, update = placement)
+        if (!done.ok) Log.w(TAG, "update $source/$externalId: the download for $link failed: ${done.error}")
         return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
     }
 
@@ -608,6 +632,9 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
 
     companion object {
         const val POINT = "library.updates"
+
+        /** Where a failed record or update download says why, so a console without a screen to read still tells it. */
+        private const val TAG = "droidtop.Updates"
 
         /** A round's `check`: the source paces its own requests, so it gets longer than a quick call; a miss is not a crash. */
         const val CHECK_BUDGET_MS = 120_000L

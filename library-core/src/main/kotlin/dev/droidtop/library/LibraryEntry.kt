@@ -1422,8 +1422,24 @@ class Library(
         pickedFrom: List<UpdateSources.Download>,
     ): UpdateSources.Download? = withContext(Dispatchers.IO) {
         val answer = runCatching { updateSources.record(source, externalId) }.getOrNull()
-        val fresh = answer?.takeIf { it.failure == null }?.record ?: return@withContext null
-        RecordMirrors.sameIn(picked, pickedFrom, fresh.downloads)
+        val fresh = answer?.takeIf { it.failure == null }?.record ?: run {
+            android.util.Log.w("droidtop.Updates", "update $source/$externalId: no fresh record for ${picked.host}: ${answer?.failure ?: "no answer"}")
+            return@withContext null
+        }
+        RecordMirrors.sameIn(picked, pickedFrom, fresh.downloads).also { found ->
+            if (found == null) android.util.Log.w("droidtop.Updates", "update $source/$externalId: the fresh record no longer lists ${picked.section} ${picked.host}")
+            else if (found.url == null) android.util.Log.w("droidtop.Updates", "update $source/$externalId: ${picked.host} has no address in the fresh record either")
+        }
+    }
+
+    /** Whether [source] wants the person signed in to its site and no one is: its records then carry no download addresses. */
+    suspend fun sourceSignedOut(source: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching { updateSources.signedOut(source) }.getOrDefault(false)
+    }
+
+    /** Opens [source]'s sign-in in droidtop's web view; true when the person signed in. Blocks until the view closes. */
+    suspend fun signInToSource(source: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching { updateSources.signIn(source) }.getOrDefault(false)
     }
 
     /** droidtop's saved copy of [source]'s record [externalId], for the record page to show at once; null when there is none. */

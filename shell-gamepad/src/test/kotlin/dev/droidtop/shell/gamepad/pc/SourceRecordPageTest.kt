@@ -100,4 +100,14 @@ class SourceRecordPageTest {
         val one = GameLinks(sources = listOf(SourceLink("forum", "18978", SourceAnswer("Episode 3", 0L))))
         assertEquals(forum to "18978", updateSourceOf(listOf(forum, feed), one, "v0.37.dv"))
     }
+
+    @Test
+    fun `signed out with links that have no address, Downloads starts with the source's sign-in`() {
+        // Droidtop/tracker#599: F95zone gives download links to members only; "no link now" was all a guest got.
+        val row = signInRow("F95zone", record, signedOut = true)
+        assertEquals(RecordRow("Sign in to F95zone", subtitle = "to get download links", action = RecordAction.SignIn), row)
+        assertNull("signed in, no row", signInRow("F95zone", record, signedOut = false))
+        val addressed = record.copy(downloads = record.downloads.map { it.copy(url = "https://pixeldrain.com/u/a") })
+        assertNull("every link has its address: nothing to sign in for", signInRow("F95zone", addressed, signedOut = true))
+    }
 }
