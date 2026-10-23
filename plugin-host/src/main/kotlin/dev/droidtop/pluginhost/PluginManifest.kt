@@ -14,6 +14,14 @@ import org.json.JSONObject
  */
 const val PLUGIN_CONTRACT_VERSION = 2
 
+/**
+ * The newest manifest contract this build installs (docs/plugin-api.md 7, "Contract 3"). 3 says the plugin needs facets
+ * (1.10): a droidtop without them refuses it rather than install a plugin whose settings or panel it cannot draw. The
+ * call envelope is unchanged by 3, so calls still carry [PLUGIN_CONTRACT_VERSION] and a plugin written for 2 answers
+ * them as before.
+ */
+const val PLUGIN_MANIFEST_CONTRACT_VERSION = 3
+
 /** One payload file's declared hash (trust-boundary checklist point 1: every file, always, no "no hash recorded" skip). */
 data class PluginPayloadFile(val path: String, val sha256: String)
 
@@ -215,8 +223,8 @@ data class PluginManifest(
      * with no `.so` payload has nothing to check per ABI.
      */
     fun structuralProblems(): List<String> = buildList {
-        if (contractVersion > PLUGIN_CONTRACT_VERSION) {
-            add("contractVersion $contractVersion is newer than this build of droidtop understands ($PLUGIN_CONTRACT_VERSION)")
+        if (contractVersion > PLUGIN_MANIFEST_CONTRACT_VERSION) {
+            add("contractVersion $contractVersion is newer than this build of droidtop understands ($PLUGIN_MANIFEST_CONTRACT_VERSION)")
         }
         if (kind == PluginKind.NATIVE_BUNDLE && entryClass == null) {
             add("a native_bundle plugin must declare entryClass")

@@ -74,8 +74,15 @@ class PluginManifestTest {
 
     @Test
     fun `flags a contract version newer than this build understands`() {
-        val manifest = PluginManifest.fromJson(manifestJson(contractVersion = PLUGIN_CONTRACT_VERSION + 1))!!
+        val manifest = PluginManifest.fromJson(manifestJson(contractVersion = PLUGIN_MANIFEST_CONTRACT_VERSION + 1))!!
         assertTrue(manifest.structuralProblems().any { it.contains("contractVersion") })
+    }
+
+    @Test
+    fun `a contract 3 manifest, one that needs facets, installs while calls stay contract 2`() {
+        val manifest = PluginManifest.fromJson(manifestJson(contractVersion = 3))!!
+        assertTrue(manifest.structuralProblems().none { it.contains("contractVersion") })
+        assertEquals(2, PLUGIN_CONTRACT_VERSION)
     }
 
     @Test
