@@ -23366,9 +23366,21 @@ without its runtime said "Running". Decisions:
   supposed to be transparently exposed in the search". So the one search lists what is here first (the device's games
   and apps, and a game the library has that a source also offers, merged as before), then the games found only on the
   download sources and the sites to search on, under the heading **Get new games** (`SearchRow.isNew`). Updates has a
-  **Get new games** row (`GetGamesEntry.UPDATES_ROW_ID`), beside Get apps, that opens the same search over every
-  source, empty and ready for typing (`GamingSection.NEW_GAMES`); Back returns to Updates, and the left menu marks
-  Updates meanwhile. It is not a row of the left menu (owner, the same day: "THe "get new games" menu needs to be
+  **Get new games** row (`GetGamesEntry.UPDATES_ROW_ID`), beside Get apps, that opens the Get new games page
+  (`GamingSection.NEW_GAMES`, `GetNewGamesPage`); Back returns to Updates, and the left menu marks Updates meanwhile.
+  **The page opens on a list, never on a blank search bar** (owner, 2026-10-23, Droidtop/tracker#612: "The 'get new
+  games' page should NOT open to a blank search bar. It should open to a recommendations list, with the ability to
+  search at the top"). Everything on it comes from the library and the person's sources (`NewGames`):
+  - **Search for a game** first, a row like the rest: picking it opens the one search, typing at once.
+  - **New versions of your games**: the games a source names a newer version of; each opens Updates, where updates
+    live.
+  - **More from <series or developer>, because you played <game>**: for the three most played games, their series
+    (else their developer) asked of every source, the games the library already has left out, six at most each.
+    Picking one opens the search on its title, where getting it works as it always does.
+  - With **no source**, it says so and offers Plugins, where sources are added; with sources that found nothing, it
+    says that and points at the search. The Search row shows at once; the rest joins as the sources answer.
+  - The sources have no list of new or popular games of their own. An optional `featured {platform, limit}` source
+    call is the plugin lane's to add (coordinator, #612), and its rows join this page. It is not a row of the left menu (owner, the same day: "THe "get new games" menu needs to be
   UNDER Updates. The left menu is growing really large, we need to review that"; the review is #621). Kid and Kiosk
   hide it with Updates. Outside Gaming the row opens Gaming on the search, the only place it is drawn, and is left
   out when Gaming is switched off. The "Get games" rows of the game menu,

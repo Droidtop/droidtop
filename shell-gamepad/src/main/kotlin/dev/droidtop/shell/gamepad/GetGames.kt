@@ -78,9 +78,18 @@ internal fun GetGamesChip(
  * no device rows of its own: the place it was opened from already lists what is here.
  */
 @Composable
-internal fun GetGamesSearch(systemId: String? = null, systemFolder: java.io.File? = null, pc: Boolean = false, onDismiss: () -> Unit) {
+internal fun GetGamesSearch(
+    systemId: String? = null,
+    systemFolder: java.io.File? = null,
+    pc: Boolean = false,
+    // What the search starts with (a title picked on Get new games), and whether the person chose to type.
+    text: String = "",
+    startTyping: Boolean = false,
+    onDismiss: () -> Unit,
+) {
     dev.droidtop.shell.gamepad.query.LibrarySearchDialog(
-        query = dev.droidtop.shell.gamepad.query.LibraryQuery(),
+        query = dev.droidtop.shell.gamepad.query.LibraryQuery(text = text),
+        startTyping = startTyping,
         matchCount = 0,
         totalCount = 0,
         onTextChange = {},
