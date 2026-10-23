@@ -592,8 +592,11 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         if (java.io.File(games, name).exists()) return Result.failure(IllegalStateException("$name is already in ${games.name}"))
         val engine = dev.droidtop.library.GameEngine.entries.firstOrNull { it.toLibraryEntryKind() == newest.kind }
         val beside = engine?.let { dev.droidtop.library.EnginesDatabase.defFor(app, it)?.saves?.beside }.orEmpty()
-        val placement = mapOf("destinationPath" to games.absolutePath, dev.droidtop.pluginhost.DownloadJobs.ARG_VERSION_FOLDER to name) +
-            UpdatePlacement.savesArgs(folder, beside)
+        val placement = mapOf(
+            "destinationPath" to games.absolutePath,
+            dev.droidtop.pluginhost.DownloadJobs.ARG_VERSION_FOLDER to name,
+            UpdatePlacement.ARG_PREVIOUS to folder.absolutePath,
+        ) + UpdatePlacement.savesArgs(folder, beside)
         return Result.success(placement to name)
     }
 

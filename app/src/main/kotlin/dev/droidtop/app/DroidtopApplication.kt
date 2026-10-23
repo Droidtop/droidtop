@@ -118,10 +118,14 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         )
         // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
         // engine before the library indexes it, and an update's saves are copied into its new version folder
-        // (docs/SPEC.md 7g, "Getting an update").
+        // (docs/SPEC.md 7g, "Getting an update"), with the version it follows offered for removal.
         dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->
             dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
-            dev.droidtop.library.integrations.UpdatePlacement.copySaves(placed, args)
+            listOfNotNull(
+                dev.droidtop.library.integrations.UpdatePlacement.copySaves(placed, args),
+                // The version it follows, offered for removal (Droidtop/tracker#624).
+                dev.droidtop.library.integrations.UpdatePlacement.removalOffer(args),
+            ).joinToString(". ").ifEmpty { null }
         }
         // `social.changed` (docs/plugin-api.md 3 C19): a social provider plugin says something changed, and the
         // social hub asks it again off the binder thread (SPEC "Social").
