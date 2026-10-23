@@ -20,8 +20,16 @@ import kotlinx.coroutines.launch
  * itself; a web link still reaches the browser.
  */
 class LinkActivity : ComponentActivity() {
+    private companion object {
+        val SWARM_TYPES = setOf("application/x-bittorrent", "application/metalink4+xml", "application/metalink+xml")
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        fileOf(intent)?.let { file ->
+            offerFile(file)
+            return
+        }
         val link = linkOf(intent)
         if (link == null) {
             dev.droidtop.library.settings.Notices.flash("That isn't a link droidtop can open", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = this)
@@ -44,6 +52,49 @@ class LinkActivity : ComponentActivity() {
                 }
                 is LinkRouter.Result.Message -> dev.droidtop.library.settings.Notices.flash(result.text, context = context)
                 is LinkRouter.Result.Browser -> toBrowser(result.link)
+            }
+            finish()
+        }
+    }
+
+    /**
+     * A .torrent or Metalink file opened with or shared to droidtop (its type says so, or its name ends that way), as
+     * its address; null for anything else.
+     */
+    private fun fileOf(intent: Intent?): Uri? {
+        intent ?: return null
+        @Suppress("DEPRECATION")
+        val uri = (if (intent.action == Intent.ACTION_SEND) intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri else intent.data) ?: return null
+        if (uri.scheme != "content" && uri.scheme != "file") return null
+        val type = intent.type ?: runCatching { contentResolver.getType(uri) }.getOrNull()
+        val name = uri.lastPathSegment.orEmpty().lowercase()
+        val swarm = type in SWARM_TYPES || listOf(".torrent", ".meta4", ".metalink").any { name.endsWith(it) }
+        return uri.takeIf { swarm }
+    }
+
+    /** Offers a received file in Downloads > Add download, which asks where it goes; nothing downloads before that. */
+    private fun offerFile(uri: Uri) {
+        val context = applicationContext
+        if (UiModePrefs.get(this).hidesSettings) {
+            dev.droidtop.library.settings.Notices.flash("Downloads cannot be added in this UI mode", context = context)
+            finish()
+            return
+        }
+        lifecycleScope.launch {
+            val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                dev.droidtop.library.integrations.ManualDownloads.readSmallFile(context, uri)
+            }
+            val name = uri.lastPathSegment?.substringAfterLast('/') ?: "Download"
+            // Null when it was offered; otherwise why it was not.
+            val why = if (bytes == null) {
+                "That file could not be read, or is larger than a torrent can be"
+            } else {
+                dev.droidtop.library.integrations.ManualDownloads.offerFile(name, bytes)
+            }
+            if (why == null) {
+                startActivity(CatalogScreenLink.intent(context, dev.droidtop.library.integrations.ManualDownloads.SCREEN_ID))
+            } else {
+                dev.droidtop.library.settings.Notices.flash(why, tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
             }
             finish()
         }
