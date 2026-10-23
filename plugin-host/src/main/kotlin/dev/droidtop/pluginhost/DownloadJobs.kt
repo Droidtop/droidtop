@@ -99,6 +99,16 @@ object DownloadJobs {
     const val SWARM_MAGNET = "magnet"
     const val SWARM_TORRENT = "torrent"
 
+    /** A Metalink (`.meta4`/`.metalink`) given as data, for a download the person added (it is not in the plugin contract). */
+    const val SWARM_METALINK = "metalink"
+
+    /**
+     * Places a download in `destinationPath` under `targetName` ("Name (2)" beside one of that name), a file or a folder,
+     * without telling the library: a download the person added, saved to a folder of theirs that is not a games folder.
+     * Open goes to what it placed.
+     */
+    const val POST_SAVE = "save"
+
     /** The largest `.torrent` droidtop takes, given or fetched. */
     const val TORRENT_MAX_BYTES = 4L * 1024 * 1024
 
@@ -186,6 +196,13 @@ object DownloadJobs {
                     }
             }
             summary
+        }
+        registerPost(POST_SAVE) { _, file, args ->
+            withContext(Dispatchers.IO) {
+                val target = if (file.isDirectory) placeFolder(file, args) else placeInFolder(file, args)
+                JobHandle.current()?.open(if (target.isDirectory) OpenTarget.Folder(target.absolutePath) else OpenTarget.File(target.absolutePath))
+                "Saved ${target.name} in ${target.parentFile?.name ?: target.parent}"
+            }
         }
         registerPost(POST_MOVE_TO) { jobContext, file, args ->
             withContext(Dispatchers.IO) {
@@ -291,6 +308,13 @@ object DownloadJobs {
      * Whether [bytes] can be a `.torrent`: within [TORRENT_MAX_BYTES], a bencoded dictionary with an `info` dictionary.
      * A check of its shape only; the engine reads the rest.
      */
+    /** Whether [bytes] can be a Metalink: within [TORRENT_MAX_BYTES], XML naming the Metalink namespace near its start. */
+    fun looksLikeMetalink(bytes: ByteArray): Boolean {
+        if (bytes.isEmpty() || bytes.size > TORRENT_MAX_BYTES) return false
+        val head = String(bytes, 0, minOf(bytes.size, 4096), Charsets.UTF_8).trimStart('\uFEFF', ' ', '\n', '\r', '\t')
+        return head.startsWith("<") && head.contains("metalink", ignoreCase = true)
+    }
+
     fun looksLikeTorrent(bytes: ByteArray): Boolean =
         bytes.size in 1..TORRENT_MAX_BYTES && bytes[0] == 'd'.code.toByte() && String(bytes, Charsets.ISO_8859_1).contains("4:infod")
 
@@ -498,14 +522,16 @@ object DownloadJobs {
         allowSites: List<String>? = null,
         /** [SWARM_MAGNET] or [SWARM_TORRENT] for a download of a whole folder ([ARG_SWARM]); [url] is then the magnet, or the `.torrent`'s address. */
         swarm: String? = null,
-        /** The `.torrent` itself, for [SWARM_TORRENT] with no [url]. */
+        /** The `.torrent` itself for [SWARM_TORRENT] with no [url], or the Metalink itself for [SWARM_METALINK]. */
         torrent: ByteArray? = null,
     ): PluginResult {
         require(more.size < MAX_FILES) { "a download has at most $MAX_FILES files" }
         require(swarm == null || more.isEmpty()) { "a torrent is one download of its own" }
         torrent?.let { bytes ->
-            require(swarm == SWARM_TORRENT && looksLikeTorrent(bytes)) { "that is not a torrent file" }
-            withContext(Dispatchers.IO) { torrentFileFor(fileFor(context, name)).let { it.parentFile?.mkdirs(); it.writeBytes(bytes) } }
+            require(
+                swarm == SWARM_TORRENT && looksLikeTorrent(bytes) || swarm == SWARM_METALINK && looksLikeMetalink(bytes),
+            ) { "that is not a torrent or Metalink file" }
+            withContext(Dispatchers.IO) { swarmFileFor(fileFor(context, name), swarm!!).let { it.parentFile?.mkdirs(); it.writeBytes(bytes) } }
         }
         val plain = holdSecrets(name, headers)
         val morePlain = more.map { holdSecrets(it.name, it.headers) }
@@ -610,7 +636,9 @@ object DownloadJobs {
                 runCatching {
                     val folder = fileFor(context, name)
                     folder.parentFile?.let { SafeDelete.deleteWithin(it, folder) }
-                    torrentFileFor(folder).let { it.delete(); TransferRequest.controlFile(it).delete() }
+                    listOf(SWARM_TORRENT, SWARM_METALINK).forEach { kind ->
+                        swarmFileFor(folder, kind).let { it.delete(); TransferRequest.controlFile(it).delete() }
+                    }
                 }
             }
             return
@@ -703,7 +731,7 @@ object DownloadJobs {
             } catch (e: TransferException) {
                 throw IllegalStateException(e.message)
             }
-            withContext(Dispatchers.IO) { torrentFileFor(folder).delete() }
+            withContext(Dispatchers.IO) { swarmFileFor(folder, args[ARG_SWARM].orEmpty()).delete() }
             report(100, "Checking the download…", FETCHED)
         }
         report(100, "Finishing…", null)
@@ -719,8 +747,8 @@ object DownloadJobs {
         return summary
     }
 
-    /** Where a swarm job keeps its `.torrent` while it runs: beside its folder. */
-    private fun torrentFileFor(folder: File) = File(folder.path + ".torrent")
+    /** Where a swarm job keeps its `.torrent` or Metalink while it runs: beside its folder. */
+    private fun swarmFileFor(folder: File, swarm: String) = File(folder.path + if (swarm == SWARM_METALINK) ".meta4" else ".torrent")
 
     /** What a swarm job starts from; a `.torrent` named by an address is fetched first, as any file is, and checked. */
     private suspend fun swarmSource(
@@ -734,7 +762,7 @@ object DownloadJobs {
         return when (args[ARG_SWARM]) {
             SWARM_MAGNET -> SwarmSource.Magnet(url)
             SWARM_TORRENT -> {
-                val file = torrentFileFor(folder)
+                val file = swarmFileFor(folder, SWARM_TORRENT)
                 if (!file.isFile) {
                     require(url.isNotEmpty()) { "the torrent is missing" }
                     report(-1, "Fetching the torrent…", null)
@@ -746,6 +774,12 @@ object DownloadJobs {
                     throw IllegalStateException("that is not a torrent file")
                 }
                 SwarmSource.Torrent(bytes)
+            }
+            SWARM_METALINK -> {
+                val bytes = withContext(Dispatchers.IO) { swarmFileFor(folder, SWARM_METALINK).takeIf { it.isFile }?.readBytes() }
+                    ?: throw IllegalStateException("the Metalink is missing")
+                check(looksLikeMetalink(bytes)) { "that is not a Metalink file" }
+                SwarmSource.Metalink(bytes)
             }
             else -> throw IllegalStateException("this version of droidtop cannot run that download")
         }
