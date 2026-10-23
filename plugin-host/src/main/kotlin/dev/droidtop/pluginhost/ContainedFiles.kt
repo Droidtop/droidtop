@@ -70,6 +70,8 @@ internal object ContainedFiles {
                         dex.map { FLUTTER_DEX + it.name to it },
                 )
             }
+            // Its app has its own files; droidtop hands an app's plugin none.
+            PluginKind.APP_INTERFACE -> Result.Files(emptyList())
         }
     }
 }

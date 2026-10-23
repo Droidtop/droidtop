@@ -58,6 +58,14 @@ enum class PluginKind(val id: String) {
      * is tied to the exact engine build, not a version range.
      */
     FLUTTER_EMBED("flutter_embed"),
+
+    /**
+     * An installed Android app that is also a plugin (docs/plugin-api.md 1.3, Droidtop/tracker#547): its manifest is an
+     * asset of its APK, its code is the app, and droidtop binds the app's own service ([AppInterfaces]) where the other
+     * kinds get a droidtop process. Its trust is the app's Android signature, which droidtop checks itself
+     * ([AppInterfaceTrust]). Everything it does with droidtop is a broker call, as for every kind.
+     */
+    APP_INTERFACE("app_interface"),
     ;
 
     companion object {

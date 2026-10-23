@@ -63,6 +63,8 @@ dependencies {
     // classpath itself to read the xz codec, so it is declared here too.
     implementation(libs.commons.compress)
     implementation(libs.xz)
+    // An app interface plugin's trust is its app's signature, which droidtop verifies itself (docs/plugin-api.md 1.3).
+    implementation(libs.apksig)
     // Shizuku's client library and its binder-receiving provider (docs/plugin-api.md 2.7): the
     // provider is declared in this module's manifest, in :pluginhost, so a Shizuku binder arrives
     // in the process a provider plugin runs in. A plugin's DexClassLoader delegates to this

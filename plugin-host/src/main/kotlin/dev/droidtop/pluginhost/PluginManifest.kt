@@ -122,6 +122,8 @@ data class PluginManifest(
     val v2: V2Declarations = V2Declarations.EMPTY,
     /** Summary, publisher, home page, category, icon and screenshots ([PluginPresentation], Droidtop/tracker#521 item 2). */
     val presentation: PluginPresentation = PluginPresentation(),
+    /** For [PluginKind.APP_INTERFACE] only: the app that is the plugin, and the service droidtop binds (docs/plugin-api.md 1.3). */
+    val app: AppTarget? = null,
 ) {
     companion object {
         private val REQUIRED_ABIS = setOf("arm64-v8a", "x86_64")
@@ -198,6 +200,7 @@ data class PluginManifest(
                 subscribedEvents = subscribedEvents,
                 v2 = declaredV2,
                 presentation = PluginPresentation.fromJson(json, payload.map { it.path }.toSet()),
+                app = AppTarget.fromJson(json.optJSONObject("app")),
             )
             return manifest.withDerivedV2()
         }
@@ -228,6 +231,17 @@ data class PluginManifest(
         }
         if (kind == PluginKind.NATIVE_BUNDLE && entryClass == null) {
             add("a native_bundle plugin must declare entryClass")
+        }
+        if (kind == PluginKind.APP_INTERFACE) {
+            if (app == null) add("an app_interface plugin must name its app: {\"package\", \"service\"}")
+            if (payload.isNotEmpty() || entryClass != null) add("an app_interface plugin carries no payload or entryClass: its code is its app")
+            if (contractVersion < 2) add("an app_interface plugin must be contract 2 or later")
+            // docs/plugin-api.md 1.3: the app never runs in a droidtop process, so nothing that reaches past one applies.
+            v2.permissions.filter { it.id == PluginTiers.FULL_TRUST || it.id == "gpu.render" }.forEach {
+                add("an app_interface plugin cannot ask for ${it.id}: its app never runs in droidtop's process")
+            }
+        } else if (app != null) {
+            add("only an app_interface plugin names an app")
         }
         if (kind == PluginKind.PYTHON && payload.none { it.path == "plugin.py" }) {
             add("a python plugin must ship plugin.py at its payload root")
