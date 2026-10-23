@@ -20,7 +20,9 @@ import dev.droidtop.shell.gamepad.input.HintBinding
 
 /**
  * Select on an app: the focused app's own menu (docs/SPEC.md 7j, "Filters,
- * sort and the hint bar"). Its details, its favourite, and Mark as game
+ * sort and the hint bar"). The same shape as the game menu's top
+ * (Droidtop/tracker#610): its primary action (Open an app, Play a game) first,
+ * then its details, its favourite, and Mark as game
  * (the Apps view's Category filter seeds Games from Android's own flag and
  * droidtop's lists; this is the person's override, also on a long press),
  * then Hide from droidtop and Uninstall (Android's own prompt) for an installed app.
@@ -30,6 +32,8 @@ import dev.droidtop.shell.gamepad.input.HintBinding
 @Composable
 internal fun AppOptionsMenu(
     entry: LibraryEntry,
+    // What A on the thing does, first in the menu as on the game menu; null where the caller has none.
+    onPrimary: (() -> Unit)? = null,
     onDetails: () -> Unit,
     onToggleFavorite: () -> Unit,
     onDismiss: () -> Unit,
@@ -54,6 +58,7 @@ internal fun AppOptionsMenu(
 
     val options = remember(entry, isGame, hidden, detailsLabel, hasPluginActions) {
         buildList<Option> {
+            onPrimary?.let { add(Option(if (entry.appFacts != null) "Open" else "Play", null, it)) }
             add(Option(detailsLabel, null, onDetails))
             if (hasPluginActions) {
                 add(
