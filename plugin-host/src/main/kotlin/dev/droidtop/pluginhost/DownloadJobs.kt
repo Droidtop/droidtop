@@ -997,10 +997,13 @@ object DownloadJobs {
         name: String,
         headers: Map<String, String> = emptyMap(),
         maxBytes: Long = 0L,
+        /** False for one file of many: the caller counts the job's bytes itself, and one file's would read as the job's. */
+        tellJob: Boolean = true,
         report: (percent: Int, statusLine: String) -> Unit = { _, _ -> },
     ): File {
         val file = fileFor(context, name)
-        fetchWithEngine(context, url, headers, file, maxBytes, TransferNumbers(JobHandle.current()), { percent, line, _ -> report(percent, line) })
+        val numbers = TransferNumbers(if (tellJob) JobHandle.current() else null)
+        fetchWithEngine(context, url, headers, file, maxBytes, numbers, { percent, line, _ -> report(percent, line) })
         return file
     }
 
