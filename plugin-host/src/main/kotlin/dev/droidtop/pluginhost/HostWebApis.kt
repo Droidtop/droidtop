@@ -54,6 +54,8 @@ internal object HostWebApis {
             val url = sessionUrl(args, domains)
             val doneCookie = args.optString("doneCookie").trim().takeIf { it.matches(Regex("[A-Za-z0-9_.-]{1,64}")) }
             val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.SIGN_IN, url, domains, stored(env, record), doneCookie))
+            // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
+            env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
             // A new sign-in may be another account: its name is the plugin's to tell again (set_account).
             if (result.completed) save(env, record, result.session?.copy(account = null))
             JSONObject().put("signedIn", result.completed && result.session?.cookies?.isNotEmpty() == true)
@@ -106,6 +108,8 @@ internal object HostWebApis {
             // `max` downloads, the acquire reply's limit for several files.
             val max = args.optInt("max", 1).coerceIn(1, MAX_CAPTURED)
             val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null, maxDownloads = max))
+            // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
+            env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
             // The site may have renewed the session while the person was there.
             result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it.copy(account = stored(env, record)?.account)) }
             if (result.downloads.isEmpty()) return@HostOp JSONObject().put("captured", false)

@@ -156,14 +156,39 @@ internal object HostNetApis {
     ): JSONObject {
         val method = args.optString("method", "GET").uppercase()
         if (method !in METHODS) invalid("method must be one of ${METHODS.joinToString()}")
+        val target = url(args)
+        val host = NetScope.hostOf(target)
         val replaced = added.keys.map { it.lowercase() }.toSet()
-        val sent = headers(args).filterKeys { it.lowercase() !in replaced } + added
-        val request = HttpCall(method, url(args), sent, body(args), timeout(env, record, args), MAX_BODY)
+        val sent = withClearance(env, record, host, headers(args).filterKeys { it.lowercase() !in replaced } + added)
+        val request = HttpCall(method, target, sent, body(args), timeout(env, record, args), MAX_BODY)
         val answer = env.http(request) { hop ->
             hopCheck(hop)
             reach(env, record, hop)
         }
+        // A browser check instead of the page (docs/SPEC.md 12a, Droidtop/tracker#600): the plugin gets one plain
+        // sentence, never the challenge's HTML, and droidtop remembers where to open the check for the person.
+        if (SiteChecks.isChallenge(answer.status, answer.headers, answer.body)) {
+            val at = NetScope.hostOf(answer.finalUrl)?.let { answer.finalUrl } ?: target
+            SiteChecks.met(record.manifest.id, at)
+            android.util.Log.i(TAG, "${record.manifest.id}: ${NetScope.hostOf(at)} answered with a browser check (${answer.status})")
+            throw BrokerException(PluginErrorCode.BROWSER_CHECK_REQUIRED, SiteChecks.refusal(NetScope.hostOf(at) ?: host.orEmpty()))
+        }
+        host?.let { SiteChecks.passed(record.manifest.id, it) }
         return answerJson(answer, args)
+    }
+
+    /**
+     * [headers] with the clearance the person earned on [host]'s check, when there is one: its cookies added to any the
+     * request carries, and the user agent of the web view that earned it, which the clearance is bound to.
+     */
+    private fun withClearance(env: BrokerEnvironment, record: PluginRecord, host: String?, headers: Map<String, String>): Map<String, String> {
+        host ?: return headers
+        val clearance = env.vault()?.let { SiteChecks.read(it, record.manifest.id) } ?: return headers
+        val cookies = clearance.forHost(host) ?: return headers
+        val cookieKey = headers.keys.firstOrNull { it.equals("Cookie", ignoreCase = true) }
+        val merged = SiteChecks.mergeCookies(cookieKey?.let { headers[it] }, cookies)
+        return headers.filterKeys { !it.equals("Cookie", ignoreCase = true) && !(clearance.userAgent != null && it.equals("User-Agent", ignoreCase = true)) } +
+            listOfNotNull(merged?.let { "Cookie" to it }, clearance.userAgent?.let { "User-Agent" to it })
     }
 
     /** An answer as the plugin reads it: status, final URL, headers, and the body as text or base64 (`as`). */
@@ -182,6 +207,8 @@ internal object HostNetApis {
                 if (asBase64) put("bodyBase64", Base64.getEncoder().encodeToString(answer.body)) else put("body", answer.body.toString(Charsets.UTF_8))
             }
     }
+
+    private const val TAG = "droidtop.SiteChecks"
 
     val ops: List<HostOp> = listOf(
         // D1: whether the device is online, and how.

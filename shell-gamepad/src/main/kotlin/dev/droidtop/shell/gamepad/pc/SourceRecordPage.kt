@@ -55,7 +55,14 @@ internal sealed interface RecordAction {
 
     /** The source's sign-in, when its download links are for signed-in people and no one is (Droidtop/tracker#599). */
     data object SignIn : RecordAction
+
+    /** The source's site checks the browser first: its check, in droidtop's web view (Droidtop/tracker#600). */
+    data object PassCheck : RecordAction
 }
+
+/** The row every tab starts with while [sourceLabel]'s site waits for the person to pass its browser check. */
+internal fun checkRow(sourceLabel: String): RecordRow =
+    RecordRow("Open $sourceLabel to pass its check", subtitle = "The site checks the browser first", action = RecordAction.PassCheck)
 
 /**
  * The row the Downloads tab starts with while [sourceLabel]'s site wants the person signed in and the record has links
@@ -184,6 +191,8 @@ internal fun SourceRecordPage(
         value = library.sourceRecord(source.key, externalId)
     }
     val signedOut by produceState(false, source.key, asked) { value = library.sourceSignedOut(source.key) }
+    // Asked after the record: the record's own call is what meets a site's check.
+    val needsCheck by produceState(false, source.key, asked, answer) { value = library.sourceNeedsCheck(source.key) }
     var tab by remember(source.key, externalId) { mutableStateOf(startTab) }
     var focusIndex by remember(source.key, externalId, tab) { mutableIntStateOf(0) }
     var armed by remember(source.key, externalId, tab) { mutableStateOf<Int?>(null) }
@@ -194,12 +203,13 @@ internal fun SourceRecordPage(
     val prefs = remember { context.getSharedPreferences(RECORD_PREFS, Context.MODE_PRIVATE) }
     var picked by remember(source.key, externalId) { mutableStateOf(prefs.getString(SYSTEM_KEY_PREFIX + source.key, null)) }
     // With no page to show, the one thing to do is Change link: the page never relinks by itself (Droidtop/tracker#619).
-    val rows = remember(record, tab, picked, answer, signedOut) {
+    val rows = remember(record, tab, picked, answer, signedOut, needsCheck) {
+        val check = listOfNotNull(checkRow(source.label).takeIf { needsCheck })
         record?.let { r ->
-            val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS }
-            listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
+            val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS && !needsCheck }
+            check + listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
         }
-            ?: if (answer != null) listOf(RecordRow("Change link", "#$externalId", action = RecordAction.Relink)) else emptyList()
+            ?: if (answer != null) check + RecordRow("Change link", "#$externalId", action = RecordAction.Relink) else emptyList()
     }
 
     fun pickSystem(step: Int) {
@@ -223,6 +233,9 @@ internal fun SourceRecordPage(
             RecordAction.SignIn -> scope.launch {
                 if (library.signInToSource(source.key)) asked++
             }
+            RecordAction.PassCheck -> scope.launch {
+                if (library.passSourceCheck(source.key)) asked++
+            }
             is RecordAction.Download -> {
                 // Two presses: the first says what the second does (the design language's two-step confirm).
                 if (armed != index) {
@@ -235,6 +248,14 @@ internal fun SourceRecordPage(
                 val picked = action.download
                 val pickedFrom = record?.downloads.orEmpty()
                 scope.launch {
+                    // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).
+                    if (library.sourceNeedsCheck(source.key)) {
+                        say("${source.label} checks the browser first")
+                        if (!library.passSourceCheck(source.key)) {
+                            say("${source.label}'s check was not passed, so nothing was downloaded")
+                            return@launch
+                        }
+                    }
                     // A link the source gave is opened in droidtop's web view, where the person starts the download and
                     // droidtop takes it over (Droidtop/tracker#599). A mirror with no link is looked up in the record asked
                     // again first: the token of a saved record goes stale when the source's page changes. Only a mirror

@@ -120,6 +120,12 @@ interface UpdateSources {
     /** Opens [source]'s sign-in in droidtop's web view; true when a session is kept. Blocks until the view closes. */
     fun signIn(source: String): Boolean = false
 
+    /** Whether [source]'s site met droidtop with a browser check the person has not passed yet (docs/SPEC.md 12a). */
+    fun needsCheck(source: String): Boolean = false
+
+    /** Opens [source]'s browser check in droidtop's web view; true when the site cleared it. Blocks until the view closes. */
+    fun passCheck(source: String): Boolean = false
+
     /**
      * Opens [url], a download link the record gave, in droidtop's web view with the source's session; the person starts
      * the download there and droidtop takes it over and places it as [download] does. When the page starts nothing (an

@@ -1437,6 +1437,16 @@ class Library(
         runCatching { updateSources.signedOut(source) }.getOrDefault(false)
     }
 
+    /** Whether [source]'s site waits for the person to pass its browser check (docs/SPEC.md 12a, Droidtop/tracker#600). */
+    suspend fun sourceNeedsCheck(source: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching { updateSources.needsCheck(source) }.getOrDefault(false)
+    }
+
+    /** Opens [source]'s browser check in droidtop's web view; true when the site cleared it. Blocks until the view closes. */
+    suspend fun passSourceCheck(source: String): Boolean = withContext(Dispatchers.IO) {
+        runCatching { updateSources.passCheck(source) }.getOrDefault(false)
+    }
+
     /** Opens [source]'s sign-in in droidtop's web view; true when the person signed in. Blocks until the view closes. */
     suspend fun signInToSource(source: String): Boolean = withContext(Dispatchers.IO) {
         runCatching { updateSources.signIn(source) }.getOrDefault(false)
