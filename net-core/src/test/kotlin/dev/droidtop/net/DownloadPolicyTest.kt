@@ -32,6 +32,36 @@ class DownloadPolicyTest {
     }
 
     @Test
+    fun `a metered connection the person allowed lets every download use it, but no network still holds`() {
+        val allowed = Conditions(NetworkClass.METERED, 12 * 60, false, meteredAllowed = true)
+        val s = defaults.copy(network = NetworkRule.WIFI_ONLY)
+        assertEquals(Verdict.Go, DownloadPolicy.decide(s, allowed, JobFacts(5000 * mb)))
+        assertEquals(Verdict.Go, DownloadPolicy.decide(s, allowed, JobFacts(0)))
+        val off = Conditions(NetworkClass.OFFLINE, 12 * 60, false, meteredAllowed = true)
+        assertEquals(Verdict.Hold(DownloadPolicy.WAITING_FOR_NETWORK), DownloadPolicy.decide(s, off, JobFacts(1 * mb)))
+    }
+
+    @Test
+    fun `only the connection's own holds are network holds`() {
+        assertTrue(DownloadPolicy.isNetworkHold("Waiting for Wi-Fi"))
+        assertTrue(DownloadPolicy.isNetworkHold("Waiting for a network"))
+        assertFalse(DownloadPolicy.isNetworkHold("Waiting for 02:00"))
+        assertFalse(DownloadPolicy.isNetworkHold("Waiting until you stop playing"))
+        assertFalse(DownloadPolicy.isNetworkHold(null))
+    }
+
+    @Test
+    fun `a grant is for one connection once or for its name always`() {
+        val home = MeteredGrants.Connection(handle = 7, kind = MeteredGrants.Kind.WIFI, key = "wifi:Home", label = "Home")
+        val nameless = home.copy(key = null)
+        assertTrue(MeteredGrants.allows(home, onceHandle = 7, always = emptyMap()))
+        assertFalse(MeteredGrants.allows(home.copy(handle = 8), onceHandle = 7, always = emptyMap()))
+        assertTrue(MeteredGrants.allows(home.copy(handle = 8), onceHandle = null, always = mapOf("wifi:Home" to "Home")))
+        assertFalse(MeteredGrants.allows(nameless, onceHandle = null, always = mapOf("wifi:Home" to "Home")))
+        assertFalse(MeteredGrants.allows(null, onceHandle = 7, always = mapOf("wifi:Home" to "Home")))
+    }
+
+    @Test
     fun `any connection never holds for the network`() {
         val s = defaults.copy(network = NetworkRule.ANY)
         assertEquals(Verdict.Go, DownloadPolicy.decide(s, mobile(), JobFacts(9000 * mb)))
