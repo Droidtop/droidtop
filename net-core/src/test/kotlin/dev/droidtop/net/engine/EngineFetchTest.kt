@@ -5,6 +5,8 @@ import java.io.IOException
 import java.nio.file.Files
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
@@ -80,6 +82,24 @@ class EngineFetchTest {
         assertEquals("acquire_1.bin", options["out"])
         assertEquals("1", options["split"])
         assertEquals("Accept: */*", options["header"])
+    }
+
+    @Test
+    fun aDownloadTheEngineSaysEndedIsReadAtOnceNotAtTheNextPoll() = runTest {
+        // A store's chunk of a megabyte is done long before a poll: the engine's word ends the wait.
+        val ends = MutableSharedFlow<String>(replay = 1)
+        val engine = object : TransferEngine by FakeEngine(listOf(listOf(complete(1 * mib)))) {
+            override val ended: Flow<String> = ends
+        }
+        ends.tryEmit("gid1")
+        EngineFetch.fetch(engine, request(), { }, size, passThrough, Dispatchers.Unconfined)
+        assertEquals("no poll was waited for", 0L, testScheduler.currentTime)
+    }
+
+    @Test
+    fun anEndTheEngineNeverToldIsReadByThePoll() = runTest {
+        EngineFetch.fetch(FakeEngine(listOf(listOf(complete(1 * mib)))), request(), { }, size, passThrough, Dispatchers.Unconfined)
+        assertEquals(EngineFetch.POLL_MS, testScheduler.currentTime)
     }
 
     @Test
