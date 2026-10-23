@@ -7833,11 +7833,13 @@ leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
   on the hat, tracker#1/#43).
 - **Analog triggers are buttons** on a pad that has no L2/R2 key: past
   half travel they press `BUTTON_L2`/`BUTTON_R2` once, no repeat.
-- **A held Select is R2**, the Quick Menu's fallback for pads whose
-  triggers send nothing. Select is held back until it is released (one
-  Select press is delivered) or held for the long-press timeout (one R2
-  press is delivered, its release dropped); no screen ever sees half a
-  hold.
+- **A held Select is R2 and a held Start is L2**: the fallbacks to the Quick Menu (the global menu) and the focused
+  thing's menu (the local one) for pads whose triggers send nothing (owner, 2026-10-23, Droidtop/tracker#621: "if
+  that's what you recommend, then sure"). Each is held back until it is released (one press of the button itself is
+  delivered) or held for the long-press timeout (one trigger press is delivered, its release dropped); no screen ever
+  sees half a hold. A tap of Start therefore opens the left menu on release, as Select's tap already acted. Start here
+  is the pad's Start or Menu button (`BUTTON_START`), never the Xbox, PlayStation or Steam button (`BUTTON_MODE`),
+  which Gaming does not use.
 - Desktop mode hands the pad to the container (§6b), so the activity's
   gate steps aside there. Every D-pad edge is logged under
   `droidtop.input` with what became of it, for console runs read back
