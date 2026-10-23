@@ -44,12 +44,15 @@ class OldVersionsTest {
         val old = File(dir, "Game v0.37").apply { File(this, "game/saves").mkdirs() }
         val kept = File(dir, "Game v0.38").apply { File(this, "game/saves").mkdirs() }
         File(old, "game/saves/1-1.save").writeText("only here")
-        File(old, "game/saves/persistent").writeText("old").also { it.setLastModified(1_000_000L) }
-        File(kept, "game/saves/persistent").writeText("new").also { it.setLastModified(2_000_000L) }
+        File(old, "game/saves/persistent").apply { writeText("old"); setLastModified(1_000_000L) }
+        File(kept, "game/saves/persistent").apply { writeText("new"); setLastModified(2_000_000L) }
         File(old, "game/script.rpy").writeText("not a save")
 
         val plan = OldVersions.savesPlan(old, kept, listOf("game/saves/**"))
-        assertEquals(listOf(File(old, "game/saves/1-1.save") to File(kept, "game/saves/1-1.save")), plan.copy)
+        assertEquals(
+            listOf("game/saves/1-1.save" to "game/saves/1-1.save"),
+            plan.copy.map { (from, to) -> from.relativeTo(old).path to to.relativeTo(kept).path },
+        )
         assertEquals(emptyList<String>(), plan.newer)
 
         File(old, "game/saves/persistent").setLastModified(3_000_000L)
