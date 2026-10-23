@@ -20750,6 +20750,11 @@ and work with each other over the plugin API so no matter what, saves go where t
   (`saves.locations@1`); the plugin asks droidtop where a game's saves belong (`saves where`) before starting a game,
   and tells it when a game wrote saves (`saves changed`) after, whichever app launched the game. droidtop adopts, backs
   up and syncs them as after a game it launched itself.
+- **Games, not configs.** The owner: "droidtop should also present games for enginehost to register, but not
+  necessarily their whole configs. Remember, we want configs to be created by the USER, not necessarily saved into the
+  game folder". The plugin reads the library's engine games (`library.read list_engine_games`: identity, folder,
+  detected engine) and registers them; their configs stay the person's, made in the app, and nothing is written into
+  a game's folder.
 - **The old contract goes.** The `GAME_ENDED` broadcast receiver stays only until the Enginehost release that carries
   its plugin is out. The LAUNCH intent stays for now (starting another app's activity is navigation, not data); moving
   launch onto the API is a follow-up.

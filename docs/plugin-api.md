@@ -2275,6 +2275,18 @@ difference:
     `saveFolder`. droidtop adopts and backs them up into its own folder for
     the game and syncs them when the game's saves are synced, as after a
     game it launched.
+- **droidtop offers its engine games (host API `library.read`, op
+  `list_engine_games`, permission `library.read`):** the owner: "droidtop
+  should also present games for enginehost to register, but not
+  necessarily their whole configs. Remember, we want configs to be created
+  by the USER, not necessarily saved into the game folder".
+  `list_engine_games {engines?}` → `{games: [{gameId, title, path, engine,
+  engineVersion?, updatedAtMs}], complete}`: the library's engine games
+  only, the whole list each time (at most 2,000; `complete: false` when
+  cut), for the app to register what is new and drop what is gone. No
+  configs travel and droidtop writes nothing into a game's folder: a
+  game's configs are the person's, made in the app. The app asks again
+  when droidtop connects, after a knock, and on `library.scan_finished`.
 - **Without a broker yet:** the plugin's app knocks on droidtop's door
   (§1.3, `app_interface`), gets its broker within seconds, and asks or
   tells then.
