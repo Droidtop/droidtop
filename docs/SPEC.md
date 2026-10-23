@@ -12334,6 +12334,16 @@ reimplemented it as my own f95seeker code." So:
   saved copy as the answer, and finds the same mirror in it (`RecordMirrors`: the same section, host and label; among
   several alike, the same token, else the same place). That mirror's address is opened as above; only one that still
   has none goes to the source's `download` job, with its fresh token.
+  - **Signed out:** a source whose site gives download links to signed-in people only (F95zone shows them to
+    members) gives no addresses to a guest, and its job then finds no link either. So while the source's account
+    (12a, "A plugin's site account") is signed out and the record has links with no address, the Downloads tab starts
+    with "Sign in to <source>", "to get download links", which opens the site's sign-in and asks for the record
+    again. Pressing such a link signed out says the same and opens the sign-in at once, then opens the link from the
+    record asked again; it never ends in "no link now". A session the site no longer honours is the source's to notice:
+    it clears its session (`web.session clear`), so droidtop shows it signed out.
+  - **Logged:** every failure on this path writes one line under the tag `droidtop.Updates` (the record not given,
+    no fresh record, a mirror no longer listed or still with no address, the web view starting nothing, the source's
+    job or the download failing), with the source, the record and the link, never a cookie or a file's address.
 - **Picking a link downloads that version for droidtop to place.** It is the
   source's `download` job (A6), whose reply is an `acquire` reply (A2: one
   file, several, captured in the signed-in web view, `unpack`), so it is one

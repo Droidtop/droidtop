@@ -52,7 +52,18 @@ internal sealed interface RecordAction {
 
     /** The Downloads tab's system row: A, Left and Right move to the next or the previous system. */
     data object PickSystem : RecordAction
+
+    /** The source's sign-in, when its download links are for signed-in people and no one is (Droidtop/tracker#599). */
+    data object SignIn : RecordAction
 }
+
+/**
+ * The row the Downloads tab starts with while [sourceLabel]'s site wants the person signed in and the record has links
+ * with no address: the source only gives those to signed-in people. Null otherwise. Pure.
+ */
+internal fun signInRow(sourceLabel: String, record: UpdateSources.Record, signedOut: Boolean): RecordRow? =
+    RecordRow("Sign in to $sourceLabel", subtitle = "to get download links", action = RecordAction.SignIn)
+        .takeIf { signedOut && record.downloads.any { it.url == null } }
 
 internal data class RecordRow(val title: String, val value: String? = null, val subtitle: String? = null, val action: RecordAction? = null)
 
@@ -166,10 +177,13 @@ internal fun SourceRecordPage(
     startTab: RecordTab = RecordTab.OVERVIEW,
 ) {
     // droidtop's saved copy first, so the page shows at once, then the source's answer (Droidtop/tracker#599).
-    val answer by produceState<UpdateSources.RecordAnswer?>(null, source.key, externalId) {
-        value = library.savedSourceRecord(source.key, externalId)
+    // Asked again after a sign-in, which gives the source's download links.
+    var asked by remember(source.key, externalId) { mutableIntStateOf(0) }
+    val answer by produceState<UpdateSources.RecordAnswer?>(null, source.key, externalId, asked) {
+        if (value == null) value = library.savedSourceRecord(source.key, externalId)
         value = library.sourceRecord(source.key, externalId)
     }
+    val signedOut by produceState(false, source.key, asked) { value = library.sourceSignedOut(source.key) }
     var tab by remember(source.key, externalId) { mutableStateOf(startTab) }
     var focusIndex by remember(source.key, externalId, tab) { mutableIntStateOf(0) }
     var armed by remember(source.key, externalId, tab) { mutableStateOf<Int?>(null) }
@@ -180,8 +194,11 @@ internal fun SourceRecordPage(
     val prefs = remember { context.getSharedPreferences(RECORD_PREFS, Context.MODE_PRIVATE) }
     var picked by remember(source.key, externalId) { mutableStateOf(prefs.getString(SYSTEM_KEY_PREFIX + source.key, null)) }
     // With no page to show, the one thing to do is Change link: the page never relinks by itself (Droidtop/tracker#619).
-    val rows = remember(record, tab, picked, answer) {
-        record?.let { recordRows(it, tab, picked) { ms -> dateFormat.format(Date(ms)) } }
+    val rows = remember(record, tab, picked, answer, signedOut) {
+        record?.let { r ->
+            val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS }
+            listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
+        }
             ?: if (answer != null) listOf(RecordRow("Change link", "#$externalId", action = RecordAction.Relink)) else emptyList()
     }
 
@@ -203,6 +220,9 @@ internal fun SourceRecordPage(
             is RecordAction.Open -> onOpen(action.url)
             RecordAction.Relink -> onRelink()
             RecordAction.PickSystem -> pickSystem(1)
+            RecordAction.SignIn -> scope.launch {
+                if (library.signInToSource(source.key)) asked++
+            }
             is RecordAction.Download -> {
                 // Two presses: the first says what the second does (the design language's two-step confirm).
                 if (armed != index) {
@@ -219,7 +239,16 @@ internal fun SourceRecordPage(
                     // droidtop takes it over (Droidtop/tracker#599). A mirror with no link is looked up in the record asked
                     // again first: the token of a saved record goes stale when the source's page changes. Only a mirror
                     // that still has no link goes to the source's job, with the fresh token.
-                    val use = if (picked.url != null) picked else library.freshDownload(source.key, externalId, picked, pickedFrom) ?: picked
+                    var use = if (picked.url != null) picked else library.freshDownload(source.key, externalId, picked, pickedFrom) ?: picked
+                    // Still no address, and the source's links are for signed-in people: its sign-in, not "no link now".
+                    if (use.url == null && library.sourceSignedOut(source.key)) {
+                        say("Sign in to ${source.label} to get download links")
+                        if (!library.signInToSource(source.key)) {
+                            say("Not signed in to ${source.label}, so nothing was downloaded")
+                            return@launch
+                        }
+                        use = library.freshDownload(source.key, externalId, picked, pickedFrom) ?: use
+                    }
                     val url = use.url
                     say(
                         if (url != null) {

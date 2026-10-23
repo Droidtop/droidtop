@@ -112,6 +112,15 @@ interface UpdateSources {
     fun savedRecord(source: String, externalId: String): RecordAnswer? = null
 
     /**
+     * Whether [source] needs the person signed in to its site and no one is (its `web.session` account, docs/SPEC.md 12a
+     * "A plugin's site account"): a record read then carries no download addresses. Reads the vault: off the main thread.
+     */
+    fun signedOut(source: String): Boolean = false
+
+    /** Opens [source]'s sign-in in droidtop's web view; true when a session is kept. Blocks until the view closes. */
+    fun signIn(source: String): Boolean = false
+
+    /**
      * Opens [url], a download link the record gave, in droidtop's web view with the source's session; the person starts
      * the download there and droidtop takes it over and places it as [download] does. When the page starts nothing (an
      * expired link), [fallbackUrl], the record's own page, is opened for the person to pick again. Returns the last line.
