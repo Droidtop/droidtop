@@ -59,8 +59,8 @@ object DownloadPools {
 
     /**
      * One download the pools consider: one the policy would let run now. [running] when it is transferring, else it
-     * waits (queued, or held by a rule that has just lifted). [pinned] when the person resumed it themselves: it takes a
-     * slot and is never queued.
+     * waits (queued, or held by a rule that has just lifted). [pinned] when the person pressed Download now on it: it
+     * takes a slot first, is never queued, and starts when it waits.
      */
     data class Entry(val id: String, val category: DownloadCategory, val startedAtMs: Long, val running: Boolean, val pinned: Boolean = false)
 
@@ -81,7 +81,8 @@ object DownloadPools {
         entries.groupBy { it.category }.flatMap { (category, inPool) ->
             val max = limit(category)
             var slots = max - inPool.count { it.pinned }
-            inPool.filter { !it.pinned }.sortedBy { it.startedAtMs }.mapNotNull { entry ->
+            val pinnedStarts = inPool.filter { it.pinned && !it.running }.map<Entry, Move> { Move.Start(it.id) }
+            pinnedStarts + inPool.filter { !it.pinned }.sortedBy { it.startedAtMs }.mapNotNull { entry ->
                 if (slots > 0) {
                     slots--
                     if (entry.running) null else Move.Start(entry.id)

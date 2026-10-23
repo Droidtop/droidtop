@@ -89,8 +89,9 @@ object DownloadGate {
             if (entry.paused && entry.hold == null) continue
             val verdict = DownloadPolicy.decide(settings, conditions, facts(entry))
             // The person's word wins over the update window and a running game, never over the connection.
+            // Held again by the connection after Download now, it is released first once the connection allows.
             if (entry.policyOverride && !(verdict is Verdict.Hold && DownloadPolicy.isNetworkHold(verdict.reason))) {
-                if (!entry.paused) pooled += DownloadPools.Entry(entry.jobId, category(entry), entry.startedAtMs, running = true, pinned = true)
+                pooled += DownloadPools.Entry(entry.jobId, category(entry), entry.startedAtMs, running = !entry.paused, pinned = true)
                 continue
             }
             if (verdict is Verdict.Hold) {

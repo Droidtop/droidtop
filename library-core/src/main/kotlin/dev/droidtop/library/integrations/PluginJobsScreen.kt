@@ -265,8 +265,9 @@ object PluginJobsScreen {
                 ),
             )
             // A native job with no checkpoint yet pauses to a fresh start, so it may always be paused.
-            // A download the policy holds can be started anyway, even a single file that has no Pause, except past the
-            // connection: on a metered one the person allows the connection, never this one download (docs/SPEC.md 12a).
+            // Download now on a held download, even a single file that has no Pause, puts it first in line and starts it,
+            // except past the connection: it waits for that like every download, first (docs/SPEC.md 12a). On a metered
+            // connection the person allows the connection, never this one download.
             val networkHold = DownloadPolicy.isNetworkHold(entry.hold)
             if (entry.hold == DownloadPolicy.WAITING_FOR_WIFI) {
                 add(
@@ -278,11 +279,12 @@ object PluginJobsScreen {
                     ),
                 )
             }
-            if ((entry.hold != null && !networkHold) || (entry.hold == null && entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null || entry.nativeKind != null))) {
+            if (entry.hold != null || (entry.pausable && entry.resumable && (entry.paused || entry.resumePayload != null || entry.nativeKind != null))) {
                 add(
                     ActionItem(
                         id = "plugin_job_${jobId}_${if (entry.paused) "resume" else "pause"}",
                         title = if (entry.hold != null) "Download now" else if (entry.paused) "Resume" else "Pause",
+                        subtitle = if (networkHold) "Goes first. It starts when there is a connection downloads may use" else null,
                         run = { if (entry.paused) PluginJobsCenter.resume(jobId) else PluginJobsCenter.pause(jobId) },
                     ),
                 )
