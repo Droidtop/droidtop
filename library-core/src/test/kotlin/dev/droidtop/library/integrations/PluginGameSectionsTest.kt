@@ -82,4 +82,17 @@ class PluginGameSectionsTest {
         assertEquals("Acme Notes: nothing here", empty.single().title)
         assertNull(empty.single().viewAction)
     }
+
+    @Test
+    fun `a facets section asks for the game page, about the game only when its identity was given`() {
+        val facets = PluginGameSections.Section(record, ProvidedPoint(point = PluginFacets.POINT, id = "main", extra = """{"targets":["game.page"]}"""))
+        assertEquals(true, facets.facets)
+        assertEquals(PluginFacets.POINT, facets.point)
+        assertEquals(false, section.facets)
+        val about = PluginFacets.getArgs(PluginFacets.GAME_PAGE, PluginFacets.gameSubject(JSONObject().put("id", "g1")))
+        assertEquals("game.page", about.getString("target"))
+        assertEquals("g1", about.getJSONObject("subject").getString("gameId"))
+        // Without library.read the target carries no id, and the plugin is asked without a subject.
+        assertEquals(false, PluginFacets.getArgs(PluginFacets.GAME_PAGE, PluginFacets.gameSubject(JSONObject())).has("subject"))
+    }
 }
