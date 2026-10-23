@@ -2249,8 +2249,9 @@ Risk —.
   for the save paths it resolved itself. The plugin never picks a path.
 
 **A7a Where saves are, both ways (Droidtop/tracker#547, contract
-2026-10-23).** EP `saves.locations@1` (risk low) and host API `saves`
-(permission `saves.exchange`, normal). The owner: "The two applications
+2026-10-23).** EP `saves.locations@1`. Risk low. Host API `saves`
+(permission `saves.exchange`, normal; only an `app_interface` plugin may
+call it, any other gets `PERMISSION_DENIED`). The owner: "The two applications
 should detect and work with each other over the plugin API so no matter
 what, saves go where they're needed". Which app launched a game makes no
 difference:
@@ -2269,12 +2270,19 @@ difference:
     syncs) a game's saves in, the one it passes in its own launch, for the
     game at `path`, asked before the game starts, whoever starts it.
     `saveRoot: null` means the plugin's own default. droidtop answers only
-    about the folder the plugin names and never lists its library.
-  - `saves changed {path, saveFolder, reason?, endedAtMs?}` →
-    `{accepted, synced?, message}`: the game at `path` wrote saves in
-    `saveFolder`. droidtop adopts and backs them up into its own folder for
-    the game and syncs them when the game's saves are synced, as after a
-    game it launched.
+    about the folder the plugin names and never lists its library. For a
+    synced game droidtop syncs the saves down first, as before its own
+    launch (it may ask the person about a conflict), so the call can take
+    seconds. `{known: false, ready: false}` while the library is loading.
+  - `saves report_changed {path, saveFolder, reason?, endedAtMs?}` →
+    `{accepted, synced?, message}` (named `changed` in the first contract
+    post; an op is named for what it does): the game at `path` wrote saves
+    in `saveFolder`. For a synced game droidtop adopts them into its own
+    folder for the game and uploads them, as after a game it launched; for
+    any other game it copies nothing (`accepted: true, synced: false`).
+    `saveFolder` must be a folder in shared storage or on a card, whose
+    real path is not droidtop's own: anything else is `accepted: false`
+    with the reason. Always in the activity log.
 - **droidtop offers its engine games (host API `library.read`, op
   `list_engine_games`, permission `library.read`):** the owner: "droidtop
   should also present games for enginehost to register, but not
@@ -2283,14 +2291,19 @@ difference:
   `list_engine_games {engines?}` → `{games: [{gameId, title, path, engine,
   engineVersion?, updatedAtMs}], complete}`: the library's engine games
   only, the whole list each time (at most 2,000; `complete: false` when
-  cut), for the app to register what is new and drop what is gone. No
+  cut), for the app to register what is new and drop what is gone.
+  `path` is the folder droidtop's launch hands Enginehost, `engine`
+  Enginehost's own engine name, `updatedAtMs` when the folder last
+  changed; `{ready: false}` while the library is loading. No
   configs travel and droidtop writes nothing into a game's folder: a
   game's configs are the person's, made in the app. The app asks again
   when droidtop connects, after a knock, and on `library.scan_finished`.
 - **Without a broker yet:** the plugin's app knocks on droidtop's door
   (§1.3, `app_interface`), gets its broker within seconds, and asks or
   tells then.
-- **Status:** contract only (2026-10-23); being built.
+- **Status:** `saves where`, `saves report_changed` and
+  `list_engine_games` built (AppInterfaceSaves); `saves.locations` and
+  the game page's Saves row next.
 
 **A8 Achievements.** EP `achievements.provider@1`. Risk medium.
 - **For:** achievement sets and progress, for example RetroAchievements
@@ -3242,6 +3255,7 @@ wording the host uses, so it is identical in every mode.
 | `library.folders.write` | dangerous | Add files to your game folders | A2 |
 | `saves.read` | dangerous | Read save data of your games | A7 |
 | `saves.write` | dangerous | Replace save data of your games | A7 |
+| `saves.exchange` | normal | Ask where your games' saves go, and tell droidtop when it saved | A7a |
 | `media.read` | dangerous | See your music, videos and pictures | A9 |
 | `perf.read` | normal | See performance readings (CPU, temperature, battery) | B6 |
 | `perf.profile.set` | dangerous | Change performance and fan settings | B7 |

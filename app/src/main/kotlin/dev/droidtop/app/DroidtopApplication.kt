@@ -109,6 +109,13 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 dev.droidtop.library.integrations.PluginLibraryRead.snapshot(this@DroidtopApplication, LibraryCore.library(this@DroidtopApplication))
             }
         }
+        // `saves` and `library.read` `list_engine_games` (docs/plugin-api.md 3 A7a): an app's plugin asks where a game's
+        // saves go and says where it saved, answered by the same save model droidtop's own Enginehost launch uses.
+        dev.droidtop.pluginhost.PluginBrokers.saves = dev.droidtop.library.integrations.AppInterfaceSaves(
+            this,
+            library = { LibraryCore.library(this) },
+            records = LibraryCore.records(this),
+        )
         // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
         // engine before the library indexes it, and an update's saves are copied into its new version folder
         // (docs/SPEC.md 7g, "Getting an update").

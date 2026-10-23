@@ -109,8 +109,10 @@ object EnginehostSaves {
     suspend fun afterGameEnded(context: Context, storeKey: String, gameFolder: String, saveFolder: String?): Boolean {
         val passed = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(PASSED_PREFIX + storeKey, null)
         if (sameFolder(passed, saveFolder)) return true
-        val used = saveFolder?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory } ?: return false
-        if (inside(used, File(gameFolder))) return false
+        // Only a folder Enginehost could have been handed (shared storage or a card), never one of droidtop's own: whoever
+        // reports names it, and droidtop copies from it.
+        val used = saveFolder?.let(::readableSaveFolder) ?: return false
+        if (inside(used, runCatching { File(gameFolder).canonicalFile }.getOrDefault(File(gameFolder)))) return false
         val into = (storeFolder(context, storeKey) ?: knownFolder(context, storeKey))?.takeIf { it.isDirectory || it.mkdirs() }
         if (into == null) {
             // No folder known yet (the store cannot be asked now): the next launch brings these saves in ([saveRoot]).
@@ -121,6 +123,16 @@ object EnginehostSaves {
         }
         if (sameFolder(into.absolutePath, used.absolutePath)) return true
         return adopt(used, into) >= 0
+    }
+
+    /**
+     * [path] as a folder droidtop may copy saves from: an existing folder whose real path (links resolved) is one
+     * [acceptablePath] takes. Null otherwise, so a report naming droidtop's private files, or a link to them, copies nothing.
+     */
+    fun readableSaveFolder(path: String): File? {
+        if (path.isBlank()) return null
+        val real = runCatching { File(path).canonicalFile }.getOrNull() ?: return null
+        return real.takeIf { it.isDirectory && acceptablePath(it.absolutePath) }
     }
 
     /** Whether [passed] and [reported] name the same folder, path for path. Pure but for the paths it builds. */

@@ -92,4 +92,17 @@ class EnginehostSavesTest {
         // A second pass finds nothing newer.
         assertEquals(0, EnginehostSaves.adopt(from, into))
     }
+
+    @Test
+    fun savesAreTakenOnlyFromSharedStorageNeverFromDroidtopsOwnFiles() {
+        // Whoever reports names the folder droidtop copies from (the broadcast, an app's plugin): a private folder, or a
+        // link to one, copies nothing. The test's own folder is private storage, as droidtop's files are.
+        val private = temp.newFolder("files")
+        assertEquals(null, EnginehostSaves.readableSaveFolder(private.absolutePath))
+        val link = File(temp.root, "link")
+        java.nio.file.Files.createSymbolicLink(link.toPath(), private.toPath())
+        assertEquals(null, EnginehostSaves.readableSaveFolder(link.absolutePath))
+        assertEquals(null, EnginehostSaves.readableSaveFolder(""))
+        assertEquals(null, EnginehostSaves.readableSaveFolder("/storage/emulated/0/no/such/folder/here"))
+    }
 }

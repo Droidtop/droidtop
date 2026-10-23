@@ -44,6 +44,10 @@ object LibraryCore {
         ) { library(app) }
     }
 
+    /** The one store of game records (docs/SPEC.md 7g): files/library/games/, read one game at a time. */
+    fun records(context: Context): FileGameRecordStore =
+        FileGameRecordStore(java.io.File(context.applicationContext.filesDir, "library/games"))
+
     /** One instance per process: providers read their roots fresh on every scan, so nothing here goes stale. */
     fun library(context: Context): Library = instance ?: synchronized(this) {
         instance ?: build(context.applicationContext).also { instance = it }
@@ -52,7 +56,7 @@ object LibraryCore {
     private fun build(app: Context): Library {
         // One store behind every provider's records (docs/SPEC.md 7g,
         // step 2) -- files/library/games/, per that section's own layout.
-        val records = FileGameRecordStore(java.io.File(app.filesDir, "library/games"))
+        val records = records(app)
         // Fills library-core's PcGameRuntime seam, which is what makes the
         // WINE_PREFIX / LINUX_CONTAINER launch strategies real rather than
         // error() stubs. The session supplier is only for the native-Linux
