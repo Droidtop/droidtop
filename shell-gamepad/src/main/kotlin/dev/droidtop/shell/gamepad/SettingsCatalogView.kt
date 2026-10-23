@@ -1848,8 +1848,11 @@ internal fun CatalogChoicePicker(
         MenuHeader(item.title)
         LazyColumn(
             state = listState,
+            // The height under the header, not the page's: the full height ran the last options off the screen,
+            // where the cursor reached them without the list scrolling (Droidtop/tracker#616).
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .focusRequester(focus)
                 .focusable()
                 .onPad { press ->
