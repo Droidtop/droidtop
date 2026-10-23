@@ -14951,8 +14951,8 @@ A tap on a button, tab or row is the same press.
 
 **The page grows out of its capsule** (2026-10-08, Droidtop/tracker#363; owner:
 DroidDeck's signature motion, behind the Animations switch). Opened from the
-capsule under the cursor (Select's "Game page" row, or a long press on the selected
-capsule), the capsule's plate stretches over the screen on loose springs, the far
+capsule under the cursor (Select's "Game page" row; a long press opens the game's menu since 2026-10-23,
+Droidtop/tracker#610), the capsule's plate stretches over the screen on loose springs, the far
 edges first, and the page rises into it once it is covered; B draws it back down
 into the capsule before the page closes (`PageFlood`, `FloodOrigin`, ported from
 DroidDeck's `ui/PageFlood.kt`). **Play grows into the launch screen**: Play on the
@@ -15859,8 +15859,9 @@ Consequences:
   read "Apps", two lines below a heading that already said so (rig,
   build 547). Nothing is invented for it: an app that declares no
   category gets "Android app", not a guess;
-- **long-press is Y** on a game card or app tile --- the same "act on
-  this one" the pad reaches with a second button;
+- **a long press opens the thing's own menu** (owner, 2026-10-23, Droidtop/tracker#610): a PC game's game menu, an
+  app tile's app menu (Mark as game is a row of it; a long press used to mark the app at once, with nothing on screen
+  saying so), and a Retro Games card's details, which are a console game's own actions;
 - a value that is **stepped** rather than opened --- a slider, a small
   cycling choice --- makes the two arrows the row already draws into two
   targets, because a touch screen has no Left/Right and a slider has no
@@ -23078,10 +23079,12 @@ listed only when it has a row that can be pressed and saying its first rows ("Sc
   Lutris import; Linux tools; Enginehost's settings).
 - **Controls and saves:** Controls, Saves, Sync cloud saves.
 
-Each opens one page and nothing deeper (`PcMenuPage`); B on a page returns to the top. Get games left the menu (owner:
-new games are found in search and in their own place, Droidtop/tracker#612). Still deeper than one level, and next:
-Wine and graphics, Program, Game properties and Linux tools open settings sheets that have pages of their own, and DLC
-and versions opens its own sheet; the shared menu work (#610) moves them to a page of their own.
+Each opens one page and nothing deeper (`PcMenuPage`); B on a page returns to the top. A row that opens a settings page
+(Wine and graphics, Program, Game properties, Linux tools) or a picker (DLC and versions, Runs with, Engine, Collections)
+opens a page or a task, not another menu: it takes the screen, may have pages of its own as Settings does, and its
+Back returns to the menu where it was. Get games left the menu (owner:
+new games are found in search and in their own place, Droidtop/tracker#612). Nothing in it is deeper than one
+level: the rows that open settings pages and pickers are pages and tasks (above).
 
 **v2 direction:**
 - Keep everything else: the themed Retro Games tab, the droidtop-native PC
