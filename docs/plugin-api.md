@@ -445,7 +445,24 @@ store". Its adapter is the app itself:
   carries the asset), installed through the same approval list, grants,
   first-use sheet, Permissions screen and Activity as any plugin. Its
   page says "Runs in its own app, outside droidtop; it reaches droidtop
-  only through droidtop's checks".
+  only through droidtop's checks". Built 2026-10-23:
+  - **"In your apps"** lists each app found, with droidtop's verdict.
+    - **Official** (a pinned certificate) or **trusted by you**: **Add**
+      installs it as a record waiting for approval in Installed.
+    - **Unofficial**, a key nobody trusted yet: its fingerprint, and
+      **Trust and add**, which asks first, keeps the key for that app alone
+      ("Apps you trust", under Keys you trust, with Stop trusting) and
+      installs it.
+    - **Refused**: one sentence saying why (an old-style signature, two
+      signers, a signer Android reports but the APK does not carry, a
+      manifest that is not this app's).
+    - An app already added is in Installed, not here. It shows here again
+      when the app changed, as **Review the new version**. The same key
+      keeps the approval; the new version's new items wait as any update's.
+  - **Its card** has no Unofficial chip only when signed by a pinned
+    official certificate, and its page says whose key signs it.
+  - **Uninstalling it** removes the plugin, not the app, and lets droidtop's
+    binding to the app go.
 
 ### 1.4 The broker
 

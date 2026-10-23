@@ -1381,7 +1381,7 @@ object AppSettingsCatalogs {
                     shown.forEach { (_, _, card) -> add(card) }
                 },
             ),
-        ) + providedByGroups(resolution, providerChoices) + listOf(
+        ) + listOfNotNull(appInterfacesGroup(context, installed)) + providedByGroups(resolution, providerChoices) + listOf(
             CatalogGroup(
                 id = "plugins_more",
                 title = null,
@@ -1404,6 +1404,68 @@ object AppSettingsCatalogs {
                 ),
             ),
         )
+    }
+
+    /**
+     * "In your apps" (docs/plugin-api.md 1.3, docs/SPEC.md 12a; Droidtop/tracker#547): the installed apps that carry a
+     * plugin, found with PackageManager and checked by droidtop's own reading of their signatures. Adding one installs
+     * it like any plugin: it waits for approval in Installed, with the same grants, Permissions screen and Activity. An
+     * app already added is in Installed, and shows here again only when the app changed and its new version waits.
+     * Null when no app carries one. Reads every such app's APKs (kept until they change): off the main thread.
+     */
+    private fun appInterfacesGroup(context: Context, installed: List<dev.droidtop.pluginhost.PluginRecord>): CatalogGroup? {
+        val found = runCatching { dev.droidtop.pluginhost.AppInterfaces.discover(context) }.getOrDefault(emptyList())
+        val items = found.mapNotNull { app ->
+            val record = installed.firstOrNull { it.manifest.kind == PluginKind.APP_INTERFACE && it.manifest.app?.packageName == app.packageName }
+            val cert = dev.droidtop.pluginhost.AppInterfaceTrust.certOf(app.verdict)
+            val current = record != null && cert.equals(record.approvedKeySha256, ignoreCase = true) &&
+                app.manifestBytes?.let { dev.droidtop.runtime.util.Sha256.hex(it) } == record.archiveDigest
+            if (current) return@mapNotNull null
+            appInterfaceRow(app, update = record != null)
+        }
+        if (items.isEmpty()) return null
+        return CatalogGroup(id = "plugins_apps", title = "In your apps", items = items)
+    }
+
+    /** One app that carries a plugin, as "In your apps" shows it: what droidtop decided about it, and how to add it. */
+    private fun appInterfaceRow(app: dev.droidtop.pluginhost.AppInterfaces.Found, update: Boolean): CatalogItem {
+        val verdict = app.verdict
+        val fingerprint = dev.droidtop.pluginhost.AppInterfaceTrust.certOf(verdict)?.let { PluginDangers.groupsOfFour(it) }
+        val refusal = (verdict as? dev.droidtop.pluginhost.AppInterfaceTrust.Verdict.Refused)?.reason ?: app.problem
+        val id = "plugins_app_${app.packageName}"
+        if (refusal != null) {
+            return ActionItem(id = id, title = app.appLabel, subtitle = "Can't be added: $refusal", run = {})
+        }
+        val runsIn = "Runs in its own app, outside droidtop; it reaches droidtop only through droidtop's checks"
+        fun add(ctx: Context): String {
+            val result = dev.droidtop.pluginhost.AppInterfaces.install(ctx, dev.droidtop.pluginhost.AppInterfaces.inspect(ctx, app.packageName, app.serviceName))
+            val record = result.getOrElse { return "${app.appLabel} can't be added: ${it.message}" }
+            pluginsChanged(ctx)
+            return if (record.trust == PluginTrustState.APPROVED) "${app.appLabel} is updated" else "${app.appLabel} is in Installed: approve it there to let it run"
+        }
+        return when (verdict) {
+            is dev.droidtop.pluginhost.AppInterfaceTrust.Verdict.NotTrusted -> AsyncActionItem(
+                id = id,
+                title = app.appLabel,
+                subtitle = "Unofficial: signed by a key you haven't trusted, $fingerprint. $runsIn",
+                value = "Trust and add",
+                confirmTitle = "Trust the key ${app.appLabel} is signed with ($fingerprint)? droidtop hasn't checked who holds it. " +
+                    "Its updates signed by the same key are trusted too",
+                run = { ctx, _ ->
+                    UserOriginKeys.trustApp(UserOriginKeys.storeFile(ctx), app.packageName, verdict.certSha256)
+                    dev.droidtop.pluginhost.AppInterfaces.recheck(app.packageName)
+                    add(ctx)
+                },
+            )
+            else -> AsyncActionItem(
+                id = id,
+                title = app.appLabel,
+                subtitle = (if (verdict is dev.droidtop.pluginhost.AppInterfaceTrust.Verdict.Official) "Official. " else "Unofficial, signed by a key you trust, $fingerprint. ") +
+                    (if (update) "The app changed: its new version waits for your approval. " else "") + runsIn,
+                value = if (update) "Review the new version" else "Add",
+                run = { ctx, _ -> add(ctx) },
+            )
+        }
     }
 
     /** The Plugins place's first group (Droidtop/tracker#513): getting plugins, above the installed list. */
@@ -1569,7 +1631,10 @@ object AppSettingsCatalogs {
             subtitle = m.presentation.summary ?: pluginSummary(m, enabledPoints),
             inline = pluginDetailScreen(m.id, m.label, m.presentation.summary),
             valueLabel = { "$state · v${m.version}" },
-            chip = if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
+            // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547).
+            chip = if (m.kind == PluginKind.APP_INTERFACE) {
+                if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) null else "Unofficial"
+            } else if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
             // Its own icon and its summary, always shown (#513, #514). Built on IO, like the whole list.
             iconFile = PluginStore.iconFile(context, record),
             summaryShown = true,
@@ -1652,7 +1717,11 @@ object AppSettingsCatalogs {
                 record.trust == PluginTrustState.APPROVED && record.enabled -> "Running"
                 else -> "Disabled"
             }
-            val trustLine = if (!PluginOriginKeys.isOfficial(m.origin) && !userKeys.containsKey(m.origin)) {
+            val trustLine = if (m.kind == PluginKind.APP_INTERFACE) {
+                // An app's plugin: trusted by the app's own signature, checked again before every run (Droidtop/tracker#547).
+                val key = PluginDangers.groupsOfFour(record.approvedKeySha256)
+                if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) "Official: signed by its maker's release key, $key" else "Unofficial: signed by a key you trust, $key"
+            } else if (!PluginOriginKeys.isOfficial(m.origin) && !userKeys.containsKey(m.origin)) {
                 "NOT TRUSTED: no trusted key for this origin anymore (see Keys you trust)"
             } else {
                 pluginTrustBadge(m.origin, userKeys, catalogNames)
@@ -1662,6 +1731,16 @@ object AppSettingsCatalogs {
             // (docs/SPEC.md 12a "Added catalogs"): from a catalog that is not droidtop's, it is Unofficial.
             // U3 (docs/SPEC.md 7, "Developer menu", "Notices"): an update from a different maker waits for the person, in caution, with the
             // fingerprints in Info; approving it asks in red (D3).
+            if (m.kind == PluginKind.APP_INTERFACE) {
+                add(
+                    ActionItem(
+                        id = "plugin_${m.id}_app",
+                        title = "Runs in its own app, outside droidtop",
+                        subtitle = "${m.app?.packageName}: it reaches droidtop only through droidtop's checks. $trustLine",
+                        run = {},
+                    ),
+                )
+            }
             if (record.trust == PluginTrustState.PENDING && record.replacedKeySha256 != null) {
                 add(
                     NoticeItem(
@@ -2833,6 +2912,41 @@ object AppSettingsCatalogs {
     private var pendingKeyManualKey = ""
     private var pendingKeyProposal: ProposedKey? = null
 
+    /** "Apps you trust": the app certificates trusted for an app's plugin, each for its one app, with Stop trusting. */
+    private suspend fun appKeysGroup(context: Context): CatalogGroup {
+        val apps = withContext(Dispatchers.IO) { UserOriginKeys.appEntries(UserOriginKeys.storeFile(context)) }
+        return CatalogGroup(
+            id = "plugin_keys_apps",
+            title = "Apps you trust",
+            items = if (apps.isEmpty()) {
+                listOf(ActionItem(id = "plugin_keys_apps_none", title = "No app keys added by you", subtitle = "An app's plugin signed by its maker's official key needs none", run = {}))
+            } else {
+                apps.entries.sortedBy { it.key }.flatMap { (packageName, cert) ->
+                    listOf(
+                        ActionItem(
+                            id = "plugin_key_app_$packageName",
+                            title = packageName,
+                            subtitle = "An app's plugin, trusted by you: NOT official. Key ${PluginDangers.groupsOfFour(cert)}",
+                            run = {},
+                        ),
+                        AsyncActionItem(
+                            id = "plugin_key_app_${packageName}_remove",
+                            title = "Stop trusting $packageName",
+                            subtitle = "Its plugin stops running until you trust its key again",
+                            confirmTitle = "Stop trusting the key $packageName is signed with?",
+                            run = { ctx, _ ->
+                                UserOriginKeys.forgetApp(UserOriginKeys.storeFile(ctx), packageName)
+                                dev.droidtop.pluginhost.AppInterfaces.recheck(packageName)
+                                pluginsChanged(ctx)
+                                "No longer trusting $packageName's key"
+                            },
+                        ),
+                    )
+                }
+            },
+        )
+    }
+
     private fun pluginKeysScreen() = CatalogScreen(
         id = SCREEN_PLUGIN_KEYS,
         title = "Keys you trust",
@@ -2901,6 +3015,8 @@ object AppSettingsCatalogs {
                         }
                     },
                 ),
+                // The app keys the person trusted for an app's plugin (Droidtop/tracker#547): each for one app alone.
+                appKeysGroup(context),
                 CatalogGroup(
                     id = "plugin_keys_source",
                     title = "Add a plugin source",

@@ -20769,7 +20769,13 @@ and work with each other over the plugin API so no matter what, saves go where t
   `app: {package, service}`) and exports one service answering `dev.droidtop.plugin.APP_INTERFACE` with droidtop's
   own `IPluginRuntime` binder. droidtop finds it with PackageManager and lists it under Plugins, "In your apps", and it
   is installed, approved, granted, asked at first use, listed under Permissions and logged under Activity like any
-  plugin. The one runner (`NativePluginRunner`) binds the app's service instead of a droidtop process; nothing else
+  plugin. "In your apps" shows each app found with droidtop's verdict:
+  - Official or trusted by the person: Add.
+  - An unknown key: its fingerprint, and Trust and add, asked first. The key is kept for that app alone, under "Apps
+    you trust" in Keys you trust.
+  - Refused: why, in one sentence.
+
+  An app already added is in Installed, and shows here again only when the app changed ("Review the new version"). The one runner (`NativePluginRunner`) binds the app's service instead of a droidtop process; nothing else
   about running a plugin changes.
 - **Trust is the app's Android signature, checked by droidtop in process.** Every APK of the app (base and splits) is
   read once from an open descriptor, its v2/v3 signature block verified with apksig, the signer compared with what
