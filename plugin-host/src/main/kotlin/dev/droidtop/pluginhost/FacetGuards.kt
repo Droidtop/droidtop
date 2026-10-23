@@ -235,6 +235,19 @@ object FacetGuards {
 
     fun targetKey(target: String): String = TARGET_KEY_PREFIX + target
 
+    /** The grant-file key of the person's switch for one facet on one target ("the hidden facets to show again"). */
+    const val FACET_KEY_PREFIX = "facet:"
+
+    fun facetKey(target: String, facetId: String): String = "$FACET_KEY_PREFIX$target/$facetId"
+
+    /** The person's switch for one facet: shown unless they turned it off under "Where it appears". */
+    fun facetOn(snapshot: PluginGrants.Snapshot, target: String, facetId: String): Boolean =
+        snapshot.states[facetKey(target, facetId)] != GrantState.DENIED
+
+    /** [facets] less the ones the person hid on [target]. A hidden facet is not drawn, and its group goes with it. */
+    fun unhidden(facets: List<Facet>, target: String, snapshot: PluginGrants.Snapshot): List<Facet> =
+        facets.filter { facetOn(snapshot, target, it.id) }
+
     /** The person's switch for [target]: on unless they turned it off, and always on for the plugin's own pages. */
     fun targetOn(snapshot: PluginGrants.Snapshot, target: String): Boolean =
         target in OWN_PAGES || snapshot.states[targetKey(target)] != GrantState.DENIED
