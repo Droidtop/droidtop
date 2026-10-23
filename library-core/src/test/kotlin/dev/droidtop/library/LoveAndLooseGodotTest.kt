@@ -42,6 +42,22 @@ class LoveAndLooseGodotTest {
     }
 
     @Test
+    fun `a LOVE game is a game-named love file with a note beside it`() {
+        // The rig's library (tracker#577, comment 6355065043): the share root holds Manual beside the store folders.
+        file("Manual/love2d/Mari0 Community Edition/Mari0_Community_Edition_v1.6.love", "PK")
+        file("Manual/love2d/Mari0 Community Edition/SOURCE.txt", "https://example.test/mari0")
+        file("Manual/love2d/Mari0 Community Edition/enginehost.json", "{\"engine\":\"love2d\"}")
+        file("Manual/love2d/Thermomorph/SOURCE.txt", "https://example.test/thermomorph")
+        file("Manual/love2d/Thermomorph/thermomorph.love", "PK")
+        file("Manual/Extracted/readme.txt")
+        file("Manual/ags/Game/acsetup.cfg")
+
+        val love = GameEngineDetector.scan(tmp.root, emptyMap(), defs).filter { it.engine == GameEngine.LOVE2D }
+
+        assertEquals(listOf("Mari0 Community Edition", "Thermomorph"), love.map { it.displayFolder.name }.sorted())
+    }
+
+    @Test
     fun `a main lua without love conf is not a LOVE game`() {
         file("Other/Thing/main.lua", "print('hi')")
         assertEquals(emptyList<DetectedGame>(), GameEngineDetector.scan(tmp.root, emptyMap(), defs))
