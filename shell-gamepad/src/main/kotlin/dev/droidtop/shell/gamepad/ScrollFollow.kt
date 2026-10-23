@@ -63,12 +63,26 @@ internal suspend fun LazyListState.keepInView(index: Int, animate: Boolean = tru
                     (first.offset - roomTop) - (first.index - index) * perItem
                 }
             }
-            row.offset < roomTop -> (row.offset - roomTop).toFloat()
-            row.offset + row.size > roomBottom -> (row.offset + row.size - roomBottom).toFloat()
-            else -> return
+            else -> inViewDelta(row.offset, row.size, roomTop, roomBottom) ?: return
         }
         if (animate) animateScrollBy(delta, Motion.scroll(chained = isScrollInProgress)) else scrollBy(delta)
     }
+}
+
+/**
+ * How far to scroll so an item laid out at [itemStart], [itemSize] long, is in the room from [roomStart] to
+ * [roomEnd], by as little as it takes; null when it already is. Positive scrolls forward. An item longer than the
+ * room shows its start, so moving inside it never scrolls (Droidtop/tracker#616: Home's first row, taller than the
+ * screen, scrolled down to its end and back up to its start on every left or right). Pure, for the tests.
+ */
+internal fun inViewDelta(itemStart: Int, itemSize: Int, roomStart: Int, roomEnd: Int): Float? {
+    val delta = when {
+        itemSize > roomEnd - roomStart -> itemStart - roomStart
+        itemStart < roomStart -> itemStart - roomStart
+        itemStart + itemSize > roomEnd -> itemStart + itemSize - roomEnd
+        else -> 0
+    }
+    return delta.takeIf { it != 0 }?.toFloat()
 }
 
 /** [LazyListState.keepInView] for a grid: rows instead of items. */
@@ -94,9 +108,7 @@ internal suspend fun LazyGridState.keepInView(index: Int, animate: Boolean = tru
                     (first.offset.y - top) - ((first.index - index + columns - 1) / columns) * perRow
                 }
             }
-            item.offset.y < top -> (item.offset.y - top).toFloat()
-            item.offset.y + item.size.height > bottom -> (item.offset.y + item.size.height - bottom).toFloat()
-            else -> return
+            else -> inViewDelta(item.offset.y, item.size.height, top, bottom) ?: return
         }
         if (animate) animateScrollBy(delta, Motion.scroll(chained = isScrollInProgress)) else scrollBy(delta)
     }

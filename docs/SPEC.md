@@ -7944,6 +7944,16 @@ key code or an edge.
   `GridPad`. A held direction follows without animating each step, so the
   scroll keeps up with the cursor instead of restarting an animation on
   every repeat.
+  Two rules keep it true (console, 0.2.0-dev.2272, Droidtop/tracker#616: "dpad navigation is kinda broken... On
+  home, and the plugins screen. Scrolling with it doesn't seem to work"):
+  - **A scrolling list under a header takes the height left**, `Modifier.weight(1f)`, never `fillMaxSize()`. At the
+    full height its end ran off the screen, where a row the cursor reached counted as shown and was never scrolled
+    to (Home under its band, a setting's choice list under its title).
+  - **An item taller than the list shows its start** (`inViewDelta`): it used to scroll to its end and back to its
+    start on every move inside it. And a stop of its own is an item of its own: Home's strip is no longer drawn
+    inside the first shelf's item (`HomeColumn`), so moving along the games row never scrolls the page.
+  `ScrollFollowTest` holds the rule. Home's shelves are also set once per change, not twice (without Recommended,
+  then with it), so the cursor's shelf does not shift and restart the scroll on every update.
 
 **4. The selection is drawn only while a pad or keyboard drives
 (Droidtop/tracker#159).** Pointer and focus stay one selection: a tap

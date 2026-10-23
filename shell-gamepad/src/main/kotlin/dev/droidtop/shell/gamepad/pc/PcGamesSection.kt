@@ -3,8 +3,6 @@ package dev.droidtop.shell.gamepad.pc
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -512,9 +510,10 @@ internal fun PcGamesSection(
         val all = games ?: return@LaunchedEffect
         onHomeActivityChanged(all + others)
         val own = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others, options = ownership, isRecentlyAdded = recentlyAdded)) }
-        val next = own + pluginShelfList
-        if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
-        homeShelfList = next
+        // The first paint shows Home's own rows before the slower ones below. After that the list is set once per
+        // change: set twice (without Recommended, then with it) the shelves shifted under the cursor and the
+        // scroll that follows it restarted on every update (Droidtop/tracker#616).
+        if (homeShelfList.isEmpty()) homeShelfList = own + pluginShelfList
         val home = all + others
         // Droidtop's own recommendations, after Home's own rows (Droidtop/tracker#611): the recommender names games the
         // person has and has not played that look like what they do play. Home only; worked out off the main thread.
@@ -532,10 +531,11 @@ internal fun PcGamesSection(
         val fresh = withContext(Dispatchers.IO) {
             pluginHomeShelves(dev.droidtop.library.integrations.PluginShelves.shelvesFor(context, home), home)
         }
-        if (fresh != pluginShelfList || recommended != null) {
-            pluginShelfList = fresh
-            if (state.home && !state.stripFocused) keepCursor(homeShelfList, ownRows + fresh)
-            homeShelfList = ownRows + fresh
+        pluginShelfList = fresh
+        val next = ownRows + fresh
+        if (next != homeShelfList) {
+            if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
+            homeShelfList = next
         }
     }
     // The collections pinned as tabs, by id and name: Overview's shelves when the library has one source.
@@ -884,8 +884,7 @@ internal fun PcGamesSection(
     val homeCardsState = rememberLazyListState()
     LaunchedEffect(onHomeStrip, state.homeCard, state.homeTab) {
         if (onHomeStrip) {
-            // The strip is drawn inside the games row's item (or alone, first, on an empty Home).
-            columnState.keepInView(0, animate = !heldStep)
+            columnState.keepInView(HomeColumn.strip(shelves.size), animate = !heldStep)
             if (homeTab?.cards?.isNotEmpty() == true) homeCardsState.keepCentred(state.homeCard, chained = heldStep)
         }
     }
@@ -893,11 +892,11 @@ internal fun PcGamesSection(
         when {
             onHomeStrip -> Unit
             state.stripFocused -> stripState.keepCentred(state.stripIndex, chained = heldStep)
-            onDest -> columnState.keepInView(shelves.size + (if (state.home && shelves.isEmpty()) 1 else 0), animate = !heldStep)
+            onDest -> columnState.keepInView(HomeColumn.destinations(state.home, shelves.size), animate = !heldStep)
             onTiles -> if (tiles.isNotEmpty()) tilesState.keepCentred(gridIndexOfTile(collectionGroupList, state.itemIndex), chained = heldStep)
             state.onShelves -> {
                 val shelf = shelves.getOrNull(state.shelfIndex) ?: return@LaunchedEffect
-                columnState.keepInView(state.shelfIndex, animate = !heldStep)
+                columnState.keepInView(HomeColumn.shelf(state.home, state.shelfIndex), animate = !heldStep)
                 rowState(shelf.id).keepCentred(state.itemIndex, chained = heldStep)
             }
             else -> if (grid.isNotEmpty()) gridState.keepCentred(state.itemIndex, chained = heldStep)
@@ -1669,7 +1668,9 @@ private fun PcShelvesHome(
     }
     LazyColumn(
         state = columnState,
-        modifier = Modifier.fillMaxSize(),
+        // What is left under the band, not the whole page: the full height ran the list's end off the screen, where
+        // a row the cursor reached counted as shown and was never scrolled to (Droidtop/tracker#616).
+        modifier = Modifier.weight(1f).fillMaxWidth(),
         contentPadding = PaddingValues(
             top = Space.Sm,
             bottom = Space.Lg,
@@ -1681,61 +1682,61 @@ private fun PcShelvesHome(
         if (home != null && shelves.isEmpty()) {
             item(key = "home-strip") { HomeStripItem(home, state) }
         }
-        itemsIndexed(shelves, key = { _, shelf -> shelf.id }) { shelfIndex, shelf ->
-            val onThisShelf = !state.stripFocused && !onDest && !(home?.onStrip ?: false) && state.shelfIndex == shelfIndex
-            Column(if (entered) Modifier else Modifier.rise(shelfIndex)) {
-                // The hero row of what was being played carries no heading,
-                // as the Deck's recent row has none: the hero card's own
-                // caption ("Played today · 2 h") says what the row is.
-                // Steam's shelf heading: the heading weight, quieter until
-                // the cursor is on the shelf.
-                // Home's games row is headed "Recent games" (the final design on tracker#485, B.2).
-                if (home != null || !(shelfIndex == 0 && shelf.id == SHELF_CONTINUE)) Text(
-                    shelf.heading,
-                    color = if (onThisShelf) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-                    style = TypeRole.screenTitle,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(
-                            start = window.edgePadding,
-                            end = window.edgePadding,
-                            bottom = Space.Sm,
-                        )
-                        .focusRing(onThisShelf && state.headingFocused, dev.droidtop.shell.gamepad.Corners.Crisp)
-                        .clickable { onOpenShelf(shelf) },
-                )
-                LazyRow(
-                    state = rowState(shelf.id),
-                    contentPadding = PaddingValues(horizontal = window.edgePadding),
-                    horizontalArrangement = Arrangement.spacedBy(Space.Md),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    itemsIndexed(shelf.entries, key = { _, entry -> entry.id }) { itemIndex, entry ->
-                        // The game most likely wanted leads the first shelf as a
-                        // landscape hero card (docs/SPEC.md 7i, "Home art").
-                        val hero = isHeroCard(shelfIndex, itemIndex)
-                        PcCapsule(
-                            entry = entry,
-                            selected = onThisShelf && !state.headingFocused && state.itemIndex == itemIndex,
-                            width = if (hero) heroCardWidth else width,
-                            onTap = { onTapCapsule(shelfIndex, itemIndex, entry) },
-                            onLongPress = { onLongPressCapsule(entry) },
-                            download = entry.downloadKey()?.let { downloads[it] },
-                            parts = partsOf(entry),
-                            hero = hero,
-                            // What each game is and where it is from, where that tells the cards apart (#496).
-                            badge = pageBadges.of(badgeOf(entry)),
-                            nameUnder = namesUnder,
-                        )
+        shelves.forEachIndexed { shelfIndex, shelf ->
+            item(key = shelf.id) {
+                val onThisShelf = !state.stripFocused && !onDest && !(home?.onStrip ?: false) && state.shelfIndex == shelfIndex
+                Column(if (entered) Modifier else Modifier.rise(shelfIndex)) {
+                    // The hero row of what was being played carries no heading,
+                    // as the Deck's recent row has none: the hero card's own
+                    // caption ("Played today · 2 h") says what the row is.
+                    // Steam's shelf heading: the heading weight, quieter until
+                    // the cursor is on the shelf.
+                    // Home's games row is headed "Recent games" (the final design on tracker#485, B.2).
+                    if (home != null || !(shelfIndex == 0 && shelf.id == SHELF_CONTINUE)) Text(
+                        shelf.heading,
+                        color = if (onThisShelf) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
+                        style = TypeRole.screenTitle,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(
+                                start = window.edgePadding,
+                                end = window.edgePadding,
+                                bottom = Space.Sm,
+                            )
+                            .focusRing(onThisShelf && state.headingFocused, dev.droidtop.shell.gamepad.Corners.Crisp)
+                            .clickable { onOpenShelf(shelf) },
+                    )
+                    LazyRow(
+                        state = rowState(shelf.id),
+                        contentPadding = PaddingValues(horizontal = window.edgePadding),
+                        horizontalArrangement = Arrangement.spacedBy(Space.Md),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        itemsIndexed(shelf.entries, key = { _, entry -> entry.id }) { itemIndex, entry ->
+                            // The game most likely wanted leads the first shelf as a
+                            // landscape hero card (docs/SPEC.md 7i, "Home art").
+                            val hero = isHeroCard(shelfIndex, itemIndex)
+                            PcCapsule(
+                                entry = entry,
+                                selected = onThisShelf && !state.headingFocused && state.itemIndex == itemIndex,
+                                width = if (hero) heroCardWidth else width,
+                                onTap = { onTapCapsule(shelfIndex, itemIndex, entry) },
+                                onLongPress = { onLongPressCapsule(entry) },
+                                download = entry.downloadKey()?.let { downloads[it] },
+                                parts = partsOf(entry),
+                                hero = hero,
+                                // What each game is and where it is from, where that tells the cards apart (#496).
+                                badge = pageBadges.of(badgeOf(entry)),
+                                nameUnder = namesUnder,
+                            )
+                        }
                     }
                 }
-                // Home's strip sits under the games row (docs/SPEC.md 7i, "Home").
-                if (home != null && shelfIndex == 0) {
-                    Spacer(Modifier.height(Space.Xl))
-                    HomeStripItem(home, state)
-                }
             }
+            // Home's strip sits under the games row (docs/SPEC.md 7i, "Home"), as an item of its own, so following
+            // the cursor along the games row never scrolls to the strip and back ([HomeColumn]).
+            if (home != null && shelfIndex == 0) item(key = "home-strip") { HomeStripItem(home, state) }
         }
         // Home's way to the libraries: the Retro and PC menus, the last stop of
         // the one list rather than a bar above it.
@@ -1748,6 +1749,19 @@ private fun PcShelvesHome(
         }
     }
     }
+}
+
+/**
+ * Where each stop of the shelves page is in its one column (Droidtop/tracker#616). Home's strip is an item of its
+ * own right after the first shelf, or first on an empty Home; the destinations end the column. PC Games' Overview
+ * has no strip. Pure, for the tests.
+ */
+internal object HomeColumn {
+    fun shelf(home: Boolean, shelf: Int): Int = if (home && shelf > 0) shelf + 1 else shelf
+
+    fun strip(shelfCount: Int): Int = if (shelfCount == 0) 0 else 1
+
+    fun destinations(home: Boolean, shelfCount: Int): Int = if (home) shelfCount + 1 else shelfCount
 }
 
 /** What Home adds to the shelves page: the band's data and taps, and the strip's cursor and taps. */
