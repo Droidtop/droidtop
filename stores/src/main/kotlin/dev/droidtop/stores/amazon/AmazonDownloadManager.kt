@@ -35,6 +35,15 @@ internal class AmazonDownloadManager(
         private const val MAX_RETRIES = 3
         private const val RETRY_DELAY_MS = 1000L
         private const val TAG = "Amazon"
+
+        /**
+         * The start of the downloads-area names of [productId]'s files, so a discarded install deletes its own partial
+         * files and not another game's. Pure.
+         */
+        fun areaPrefix(productId: String): String = "amazon_" + productId.replace(Regex("[^A-Za-z0-9._-]"), "_") + "_"
+
+        /** The downloads-area name of [productId]'s file with the SHA-256 [hashHex]. Pure. */
+        fun areaName(productId: String, hashHex: String): String = areaPrefix(productId) + hashHex
     }
 
     /** Download and install an Amazon game. */
@@ -125,6 +134,7 @@ internal class AmazonDownloadManager(
                     async {
                         downloadFileWithRetry(
                             context = context,
+                            productId = productId,
                             baseUrl = baseUrl,
                             file = file,
                             installDir = installDir,
@@ -196,6 +206,7 @@ internal class AmazonDownloadManager(
 
     private suspend fun downloadFileWithRetry(
         context: Context,
+        productId: String,
         baseUrl: String,
         file: AmazonManifest.ManifestFile,
         installDir: File,
@@ -207,7 +218,7 @@ internal class AmazonDownloadManager(
                 throw CancellationException("Download cancelled")
             }
 
-            val result = downloadFile(context, baseUrl, file, installDir, downloadInfo)
+            val result = downloadFile(context, productId, baseUrl, file, installDir, downloadInfo)
             if (result.isSuccess) return result
 
             lastException = result.exceptionOrNull() as? Exception
@@ -232,6 +243,7 @@ internal class AmazonDownloadManager(
      */
     private suspend fun downloadFile(
         context: Context,
+        productId: String,
         baseUrl: String,
         file: AmazonManifest.ManifestFile,
         installDir: File,
@@ -261,7 +273,7 @@ internal class AmazonDownloadManager(
             // nile uses /files/{hash_hex} per downloading/manager.py, NOT the unix path
             val hashHex = file.hashBytes.joinToString("") { "%02x".format(it) }
             val url = appendPath(baseUrl, "files/$hashHex")
-            val areaName = "amazon_$hashHex"
+            val areaName = areaName(productId, hashHex)
             var counted = 0L
             val fetched = DownloadJobs.fetchForJob(
                 context, url, areaName, headers = mapOf("User-Agent" to "nile/0.1 Amazon"), tellJob = false,

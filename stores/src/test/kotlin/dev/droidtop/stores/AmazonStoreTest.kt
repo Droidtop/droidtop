@@ -1,5 +1,6 @@
 package dev.droidtop.stores
 
+import dev.droidtop.stores.amazon.AmazonDownloadManager
 import dev.droidtop.stores.amazon.AmazonManifest
 import dev.droidtop.stores.amazon.AmazonStore
 import java.io.ByteArrayOutputStream
@@ -16,6 +17,15 @@ class AmazonStoreTest {
         assertEquals("All 12 files match", AmazonStore.verifyLine(12, missing = 0, changed = 0))
         assertEquals("2 missing of 12 files. Install again to repair them", AmazonStore.verifyLine(12, missing = 2, changed = 0))
         assertEquals("1 missing, 3 changed of 12 files. Install again to repair them", AmazonStore.verifyLine(12, missing = 1, changed = 3))
+    }
+
+    @Test
+    fun `a game's partial downloads are named by its product, so discarding one game leaves another's`() {
+        val name = AmazonDownloadManager.areaName("amzn1.adg.product.ab-12", "00ff")
+        assertEquals("amazon_amzn1.adg.product.ab-12_00ff", name)
+        assertTrue(name.startsWith(AmazonDownloadManager.areaPrefix("amzn1.adg.product.ab-12")))
+        assertTrue(!name.startsWith(AmazonDownloadManager.areaPrefix("amzn1.adg.product.ab")))
+        assertEquals("amazon_a_b_", AmazonDownloadManager.areaPrefix("a/b"))
     }
 
     /** One uncompressed manifest: a header saying "no compression", a body with one package of one file. */
