@@ -248,10 +248,11 @@ meaning, and a v1 manifest is translated into this shape by one function
   this version of droidtop", so the user sees what the plugin wanted and
   did not get.
 
-### 1.3 Three kinds, one contract: one adapter per kind
+### 1.3 Four kinds, one contract: one adapter per kind
 
-`PluginKind` (`native_bundle`, `python`, `flutter_embed`) says how a
-plugin's code is *loaded*. It never decides what that code may *do*.
+`PluginKind` (`native_bundle`, `python`, `flutter_embed`, `app_interface`)
+says how a plugin's code is *loaded*. It never decides what that code may
+*do*.
 Each kind has exactly one adapter, and the adapter's only job is to carry
 the same envelope in both directions:
 
@@ -358,6 +359,65 @@ The rules that make this "no kind-specific features":
 3. **A new kind is a new adapter plus a pass of the same conformance
    script,** and nothing else. This is what `PluginKind`'s own doc
    comment already asks for ("add a case and a matching runner").
+
+**`app_interface`: an installed app as a plugin (Droidtop/tracker#547;
+contract 2026-10-23).** The owner: "This is a third plugin type,
+"application interface". It's a plugin that's also another app. It has to
+go through the same approvals and everything as a normal plugin, and is
+therefore granted permissions the same way. The API is the gate for
+everything", and "Applications interface plugins don't get a special
+signing certificate. They use the android signature. This also means
+using root to bypass the signature check will STILL trip our trust
+store". Its adapter is the app itself:
+
+- **The manifest** is an APK asset, `assets/droidtop-plugin.json`: a
+  contract 3 manifest with `"kind": "app_interface"` and
+  `"app": {"package", "service"}` (the APK's own package and its service
+  class), and no `payload` or `entryClass`. `host.full_trust` and
+  `gpu.render` are refused for this kind: the app never runs in a droidtop
+  process. Its `version` moves whenever the asset changes, and droidtop
+  treats a changed asset as an update (new points and permissions wait for
+  approval).
+- **The service** is exported with the action
+  `dev.droidtop.plugin.APP_INTERFACE` and returns an `IPluginRuntime`
+  binder built from droidtop's own AIDL, copied unchanged:
+  `plugin-host/src/main/aidl/dev/droidtop/pluginhost/IPluginRuntime.aidl`,
+  `IPluginHostBroker.aidl` and `IPluginRuntimeCallback.aidl` (package
+  `dev.droidtop.pluginhost`; methods are only ever appended). droidtop
+  binds it and calls `loadContained(pluginId, manifestJson, [], [],
+  broker)` with the manifest droidtop verified itself, then `handle`,
+  `startJob`, `cancelJob`, `registerCallback` and `unloadPlugin` as for any
+  plugin; `attachScreen`, `invoke` and `attachRelay` are never called. The
+  service answers only droidtop (`Binder.getCallingUid()` is
+  `dev.droidtop.app` with droidtop's certificate).
+- **Trust is the APK's own signature, checked by droidtop itself.**
+  droidtop opens `sourceDir` and every split once each, verifies their APK
+  Signature Scheme v2 or v3 blocks in process, requires one signer for all
+  of them and the same signer PackageManager reports, and reads the
+  manifest asset from the same open file. A pinned official app
+  certificate gives "Official"; any other signer is trusted only through
+  "Keys you trust" (an entry with `app: {package, certSha256}`) and shows
+  "Unofficial". A disagreement with PackageManager (a device with its
+  signature checks patched out), a v1-only APK or a failed check refuses
+  the plugin: "Its app's signature could not be checked, so droidtop won't
+  use it". It is checked again on every package update; a v3 key rotation
+  keeps trust only through a verified rotation lineage.
+- **The broker is the only way in.** Everything the app does with
+  droidtop is a broker call (declared, granted, rate-limited, logged).
+  droidtop exports one more thing for this kind, the **door**: a service
+  with the action `dev.droidtop.plugin.APP_INTERFACE_DOOR` whose binder has
+  one method, `boolean knock()` (`IAppInterfaceDoor.aidl`). An installed,
+  approved, verified app_interface plugin's app calls it when it needs
+  droidtop and has no broker (it started a game on its own); droidtop
+  checks the calling uid against that plugin, binds the app's service and
+  hands it its broker in `loadContained`. Any other caller gets `false`
+  and nothing happens. The door carries no data.
+- **Where it shows:** under Plugins, "In your apps", found with
+  PackageManager (apps whose service answers the action and whose APK
+  carries the asset), installed through the same approval list, grants,
+  first-use sheet, Permissions screen and Activity as any plugin. Its
+  page says "Runs in its own app, outside droidtop; it reaches droidtop
+  only through droidtop's checks".
 
 ### 1.4 The broker
 
@@ -2188,6 +2248,38 @@ Risk —.
 - **Status:** not built.
 - **Rules:** the host hands the plugin read or write file descriptors
   for the save paths it resolved itself. The plugin never picks a path.
+
+**A7a Where saves are, both ways (Droidtop/tracker#547, contract
+2026-10-23).** EP `saves.locations@1` (risk low) and host API `saves`
+(permission `saves.exchange`, normal). The owner: "The two applications
+should detect and work with each other over the plugin API so no matter
+what, saves go where they're needed". Which app launched a game makes no
+difference:
+- **droidtop asks the plugin (EP `saves.locations@1`):**
+  `list {games: [{gameId, path, engine?, title?}]}` →
+  `{games: [{gameId, locations: [{path, place, engineNames?}]}]}`, `place`
+  one of `game_folder`, `runner_folder`, `runner_root` (with
+  `engineNames: true` when the engine picks its own folder inside the
+  root, which stays the save model's rule, Droidtop/tracker#546). Facts for
+  the save model; droidtop writes nothing because of them alone. Asked
+  when it needs the answer, kept for one hour.
+- **The plugin asks droidtop (host API `saves`, permission
+  `saves.exchange`):**
+  - `saves where {path, engine?, title?}` → `{known: true, gameId,
+    saveRoot, synced}` or `{known: false}`: the folder droidtop keeps (and
+    syncs) a game's saves in, the one it passes in its own launch, for the
+    game at `path`, asked before the game starts, whoever starts it.
+    `saveRoot: null` means the plugin's own default. droidtop answers only
+    about the folder the plugin names and never lists its library.
+  - `saves changed {path, saveFolder, reason?, endedAtMs?}` →
+    `{accepted, synced?, message}`: the game at `path` wrote saves in
+    `saveFolder`. droidtop adopts and backs them up into its own folder for
+    the game and syncs them when the game's saves are synced, as after a
+    game it launched.
+- **Without a broker yet:** the plugin's app knocks on droidtop's door
+  (§1.3, `app_interface`), gets its broker within seconds, and asks or
+  tells then.
+- **Status:** contract only (2026-10-23); being built.
 
 **A8 Achievements.** EP `achievements.provider@1`. Risk medium.
 - **For:** achievement sets and progress, for example RetroAchievements

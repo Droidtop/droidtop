@@ -20734,6 +20734,39 @@ components, and get no surface family of their own yet.
   Start menu and home-screen actions (`launcher.actions`), context actions on
   an app or a window, file associations, widget lines.
 
+**Application interface plugins: an installed app as a plugin (Droidtop/tracker#547; contract 2026-10-23).**
+The owner (2026-10-14): "This is a third plugin type, "application interface". It's a plugin that's also another
+app. It has to go through the same approvals and everything as a normal plugin, and is therefore granted permissions
+the same way. The API is the gate for everything"; "Applications interface plugins don't get a special signing
+certificate. They use the android signature. This also means using root to bypass the signature check will STILL trip
+our trust store"; and on the old direct Enginehost contract, "The point of the API is to be the point of contact
+between "droidtop" and "not droidtop". It's a security layer". Then (2026-10-23): "The two applications should detect
+and work with each other over the plugin API so no matter what, saves go where they're needed". So:
+- **The kind `app_interface`.** An app carries a contract 3 manifest as an APK asset (`droidtop-plugin.json`, with
+  `app: {package, service}`) and exports one service answering `dev.droidtop.plugin.APP_INTERFACE` with droidtop's
+  own `IPluginRuntime` binder. droidtop finds it with PackageManager and lists it under Plugins, "In your apps", and it
+  is installed, approved, granted, asked at first use, listed under Permissions and logged under Activity like any
+  plugin. The one runner (`NativePluginRunner`) binds the app's service instead of a droidtop process; nothing else
+  about running a plugin changes.
+- **Trust is the app's Android signature, checked by droidtop in process.** Every APK of the app (base and splits) is
+  read once from an open descriptor, its v2/v3 signature block verified with apksig, the signer compared with what
+  PackageManager reports, and the manifest asset read from the same descriptor. Pinned official app certificates are
+  Official; any other signer is trusted only through "Keys you trust" (an `app` entry) and shows Unofficial. A
+  disagreement with PackageManager, a v1-only APK or a failed check refuses the plugin in one sentence, so a rooted
+  device that patched out Android's signature checks still trips droidtop's trust store. Verified again on every
+  package update (the cache key is size, mtime and `lastUpdateTime`, never the version code alone).
+- **The broker is the only way in, and a door lets the app ask for it.** All data goes through the plugin's broker.
+  droidtop exports one service for this kind, the door (`dev.droidtop.plugin.APP_INTERFACE_DOOR`, one method
+  `knock()`): an approved, verified app_interface plugin's app knocks when it needs droidtop and has no broker, and
+  droidtop binds it and hands its broker over. It carries no data and answers no one else.
+- **Saves, both ways** (docs/plugin-api.md 3 A7a). droidtop asks the plugin where a game's saves are
+  (`saves.locations@1`); the plugin asks droidtop where a game's saves belong (`saves where`) before starting a game,
+  and tells it when a game wrote saves (`saves changed`) after, whichever app launched the game. droidtop adopts, backs
+  up and syncs them as after a game it launched itself.
+- **The old contract goes.** The `GAME_ENDED` broadcast receiver stays only until the Enginehost release that carries
+  its plugin is out. The LAUNCH intent stays for now (starting another app's activity is navigation, not data); moving
+  launch onto the API is a follow-up.
+
 **The API surface** (`PluginCapability`, a closed set — the trust shape
 differs per capability, same reasoning §12's `IntegrationCapability`
 already uses):
