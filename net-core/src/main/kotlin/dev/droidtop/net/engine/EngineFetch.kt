@@ -191,10 +191,12 @@ object EngineFetch {
         io: CoroutineDispatcher = Dispatchers.IO,
         /** A host's addresses, for the local-network pass ([LocalAddresses.passesFor]). */
         lookup: (String) -> List<java.net.InetAddress> = { java.net.InetAddress.getAllByName(it).toList() },
+        /** Where an address ends up after its redirects, for saying why the engine refused it ([refusal]). */
+        follow: (String) -> String = { RedirectGuard.resolve(it, emptyMap(), allow = {}).url },
     ) {
         var restarted = false
         retrying(
-            attempt = { attempt(engine, request, restarted, report, size, resolve, io, lookup) },
+            attempt = { attempt(engine, request, restarted, report, size, resolve, io, lookup, follow) },
             restart = {
                 withContext(io) { request.files().forEach { it.delete() } }
                 restarted = true
@@ -262,6 +264,25 @@ object EngineFetch {
 
     private const val RETRY_NETWORK = -1
 
+    /** aria2's "unknown error", which is also what a connect the engine's broker refused comes back as. */
+    private const val UNKNOWN_ERROR = 1
+
+    /**
+     * Why the engine's broker refused [url], in a sentence, when that is what an [UNKNOWN_ERROR] was; null otherwise.
+     * The broker refuses every local address it holds no pass for (docs/SPEC.md 12a, "The local network"): a download
+     * droidtop sent to the person's own server had one ([hadPass]), so its refusal means that server could not be
+     * reached; one that had none and ends on the local network got there by a redirect aria2 followed, from a site
+     * onto the person's own network, which droidtop never lets through.
+     */
+    internal fun refusal(url: String, hadPass: Boolean, lookup: (String) -> List<java.net.InetAddress>, follow: (String) -> String): String? {
+        val host = runCatching { java.net.URI(url).host }.getOrNull() ?: return null
+        if (hadPass) return "droidtop could not reach $host on your local network"
+        val end = runCatching { follow(url) }.getOrNull() ?: return null
+        if (LocalAddresses.passesFor(end, lookup).isEmpty()) return null
+        val local = runCatching { java.net.URI(end).host }.getOrNull() ?: end
+        return "$host sent this download on to $local, an address on your local network, and droidtop does not follow a site onto your own network"
+    }
+
     /** One add and watch. Null code: the file is whole. */
     private suspend fun attempt(
         engine: TransferEngine,
@@ -272,6 +293,7 @@ object EngineFetch {
         resolve: (String, Map<String, String>) -> RedirectGuard.Resolved,
         io: CoroutineDispatcher,
         lookup: (String) -> List<java.net.InetAddress>,
+        follow: (String) -> String,
     ): End {
         val resolved = withContext(io) { resolve(request.url, request.headers) }
         val options = EngineOptions.forRequest(request.destination.name, resolved.headers)
@@ -297,6 +319,9 @@ object EngineFetch {
                     }
                     "error" -> {
                         settled = true
+                        if (transfer.errorCode == UNKNOWN_ERROR) {
+                            withContext(io) { refusal(resolved.url, passes.isNotEmpty(), lookup, follow) }?.let { throw TransferException(it) }
+                        }
                         return End(transfer.errorCode, maxOf(completed, transfer.completedLength))
                     }
                     "removed" -> throw EngineGoneException("the engine dropped the download")
