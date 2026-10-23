@@ -8,6 +8,10 @@ import dev.droidtop.library.LaunchFacts
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryKinds
+import dev.droidtop.library.saves.ReportedSaveFolders
+import dev.droidtop.library.saves.ReportedSaves
+import dev.droidtop.library.saves.SaveHandoff
+import dev.droidtop.library.saves.SaveSyncEngines
 import dev.droidtop.library.stores.EnginehostSaves
 import dev.droidtop.library.stores.StoreSaves
 import dev.droidtop.library.toLibraryEntryKind
@@ -71,17 +75,18 @@ class AppInterfaceSaves(
         if (EnginehostSaves.readableSaveFolder(saveFolder) == null) {
             return@runBlocking refused("droidtop takes saves only from a folder in shared storage or on a card, and $saveFolder is not one")
         }
-        val storeKey = EnginehostSaves.storeKeyOf(game.entry.id, game.entry.pcInfo?.storeId)
-            ?: return@runBlocking JSONObject().put("accepted", true).put("synced", false)
-                .put("message", "droidtop does not sync this game's saves; they stay where the game wrote them")
-        if (!EnginehostSaves.prepare(context, storeKey, File(game.path))) {
-            return@runBlocking refused("droidtop could not make its folder for this game's saves")
-        }
-        val title = GameNaming.displayName(game.entry.title)
-        val upload = EnginehostSaves.afterGameEnded(context, storeKey, game.path, saveFolder)
-        if (upload) StoreSaves.afterExit(context, storeKey, title)
-        JSONObject().put("accepted", true).put("synced", true)
-            .put("message", if (upload) "droidtop is uploading $title's saves" else "nothing of $title's saves to upload")
+        val saves = ReportedSaves(
+            gameId = game.entry.id,
+            title = GameNaming.displayName(game.entry.title),
+            gameFolder = game.path,
+            saveFolder = saveFolder,
+            storeKey = EnginehostSaves.storeKeyOf(game.entry.id, game.entry.pcInfo?.storeId),
+            reportedAtMs = args.optLong("endedAtMs", 0L).takeIf { it > 0 } ?: System.currentTimeMillis(),
+            by = pluginId,
+        )
+        // Where it saved is kept for every game, synced or not; then every engine that covers the game takes it at once.
+        ReportedSaveFolders.record(context, saves)
+        reply(SaveSyncEngines.saved(context, saves))
     }
 
     override fun engineGames(args: JSONObject): JSONObject = runBlocking {
@@ -122,6 +127,17 @@ class AppInterfaceSaves(
     private fun refused(message: String): JSONObject = JSONObject().put("accepted", false).put("message", message)
 
     companion object {
+        /**
+         * The `report_changed` reply from what each engine did: `synced` when any engine covers the game, `engines` one
+         * line each. With none, nothing is copied and that is no failure. Pure.
+         */
+        fun reply(handoffs: List<SaveHandoff>): JSONObject {
+            val engines = JSONArray()
+            handoffs.forEach { engines.put(JSONObject().put("engine", it.engine).put("line", it.line)) }
+            val message = if (handoffs.isEmpty()) "no sync covers this game; droidtop noted where it saved" else handoffs.joinToString("; ") { it.line }
+            return JSONObject().put("accepted", true).put("synced", handoffs.isNotEmpty()).put("engines", engines).put("message", message)
+        }
+
         /** The most games one `list_engine_games` answer carries; `complete` is false past it. */
         const val MAX_GAMES = 2_000
 

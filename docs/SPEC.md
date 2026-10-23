@@ -20785,9 +20785,12 @@ and work with each other over the plugin API so no matter what, saves go where t
 - **Saves, both ways** (docs/plugin-api.md 3 A7a). droidtop asks the plugin where its app keeps saves
   (`saves.roots@1`, Droidtop/tracker#546's point, with its checks); the plugin asks droidtop where a game's saves belong (`saves where`) before starting a game,
   and tells it when a game wrote saves (`saves report_changed`) after, whichever app launched the game. For a game whose
-  saves droidtop syncs, `where` names the folder droidtop's own launch passes, after the same sync down, and a report
-  adopts and uploads them as after a game it launched itself; for any other game, `where` leaves the folder to the app
-  and droidtop copies nothing. Only an app's plugin may ask, and droidtop copies saves only from shared storage or a
+  saves droidtop syncs, `where` names the folder droidtop's own launch passes, after the same sync down; for any other
+  game, `where` leaves the folder to the app. A report is kept (where each game last saved, for every game) and handed
+  at once to every save sync engine that covers the game: the store's cloud today; paired computers and handhelds
+  (Droidtop/tracker#546), a cloud or network share (Droidtop/tracker#573) and `saves.sync` plugins
+  (Droidtop/tracker#284) as each comes. The owner: "If we don't sync somewhere, there's nowhere to copy it to, and
+  that's fine": with no engine for the game, nothing is copied. Only an app's plugin may ask, and droidtop copies saves only from shared storage or a
   card, never from a folder of its own, whoever names it (the `GAME_ENDED` broadcast included).
 - **Games, not configs.** The owner: "droidtop should also present games for enginehost to register, but not
   necessarily their whole configs. Remember, we want configs to be created by the USER, not necessarily saved into the
