@@ -198,7 +198,7 @@ object PluginJobsCenter {
         // the person to resume: it runs again from its checkpoint.
         // One the person paused stays paused: only the restart stopped the others (console, 0.2.0-dev.2129: "Get details
         // for PC games" came back Paused after the self-update and waited for Resume).
-        restored.filter { it.nativeKind in nativeReattachKinds && it.paused && !it.pausedByPerson && !it.done && nativeSpecs.containsKey(it.jobId) }.forEach { entry ->
+        restored.filter { it.nativeKind?.let { k -> k in nativeReattachKinds } == true && it.paused && !it.pausedByPerson && !it.done && nativeSpecs.containsKey(it.jobId) }.forEach { entry ->
             // A download the policy was holding stays held while the policy still says wait.
             val kind = entry.nativeKind
             if (entry.hold != null && kind != null && kind in downloadKinds && admission(kind, nativeSpecs[entry.jobId]?.args.orEmpty()) != null) return@forEach
