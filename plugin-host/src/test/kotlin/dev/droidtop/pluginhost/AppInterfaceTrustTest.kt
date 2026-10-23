@@ -59,7 +59,7 @@ class AppInterfaceTrustTest {
         JSONObject(
             """{"id": "$origin.saves", "origin": "$origin", "label": "Enginehost", "version": "1.4.0", "kind": "$kind", "contractVersion": 3,
                "app": {"package": "dev.enginehost", "service": "dev.enginehost.droidtop.DroidtopInterfaceService"},
-               "provides": [{"point": "saves.locations", "version": 1, "id": "enginehost"}],
+               "provides": [{"point": "saves.roots", "version": 1, "id": "enginehost"}],
                "permissions": [{"id": "saves.exchange", "reason": "x"}$extra]}""",
         ),
     )

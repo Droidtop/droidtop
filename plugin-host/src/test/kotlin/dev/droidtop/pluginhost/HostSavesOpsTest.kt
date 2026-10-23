@@ -25,7 +25,8 @@ class HostSavesOpsTest {
     }
 
     @Test
-    fun `saves locations is a low risk point`() {
-        assertEquals(PointRisk.LOW, ExtensionPoints.find("saves.locations")!!.risk)
+    fun `saves roots is the medium risk point of tracker 546, and saves locations is gone`() {
+        assertEquals(PointRisk.MEDIUM, ExtensionPoints.find("saves.roots")!!.risk)
+        assertEquals(null, ExtensionPoints.find("saves.locations"))
     }
 }

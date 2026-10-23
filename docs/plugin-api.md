@@ -2249,20 +2249,42 @@ Risk —.
   for the save paths it resolved itself. The plugin never picks a path.
 
 **A7a Where saves are, both ways (Droidtop/tracker#547, contract
-2026-10-23).** EP `saves.locations@1`. Risk low. Host API `saves`
+2026-10-23).** EP `saves.roots@1`. Risk medium. Host API `saves`
 (permission `saves.exchange`, normal; only an `app_interface` plugin may
 call it, any other gets `PERMISSION_DENIED`). The owner: "The two applications
 should detect and work with each other over the plugin API so no matter
 what, saves go where they're needed". Which app launched a game makes no
 difference:
-- **droidtop asks the plugin (EP `saves.locations@1`):**
-  `list {games: [{gameId, path, engine?, title?}]}` →
-  `{games: [{gameId, locations: [{path, place, engineNames?}]}]}`, `place`
-  one of `game_folder`, `runner_folder`, `runner_root` (with
-  `engineNames: true` when the engine picks its own folder inside the
-  root, which stays the save model's rule, Droidtop/tracker#546). Facts for
-  the save model; droidtop writes nothing because of them alone. Asked
-  when it needs the answer, kept for one hour.
+- **droidtop asks the plugin (EP `saves.roots@1`, Droidtop/tracker#546
+  design v3 section 8, checks C10 and D12):** one point per job, so this
+  is #546's point; the first contract post's `saves.locations@1` is
+  dropped.
+  - `roots {games: [{entryId, folder, engine, context?}]}` →
+    `{default, families: {<family>: path}, games: [{entryId, folder?}]}`.
+    `folder` is the game's folder as droidtop's launch hands it,
+    `engine` and `context` Enginehost's engine name and engine context
+    (as in `list_engine_games` and the launch config). `default` is the
+    app's save root; `families` the root per engine family where it
+    differs; `games[].folder` the game's own folder inside its family's
+    root, only for families whose folder the host names (HTML,
+    Flash/AIR, CatSystem2, web RPG Maker MV/MZ), never for an engine
+    that names its own (Ren'Py's `config.save_directory`).
+  - Roots, never files: a plugin names folders, droidtop finds the saves
+    in them by the game's save rule.
+  - Each path is used only when (C10) its canonical path is a directory
+    droidtop can read on a mounted shared-storage volume, not under
+    `Android/data` or `Android/obb`; (D12) it ends in the folder name
+    `saves` (Enginehost's `SaveLocationStore.saveRootFor` always appends
+    it) and is either the default `<volume>/Enginehost/saves` or one the
+    person confirmed once: "Enginehost keeps game saves in <folder>. Use
+    the same folder for these games here?"; and a game's folder is inside
+    its family's root. Anything else is ignored and droidtop keeps
+    Enginehost's default root. The person's own override (Settings >
+    Saves > "Save folder for <engine>") still wins for droidtop's
+    runners.
+  - Asked when the save model needs an answer, kept for one hour.
+    Facts for the save model: droidtop writes nothing because of them
+    alone.
 - **The plugin asks droidtop (host API `saves`, permission
   `saves.exchange`):**
   - `saves where {path, engine?, title?}` → `{known: true, gameId,
@@ -2305,8 +2327,9 @@ difference:
   (§1.3, `app_interface`), gets its broker within seconds, and asks or
   tells then.
 - **Status:** `saves where`, `saves report_changed` and
-  `list_engine_games` built (AppInterfaceSaves); `saves.locations` and
-  the game page's Saves row next.
+  `list_engine_games` built (AppInterfaceSaves); `saves.roots@1`
+  registered, asked by the save model next, and the reported folder shown
+  on the game's Saves row.
 
 **A8 Achievements.** EP `achievements.provider@1`. Risk medium.
 - **For:** achievement sets and progress, for example RetroAchievements
