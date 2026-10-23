@@ -656,15 +656,14 @@ object DownloadJobs {
         val kept = postName == POST_KEEP || postName in keptPosts
         if (!kept) withContext(Dispatchers.IO) { file.delete() }
         // Open on the finished job goes to what the download became: the game folder's new file or folder, or the kept file.
-        job?.open(
-            when {
-                postName == POST_PLACE_IN_FOLDER -> placedTarget(args)?.let { (target, folder) ->
-                    if (folder) OpenTarget.Folder(target.absolutePath) else OpenTarget.File(target.absolutePath)
-                }
-                kept -> OpenTarget.File(file.absolutePath)
-                else -> null
-            },
-        )
+        // Another post step may have named its own (a plugin install opens Plugins), which a null here must not clear.
+        when {
+            postName == POST_PLACE_IN_FOLDER -> placedTarget(args)?.let { (target, folder) ->
+                if (folder) OpenTarget.Folder(target.absolutePath) else OpenTarget.File(target.absolutePath)
+            }
+            kept -> OpenTarget.File(file.absolutePath)
+            else -> null
+        }?.let { job?.open(it) }
         return summary
     }
 
@@ -711,14 +710,12 @@ object DownloadJobs {
         val summary = post.process(context, folder, args)
         val kept = postName == POST_KEEP || postName in keptPosts
         if (!kept) withContext(Dispatchers.IO) { SafeDelete.deleteWithin(area, folder) }
-        // Open goes to the folder the download became: placed in the game folder, or kept.
-        job?.open(
-            when {
-                postName == POST_PLACE_IN_FOLDER -> placedTarget(args)?.let { OpenTarget.Folder(it.first.absolutePath) }
-                kept -> OpenTarget.Folder(folder.absolutePath)
-                else -> null
-            },
-        )
+        // Open goes to the folder the download became: placed in the game folder, or kept. A post step's own stays.
+        when {
+            postName == POST_PLACE_IN_FOLDER -> placedTarget(args)?.let { OpenTarget.Folder(it.first.absolutePath) }
+            kept -> OpenTarget.Folder(folder.absolutePath)
+            else -> null
+        }?.let { job?.open(it) }
         return summary
     }
 
