@@ -214,6 +214,28 @@ object GameEngineDetector {
     const val MAX_SCAN_DEPTH = 4
 
     /**
+     * A top-level folder's change stamp for the slow rebuild pass (docs/SPEC.md 7g, step 4): the newest modification
+     * time of [folder] and of the directories under it, down to the walk's own bound ([MAX_SCAN_DEPTH] title levels;
+     * a part or version folder costs none, as in the walk). A directory's time moves only when its own entries change,
+     * so the folder's own time missed a game added further down: two LOVE games under `Manual/love2d` were never found
+     * by the background pass (tracker#577). One stat per directory and no file reads; links are not followed. 0 when
+     * [folder] cannot be read, which the pass reads as "walk it". Disk work; never on the main thread.
+     */
+    fun subtreeStamp(folder: File): Long {
+        var newest = folder.lastModified().takeIf { it > 0L } ?: return 0L
+        fun walk(dir: File, depth: Int) {
+            for (child in dir.listFiles() ?: return) {
+                if (!child.isDirectory || java.nio.file.Files.isSymbolicLink(child.toPath())) continue
+                newest = maxOf(newest, child.lastModified())
+                val next = if (GameNaming.isStructuralFolderName(child.name)) depth else depth + 1
+                if (next < MAX_SCAN_DEPTH) walk(child, next)
+            }
+        }
+        walk(folder, 1)
+        return newest
+    }
+
+    /**
      * Every game under [root], wherever in its folder tree the games
      * actually sit: the walk descends through folders that are not games
      * until games are detected, and each detected game is ONE entry whose
@@ -1338,7 +1360,7 @@ class EngineGameProvider(
     override suspend fun scan(): List<LibraryEntry> {
         val found = mutableListOf<LibraryEntry>()
         scanRootsByFolder(
-            publish = { _, _, entries -> found += entries },
+            publish = { _, _, entries, _ -> found += entries },
             rootDone = { _, _ -> },
         )
         return found.finish()
@@ -1361,12 +1383,14 @@ class EngineGameProvider(
      */
     override fun scanProgressive(): Flow<ScanStep> = channelFlow {
         scanRootsByFolder(
-            publish = { root, folder, entries ->
+            publish = { root, folder, entries, stamp ->
                 send(
                     ScanStep.Segment(
                         key = folder.absolutePath,
                         root = root.absolutePath,
                         entries = entries.finish(),
+                        // The subtree's stamp, kept for the slow pass to compare ([subtreeStamp]); 0 is "unknown".
+                        folderMtime = stamp,
                     ),
                 )
             },
@@ -1378,8 +1402,9 @@ class EngineGameProvider(
 
     /**
      * The slow rebuild pass (docs/SPEC.md 7g, step 4): the same walk as
-     * [scanProgressive], except a folder whose OWN modification time
-     * still matches [knownMtimes] is left alone entirely -- not
+     * [scanProgressive], except a folder whose subtree stamp
+     * ([GameEngineDetector.subtreeStamp], the newest directory time under
+     * it) still matches [knownMtimes] is left alone entirely -- not
      * re-detected, not re-published -- and every folder that IS walked
      * is followed by a [pauseMs] delay. [knownMtimes] missing an entry,
      * or holding 0 (docs/SPEC.md 7g: a part that isn't one directory),
@@ -1388,21 +1413,23 @@ class EngineGameProvider(
      */
     override fun slowRebuildProgressive(knownMtimes: Map<PartRef, Long>, pauseMs: Long): Flow<ScanStep> = channelFlow {
         scanRootsByFolder(
-            publish = { root, folder, entries ->
+            publish = { root, folder, entries, stamp ->
                 send(
                     ScanStep.Segment(
                         key = folder.absolutePath,
                         root = root.absolutePath,
                         entries = entries.finish(),
+                        // The subtree's stamp, kept for the slow pass to compare ([subtreeStamp]); 0 is "unknown".
+                        folderMtime = stamp,
                     ),
                 )
             },
             rootDone = { root, folders ->
                 send(ScanStep.RootDone(root.absolutePath, folders.map { it.absolutePath }))
             },
-            skip = { root, folder ->
+            skip = { root, folder, stamp ->
                 val known = knownMtimes[PartRef(folder.absolutePath, root.absolutePath)]
-                known != null && known != 0L && folder.exists() && folder.lastModified() == known
+                known != null && known != 0L && stamp != 0L && stamp == known
             },
             pauseMs = pauseMs,
             rootMounted = { root -> root.isDirectory },
@@ -1478,7 +1505,7 @@ class EngineGameProvider(
      * [ScanLog]).
      */
     private suspend fun scanRootsByFolder(
-        publish: suspend (root: File, folder: File, entries: List<LibraryEntry>) -> Unit,
+        publish: suspend (root: File, folder: File, entries: List<LibraryEntry>, stamp: Long) -> Unit,
         rootDone: suspend (root: File, folders: List<File>) -> Unit,
         // The slow rebuild pass' own two knobs (docs/SPEC.md 7g, step 4):
         // a folder [skip] says to leave alone entirely -- no [publish] for
@@ -1488,7 +1515,7 @@ class EngineGameProvider(
         // deliberate "Rescan library" is allowed to. Defaulted to "skip
         // nothing, pause nothing" so scan()/scanProgressive() -- every
         // call site before step 4 existed -- are unchanged.
-        skip: (root: File, folder: File) -> Boolean = { _, _ -> false },
+        skip: (root: File, folder: File, stamp: Long) -> Boolean = { _, _, _ -> false },
         pauseMs: Long = 0L,
         // "A root that is not mounted is skipped, never emptied"
         // (docs/SPEC.md 7g, step 4): defaulted to "always mounted" so
@@ -1548,7 +1575,9 @@ class EngineGameProvider(
                 var rootGames = 0
                 var unchanged = 0
                 for ((index, folder) in top.folders.withIndex()) {
-                    if (skip(root, folder)) {
+                    // Taken before the walk: a change while it runs then moves past the stamp kept, and the next pass walks again.
+                    val stamp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { GameEngineDetector.subtreeStamp(folder) }
+                    if (skip(root, folder, stamp)) {
                         unchanged++
                         continue
                     }
@@ -1596,7 +1625,7 @@ class EngineGameProvider(
                         ).joinToString("; "),
                         base = folder,
                     )
-                    publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir) })
+                    publish(root, folder, scanned.games.map { it.toEntry(root, folder, installsByDir) }, stamp)
                     if (pauseMs > 0) delay(pauseMs)
                 }
                 rootDone(root, top.folders)

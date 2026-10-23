@@ -56,14 +56,16 @@ class PcFolderScanTest {
         game("EA/SimCity")
         game("Ubisoft/Far Cry 5")
         val ea = File(temp.root, "EA")
+        // The stamp is the subtree's (docs/SPEC.md 7g, step 4), not the folder's own time.
+        val stamp = GameEngineDetector.subtreeStamp(ea)
         val tops = PcFolderScan.gamesByTopLevelFolder(temp.root, defs) { folder, mtime ->
-            folder == ea && mtime == ea.lastModified()
+            folder == ea && mtime == stamp
         }
         val byName = tops.associateBy { it.folder.name }
         assertEquals(setOf("EA", "Ubisoft"), byName.keys)
         assertTrue(byName.getValue("EA").skipped)
         assertEquals(emptyList<File>(), byName.getValue("EA").games)
-        assertEquals(ea.lastModified(), byName.getValue("EA").mtime)
+        assertEquals(stamp, byName.getValue("EA").mtime)
         assertFalse(byName.getValue("Ubisoft").skipped)
         assertEquals(listOf("Far Cry 5"), byName.getValue("Ubisoft").games.map { it.name })
     }

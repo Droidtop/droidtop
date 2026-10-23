@@ -247,7 +247,8 @@ object PcFolderScan {
         options: Options = Options(),
         skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
     ): TopLevelFolder {
-        val mtime = folder.lastModified()
+        // The subtree's stamp, not the folder's own time: a game added further down moves it (docs/SPEC.md 7g, step 4).
+        val mtime = GameEngineDetector.subtreeStamp(folder)
         if (skip(folder, mtime)) return TopLevelFolder(folder, emptyList(), mtime, skipped = true)
         val walk = Walk(defs, options)
         val startedAt = System.currentTimeMillis()
