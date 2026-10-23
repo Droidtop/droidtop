@@ -15159,8 +15159,8 @@ the pipeline applies it.
   "Filters, sort and the hint bar"). **Select** is Options: the focused
   game's own menu (`PcGameMenu`, unchanged in substance: the game page, the
   favourite, the runner and its picker, Wine/container settings, ProtonDB,
-  the Lutris import, the source links and updates, merge and versions, under
-  Play / About / Fix and advanced); **L2** is its alias and the header's L2
+  the Lutris import, the source links and updates, merge and versions, filed
+  in its categories, "The game menu" below); **L2** is its alias and the header's L2
   pill (§7k) is live on this tab exactly while a game is under the cursor.
   With no game under the cursor (the strip, an empty list) Select opens the
   list's options (`GamelistOptionsMenu` with the `pc` system id: Jump to
@@ -23049,6 +23049,30 @@ Settings`, above), Start opening the left menu (§7j, "Gaming controls").
   short top page (7i, "The PC library is a controller-first storefront
   view"), so no single screen of the menu is longer than about nine
   rows.
+
+**The game menu (owner, 2026-10-23, Droidtop/tracker#610).** The owner: the menus are "kinda terrible", worst for game
+navigation, "the 'scrape' option is deep down a list nested in an option that's far down another list" (it was Select >
+"Game info and links", subtitled "Store links, compatibility, collections", > past the links, Title, part and
+update-source rows > Scrape). "I'm ok with nested menus, we just need better categories. No more than one nested menu
+deep, and fairly short categories", a rule "for the game menu" (Settings "requires the complexity it deserves"). The top
+page is the primary action (the same as the page's button: Play, Install, Update, Download now, Resume, Try again) with
+Play without updating and a store's other ways to play, then Game page and the favourite, then the categories, each
+listed only when it has a row that can be pressed and saying its first rows ("Scrape, Choose match, View media"):
+- **Info and art:** Scrape, Choose match, View media, Title, then the links and where it is owned, compatibility,
+  ProtonDB and What's new.
+- **Organise:** Collections, the part rows (Finished with, Make it its own game), the replacement fold, The same game
+  as..., and the game's other folders.
+- **Install and files:** a store game's DLC and versions, Downloads (the job's own line), Keep up to date, Verify files,
+  Uninstall.
+- **Updates:** each update source and Check now.
+- **How it runs:** Runs with, Engine, and the one runner's settings (Wine and graphics, Program, Game properties, the
+  Lutris import; Linux tools; Enginehost's settings).
+- **Controls and saves:** Controls, Saves, Sync cloud saves.
+
+Each opens one page and nothing deeper (`PcMenuPage`); B on a page returns to the top. Get games left the menu (owner:
+new games are found in search and in their own place, Droidtop/tracker#612). Still deeper than one level, and next:
+Wine and graphics, Program, Game properties and Linux tools open settings sheets that have pages of their own, and DLC
+and versions opens its own sheet; the shared menu work (#610) moves them to a page of their own.
 
 **v2 direction:**
 - Keep everything else: the themed Retro Games tab, the droidtop-native PC
