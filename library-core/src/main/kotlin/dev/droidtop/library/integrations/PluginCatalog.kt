@@ -368,12 +368,15 @@ object PluginCatalog {
             val version = args[ARG_VERSION].orEmpty()
             // The user-trusted keys too: a bundle from an origin the person trusted verifies like an official one.
             when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)), hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
-                is PluginInstallResult.Installed ->
+                is PluginInstallResult.Installed -> {
+                    // Open on the finished job goes to Plugins, where a new plugin is approved and every plugin's page is.
+                    dev.droidtop.pluginhost.JobHandle.current()?.open(dev.droidtop.pluginhost.OpenTarget.Place(dev.droidtop.library.settings.Place.ID_PLUGINS))
                     if (result.record.trust == PluginTrustState.APPROVED) {
                         "Updated $label to $version"
                     } else {
                         "$label $version installed. Approve it on the Plugins screen before it runs"
                     }
+                }
                 is PluginInstallResult.Refused -> "$NOT_INSTALLED ${result.error.reason}"
             }
         }
