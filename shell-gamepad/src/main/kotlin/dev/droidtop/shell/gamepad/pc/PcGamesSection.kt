@@ -1051,9 +1051,10 @@ internal fun PcGamesSection(
                         // Home is not a list: X does nothing there and Y is Search (docs/SPEC.md 7i, "Home").
                         GamepadAction.X -> if (!state.home) state.filterOpen = true
                         GamepadAction.Y -> if (state.home) state.searchOpen = true else state.sortOpen = true
-                        // Options is the focused game's menu (L2 stays its
-                        // alias); with no game under the cursor it is the
-                        // list's own options.
+                        // Options is the focused thing's menu; L2 and a long
+                        // press open the same one (owner, 2026-10-23,
+                        // Droidtop/tracker#621). With nothing under the cursor
+                        // it is the list's own options.
                         // On a pinned tab, Select is that tab's Options (Edit, Unpin, Move).
                         GamepadAction.SELECT, GamepadAction.L2 -> {
                             val pinned = (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.takeIf { state.stripFocused && !it.builtIn }
@@ -1101,6 +1102,12 @@ internal fun PcGamesSection(
                         state.stripFocused = false
                         if (state.itemIndex == index) tiles.getOrNull(index)?.let { state.showGrid(it.query) } else moveTo(state.shelfIndex, index)
                     },
+                    // The tile's menu, the one L2 and Select open (owner, 2026-10-23, Droidtop/tracker#621).
+                    onLongPress = { index ->
+                        state.stripFocused = false
+                        moveTo(state.shelfIndex, index)
+                        tiles.getOrNull(index)?.let { tileMenu = it }
+                    },
                     empty = COLLECTIONS_EMPTY,
                 )
                 state.onShelves -> PcShelvesHome(
@@ -1143,7 +1150,7 @@ internal fun PcGamesSection(
                         state.destFocused = false
                         if (state.shelfIndex == shelf && state.itemIndex == item) activate(entry) else moveTo(shelf, item)
                     },
-                    // A long press is the thing's menu, everywhere (owner, 2026-10-23, Droidtop/tracker#610).
+                    // A long press opens the thing's menu, the one L2 opens (owner, 2026-10-23, Droidtop/tracker#610, #621).
                     onLongPressCapsule = ::openOptions,
                     downloads = downloads,
                     partsOf = ::partsOf,

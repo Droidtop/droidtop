@@ -32,13 +32,20 @@ class LeftMenuTest {
             listOf(
                 GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
                 GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS, GamingSection.UPDATES,
-                // Get new games, right under Updates (Droidtop/tracker#612).
-                GamingSection.NEW_GAMES,
                 GamingSection.PLUGINS,
                 GamingSection.SETTINGS,
             ),
             menuSectionsFor(UiMode.FULL),
         )
+    }
+
+    @Test
+    fun `Get new games is a page of Updates, not a row of its own`() {
+        // Owner, 2026-10-23: "THe "get new games" menu needs to be UNDER Updates" (Droidtop/tracker#621).
+        assertFalse(GamingSection.NEW_GAMES in menuSectionsFor(UiMode.FULL))
+        val updates = all.single { it.section == GamingSection.UPDATES }
+        assertTrue(updates.isAt(GamingSection.NEW_GAMES))
+        assertEquals(listOf(updates), all.filter { it.isAt(GamingSection.NEW_GAMES) })
     }
 
     @Test

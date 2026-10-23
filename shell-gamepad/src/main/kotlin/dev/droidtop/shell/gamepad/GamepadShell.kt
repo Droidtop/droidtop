@@ -1344,11 +1344,11 @@ private fun GamepadShellBody(
                             onClose = { nav.back() },
                             onPrimaryFocus = { detailPrimaryLabel = it },
                         )
-                        // Get new games (Droidtop/tracker#612): the search over the download
-                        // sources, empty and ready for typing; leaving it goes back to the default section.
+                        // Get new games (Droidtop/tracker#612, #621): the search over the download
+                        // sources, empty and ready for typing; a page of Updates, so leaving it goes back there.
                         shownSection == GamingSection.NEW_GAMES -> {
                             canGoBack = true
-                            GetGamesSearch { nav.openSection(GamingPrefs.defaultSection(context)) }
+                            GetGamesSearch { nav.openSection(GamingSection.UPDATES) }
                         }
                         // The left menu's places: a registered settings screen each,
                         // in place (docs/SPEC.md 7j "Places"). Back is always
@@ -1372,6 +1372,8 @@ private fun GamepadShellBody(
                                     val wine = PcSource.WineShortcut.id
                                     put("${PcSource.LIBRARY_ITEM_PREFIX}$wine", openGames { pcGames.showSource(wine) })
                                     put(PcSource.IMPORTED_ITEM_ID, openGames { pcGames.showImported() })
+                                    // Updates' Get new games row opens the search here, in place.
+                                    put(dev.droidtop.library.integrations.GetGamesEntry.UPDATES_ROW_ID) { nav.openSection(GamingSection.NEW_GAMES) }
                                 }
                             }
                             PlaceCatalogView(
@@ -2078,9 +2080,10 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
     UPDATES(dev.droidtop.library.settings.Place.UPDATES),
 
     /**
-     * Get new games, right under Updates (owner, 2026-10-23: "add a 'get new games' under 'updates' that's its own UI",
-     * Droidtop/tracker#612): the one search over the download sources, on its own. Not a settings place: it draws the
-     * search itself. Kid and Kiosk hide it with the places, since it downloads.
+     * Get new games: the one search over the download sources, on its own (owner, 2026-10-23: "add a 'get new games'
+     * under 'updates' that's its own UI", Droidtop/tracker#612). A page of Updates, opened by its Get new games row,
+     * not a row of the left menu (owner, 2026-10-23: "THe "get new games" menu needs to be UNDER Updates. The left menu
+     * is growing really large", Droidtop/tracker#621). Back returns to Updates, and the left menu marks Updates.
      */
     NEW_GAMES,
     PLUGINS(dev.droidtop.library.settings.Place.PLUGINS),
@@ -2093,6 +2096,9 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
 
     /** The settings-registry screen a place draws, null for a tab with a view of its own. */
     val placeScreenId: String? get() = place?.screenId
+
+    /** The left menu row that stands for this section: itself, or Updates for Get new games, a page of it. */
+    val menuSection: GamingSection get() = if (this == NEW_GAMES) UPDATES else this
 }
 
 // Registry ids of the screens the places draw, from the one place list.
@@ -2124,8 +2130,8 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
  */
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
-    // The places, with Get new games right under Updates; Kiosk and Kid hide them all, since they manage the device or download.
-    val places = GamingSection.entries.filter { (it.isPlace || it == GamingSection.NEW_GAMES) && !mode.hidesSettings }
+    // The places; Kiosk and Kid hide them all, since they manage the device. Get new games is a page of Updates.
+    val places = GamingSection.entries.filter { it.isPlace && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
         when (it) {
@@ -3899,9 +3905,11 @@ private fun AppIconTile(
                     }
                     // Select is Options, the focused thing's own menu
                     // (docs/SPEC.md 7j): its details, favourite and
-                    // Mark as game. X and Y are the list's (Filter and
-                    // Sort By) and bubble to the section around the grid.
-                    GamepadAction.SELECT -> {
+                    // Mark as game. L2 and a long press open the same one
+                    // (owner, 2026-10-23, Droidtop/tracker#621). X and Y are
+                    // the list's (Filter and Sort By) and bubble to the
+                    // section around the grid.
+                    GamepadAction.SELECT, GamepadAction.L2 -> {
                         onOptions()
                         true
                     }

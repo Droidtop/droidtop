@@ -9,8 +9,11 @@ package dev.droidtop.library.integrations
 object GetGamesEntry {
     const val LABEL = "Get games"
 
-    /** The search's heading over matches from the download sources, and the left menu's place for them (Droidtop/tracker#612). */
+    /** The search's heading over matches from the download sources, and Updates' row for them (Droidtop/tracker#612, #621). */
     const val NEW_GAMES = "Get new games"
+
+    /** Updates' Get new games row: Gaming opens the search in place; elsewhere it opens Gaming on it. */
+    const val UPDATES_ROW_ID = "updates_get_new_games"
 
     /** The PC Games list's pseudo system id: it has no system folder to download into, so it is never a destination. */
     const val PC_SYSTEM_ID = "pc"

@@ -15908,9 +15908,13 @@ Consequences:
   read "Apps", two lines below a heading that already said so (rig,
   build 547). Nothing is invented for it: an app that declares no
   category gets "Android app", not a guess;
-- **a long press opens the thing's own menu** (owner, 2026-10-23, Droidtop/tracker#610): a PC game's game menu, an
-  app tile's app menu (Mark as game is a row of it; a long press used to mark the app at once, with nothing on screen
-  saying so), and a Retro Games card's details, which are a console game's own actions;
+- **a long press opens the thing's own menu, the same one L2 and Select open** (owner, 2026-10-23,
+  Droidtop/tracker#610; then #621: "The long-press game menu should BE the L2 menu as it is right now. Different path
+  to it"). One menu per thing, three ways to it: a PC game's game menu, a collection tile's menu, an app tile's app
+  menu (Mark as game is a row of it; a long press used to mark the app at once, with nothing on screen saying so), and
+  for a Retro game or an app on Home's shelves the same small menu. A Retro Games card's long press stays its details,
+  which are a console game's own actions; that tab has no L2 menu for one game (Select there is the gamelist's
+  options), and whether it gets one is part of the #621 review;
 - a value that is **stepped** rather than opened --- a slider, a small
   cycling choice --- makes the two arrows the row already draws into two
   targets, because a touch screen has no Left/Right and a slider has no
@@ -23200,7 +23204,7 @@ Each opens one page and nothing deeper (`PcMenuPage`); B on a page returns to th
 (Wine and graphics, Program, Game properties, Linux tools) or a picker (DLC and versions, Runs with, Engine, Collections)
 opens a page or a task, not another menu: it takes the screen, may have pages of its own as Settings does, and its
 Back returns to the menu where it was. Get games left the menu (owner:
-new games are found in search and in their own place, Droidtop/tracker#612). Nothing in it is deeper than one
+new games are found in search and on their own page under Updates, Droidtop/tracker#612, #621). Nothing in it is deeper than one
 level: the rows that open settings pages and pickers are pages and tasks (above).
 
 **v2 direction:**
@@ -23325,14 +23329,18 @@ without its runtime said "Running". Decisions:
   empty-library states) keeps a "Get games" entry, and it opens the one search, empty and ready for typing,
   scoped as that place is (a system's entry searches that system and downloads to its folder; PC Games searches
   PC). It is still not in the Quick Menu or any System group (owner, 2026-10-01).
-  **Get new games: under the results, and a place of its own (owner, 2026-10-23, Droidtop/tracker#612).** "Get new
+  **Get new games: under the results, and a page of Updates (owner, 2026-10-23, Droidtop/tracker#612, #621).** "Get new
   games should be presented under the search results, presenting matches that are relevant (so roms from romgi, abd
   etc). Also add a 'get new games' under 'updates' that's its own UI." Earlier the same day: Get More Games "is
   supposed to be transparently exposed in the search". So the one search lists what is here first (the device's games
   and apps, and a game the library has that a source also offers, merged as before), then the games found only on the
-  download sources and the sites to search on, under the heading **Get new games** (`SearchRow.isNew`). The left menu
-  has **Get new games** right under Updates (`GamingSection.NEW_GAMES`; Kid and Kiosk hide it with the places, since
-  it downloads): the same search over every source, empty and ready for typing. The "Get games" rows of the game menu,
+  download sources and the sites to search on, under the heading **Get new games** (`SearchRow.isNew`). Updates has a
+  **Get new games** row (`GetGamesEntry.UPDATES_ROW_ID`), beside Get apps, that opens the same search over every
+  source, empty and ready for typing (`GamingSection.NEW_GAMES`); Back returns to Updates, and the left menu marks
+  Updates meanwhile. It is not a row of the left menu (owner, the same day: "THe "get new games" menu needs to be
+  UNDER Updates. The left menu is growing really large, we need to review that"; the review is #621). Kid and Kiosk
+  hide it with Updates. Outside Gaming the row opens Gaming on the search, the only place it is drawn, and is left
+  out when Gaming is switched off. The "Get games" rows of the game menu,
   the Select menus (All games, a system, PC Games) and a console game's details are gone with that: a system's own
   search ("Search SNES") shows that system's new games under the same heading. The chips in the empty states and the
   Apps section stay, since an empty place needs a way to fill it.
