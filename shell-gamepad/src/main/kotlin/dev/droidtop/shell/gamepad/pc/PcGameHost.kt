@@ -21,7 +21,7 @@ import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.PartProgress
-import dev.droidtop.library.StoreDownloads
+import dev.droidtop.library.stores.StoreInstallJob
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.currentShellWindow
@@ -69,7 +69,7 @@ class PcLaunch internal constructor(
 @Composable
 fun rememberPcLaunch(onLaunch: (LibraryEntry) -> Unit, onOpenDownloads: () -> Unit): PcLaunch {
     val context = LocalContext.current
-    val downloads by StoreDownloads.active.collectAsState()
+    val downloads by StoreInstallJob.live.collectAsState()
     val scope = rememberCoroutineScope()
     val currentLaunch by rememberUpdatedState(onLaunch)
     val currentOpenDownloads by rememberUpdatedState(onOpenDownloads)

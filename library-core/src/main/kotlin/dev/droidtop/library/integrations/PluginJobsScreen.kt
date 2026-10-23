@@ -203,6 +203,14 @@ object PluginJobsScreen {
     }
 
     /**
+     * A job said in one line, for a place with room for one: a game's button and its menu row (docs/SPEC.md 12a,
+     * "Jobs and their results"). The same words as the job's row here ([progressLine]), joined, so the game page cannot
+     * say less than the Downloads place; a failed job says why.
+     */
+    fun oneLine(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): String =
+        if (entry.done) outcome(entry).lineSequence().first() else progressLine(entry, JobEta.line(entry, nowMs)).replace("\n", " · ")
+
+    /**
      * One job as one row, wherever a list of jobs is drawn (this screen, a store's page): a running
      * or paused job is its name, its progress bar and [progressLine], and A opens its page; a
      * finished one is its name and how it ended.
