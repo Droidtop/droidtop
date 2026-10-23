@@ -34,6 +34,8 @@ internal fun ViewStrip(
     pill: String?,
     onSelect: (Int) -> Unit,
     onClearPill: () -> Unit,
+    // A tab's own menu, where a tab has one (a pinned view); null where none does.
+    onLongPress: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
 ) {
@@ -63,6 +65,7 @@ internal fun ViewStrip(
                     tab = true,
                     selected = focused == index,
                     onClick = { onSelect(index) },
+                    onLongClick = onLongPress?.let { { it(index) } },
                 )
             }
         }

@@ -190,6 +190,7 @@ fun Modifier.selectionFrame(
  * the recent filter and the PC surface's filter chip), each of which drew
  * focus its own way.
  */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun ShellChip(
     label: String,
@@ -210,10 +211,13 @@ internal fun ShellChip(
     // when the caller says it is the selected one. Null is the chip
     // driving itself through Compose focus, as every other caller uses it.
     selected: Boolean? = null,
+    // The chip's own menu on a long press, the one L2 opens on it (Droidtop/tracker#621); null for none.
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = if (large) Corners.Crisp else Corners.Pill
+    val press = if (onLongClick != null) Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick) else Modifier.clickable(onClick = onClick)
     // A chosen tab is a place on the strip, not a filter in effect: it keeps the quiet look.
     val filled = (on && !tab) || primary
     val isSelected = selected ?: focused
@@ -257,14 +261,14 @@ internal fun ShellChip(
                         }
                         .onFocusChanged { focused = it.isFocused }
                         .focusable()
-                        .clickable(onClick = onClick)
+                        .then(press)
                 } else {
                     // The caller's cursor is the selection; a tap is still
                     // the press. `clickable` brings a focus target, made
                     // unfocusable here exactly as the tab bar's are.
                     Modifier
                         .focusProperties { canFocus = false }
-                        .clickable(onClick = onClick)
+                        .then(press)
                 },
             )
             .then(
