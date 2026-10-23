@@ -9518,9 +9518,9 @@ runs (Wine's output so far from the run's `RunLogCollector`, the run's setup, th
 `wine-report-last.log` and a `wine-report-run-<game>-<time>.log` beside the frame that was shown as a PNG, then opens
 Share diagnostics (`DiagnosticsArchive.share`, the same step as Settings' row), so the person chooses where it goes;
 droidtop sends nothing itself. Every Wine record now also names the run's setup: the Wine build, Direct3D (DXVK or
-VKD3D and its version), the graphics driver and its version, and the emulator. Still to be decided by the owner
-(asked 2026-10-23): whether 45 s is right or a per-game setting, whether Report a problem is also in the Quick Menu
-for any running Wine game, and whether a report offers a link to open a tracker issue.
+VKD3D and its version), the graphics driver and its version, and the emulator. The owner confirmed 45 s
+(2026-10-23, asked "Is 45 seconds right": "yeah"). Still to be decided: whether Report a problem is also in the
+Quick Menu for any running Wine game, and whether a report offers a link to open a tracker issue.
 
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
