@@ -497,6 +497,16 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         return account.allowed && !account.signedIn
     }
 
+    override fun needsCheck(source: String): Boolean {
+        val (record, _) = providers().firstOrNull { (_, e) -> e.id == source } ?: return false
+        return dev.droidtop.pluginhost.SiteChecks.pendingFor(record.manifest.id) != null
+    }
+
+    override fun passCheck(source: String): Boolean {
+        val (record, _) = providers().firstOrNull { (_, e) -> e.id == source } ?: return false
+        return dev.droidtop.pluginhost.PluginWebAccount.open(app, record, dev.droidtop.pluginhost.PluginWebAccount.Need.BROWSER_CHECK)
+    }
+
     override fun signIn(source: String): Boolean {
         val (record, _) = providers().firstOrNull { (_, e) -> e.id == source } ?: return false
         return dev.droidtop.pluginhost.PluginWebAccount.open(app, record, dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN)

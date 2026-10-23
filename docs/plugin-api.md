@@ -316,6 +316,34 @@ again after). It opens the plugin's `web.session` in droidtop's web view: the
 for a browser check. This needs `web.session` with a site; for a plugin
 without one, a `SIGN_IN_REQUIRED`'s own `action` is still offered as before.
 
+**droidtop finds the browser check itself (2026-10-23, Droidtop/tracker#600).**
+The owner: "f95 has gotten more aggressive with cloudflare filtering.
+F95checker has gotten better at allowing users to solve the captcha. we need
+to do the same." A plugin no longer has to recognise a check:
+- **Found by droidtop.** Every `net.request` and `web.session fetch` answer
+  is looked at. A 403, 429 or 503 carrying a challenge (Cloudflare's
+  `window._cf_chl_opt`, `<title>Just a moment...</title>` or
+  `/cdn-cgi/challenge-platform/`, DDoS-Guard's page), or any answer with
+  Cloudflare's `cf-mitigated: challenge` header, reaches the plugin as the
+  error `BROWSER_CHECK_REQUIRED` with one plain sentence ("<host> checks the
+  browser first; open it in droidtop to continue"). It never gets the page.
+- **Passed by the person.** droidtop remembers the address the check was met
+  at, and its own surfaces (a source's search, a view page, the update page
+  of a game) offer **Open the site**, which opens that site in droidtop's
+  web view. This works for a plugin without `web.session` too. The view
+  closes by itself once the site hands it a new clearance.
+- **Cleared after.** The clearance the view earned is kept for that plugin:
+  the site's clearance cookies only (`cf_clearance`, `__cf*`, `cf_chl*`,
+  `__ddg*`, never an account's cookie), with the web view's own user agent,
+  which the clearance is bound to. droidtop adds both to every `net.request`
+  and `web.session fetch` to that site and its subdomains after; a cookie
+  the plugin sends keeps its own value. A sign-in or an opened link that
+  passes a check keeps its clearance the same way. Kept in the plugin's
+  vault under a host key it cannot name (`@web.clearance`), deleted with it.
+- **Retried.** The surface that offered the check asks again after it.
+  Nothing is retried in a loop: a background call that meets a check fails
+  with the error, and the check waits for the person.
+
 **Plugin → host (the broker):**
 
 ```json

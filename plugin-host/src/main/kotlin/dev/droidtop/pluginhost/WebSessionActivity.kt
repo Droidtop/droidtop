@@ -73,6 +73,8 @@ class WebSessionActivity : Activity() {
         cookies.setAcceptCookie(true)
         asked.domains.forEach { purge(cookies, it) }
         asked.session?.cookies?.forEach { (domain, header) -> inject(cookies, domain, header) }
+        // The clearance each site had when the view opened: a check ends once the site gives a new one.
+        val clearedAtOpen = asked.domains.associateWith { SiteChecks.clearanceOf(cookies.getCookie("https://$it").orEmpty()) }
         cookies.flush()
 
         val root = LinearLayout(this).apply {
@@ -147,7 +149,9 @@ class WebSessionActivity : Activity() {
             settings.allowFileAccess = false
             settings.allowContentAccess = false
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-            asked.session?.userAgent?.let { settings.userAgentString = it }
+            // The web view's own user agent, never one kept from before: a browser check compares it with the engine
+            // that runs the check, and a kept one from an older WebView made Cloudflare ask again and again
+            // (Droidtop/tracker#600). What the view ends with is kept, and droidtop's requests send that one.
             cookies.setAcceptThirdPartyCookies(this, true)
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
@@ -161,6 +165,14 @@ class WebSessionActivity : Activity() {
                 override fun onPageFinished(view: WebView, url: String?) {
                     location?.text = url?.let { NetScope.hostOf(it) }.orEmpty()
                     if (url != null && browse) asked.onPage?.invoke(url)
+                    // A browser check is passed when the site hands the view a new clearance (Droidtop/tracker#600).
+                    if (asked.mode == WebSessionRequest.Mode.CHECK && asked.domains.any { domain ->
+                            SiteChecks.clearanceOf(cookies.getCookie("https://$domain").orEmpty())?.let { it != clearedAtOpen[domain] } == true
+                        }
+                    ) {
+                        finishWith(completed = true, download = null)
+                        return
+                    }
                     val done = asked.doneCookie ?: return
                     if (asked.mode != WebSessionRequest.Mode.SIGN_IN) return
                     val set = asked.domains.any { domain ->

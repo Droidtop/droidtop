@@ -110,4 +110,10 @@ class SourceRecordPageTest {
         val addressed = record.copy(downloads = record.downloads.map { it.copy(url = "https://pixeldrain.com/u/a") })
         assertNull("every link has its address: nothing to sign in for", signInRow("F95zone", addressed, signedOut = true))
     }
+
+    @Test
+    fun `a site waiting for its browser check says so first, with the check as its action`() {
+        // Droidtop/tracker#600: F95zone's Cloudflare check, passed in droidtop's web view.
+        assertEquals(RecordRow("Open F95zone to pass its check", subtitle = "The site checks the browser first", action = RecordAction.PassCheck), checkRow("F95zone"))
+    }
 }

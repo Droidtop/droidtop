@@ -78,24 +78,46 @@ object PluginWebAccount {
      * Returns whether a session is now kept.
      */
     fun open(context: Context, record: PluginRecord, need: Need): Boolean {
-        val account = of(context, record) ?: return false
-        if (!account.allowed) return false
+        val account = of(context, record)
+        // A check is the site's, not the account's: a plugin with no web.session still gets one (Droidtop/tracker#600).
+        if (need == Need.SIGN_IN && (account == null || !account.allowed)) return false
+        if (account != null && !account.allowed) return false
+        val metAt = SiteChecks.pendingFor(record.manifest.id)?.let { NetScope.hostOf(it) }
         val url = when (need) {
-            Need.SIGN_IN -> account.signInUrl ?: checkUrl(record)
-            Need.BROWSER_CHECK -> checkUrl(record)
+            Need.SIGN_IN -> account?.signInUrl ?: checkUrl(record)
+            Need.BROWSER_CHECK -> metAt?.let { "https://$it/" } ?: checkUrl(record)
         } ?: return false
-        val domains = WebSessions.declaredDomains(record.manifest.v2.permissions)
+        val declared = WebSessions.declaredDomains(record.manifest.v2.permissions)
+        val domains = (if (account != null) declared else emptyList()) +
+            listOfNotNull(metAt, NetScope.hostOf(url)).filter { host -> !WebSessions.covers(host, declared) || account == null }
         val vault = PluginVault.forContext(context)
-        val stored = WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY))
+        val stored = if (account != null) WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY)) else null
+        // The view starts with what was cleared before, so a check still good is not asked again.
+        val withClearance = withClearance(stored, SiteChecks.read(vault, record.manifest.id), domains.distinct())
         val mode = if (need == Need.SIGN_IN) WebSessionRequest.Mode.SIGN_IN else WebSessionRequest.Mode.CHECK
         val done = if (need == Need.SIGN_IN) doneCookie(record) else null
-        val result = WebSessionActivity.show(context, WebSessionRequest(record.manifest.label, mode, url, domains, stored, done))
-        val session = result.session?.takeIf { result.completed && it.cookies.isNotEmpty() } ?: return false
+        val result = WebSessionActivity.show(context, WebSessionRequest(record.manifest.label, mode, url, domains.distinct(), withClearance, done))
+        // What the view cleared is kept whether or not the person pressed Done: droidtop's requests to the site send it.
+        SiteChecks.keep(vault, record.manifest.id, result.session)
+        val cleared = SiteChecks.Clearance.from(result.session) != null
+        if (account == null) return need == Need.BROWSER_CHECK && cleared
+        val session = result.session?.takeIf { result.completed && it.cookies.isNotEmpty() }
+            ?.let { it.copy(cookies = it.cookies.filterKeys { domain -> WebSessions.covers(domain, declared) }) }
+            ?: return need == Need.BROWSER_CHECK && cleared
         // A sign-in may be another account, whose name the plugin tells again; a browser check keeps the name it had.
         val name = if (need == Need.SIGN_IN) null else stored?.account
         vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, session.copy(account = name).toJson())
         if (account.grant == GrantState.ASK) PluginGrants.forContext(context).set(record.manifest.id, WebSessions.PERMISSION, GrantState.GRANTED)
         return true
+    }
+
+    /** [stored] with [clearance]'s cookies added for each of [domains] it clears; the stored user agent is not used. */
+    private fun withClearance(stored: WebSessions.Stored?, clearance: SiteChecks.Clearance?, domains: List<String>): WebSessions.Stored? {
+        clearance ?: return stored
+        val cookies = domains.associateWith { domain ->
+            SiteChecks.mergeCookies(stored?.cookies?.get(domain), clearance.forHost(domain))
+        }.filterValues { !it.isNullOrBlank() }.mapValues { it.value!! }
+        return WebSessions.Stored(stored?.userAgent, cookies, stored?.account).takeIf { cookies.isNotEmpty() } ?: stored
     }
 
     /**
@@ -117,6 +139,7 @@ object PluginWebAccount {
         val stored = if (grant == GrantState.GRANTED) WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY)) else null
         val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (stored != null) domains else emptyList(), stored, null, maxDownloads = max.coerceIn(1, 16))
         val result = WebSessionActivity.show(context, request)
+        SiteChecks.keep(vault, record.manifest.id, result.session)
         result.session?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {
             vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, it.copy(account = stored?.account).toJson())
         }
