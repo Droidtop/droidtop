@@ -6,6 +6,15 @@ import dev.droidtop.library.credentials.handoff.HandoffField
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.runtime.prefs.PrefsFile
 
+/**
+ * Opens the guided key setup for a service (the screen behind Settings > Accounts and sources), from anywhere in
+ * droidtop: a game page's "Sign in to RetroAchievements" row opens it in place (Droidtop/tracker#143). The screen is
+ * the app's, so :app sets [open] at start; until it does, nothing opens.
+ */
+object ScraperKeySetupLink {
+    @Volatile var open: (Context, ScraperKeyService) -> Unit = { _, _ -> }
+}
+
 /** One value a service takes: its id is the same in the phone page, the in-app key page and the vault. */
 data class KeyField(val id: String, val label: String, val secret: Boolean, val storeKey: String)
 

@@ -14302,8 +14302,12 @@ hash. Hashing reads the file, so it is never done on the main thread or while a 
 
 **RetroAchievements: achievements and progress on the game's page (directed 2026-10-09, Droidtop/tracker#143).**
 A console game's detail screen (`EntryDetailScreen`, Y on a themed gamelist) gets an "Achievements" line and an
-Achievements chip once the person has entered their username and Web API Key (above); with no key it has nothing,
-because a missing fact is not a row. It is read when the screen opens, off the main thread, and never for a list
+Achievements chip once the person has entered their username and Web API Key (above). **With no key (2026-10-23,
+Droidtop/tracker#143)** a game on a console RetroAchievements covers gets "Achievements: Sign in" ("Show your
+achievements: sign in to RetroAchievements") and a "Sign in for achievements" chip: A on either opens the guided key
+setup in place (the same screen as Settings > Accounts and sources, `ScraperKeySetupLink`), and back on the page
+with a key stored the row is asked again and becomes the achievements. A game on a console it does not cover still
+has no row. Before this, a person with no key had no sign the feature existed. It is read when the screen opens, off the main thread, and never for a list
 (`RetroAchievements.lookup`): the game is recognised first by the hash of its file against the console's list of games
 and hashes (`API_GetGameList` with hashes, one request per console, kept a week), then, only when no hash matches
 or the file cannot be hashed, by a title that normalises to exactly one RetroAchievements title (`RaMatching`: case,

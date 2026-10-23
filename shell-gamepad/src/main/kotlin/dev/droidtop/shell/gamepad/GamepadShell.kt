@@ -1856,7 +1856,8 @@ private fun EntryDetailScreen(
                     onClick = {
                         val page = row.screen
                         val address = row.url
-                        if (page != null) pluginActionScreen = page else if (address != null) openAddress(context, address)
+                        val step = row.run
+                        if (step != null) step(context) else if (page != null) pluginActionScreen = page else if (address != null) openAddress(context, address)
                     },
                 )
             }

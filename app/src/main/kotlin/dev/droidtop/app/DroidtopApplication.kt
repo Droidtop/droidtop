@@ -119,6 +119,10 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
         // engine before the library indexes it, and an update's saves are copied into its new version folder
         // (docs/SPEC.md 7g, "Getting an update"), with the version it follows offered for removal.
+        // The guided key setup, opened in place from a game page's sign-in row (Droidtop/tracker#143).
+        dev.droidtop.library.scraper.ScraperKeySetupLink.open = { context, service ->
+            context.startActivity(ScraperKeySetupActivity.intent(context, service).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
         dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->
             dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
             listOfNotNull(
