@@ -415,9 +415,12 @@ class PluginJobsCenterTest {
         val again = PluginJobsCenter.retry(null, id)!!
         withTimeout(5_000) { while (PluginJobsCenter.find(again)?.done != true) kotlinx.coroutines.delay(10) }
         assertNull("the retried row is replaced by the new run", PluginJobsCenter.find(id))
+        assertEquals("a page left open on the old run follows the new one", again, PluginJobsCenter.followed(id))
+        assertTrue(!PluginJobsCenter.wasCleared(again))
         assertEquals(listOf(mapOf("only" to "A"), mapOf("only" to "A")), runs.toList())
         assertTrue(PluginJobsCenter.clear(again))
         assertNull(PluginJobsCenter.find(again))
+        assertTrue(PluginJobsCenter.wasCleared(again))
     }
 
     @Test

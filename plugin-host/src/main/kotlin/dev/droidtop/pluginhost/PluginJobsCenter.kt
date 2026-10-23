@@ -473,6 +473,9 @@ object PluginJobsCenter {
         }
     }
 
+    /** How many Retries in a row [followed] walks; a page is never left that many runs behind. */
+    private const val MAX_RETRY_CHAIN = 32
+
     /** The least time between two progress updates of one native job's row: about four a second. */
     internal const val PROGRESS_INTERVAL_MS = 250L
 
@@ -631,10 +634,27 @@ object PluginJobsCenter {
         return entries.filter { !it.done || it.jobId in finished }
     }
 
+    /** The job a Retry started in place of each retried one, so a page left open on the old one follows the new. */
+    private val successors = ConcurrentHashMap<String, String>()
+
+    /** Jobs the person cleared this run, so a page left open on one says so instead of showing what it last saw. */
+    private val clearedIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** The job [jobId] is now: itself, or the run a Retry started in its place, followed through repeated Retries. */
+    fun followed(jobId: String): String {
+        var id = jobId
+        repeat(MAX_RETRY_CHAIN) { id = successors[id] ?: return id }
+        return id
+    }
+
+    /** Whether the person cleared [jobId] (Clear, or Clear finished) while droidtop ran. */
+    fun wasCleared(jobId: String): Boolean = jobId in clearedIds
+
     /** Forgets a finished job and its report (the row's Clear). False for a job still running or paused. */
     fun clear(jobId: String): Boolean {
         val entry = find(jobId) ?: return false
         if (!entry.done) return false
+        clearedIds += jobId
         state.update { list -> list.filterNot { it.jobId == jobId } }
         finishedSpecs.remove(jobId)
         persist()
@@ -643,6 +663,7 @@ object PluginJobsCenter {
 
     /** Forgets every finished job (Clear finished). */
     fun clearFinished() {
+        state.value.filter { it.done }.forEach { clearedIds += it.jobId }
         state.update { list -> list.filterNot { it.done } }
         finishedSpecs.clear()
         persist()
@@ -657,6 +678,7 @@ object PluginJobsCenter {
         if (!entry.done) return null
         val spec = finishedSpecs[jobId] ?: return null
         val started = startNative(context, spec.kind, entry.title, spec.args, owner = entry.pluginLabel, pausable = entry.pausable) ?: return null
+        successors[jobId] = started
         clear(jobId)
         return started
     }

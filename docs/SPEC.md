@@ -5880,7 +5880,10 @@ one:
   how it ended, and opens the job's page: how it ended, then Open (what it made, `JobOpen`), Retry and Clear, then
   its report, a section per outcome, failures first, each line opening its own target. Open is :app's
   (`JobOpener`): a game opens its page, a place opens where the person is, a folder or file on shared storage opens
-  in Android's files app; a path outside shared storage is not offered.
+  in Android's files app; a path outside shared storage is not offered. A job's page follows its job: after Retry it
+  shows the new run (`PluginJobsCenter.followed`), and while the list does not hold the job for a moment it keeps what
+  it last showed; only a job the person cleared reads "This job was cleared" (rig on 0.2.0-dev.2194: an open page read
+  "This job is no longer tracked" when its job finished or was retried).
   **Waiting is a state (2026-10-22).** A running job that lost its connection is waiting for it
   (`WAITING_FOR_NETWORK`), and one between attempts is waiting to try again (`WAITING_TO_RETRY`), set by the job
   through `JobHandle.waiting`; a lost connection is never a failure (Droidtop/tracker#577). Both sit in the Waiting

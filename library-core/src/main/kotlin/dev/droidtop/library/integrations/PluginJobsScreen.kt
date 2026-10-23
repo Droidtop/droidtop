@@ -220,22 +220,33 @@ object PluginJobsScreen {
         )
     }
 
-    /** A job's own page: where it has got, then Pause or Resume and Cancel where the job supports them. Live. */
-    private fun jobPage(jobId: String, title: String): CatalogScreen = CatalogScreen(
-        id = "plugin_job_page_$jobId",
-        title = title,
-        groups = { _ ->
-            val entry = PluginJobsCenter.entries().value.firstOrNull { it.jobId == jobId }
-            listOf(CatalogGroup(id = "plugin_job_page_$jobId", title = null, items = jobControls(jobId, entry)))
-        },
-        // A job is not a setting: search has nothing to find here.
-        indexGroups = { emptyList() },
-        live = PluginJobsCenter.entries(),
-    )
+    /**
+     * A job's own page: where it has got, then Pause or Resume and Cancel where the job supports them. Live, and it
+     * follows its job (tracker#577, rig on 0.2.0-dev.2194: a page left open said "This job is no longer tracked" when
+     * its job finished or was retried): after Retry it shows the new run ([PluginJobsCenter.followed]), and while the
+     * list does not hold the job for a moment it keeps showing what it last saw. Only a job the person cleared is gone.
+     */
+    private fun jobPage(jobId: String, title: String): CatalogScreen {
+        var lastSeen: PluginJobsCenter.Entry? = null
+        return CatalogScreen(
+            id = "plugin_job_page_$jobId",
+            title = title,
+            groups = { _ ->
+                val current = PluginJobsCenter.followed(jobId)
+                val entry = PluginJobsCenter.find(current)?.also { lastSeen = it }
+                    ?: lastSeen?.takeIf { it.jobId == current && !PluginJobsCenter.wasCleared(current) }
+                listOf(CatalogGroup(id = "plugin_job_page_$jobId", title = null, items = jobControls(current, entry)))
+            },
+            // A job is not a setting: search has nothing to find here.
+            indexGroups = { emptyList() },
+            live = PluginJobsCenter.entries(),
+        )
+    }
 
     private fun jobControls(jobId: String, entry: PluginJobsCenter.Entry?): List<CatalogItem> {
         if (entry == null) {
-            return listOf(ActionItem(id = "plugin_job_${jobId}_gone", title = "This job is no longer tracked", run = {}))
+            val said = if (PluginJobsCenter.wasCleared(jobId)) "This job was cleared" else "This job is no longer tracked"
+            return listOf(ActionItem(id = "plugin_job_${jobId}_gone", title = said, run = {}))
         }
         if (entry.done) return finishedControls(jobId, entry)
         return buildList {
