@@ -1416,11 +1416,8 @@ object AppSettingsCatalogs {
     private fun appInterfacesGroup(context: Context, installed: List<dev.droidtop.pluginhost.PluginRecord>): CatalogGroup? {
         val found = runCatching { dev.droidtop.pluginhost.AppInterfaces.discover(context) }.getOrDefault(emptyList())
         val items = found.mapNotNull { app ->
+            if (dev.droidtop.pluginhost.AppInterfaces.isAdded(context, app)) return@mapNotNull null
             val record = installed.firstOrNull { it.manifest.kind == PluginKind.APP_INTERFACE && it.manifest.app?.packageName == app.packageName }
-            val cert = dev.droidtop.pluginhost.AppInterfaceTrust.certOf(app.verdict)
-            val current = record != null && cert.equals(record.approvedKeySha256, ignoreCase = true) &&
-                app.manifestBytes?.let { dev.droidtop.runtime.util.Sha256.hex(it) } == record.archiveDigest
-            if (current) return@mapNotNull null
             appInterfaceRow(app, update = record != null)
         }
         if (items.isEmpty()) return null

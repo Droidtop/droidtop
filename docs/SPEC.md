@@ -20769,7 +20769,10 @@ and work with each other over the plugin API so no matter what, saves go where t
     you trust" in Keys you trust.
   - Refused: why, in one sentence.
 
-  An app already added is in Installed, and shows here again only when the app changed ("Review the new version"). The one runner (`NativePluginRunner`) binds the app's service instead of a droidtop process; nothing else
+  An app already added is in Installed, and shows here again only when the app changed ("Review the new version").
+  An app announces itself by knocking on the door when it starts, and droidtop also notices installs and updates by
+  itself (live while it runs; on start, what changed while it did not). An app not added yet is told to the person
+  once per app version, in a notification that opens Plugins. Nothing is added or trusted without the person. The one runner (`NativePluginRunner`) binds the app's service instead of a droidtop process; nothing else
   about running a plugin changes.
 - **Trust is the app's Android signature, checked by droidtop in process.** Every APK of the app (base and splits) is
   read once from an open descriptor, its v2/v3 signature block verified with apksig, the signer compared with what
