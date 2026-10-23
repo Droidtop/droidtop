@@ -4578,7 +4578,13 @@ version was bumped.
   "Not supported by this version" and never called, but the rest of the
   plugin still works.
 
-**Contract 3 (proposed 2026-10-22, Droidtop/tracker#602, not built).**
+**Contract 3 (proposed 2026-10-22, approved 2026-10-23, Droidtop/tracker#602, built 2026-10-23).**
+A plugin whose manifest says `"contractVersion": 3` needs facets: a droidtop built before them refuses to install it
+("contractVersion 3 is newer than this build of droidtop understands (2)") and keeps the version it has, so a plugin
+that moved its settings or panel to facets is never installed where they cannot be drawn. droidtop installs contract
+1 to 3 (`PLUGIN_MANIFEST_CONTRACT_VERSION`). The call envelope does not change in 3: a call's `contract` stays 2, so
+a plugin's check for it holds whichever contract its manifest says. `minDroidtop` is documentation only; no droidtop
+reads it.
 Facets (§1.10): small, typed pieces of UI and information that any
 plugin gives droidtop for its targets (a game page, the Quick Menu, Home,
 the companion, Settings, notifications, the status area, widgets), which
