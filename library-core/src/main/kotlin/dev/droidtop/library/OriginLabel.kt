@@ -12,9 +12,11 @@ import dev.droidtop.library.stores.StoreHolding
  * Engines no Enginehost plugin runs (docs/SPEC.md 7e2b's table): their games are Windows builds, run in Wine (or a
  * native Linux build in a container), so they are PC games, store or local (Droidtop/tracker#603: a local Unity
  * folder was badged "Engine" though it ran in Wine). The engine they are built on stays a fact on the game's page.
+ * LOVE is not one: Enginehost's LOVE plugin runs a `.love` game and a fused one (the engines database lists
+ * ENGINEHOST first for it), so a LOVE game is an Engine game.
  */
 val WINE_ENGINE_KINDS: Set<LibraryEntryKind> =
-    setOf(LibraryEntryKind.UNITY, LibraryEntryKind.UNREAL, LibraryEntryKind.AGS, LibraryEntryKind.LOVE2D)
+    setOf(LibraryEntryKind.UNITY, LibraryEntryKind.UNREAL, LibraryEntryKind.AGS)
 
 /** Whether Enginehost runs games of this kind: the one rule for the "Engine" badge and the Kind filter. */
 fun LibraryEntryKind.runsInEnginehost(): Boolean = engineFamily() != null && this !in WINE_ENGINE_KINDS
