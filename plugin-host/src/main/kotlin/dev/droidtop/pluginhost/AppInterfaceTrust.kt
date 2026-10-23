@@ -45,9 +45,12 @@ object AppInterfaceTrust {
 
     /**
      * The official app certificates, by package: the SHA-256 of each one's signing certificate (lowercase hex). An app
-     * signed by one of these is Official. Enginehost's goes here once its full digest is on Droidtop/tracker#547.
+     * signed by one of these is Official. Enginehost's is its release certificate (the v2 signer of enginehost-latest.apk,
+     * Droidtop/tracker#547).
      */
-    val OFFICIAL: Map<String, Set<String>> = emptyMap()
+    val OFFICIAL: Map<String, Set<String>> = mapOf(
+        "dev.enginehost" to setOf("56ad873eefebacfbbd5662b3b8bd0b094b6ac2d86f27933b257080d04951bf35"),
+    )
 
     /** droidtop's own verification of one APK of the app: verified at all, with v2 or v3, and by which certificates. */
     data class ApkCheck(val verified: Boolean, val v2OrV3: Boolean, val signers: Set<String>)

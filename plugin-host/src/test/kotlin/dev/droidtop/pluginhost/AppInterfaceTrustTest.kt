@@ -29,6 +29,16 @@ class AppInterfaceTrustTest {
     }
 
     @Test
+    fun `Enginehost signed by its release certificate is Official, and by any other key is not`() {
+        val release = "56ad873eefebacfbbd5662b3b8bd0b094b6ac2d86f27933b257080d04951bf35"
+        assertEquals(setOf(release), AppInterfaceTrust.OFFICIAL["dev.enginehost"])
+        assertEquals(AppInterfaceTrust.Verdict.Official(release), AppInterfaceTrust.decide("dev.enginehost", listOf(apk(release)), setOf(release), emptySet()))
+        assertEquals(AppInterfaceTrust.Verdict.NotTrusted(a), AppInterfaceTrust.decide("dev.enginehost", listOf(apk(a)), setOf(a), emptySet()))
+        // The pin is per package: another app signed by Enginehost's key is not Official by it.
+        assertEquals(AppInterfaceTrust.Verdict.NotTrusted(release), AppInterfaceTrust.decide("com.example.app", listOf(apk(release)), setOf(release), emptySet()))
+    }
+
+    @Test
     fun `a signer Android reports but the APK does not carry is refused, as on a device with its checks patched out`() {
         assertEquals(
             AppInterfaceTrust.Verdict.Refused(AppInterfaceTrust.NOT_ITS_SIGNER),
