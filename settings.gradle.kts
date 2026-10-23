@@ -15,21 +15,6 @@ dependencyResolutionManagement {
         // see shell-default/README.md): chickenhook-restrictionbypass and
         // a couple of its other deps are only published there.
         maven { url = uri("https://jitpack.io") }
-        // Needed by :stores (droidtop's Steam client): GameNative's JavaSteam
-        // is a SNAPSHOT (io.github.joshuatam:javasteam), published only here,
-        // the repository GameNative's own settings.gradle declares.
-        // Exclusive, both ways: that group is looked up here and nowhere
-        // else, and nothing else is looked up here. A SNAPSHOT's metadata
-        // is fetched from every repository listed before the one that has
-        // it, so jitpack was asked first on every CI run, and a jitpack
-        // timeout failed the build ("could not resolve ...
-        // javasteam-depotdownloader:1.8.0.1-26-SNAPSHOT", jitpack.io
-        // maven-metadata.xml; three main runs on 2026-10-02,
-        // Droidtop/tracker#283).
-        exclusiveContent {
-            forRepository { maven { url = uri("https://central.sonatype.com/repository/maven-snapshots/") } }
-            filter { includeGroup("io.github.joshuatam") }
-        }
         // Needed by :plugin-host (docs/SPEC.md 12a, flutter_embed kind):
         // Flutter's own Maven repo for the `io.flutter:flutter_embedding_release`
         // artifact -- the Java-only embedding classes (FlutterEngine,
@@ -109,6 +94,16 @@ include(":library-core")
 // The PC stores droidtop runs itself (docs/SPEC.md 7g, "Stores"): Epic, GOG,
 // Amazon Games and itch.io, lifted out of GameNative behind
 // library-core's StoreLibrary.
+// :stores' Steam client is JavaSteam, built from source: droidtop's fork (vendor/javasteam, Droidtop/javasteam,
+// branch droidtop, from GameNative's JavaSteam), which hands depot chunks, web files and Workshop files to droidtop's
+// download engine (its Fetcher; docs/SPEC.md 12a, "Everything moves"). Its two modules stand in for the coordinates
+// :stores names.
+includeBuild("vendor/javasteam") {
+    dependencySubstitution {
+        substitute(module("io.github.joshuatam:javasteam")).using(project(":"))
+        substitute(module("io.github.joshuatam:javasteam-depotdownloader")).using(project(":javasteam-depotdownloader"))
+    }
+}
 include(":stores")
 
 // The plugin host (docs/SPEC.md 12a): manifest validation, install/

@@ -3,7 +3,7 @@ package dev.droidtop.stores
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.stores.epic.EpicDownloadManager
 import dev.droidtop.stores.gog.GOGDownloadManager
-import dev.droidtop.stores.steam.SteamChunkFetch
+import dev.droidtop.stores.steam.SteamFetcher
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -36,10 +36,8 @@ class StoreChunkNamesTest {
     }
 
     @Test
-    fun `only a depot chunk goes to the engine, under a name of its depot and id`() {
-        assertEquals(731 to "0a1b2c3d4e", SteamChunkFetch.chunkOf("/depot/731/chunk/0A1B2C3D4E"))
-        assertEquals("steam_731_0a1b2c3d4e", SteamChunkFetch.areaName(731, "0a1b2c3d4e"))
-        assertNull("a manifest is a request", SteamChunkFetch.chunkOf("/depot/731/manifest/123456/5/987"))
-        assertNull(SteamChunkFetch.chunkOf("/ISteamApps/GetSDRConfig/v1/"))
+    fun `JavaSteam's downloads have bare names of their own in the downloads area`() {
+        assertEquals("steam_chunk_731_0a1b2c3d4e", SteamFetcher.areaName("chunk_731_0a1b2c3d4e"))
+        assertEquals("steam_web_480_My_Mod_.zip", SteamFetcher.areaName("web_480_My Mod!.zip"))
     }
 }

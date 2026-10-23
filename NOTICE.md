@@ -42,12 +42,13 @@ This project is distributed under the GNU General Public License v3.0 (see
   converters and DAOs, `KeyValueUtils.generateSteamApp`, `LicenseSerializer`
   and `CaseInsensitiveFileSystem`. GameNative's authors hold the copyright in
   that code; it stays under GPL-3.0.
-- **JavaSteam** — https://github.com/Longi94/JavaSteam — MIT, as GameNative
-  builds it (https://github.com/joshuatam/JavaSteam, branch
-  `gamenative-latest`, the `io.github.joshuatam:javasteam` and
-  `javasteam-depotdownloader` artifacts): the Steam protocol, sign-in and
-  depot downloader under droidtop's own Steam client (`:stores`). A Maven
-  dependency, not vendored.
+- **JavaSteam** — https://github.com/Longi94/JavaSteam — MIT, from
+  GameNative's fork (https://github.com/joshuatam/JavaSteam, branch
+  `gamenative-latest`) by way of droidtop's own (https://github.com/Droidtop/javasteam,
+  branch `droidtop`, which adds a fetcher hook for droidtop's download
+  engine): the Steam protocol, sign-in and depot downloader under droidtop's
+  own Steam client (`:stores`). Vendored as a submodule at
+  `vendor/javasteam` and built from source.
 - **ZXing** — https://github.com/zxing/zxing — Apache-2.0. Its `core`
   artifact draws droidtop's QR codes (Steam's sign-in, the scraper key
   setup). A Maven dependency, not vendored.

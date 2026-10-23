@@ -371,7 +371,7 @@ class SteamStore : StoreLibrary {
             val install = db.installs().find(appId) ?: return@withContext
             File(context.cacheDir, "steam_chunks/$appId").let { staging -> SafeDelete.deleteWithin(staging.parentFile ?: context.cacheDir, staging) }
             // The chunks the engine had begun: Steam installs one game at a time, so every Steam chunk in the area is this one's.
-            DownloadJobs.discardAllForJob(context, SteamChunkFetch.AREA_PREFIX)
+            DownloadJobs.discardAllForJob(context, SteamFetcher.AREA_PREFIX)
             if (install.isDownloaded || install.installPath.isBlank()) return@withContext
             val dir = File(install.installPath)
             dir.parentFile?.let { SafeDelete.deleteWithin(it, dir) }

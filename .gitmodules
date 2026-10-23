@@ -46,3 +46,7 @@
 [submodule "vendor/notices"]
 	path = vendor/notices
 	url = https://github.com/Droidtop/notices
+[submodule "vendor/javasteam"]
+	path = vendor/javasteam
+	url = https://github.com/Droidtop/javasteam
+	branch = droidtop
