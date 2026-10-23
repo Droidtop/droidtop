@@ -96,7 +96,7 @@ enum class LibraryFacet(val key: String, val label: String) {
         SOURCE -> PcSource.of(entry, context.pcRoots)?.let { listOf(it.id) }.orEmpty()
         // A store row only: a folder game is no store's to hold.
         OWNERSHIP -> entry.holding()?.let { listOf(it.name) }.orEmpty()
-        KIND -> listOf(if (entry.kind in dev.droidtop.shell.gamepad.pc.NON_ENGINE_KINDS) KIND_PC else KIND_ENGINE)
+        KIND -> listOf(if (dev.droidtop.shell.gamepad.pc.isPcKind(entry.kind)) KIND_PC else KIND_ENGINE)
         IMPORTED_FROM -> context.viaOf(entry)?.let { listOf(it) }.orEmpty()
         COLLECTION -> context.collectionsOf(entry).toList()
         ENGINE -> entry.engineLabel()?.let { listOf(it) }.orEmpty()

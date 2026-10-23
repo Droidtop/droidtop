@@ -9,17 +9,28 @@ import dev.droidtop.library.stores.StoreHolding
  * value and the capsule badge read this one answer (docs/SPEC.md 7i).
  */
 /**
- * Engines no Enginehost plugin runs (docs/SPEC.md 7e2b's table): their games are Windows builds, run in Wine (or a
- * native Linux build in a container), so they are PC games, store or local (Droidtop/tracker#603: a local Unity
- * folder was badged "Engine" though it ran in Wine). The engine they are built on stays a fact on the game's page.
- * LOVE is not one: Enginehost's LOVE plugin runs a `.love` game and a fused one (the engines database lists
- * ENGINEHOST first for it), so a LOVE game is an Engine game.
+ * The engines database's rows as last read ([EnginesDatabase.defs] fills it), for the answers drawn per card that
+ * have no context to read it with ([runsInEnginehost]). Null until the database is read.
  */
-val WINE_ENGINE_KINDS: Set<LibraryEntryKind> =
-    setOf(LibraryEntryKind.UNITY, LibraryEntryKind.UNREAL, LibraryEntryKind.AGS)
+object EngineRunners {
+    @Volatile
+    var defs: List<EngineDef>? = null
+}
 
-/** Whether Enginehost runs games of this kind: the one rule for the "Engine" badge and the Kind filter. */
-fun LibraryEntryKind.runsInEnginehost(): Boolean = engineFamily() != null && this !in WINE_ENGINE_KINDS
+/**
+ * Whether Enginehost runs games of this kind: the one rule for the "Engine" badge, the Kind filter and the page's
+ * "runs in Wine" (Droidtop/tracker#603). It reads the engines database's strategy order ([defs]): an engine whose row
+ * puts ENGINEHOST first is Enginehost's, one whose rows do not (Unity and Unreal, built for Windows or Linux) runs
+ * as a PC game, store or local. So an engine that gains an Enginehost core (AGS, droidtop-platforms bf9a195) reads
+ * "Engine" with the database update, not an app change. Before the database is read, an engine kind counts as
+ * Enginehost's.
+ */
+fun LibraryEntryKind.runsInEnginehost(defs: List<EngineDef>? = EngineRunners.defs): Boolean {
+    if (engineFamily() == null) return false
+    val rows = defs?.filter { it.engine?.toLibraryEntryKind() == this }.orEmpty()
+    if (rows.isEmpty()) return true
+    return rows.any { it.strategies.firstOrNull() == GameLaunchStrategy.ENGINEHOST }
+}
 
 fun LibraryEntryKind.engineFamily(): String? = when (this) {
     LibraryEntryKind.RENPY -> "Ren'Py"

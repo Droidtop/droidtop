@@ -262,9 +262,8 @@ internal class ViewBadges(badges: Collection<KindBadge?>) {
     }
 }
 
-/** The kinds badged "PC", not "Engine": every kind Enginehost does not run, Wine-run engines included (#603). The one rule, [runsInEnginehost]. */
-internal val NON_ENGINE_KINDS: Set<LibraryEntryKind> =
-    LibraryEntryKind.entries.filterTo(HashSet()) { !it.runsInEnginehost() }
+/** Whether [kind] is badged "PC", not "Engine": every kind Enginehost does not run, Wine-run engines included (#603). The one rule, [runsInEnginehost]. */
+internal fun isPcKind(kind: LibraryEntryKind): Boolean = !kind.runsInEnginehost()
 
 /**
  * The [KindBadge] of [entry], from fields the entry already carries and
@@ -284,7 +283,7 @@ internal fun kindBadgeOf(
     entry.appFacts != null || entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP -> KindBadge(BadgeKind.APP, null)
     entry.inPcFold -> {
         val origin = originLabel(entry, origins, style, roots)
-        if (!origin.shown) null else KindBadge(if (entry.kind in NON_ENGINE_KINDS) BadgeKind.PC else BadgeKind.ENGINE, origin.detail)
+        if (!origin.shown) null else KindBadge(if (isPcKind(entry.kind)) BadgeKind.PC else BadgeKind.ENGINE, origin.detail)
     }
     else -> KindBadge(BadgeKind.RETRO, entry.systemId?.let { systemNames[it] ?: it })
 }

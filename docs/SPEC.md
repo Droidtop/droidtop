@@ -9065,10 +9065,12 @@ The table is the design; a row's `strategies` list carries it as data.
 
 **The "Engine" badge follows how a game runs (decided 2026-10-22, Droidtop/tracker#603).** The owner, on a local
 Unity build badged "Engine" though it ran in Wine: "I think because it was provided locally, not through a store".
-"Engine" on a capsule and in the Kind filter means Enginehost runs the game (`runsInEnginehost`); the engines no
-Enginehost plugin runs, Unity, Unreal and AGS (`WINE_ENGINE_KINDS`), are Windows builds run in Wine, so they are
-"PC", store or local alike. LOVE is an Engine game: Enginehost's LOVE plugin runs `.love` and fused games, and the
-engines database lists ENGINEHOST first for it. The engine stays a fact: the game page's Engine row reads "Unity, runs in Wine".
+"Engine" on a capsule and in the Kind filter means Enginehost runs the game (`runsInEnginehost`), read from the
+engines database's strategy order, not a list in the app (coordinator, 2026-10-23: "Drive the badge from the
+database's strategy order rather than a hardcoded list, so the next core doesn't need a badge change"): an engine
+whose row puts ENGINEHOST first (Ren'Py, Godot, LOVE, and AGS since droidtop-platforms bf9a195) is "Engine"; one
+whose rows do not (Unity, Unreal: Windows or Linux builds) is "PC", store or local alike. Until the database is read
+(`EngineRunners.defs`, filled by `EnginesDatabase.defs`), an engine kind counts as Enginehost's. The engine stays a fact: the game page's Engine row reads "Unity, runs in Wine".
 A game whose runner the person changed by hand keeps its kind's badge.
 
 "Complete" for coverage means: on an unrooted arm64 handheld every
