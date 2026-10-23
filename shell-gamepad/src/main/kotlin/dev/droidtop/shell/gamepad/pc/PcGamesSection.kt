@@ -1151,7 +1151,8 @@ internal fun PcGamesSection(
                         state.destFocused = false
                         if (state.shelfIndex == shelf && state.itemIndex == item) activate(entry) else moveTo(shelf, item)
                     },
-                    onLongPressCapsule = ::openPage,
+                    // A long press is the thing's menu, everywhere (owner, 2026-10-23, Droidtop/tracker#610).
+                    onLongPressCapsule = ::openOptions,
                     downloads = downloads,
                     partsOf = ::partsOf,
                     systemNames = systemNames,
@@ -1188,7 +1189,7 @@ internal fun PcGamesSection(
                                         state.stripFocused = false
                                         if (state.itemIndex == index) activate(entry) else moveTo(state.shelfIndex, index)
                                     },
-                                    onLongPress = { state.pageId = entry.id },
+                                    onLongPress = { openOptions(entry) },
                                     download = entry.downloadKey()?.let { downloads[it] },
                                     parts = partsOf(entry),
                                     badge = gridBadges.of(badgeOf(entry)),
@@ -1447,6 +1448,10 @@ internal fun PcGamesSection(
         AppOptionsMenu(
             entry = entry,
             detailsLabel = if (entry.appFacts != null) "App details" else "Game details",
+            onPrimary = {
+                otherMenu = null
+                onLaunch(entry)
+            },
             onDetails = {
                 otherMenu = null
                 onShowDetail(entry)

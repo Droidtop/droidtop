@@ -3697,7 +3697,6 @@ private fun AppsSection(
                             firstTileFocus = if (!firstAssigned) firstFocus else null,
                             onLaunch = onLaunch,
                             onOptions = { optionsFor = it },
-                            onMarkGame = markGame,
                             onFocusedEntryChanged = onFocusedEntryChanged,
                         )
                     } else {
@@ -3771,6 +3770,10 @@ private fun AppsSection(
         AppOptionsMenu(
             entry = entry,
             isGame = rules.isGame(entry.id, entry.appFacts),
+            onPrimary = {
+                optionsFor = null
+                onLaunch(entry)
+            },
             onDetails = {
                 optionsFor = null
                 onShowDetail(entry)
@@ -3811,7 +3814,6 @@ private fun AppIconGrid(
     firstTileFocus: FocusRequester?,
     onLaunch: (LibraryEntry) -> Unit,
     onOptions: (LibraryEntry) -> Unit,
-    onMarkGame: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
 ) {
     Column {
@@ -3854,7 +3856,6 @@ private fun AppIconGrid(
                     modifier = if (index == 0 && firstTileFocus != null) Modifier.focusRequester(firstTileFocus) else Modifier,
                     onLaunch = { onLaunch(entry) },
                     onOptions = { onOptions(entry) },
-                    onMarkGame = { onMarkGame(entry) },
                     onFocused = { onFocusedEntryChanged(entry) },
                 )
             }
@@ -3871,7 +3872,6 @@ private fun AppIconTile(
     modifier: Modifier = Modifier,
     onLaunch: () -> Unit,
     onOptions: () -> Unit = {},
-    onMarkGame: () -> Unit = {},
     onFocused: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -3903,9 +3903,11 @@ private fun AppIconTile(
             .declaresHints(APP_TILE_HINTS)
             .focusable()
             // Same real touch-input fix as GameCard -- see its own
-            // comment. A long press marks the app as a game (or not),
-            // the touch route to the same answer the options menu gives.
-            .combinedClickable(onClick = onLaunch, onLongClick = onMarkGame)
+            // comment. A long press opens the app's menu, as a long press
+            // does on every thing (owner, 2026-10-23, Droidtop/tracker#610);
+            // Mark as game is a row of that menu. It used to mark the app at
+            // once, with nothing on screen saying so.
+            .combinedClickable(onClick = onLaunch, onLongClick = onOptions)
             // The shell's ONE selection idiom, the same one [GameCard]
             // and the menus draw: the accent ring over a brightened
             // surface. This tile kept a third one -- a thin white
