@@ -182,7 +182,7 @@ class FacetsTest {
 
     @Test
     fun `host info says which kinds and targets this droidtop draws`() {
-        val info = PluginEnvelope.hostInfo().getJSONObject("facets")
+        val info = PluginCall.hostInfo().getJSONObject("facets")
         assertEquals(1, info.getJSONObject("kinds").getJSONArray("status").getInt(0))
         assertTrue(info.getJSONObject("targets").has("quickmenu"))
         assertTrue(info.getJSONObject("targets").has("game.page"))
