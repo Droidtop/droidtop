@@ -6380,6 +6380,16 @@ droidtop's risky-actions setting is on; it is off by default, never offered
 as a fix, and never suggested in text. It is the same kind of grant as the
 two above (shown, revocable).
 
+**Every control is the person's, with secure defaults (owner, 2026-10-23).** "the wine sandbox should be
+configurable. if the user WANTS to do dumb shit on their droidtop PC, we can. we just have secure defaults".
+Properties > Wine > Protection on a game, and a global default in Settings, expose each containment control:
+the network (on by default: games go online), extra folders read-only or read-write (including another prefix or
+any storage droidtop can see; none by default), running programs from outside the game's folder and prefix (off by
+default), the kernel-driver default (deny, Droidtop/tracker#607), and protection off entirely. Each starts at its
+secure default, and moving one away from its default shows a warning first, as the driver default does. Protection
+off stays the item 6 toggle: shown only while Risky actions is on, never recommended. A game's setting wins over
+the global default; the run record names every control that is not at its default.
+
 **7. Where the toggles are stored.** In the prefix's and the game's settings
 next to the other prefix settings (`WineGameOptionsPrefs` for a game,
 the container's own record for a prefix), read by `WineGrants` (5b), which
@@ -6721,6 +6731,21 @@ is a whole copy-on-write copy of the base and needs no layer (owner,
 layer system"). The layer is therefore the case for devices without it,
 never required where the kernel does the job, and the broker's containment
 applies to both.
+
+**Wine gets a containment sandbox, not a hostile one (owner, 2026-10-23).** "the wine sandbox also doesn't have to
+be anywhere near as hostile". Enginehost's cores keep the hostile policy (engine code has no internet and no
+arbitrary file access). Wine's sandbox is there to own the filesystem view: the prefix layer, the read-only game
+folder, the kernel-driver discard (#607), and keeping Wine out of droidtop's private folders and other prefixes. So
+the network, exec of Wine's own binaries, the translators and the game's own programs inside its folder and prefix,
+threads, signals, shared memory and the usual system calls Wine and FEX or Box64 make are allowed; only what clearly
+escapes is refused (ptrace of another process, namespaces, mounts, module loading, bpf). What Wine really uses is
+found with the library's learning mode, not by tightening first. The layer is the broker's decider (owner: "The idea
+was to use the sandbox we use for wine to implement the layering"): no FUSE, no proot bind. Built in pieces, each
+landed green on its own: 0, Wine under the lockdown and broker with a pass-through decider and learning (it needs
+the library's child attach by preload, brokered exec and Unix sockets, and a multi-client listener, asked of the
+sandbox lane on Droidtop/tracker#584); 1, the managed-prefix registry and the move of the shared prefix into it;
+2, the layer and the read-only game folder in the decider; 3, the kernel-driver discard and the Drivers tab, with
+`Start=4` set when the layer copies `system.reg` up, so a placeholdered driver is never loadable for even one boot.
 
 **The shape.**
 
