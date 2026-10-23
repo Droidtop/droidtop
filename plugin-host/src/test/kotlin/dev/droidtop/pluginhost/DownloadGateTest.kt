@@ -94,6 +94,19 @@ class DownloadGateTest {
     }
 
     @Test
+    fun `download now held again by the connection goes first once the connection allows`() {
+        val big = { _: PluginJobsCenter.Entry -> JobFacts(900L * 1024 * 1024) }
+        val allowed = Conditions(NetworkClass.METERED, 12 * 60, false, meteredAllowed = true)
+        val entries = listOf(
+            entry("older", paused = true, hold = "Waiting for Wi-Fi").copy(startedAtMs = 0),
+            entry("pressed", paused = true, hold = "Waiting for Wi-Fi", override = true).copy(startedAtMs = 10),
+        )
+        val moves = DownloadGate.plan(entries, big, settings, allowed)
+        assertTrue(DownloadGate.Move.Release("pressed") in moves)
+        assertTrue(moves.none { it is DownloadGate.Move.Release && it.jobId == "older" })
+    }
+
+    @Test
     fun `a metered connection the person allowed releases every download held for Wi-Fi`() {
         val big = { _: PluginJobsCenter.Entry -> JobFacts(900L * 1024 * 1024) }
         val allowed = Conditions(NetworkClass.METERED, 12 * 60, false, meteredAllowed = true)
