@@ -12423,8 +12423,16 @@ data, and any index can be rebuilt from them.
   records there, matching "removing a root still drops its rows and
   records; nothing else deletes a record."
 - The slow pass skips unchanged parts in both folder-walking
-  providers. `EngineGameProvider`'s parts are one folder each, so a
-  part's own modification time is its stamp. `ConsoleRomProvider`'s part
+  providers. `EngineGameProvider`'s parts are one folder each, stamped by
+  the newest modification time of the folder and of the directories under
+  it, down to the walk's own depth bound (`GameEngineDetector.subtreeStamp`:
+  four title levels, a part or version folder costing none; one stat per
+  directory, no file reads, taken off the main thread before the folder is
+  walked). A directory's own time moves only when its own entries change,
+  so the folder's own time alone hid a game added further down: two LOVE
+  games under `Manual/love2d` were never found by the background pass
+  (tracker#577; the coordinator, 2026-10-23: "One stat per directory and no
+  file reads is linear, so it's fine for a background pass"). `ConsoleRomProvider`'s part
   is a system under a root, several folders, and it stamps itself: one
   number over the modification times of the system's folders and of
   every folder its known ROMs sit in (a system may be sorted into
@@ -12438,7 +12446,7 @@ data, and any index can be rebuilt from them.
   of every system folder every round (headers re-read, media re-resolved)
   for a library that had not changed.
   `PcGameProvider` stamps its two kinds of part too: each top-level
-  folder of a root by its own modification time, read before the folder
+  folder of a root by the same subtree stamp, read before the folder
   is walked, and the store part by one number over what that part reads
   (gamenative's store database and its write-ahead log, each Wine
   prefix's Desktop folder, the scanner's folders outside droidtop's
