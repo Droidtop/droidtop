@@ -118,15 +118,16 @@ object SessionMonitor {
     }
 
     /**
-     * Whether [packageName] still holds a task: from the system's task list with the privileged helper; without one, from
-     * Enginehost itself for Enginehost's games ([EnginehostCapabilities.holdsTask]), the one app that can say; null when
-     * nothing can say.
+     * Whether [packageName] still holds a task: for Enginehost's games, Enginehost's own answer first
+     * ([EnginehostCapabilities.holdsTask]), then the system's task list with the privileged helper; null when nothing can
+     * say. The same order as the launch watch ([LaunchWatchPolicy.listed]): after Cancel on Enginehost's no-sandbox
+     * warning its task could stay in the system's list, so the session stayed open and the Start menu offered "Resume"
+     * for a game that never ran (tracker#577, rig on 0.2.0-dev.2194).
      */
     private suspend fun taskListed(app: Context, packageName: String): Boolean? {
-        if (!TaskManager.privileges().shell) {
-            return if (packageName == EngineHost.PACKAGE_NAME) EnginehostCapabilities.holdsTask(app) else null
-        }
+        val appSays = if (packageName == EngineHost.PACKAGE_NAME) EnginehostCapabilities.holdsTask(app) else null
+        if (!TaskManager.privileges().shell) return appSays
         val snapshot = TaskManager.snapshotWithin(app, maxAgeMs = 2_000L)
-        return if (snapshot.fidelity == Fidelity.EXACT) snapshot.apps.any { it.packageName == packageName } else null
+        return LaunchWatchPolicy.listed(appSays, if (snapshot.fidelity == Fidelity.EXACT) snapshot.apps.any { it.packageName == packageName } else null)
     }
 }

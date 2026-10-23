@@ -9517,7 +9517,9 @@ Whether an Enginehost launch is still open is Enginehost's own word first (its `
 `EnginehostCapabilities.holdsTask`, through `LaunchWatchPolicy.listed`), the task list only when it cannot say: the
 task list missed the no-sandbox warning while it waited for an answer, and the watch ended the launch as left
 (console, 0.2.0-dev.2129: "dev.enginehost returned after 12289 ms with nothing open"). A pending Enginehost question is
-a launch still under way.
+a launch still under way. The session watch (`SessionMonitor`) asks in the same order, so a game ends when Enginehost
+says it holds no task even while its task still shows in the system's list: after Cancel on the warning the session
+stayed open and the Start menu offered "Resume" for a game that never ran (tracker#577, rig on 0.2.0-dev.2194).
 
 Considered and not built (Droidtop/tracker#270): a timed "taking a long time" notice for an emulator that is open
 and responsive but never draws. Time alone does not tell it from a healthy long-running game, so it would fire on
