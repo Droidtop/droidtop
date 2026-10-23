@@ -48,7 +48,9 @@ class SaveSyncEnginesTest {
         val elsewhere = Fake("test_elsewhere", covers = false)
         listOf(computers, share, elsewhere).forEach(SaveSyncEngines::register)
 
-        val handoffs = SaveSyncEngines.saved(context, saves())
+        // The engine list is the process's; another test's engines may be in it, so only these three are looked at.
+        val mine = setOf("test_computers", "test_share", "test_elsewhere")
+        val handoffs = SaveSyncEngines.saved(context, saves()).filter { it.engine in mine }
         assertEquals(1, computers.seen.size)
         assertEquals(1, share.seen.size)
         assertEquals(1, elsewhere.seen.size)
