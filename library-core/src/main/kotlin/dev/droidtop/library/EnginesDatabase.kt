@@ -43,6 +43,7 @@ object EnginesDatabase {
                     )
                 }.getOrElse { emptyList() }
             cached = loaded
+            EngineRunners.defs = loaded
             return loaded
         }
     }

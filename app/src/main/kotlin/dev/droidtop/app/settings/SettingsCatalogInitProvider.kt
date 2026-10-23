@@ -112,6 +112,11 @@ class SettingsCatalogInitProvider : ContentProvider() {
             dev.droidtop.app.update.AppSelfUpdate.cleanStaleDownloads(appContext)
         }
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
+        // The engines database decides the "Engine" badge (runsInEnginehost, docs/SPEC.md after the 7e2b table): read
+        // it now, off the main thread, so the first cards drawn already have it.
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching { dev.droidtop.library.EnginesDatabase.defs(appContext) }
+        }
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
         dev.droidtop.app.LaunchWatchNotification.start(appContext)
         AppSettingsCatalogs.ensureRegistered()

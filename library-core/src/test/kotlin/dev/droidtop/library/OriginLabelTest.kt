@@ -2,7 +2,10 @@ package dev.droidtop.library
 
 import dev.droidtop.library.stores.StoreHolding
 import org.junit.Assert.assertEquals
+import org.junit.After
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -11,6 +14,29 @@ import org.junit.Test
  * holding and how many origins the library has.
  */
 class OriginLabelTest {
+    /** The rows' strategy order as the engines database states it (droidtop-platforms bf9a195 for AGS). */
+    private val defs = listOf(
+        row("renpy", GameEngine.RENPY, GameLaunchStrategy.ENGINEHOST, GameLaunchStrategy.WINE_PREFIX),
+        row("godot", GameEngine.GODOT, GameLaunchStrategy.ENGINEHOST, GameLaunchStrategy.LINUX_CONTAINER, GameLaunchStrategy.WINE_PREFIX),
+        row("html", GameEngine.HTML, GameLaunchStrategy.ENGINEHOST),
+        row("love2d", GameEngine.LOVE2D, GameLaunchStrategy.ENGINEHOST, GameLaunchStrategy.LINUX_CONTAINER, GameLaunchStrategy.WINE_PREFIX),
+        row("ags", GameEngine.AGS, GameLaunchStrategy.ENGINEHOST, GameLaunchStrategy.WINE_PREFIX),
+        row("unity", GameEngine.UNITY, GameLaunchStrategy.LINUX_CONTAINER, GameLaunchStrategy.WINE_PREFIX),
+        row("unreal", GameEngine.UNREAL, GameLaunchStrategy.LINUX_CONTAINER, GameLaunchStrategy.WINE_PREFIX),
+    )
+
+    private fun row(id: String, engine: GameEngine, vararg strategies: GameLaunchStrategy) =
+        EngineDef(id = id, engine = engine, detect = emptyList(), strategies = strategies.toList(), enginehost = null)
+
+    @Before
+    fun readDatabase() {
+        EngineRunners.defs = defs
+    }
+
+    @After
+    fun forgetDatabase() {
+        EngineRunners.defs = null
+    }
 
     private val roots = listOf("/sd/Games", "/sd/BstSharedFolder", "/sd/Retro-Games-Collection", "/sd/Longfoldername")
 
@@ -84,14 +110,25 @@ class OriginLabelTest {
     }
 
     @Test
-    fun `engine means Enginehost runs it, and every Wine-run engine is PC`() {
+    fun `engine means the database puts Enginehost first for it, and every other engine is PC`() {
         assertTrue(LibraryEntryKind.RENPY.runsInEnginehost())
         assertTrue(LibraryEntryKind.GODOT.runsInEnginehost())
         assertTrue(LibraryEntryKind.HTML.runsInEnginehost())
-        // Enginehost's LOVE plugin runs LOVE games, so they are Engine games, not Wine ones.
+        // Enginehost's LOVE plugin and its AGS core run those games, so they are Engine games.
         assertTrue(LibraryEntryKind.LOVE2D.runsInEnginehost())
-        WINE_ENGINE_KINDS.forEach { assertTrue("$it has an engine family", it.engineFamily() != null) }
-        WINE_ENGINE_KINDS.forEach { org.junit.Assert.assertFalse("$it runs in Wine", it.runsInEnginehost()) }
-        org.junit.Assert.assertFalse(LibraryEntryKind.WINE_PROFILE.runsInEnginehost())
+        assertTrue(LibraryEntryKind.AGS.runsInEnginehost())
+        assertFalse(LibraryEntryKind.UNITY.runsInEnginehost())
+        assertFalse(LibraryEntryKind.UNREAL.runsInEnginehost())
+        assertFalse(LibraryEntryKind.WINE_PROFILE.runsInEnginehost())
+    }
+
+    @Test
+    fun `an engine follows the database it is given, so a new core needs no app change`() {
+        val before = listOf(row("ags", GameEngine.AGS, GameLaunchStrategy.WINE_PREFIX))
+        assertFalse(LibraryEntryKind.AGS.runsInEnginehost(before))
+        assertTrue(LibraryEntryKind.AGS.runsInEnginehost(defs))
+        // Before the database is read an engine kind counts as Enginehost's; a program never does.
+        assertTrue(LibraryEntryKind.UNITY.runsInEnginehost(null))
+        assertFalse(LibraryEntryKind.WINE_PROFILE.runsInEnginehost(null))
     }
 }

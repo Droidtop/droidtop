@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
 import dev.droidtop.library.friendlyLocation
+import dev.droidtop.library.runsInEnginehost
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -1401,7 +1402,7 @@ private fun pageRows(
         ?.let { add(PageFact("Folder name", it)) }
     // A Wine-run engine says so: what it was built with, and how it runs here (#603).
     entry.engineLabel()?.let { label ->
-        add(PageFact("Engine", if (entry.kind in dev.droidtop.library.WINE_ENGINE_KINDS) "$label, runs in Wine" else label))
+        add(PageFact("Engine", if (!entry.kind.runsInEnginehost()) "$label, runs in Wine" else label))
     }
     // The play state's own line (a store game's "Downloads 590 MB", an install step) is the action band's
     // and is not a statement about the runner, so it is never drawn under this label; a store stage with
