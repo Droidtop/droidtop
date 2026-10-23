@@ -10,6 +10,7 @@ import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreSyncs
 import dev.droidtop.library.stores.StoreUpdateCheck
+import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.db.StoresDatabase
 import dev.droidtop.stores.util.Marker
@@ -140,6 +141,11 @@ class AmazonStore : StoreLibrary {
             val dir = File(game.installPath)
             dir.parentFile?.let { SafeDelete.deleteWithin(it, dir) }
             dao.insertAll(listOf(game.copy(installPath = "")))
+            // The files the download engine had begun in the downloads area, this game's only.
+            val prefix = AmazonDownloadManager.areaPrefix(gameId)
+            DownloadJobs.fileFor(context, "x").parentFile?.list()
+                ?.filter { it.startsWith(prefix) && !it.endsWith(".aria2") }
+                ?.forEach { DownloadJobs.discardForJob(context, it) }
         }
     }
 
