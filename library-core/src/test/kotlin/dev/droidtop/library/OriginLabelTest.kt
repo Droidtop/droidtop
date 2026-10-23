@@ -39,7 +39,7 @@ class OriginLabelTest {
         Row(store("steam:9", kind = LibraryEntryKind.RENPY), 1, "Engine", steam, null),
         Row(store("steam:8", kind = LibraryEntryKind.RENPY), 2, "Engine · $steam", steam, null),
         Row(folder("/sd/Games/Some VN", LibraryEntryKind.RPG_MAKER_MZ), 3, "Engine", "Folder: Games", null),
-        // A Unity (or Unreal, AGS, LOVE) build runs in Wine: it is a PC game, store or local (#603).
+        // A Unity (or Unreal, AGS) build runs in Wine: it is a PC game, store or local (#603).
         Row(folder("/sd/Games/Clover Days", LibraryEntryKind.UNITY), 1, "PC", "Folder: Games", null),
         Row(store("steam:13", kind = LibraryEntryKind.UNREAL), 1, "PC", steam, null),
         // Ownership is never text on the capsule: a glyph, and the words on the focus line.
@@ -88,6 +88,8 @@ class OriginLabelTest {
         assertTrue(LibraryEntryKind.RENPY.runsInEnginehost())
         assertTrue(LibraryEntryKind.GODOT.runsInEnginehost())
         assertTrue(LibraryEntryKind.HTML.runsInEnginehost())
+        // Enginehost's LOVE plugin runs LOVE games, so they are Engine games, not Wine ones.
+        assertTrue(LibraryEntryKind.LOVE2D.runsInEnginehost())
         WINE_ENGINE_KINDS.forEach { assertTrue("$it has an engine family", it.engineFamily() != null) }
         WINE_ENGINE_KINDS.forEach { org.junit.Assert.assertFalse("$it runs in Wine", it.runsInEnginehost()) }
         org.junit.Assert.assertFalse(LibraryEntryKind.WINE_PROFILE.runsInEnginehost())
