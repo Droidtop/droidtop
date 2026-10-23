@@ -44,9 +44,14 @@
          systemstatus theme element (EsDeThemeRenderer.kt). -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Wi-Fi signal level for the status surfaces (Companion bar,
-         Desktop tray, Gaming settings). SSID is deliberately never
-         read: it would drag in fine-location. -->
+         Desktop tray, Gaming settings). The SSID is read for one thing
+         only: remembering a metered Wi-Fi network the person allowed
+         downloads on, always (docs/SPEC.md 12a). That needs the location
+         permission below, which droidtop asks for only from that row,
+         marked not recommended, and never for anything else. -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Pairing a computer: the computer finds this device by a LAN broadcast while the pairing screen is open (docs/SPEC.md 7o). -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <!-- Do Not Disturb control. Like WRITE_SETTINGS this is a special
@@ -577,6 +582,11 @@
 
         <activity
             android:name="dev.droidtop.app.MicrophonePermissionActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <activity
+            android:name="dev.droidtop.app.WifiNamePermissionActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
