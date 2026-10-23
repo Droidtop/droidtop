@@ -44,6 +44,9 @@ object ComponentSourcesCatalog {
                         onChange = { _, text -> link = text.trim() },
                     ),
                 )
+                if (link.isNotEmpty()) {
+                    add(ActionItem(id = "wine_build_link_clear", title = "Clear the link", run = { link = "" }))
+                }
                 add(
                     AsyncActionItem(
                         id = "wine_build_add_link",

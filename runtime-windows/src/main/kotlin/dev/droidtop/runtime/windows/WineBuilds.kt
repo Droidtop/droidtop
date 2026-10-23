@@ -74,10 +74,15 @@ object WineBuilds {
     suspend fun addFromUrl(context: Context, url: String, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
         val trimmed = url.trim()
         if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) return@withContext "Give a link that starts with https://"
+        // Its first bytes say whether it can be a Wine build at all, before a gigabyte of something else is downloaded.
+        onStatus("Checking the link…")
+        linkHead(trimmed)?.let { head -> packageRefusal(head)?.let { return@withContext "$it. Nothing was downloaded" } }
         val file = File(context.cacheDir, "wine-build-download")
         try {
             onStatus("Downloading…")
-            RuntimeDownloads.fetchUrl(context, trimmed, file) { onStatus("Downloading… ${(it.coerceIn(0f, 1f) * 100).toInt()}%") }
+            RuntimeDownloads.fetchUrl(context, trimmed, file, title = "Wine build: ${linkName(trimmed)}") {
+                onStatus("Downloading… ${(it.coerceIn(0f, 1f) * 100).toInt()}%")
+            }
             add(context, file, trimmed, onStatus)
         } catch (e: Exception) {
             "Couldn't add it: ${e.message ?: e}"
@@ -106,15 +111,56 @@ object WineBuilds {
         return json.keys().asSequence().associateWith { json.getString(it) }
     }
 
-    private fun add(context: Context, archive: File, origin: String, onStatus: (String) -> Unit): String {
-        val magic = archive.inputStream().use { input -> ByteArray(4).also { input.read(it) } }
-        when {
-            magic[0] == 0x1f.toByte() && magic[1] == 0x8b.toByte() ->
-                return "This is a .tar.gz, the way Linux Wine builds (GE-Proton, Kron4ek, Steam's Proton) ship. " +
-                    "Linux builds need droidtop's Linux engine, which is not available yet; builds packed for Winlator or GameNative (.wcp) run here."
-            magic[0] == 'P'.code.toByte() && magic[1] == 'K'.code.toByte() ->
-                return "This is a zip; a Wine build is a .wcp package. Driver packages are added under Driver build."
+    /**
+     * Why bytes starting with [head] cannot be a Wine build, or null when they can: a .wcp package is a tar.xz or a
+     * tar.zst archive. Pure.
+     */
+    internal fun packageRefusal(head: ByteArray): String? {
+        fun starts(vararg bytes: Int) = head.size >= bytes.size && bytes.indices.all { head[it] == bytes[it].toByte() }
+        return when {
+            starts(0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00) || starts(0x28, 0xB5, 0x2F, 0xFD) -> null
+            starts(0x1f, 0x8b) ->
+                "This is a .tar.gz, the way Linux Wine builds (GE-Proton, Kron4ek, Steam's Proton) ship. " +
+                    "Linux builds need droidtop's Linux engine, which is not available yet; builds packed for Winlator or GameNative (.wcp) run here"
+            starts('P'.code, 'K'.code) -> "This is a zip; a Wine build is a .wcp package. Driver packages are added under Driver build"
+            starts('<'.code) -> "That link is a web page, not a file; a Wine build is a .wcp package. Use the link of the file itself"
+            else -> "That is not a .wcp package; a Wine build is a tar.xz or tar.zst archive"
         }
+    }
+
+    /** The first bytes [url] serves, or null when it cannot be asked (the download then says why). Network. */
+    private fun linkHead(url: String): ByteArray? = runCatching {
+        val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        try {
+            c.connectTimeout = 20_000
+            c.readTimeout = 30_000
+            c.setRequestProperty("Range", "bytes=0-7")
+            if (c.responseCode !in 200..299) return@runCatching null
+            c.inputStream.use { input ->
+                val head = ByteArray(8)
+                var n = 0
+                while (n < head.size) {
+                    val read = input.read(head, n, head.size - n)
+                    if (read < 0) break
+                    n += read
+                }
+                head.copyOf(n)
+            }
+        } finally {
+            c.disconnect()
+        }
+    }.getOrNull()?.takeIf { it.isNotEmpty() }
+
+    /** What a Wine-build download is called in Downloads: the link's file name, else its site. Pure. */
+    internal fun linkName(url: String): String {
+        val uri = runCatching { java.net.URI(url) }.getOrNull()
+        val last = uri?.path?.substringAfterLast('/')?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrDefault(it) }
+        return last?.takeIf { it.isNotBlank() } ?: uri?.host ?: url
+    }
+
+    private fun add(context: Context, archive: File, origin: String, onStatus: (String) -> Unit): String {
+        val magic = archive.inputStream().use { input -> ByteArray(8).also { input.read(it) } }
+        packageRefusal(magic)?.let { return it }
         onStatus("Checking it…")
         val manager = ContentsManager(context)
         val (profile, reason) = ManifestInstaller.extract(manager, Uri.fromFile(archive))
