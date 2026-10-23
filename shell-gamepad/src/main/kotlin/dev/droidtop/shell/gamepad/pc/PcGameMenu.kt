@@ -39,7 +39,6 @@ import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.GameUpdates
-import dev.droidtop.library.StoreDownloads
 import dev.droidtop.library.GameLaunchStrategy
 import dev.droidtop.library.LaunchStrategyOverridePrefs
 import dev.droidtop.library.Library
@@ -189,7 +188,7 @@ internal fun PcGameMenu(
     // to another row disarms it.
     var removeArmed by remember(entry) { mutableStateOf(false) }
     LaunchedEffect(focusIndex, page) { removeArmed = false }
-    val downloads by StoreDownloads.active.collectAsState()
+    val downloads by dev.droidtop.library.stores.StoreInstallJob.live.collectAsState()
     val autoUpdateChoices by dev.droidtop.net.DownloadPolicy.games.collectAsState()
     val downloadRules by dev.droidtop.net.DownloadPolicy.settings.collectAsState()
 
@@ -583,8 +582,8 @@ internal fun PcGameMenu(
             if (hasContent) {
                 add(PcActionRow("DLC and versions", "Which DLC to have and which version to follow", { contentOpen = true }))
             }
-            if (downloads[key] != null) {
-                add(PcActionRow("Downloads", "Where this download is paused, resumed or cancelled", {
+            downloads[key]?.let { job ->
+                add(PcActionRow("Downloads", dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job), {
                     onClose()
                     onOpenDownloads()
                 }))

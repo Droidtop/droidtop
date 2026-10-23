@@ -13001,8 +13001,8 @@ follows:
   job, restored paused after a restart, one starter whichever surface asked.
   The job's checkpoint is the row's key; the stores resume from what is on
   disk. Cancel removes what a download that never finished left behind and
-  never touches an installed game. Progress reaches the capsule and the game
-  page through `StoreDownloads`, which the install jobs publish.
+  never touches an installed game. The capsule, the game page and its menu
+  read the game's job itself (`StoreInstallJob.live`, below).
 - **Where a store installs** (the owner, 2026-10-07: "The location problem
   is solved by the game folder system"): in one of the person's own game
   folders, the same set every library walk reads (`GamesRoots.configured`,
@@ -15209,11 +15209,18 @@ place. The Storage view (bytes per store and per game,
 sorted by size, free space per folder, an uninstall per row) is the rest
 of Droidtop/tracker#227.
 
-**Live downloads.** `StoreDownloads` (`:library-core`) is an in-memory map
-by store id, one share per writer; its one writer is the store install
-jobs (`StoreInstallJob`, every store, Steam included), and the shell
-collects it. A download that ends leaves the map and `StoreDownloadWatch`
-(`:runtime-windows`) asks its store about the game again.
+**Live downloads: a game says what its job says (2026-10-23, Droidtop/tracker#577).** The capsule, the game page's
+button and the game menu read the game's store job itself: `StoreInstallJob.live`, the jobs list's own entries by store
+id, the newest per game while it runs, waits, is paused or failed (`byGame`, derived from `PluginJobsCenter.entries`;
+nothing publishes it). `StoreDownloads`, a copy that kept only a percent and paused-or-not, is deleted: with it the game
+page read "Stopped at 40%" for a download held for Wi-Fi, "Downloading" for one waiting for its connection, and plain
+"Install" again after a failure. The words are the Downloads place's, one line (`PluginJobsScreen.oneLine`), so the
+game page cannot say less than Downloads: running reads "Downloading" over "120 MB of 300 MB · About 3 min left";
+waiting for its connection or its next try reads "Downloading" over that; held by the download rules reads **Download now** over the reason ("Waiting for Wi-Fi"), and pressing it is Download now (12a: first
+in line, still waiting for the connection); paused reads Resume; failed reads **Try again** over why, and runs the job
+again with its arguments (`PluginJobsCenter.retry`). The capsule badge says Waiting, Paused or Failed. The droidtop
+update line on Updates uses the same one line. `StoreDownloadWatch` (`:runtime-windows`) asks a store about a game
+again when its job stops running.
 
 **The strip's counts.** `pcViewCounts` counts each built-in view with the
 view's own query, once per library change, off the main thread; the chip

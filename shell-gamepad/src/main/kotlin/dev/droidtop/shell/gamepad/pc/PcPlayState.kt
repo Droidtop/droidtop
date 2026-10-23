@@ -17,7 +17,9 @@ import dev.droidtop.library.PcRunnerOptions
 import dev.droidtop.library.ResolvedRunner
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.RunnerAction
-import dev.droidtop.library.StoreDownloads
+import dev.droidtop.library.integrations.PluginJobsScreen
+import dev.droidtop.pluginhost.JobState
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.library.StoreUpdate
 import dev.droidtop.library.WindowsSetup
 import dev.droidtop.library.GameNaming
@@ -59,22 +61,30 @@ internal data class PcPlayState(
 )
 
 /** Where a store game is in its life on this device, when that is the thing to do next. */
-internal enum class StoreStage { INSTALL, UPDATE, DOWNLOADING, PAUSED, WISHLIST }
+internal enum class StoreStage { INSTALL, UPDATE, DOWNLOADING, WAITING, PAUSED, FAILED, WISHLIST }
 
 /**
  * The store stage of [entry], or null when there is none (a folder game, an
  * installed store game with no known update). Pure, so the capsule badge,
- * the primary button and the tests share it. [download] is what
- * [StoreDownloads] says about this game; a running download wins over
+ * the primary button and the tests share it. [download] is this game's job
+ * ([StoreInstallJob.live]): one running, held, paused or failed wins over
  * everything, then not installed, then an update. An update is only ever
  * [StoreUpdate.AVAILABLE] when a store said so: an unknown stays unknown.
  */
-internal fun storeStageOf(entry: LibraryEntry, download: StoreDownloads.Progress?): StoreStage? {
+internal fun storeStageOf(entry: LibraryEntry, download: PluginJobsCenter.Entry?): StoreStage? {
     val pc = entry.pcInfo?.takeIf { entry.isStoreRow() } ?: return null
     return when {
         // On a wishlist and not owned: there is nothing to install, only the store's page to find it on.
         pc.holding == StoreHolding.WISHLIST -> StoreStage.WISHLIST
-        download != null -> if (download.paused) StoreStage.PAUSED else StoreStage.DOWNLOADING
+        download != null -> when (download.state) {
+            JobState.FAILED -> StoreStage.FAILED
+            // Held by the download rules or a full queue: Download now is the answer.
+            JobState.HELD -> StoreStage.WAITING
+            JobState.PAUSED -> StoreStage.PAUSED
+            JobState.DONE -> null
+            // Still running, waiting for its connection or its next try: its line says which.
+            JobState.RUNNING, JobState.WAITING_FOR_NETWORK, JobState.WAITING_TO_RETRY -> StoreStage.DOWNLOADING
+        } ?: storeStageOf(entry, null)
         !pc.installed -> StoreStage.INSTALL
         pc.update == StoreUpdate.AVAILABLE -> StoreStage.UPDATE
         else -> null
@@ -100,7 +110,9 @@ internal fun LibraryEntry.downloadKey(): String? = pcInfo?.storeId
  * answer it. A store droidtop runs itself ([ownStore]) installs from here and
  * shows its download in the Downloads place; Steam still opens its own screen.
  */
-internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: StoreDownloads.Progress?): PcPlayState {
+internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: PluginJobsCenter.Entry?): PcPlayState {
+    // The job's own words, as the Downloads place says them ("Waiting for Wi-Fi", "120 MB of 300 MB · About 3 min left").
+    val said = download?.let { PluginJobsScreen.oneLine(it) }.orEmpty()
     val own = entry.ownStore() != null
     return when (stage) {
         StoreStage.INSTALL -> {
@@ -122,14 +134,18 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: St
             pressable = true, ready = false, store = stage,
         )
         StoreStage.DOWNLOADING -> PcPlayState(
-            "Downloading",
-            "${download?.percent ?: 0}%. Opens ${if (own) "Downloads" else "the download"}",
-            pressable = true, ready = false, store = stage, progress = download?.fraction,
+            "Downloading", said, pressable = true, ready = false, store = stage, progress = download?.fraction(),
+        )
+        // Held by the download rules: Download now puts it first in line, and it still waits for a connection downloads
+        // may use (docs/SPEC.md 12a).
+        StoreStage.WAITING -> PcPlayState(
+            "Download now", said, pressable = true, ready = false, store = stage, progress = download?.fraction(),
         )
         StoreStage.PAUSED -> PcPlayState(
-            "Resume",
-            "Stopped at ${download?.percent ?: 0}%",
-            pressable = true, ready = false, store = stage, progress = download?.fraction,
+            "Resume", said, pressable = true, ready = false, store = stage, progress = download?.fraction(),
+        )
+        StoreStage.FAILED -> PcPlayState(
+            "Try again", said, pressable = true, ready = false, store = stage,
         )
         StoreStage.WISHLIST -> PcPlayState(
             "Find on ${entry.storeLabel() ?: "the store"}",
@@ -154,7 +170,7 @@ internal val PcPlayStateLoading = PcPlayState("…", "", pressable = false, read
 internal fun playStateOf(
     runner: ResolvedRunner?,
     entry: LibraryEntry,
-    download: StoreDownloads.Progress? = null,
+    download: PluginJobsCenter.Entry? = null,
     noRunnerLine: String = "No runner on this device offers this game",
     /** What Windows setup is doing or last did ([WindowsSetup.live]); null when nothing has happened this process. */
     windowsSetup: WindowsSetup.State? = null,
@@ -203,7 +219,7 @@ internal fun primaryActionLabel(action: RunnerAction?): String = when (action) {
 @Composable
 internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, ResolvedRunner?> {
     val context = LocalContext.current
-    val downloads by StoreDownloads.active.collectAsState()
+    val downloads by StoreInstallJob.live.collectAsState()
     val download = entry.downloadKey()?.let { downloads[it] }
     val windowsSetup by WindowsSetup.live.collectAsState()
     // The runner is worked out again when a Windows setup starts or ends: the
@@ -268,18 +284,26 @@ internal suspend fun startOwnStoreInstall(context: Context, entry: LibraryEntry,
 }
 
 /**
- * What a press on a store game's primary action does when the game is
- * already downloading or paused: a paused download resumes, a running one
- * opens the Downloads place ([onOpenDownloads]). Returns the line to show,
- * or null.
+ * What a press on a store game's primary action does when the game already
+ * has a job: a paused one resumes, a waiting one is Download now (first in
+ * line, still waiting for the connection), a failed one runs again, and a
+ * running one opens the Downloads place ([onOpenDownloads]). Returns the line
+ * to show, or null.
  */
 internal fun continueStoreDownload(context: Context, entry: LibraryEntry, stage: StoreStage, onOpenDownloads: () -> Unit): String? {
     if (entry.ownStore() == null) return NO_STORE_LINE
-    val key = entry.pcInfo?.storeId ?: entry.id
-    if (stage == StoreStage.PAUSED && StoreInstallJob.resume(key)) return null
+    val job = (entry.pcInfo?.storeId ?: entry.id).let { StoreInstallJob.live.value[it] }
+    when {
+        job == null -> Unit
+        stage == StoreStage.PAUSED || stage == StoreStage.WAITING -> if (PluginJobsCenter.resume(job.jobId)) return null
+        stage == StoreStage.FAILED -> return if (PluginJobsCenter.retry(context, job.jobId) != null) null else "This download can no longer be tried again"
+    }
     onOpenDownloads()
     return null
 }
+
+/** How far [this] job is, 0 to 1; null while it does not know. */
+internal fun PluginJobsCenter.Entry.fraction(): Float? = percent.takeIf { it >= 0 }?.let { it.coerceAtMost(100) / 100f }
 
 /** What a store action says for a game whose store this build does not have. */
 internal const val NO_STORE_LINE = "No store in this build installs this game"

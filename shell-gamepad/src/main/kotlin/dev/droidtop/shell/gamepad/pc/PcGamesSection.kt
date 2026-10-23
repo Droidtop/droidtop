@@ -48,7 +48,8 @@ import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.RunnerAction
 import dev.droidtop.library.RunnerState
-import dev.droidtop.library.StoreDownloads
+import dev.droidtop.library.stores.StoreInstallJob
+import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
@@ -669,7 +670,7 @@ internal fun PcGamesSection(
     // game folder has are named before anything downloads; a download
     // already running goes straight to the store's queue.
     // The rule is shared with every host outside Gaming (rememberPcLaunch, Droidtop/tracker#349).
-    val downloads by StoreDownloads.active.collectAsState()
+    val downloads by StoreInstallJob.live.collectAsState()
     val pcLaunch = rememberPcLaunch(
         onLaunch = { entry -> onLaunch(folded?.continuing?.get(entry.id) ?: entry) },
         onOpenDownloads = { onOpenSection(GamingSection.DOWNLOADS) },
@@ -1603,7 +1604,7 @@ private fun PcShelvesHome(
     rowState: (String) -> LazyListState,
     onTapCapsule: (shelf: Int, item: Int, entry: LibraryEntry) -> Unit,
     onLongPressCapsule: (LibraryEntry) -> Unit,
-    downloads: Map<String, StoreDownloads.Progress>,
+    downloads: Map<String, PluginJobsCenter.Entry>,
     partsOf: (LibraryEntry) -> Int,
     systemNames: Map<String, String>,
     // What each card's badge says (kindBadgeOf with the library's origins and the Capsule badge option).
