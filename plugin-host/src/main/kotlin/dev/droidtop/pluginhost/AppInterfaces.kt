@@ -61,6 +61,17 @@ object AppInterfaces {
 
     private val cache = HashMap<String, Cached>()
 
+    /** Forgets [packageName]'s kept check, so the next [inspect] decides again: after the person trusts or stops trusting its key. */
+    fun recheck(packageName: String) {
+        synchronized(cache) { cache.remove(packageName) }
+    }
+
+    /** Whether [record] is an app plugin signed by its app's pinned official certificate. */
+    fun isOfficial(record: PluginRecord): Boolean {
+        val pkg = record.manifest.app?.packageName ?: return false
+        return AppInterfaceTrust.OFFICIAL[pkg]?.any { it.equals(record.approvedKeySha256, ignoreCase = true) } == true
+    }
+
     /**
      * Every installed app whose service answers [AppInterfaceTrust.ACTION], checked. Reads every APK of each: call it off
      * the main thread.

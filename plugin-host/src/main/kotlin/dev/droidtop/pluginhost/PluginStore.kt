@@ -216,6 +216,8 @@ object PluginStore {
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.forget(appContext, pluginId) } }, "devices-forget").start()
         File(root(context), pluginId).deleteRecursively()
         runCatching { PluginProcesses.retire(pluginId) }
+        // An app's plugin: droidtop lets the app go now. The app itself stays installed (Droidtop/tracker#547).
+        runCatching { AppInterfaceConnections.forget(context, pluginId) }
         PluginEpoch.bump()
     }
 }
