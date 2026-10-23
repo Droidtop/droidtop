@@ -28,7 +28,6 @@ import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.importGamelistXml
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.shell.gamepad.pc.PC_SYSTEM_ID
-import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.GamingSettingsCatalog
 import dev.droidtop.library.settings.SettingsScreenRegistry
@@ -133,7 +132,6 @@ internal fun GamelistOptionsMenu(
     val libraryScope = groupKey.isEmpty()
     // Get games opens the one search (docs/SPEC.md 13, "There is no Get games sheet"): a console system's list searches
     // that system, the PC list searches PC, All games and a collection search every source.
-    var gettingGames by remember { mutableStateOf(false) }
     // A system's list searches that system ("Search SNES", the owner's per-console search, 2026-10-14): its
     // games and the sources that serve it, a download landing in its folder (docs/SPEC.md 12a).
     val searchRowLabel = when {
@@ -156,8 +154,8 @@ internal fun GamelistOptionsMenu(
     val chooseMatchesLabel = "${dev.droidtop.library.scraper.PcScraper.CHOOSE_MATCHES} ($needPickCount)"
     val actions = buildList {
         if (libraryScope) {
-            // The library-wide actions that used to live in Settings.
-            add(GetGamesEntry.LABEL)
+            // The library-wide actions that used to live in Settings. Getting new games is the left menu's place and
+            // search's own section, not a menu row (owner, 2026-10-23, Droidtop/tracker#612).
             add("Rescan library")
             add("Scrape all systems")
             add(SCRAPE_ALL_PC)
@@ -185,9 +183,6 @@ internal fun GamelistOptionsMenu(
                 add("Get artwork and details")
                 add("Import from ES-DE")
             }
-            // Wherever games are listed, not only one console system (rig, 2026-09-30: the entry was unreachable
-            // from the Games tab).
-            add(GetGamesEntry.LABEL)
             // Offered wherever PC or engine games are actually on
             // screen, which is the same "act on what you are looking
             // at" placement every other action here uses. Those groups
@@ -371,7 +366,6 @@ internal fun GamelistOptionsMenu(
                     onScraped()
                 }
             }
-            GetGamesEntry.LABEL -> gettingGames = true
             PC_SETUP -> {
                 onDismiss()
                 onOpenStores()
@@ -400,14 +394,6 @@ internal fun GamelistOptionsMenu(
         ChooseMatchesList {
             choosingMatches = false
             // A pick writes the game's art and details: rescan so the list shows them.
-            onScraped()
-        }
-        return
-    }
-    if (gettingGames) {
-        GetGamesSearch(systemId = systemId.takeIf { !libraryScope }, pc = systemId == PC_SYSTEM_ID && !libraryScope) {
-            gettingGames = false
-            // A download may have just landed a file in this system's folder: rescan so it shows up.
             onScraped()
         }
         return

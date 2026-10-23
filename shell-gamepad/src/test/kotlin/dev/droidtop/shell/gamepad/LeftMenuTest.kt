@@ -30,7 +30,10 @@ class LeftMenuTest {
         assertEquals(
             listOf(
                 GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
-                GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS, GamingSection.UPDATES, GamingSection.PLUGINS,
+                GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS, GamingSection.UPDATES,
+                // Get new games, right under Updates (Droidtop/tracker#612).
+                GamingSection.NEW_GAMES,
+                GamingSection.PLUGINS,
                 GamingSection.SETTINGS,
             ),
             menuSectionsFor(UiMode.FULL),

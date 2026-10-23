@@ -215,6 +215,20 @@ class UnifiedSearchTest {
     }
 
     @Test
+    fun `a game found only on a source is new, one the library has too is not`() {
+        // Owner, 2026-10-23: "Get new games should be presented under the search results" (Droidtop/tracker#612).
+        val rows = UnifiedSearch.rank(
+            "love",
+            listOf(LocalSearchRow("lib", SearchRowKind.GAME, "Love and Sex: Second Base", "Game") {}),
+            listOf(SourceOutcome(source("f95"), listOf(result("1", "Love & Sex: Second Base"), result("2", "Lovely Day")))),
+            emptyList(),
+            listOf(source("f95")),
+        )
+        assertFalse(rows.single { it.key == "lib" }.isNew)
+        assertTrue(rows.single { it.title == "Lovely Day" }.isNew)
+    }
+
+    @Test
     fun `different games and apps are never merged`() {
         val rows = UnifiedSearch.rank(
             "zelda",
