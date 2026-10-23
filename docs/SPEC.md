@@ -5070,8 +5070,25 @@ rig check in the commit message.
   extract editor (`IME_FLAG_NO_FULLSCREEN | IME_FLAG_NO_EXTRACT_UI`): the themes' roots (`DroidtopTheme`,
   `GamingTheme`) wrap their content in `NoFullscreenTextInput` (`:ui-shared`), so it reaches every field below them,
   dialogs and `TextEntry` included; a View field sets the same flags (`noFullscreen`).
-- **droidtop's own text fields always type.** On a display Android draws no keyboard on
-  (`AddonKeyboardRules.ownFieldNeedsKeyboard`), the shell's text fields (library search, the text
+- **Where typing happens, and when a keyboard comes up (owner, 2026-10-23, Droidtop/tracker#612).** The owner:
+  "No, gboard DOESN'T always land on the companion. It should always land on the lowest screen, ideally just opening
+  the keys option on the companion. Its current behavior, of always being on the screen that's focused, is wrong";
+  and "droidtop SHOULD raise a keyboard when it focuses a field on a device that has no hardware controller or
+  keyboard, if it has only one screen". So, for every droidtop text field:
+  - **Two screens** (a companion showing on another screen): typing happens on the companion, its Keys, whichever
+    screen holds the field; the field shows the text as it is typed, and Android's keyboard is kept off the field's
+    screen (`AddonKeyboardRules.droidtopServesField`: the placement resolves to the companion). It used to apply only
+    where Android draws no keyboard, so a field on the built-in screen got Gboard on whichever screen had focus.
+  - **One screen** with a controller or a hardware keyboard attached: Android's keyboard, as before.
+  - **No keyboard comes up by itself** when droidtop puts the cursor in a field, except on **one screen with no
+    controller or keyboard** (a touch-only phone or tablet), where it does as any touch app does
+    (`AddonKeyboardRules.raisesOnOwnFocus`). Otherwise the keyboard waits for the person to choose to type: A or a tap
+    on the field, or a key typed (the search's `typing`; `InWindowKeyboard`'s pick for every other window). Before,
+    the search raised Gboard each time it opened.
+  - "A controller or keyboard" is read from the attached input devices and kept live
+    (`ControllerLayouts.padOrKeyboard`): plugging one in or out changes the answer.
+- **droidtop's own text fields always type.** Wherever droidtop's keyboard serves the field
+  (`KeyboardTargets.servesField`, above), the shell's text fields (library search, the text
   dialog, the metadata editor, a new collection's name) draw `OwnFieldKeyboard` under the field. Its
   keys are dispatched into the field's own window as keys of Android's virtual keyboard device, the
   path an attached keyboard takes: no input method, no window focus, no permission. The panel is
