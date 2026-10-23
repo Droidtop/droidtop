@@ -55,6 +55,8 @@ data class PluginView(
          */
         fun parse(json: JSONObject?, messages: MutableList<String>? = null): PluginView? {
             if (json == null) return null
+            // Contract 3: a reply of facets (docs/plugin-api.md 1.10) is drawn by the same renderer.
+            if (!json.has("sections")) FacetViews.fromReply(json, messages)?.let { return it }
             val version = json.optInt("view", VERSION)
             if (version != VERSION) return null
             val sectionsJson = json.optJSONArray("sections") ?: return null
@@ -324,6 +326,20 @@ object PluginViewCall {
     fun args(actionArgs: JSONObject, values: Map<String, String>, context: JSONObject): JSONObject {
         val out = JSONObject()
         actionArgs.keys().forEach { out.put(it, actionArgs.get(it)) }
+        // A facet's input sends its own committed value as `value`, typed (docs/plugin-api.md 1.10, "Interaction").
+        (out.remove(FacetViews.MARK) as? JSONObject)?.let { mark ->
+            val raw = values[mark.optString("id")]
+            if (raw != null) {
+                out.put(
+                    "value",
+                    when (mark.optString("type")) {
+                        "bool" -> raw == "true"
+                        "number" -> raw.toDoubleOrNull() ?: raw
+                        else -> raw
+                    },
+                )
+            }
+        }
         out.put("values", JSONObject(values as Map<*, *>))
         out.put("context", context)
         return out

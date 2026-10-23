@@ -27,9 +27,10 @@ import org.json.JSONObject
  * Plugins section is a list with one row per plugin; A opens that plugin's panel and B comes back to the list.
  *
  * A panel is drawn by droidtop from data, never by the plugin: its quick and status tiles first (C2, C3), then the
- * view the plugin returns for `ui.panel` `panel` (the view schema of docs/plugin-api.md 1.6, through the one
- * renderer [PluginViews]), then the ways into the plugin's other pages (its settings, its own app, the app it
- * manages). A plugin that declares no `ui.panel` but has tiles on the Quick Menu still gets a panel of its tiles, so
+ * plugin's facets for the `quickmenu` target (docs/plugin-api.md 1.10, [PluginFacets]) or, from a plugin that has not
+ * moved to facets, the view it returns for `ui.panel` `panel` (the view schema of docs/plugin-api.md 1.6), both
+ * through the one renderer [PluginViews], then the ways into the plugin's other pages (its settings, its own app, the
+ * app it manages). A plugin that declares no `ui.panel` but has tiles on the Quick Menu still gets a panel of its tiles, so
  * every plugin already installed appears here without a change to the plugin.
  *
  * Nothing here runs from list drawing: which plugins have a panel is read from manifests, a panel's view and its
@@ -68,10 +69,13 @@ object PluginPanels {
      */
     const val MANAGE_ROW_ID = "plugin_panels_manage"
 
-    /** One plugin's Quick Menu presence: its `ui.panel` entry if it declared one, and its tiles on the Quick Menu. */
-    data class Panel(val record: PluginRecord, val entry: ProvidedPoint?, val tiles: List<PluginTiles.Tile>) {
+    /**
+     * One plugin's Quick Menu presence: its `ui.panel` entry if it declared one, its tiles on the Quick Menu, and
+     * [facets], its `ui.facets` entry when that declares the `quickmenu` target.
+     */
+    data class Panel(val record: PluginRecord, val entry: ProvidedPoint?, val tiles: List<PluginTiles.Tile>, val facets: ProvidedPoint? = null) {
         val pluginId: String get() = record.manifest.id
-        val label: String get() = entry?.label ?: record.manifest.label
+        val label: String get() = entry?.label ?: facets?.label ?: record.manifest.label
 
         /** What the panel declares it does on the companion ([CompanionAbilities]): rows on Game, recording, keep-on. */
         val abilities: Set<String> get() = CompanionAbilities.of(entry)
@@ -83,10 +87,19 @@ object PluginPanels {
      */
     fun panelsFor(context: Context, mode: String? = null): List<Panel> {
         val declared = providersOf(context, POINT, mode).distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
+        val faceted = providersOf(context, PluginFacets.POINT, mode)
+            .filter { (_, entry) -> PluginFacets.QUICK_MENU in dev.droidtop.pluginhost.FacetGuards.declaredTargets(listOf(entry)) }
+            .distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
         val tiles = PluginTiles.tilesFor(context, mode = mode).groupBy { it.record.manifest.id }
-        return (declared.keys + tiles.keys).map { id ->
+        return (declared.keys + faceted.keys + tiles.keys).map { id ->
             val panel = declared[id]
-            Panel(record = panel?.first ?: tiles.getValue(id).first().record, entry = panel?.second, tiles = tiles[id].orEmpty())
+            val facets = faceted[id]
+            Panel(
+                record = panel?.first ?: facets?.first ?: tiles.getValue(id).first().record,
+                entry = panel?.second,
+                tiles = tiles[id].orEmpty(),
+                facets = facets?.second,
+            )
         }.sortedBy { it.label.lowercase() }
     }
 
@@ -177,7 +190,22 @@ object PluginPanels {
         val more: List<CatalogGroup> = if (withMore) moreGroups(record) else emptyList()
         val id = "plugin_panel_${panel.pluginId}_$surface"
         val entry = panel.entry
-        return if (entry != null) {
+        return if (panel.facets != null) {
+            // Facets first: a plugin that declares the Quick Menu target is drawn from them, never from its old panel.
+            PluginViews.screen(
+                record = record,
+                point = PluginFacets.POINT,
+                op = PluginFacets.OP_GET,
+                id = id,
+                title = panel.label,
+                args = PluginFacets.getArgs(PluginFacets.QUICK_MENU),
+                hostContext = hostContext,
+                leadGroups = tiles,
+                extraGroups = { _, _ -> more },
+                panel = true,
+                iconFile = PluginStore.iconFile(context, record),
+            )
+        } else if (entry != null) {
             PluginViews.screen(
                 record = record,
                 point = POINT,
