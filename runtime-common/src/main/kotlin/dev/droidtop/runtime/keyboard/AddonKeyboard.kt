@@ -98,9 +98,23 @@ object AddonKeyboardRules {
     fun androidDrawsKeyboard(displayId: Int, localDisplays: Set<Int>): Boolean =
         displayId == DEFAULT_DISPLAY || displayId in localDisplays
 
-    /** Whether a droidtop text field on [displayId] draws droidtop's keyboard in its own window. */
-    fun ownFieldNeedsKeyboard(displayId: Int?, localDisplays: Set<Int>): Boolean =
-        displayId != null && !androidDrawsKeyboard(displayId, localDisplays)
+    /**
+     * Whether droidtop's keyboard, not Android's, serves a droidtop text field on [displayId]: Android draws none
+     * there, or [placement] (the field's resolved "Keyboard displays on") sends its keys to the companion. The owner,
+     * 2026-10-23 (Droidtop/tracker#612): typing "should always land on the lowest screen, ideally just opening the keys
+     * option on the companion. Its current behavior, of always being on the screen that's focused, is wrong". With
+     * one screen the placement is the field's own screen, and on the built-in display that is Android's keyboard.
+     */
+    fun droidtopServesField(displayId: Int?, localDisplays: Set<Int>, placement: KeyboardPlacement): Boolean =
+        displayId != null && (!androidDrawsKeyboard(displayId, localDisplays) || placement == KeyboardPlacement.COMPANION)
+
+    /**
+     * Whether a keyboard comes up when droidtop itself puts the cursor in a field, before the person chose to type
+     * (owner, 2026-10-23, Droidtop/tracker#612): only on one screen with no controller or keyboard attached, a
+     * touch-only phone or tablet, as any touch app does. With [twoScreens], or with [padOrKeyboard], it waits for the
+     * person: A or a tap on the field, or a key typed.
+     */
+    fun raisesOnOwnFocus(twoScreens: Boolean, padOrKeyboard: Boolean): Boolean = !twoScreens && !padOrKeyboard
 
     /**
      * The route droidtop's keyboard types through into another app, best first: droidtop's input method's connection,

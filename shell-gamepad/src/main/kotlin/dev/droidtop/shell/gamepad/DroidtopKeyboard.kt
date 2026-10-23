@@ -17,7 +17,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.delay
 import dev.droidtop.runtime.keyboard.AddonKeyboard
-import dev.droidtop.runtime.keyboard.AddonKeyboardRules
 import org.pocketworkstation.pckeyboard.KeyboardPanel
 import org.pocketworkstation.pckeyboard.KeyboardSink
 import org.pocketworkstation.pckeyboard.WindowKeySink
@@ -55,8 +54,9 @@ fun DroidtopKeyboard(
 }
 
 /**
- * droidtop's keyboard under a droidtop text field, drawn only on a screen where Android draws no keyboard
- * (a secondary display droidtop has not set to show Android's own, [AddonKeyboardRules.ownFieldNeedsKeyboard]).
+ * droidtop's keyboard for a droidtop text field, wherever droidtop's keyboard serves it ([KeyboardTargets.servesField]:
+ * a screen where Android draws no keyboard, or any screen while a companion takes the typing, Droidtop/tracker#612).
+ * With a companion the keys are typed on its Keys panel and Android's keyboard is kept away from this screen.
  * It types into whichever field of this window has focus, through the window's own key path ([WindowKeySink]),
  * so it needs no input method, no window focus and no permission. [active] is whether the person is typing in the
  * field now: a page whose cursor left the field for its rows passes false, and the keyboard closes wherever it was
@@ -69,7 +69,14 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
     var displayId by remember(view) { mutableStateOf<Int?>(null) }
     // Read once the window is attached: a dialog's view has no display during its first composition.
     LaunchedEffect(view) { displayId = view.display?.displayId }
-    if (!AddonKeyboardRules.ownFieldNeedsKeyboard(displayId, local)) return
+    val setting by AddonKeyboard.placement.collectAsState()
+    val hosts by AddonKeyboard.companionHostsKeyboard.collectAsState()
+    val companions by KeyboardTargets.companionsChanged.collectAsState()
+    // Decided again when a companion comes or goes, or the setting or Android's own keyboards change.
+    val serves = remember(displayId, local, setting, hosts, companions) {
+        KeyboardTargets.servesField(displayId, KeyboardTargets.assistiveOn(view.context))
+    }
+    if (!serves) return
     // This window's field has its keyboard beside it: the window-wide one stays away.
     DisposableEffect(view) {
         val root = view.rootView
@@ -78,9 +85,6 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
     }
     val sink = remember(view) { WindowKeySink { view.rootView } }
     // Wherever "Keyboard displays on" puts it (SPEC 4c): drawn here only when that is this screen.
-    val setting by AddonKeyboard.placement.collectAsState()
-    val hosts by AddonKeyboard.companionHostsKeyboard.collectAsState()
-    val companions by KeyboardTargets.companionsChanged.collectAsState()
     val display = displayId ?: return
     var opened by remember(view) { mutableStateOf<KeyboardTargets.Opened?>(null) }
     DisposableEffect(sink, display, setting, hosts, companions, active) {

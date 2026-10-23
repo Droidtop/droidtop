@@ -24,6 +24,8 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -102,28 +104,63 @@ object ControllerLayouts {
     private var lastHeavyAt = 0L
     private var listening = false
 
+    private val padOrKeyboardState = MutableStateFlow(false)
+
+    /**
+     * Whether a controller or a hardware keyboard is attached right now, kept live from the device list: plugging
+     * one in or out changes it (owner, 2026-10-23, Droidtop/tracker#612: with none, droidtop raises the on-screen
+     * keyboard when it puts the cursor in a field, as any touch app does). Read after [listen].
+     */
+    val padOrKeyboard: StateFlow<Boolean> = padOrKeyboardState
+
     /** Registers for device changes and starts the first load. Call from the shell and from onboarding. */
     fun attach(context: Context) {
+        val app = context.applicationContext
+        listen(app)
+        recheck(app)
+    }
+
+    /** Registers for device changes only, without the layout load: what every droidtop window needs for [padOrKeyboard]. */
+    fun listen(context: Context) {
         val app = context.applicationContext
         if (!listening) {
             listening = true
             val manager = app.getSystemService(Context.INPUT_SERVICE) as InputManager
             manager.registerInputDeviceListener(
                 object : InputManager.InputDeviceListener {
-                    override fun onInputDeviceAdded(deviceId: Int) = recompute()
-
-                    override fun onInputDeviceRemoved(deviceId: Int) {
-                        if (active?.id == deviceId) active = null
+                    override fun onInputDeviceAdded(deviceId: Int) {
+                        refreshPadOrKeyboard()
                         recompute()
                     }
 
-                    override fun onInputDeviceChanged(deviceId: Int) = deviceChanged(app, deviceId)
+                    override fun onInputDeviceRemoved(deviceId: Int) {
+                        if (active?.id == deviceId) active = null
+                        refreshPadOrKeyboard()
+                        recompute()
+                    }
+
+                    override fun onInputDeviceChanged(deviceId: Int) {
+                        refreshPadOrKeyboard()
+                        deviceChanged(app, deviceId)
+                    }
                 },
                 handler,
             )
         }
-        recheck(app)
+        refreshPadOrKeyboard()
     }
+
+    private fun refreshPadOrKeyboard() {
+        padOrKeyboardState.value = InputDevice.getDeviceIds().any { id ->
+            val device = InputDevice.getDevice(id) ?: return@any false
+            device.isGamepad() || device.isHardwareKeyboard()
+        }
+    }
+
+    /** A real typing keyboard: letters, not a handheld's volume and power keys, and not Android's virtual one. */
+    private fun InputDevice.isHardwareKeyboard(): Boolean =
+        !isVirtual && keyboardType == InputDevice.KEYBOARD_TYPE_ALPHABETIC &&
+            (sources and InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
 
     /**
      * Re-reads what can change. Safe to call on every screen change: the
