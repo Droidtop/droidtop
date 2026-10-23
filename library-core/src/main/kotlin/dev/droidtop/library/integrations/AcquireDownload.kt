@@ -118,7 +118,13 @@ internal object AcquireDownload {
             sha256 = first.sha256,
             sha1 = first.sha1,
             md5 = first.md5,
-            unpack = if (descriptors.any { it.unpack }) DownloadJobs.UNPACK_ARCHIVE else null,
+            // An update that is one archive is the game's new version only once unpacked into its version folder, whether or
+            // not the source said so (a download taken over from a file host's page says nothing).
+            unpack = if (descriptors.any { it.unpack } || (update != null && descriptors.size == 1 && DownloadJobs.archiveStem(first.targetName) != null)) {
+                DownloadJobs.UNPACK_ARCHIVE
+            } else {
+                null
+            },
             maxBytes = first.maxBytes,
             headers = first.headers,
             more = parts.drop(1),
