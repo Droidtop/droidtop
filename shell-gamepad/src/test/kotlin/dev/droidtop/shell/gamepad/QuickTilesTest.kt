@@ -341,11 +341,14 @@ class QuickTilesTest {
             ),
             idsOf(QuickSection.DISPLAY),
         )
+        assertEquals(
+            listOf(GamingSettingsCatalog.ID_SYSTEM_NETWORK, GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH, GamingSettingsCatalog.ID_SYSTEM_AIRPLANE),
+            idsOf(QuickSection.CONNECTIONS),
+        )
         val system = idsOf(QuickSection.SYSTEM)
-        assertTrue(GamingSettingsCatalog.ID_SYSTEM_AIRPLANE in system)
         assertTrue(GamingSettingsCatalog.ID_SYSTEM_POWER_MENU in system)
         assertTrue("pref_future_system_row" in system)
-        val claimed = QuickTiles.AUDIO_IDS + QuickTiles.DISPLAY_IDS
+        val claimed = QuickTiles.AUDIO_IDS + QuickTiles.DISPLAY_IDS + QuickTiles.CONNECTION_IDS
         assertTrue(system.none { it in claimed })
     }
 }
