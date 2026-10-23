@@ -632,6 +632,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <!--
+              A .torrent or Metalink file opened with or shared to droidtop: offered in Downloads > Add download, which
+              asks where it goes before anything downloads (docs/SPEC.md 12a, "Adding a download").
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/x-bittorrent" />
+                <data android:mimeType="application/metalink4+xml" />
+                <data android:mimeType="application/metalink+xml" />
+            </intent-filter>
         </activity>
 
         <!--

@@ -30,9 +30,12 @@ object LinkSchemes {
         worker.execute { sync(app) }
     }
 
+    /** Schemes droidtop opens itself whatever plugins are installed: a magnet goes to Downloads (Add download). */
+    private val OWN = setOf("magnet")
+
     private fun sync(context: Context) {
         runCatching {
-            val wanted = PluginLinks.schemesWanted(PluginStore.installed(context))
+            val wanted = PluginLinks.schemesWanted(PluginStore.installed(context)) + OWN
             val pm = context.packageManager
             for (scheme in PluginLinks.MANIFEST_SCHEMES) {
                 val component = ComponentName(context.packageName, aliasFor(scheme))
