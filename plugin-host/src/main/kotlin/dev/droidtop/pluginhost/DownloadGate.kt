@@ -9,6 +9,7 @@ import dev.droidtop.net.DownloadPools
 import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.net.DownloadSettings
 import dev.droidtop.net.JobFacts
+import dev.droidtop.net.MeteredGrants
 import dev.droidtop.net.Verdict
 import dev.droidtop.runtime.tasks.LaunchLedger
 import java.util.Calendar
@@ -31,8 +32,9 @@ import kotlinx.coroutines.launch
  * kind registered with `download = true` in [PluginJobsCenter] is held at its start ([PluginJobsCenter.admission])
  * and, while it runs, whenever the network, the clock, a game or the person's rules change: a job the policy will
  * not run now is paused with the reason as its status line, and resumes by itself when the verdict turns to go. A job
- * the person resumes themselves is left alone for its life ([PluginJobsCenter.Entry.policyOverride]); a job the
- * person paused is never resumed by the policy. Nothing here polls fast: changes arrive from the system's network
+ * the person resumes themselves is left alone for its life ([PluginJobsCenter.Entry.policyOverride]), except by the
+ * connection: no job is started past a network hold, the person allows the connection instead ([MeteredGrants]). A job
+ * the person paused is never resumed by the policy. Nothing here polls fast: changes arrive from the system's network
  * callback and the settings, and a slow tick covers the clock.
  */
 object DownloadGate {
@@ -85,11 +87,12 @@ object DownloadGate {
         for (entry in entries) {
             if (entry.done || !PluginJobsCenter.isDownloadKind(entry.nativeKind)) continue
             if (entry.paused && entry.hold == null) continue
-            if (entry.policyOverride) {
+            val verdict = DownloadPolicy.decide(settings, conditions, facts(entry))
+            // The person's word wins over the update window and a running game, never over the connection.
+            if (entry.policyOverride && !(verdict is Verdict.Hold && DownloadPolicy.isNetworkHold(verdict.reason))) {
                 if (!entry.paused) pooled += DownloadPools.Entry(entry.jobId, category(entry), entry.startedAtMs, running = true, pinned = true)
                 continue
             }
-            val verdict = DownloadPolicy.decide(settings, conditions, facts(entry))
             if (verdict is Verdict.Hold) {
                 if (!entry.paused || entry.hold != verdict.reason) moves += Move.Hold(entry.jobId, verdict.reason)
                 continue
@@ -134,11 +137,12 @@ object DownloadGate {
         val app = context.applicationContext
         scope.launch(Dispatchers.IO) {
             DownloadPolicy.load(app)
+            MeteredGrants.load(app)
             val categoryOfEntry = { e: PluginJobsCenter.Entry -> categoryOf(PluginJobsCenter.argsOf(e.jobId)) }
             PluginJobsCenter.admission = { _, args ->
                 admit(args, PluginJobsCenter.entries().value, categoryOfEntry, DownloadPolicy.settings.value, conditions(app, gameRunning))
             }
-            merge(networkChanges(app), DownloadPolicy.settings.map { }, runningDownloads(), ticks()).conflate().collect {
+            merge(networkChanges(app), DownloadPolicy.settings.map { }, MeteredGrants.always.map { }, MeteredGrants.once.map { }, runningDownloads(), ticks()).conflate().collect {
                 val entries = PluginJobsCenter.entries().value
                 plan(entries, { factsOf(PluginJobsCenter.argsOf(it.jobId)) }, DownloadPolicy.settings.value, conditions(app, gameRunning), categoryOfEntry).forEach { move ->
                     when (move) {
@@ -156,7 +160,10 @@ object DownloadGate {
     private fun conditions(app: Context, gameRunning: () -> Boolean): Conditions {
         val now = Calendar.getInstance()
         val saver = runCatching { app.getSystemService(android.os.PowerManager::class.java)?.isPowerSaveMode == true }.getOrDefault(false)
-        return Conditions(DownloadPolicy.networkNow(app), now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE), gameRunning(), saver)
+        return Conditions(
+            DownloadPolicy.networkNow(app), now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE), gameRunning(), saver,
+            meteredAllowed = MeteredGrants.allows(MeteredGrants.connectionNow(app)),
+        )
     }
 
     private fun ticks(): Flow<Unit> = flow {

@@ -48,7 +48,14 @@ enum class NetworkClass { OFFLINE, UNMETERED, METERED }
 /** What the policy needs to know about one job. [sizeBytes] is 0 when nobody knows. */
 data class JobFacts(val sizeBytes: Long = 0, val automatic: Boolean = false)
 
-data class Conditions(val network: NetworkClass, val minuteOfDay: Int, val gameRunning: Boolean, val batterySaver: Boolean = false)
+data class Conditions(
+    val network: NetworkClass,
+    val minuteOfDay: Int,
+    val gameRunning: Boolean,
+    val batterySaver: Boolean = false,
+    /** The person allowed downloads on this metered connection, once or always ([MeteredGrants]). */
+    val meteredAllowed: Boolean = false,
+)
 
 sealed interface Verdict {
     object Go : Verdict
@@ -74,6 +81,19 @@ object DownloadPolicy {
     private const val KEY_AUTO_DEFAULT = "auto_default"
     private const val GAME_PREFIX = "auto."
     private const val POOL_PREFIX = "pool."
+
+    /** The hold line while there is no network. */
+    const val WAITING_FOR_NETWORK = "Waiting for a network"
+
+    /** The hold line while the connection is metered and the rules keep this download off it. */
+    const val WAITING_FOR_WIFI = "Waiting for Wi-Fi"
+
+    /**
+     * Whether [reason] is a hold on the connection itself. No single job may be started past one (owner, 2026-10-23:
+     * enabling one game's download on a metered connection "can be deceptive"); the person allows the connection
+     * instead ([MeteredGrants]).
+     */
+    fun isNetworkHold(reason: String?): Boolean = reason == WAITING_FOR_NETWORK || reason == WAITING_FOR_WIFI
 
     /** Mobile data is allowed under this size when the rule is [NetworkRule.SMALL_ON_MOBILE]. */
     const val SMALL_BYTES = 50L * 1024 * 1024
@@ -162,8 +182,9 @@ object DownloadPolicy {
 
     fun decide(settings: DownloadSettings, conditions: Conditions, job: JobFacts): Verdict {
         when (conditions.network) {
-            NetworkClass.OFFLINE -> return Verdict.Hold("Waiting for a network")
-            NetworkClass.METERED -> if (!allowsMetered(settings, job.sizeBytes)) return Verdict.Hold("Waiting for Wi-Fi")
+            NetworkClass.OFFLINE -> return Verdict.Hold(WAITING_FOR_NETWORK)
+            NetworkClass.METERED ->
+                if (!conditions.meteredAllowed && !allowsMetered(settings, job.sizeBytes)) return Verdict.Hold(WAITING_FOR_WIFI)
             NetworkClass.UNMETERED -> Unit
         }
         if (job.automatic) {

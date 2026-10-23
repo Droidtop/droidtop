@@ -9,6 +9,7 @@ import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.net.DownloadCategory
 import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.net.DownloadPools
+import dev.droidtop.net.MeteredGrants
 import dev.droidtop.net.NetworkRule
 import dev.droidtop.net.engine.EnginePrefs
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +33,7 @@ object DownloadRulesCatalog {
     private suspend fun groups(context: Context): List<CatalogGroup> {
         val isolated = withContext(Dispatchers.IO) {
             DownloadPolicy.load(context)
+            MeteredGrants.load(context)
             EnginePrefs.androidIsolation(context)
         }
         val s = DownloadPolicy.settings.value
@@ -43,13 +45,14 @@ object DownloadRulesCatalog {
                     ChoiceItem(
                         id = "download_rules_network_rule",
                         title = "Download over",
-                        subtitle = "A download that is held waits and says why. Resume a held download to run it anyway",
+                        subtitle = "A download that is held waits and says why. On a metered connection you can allow the connection, never one download",
                         options = NetworkRule.values().map { ChoiceOption(it.key, it.label) },
                         current = s.network.key,
                         onSelect = { ctx, value -> DownloadPolicy.update(ctx) { it.copy(network = NetworkRule.fromKey(value)) } },
                     ),
                 ),
             ),
+        ) + listOfNotNull(MeteredConnectionCatalog.alwaysGroup()) + listOf(
             // The pools (docs/SPEC.md 12a, "One download engine"): the owner, "Configurable, intelligent".
             CatalogGroup(
                 id = "download_rules_pools",
