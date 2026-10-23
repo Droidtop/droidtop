@@ -98,6 +98,10 @@ class PcGameProvider(
     override fun scanProgressive(): kotlinx.coroutines.flow.Flow<dev.droidtop.library.ScanStep> =
         kotlinx.coroutines.flow.channelFlow { walk { step -> send(step) } }
 
+    /** "Rescan library": the same walk, asking every engine question of the disk again (docs/SPEC.md 7g). */
+    override fun rescanProgressive(): kotlinx.coroutines.flow.Flow<dev.droidtop.library.ScanStep> =
+        kotlinx.coroutines.flow.channelFlow { walk(fresh = true) { step -> send(step) } }
+
     /**
      * The slow rebuild pass (docs/SPEC.md 7g, step 4): the same walk,
      * except that when the stores' stamp ([storeStamp]) still matches
@@ -177,6 +181,8 @@ class PcGameProvider(
     private suspend fun walk(
         // The slow pass' stamps; null walks everything.
         known: Map<dev.droidtop.library.PartRef, Long>? = null,
+        // "Rescan library": kept engine verdicts are not read.
+        fresh: Boolean = false,
         emit: suspend (dev.droidtop.library.ScanStep) -> Unit,
     ) {
         val storeStamp = storeStamp()
@@ -198,7 +204,7 @@ class PcGameProvider(
         // partial list would mark every folder it never reached as gone.
         var folderPassFinished = false
         try {
-            PcLibrary.folderGames(context, skip) { group ->
+            PcLibrary.folderGames(context, skip, fresh) { group ->
                 folderGroups += group
                 if (group.skipped) return@folderGames
                 emit(

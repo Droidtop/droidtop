@@ -13744,6 +13744,16 @@ unchanged second walk must report zero engine checks for folders with
 reusable verdicts. A cache miss is evidence to investigate, not a
 successful cache operation merely because the cache file exists.
 
+**"Rescan library" asks again.** A folder's own time and entry count do not move when something changes further
+down, and a shared folder (BlueStacks' Windows share) may not move them at all, so a kept verdict can outlive what
+it describes: the rig's LOVE games under `Manual/love2d` and the console's Godot games under `Adult/godot` stayed
+on stale verdicts through rescans (Droidtop/tracker#577, #604; the coordinator, 2026-10-23: "Rescan library
+doesn't re-check cached engine verdicts, so a stale verdict sticks. A full rescan should revalidate them"). The
+person's "Rescan library" walks with `EngineVerdicts.fresh()`: no kept verdict is read, every engine question is
+asked of the disk again, and the answers replace what was kept, so the ordinary walks and the background pass
+after it reuse them. Both folder walks do (`EngineGameProvider.rescanProgressive`,
+`PcGameProvider.rescanProgressive`); an ordinary scan and the background pass still read the kept verdicts.
+
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
 **PC games get PC-native sources (directed 2026-09-24).** PC and engine games are scraped from the

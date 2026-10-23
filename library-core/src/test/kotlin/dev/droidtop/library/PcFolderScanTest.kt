@@ -262,6 +262,27 @@ class PcFolderScanTest {
     }
 
     @Test
+    fun `a rescan asks every engine question again and keeps what it finds`() {
+        categoryWithEngineFolders("Cat", count = 6)
+        val folder = File(temp.root, "Cat")
+        val kept = File(temp.root, "verdicts.tsv")
+        val first = PcFolderScan.EngineVerdicts.load(kept, defs)
+        PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = first))
+        first.save(kept)
+
+        // "Rescan library" (tracker#577, #604): nothing kept is read, so a stale verdict cannot stick.
+        val restarted = PcFolderScan.EngineVerdicts.load(kept, defs)
+        val rescan = PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = restarted.fresh()))
+        assertTrue(rescan.work.engineChecks > 0)
+        assertEquals(0, rescan.work.engineVerdictsKept)
+
+        // What the rescan found is kept for the ordinary walks after it.
+        val after = PcFolderScan.scanTopLevel(folder, defs, PcFolderScan.Options(verdicts = restarted))
+        assertEquals(0, after.work.engineChecks)
+        assertEquals(rescan.games, after.games)
+    }
+
+    @Test
     fun `a kept engine verdict is dropped when the folder or the rules changed`() {
         categoryWithEngineFolders("Cat", count = 6)
         val folder = File(temp.root, "Cat")

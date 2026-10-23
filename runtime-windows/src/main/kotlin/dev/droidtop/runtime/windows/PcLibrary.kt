@@ -218,6 +218,8 @@ object PcLibrary {
     suspend fun folderGames(
         context: Context,
         skip: (folder: File, mtime: Long) -> Boolean = { _, _ -> false },
+        // "Rescan library": engine questions are asked of the disk again (PcFolderScan.EngineVerdicts.fresh).
+        fresh: Boolean = false,
         onGroup: suspend (FolderGroup) -> Unit = {},
     ): List<FolderGroup> {
         DroidtopGameIdStore.install(context)
@@ -240,7 +242,7 @@ object PcLibrary {
                     // store's entries, with the store's facts, and are not
                     // listed a second time as folder games.
                     val storeOwned = storeOwnedFolders(context)
-                    found = scanGameFolders(context, roots, skip).map { group ->
+                    found = scanGameFolders(context, roots, skip, fresh).map { group ->
                         if (storeOwned.isEmpty()) group else group.copy(gameFolders = group.gameFolders.filterNot { it.isUnder(storeOwned) })
                     }
                     adoptFoundFolders(rootPaths, found)
@@ -568,6 +570,7 @@ object PcLibrary {
         context: Context,
         roots: List<File>,
         skip: (folder: File, mtime: Long) -> Boolean,
+        fresh: Boolean = false,
     ): List<ScannedFolder> = coroutineScope {
         val rootPaths = roots.map { it.absolutePath }
         runCatching {
@@ -592,7 +595,7 @@ object PcLibrary {
         // The engine verdicts survive a restart and are the same ones the
         // engine walk reads ([EngineVerdictStore]); loaded and saved off the
         // main thread, and saved even when the scan is cancelled part way.
-        val verdicts = withContext(Dispatchers.IO) { EngineVerdictStore.forRules(context, defs) }
+        val verdicts = withContext(Dispatchers.IO) { EngineVerdictStore.forRules(context, defs) }.let { if (fresh) it.fresh() else it }
         val tops = withContext(Dispatchers.IO) {
             roots.flatMap { root -> PcFolderScan.topLevelFolders(root).map { root to it } }
         }
