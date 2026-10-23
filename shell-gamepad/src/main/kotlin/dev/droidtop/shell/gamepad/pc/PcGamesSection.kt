@@ -179,27 +179,6 @@ internal class PcGamesState {
     var sortOpen by mutableStateOf(false)
     var searchOpen by mutableStateOf(false)
 
-    /**
-     * Opens Home or PC Games, from the left menu's two rows. PC Games opens
-     * on its Overview shelves; choosing it while one of its grid views shows
-     * keeps that view (the row is already where the user is). Switching
-     * resets the cursor, because the surfaces draw different lists.
-     */
-    fun open(home: Boolean) {
-        if (home == this.home) return
-        if (!home && (view == PcView.GRID || view == PcView.COLLECTIONS)) return
-        view = if (home) PcView.HOME else PcView.OVERVIEW
-        stripFocused = false
-        stripIndex = 0
-        destFocused = false
-        destIndex = 0
-        homeStrip = false
-        homeCard = 0
-        shelfIndex = 0
-        itemIndex = 0
-        shelfItems.clear()
-    }
-
     /** PC Games' Overview shelves: its strip's first chip, and B from a grid view. */
     fun showOverview() {
         if (view == PcView.OVERVIEW) return
@@ -537,13 +516,26 @@ internal fun PcGamesSection(
         if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
         homeShelfList = next
         val home = all + others
+        // Droidtop's own recommendations, after Home's own rows (Droidtop/tracker#611): the recommender names games the
+        // person has and has not played that look like what they do play. Home only; worked out off the main thread.
+        val recommended = if (!state.home) {
+            null
+        } else {
+            withContext(Dispatchers.Default) {
+                val titles = dev.droidtop.library.integrations.LocalSimilarityRecommendations({ home })
+                    .recommend(context, dev.droidtop.library.integrations.RecommendationScope.Overall, SHELF_LIMIT)
+                    .map { it.title }
+                recommendedShelf(titles, home)
+            }
+        }
+        val ownRows = own + listOfNotNull(recommended)
         val fresh = withContext(Dispatchers.IO) {
             pluginHomeShelves(dev.droidtop.library.integrations.PluginShelves.shelvesFor(context, home), home)
         }
-        if (fresh != pluginShelfList) {
+        if (fresh != pluginShelfList || recommended != null) {
             pluginShelfList = fresh
-            if (state.home && !state.stripFocused) keepCursor(homeShelfList, own + fresh)
-            homeShelfList = own + fresh
+            if (state.home && !state.stripFocused) keepCursor(homeShelfList, ownRows + fresh)
+            homeShelfList = ownRows + fresh
         }
     }
     // The collections pinned as tabs, by id and name: Overview's shelves when the library has one source.
@@ -796,8 +788,8 @@ internal fun PcGamesSection(
     BackHandler(enabled = canGoBack) {
         EsDeNavigationSounds.play(UiSound.BACK)
         state.stripIndex = 0
-        // A grid view or Collections goes back to Overview, Overview back to Home, the hub.
-        if (state.view == PcView.GRID || state.view == PcView.COLLECTIONS) state.showOverview() else state.open(home = true)
+        // A grid view or Collections goes back to Overview, Overview back to Home, the hub (a section of its own).
+        if (state.view == PcView.GRID || state.view == PcView.COLLECTIONS) state.showOverview() else onOpenSection(GamingSection.HOME)
     }
 
     // Home also shows the Retro library and the launcher apps: it is empty only when they are too.
@@ -1485,14 +1477,14 @@ internal fun PcGamesSection(
             onDismiss = { tileMenu = null },
         )
     }
-    promptStore?.takeIf { tileMenu == null && tabMenu == null && !state.filterOpen }?.let { storeId ->
+    // On PC Games only: its Choose in Collections opens PC Games' own Collections, which Home has not got.
+    promptStore?.takeIf { !state.home && tileMenu == null && tabMenu == null && !state.filterOpen }?.let { storeId ->
         val count = membership.collections.count { CollectionScope.importedFrom(it.id) == storeId }
         ImportedCollectionsPrompt(
             storeLabel = PcSource.Store(storeId).label(),
             count = count,
             onChoose = {
                 answerPrompt(storeId)
-                state.open(home = false)
                 state.showCollections()
                 state.stripFocused = false
                 state.stripIndex = tabs.indexOf(PcTab.Collections).coerceAtLeast(0)

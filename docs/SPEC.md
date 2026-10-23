@@ -14998,11 +14998,19 @@ own games, in droidtop's own treatment:
 - **Home is a destination** (owner, 2026-10-02, Droidtop/tracker#273): the
   left menu's first row, "Home", opens the cross-library shelves, and "PC
   Games" opens the PC library's Overview shelves under its strip, the grid
-  views one strip chip away. All three are the one `PC_GAMES` section
-  (`PcView` HOME, OVERVIEW and GRID; `LeftMenuEntry.home`,
-  `PcGamesState.open`), not new sections. Choosing "PC Games" while one of
-  its grid views shows keeps that view. The Default section setting's `pc`
-  opens on Overview. Gaming opens
+  views one strip chip away. **Home is a section of its own (owner, 2026-10-23, Droidtop/tracker#611: "Home should
+  NOT be the same section. Home should be dynamic, displaying the user's most common games, recommendations, store
+  recommendations, updates, plugin facets that are relevant (like f95 reported updates), etc").** It was the
+  `PC_GAMES` section in its HOME view, sharing one state with PC Games, so showing Home threw away PC Games' grid view
+  and cursor and the other way round. Now `GamingSection.HOME` draws the same shelves surface with a state of its own
+  (`PcGamesState`, one for Home and one for PC Games), each keeping its place; B from PC Games' Overview and Back from
+  any section go to Home. The Default section setting's `home` opens Home, `pc` PC Games' Overview. Home's rows, in
+  order: Recent games (Continue playing, else Recently added); the strip (What's new, which carries the updates and
+  the plugins' reported updates, Friends, Downloads); **Most played** (games played at least twice, most first;
+  `mostPlayedShelf`); **Recommended for you** (droidtop's own recommender, `LocalSimilarityRecommendations`, the same
+  one the search's empty field shows; `recommendedShelf`); the plugins' shelves (docs/plugin-api.md 3 C11); then the
+  destinations. Not there yet: store recommendations, since no store droidtop runs offers them (a store plugin's
+  facet, docs/plugin-api.md, is the way they will come). Gaming opens
   on Home: the Default section setting's `home` is its default, and a cold
   start never restores the last place. Saved shell state is restored only
   for a configuration recreate (the Text size setting, a rotation): `sessionOnly`
