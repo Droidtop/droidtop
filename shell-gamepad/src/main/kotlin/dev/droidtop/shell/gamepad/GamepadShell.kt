@@ -1258,6 +1258,7 @@ private fun GamepadShellBody(
             GamingSection.SOCIAL,
             GamingSection.DOWNLOADS,
             GamingSection.UPDATES,
+            GamingSection.NEW_GAMES,
             GamingSection.PLUGINS,
             -> true
         }
@@ -1345,6 +1346,12 @@ private fun GamepadShellBody(
                             onClose = { nav.back() },
                             onPrimaryFocus = { detailPrimaryLabel = it },
                         )
+                        // Get new games (Droidtop/tracker#612): the search over the download
+                        // sources, empty and ready for typing; leaving it goes back to the default section.
+                        shownSection == GamingSection.NEW_GAMES -> {
+                            canGoBack = true
+                            GetGamesSearch { nav.openSection(GamingPrefs.defaultSection(context)) }
+                        }
                         // The left menu's places: a registered settings screen each,
                         // in place (docs/SPEC.md 7j "Places"). Back is always
                         // something here too, for the reason Settings' is.
@@ -1479,6 +1486,7 @@ private fun GamepadShellBody(
                             GamingSection.SOCIAL,
                             GamingSection.DOWNLOADS,
                             GamingSection.UPDATES,
+                            GamingSection.NEW_GAMES,
                             GamingSection.PLUGINS,
                             -> Unit
                         }
@@ -1869,8 +1877,6 @@ private fun EntryDetailScreen(
                     },
                 )
             }
-            // More games for this game's own system (an app's page asks which system).
-            GetGamesChip(systemId = entry.systemId.takeIf { isRomEntry })
             if (media.size > 1) {
                 ShellChip("View media (${media.size})", onClick = { viewingMedia = true })
             }
@@ -2069,6 +2075,13 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
     SOCIAL(dev.droidtop.library.settings.Place.SOCIAL),
     DOWNLOADS(dev.droidtop.library.settings.Place.DOWNLOADS),
     UPDATES(dev.droidtop.library.settings.Place.UPDATES),
+
+    /**
+     * Get new games, right under Updates (owner, 2026-10-23: "add a 'get new games' under 'updates' that's its own UI",
+     * Droidtop/tracker#612): the one search over the download sources, on its own. Not a settings place: it draws the
+     * search itself. Kid and Kiosk hide it with the places, since it downloads.
+     */
+    NEW_GAMES,
     PLUGINS(dev.droidtop.library.settings.Place.PLUGINS),
     ;
 
@@ -2100,7 +2113,7 @@ internal fun placeForScreen(screenId: String, allowed: List<GamingSection>): Gam
  * over the device's configuration.
  */
 internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> =
-    GamingSection.entries.filter { !it.isPlace && !(mode.hidesSettings && it.managesDevice) }
+    GamingSection.entries.filter { !it.isPlace && it != GamingSection.NEW_GAMES && !(mode.hidesSettings && it.managesDevice) }
 
 /**
  * The destinations the left menu lists: the main tabs, then the
@@ -2110,7 +2123,8 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
  */
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
-    val places = GamingSection.entries.filter { it.isPlace && !(mode.hidesSettings && it.managesDevice) }
+    // The places, with Get new games right under Updates; Kiosk and Kid hide them all, since they manage the device or download.
+    val places = GamingSection.entries.filter { (it.isPlace || it == GamingSection.NEW_GAMES) && !mode.hidesSettings }
     // PC Games leads (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy { if (it == GamingSection.PC_GAMES) 0 else 1 }
     return main + places + tabs.filter { it == GamingSection.SETTINGS }
@@ -2129,6 +2143,7 @@ internal fun GamingSection.displayName(): String = when (this) {
     GamingSection.SETTINGS -> "Settings"
     GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS,
     GamingSection.UPDATES, GamingSection.PLUGINS -> place!!.title
+    GamingSection.NEW_GAMES -> dev.droidtop.library.integrations.GetGamesEntry.NEW_GAMES
 }
 
 /**
