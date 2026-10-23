@@ -5,6 +5,7 @@ import dev.droidtop.library.GameEngine
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.saves.SaveTemplates
+import dev.droidtop.library.toLibraryEntryKind
 import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
 import dev.droidtop.runtime.SafeDelete
@@ -84,30 +85,30 @@ object OldVersions {
      * or when the folder is not inside one of [roots] (the person's game folders). Returns the line for the page.
      */
     fun remove(context: Context, old: Old, kept: File, roots: List<File>): String {
-        val label = label(old.version)
+        val name = label(old.version)
         val root = roots.firstOrNull { root ->
             val base = root.absolutePath.trimEnd('/')
             old.folder.absolutePath.startsWith("$base/")
-        } ?: return "$label was not removed: it is not in one of your game folders"
+        } ?: return "$name was not removed: it is not in one of your game folders"
         val plan = savesPlan(old.folder, kept, besideFor(context, old.entry))
         if (plan.newer.isNotEmpty()) {
             val first = plan.newer.first()
             val more = if (plan.newer.size > 1) " and ${plan.newer.size - 1} more" else ""
-            return "$label was not removed: its save $first$more is newer than the one in the version you keep"
+            return "$name was not removed: its save $first$more is newer than the one in the version you keep"
         }
         for ((from, to) in plan.copy) {
             to.parentFile?.mkdirs()
             val copied = runCatching { from.copyTo(to); to.setLastModified(from.lastModified()) }.isSuccess
-            if (!copied) return "$label was not removed: its save ${from.relativeTo(old.folder).path} could not be copied"
+            if (!copied) return "$name was not removed: its save ${from.relativeTo(old.folder).path} could not be copied"
         }
         // A folder only partly emptied is still there, and stays in the library until a retry removes the rest.
-        SafeDelete.clearWithin(root, old.folder)?.let { reason -> return "$label was only partly removed: $reason" }
+        SafeDelete.clearWithin(root, old.folder)?.let { reason -> return "$name was only partly removed: $reason" }
         LibraryPaths.report(context, PathChange.removed(old.folder))
         val saves = when (plan.copy.size) {
             0 -> ""
             1 -> ". Its 1 save file was copied first"
             else -> ". Its ${plan.copy.size} save files were copied first"
         }
-        return "Removed $label$saves"
+        return "Removed $name$saves"
     }
 }
