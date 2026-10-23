@@ -6390,6 +6390,13 @@ secure default, and moving one away from its default shows a warning first, as t
 off stays the item 6 toggle: shown only while Risky actions is on, never recommended. A game's setting wins over
 the global default; the run record names every control that is not at its default.
 
+**Extra restrictions are opt-in (owner, 2026-10-23).** "For the wine sandbox, we don't have to worry about limiting
+or restricting handles, just the environment itself. The sandbox CAN apply extra restrictions, but that's obviously
+gonna break lots of games". The default protection is the filesystem view only (5b). Sockets, signals, IPC and
+handles are not restricted by default. Protection also lists extra restrictions the sandbox can apply (for example
+no network, or limits on sockets, signals or IPC). Each is off by default and carries a "may break games" note.
+Turning one on is the person's choice. Turning protection off entirely stays under Risky actions.
+
 **7. Where the toggles are stored.** In the prefix's and the game's settings
 next to the other prefix settings (`WineGameOptionsPrefs` for a game,
 the container's own record for a prefix), read by `WineGrants` (5b), which
@@ -6735,10 +6742,13 @@ applies to both.
 **Wine gets a containment sandbox, not a hostile one (owner, 2026-10-23).** "the wine sandbox also doesn't have to
 be anywhere near as hostile". Enginehost's cores keep the hostile policy (engine code has no internet and no
 arbitrary file access). Wine's sandbox is there to own the filesystem view: the prefix layer, the read-only game
-folder, the kernel-driver discard (#607), and keeping Wine out of droidtop's private folders and other prefixes. So
-the network, exec of Wine's own binaries, the translators and the game's own programs inside its folder and prefix,
-threads, signals, shared memory and the usual system calls Wine and FEX or Box64 make are allowed; only what clearly
-escapes is refused (ptrace of another process, namespaces, mounts, module loading, bpf). What Wine really uses is
+folder, the kernel-driver discard (#607), and keeping Wine out of droidtop's private folders and other prefixes.
+That filesystem view is the whole default protection (owner, 2026-10-23: "we don't have to worry about limiting or
+restricting handles, just the environment itself"). So the network, sockets, signals, IPC, shared memory, handles,
+threads, exec of Wine's own binaries, the translators and the game's own programs inside its folder and prefix, and
+the usual system calls Wine and FEX or Box64 make are allowed outright in the library's containment preset. Only
+what escapes the environment is refused: ptrace of another process, namespaces, mounts, module loading and bpf.
+Anything stricter is an opt-in Protection setting (5a, "Extra restrictions are opt-in"). What Wine really uses is
 found with the library's learning mode, not by tightening first. The layer is the broker's decider (owner: "The idea
 was to use the sandbox we use for wine to implement the layering"): no FUSE, no proot bind. Built in pieces, each
 landed green on its own: 0, Wine under the lockdown and broker with a pass-through decider and learning (it needs
