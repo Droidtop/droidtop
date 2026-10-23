@@ -2297,11 +2297,19 @@ difference:
     launch (it may ask the person about a conflict), so the call can take
     seconds. `{known: false, ready: false}` while the library is loading.
   - `saves report_changed {path, saveFolder, reason?, endedAtMs?}` →
-    `{accepted, synced?, message}` (named `changed` in the first contract
-    post; an op is named for what it does): the game at `path` wrote saves
-    in `saveFolder`. For a synced game droidtop adopts them into its own
-    folder for the game and uploads them, as after a game it launched; for
-    any other game it copies nothing (`accepted: true, synced: false`).
+    `{accepted, synced, engines: [{engine, line}], message}` (named
+    `changed` in the first contract post; an op is named for what it
+    does): the game at `path` wrote saves in `saveFolder`. droidtop keeps
+    where each game last saved, for every game, and hands the report at
+    once to every save sync engine that covers the game
+    (`SaveSyncEngines`): a store's cloud adopts the saves into droidtop's
+    folder for the game and uploads them, as after a game droidtop
+    launched; paired computers and handhelds take it once they sync from
+    a folder outside a Wine prefix (Droidtop/tracker#546), a cloud or
+    network share once droidtop has one (Droidtop/tracker#573), and a
+    `saves.sync` plugin (Droidtop/tracker#284). `synced` is whether any
+    engine covers the game, `engines` what each did. With none, nothing is
+    copied and that is no failure (`accepted: true, synced: false`).
     `saveFolder` must be a folder in shared storage or on a card, whose
     real path is not droidtop's own: anything else is `accepted: false`
     with the reason. Always in the activity log. Idempotent: the app sends
