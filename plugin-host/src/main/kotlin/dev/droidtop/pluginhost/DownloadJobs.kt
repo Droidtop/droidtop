@@ -176,6 +176,8 @@ object DownloadJobs {
                 // The file is the library's from here, said by the job and not by whatever screen started it, so
                 // a page that was closed, or a restart, loses nothing (docs/SPEC.md 7g, "Targeted indexing").
                 LibraryPaths.report(jobContext, PathChange.added(target))
+                // An update opens on its new version's page, where the version it follows can be removed (#624).
+                if (args[ARG_VERSION_FOLDER] != null) JobHandle.current()?.open(OpenTarget.Game(target.absolutePath))
                 listOfNotNull("Added ${target.name}", note).joinToString(". ")
             }
         }
@@ -192,6 +194,7 @@ object DownloadJobs {
                     .let { (list, said) ->
                         val notes = list.mapNotNull { runCatching { onPlaced(jobContext, it, parts.first()) }.getOrNull() }
                         LibraryPaths.report(jobContext, PathChange(added = list.map { it.absolutePath }))
+                        if (parts.first()[ARG_VERSION_FOLDER] != null) list.singleOrNull()?.let { JobHandle.current()?.open(OpenTarget.Game(it.absolutePath)) }
                         list to (listOf(said) + notes).joinToString(". ")
                     }
             }

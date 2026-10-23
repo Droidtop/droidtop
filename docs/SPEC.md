@@ -14863,6 +14863,24 @@ folder's name says; what is set wins over the folder's name until "Clear set
 version" (Use folder name), kept by the game's id (`SetVersions`), so it
 survives a version bump. A store marker's build beats the folder's name.
 
+**Removing an older version (2026-10-23, Droidtop/tracker#624).** 7m keeps
+every version an update places beside the newest; Versions and updates has a
+row per other version folder of the same game (`OldVersions.of`: a plain
+folder, not a store's install, the same part and mods, naming another
+version), with its size (`FolderSizes`) and Remove in two presses: the first
+arms the row and says what the second does ("Press A again to remove it and
+free 1.2 GB"), moving off it disarms it. The saves the engine keeps in the
+game's folder (its `beside` places, the ones an update copies) are never
+removed with it: each one the version on the page lacks is copied there
+first, and a save in the old folder newer than the page's own copy stops the
+removal with that file named, since droidtop does not choose between two
+saves. The folder must be inside one of the person's game folders, is
+deleted with `SafeDelete` (never following a link out), and the library is
+told it is gone; "Older versions" then says what was done. **After an
+update** the job's line offers it ("Remove v0.37 to free 1.2 GB? It is under
+Versions and updates on the game's page, and its saves are kept"), and the
+finished job opens the new version's page.
+
 **Outside Gaming (decided 2026-10-08, Droidtop/tracker#349).** Owner: "Still
 focus on gaming mode for now, just wire it in OUT from there". The page was
 reachable only from the PC Games tab, so Standard's Games grid and Desktop's
