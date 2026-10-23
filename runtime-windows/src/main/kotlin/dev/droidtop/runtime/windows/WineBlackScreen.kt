@@ -102,7 +102,7 @@ internal class WineBlackScreen(
         if (activity.isFinishing || notice != null) return
         val density = activity.resources.displayMetrics.density
         val pad = (16 * density).toInt()
-        val text = TextView(activity).apply {
+        val message = TextView(activity).apply {
             text = "The game is showing a black screen.\nIt may still be loading. Report a problem saves what droidtop " +
                 "knows about this run and lets you share it."
             setTextColor(Color.WHITE)
@@ -124,12 +124,12 @@ internal class WineBlackScreen(
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.argb(230, 24, 24, 24))
             setPadding(pad, pad, pad, pad)
-            addView(text)
+            addView(message)
             addView(row)
         }
         parent.addView(card, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = pad })
         notice = card
-        line = text
+        line = message
         buttons = listOf(reportButton, waitButton)
         reportButton.requestFocus()
     }
