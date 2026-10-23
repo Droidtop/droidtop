@@ -46,6 +46,9 @@ object ExtensionPoints {
         ExtensionPoint("input.mapping", "Controller mapping", PointRisk.MEDIUM, lets = "Lets it supply controller mappings."),
         ExtensionPoint("perf.source", "Performance readings", PointRisk.LOW, lets = "Lets it report performance readings."),
         ExtensionPoint("ui.settings", "Settings", PointRisk.LOW, lets = "Lets it add its own page in Settings."),
+        // docs/plugin-api.md 1.10: facets, the small pieces droidtop draws for a plugin. Each target the entry declares is
+        // a permission row of its own, at its own risk (FacetGuards.TARGETS).
+        ExtensionPoint(FacetGuards.POINT, "Its information and controls in droidtop", PointRisk.LOW, lets = "Lets it show small pieces of information and controls in the places of droidtop it names, drawn by droidtop."),
         ExtensionPoint("ui.main", "Its own full-screen app", PointRisk.LOW, lets = "Lets it run its own full-screen app."),
         ExtensionPoint("ui.panel", "Quick Menu panel", PointRisk.LOW, lets = "Lets it add its own panel to the Quick Menu and the companion screen, where you use and set it up."),
         ExtensionPoint("ui.game_section", "Rows on a game's page", PointRisk.MEDIUM, lets = "Lets it add its own rows to a game's page."),
