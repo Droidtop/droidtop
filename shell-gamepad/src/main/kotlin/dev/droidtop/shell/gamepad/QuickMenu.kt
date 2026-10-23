@@ -173,8 +173,15 @@ internal fun QuickMenu(
         val gameRunning = runningEntry != null
         // The sections Kid and Kiosk allow come from ControlAccess, like the companion's tabs.
         val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
-        val sections = remember(gameRunning, hasPlugins, uiMode) {
-            QuickTiles.visibleSections(gameRunning, hasPlugins, uiMode)
+        // The person's order for the rail (Settings > Shell > Quick Menu order), read once off the main thread.
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                dev.droidtop.library.settings.QuickMenuOrder.load(context.applicationContext)
+            }
+        }
+        val order by dev.droidtop.library.settings.QuickMenuOrder.order.collectAsState()
+        val sections = remember(gameRunning, hasPlugins, uiMode, order) {
+            QuickTiles.visibleSections(gameRunning, hasPlugins, uiMode, order)
         }
         var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning, granted)) }
         LaunchedEffect(sections, section) {
@@ -253,7 +260,7 @@ internal fun QuickMenu(
                         }
                         QuickSection.APPS -> AppsTab(close)
                         QuickSection.NOTIFICATIONS -> NotificationsTab(close)
-                        QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
+                        QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
                             QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
                         QuickSection.PERFORMANCE -> PerformanceSection(close)
                         QuickSection.DOWNLOADS -> DownloadsSection(close)
@@ -960,6 +967,11 @@ private fun GameTab(
                     ),
                 )
             }
+            // Quit, the gentle end the companion's Game tab has too (owner, 2026-10-23: "Quit still exists on the
+            // companion, so it should exist in the quick menu"); Kill stays the header's force-stop.
+            if (dev.droidtop.library.settings.ControlAccess.shows(uiMode, dev.droidtop.library.settings.ControlRow.GAME_QUIT)) {
+                add(ending(GameEnding.QUIT, "Quit", null, restart = false))
+            }
             add(ending(GameEnding.RESTART, "Restart", null, restart = true))
         }
     }
@@ -1058,7 +1070,7 @@ private fun GameTab(
 }
 
 /** The two controls of the Game section that end the game, so each can wait for its own second press. */
-private enum class GameEnding { RESTART, KILL }
+private enum class GameEnding { QUIT, RESTART, KILL }
 
 /** The Game section's cursor on the header's Stop pill rather than on a row. */
 private const val STOP_PILL = -1

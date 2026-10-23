@@ -46,16 +46,23 @@ enum class QuickGlyph {
  * for quick management only; destinations and the places things live are
  * the left menu's, and Get games is a contextual action that is not here.
  */
-enum class QuickSection(val label: String, val glyph: QuickGlyph, val panel: ControlPanel) {
-    GAME("Game", QuickGlyph.GAMEPAD, ControlPanel.GAME),
-    APPS("Running apps", QuickGlyph.APPS, ControlPanel.APPS),
-    NOTIFICATIONS("Notifications", QuickGlyph.BELL, ControlPanel.NOTIFICATIONS),
-    SYSTEM("System", QuickGlyph.SETTINGS, ControlPanel.SYSTEM),
-    PERFORMANCE("Performance", QuickGlyph.GAUGE, ControlPanel.PERFORMANCE),
-    AUDIO("Audio", QuickGlyph.VOLUME, ControlPanel.AUDIO),
-    DISPLAY("Display", QuickGlyph.DISPLAY, ControlPanel.DISPLAY),
-    DOWNLOADS("Downloads and jobs", QuickGlyph.DOWNLOAD, ControlPanel.DOWNLOADS),
-    PLUGINS("Plugins", QuickGlyph.PLUGIN, ControlPanel.PLUGINS),
+enum class QuickSection(val glyph: QuickGlyph, val panel: ControlPanel) {
+    GAME(QuickGlyph.GAMEPAD, ControlPanel.GAME),
+    APPS(QuickGlyph.APPS, ControlPanel.APPS),
+    NOTIFICATIONS(QuickGlyph.BELL, ControlPanel.NOTIFICATIONS),
+    // The radios, out of what was one System wall of about 20 tiles (owner, 2026-10-23, Droidtop/tracker#610).
+    CONNECTIONS(QuickGlyph.NETWORK, ControlPanel.CONNECTIONS),
+    // Everything else the System tab held: switching mode, power, screenshot, the app in front.
+    SYSTEM(QuickGlyph.POWER, ControlPanel.SYSTEM),
+    PERFORMANCE(QuickGlyph.GAUGE, ControlPanel.PERFORMANCE),
+    AUDIO(QuickGlyph.VOLUME, ControlPanel.AUDIO),
+    DISPLAY(QuickGlyph.DISPLAY, ControlPanel.DISPLAY),
+    DOWNLOADS(QuickGlyph.DOWNLOAD, ControlPanel.DOWNLOADS),
+    PLUGINS(QuickGlyph.PLUGIN, ControlPanel.PLUGINS),
+    ;
+
+    /** The section's name, kept with the order the person sets ([QuickMenuOrder]), so the two cannot differ. */
+    val label: String get() = dev.droidtop.library.settings.QuickMenuOrder.label(panel)
 }
 
 /**
@@ -98,6 +105,16 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_MIC_MUTE,
     )
 
+    /** What the Connections section claims: the device's radios and its network. */
+    val CONNECTION_IDS = listOf(
+        GamingSettingsCatalog.ID_SYSTEM_NETWORK,
+        GamingSettingsCatalog.ID_SYSTEM_WIFI,
+        GamingSettingsCatalog.ID_SYSTEM_BLUETOOTH,
+        GamingSettingsCatalog.ID_SYSTEM_AIRPLANE,
+        GamingSettingsCatalog.ID_SYSTEM_VPN,
+        GamingSettingsCatalog.ID_SYSTEM_LOCATION,
+    )
+
     val DISPLAY_IDS = listOf(
         GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS,
         GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS_GRANT,
@@ -117,11 +134,17 @@ object QuickTiles {
      * The sections the rail shows now: those [mode] allows on the Quick Menu ([ControlAccess], the one
      * restriction model), Game only while a game runs, Plugins only when a plugin has a panel or tiles here.
      */
-    fun visibleSections(gameRunning: Boolean, hasPlugins: Boolean, mode: UiMode = UiMode.FULL): List<QuickSection> {
+    fun visibleSections(
+        gameRunning: Boolean,
+        hasPlugins: Boolean,
+        mode: UiMode = UiMode.FULL,
+        // The person's order (Settings > Shell > Quick Menu order); a section it does not name keeps its own place.
+        order: List<ControlPanel> = QuickSection.entries.map { it.panel },
+    ): List<QuickSection> {
         val allowed = ControlAccess.panels(mode, ControlSurface.QUICK_MENU)
         return QuickSection.entries.filter {
             it.panel in allowed && (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPlugins)
-        }
+        }.sortedBy { section -> order.indexOf(section.panel).takeIf { it >= 0 } ?: (order.size + section.ordinal) }
     }
 
     /**
@@ -152,12 +175,13 @@ object QuickTiles {
     fun sectionGroups(catalog: List<CatalogGroup>, section: QuickSection, mode: UiMode = UiMode.FULL): List<CatalogGroup> {
         val all = ControlAccess.filter(mode, catalog)
         val system = all.firstOrNull { it.id == GamingSettingsCatalog.GROUP_SYSTEM }?.items.orEmpty()
-        val claimed = AUDIO_IDS + DISPLAY_IDS
+        val claimed = AUDIO_IDS + DISPLAY_IDS + CONNECTION_IDS
         val byId = (system + all.filter { it.id != GamingSettingsCatalog.GROUP_SYSTEM }.flatMap { it.items })
             .associateBy { it.id }
         val items = when (section) {
             QuickSection.AUDIO -> AUDIO_IDS.mapNotNull { byId[it] }
             QuickSection.DISPLAY -> DISPLAY_IDS.mapNotNull { byId[it] }
+            QuickSection.CONNECTIONS -> CONNECTION_IDS.mapNotNull { byId[it] }
             else -> systemGroups(all).flatMap { it.items }.filter { it.id !in claimed }
         }
         return listOf(CatalogGroup(id = "quick_${section.name.lowercase()}", title = null, items = items))
