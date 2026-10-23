@@ -639,12 +639,15 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
                     val url = d.optString("url").trim().takeIf { it.startsWith("https://") && it.length <= MAX_LINK }
                     val link = d.optString("link").takeIf { it.isNotBlank() && it.length <= MAX_LINK }
                     if (url == null && link == null) return@mapNotNull null
+                    val section = d.optString("section").trim().take(80).ifEmpty { "Downloads" }
                     dev.droidtop.library.UpdateSources.Download(
-                        section = d.optString("section").trim().take(80).ifEmpty { "Downloads" },
+                        section = section,
                         host = d.optString("host").trim().take(80).ifEmpty { "Link" },
                         label = d.optString("label").trim().take(200).ifEmpty { d.optString("host").trim().take(80).ifEmpty { "Download" } },
                         link = link.orEmpty(),
                         url = url,
+                        // Its systems, as a contract 3 entry names them, else from its heading ("Win/Linux").
+                        systems = dev.droidtop.pluginhost.DownloadSystems.of(dev.droidtop.pluginhost.DownloadSystems.read(d.optJSONArray("systems")), section),
                     )
                 }
             }.orEmpty()

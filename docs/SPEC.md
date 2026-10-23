@@ -12285,7 +12285,18 @@ reimplemented it as my own f95seeker code." So:
   - **Changelog**: the source's changelog text, as given.
   - **Downloads**: every link, grouped under the source's own section headings
     ("Win/Linux", "Mac", "Android") and, within one, by file host, each row
-    the host and the link's label.
+    the host and the link's label. **One system at a time (2026-10-23,
+    Droidtop/tracker#617).** The owner: "We should be able to pick a system,
+    and have the download links for it. Make sure to flag when "android" is
+    selected, saying "this will not be trackable by us. Windows or Linux is
+    recommended"". When the links are for more than one system, the tab's
+    first row is System (Windows, then Linux, picked first; Left, Right and A
+    change it) and only that system's links show, with the ones for any
+    system. Android picked (or the only system there is), droidtop's line
+    says "This will not be trackable by us. Windows or Linux is
+    recommended." A link's systems are the ones the source names on it
+    (`systems`), else the ones its heading names; a heading naming none
+    ("Extras") is for any system.
   - **Info**: version, developer, status, rating with its vote count, when
     the source last updated it, the tags, and Open the source's page.
 - **Where it opens:** tapping an update wherever it shows (the game page's

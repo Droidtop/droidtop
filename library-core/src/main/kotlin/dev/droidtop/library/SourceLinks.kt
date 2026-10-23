@@ -73,9 +73,10 @@ interface UpdateSources {
     /**
      * One link of a record's Downloads tab: the source's heading, the file host, what the link says, and either the
      * address droidtop opens itself in its web view ([url], Droidtop/tracker#599) or the token the source's `download`
-     * job takes ([link]).
+     * job takes ([link]). [systems] are the systems it is for (dev.droidtop.pluginhost.DownloadSystems), empty for
+     * any: the Downloads tab shows the picked system's links (Droidtop/tracker#617).
      */
-    data class Download(val section: String, val host: String, val label: String, val link: String, val url: String? = null)
+    data class Download(val section: String, val host: String, val label: String, val link: String, val url: String? = null, val systems: List<String> = emptyList())
 
     /**
      * A record's page, as the source tells it (docs/plugin-api.md 3 A6 `record`); droidtop draws it (docs/SPEC.md 7g,

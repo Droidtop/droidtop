@@ -67,7 +67,7 @@ object ItemPageFacets {
             downloads = downloads.mapNotNull { d ->
                 val url = d.url?.takeIf { it.startsWith("https://") }
                 if (url == null && d.link.isNullOrBlank()) return@mapNotNull null
-                UpdateSources.Download(section = d.section, host = d.host, label = d.label, link = d.link.orEmpty(), url = url)
+                UpdateSources.Download(section = d.section, host = d.host, label = d.label, link = d.link.orEmpty(), url = url, systems = d.systems)
             },
         )
     }

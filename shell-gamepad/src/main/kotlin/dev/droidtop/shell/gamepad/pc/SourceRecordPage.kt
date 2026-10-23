@@ -19,6 +19,7 @@ import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.UpdateSources
+import dev.droidtop.pluginhost.DownloadSystems
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
@@ -47,6 +48,9 @@ internal sealed interface RecordAction {
     data class Download(val download: UpdateSources.Download) : RecordAction
     data class Open(val url: String) : RecordAction
     data object Relink : RecordAction
+
+    /** The Downloads tab's system row: A, Left and Right move to the next or the previous system. */
+    data object PickSystem : RecordAction
 }
 
 internal data class RecordRow(val title: String, val value: String? = null, val subtitle: String? = null, val action: RecordAction? = null)
@@ -70,21 +74,50 @@ internal fun groupedDownloads(downloads: List<UpdateSources.Download>): List<Upd
     }
 }
 
-/** One tab's rows. [formatDate] turns epoch milliseconds into the date the Info tab shows. Pure, for the tests. */
-internal fun recordRows(record: UpdateSources.Record, tab: RecordTab, formatDate: (Long) -> String): List<RecordRow> = when (tab) {
+/** The systems the record's links are for (Droidtop/tracker#617), in the order the Downloads tab's picker offers them. */
+internal fun downloadSystems(record: UpdateSources.Record): List<String> = DownloadSystems.offered(record.downloads.map { it.systems })
+
+/**
+ * The Downloads tab's rows: when the links differ by system, a System row first, droidtop's word on the picked system
+ * if it has one (Android: not trackable), then only the picked system's links, and the links for any system.
+ */
+internal fun downloadRows(record: UpdateSources.Record, picked: String?): List<RecordRow> {
+    if (record.downloads.isEmpty()) return listOf(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"))
+    val offered = downloadSystems(record)
+    val system = picked?.takeIf { it in offered } ?: DownloadSystems.first(offered)
+    val head = listOfNotNull(
+        if (offered.size >= 2) {
+            RecordRow("System", DownloadSystems.LABELS[system] ?: system, subtitle = "Left and Right show another system's links", action = RecordAction.PickSystem)
+        } else {
+            null
+        },
+        system?.let { DownloadSystems.notice(it) }?.let { RecordRow(it) },
+    )
+    val links = groupedDownloads(record.downloads.filter { DownloadSystems.shows(it.systems, system) }).map { d ->
+        RecordRow("${d.host} · ${d.label}".takeIf { d.label != d.host } ?: d.host, subtitle = d.section, action = RecordAction.Download(d))
+    }
+    return head + links.ifEmpty { listOf(RecordRow("No links for ${DownloadSystems.LABELS[system] ?: system}")) }
+}
+
+/** The system [step] away from [picked] among [offered], wrapping round. */
+internal fun nextSystem(offered: List<String>, picked: String?, step: Int): String? {
+    if (offered.isEmpty()) return null
+    val at = offered.indexOf(picked ?: DownloadSystems.first(offered)).coerceAtLeast(0)
+    return offered[(at + step + offered.size) % offered.size]
+}
+
+/**
+ * One tab's rows. [formatDate] turns epoch milliseconds into the date the Info tab shows; [picked] is the Downloads
+ * tab's system, null for droidtop's first choice. Pure, for the tests.
+ */
+internal fun recordRows(record: UpdateSources.Record, tab: RecordTab, picked: String? = null, formatDate: (Long) -> String): List<RecordRow> = when (tab) {
     RecordTab.OVERVIEW -> listOfNotNull(
         record.version?.let { RecordRow("Version", it) },
         record.status?.let { RecordRow("Status", it) },
         RecordRow("About", subtitle = record.overview ?: "The source gives no description"),
     )
     RecordTab.CHANGELOG -> listOf(RecordRow("Changelog", subtitle = record.changelog ?: "The source gives no changelog"))
-    RecordTab.DOWNLOADS -> if (record.downloads.isEmpty()) {
-        listOf(RecordRow("No downloads listed", subtitle = "The source lists no links for this version"))
-    } else {
-        groupedDownloads(record.downloads).map { d ->
-            RecordRow("${d.host} · ${d.label}".takeIf { d.label != d.host } ?: d.host, subtitle = d.section, action = RecordAction.Download(d))
-        }
-    }
+    RecordTab.DOWNLOADS -> downloadRows(record, picked)
     RecordTab.INFO -> listOfNotNull(
         record.version?.let { RecordRow("Version", it) },
         record.developer?.let { RecordRow("Developer", it) },
@@ -128,7 +161,18 @@ internal fun SourceRecordPage(
     var armed by remember(source.key, externalId, tab) { mutableStateOf<Int?>(null) }
     val dateFormat = remember { DateFormat.getDateInstance(DateFormat.MEDIUM) }
     val record = answer?.record
-    val rows = remember(record, tab) { record?.let { recordRows(it, tab) { ms -> dateFormat.format(Date(ms)) } }.orEmpty() }
+    var picked by remember(source.key, externalId) { mutableStateOf<String?>(null) }
+    val rows = remember(record, tab, picked) { record?.let { recordRows(it, tab, picked) { ms -> dateFormat.format(Date(ms)) } }.orEmpty() }
+
+    fun pickSystem(step: Int) {
+        val r = record ?: return
+        val next = nextSystem(downloadSystems(r), picked, step) ?: return
+        if (next != picked) {
+            picked = next
+            armed = null
+            EsDeNavigationSounds.play(UiSound.MOVE)
+        }
+    }
 
     fun act(index: Int) {
         val row = rows.getOrNull(index) ?: return
@@ -136,6 +180,7 @@ internal fun SourceRecordPage(
             null -> Unit
             is RecordAction.Open -> onOpen(action.url)
             RecordAction.Relink -> onRelink()
+            RecordAction.PickSystem -> pickSystem(1)
             is RecordAction.Download -> {
                 // Two presses: the first says what the second does (the design language's two-step confirm).
                 if (armed != index) {
@@ -184,6 +229,9 @@ internal fun SourceRecordPage(
                             armed = null
                             EsDeNavigationSounds.play(UiSound.MOVE)
                         }
+                    }
+                    GamepadAction.LEFT, GamepadAction.RIGHT -> if (rows.getOrNull(focusIndex)?.action == RecordAction.PickSystem) {
+                        pickSystem(if (pad.action == GamepadAction.LEFT) -1 else 1)
                     }
                     GamepadAction.L -> switchTab(-1)
                     GamepadAction.R -> switchTab(1)

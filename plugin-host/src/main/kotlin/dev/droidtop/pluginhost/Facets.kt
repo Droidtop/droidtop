@@ -140,7 +140,18 @@ sealed interface FacetBody {
 
     data class Image(val media: Media) : FacetBody
 
-    data class DownloadEntry(val section: String, val host: String, val label: String, val url: String?, val link: String?, val size: Long?, val version: String?, val entryKind: String)
+    /** [systems]: the systems the link is for ([DownloadSystems]), named by the plugin or read from [section]; empty for any. */
+    data class DownloadEntry(
+        val section: String,
+        val host: String,
+        val label: String,
+        val url: String?,
+        val link: String?,
+        val size: Long?,
+        val version: String?,
+        val entryKind: String,
+        val systems: List<String> = emptyList(),
+    )
 
     data class Download(val entries: List<DownloadEntry>) : FacetBody
 
@@ -457,8 +468,9 @@ object Facets {
                     val url = url("url", e)
                     val link = e.text("link")
                     if (url == null && link == null) return@capped null
+                    val section = text("section", "label", e) ?: ""
                     FacetBody.DownloadEntry(
-                        section = text("section", "label", e) ?: "",
+                        section = section,
                         host = text("host", "label", e) ?: url?.let { NetScope.hostOf(it) } ?: "",
                         label = text("label", "label", e) ?: return@capped null,
                         url = url,
@@ -466,6 +478,7 @@ object Facets {
                         size = e.optLong("size", -1).takeIf { it >= 0 },
                         version = text("version", "label", e),
                         entryKind = e.optString("kind", "page").let { if (it in DOWNLOAD_KINDS) it else "page" },
+                        systems = DownloadSystems.of(DownloadSystems.read(e.optJSONArray("systems")), section),
                     )
                 },
             ).takeIf { it.entries.isNotEmpty() }
