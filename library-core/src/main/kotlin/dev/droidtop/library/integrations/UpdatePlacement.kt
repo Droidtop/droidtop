@@ -15,6 +15,9 @@ object UpdatePlacement {
     /** The job argument holding the newest version's folder, whose saves are copied. */
     const val ARG_SAVES_FROM = "savesFrom"
 
+    /** The job argument holding the version folder the update follows, offered for removal once it is placed (#624). */
+    const val ARG_PREVIOUS = "previousVersion"
+
     /** The job argument holding the engine's `beside` save patterns (a JSON array), relative to a game's folder. */
     const val ARG_SAVES_BESIDE = "savesBeside"
 
@@ -58,6 +61,22 @@ object UpdatePlacement {
             1 -> "Copied 1 save file from ${from.name}"
             else -> "Copied $copied save files from ${from.name}"
         }
+    }
+
+    /**
+     * The offer that follows a placed update (Droidtop/tracker#624): the version it follows, by name and size, can be
+     * removed from the game's Versions and updates, where its saves are moved first ([OldVersions]). Null when the job
+     * is not an update's or that folder is gone. Walks the old folder for its size: on the job's thread.
+     */
+    fun removalOffer(args: Map<String, String>): String? {
+        if (args[dev.droidtop.pluginhost.DownloadJobs.ARG_VERSION_FOLDER] == null) return null
+        val previous = args[ARG_PREVIOUS]?.let(::File)?.takeIf { it.isDirectory } ?: return null
+        val version = dev.droidtop.library.GameNaming.derive(previous.absolutePath).version.takeIf { it.isNotBlank() }
+        val name = version?.let(OldVersions::label) ?: previous.name
+        val size = dev.droidtop.library.FolderSizes.measure(previous.absolutePath)
+            ?.let { dev.droidtop.library.FolderSizes.words(it, dev.droidtop.library.format.ValueFormat::size) }
+        val frees = size?.let { " to free $it" }.orEmpty()
+        return "Remove $name$frees? It is under Versions and updates on the game's page, and its saves are kept"
     }
 
     /**

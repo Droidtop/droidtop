@@ -80,6 +80,7 @@ import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
+import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.CatalogDetailStrip
 import dev.droidtop.shell.gamepad.labelCase
 import dev.droidtop.shell.gamepad.LocalShellWindow
@@ -243,6 +244,39 @@ internal fun PcGamePage(
             onRun = { copy -> if (copy.id == entry.id) onPlay() else onPlayCopy?.invoke(copy) },
             onOptions = { copy -> copyOptions = copy },
         )
+    }
+    // The game's other version folders, each removable once its saves are moved here (docs/SPEC.md 7i; Droidtop/tracker#624).
+    val olds = remember(entry, siblings) { dev.droidtop.library.integrations.OldVersions.of(entry, siblings) }
+    val oldSizes by produceState(emptyMap<String, dev.droidtop.library.FolderSizes.Size>(), olds) {
+        value = withContext(Dispatchers.IO) {
+            olds.mapNotNull { old -> dev.droidtop.library.FolderSizes.measure(old.folder.absolutePath)?.let { old.folder.absolutePath to it } }.toMap()
+        }
+    }
+    var armedRemove by remember(entry.id) { mutableStateOf<String?>(null) }
+    var removing by remember(entry.id) { mutableStateOf(false) }
+    var removeStatus by remember(entry.id) { mutableStateOf<String?>(null) }
+    val oldRows = remember(olds, oldSizes, armedRemove, removing, removeStatus) {
+        oldVersionRows(olds, oldSizes, armedRemove, removing, removeStatus, PressWords.againSentence) { old ->
+            val path = old.folder.absolutePath
+            if (removing) return@oldVersionRows
+            if (armedRemove != path) {
+                armedRemove = path
+                return@oldVersionRows
+            }
+            armedRemove = null
+            removing = true
+            scope.launch {
+                removeStatus = withContext(Dispatchers.IO) {
+                    dev.droidtop.library.integrations.OldVersions.remove(
+                        context,
+                        old,
+                        java.io.File(entry.id),
+                        dev.droidtop.library.GamesRoots.configured(context),
+                    )
+                }
+                removing = false
+            }
+        }
     }
     var versionToken by remember(entry.id) { mutableIntStateOf(0) }
     var editingVersion by remember(entry.id) { mutableStateOf(false) }
@@ -423,9 +457,9 @@ internal fun PcGamePage(
         )
     }
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, infoRows, copies) {
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, infoRows, copies, oldRows) {
         groupRowsByTab(
-            rows + copies + listOfNotNull(programFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
+            rows + copies + oldRows + listOfNotNull(programFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
             parts,
         )
     }
@@ -453,6 +487,8 @@ internal fun PcGamePage(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { requestFocusWhenAttached(focus, "PC game page") }
     LaunchedEffect(tab) { tabState.keepInView(tab) }
+    // An armed Remove is for the row it was armed on: moving off it disarms it.
+    LaunchedEffect(zone, row, tab) { armedRemove = null }
     LaunchedEffect(zone, row, tab, current.size) {
         when (zone) {
             // The top of the page: the hero and the play row in full.
@@ -1257,6 +1293,50 @@ internal fun copyRows(
         )
     }
 }
+
+/**
+ * One row per other version folder of the game on Versions and updates (docs/SPEC.md 7i; Droidtop/tracker#624): its
+ * version and size, and Remove in two presses. The first arms it ([armed], the folder's path) and says what the second
+ * does; the second removes it, its saves moved to the version kept first ([dev.droidtop.library.integrations.OldVersions]).
+ * [status] is the last removal's line, on a heading row that stays after the folder's row is gone. Pure.
+ */
+internal fun oldVersionRows(
+    olds: List<dev.droidtop.library.integrations.OldVersions.Old>,
+    sizes: Map<String, dev.droidtop.library.FolderSizes.Size>,
+    armed: String?,
+    removing: Boolean,
+    status: String?,
+    again: String,
+    onRemove: (dev.droidtop.library.integrations.OldVersions.Old) -> Unit,
+): List<PageFact> {
+    fun words(size: dev.droidtop.library.FolderSizes.Size) =
+        dev.droidtop.library.FolderSizes.words(size, dev.droidtop.library.format.ValueFormat::size)
+    val heading = when {
+        removing -> PageFact(OLD_VERSIONS_ROW, "Removing\u2026", tab = PageTab.VERSIONS)
+        status != null -> PageFact(OLD_VERSIONS_ROW, subtitle = status, tab = PageTab.VERSIONS)
+        else -> null
+    }
+    return listOfNotNull(heading) + olds.map { old ->
+        val path = old.folder.absolutePath
+        val label = dev.droidtop.library.integrations.OldVersions.label(old.version)
+        val size = sizes[path]?.let(::words)
+        PageFact(
+            title = "Version $label",
+            value = if (armed == path) "Remove?" else "Remove",
+            subtitle = if (armed == path) {
+                "$again to remove it" + (size?.let { " and free $it" } ?: "") + ". Its saves are copied to this version first"
+            } else {
+                listOfNotNull(size, "Its saves are copied to this version before it is removed").joinToString(" \u00b7 ")
+            },
+            onActivate = { onRemove(old) },
+            tip = path,
+            tab = PageTab.VERSIONS,
+        )
+    }
+}
+
+/** The heading row that says what the last removal of an old version did. */
+internal const val OLD_VERSIONS_ROW = "Older versions"
 
 /**
  * The page's rows, in the order a store page lists them: how you have
