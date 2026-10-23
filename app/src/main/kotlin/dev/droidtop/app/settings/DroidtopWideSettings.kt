@@ -616,20 +616,7 @@ object DroidtopWideSettings {
      * Builds the diagnostics archive (10c) and only then opens the system
      * share sheet with it; the caller runs this off the main thread.
      */
-    private fun shareDiagnostics(context: Context): String = runCatching {
-        val file = dev.droidtop.library.diagnostics.DiagnosticsArchive.build(context)
-        val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-        val send = Intent(Intent.ACTION_SEND)
-            .setType("application/zip")
-            .putExtra(Intent.EXTRA_STREAM, uri)
-            .putExtra(Intent.EXTRA_SUBJECT, "droidtop diagnostics")
-            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        context.startActivity(Intent.createChooser(send, "Share diagnostics").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        "Diagnostics packed (${file.length() / 1024} KB); choose where to send it"
-    }.getOrElse {
-        android.util.Log.w("droidtop.settings", "Diagnostics archive failed", it)
-        "Couldn't pack diagnostics. Check there is space left on this device and try again."
-    }
+    private fun shareDiagnostics(context: Context): String = dev.droidtop.library.diagnostics.DiagnosticsArchive.share(context)
 
     private fun readBackup(context: Context, uri: Uri): String = runCatching {
         val text = context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }

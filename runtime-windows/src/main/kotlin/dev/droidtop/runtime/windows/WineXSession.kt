@@ -83,6 +83,9 @@ class WineXSession(
 
     private val outputCollector = Callback<String> { line -> collector.add(line) }
 
+    /** What Wine has printed so far, the collector's tail, for a report made while the game still runs. */
+    fun outputSoFar(): String = collector.text()
+
     /** Counted down when the guest's end has been reported; the teardown waits for it before it stops listening. */
     private val ended = CountDownLatch(1)
 
