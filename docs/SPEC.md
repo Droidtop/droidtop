@@ -7847,8 +7847,8 @@ leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
 the vocabulary (ES-DE's own `es_input.xml` names, logical rather than
 physical): A accept, B back one level, X the focused thing's toggle, Y its
 detail, the four directions, L/R previous/next tab (the nearest strip's, §7j
-"Gaming controls"), R2 the Quick Menu, Start the left menu, Select options
-for where you are, L2 a PC game's own menu. Pad
+"Gaming controls"), R2 the Quick Menu, Start the left menu, Select the options
+of the list or screen you are on, L2 the focused thing's own menu (R2 the global menu, L2 the local one). Pad
 buttons and the keyboard are in the same table -- arrows, Enter = A,
 Escape = B, Space = X, Backspace = Y, the menu key = Select, F10 = R2, Page
 Up/Page Down and Shift+Tab/Tab = L1/R1 -- so no screen keeps a key list of
@@ -14801,7 +14801,7 @@ it:
 | Steam Deck / Big Picture | Others | PC Games |
 | --- | --- | --- |
 | Home: horizontal shelves of capsule art ("Recent games", "Friends playing", "Great on Deck") | GOG Galaxy and Playnite fullscreen: shelves too; Daijishō/Beacon: one grid | **Shelves**, one shelf builder (`pcShelves`, `pc/PcShelves.kt`) for two surfaces (decided 2026-10-02, Droidtop/tracker#273: the owner found PC Games opening on a bare grid "worse than the older one"). **PC Games opens on Overview**, the PC library's own shelves: Continue playing (first; its first card is the hero card, see "Home art"), Recently added (newest added first, by "When a game was added" below), Update available, Favourites, Not played yet (installed games with no last-played time, newest added first; only once something has been played, before that it is the whole library), Installed (only when something is not), then, when the library has more than one source (a store, a game folder, the Wine shortcuts: `PcSource`), one shelf per source in the Source filter's order, else one per pinned collection, else one per engine family (Visual Novels, RPG Maker, Windows, ...). On Overview, **Update available leads whenever it has rows**, above Continue playing, its heading always with its count; a tap on that heading opens the Updates tab (Droidtop/tracker#397 slice C), and so does A on it from the pad: Left from the shelf's first capsule puts the cursor on the heading (its ring, the hint reads "Open"), and any other move leaves it (slice E). **The Collections tab** (`PcCollections.kt`, slice D) is a tile grid in three groups: your collections, your saved views, and each store's imported collections under "From <store>". A tile shows its name, its count and, when it is a tab, a mark, without needing focus; A opens the grid filtered to it (the **Collection** facet, static membership only, values OR), a saved view's tile applies the view. Hidden games do not count in a tile, and a collection whose every game here is hidden is not shown. Select on a tile: Pin as a tab (or Unpin), Pin all imported, Unpin all imported. A pinned collection's tab is a saved view over its Collection facet. **Home** keeps one row of games, Recent games (Continue playing, else Recently added, `homeShelves`); updates and additions are its What's new cards ("Home" below). Every shelf is capped at 24; Recently added is hidden when no entry has an added time. When a running scan republishes the library and the shelves move, the cursor stays on its game (`cursorAfter`), not on a position. |
-| Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (Select). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **Select on a pinned tab** opens its Options: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first. The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
+| Library: tabs across the top (Installed, Recent, All, Collections) and a filter funnel beside them | Playnite: filter panel on L; GOG: sidebar | **The view strip** (decided 2026-10-02, Droidtop/tracker#273 slice 2): the one row above PC Games' content, L1 and R1 glyphs at its ends: **Overview** (the shelves, `VIEW_OVERVIEW`, first and where PC Games opens), then the fixed built-in tabs **All games, Installed, Favourites, Collections**, then the person's **pinned views** in their own order (`pcStripTabs`, Droidtop/tracker#397 slice C). Built-in tabs never come and go: an empty one shows one line saying how to fill it (Collections: "Add a game to a collection from its menu (L2). Collections a store keeps appear here after it syncs."). List options > **Favourites tab / Collections tab** can hide those two; Overview, All games and Installed cannot be hidden, and the order is fixed so press counts stay the same. **Store tabs and the Updates tab are gone**: a store is a Source filter, and any filter can be saved as a tab. Everyone was given, once, a pinned view **"Updates"** over the Update available facet, first among the pinned views (`LibraryViewPrefs.withUpdatesView`); unpinning or removing it is the person's choice. Every grid tab, built-in or pinned, carries its count ("Installed · 12"). **A pinned tab's Options**: Edit (a new name, then the Filter sheet over its filters and sort; saving writes the same view, same tab position), Unpin (it stays a saved view, listed in Collections), Move left, Move right, Move to first: **L2 on a pinned tab**, or a long press on its chip (2026-10-23, Droidtop/tracker#621; it was Select). The chips are Steam's tab pills (`ShellChip(tab = true)`, 2026-10-08): small bold capitals in the tab-label role, padded 6 by 16; the view on screen sits on a quiet plate (not the accent: it is a place, not a filter in effect), the chip under the cursor turns solid, and a shoulder glyph with nowhere to go is drawn at half strength. The full grid is one press away (R1 from Overview is All games). No Home chip (Home is a destination of its own and has no strip), no Filters chip (X opens the filter dialog), no Continue playing view (it is the first shelf). B from a grid view returns to Overview. The strip ends short of the floating status cluster (`StatusClusterRoom`, Droidtop/tracker#292), so its R1 glyph is never under the clock. The filters set that no strip view stands for show as ONE pill at the strip's end, naming every active filter, the first two by name and the rest as a number ("Steam · Shared with you · +2, 40 of 3,300 ✕"), on one line that shortens its own text and never pushes tabs off the strip, cleared by one press; there is no count line and no chip row on this page (the Filter sheet keeps its chips). The filter, sort, search and saved views are reached from X, Y and the sheets (`LibraryFilterDialog`, `LibrarySearchDialog`, the one shared `LibraryQuery`, §7i 2026-09-28). |
 | 2:3 capsule art, nothing drawn on it; the focused capsule grows a little | GOG: 2:3 covers with the title under; Daijishō: box art with a name plate | **Capsules** (`PcCapsule`, 2:3, `CAPSULE_ASPECT`): the box art with nothing over it but the corner badges (see "Capsules and the primary action" below); a plate with the name and kind only where there is no art. The focused game's name and facts are said once, in one line above the hint row, not on every capsule; that line carries the version management fact too: the installed build and, when a source knows a newer one, "v0.9.6 is available" (`focusLine`, `GameUpdates.line`). No dark plate over art and no theme backing behind the row (the owner: "weird backing"). Capsule width is Steam's, by the window's tier (`capsuleWidth`, `capsuleWidthFor`; 2026-10-08, Droidtop/tracker#363): 110dp up to an 853dp window (about six across on the console's 768dp window, so a shelf's last capsule is cut and says there is more; three on a phone held upright), 134dp up to 1279dp, 172dp from 1280dp. Shelves and the grid share it; the grid packs whole capsules of that width 12dp apart and centres the row in what is left (`GridCells.FixedSize`), never stretching a capsule to fill. |
 | Game page: hero art, one big Play/Install, playtime and last played, achievements, friends, news, description | Daijishō/Beacon: description, genre, developer, rating, media | **The page** (`PcGamePage`, a full-bleed window; see "The game page" below): the hero band, ONE large primary action that says what A does (`PcPlayState`), Favourite and Options as small icon buttons, a quiet facts strip, a tab strip (Overview, Versions and updates, Extras, Details) that owns L1/R1, and the facts as rows under their tab. Only facts that exist are rows. Achievements are one row of Overview, the same row for every source: RetroAchievements fills it for a console game on its detail screen (7h, "RetroAchievements"); a store's achievements (Droidtop/tracker#230) take this page's row when they exist. |
 | The page's rows are the same rows as Steam's settings | | **Settings' rows.** The page's facts are `MenuRow(uniformHeight = true)` at `uniformRowHeight()`, with one content-sized value column (`LocalValueColumnWidth`) and the selected row's full text in the detail strip under the list (`CatalogDetailStrip`, §7k "Text in rows and tiles"); a long description is read there, never by growing a row. |
@@ -15012,7 +15012,7 @@ version rollback (#231).
 
 ### Home (decided 2026-10-14, Droidtop/tracker#485 F7a; the final design's section B)
 
-What I was playing, what changed, who is around, and the way into my library. Home is not a list, so it has no Filter and no Sort By: X does nothing there, **Y is Search**, L1/R1 step the strip, Select is the focused game's Options, A plays or opens. Top to bottom:
+What I was playing, what changed, who is around, and the way into my library. Home is not a list, so it has no Filter, no Sort By and no List options: X and Select do nothing there, **Y is Search**, L1/R1 step the strip, L2 (or a long press) is the focused game's Options, A plays or opens. Top to bottom:
 
 - **The top band** (48 dp, `HomeTopBand`): touch only, in the accessibility tree, never a stop of the pad. Over a scrim from the ground at 60 percent to clear, right to left: the status facts (`StatusCluster` itself, on a solid plate in full ink; tapping them opens the Quick Menu), a divider, Friends (the avatar, with a ring while the person's own presence on a service is not Offline; shown while a social service is on), the bell (unread messages; opens the Quick Menu), Search, and Downloads with a progress ring while a job runs (`PluginJobsCenter.entries()`). Every target is 48 dp with a content description. The floating status cluster is not drawn on Home: the band carries the facts.
 - **Recent games**, headed: Continue playing, else Recently added, across every library (`homeShelves`, one row, id `recent-games`). Up from it does nothing.
@@ -15214,13 +15214,14 @@ the pipeline applies it.
   -- the four containers this tab has, one mechanism each.
 - **A** runs the focused capsule's primary action, or presses the focused
   chip. **X** opens the Filter sheet and **Y** the Sort By sheet (§7j,
-  "Filters, sort and the hint bar"). **Select** is Options: the focused
-  game's own menu (`PcGameMenu`, unchanged in substance: the game page, the
+  "Filters, sort and the hint bar"). **L2** is Options: the focused
+  thing's own menu. On a game it is the game menu (`PcGameMenu`, unchanged in substance: the game page, the
   favourite, the runner and its picker, Wine/container settings, ProtonDB,
   the Lutris import, the source links and updates, merge and versions, filed
-  in its categories, "The game menu" below); **L2** is its alias and the header's L2
-  pill (§7k) is live on this tab exactly while a game is under the cursor.
-  With no game under the cursor (the strip, an empty list) Select opens the
+  in its categories, "The game menu" below); on a collection tile the tile's menu; on a pinned tab its Edit,
+  Unpin and Move. A long press opens the same menu. The header's L2
+  pill (§7k) is live on this tab exactly while something with a menu is under the cursor.
+  **Select** is List options, whatever is focused (owner, 2026-10-23, Droidtop/tracker#621: L2 because "it matches with R2 (global menu and local menu)"): the
   list's options (`GamelistOptionsMenu` with the `pc` system id: Jump to
   letter, Random game, Get games, Get artwork and details, Game sources,
   Close -- the console-only rows Open games on, System settings, Get artwork
@@ -15232,16 +15233,15 @@ the pipeline applies it.
 - **Touch is the same cursor.** A tap on a capsule that is not selected
   selects it (pointer and focus are one selection, and the hint row then
   names what A would do); a tap on the selected capsule is A (design
-  language: "a second activation confirms"); a long-press opens the game's
-  page. A tap on
-  a chip presses it. On the page, a tap on a button or a row is the same
+  language: "a second activation confirms"); a long press opens what L2 opens. A tap on
+  a chip presses it, and a long press on a pinned tab's chip opens its menu. On the page, a tap on a button or a row is the same
   press as A on it. Nothing on the tab is reachable by touch only or by
   pad only.
 - **The hint row is the shell's one footer, fed by the focused element**
   (§7j, "Filters, sort and the hint bar"; the tab claims no row of its
   own): A names the focused game's primary action from `PcPlayState`
-  ("Select" on the strip), X Filter, Y Sort By, Select Options, A, B Back
-  when there is a level to leave, in that order (X, Y and Select, then A and B), and the footer adds Start
+  ("Select" on the strip), X Filter, Y Sort By, L2 Options, Select List options, A, B Back
+  when there is a level to leave, in that order (X, Y, L2 and Select, then A and B), and the footer adds Start
   Menu at the row's left. Each is a `HintBinding` gated on its action really
   dispatching (§7j).
 
@@ -15908,13 +15908,14 @@ Consequences:
   read "Apps", two lines below a heading that already said so (rig,
   build 547). Nothing is invented for it: an app that declares no
   category gets "Android app", not a guess;
-- **a long press opens the thing's own menu, the same one L2 and Select open** (owner, 2026-10-23,
-  Droidtop/tracker#610; then #621: "The long-press game menu should BE the L2 menu as it is right now. Different path
-  to it"). One menu per thing, three ways to it: a PC game's game menu, a collection tile's menu, an app tile's app
-  menu (Mark as game is a row of it; a long press used to mark the app at once, with nothing on screen saying so), and
-  for a Retro game or an app on Home's shelves the same small menu. A Retro Games card's long press stays its details,
-  which are a console game's own actions; that tab has no L2 menu for one game (Select there is the gamelist's
-  options), and whether it gets one is part of the #621 review;
+- **a long press opens the thing's own menu, the one L2 opens** (owner, 2026-10-23, Droidtop/tracker#610; then #621:
+  "The long-press game menu should BE the L2 menu as it is right now. Different path to it", and on three buttons for
+  it: "Three options for the same menu is excessive"). One menu per thing, one button and one touch to it; Select is
+  the list's options, never a thing's menu. It covers a PC game's game menu, a collection tile's menu, a pinned tab's
+  menu, an app tile's app menu (Mark as game is a row of it; a long press used to mark the app at once, with nothing
+  on screen saying so), and for a Retro game or an app on Home's shelves the same small menu. A Retro Games card's
+  long press stays its details, which are a console game's own actions; that tab has no L2 menu for one game yet, and
+  whether it gets one is part of the #621 review;
 - a value that is **stepped** rather than opened --- a slider, a small
   cycling choice --- makes the two arrows the row already draws into two
   targets, because a touch screen has no Left/Right and a slider has no
@@ -16141,7 +16142,8 @@ mechanism per job).
 ### Filters, sort and the hint bar (owner, 2026-10-01, Droidtop/tracker#257, #260)
 
 One vocabulary on every library and app list: **X Filter, Y Sort By,
-Select Options** (the focused thing's own menu), **Start** the left menu,
+L2 Options** (the focused thing's own menu; a long press opens the same one), **Select List options** (the
+list's own, whatever is focused) (owner, 2026-10-23, Droidtop/tracker#621: L2 because "it matches with R2 (global menu and local menu)"), **Start** the left menu,
 **A** the primary action, **B** back one level. Principles are taken from
 what other handheld frontends and Big Picture do, not their code, art or
 words; the sheets and chips are droidtop's own, from `MenuTokens` and
@@ -16257,7 +16259,7 @@ filters, not the sort; picking a built-in view keeps the sort the person
 chose, picking a saved view brings its own. **L1/R1** step the strip (the
 page owns the shoulders, never wrapping; with a pill showing and no view lit
 the first press lands on All); the chips take no D-pad focus. The footer is
-the shell's one footer: A Open, X Filter, Y Sort By, Select Options. The
+the shell's one footer: A Open, X Filter, Y Sort By, L2 Options. The
 list below the strip is still sectioned by kind (a section per kind, a
 dense icon grid for installed apps). "Marked as a game" is a short toast now
 that the line it used to ride on is gone. Facets, in order: **Category** (Games, Emulators,
@@ -16271,8 +16273,8 @@ used, Recently installed.
   and a short list of game stores and launchers; Emulators is every
   emulator in droidtop's player database; System is a preinstalled app.
   **Mark as game** (and "Not a game") is the person's answer and beats every
-  default; it is a **long press on an app** and a row in the app's Options
-  menu (Select), both writing the same answer (`AppGameMarks`).
+  default; it is a row in the app's Options menu (L2, or a long press on the app), writing the one answer
+  (`AppGameMarks`).
 - **Recently used reads two logs.** droidtop's own launch log (it needs
   nothing), and, where the person has granted the optional **Usage access**
   special permission, what Android says, which also covers apps opened
@@ -16282,7 +16284,7 @@ used, Recently installed.
   facts an app list reads (first install time, installer, Android's game
   and system flags) come from the one package pass the scan already makes
   (`InstalledAppFacts`), never per row.
-- Select on an app opens its Options (details, favourite, Mark as game, Hide from
+- L2 on an app, or a long press, opens its Options (details, favourite, Mark as game, Hide from
   droidtop, Uninstall); the details screen is no longer a Y press. **Hide** writes the
   launcher's own hidden list (`AppHiding`, the list the scan and Standard's drawer read), so
   one rule hides an app everywhere and the Filter's Hidden view brings it back (the row then

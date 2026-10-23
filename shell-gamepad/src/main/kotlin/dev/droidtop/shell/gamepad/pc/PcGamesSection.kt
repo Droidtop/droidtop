@@ -834,8 +834,8 @@ internal fun PcGamesSection(
     }
 
     // What this tab's focus promises, X and Y being the list's Filter and
-    // Sort By (docs/SPEC.md 7j), Select the focused game's menu: only what
-    // dispatches, re-read as the cursor moves.
+    // Sort By (docs/SPEC.md 7j), L2 the focused thing's menu and Select the
+    // list's options: only what dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
     val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile, state.headingFocused, onHomeStrip, homeTab?.cards?.size) {
         // Steam's order: the list's own actions, then A and B. Start (Menu)
@@ -846,7 +846,7 @@ internal fun PcGamesSection(
             listOf(
                 HintBinding(GamepadAction.L, "Switch tab"),
                 HintBinding(GamepadAction.Y, "Search"),
-                HintBinding(GamepadAction.SELECT, "Options") { focusedEntry != null },
+                HintBinding(GamepadAction.L2, "Options") { focusedEntry != null },
                 HintBinding(GamepadAction.A, if (onDest || onHomeStrip) "Open" else verb ?: "Play") {
                     onDest || focusedEntry != null || (onHomeStrip && homeTab?.cards?.isNotEmpty() == true)
                 },
@@ -854,7 +854,11 @@ internal fun PcGamesSection(
         } else listOf(
             HintBinding(GamepadAction.X, "Filter"),
             HintBinding(GamepadAction.Y, "Sort By"),
-            HintBinding(GamepadAction.SELECT, "Options"),
+            HintBinding(GamepadAction.L2, "Options") {
+                focusedEntry != null || focusedTile != null ||
+                    (state.stripFocused && (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.builtIn == false)
+            },
+            HintBinding(GamepadAction.SELECT, "List options"),
             HintBinding(GamepadAction.A, if (onDest || focusedTile != null || (state.onShelves && state.headingFocused)) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
                 onDest || state.stripFocused || onFreeRow || focusedTile != null || focusedEntry != null
             },
@@ -1051,21 +1055,22 @@ internal fun PcGamesSection(
                         // Home is not a list: X does nothing there and Y is Search (docs/SPEC.md 7i, "Home").
                         GamepadAction.X -> if (!state.home) state.filterOpen = true
                         GamepadAction.Y -> if (state.home) state.searchOpen = true else state.sortOpen = true
-                        // Options is the focused thing's menu; L2 and a long
-                        // press open the same one (owner, 2026-10-23,
-                        // Droidtop/tracker#621). With nothing under the cursor
-                        // it is the list's own options.
-                        // On a pinned tab, Select is that tab's Options (Edit, Unpin, Move).
-                        GamepadAction.SELECT, GamepadAction.L2 -> {
+                        // L2 is the focused thing's menu, as R2 is the global
+                        // one; a long press opens the same menu. Select is the
+                        // list's options, whatever is focused (owner, 2026-10-23,
+                        // Droidtop/tracker#621). A pinned tab's menu is Edit,
+                        // Unpin and Move.
+                        GamepadAction.L2 -> {
                             val pinned = (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.takeIf { state.stripFocused && !it.builtIn }
-                            if (pinned != null) {
-                                tabMenu = pinned.view
-                            } else if (focusedTile != null) {
-                                tileMenu = focusedTile
-                            } else {
-                                focusedEntry?.let(::openOptions) ?: run { state.optionsOpen = true }
+                            when {
+                                pinned != null -> tabMenu = pinned.view
+                                focusedTile != null -> tileMenu = focusedTile
+                                focusedEntry != null -> openOptions(focusedEntry)
+                                else -> return@onPad false
                             }
                         }
+                        // Home is not a list, so it has no list options.
+                        GamepadAction.SELECT -> if (state.home) return@onPad false else state.optionsOpen = true
                         else -> return@onPad false
                     }
                     true
@@ -1082,6 +1087,14 @@ internal fun PcGamesSection(
                 onSelect = { index ->
                     state.stripFocused = true
                     activateChip(index)
+                },
+                // A pinned tab's menu, the one L2 opens on it (Droidtop/tracker#621).
+                onLongPress = { index ->
+                    (tabs.getOrNull(index) as? PcTab.Grid)?.takeIf { !it.builtIn }?.let { pinned ->
+                        state.stripFocused = true
+                        state.stripIndex = index
+                        tabMenu = pinned.view
+                    }
                 },
                 onClearPill = {
                     state.query = state.query.cleared
@@ -1260,8 +1273,7 @@ internal fun PcGamesSection(
                 editing = null
             },
             // The list's own options (jump to a letter, scrape, PC setup and
-            // the stores) are one row from here, and from Select when no
-            // game is under the cursor.
+            // the stores) are one row from here, and Select.
             footerActions = listOf(
                 SheetAction("List options", "Shared and free-to-play games, jump to a letter, scrape, game folders and stores") {
                     state.filterOpen = false
@@ -1545,7 +1557,7 @@ internal fun PcGamesSection(
 
 /** What the Collections tab says while it holds nothing (docs/SPEC.md 7i). */
 internal const val COLLECTIONS_EMPTY =
-    "Add a game to a collection from its menu (Select). Collections a store keeps appear here after it syncs."
+    "Add a game to a collection from its menu (L2). Collections a store keeps appear here after it syncs."
 
 /**
  * A pinned tab's Options (docs/SPEC.md 7i): Edit (a new name, then the Filter

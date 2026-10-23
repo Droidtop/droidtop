@@ -2036,7 +2036,7 @@ private fun ButtonHintFooter(
             // were on Select and named nowhere on screen: with no pad
             // attached they were unreachable, and with one they were
             // undiscoverable.
-            HintBinding(GamepadAction.SELECT, "Options") { showOptions },
+            HintBinding(GamepadAction.SELECT, "List options") { showOptions },
             // ES-DE's own documented "General navigation": Left/Right
             // inside a gamelist jump to the adjacent system rather than
             // going back and reselecting. Named as two separate hints
@@ -3484,7 +3484,7 @@ private val APP_TILE_HINTS = listOf(
     HintBinding(GamepadAction.A, "Open"),
     HintBinding(GamepadAction.X, "Filter"),
     HintBinding(GamepadAction.Y, "Sort By"),
-    HintBinding(GamepadAction.SELECT, "Options"),
+    HintBinding(GamepadAction.L2, "Options"),
 )
 
 /**
@@ -3903,13 +3903,12 @@ private fun AppIconTile(
                         onLaunch()
                         true
                     }
-                    // Select is Options, the focused thing's own menu
-                    // (docs/SPEC.md 7j): its details, favourite and
-                    // Mark as game. L2 and a long press open the same one
-                    // (owner, 2026-10-23, Droidtop/tracker#621). X and Y are
-                    // the list's (Filter and Sort By) and bubble to the
-                    // section around the grid.
-                    GamepadAction.SELECT, GamepadAction.L2 -> {
+                    // L2 is the focused thing's own menu (docs/SPEC.md 7j):
+                    // its details, favourite and Mark as game; a long press
+                    // opens the same one (owner, 2026-10-23,
+                    // Droidtop/tracker#621). X and Y are the list's (Filter
+                    // and Sort By) and bubble to the section around the grid.
+                    GamepadAction.L2 -> {
                         onOptions()
                         true
                     }
