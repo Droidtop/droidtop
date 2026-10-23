@@ -26,7 +26,12 @@ class AppInterfaceDoorService : Service() {
             val context: Context = applicationContext
             val identity = Binder.clearCallingIdentity()
             try {
-                val record = recordFor(context, uid) ?: return false
+                val record = recordFor(context, uid) ?: run {
+                    // An app not added yet announces itself (Droidtop/tracker#547): droidtop looks at it and tells the
+                    // person once per version. Who knocked is the caller's uid; the answer is still no.
+                    AppInterfaceAnnouncements.knocked(context, context.packageManager.getPackagesForUid(uid)?.toList().orEmpty())
+                    return false
+                }
                 // Checked again here, before saying yes: the app may have been re-signed since it was approved.
                 if (AppInterfaces.verifyRecord(context, record) != null) return false
                 scope.launch {

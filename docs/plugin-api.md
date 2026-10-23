@@ -438,8 +438,25 @@ store". Its adapter is the app itself:
   approved, verified app_interface plugin's app calls it when it needs
   droidtop and has no broker (it started a game on its own); droidtop
   checks the calling uid against that plugin, binds the app's service and
-  hands it its broker in `loadContained`. Any other caller gets `false`
-  and nothing happens. The door carries no data.
+  hands it its broker in `loadContained`. Any other caller gets `false`.
+  The door carries no data.
+- **An app announces itself (2026-10-23).** The owner: "every app with a
+  droidtop Application Interface plugin layer make a call to announce its
+  presence to droidtop, self-registering". So an app with the plugin layer
+  knocks once when it starts, added or not:
+  - An app not added yet still gets `false`. droidtop looks at the
+    packages of the calling uid (never anything the app says), at most once
+    a minute each.
+  - Android starts droidtop to answer the door, so this works whether
+    droidtop runs or not.
+  - droidtop also finds apps by itself: installs and updates while it runs,
+    and on start what changed while it did not (Android's changed-package
+    sequence; everything after a reboot or the first time).
+  - Either way droidtop checks the app's signature itself, and tells the
+    person once per app version: a notification, "<app> can work with
+    droidtop", opening Plugins, when notifications are allowed. An
+    announcement never adds or trusts anything; the person adds the app
+    under "In your apps".
 - **Where it shows:** under Plugins, "In your apps", found with
   PackageManager (apps whose service answers the action and whose APK
   carries the asset), installed through the same approval list, grants,

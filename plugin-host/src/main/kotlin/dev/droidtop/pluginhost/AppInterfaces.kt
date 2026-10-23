@@ -66,6 +66,18 @@ object AppInterfaces {
         synchronized(cache) { cache.remove(packageName) }
     }
 
+    /**
+     * Whether [found] is already added in this very version: a record for its app, approved by the certificate it is
+     * signed with now, for the manifest bytes it carries now. An app that changed is not, until its new version is added.
+     */
+    fun isAdded(context: Context, found: Found): Boolean {
+        val record = PluginStore.installed(context).firstOrNull {
+            it.manifest.kind == PluginKind.APP_INTERFACE && it.manifest.app?.packageName == found.packageName
+        } ?: return false
+        val cert = AppInterfaceTrust.certOf(found.verdict) ?: return false
+        return cert.equals(record.approvedKeySha256, ignoreCase = true) && found.manifestBytes?.let(::sha256) == record.archiveDigest
+    }
+
     /** Whether [record] is an app plugin signed by its app's pinned official certificate. */
     fun isOfficial(record: PluginRecord): Boolean {
         val pkg = record.manifest.app?.packageName ?: return false

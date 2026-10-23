@@ -147,6 +147,12 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // the person's rules, and games set to keep themselves up to date are checked a little after start.
         // Main process only: the jobs registry lives there.
         if (Build.VERSION.SDK_INT < 28 || Application.getProcessName() == packageName) {
+            // Apps that carry a droidtop plugin (Droidtop/tracker#547): told to the person once per app version when the app
+            // announces itself at the door, when it is installed or updated while droidtop runs, or, at start, when it
+            // changed while droidtop did not run.
+            dev.droidtop.pluginhost.AppInterfaceAnnouncements.notify = { context, app -> AppInterfaceNotification.show(context, app) }
+            dev.droidtop.pluginhost.AppInterfaceAnnouncements.watch(this)
+            dev.droidtop.pluginhost.AppInterfaceAnnouncements.catchUp(this)
             dev.droidtop.pluginhost.DownloadGate.install(this)
             dev.droidtop.library.stores.StoreAutoUpdates.requestLater(this)
             // PC and engine games get their details by themselves (docs/SPEC.md 7h, Droidtop/tracker#568).
