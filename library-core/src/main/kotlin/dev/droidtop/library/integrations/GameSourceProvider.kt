@@ -184,10 +184,8 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         )
     }
 
-    override fun settingsScreen(): CatalogScreen? {
-        val m = source.record.manifest
-        return if (m.contractVersion >= 2 && m.v2.provides.any { it.point == "ui.settings" } || dev.droidtop.pluginhost.PluginCapability.SETTINGS_ROWS in m.capabilities) PluginSettingsRows.screenFor(source.record) else null
-    }
+    override fun settingsScreen(): CatalogScreen? =
+        if (PluginSettingsRows.has(source.record)) PluginSettingsRows.screenFor(source.record) else null
 
 }
 

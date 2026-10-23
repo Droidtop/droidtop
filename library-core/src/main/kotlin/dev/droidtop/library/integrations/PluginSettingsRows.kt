@@ -42,8 +42,32 @@ object PluginSettingsRows {
 
     fun systemTarget(systemId: String): String = "system:$systemId"
 
+    /**
+     * True when [record] has a settings page: facets for `settings.page` (docs/plugin-api.md 1.10), a contract 2
+     * `ui.settings` view, or contract 1 settings rows. The one test every way into a plugin's settings uses.
+     */
+    fun has(record: PluginRecord): Boolean {
+        val m = record.manifest
+        return PluginFacets.declares(record, PluginFacets.SETTINGS_PAGE) ||
+            (m.contractVersion >= 2 && m.v2.provides.any { it.point == UI_SETTINGS }) ||
+            PluginCapability.SETTINGS_ROWS in m.capabilities
+    }
+
     fun screenFor(record: PluginRecord, target: String = TARGET_GLOBAL): CatalogScreen {
         val m = record.manifest
+        // Facets first (docs/plugin-api.md 1.10): a plugin that declares settings.page is drawn from them, never from
+        // its old view.
+        if (PluginFacets.declares(record, PluginFacets.SETTINGS_PAGE)) {
+            return PluginViews.screen(
+                record = record,
+                point = PluginFacets.POINT,
+                op = PluginFacets.OP_GET,
+                id = "plugin_settings_facets_${m.id}_$target",
+                title = "${m.label} settings",
+                args = PluginFacets.getArgs(PluginFacets.SETTINGS_PAGE),
+                hostContext = JSONObject().put("target", if (target == TARGET_GLOBAL) "plugin" else target),
+            )
+        }
         // A contract 2 plugin's settings page is its own view (docs/plugin-api.md 1.6):
         // inputs, actions and jobs, drawn by droidtop. `target` keeps its C1 meaning,
         // with the contract 1 "global" spelled "plugin".
