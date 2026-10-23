@@ -124,4 +124,65 @@ class LocalPassTest {
         assertEquals(null, EngineFetch.refusal("https://cdn.example.org/a.zip", hadPass = false, lookup = lan, follow = { it }))
         assertEquals(null, EngineFetch.refusal("https://cdn.example.org/a.zip", hadPass = false, lookup = lan, follow = { throw java.io.IOException("offline") }))
     }
+
+    /** A swarm download: records the calls, reports [reported] for a paused add, and is whole on its first poll. */
+    private class Swarm(private val reported: List<String> = emptyList()) : TransferEngine {
+        val calls = mutableListOf<String>()
+
+        override fun add(url: String, options: Map<String, String>): String = error("not a file download")
+
+        override fun addSwarm(source: SwarmSource, folder: File, options: Map<String, String>): String =
+            "gid".also { calls += "add paused=${options["pause"] == "true"}" }
+
+        override fun reported(gid: String): List<String> = reported
+
+        override fun resume(gid: String) {
+            calls += "resume"
+        }
+
+        override fun status(gid: String): Transfer = Transfer("complete", 10, 10, 0, 0)
+
+        override fun remove(gid: String) {
+            calls += "remove"
+        }
+
+        override fun allowLocal(address: InetAddress, port: Int) {
+            calls += "allow ${address.hostAddress}:$port"
+        }
+
+        override fun revokeLocal(address: InetAddress, port: Int) {
+            calls += "revoke ${address.hostAddress}:$port"
+        }
+    }
+
+    private val home: (String) -> List<InetAddress> = { host ->
+        listOf(InetAddress.getByName(if (host.endsWith(".lan")) "192.168.1.30" else "93.184.216.34"))
+    }
+
+    @Test
+    fun aMagnetsOwnLocalTrackerIsVouchedForBeforeItIsAdded() = runTest {
+        val engine = Swarm()
+        val magnet = "magnet:?xt=urn:btih:c12fe1c06bba254a9dc9f519b335aa7c1367a88a&tr=http%3A%2F%2Ftracker.lan%3A6969%2Fannounce&tr=udp%3A%2F%2Fopen.example.org%3A1337"
+        EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Magnet(magnet), File(dir, "m")), { }, size, Dispatchers.Unconfined, home)
+        assertEquals(listOf("allow 192.168.1.30:6969", "add paused=false", "revoke 192.168.1.30:6969"), engine.calls)
+    }
+
+    @Test
+    fun aTorrentWaitsPausedUntilWhatTheEngineReadFromItIsVouchedFor() = runTest {
+        val engine = Swarm(reported = listOf("http://seed.lan/a.bin", "https://mirror.example.org/a.bin", "udp://tracker.lan:1337"))
+        EngineFetch.fetchSwarm(engine, SwarmRequest(SwarmSource.Torrent(ByteArray(4)), File(dir, "t")), { }, size, Dispatchers.Unconfined, home)
+        assertEquals(
+            listOf("add paused=true", "allow 192.168.1.30:80", "allow 192.168.1.30:1337", "resume", "revoke 192.168.1.30:80", "revoke 192.168.1.30:1337"),
+            engine.calls,
+        )
+    }
+
+    @Test
+    fun aMagnetNamesItsTrackersAndSeeds() {
+        assertEquals(
+            listOf("http://t.lan/announce", "https://seed.example.org/a"),
+            LocalAddresses.magnetAddresses("magnet:?xt=urn:btih:abc&dn=A&tr=http%3A%2F%2Ft.lan%2Fannounce&ws=https%3A%2F%2Fseed.example.org%2Fa&x.pe=1.2.3.4:5"),
+        )
+        assertEquals(emptyList<Pair<InetAddress, Int>>(), LocalAddresses.passesFor("udp://tracker.lan/announce", home))
+    }
 }

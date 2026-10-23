@@ -138,6 +138,14 @@ object EngineHost {
             guarded { current().revokeLocal(address, port) }
         }
 
+        override fun reported(gid: String): List<String> = guarded {
+            current().status(gid)?.let { status -> status.files.flatMap { it.uris } + status.announceList }.orEmpty()
+        }
+
+        override fun resume(gid: String) {
+            guarded { current().resume(gid) }
+        }
+
         override fun status(gid: String): Transfer? = guarded {
             current().status(gid)?.let { Transfer(it.state, it.totalLength, it.completedLength, it.downloadSpeed.toLong(), it.errorCode, it.followedBy) }
         }
