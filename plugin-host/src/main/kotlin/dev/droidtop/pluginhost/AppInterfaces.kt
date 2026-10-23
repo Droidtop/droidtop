@@ -118,7 +118,7 @@ object AppInterfaces {
         if (existing != null && existing.manifest.app?.packageName != found.packageName) {
             return Result.failure(IllegalStateException("${manifest.id} is already the plugin of ${existing.manifest.app?.packageName}"))
         }
-        val digest = Sha256.hex(bytes)
+        val digest = sha256(bytes)
         val dir = PluginBundleInstaller.versionDir(root, manifest.id, digest)
         if (!File(dir, "manifest.json").isFile) {
             dir.mkdirs()
@@ -159,7 +159,7 @@ object AppInterfaces {
         val cert = AppInterfaceTrust.certOf(found.verdict)
         if (!cert.equals(record.approvedKeySha256, ignoreCase = true)) return PluginInstallError("its app is now signed by a different key; approve it again")
         val bytes = found.manifestBytes ?: return PluginInstallError(PluginRecord.FILES_MISSING)
-        if (Sha256.hex(bytes) != record.archiveDigest) return PluginInstallError("its app was updated; approve the new version")
+        if (sha256(bytes) != record.archiveDigest) return PluginInstallError("its app was updated; approve the new version")
         return null
     }
 
