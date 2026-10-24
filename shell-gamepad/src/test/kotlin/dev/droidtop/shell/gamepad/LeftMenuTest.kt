@@ -99,11 +99,13 @@ class LeftMenuTest {
     }
 
     @Test
-    fun `Downloads has a dot while a job runs and Social while a message is unread`() {
-        assertEquals(emptySet<GamingSection>(), leftMenuAttention(runningJobs = 0, unreadMessages = 0))
-        assertEquals(setOf(GamingSection.DOWNLOADS), leftMenuAttention(runningJobs = 2, unreadMessages = 0))
-        assertEquals(setOf(GamingSection.SOCIAL), leftMenuAttention(runningJobs = 0, unreadMessages = 1))
-        assertEquals(setOf(GamingSection.DOWNLOADS, GamingSection.SOCIAL), leftMenuAttention(runningJobs = 1, unreadMessages = 3))
+    fun `Downloads has a ring while jobs run and a dot when one needs the person, Social a dot while a message is unread`() {
+        assertEquals(emptyMap<GamingSection, Attention>(), leftMenuAttention(running = emptyList(), needYou = 0, unreadMessages = 0))
+        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(0.5f)), leftMenuAttention(listOf(0.25f, 0.75f, -1f), 0, 0))
+        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(-1f)), leftMenuAttention(listOf(-1f), 0, 0))
+        // Needing the person outranks the ring (Droidtop/tracker#643).
+        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Dot), leftMenuAttention(listOf(0.5f), needYou = 1, unreadMessages = 0))
+        assertEquals(mapOf(GamingSection.SOCIAL to Attention.Dot), leftMenuAttention(emptyList(), 0, unreadMessages = 1))
     }
 
     @Test

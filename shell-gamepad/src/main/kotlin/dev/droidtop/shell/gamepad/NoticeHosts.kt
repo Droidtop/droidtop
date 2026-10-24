@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -36,6 +37,7 @@ import androidx.compose.ui.window.Popup
 import dev.droidtop.library.settings.ConfirmAnswer
 import dev.droidtop.library.settings.NoticeDialogs
 import dev.droidtop.library.settings.Notices
+import dev.droidtop.ui.shared.Motion
 import dev.droidtop.shell.gamepad.input.DeclareLayerHints
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -165,20 +167,31 @@ internal fun NoticeFlashHost() {
         onStopOrDispose { Notices.detachFlashHost(token) }
     }
     val flashes by Notices.flashes.collectAsState()
+    // A press on a card shows its details in place, over the page (Droidtop/tracker#643: "Details on press, through
+    // facets in place (no redirects)"): the job's page, or Downloads for a counted card.
+    var details by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    details?.let { screen -> CatalogSheet(root = screen, onExit = { details = null }) }
     val flash = flashes.firstOrNull() ?: return
     val context = LocalContext.current
     val density = LocalDensity.current
     // A sheet or a menu is a window of its own above the shell's: a card drawn in the shell's window would sit under
     // it, so while one is open the flash is Android's own toast, which is drawn above every window.
     val layerOpen = dev.droidtop.shell.gamepad.input.LocalFocusedHints.current?.layerOpen == true
-    LaunchedEffect(flash) {
+    // The card slides in from the edge and out again on the panel roles; with motion off it is simply there and gone.
+    val shown = remember(flash.id) { androidx.compose.animation.core.Animatable(if (Motion.enabled) 0f else 1f) }
+    LaunchedEffect(flash.id) {
         dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds.play(dev.droidtop.shell.gamepad.theme.UiSound.TOAST)
+        if (!layerOpen) shown.animateTo(1f, Motion.panelIn())
+    }
+    // Keyed by the count too: a card that counts up stays its full time from the last count.
+    LaunchedEffect(flash.id, flash.count) {
         if (layerOpen) {
             Notices.platformToast(context, flash)
             Notices.shown(flash)
             return@LaunchedEffect
         }
         delay(flashMillis(context))
+        shown.animateTo(0f, Motion.panelOut())
         Notices.shown(flash)
     }
     if (layerOpen) return
@@ -186,6 +199,7 @@ internal fun NoticeFlashHost() {
     if (!windowAllowed()) return
     val fontScale = LocalDensity.current.fontScale
     val offset = with(density) { IntOffset(-16.dp.roundToPx(), -(MenuTokens.HintBarRoom + 8.dp).roundToPx()) }
+    val slide = with(density) { FLASH_SLIDE.toPx() }
     Popup(alignment = Alignment.BottomEnd, offset = offset) {
         FlashCard(
             text = flash.text,
@@ -194,7 +208,20 @@ internal fun NoticeFlashHost() {
             surface = MenuTokens.OverlaySurface,
             onSurface = MenuTokens.OnSurface,
             maxLines = if (fontScale >= LARGE_FONT_SCALE) 4 else 2,
-            modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            mark = flash.mark,
+            count = flash.count,
+            onPress = flash.opens?.let { open ->
+                {
+                    details = open()
+                    Notices.shown(flash)
+                }
+            },
+            modifier = Modifier
+                .graphicsLayer {
+                    alpha = shown.value
+                    translationX = (1f - shown.value) * slide
+                }
+                .semantics { liveRegion = LiveRegionMode.Polite },
         )
     }
 }
@@ -213,4 +240,7 @@ internal fun flashMillis(context: android.content.Context): Long {
 private const val SCRIM = 0.6f
 private const val FLASH_MS = 4_000L
 private const val FLASH_MIN_MS = 1_500L
+
+/** How far a flash slides in from, toward the screen's edge. */
+private val FLASH_SLIDE = 48.dp
 private const val LARGE_FONT_SCALE = 1.3f

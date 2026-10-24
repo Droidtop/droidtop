@@ -124,6 +124,8 @@ class SettingsCatalogInitProvider : ContentProvider() {
             runCatching { dev.droidtop.library.EnginesDatabase.defs(appContext) }
         }
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
+        // A download ending is one short flash, grouped while it is up (Droidtop/tracker#643).
+        dev.droidtop.library.integrations.JobNotices.start()
         dev.droidtop.app.LaunchWatchNotification.start(appContext)
         AppSettingsCatalogs.ensureRegistered()
         dev.droidtop.library.settings.LibraryRescan.handler = { ctx, onStatus ->

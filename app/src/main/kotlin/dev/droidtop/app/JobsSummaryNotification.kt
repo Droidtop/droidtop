@@ -26,7 +26,9 @@ import kotlinx.coroutines.launch
  *
  * It only posts when the person has already allowed notifications for droidtop (the permission is
  * asked once, with its reason, where [DesktopNotificationPermission] asks it); without it the
- * summary is simply not shown and nothing else changes. Updates arrive only when the count
+ * summary is simply not shown and nothing else changes. It carries a bar of how far the running jobs
+ * have got together (Droidtop/tracker#643: the status bar's download is shown filling, not read),
+ * moved in steps of [JobsSummary.STEP] percent, so it is posted again when the count or a step
  * changes, never per progress tick.
  */
 object JobsSummaryNotification {
@@ -38,13 +40,13 @@ object JobsSummaryNotification {
     fun start(context: Context) {
         val appContext = context.applicationContext
         scope.launch {
-            PluginJobsCenter.entries().map { JobsSummary.runningCount(it) }.distinctUntilChanged().collect { count ->
-                runCatching { show(appContext, count) }
+            PluginJobsCenter.entries().map { JobsSummary.runningCount(it) to JobsSummary.runningPercent(it) }.distinctUntilChanged().collect { (count, percent) ->
+                runCatching { show(appContext, count, percent) }
             }
         }
     }
 
-    private fun show(context: Context, count: Int) {
+    private fun show(context: Context, count: Int, percent: Int) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         if (count == 0) {
             manager.cancel(NOTIFICATION_ID)
@@ -68,6 +70,7 @@ object JobsSummaryNotification {
                 .setSmallIcon(R.drawable.ic_launcher_monochrome)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setProgress(100, percent.coerceAtLeast(0), percent < 0)
                 .setContentIntent(open)
                 .build(),
         )

@@ -17483,7 +17483,7 @@ Digits use the root locale, so a decimal point never becomes a comma inside Engl
 
 **The danger dialog** (`NoticeDialogs.confirmDanger`, drawn by `:ui-shared`'s `ConfirmDialogCard`): Steam's shape. A centred dark card, min(480 dp, 90% of the window) wide, on a 0.6 scrim; the octagon and the title at 22/28 bold; the outcome; the recommendation ("We recommend Cancel.") in the danger ink; the plugins it is about; a Details row; and two 48 dp buttons side by side, **Cancel** on the left with the focus, the risky button on the right in the danger fill. There is no second-press arm and no delay: Cancel has the focus, so a mashed A cancels, and reaching the risky button is a deliberate move and a press. B, a tap on the scrim and Cancel all answer Cancel; Left/Right move between the buttons, Up reaches Details, Y opens Details. A danger dialog appears only when something changes (an install, an update, a different maker, protection failing to start); afterwards the page says it quietly. `NoticeDialogs.confirm` is the same card for an Info or Caution question with no fill on the proceed button. Code anywhere asks and suspends; the surface on top (the last to attach as a host) draws the question in its own window, one question at a time, and with no surface attached the answer is Cancel, so nothing risky happens unseen. Gaming draws the card; Standard's settings ask with a platform dialog whose default button is Cancel.
 
-**The flash** (`Notices.flash`): a corner card at the bottom right above the hint row, at most 320 dp wide, the tone's glyph and up to two lines (four at font scale 1.3 and above) of 14 sp text, led by the plugin's name for a plugin's flash. It is drawn in a window that never takes focus, so the page's focus and hints are untouched; it stays for the longer of 4 s and Android's recommended accessibility timeout and never less than 1.5 s, and is announced politely. Nothing in a flash needs action; acknowledgements are past tense with no period ("Saved", "Copied").
+**The flash** (`Notices.flash`): a corner card at the bottom right above the hint row, at most 320 dp wide, the tone's glyph and up to two lines (four at font scale 1.3 and above) of 14 sp text, led by the plugin's name for a plugin's flash. It is drawn in a window that never takes focus, so the page's focus and hints are untouched; it stays for the longer of 4 s and Android's recommended accessibility timeout and never less than 1.5 s, and is announced politely. Nothing in a flash needs action; acknowledgements are past tense with no period ("Saved", "Copied"). It slides in from the edge on the panel roles and out again (Droidtop/tracker#643, "Motion and visual status"); a flash of a group (`Notices.merged`) that arrives while one of its group waits counts that card up instead of queueing, and a flash that has details is one target that shows them in place.
 
 **Recent**: every flash is also kept in memory (the last 50, with time, source and tone) unless it was marked private, and shown as a "droidtop" group at the top of the Quick Menu's Notifications tab, with an unread dot on the group and the tab, and Copy all on Select. It is a source of its own, so it shows without notification access.
 
@@ -17942,9 +17942,22 @@ not read; text explains on demand, and is never the primary way to see state.**
   application) keeps Android's animator duration scale current for every host, and Gaming's Animations setting is
   laid on top in Gaming. With "Remove animations" on, every role is a snap: the bar stands, the check is drawn, nothing
   pulses or shakes. The notice card and the danger dialog read the same switch.
-- **Still to come (Droidtop/tracker#643):** notices as cards that slide in with an icon and one line, grouped and
-  counting up; an animated ring and dot on the Downloads entry and the status bar; Enginehost's side, a follow-up of
-  its own. The Downloads widget and the notification still say a percent in text.
+- **Notices, one line with a mark** (`JobNotices`, `:library-core`; the owner on #643: "Toast or banner cards that slide
+  in and out, with an icon or glyph and one short line. Details on press, through facets in place"; "several
+  downloads finishing become one card that counts up, not a flood"). A download that ends is a flash: "Hades is ready"
+  with the check drawing in, or "Hades did not download" with the cross that shakes, never the error, which is on the
+  job's page; a press shows that page in a sheet over where the person is. A second finish while the card is up makes
+  it "2 downloads finished", the check drawn again with each count and the card's time starting over; a press then
+  shows Downloads. Only downloads are news (a scrape or a sync ending is not), and a job restored already finished is
+  never announced. With no droidtop surface on screen the flash waits for the next one rather than raising Android's
+  toast over a game. The pad has no route to a flash's press; its entry stays in the Quick Menu's Recent.
+- **Downloads is seen filling.** The left menu's Downloads and Updates row carries a ring (`JobRing`) filling as its
+  running jobs get on together, and a dot instead while a job has failed or waits for the person's pick
+  (`leftMenuAttention`). Home's band ring glides. The jobs notification carries a bar of the running jobs together,
+  moved in 5 percent steps (`JobsSummary.runningPercent`): Android draws its status bar's icon itself, so the bar in
+  the notification is the filling it allows.
+- **Still to come (Droidtop/tracker#643):** Enginehost's side, a follow-up of its own; the Downloads widget still
+  says a percent in text.
 
 ### A version is a FOLDER (decided 2026-09-17; a Godot single-file build amended 2026-10-10)
 

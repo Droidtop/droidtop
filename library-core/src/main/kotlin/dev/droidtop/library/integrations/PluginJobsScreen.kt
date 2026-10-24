@@ -289,6 +289,9 @@ object PluginJobsScreen {
      * its job finished or was retried): after Retry it shows the new run ([PluginJobsCenter.followed]), and while the
      * list does not hold the job for a moment it keeps showing what it last saw. Only a job the person cleared is gone.
      */
+    /** [jobId]'s own page, for a press on its flash (JobNotices): what it did, with Open, Retry and Clear. */
+    fun pageOf(jobId: String, title: String): CatalogScreen = jobPage(jobId, title)
+
     private fun jobPage(jobId: String, title: String): CatalogScreen {
         var lastSeen: PluginJobsCenter.Entry? = null
         return CatalogScreen(

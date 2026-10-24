@@ -20,7 +20,25 @@ object Notices {
     /** How many entries Recent keeps, in memory only. */
     const val RECENT_MAX = 50
 
-    class Flash internal constructor(val text: String, val tone: NoticeTone, val source: String?, val id: Long)
+    /**
+     * One flash. [mark] draws a job's own mark in place of the tone's glyph (a check that draws in, a cross that shakes;
+     * Droidtop/tracker#643). [group] gathers flashes of one kind into one card: a flash of the same group while one is
+     * still waiting updates that card, its [count] going up and its text becoming [groupLine]'s, instead of queueing a
+     * second ("3 downloads finished", not three cards). [opens] is what a press on the card shows in place: the job's
+     * page, or Downloads for a group.
+     */
+    class Flash internal constructor(
+        val text: String,
+        val tone: NoticeTone,
+        val source: String?,
+        val id: Long,
+        val mark: JobLook? = null,
+        val group: String? = null,
+        val count: Int = 1,
+        val opens: (() -> CatalogScreen?)? = null,
+        internal val groupLine: ((Int) -> String)? = null,
+        internal val groupOpens: (() -> CatalogScreen?)? = null,
+    )
 
     private val _flashes = MutableStateFlow<List<Flash>>(emptyList())
 
@@ -51,13 +69,25 @@ object Notices {
      * [context] to post with, it is a platform toast led by [source] instead, so it is still seen; it is kept in
      * Recent either way.
      */
-    fun flash(text: String, tone: NoticeTone = NoticeTone.Info, source: String? = null, private: Boolean = false, context: Context? = null) {
+    fun flash(
+        text: String,
+        tone: NoticeTone = NoticeTone.Info,
+        source: String? = null,
+        private: Boolean = false,
+        context: Context? = null,
+        mark: JobLook? = null,
+        group: String? = null,
+        groupLine: ((Int) -> String)? = null,
+        opens: (() -> CatalogScreen?)? = null,
+        groupOpens: (() -> CatalogScreen?)? = null,
+    ) {
         require(tone != NoticeTone.Danger) { "a flash needs no action; danger is a dialog" }
         val id = synchronized(this) { nextId++ }
+        val incoming = Flash(text, tone, source, id, mark, group, 1, opens, groupLine, groupOpens)
         if (hosts.value.isEmpty() && context != null) {
-            platformToast(context, Flash(text, tone, source, id))
+            platformToast(context, incoming)
         } else {
-            _flashes.update { it + Flash(text, tone, source, id) }
+            _flashes.update { merged(it, incoming) }
         }
         if (!private) {
             _recent.update { (listOf(RecentNotice(text, tone, source, System.currentTimeMillis())) + it).take(RECENT_MAX) }
@@ -71,6 +101,31 @@ object Notices {
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             Toast.makeText(context.applicationContext, shown, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * [waiting] with [incoming] added: a flash of a [Flash.group] already waiting becomes that card counted once more,
+     * in its place and under its id, so a host showing it keeps showing it and sees it count up; else it queues. Pure.
+     */
+    fun merged(waiting: List<Flash>, incoming: Flash): List<Flash> {
+        val group = incoming.group ?: return waiting + incoming
+        val index = waiting.indexOfFirst { it.group == group }
+        if (index < 0) return waiting + incoming
+        val old = waiting[index]
+        val count = old.count + 1
+        val counted = Flash(
+            text = old.groupLine?.invoke(count) ?: incoming.text,
+            tone = incoming.tone,
+            source = old.source,
+            id = old.id,
+            mark = incoming.mark,
+            group = group,
+            count = count,
+            opens = old.groupOpens ?: incoming.opens,
+            groupLine = old.groupLine,
+            groupOpens = old.groupOpens,
+        )
+        return waiting.toMutableList().also { it[index] = counted }
     }
 
     /** The host drew [flash] for its time; it is no longer waiting. */
