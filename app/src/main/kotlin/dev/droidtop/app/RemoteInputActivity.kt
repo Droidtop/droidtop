@@ -3,8 +3,11 @@ package dev.droidtop.app
 import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,7 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -39,15 +44,55 @@ import dev.droidtop.library.credentials.handoff.consoleLine
  * Refuse, and "Phone connected: typing" once paired. Opening it starts the session when none runs ([RemoteInputs]);
  * leaving it does not end the session, so the person can go to a field and type: Close here, or on the notification,
  * ends it. Opened from the companion's Keys screen, the Quick Menu's row and the key setup screens.
+ *
+ * File transfer (Droidtop/tracker#645, slice 3) has its controls here: the folder files from the phone go into (the
+ * system folder picker; Download/droidtop until one is chosen), "Send to the phone" (the system document picker) with
+ * "Stop offering", and the lines "Receiving name (size)" and "Phone sent name (size)".
  */
 class RemoteInputActivity : AppCompatActivity() {
+    private var folder by mutableStateOf("")
+
+    private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+        if (tree != null) {
+            // Kept across restarts, read and write, so the folder is still the one chosen next time.
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    tree,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            }
+            ReceiveFolder.choose(this, tree)
+            folder = ReceiveFolder.label(this)
+        }
+    }
+
+    private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri != null) {
+            // The file stays where it is and is read when the phone downloads it, so the permission must outlive this screen.
+            runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            // Reading its name and size is provider work: not on the main thread.
+            Thread({
+                val offered = RemoteInputs.offer(applicationContext, uri)
+                if (!offered) runOnUiThread { Toast.makeText(this, "That file cannot be sent. Wait for the QR code, or pick another file", Toast.LENGTH_LONG).show() }
+            }, "droidtop-remote-offer").apply { isDaemon = true; start() }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         RemoteInputs.start(this)
+        folder = ReceiveFolder.label(this)
         setContent {
             DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 Scaffold { padding ->
                     RemoteInputScreen(
+                        folder = folder,
+                        onPickFolder = { pickFolder.launch(null) },
+                        onDefaultFolder = {
+                            ReceiveFolder.choose(this, null)
+                            folder = ReceiveFolder.label(this)
+                        },
+                        onOffer = { pickFile.launch(arrayOf("*/*")) },
                         onLeave = { finish() },
                         onClose = {
                             RemoteInputs.close()
@@ -72,7 +117,15 @@ class RemoteInputActivity : AppCompatActivity() {
 }
 
 @Composable
-private fun RemoteInputScreen(onLeave: () -> Unit, onClose: () -> Unit, modifier: Modifier) {
+private fun RemoteInputScreen(
+    folder: String,
+    onPickFolder: () -> Unit,
+    onDefaultFolder: () -> Unit,
+    onOffer: () -> Unit,
+    onLeave: () -> Unit,
+    onClose: () -> Unit,
+    modifier: Modifier,
+) {
     val state by RemoteInputs.state.collectAsState()
     val confirm = remember { FocusRequester() }
     // The question is the one thing that needs an answer: the pad's A answers it.
@@ -101,12 +154,26 @@ private fun RemoteInputScreen(onLeave: () -> Unit, onClose: () -> Unit, modifier
                 shown.lastSent?.let { Text("Last sent: $it", style = MaterialTheme.typography.bodyLarge) }
                 shown.notice?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                 shown.clip?.let { Text("Clipboard from the device: $it", style = MaterialTheme.typography.bodyLarge) }
+                shown.receiving?.let { Text("Receiving $it", style = MaterialTheme.typography.bodyLarge) }
+                shown.received?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                shown.offered?.let { Text("Offered to the phone: $it", style = MaterialTheme.typography.bodyLarge) }
                 Text(
                     "Leave this screen and put the cursor in a field. Close ends it, here or on the notification.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
             else -> Unit
+        }
+        if (state !is RemoteInputState.Closed) {
+            Text("Files from the phone go into: $folder", style = MaterialTheme.typography.bodyLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = onPickFolder) { Text("Choose folder") }
+                TextButton(onClick = onDefaultFolder) { Text("Use Download/droidtop") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Button(onClick = onOffer) { Text("Send to the phone") }
+                if ((state as? RemoteInputState.Paired)?.offered != null) TextButton(onClick = { RemoteInputs.withdrawOffer() }) { Text("Stop offering") }
+            }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             if (state !is RemoteInputState.Closed) Button(onClick = onClose) { Text("Close") }

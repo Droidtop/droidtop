@@ -1,5 +1,7 @@
 package dev.droidtop.library.credentials.handoff
 
+import java.io.IOException
+import java.io.InputStream
 import java.net.URLDecoder
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -27,8 +29,17 @@ sealed interface RemoteInputState {
     /**
      * One device is paired and typing. [lastSent] is already masked for a password; [notice] says why nothing went.
      * [clip] is a line of the text the phone just put on the console's clipboard, shown for a few seconds.
+     * [receiving] is the file the phone is sending now ("name (size)"), [received] the line about the last one that
+     * arrived ("Phone sent name (size)"), [offered] the file the console offers the phone ("name (size)").
      */
-    data class Paired(val lastSent: String? = null, val notice: String? = null, val clip: String? = null) : RemoteInputState
+    data class Paired(
+        val lastSent: String? = null,
+        val notice: String? = null,
+        val clip: String? = null,
+        val receiving: String? = null,
+        val received: String? = null,
+        val offered: String? = null,
+    ) : RemoteInputState
 
     data class Closed(val reason: RemoteInputEnd) : RemoteInputState
 }
@@ -39,7 +50,8 @@ fun RemoteInputState.consoleLine(): String = when (this) {
     is RemoteInputState.Waiting ->
         if (refused) "That code was refused. Scan the new QR code" else "Scan the QR code with a device on this network"
     is RemoteInputState.Confirming -> "Does your device show $code?"
-    is RemoteInputState.Paired -> "Phone connected: typing"
+    // What the phone is sending, or last sent, is what the person looks for, on the screen and in the notification.
+    is RemoteInputState.Paired -> receiving?.let { "Receiving $it" } ?: received ?: "Phone connected: typing"
     is RemoteInputState.Closed -> reason.text
 }
 
@@ -56,6 +68,11 @@ fun RemoteInputState.consoleLine(): String = when (this) {
  * text of at most [ClipRules.MAX_BYTES] bytes goes onto the console's [clipboard] and is shown on the console briefly,
  * and the console's clip text goes to the phone unless the source marked it sensitive.
  *
+ * The same session carries file transfer (`put` and `get`, slice 3): a file the phone sends is streamed to disk into the
+ * folder [files] names, at most [FileNames.MAX_BYTES], under a sanitised name that never replaces a file; one file the
+ * console offers ([offer]) is a download link on the phone's page for this session only. Both follow the pairing, code
+ * and token rules of an edit, and neither is ever held in memory.
+ *
  * The token and the code are compared in constant time. Typing is delivered by [router]; it is called outside this
  * class's lock, because it waits for the main thread. Time passes in [tick], which the server's own loop calls
  * every second ([HandoffEndpoint.isLive]); a test calls it with its own clock.
@@ -71,6 +88,7 @@ class RemoteInput(
     private val idleTimeoutMs: Long = IDLE_TIMEOUT_MS,
     private val clipboard: ConsoleClipboard = ConsoleClipboard.None,
     private val clipShowMs: Long = CLIP_SHOW_MS,
+    private val files: ConsoleFiles = ConsoleFiles.None,
 ) {
     private var generation: Generation? = null
     private var listener: HandoffListener? = null
@@ -86,6 +104,10 @@ class RemoteInput(
     private var lastSent: String? = null
     private var clipShown: String? = null
     private var clipUntil = 0L
+    private var offered: OfferedFile? = null
+    private var offerId = 0
+    private var receiving: String? = null
+    private var received: String? = null
     private val usedCodes = HashSet<String>()
 
     /** One listener's endpoint: once the session has moved on to another, it answers nothing and ends its loop. */
@@ -99,6 +121,9 @@ class RemoteInput(
             respond(this, method, target, body, peer)
 
         override fun maxBody(target: String): Int = maxBodyFor(target)
+
+        override fun receive(method: String, target: String, length: Long?, peer: String): HandoffUpload? =
+            judgeUpload(this, method, target, length, peer)
     }
 
     /** The address the QR code shows; null while no listener is up. */
@@ -130,6 +155,28 @@ class RemoteInput(
         listenAgain(refused = true)
     }
 
+    /**
+     * Offers [file] to the phone as a download link on its page, replacing any earlier offer; false when the session is
+     * over. The link works for this session only: a refusal, the end, or [withdrawOffer] takes it away, and a
+     * replaced offer's old link answers nothing.
+     */
+    @Synchronized
+    fun offer(file: OfferedFile): Boolean {
+        if (!started || closed) return false
+        offered = file
+        offerId++
+        if (paired) publish(null)
+        return true
+    }
+
+    /** Takes the offered file away; its link answers nothing from now on. */
+    @Synchronized
+    fun withdrawOffer() {
+        if (offered == null) return
+        offered = null
+        if (!closed && paired) publish(null)
+    }
+
     /** Ends the session and its listener. */
     @Synchronized
     fun close() = end(RemoteInputEnd.PERSON)
@@ -159,6 +206,9 @@ class RemoteInput(
         device = null
         code = null
         clipShown = null
+        offered = null
+        receiving = null
+        received = null
         state.value = RemoteInputState.Closed(reason)
     }
 
@@ -172,6 +222,9 @@ class RemoteInput(
         paired = false
         lastSent = null
         clipShown = null
+        offered = null
+        receiving = null
+        received = null
         val next = Generation()
         generation = next
         var tries = 0
@@ -200,29 +253,33 @@ class RemoteInput(
 
         class Edit(val back: Int, val text: String, val enter: Boolean) : Verdict
 
-        data object Status : Verdict
+        class Status(val offer: String) : Verdict
 
         class ClipPut(val text: String) : Verdict
 
         data object ClipGet : Verdict
+
+        class Download(val file: OfferedFile) : Verdict
     }
 
     private fun respond(from: Generation, method: String, target: String, body: String, peer: String): HandoffReply {
         val verdict = synchronized(this) { if (generation === from) judge(method, target, body, peer) else Verdict.Answer(NOT_FOUND) }
         return when (verdict) {
             is Verdict.Answer -> verdict.reply
-            Verdict.Status -> status()
+            is Verdict.Status -> status(verdict.offer)
             is Verdict.Edit -> deliver(verdict)
             is Verdict.ClipPut -> putClip(verdict.text)
             Verdict.ClipGet -> getClip()
+            is Verdict.Download -> download(from, verdict.file)
         }
     }
 
     private fun judge(method: String, target: String, body: String, peer: String): Verdict {
         if (closed) return Verdict.Answer(GONE)
         val parts = target.substringBefore('?').split('/')
-        // "", "r", token [, "state" | "in"]
-        if (parts.size !in 3..4 || parts[0] != "" || parts[1] != "r" || !sameSecret(parts[2], token)) return Verdict.Answer(NOT_FOUND)
+        // "", "r", token [, "state" | "in" | "clipput" | "clipget" | "put"], or "", "r", token, "get", id
+        val shaped = parts.size in 3..4 || (parts.size == 5 && parts[3] == "get")
+        if (!shaped || parts[0] != "" || parts[1] != "r" || !sameSecret(parts[2], token)) return Verdict.Answer(NOT_FOUND)
         if (method != "GET" && method != "POST") return Verdict.Answer(NOT_FOUND)
         val what = parts.getOrNull(3)
         val now = clock()
@@ -242,7 +299,8 @@ class RemoteInput(
         if (device != peer) return Verdict.Answer(TAKEN)
         // The page's own status polling is not typing: only the page opening and an edit keep the session from going idle.
         return when {
-            method == "GET" && what == "state" -> if (paired) Verdict.Status else Verdict.Answer(json("""{"state":"confirming"}"""))
+            method == "GET" && what == "state" -> if (paired) Verdict.Status(offerJson()) else Verdict.Answer(json("""{"state":"confirming"}"""))
+            method == "GET" && what == "get" && parts.size == 5 -> judgeDownload(parts[4], target, now)
             method == "POST" && what == "in" -> judgeEdit(body, now)
             method == "POST" && what == "clipput" -> judgeClip(body, now, put = true)
             method == "POST" && what == "clipget" -> judgeClip(body, now, put = false)
@@ -250,10 +308,16 @@ class RemoteInput(
         }
     }
 
+    /** The one rule every request after the page itself follows: the console has confirmed, and the request carries the code. */
+    private fun notAllowed(form: Map<String, String>): HandoffReply? = when {
+        !paired -> HandoffReply(403, page("Confirm the code on the console first."))
+        !sameSecret(form["code"].orEmpty(), code.orEmpty()) -> HandoffReply(403, page("Wrong code."))
+        else -> null
+    }
+
     private fun judgeEdit(body: String, now: Long): Verdict {
-        if (!paired) return Verdict.Answer(HandoffReply(403, page("Confirm the code on the console first.")))
         val form = parseForm(body)
-        if (!sameSecret(form["code"].orEmpty(), code.orEmpty())) return Verdict.Answer(HandoffReply(403, page("Wrong code.")))
+        notAllowed(form)?.let { return Verdict.Answer(it) }
         val back = form["back"]?.toIntOrNull() ?: 0
         val text = form["text"].orEmpty()
         if (back !in 0..MAX_TEXT || text.length > MAX_TEXT || text.any { it.isISOControl() }) return Verdict.Answer(HandoffReply(400, ""))
@@ -263,9 +327,8 @@ class RemoteInput(
 
     /** A clipboard request is an edit's equal: paired, the code in the body, and it counts as the session being used. */
     private fun judgeClip(body: String, now: Long, put: Boolean): Verdict {
-        if (!paired) return Verdict.Answer(HandoffReply(403, page("Confirm the code on the console first.")))
         val form = parseForm(body)
-        if (!sameSecret(form["code"].orEmpty(), code.orEmpty())) return Verdict.Answer(HandoffReply(403, page("Wrong code.")))
+        notAllowed(form)?.let { return Verdict.Answer(it) }
         lastActivity = now
         if (!put) return Verdict.ClipGet
         val text = form["text"].orEmpty()
@@ -275,6 +338,161 @@ class RemoteInput(
             !ClipRules.fits(text) -> Verdict.Answer(clipFailure(413, CLIP_TOO_LARGE))
             else -> Verdict.ClipPut(text)
         }
+    }
+
+    /** The offered file as the page's poll learns of it: `null`, or its link's id, name and size in words. */
+    private fun offerJson(): String {
+        val file = offered ?: return "null"
+        return """{"id":$offerId,"name":${jsonString(FileNames.sanitise(file.name))},"size":${jsonString(sizeText(file.size))}}"""
+    }
+
+    /** A download is a GET with the code in its query, since a link cannot carry a body; the id is the current offer's only. */
+    private fun judgeDownload(id: String, target: String, now: Long): Verdict {
+        notAllowed(parseForm(target.substringAfter('?', "")))?.let { return Verdict.Answer(it) }
+        val file = offered
+        if (file == null || id != offerId.toString()) return Verdict.Answer(NOT_FOUND)
+        lastActivity = now
+        return Verdict.Download(file)
+    }
+
+    private fun download(from: Generation, file: OfferedFile): HandoffReply {
+        val stream = try {
+            file.open()
+        } catch (e: IOException) {
+            return HandoffReply(404, page(CANNOT_OPEN))
+        } catch (e: SecurityException) {
+            return HandoffReply(404, page(CANNOT_OPEN))
+        }
+        return HandoffReply(
+            200, "", "application/octet-stream",
+            HandoffDownload(FileNames.sanitise(file.name), file.size, LiveInput(from, stream)),
+        )
+    }
+
+    /**
+     * What the server thread does with a request whose body would be a file, decided from its head alone under the
+     * lock, before a byte of the body is read: null for anything that is not `POST /r/<token>/put` with the right token (it
+     * is then an ordinary request, with the small body limit and the same empty 404), else a refusal, or the go-ahead to
+     * stream. The token is checked first, so only a request that has it gets past the body cap, and the pairing, the
+     * paired device, the code (in the query, since the body is the file), a Content-Length and the 4 GB limit
+     * are all checked before it is read.
+     */
+    private fun judgeUpload(from: Generation, method: String, target: String, length: Long?, peer: String): HandoffUpload? {
+        val parts = target.substringBefore('?').split('/')
+        val name = synchronized(this) {
+            val mine = generation === from && !closed && method == "POST" && parts.size == 4 && parts[0] == "" && parts[1] == "r" &&
+                parts[3] == "put" && sameSecret(parts[2], token)
+            if (!mine) return null
+            val refusal = when {
+                device == null -> HandoffReply(403, page("Open the address from the console first."))
+                device != peer -> TAKEN
+                else -> null
+            }
+            if (refusal != null) return HandoffUpload.Refuse(refusal)
+            val form = parseForm(target.substringAfter('?', ""))
+            notAllowed(form)?.let { return HandoffUpload.Refuse(it) }
+            if (length == null || length < 0) return HandoffUpload.Refuse(HandoffReply(411, ""))
+            if (length > FileNames.MAX_BYTES) return HandoffUpload.Refuse(fileFailure(413, FILE_TOO_LARGE))
+            lastActivity = clock()
+            FileNames.sanitise(form["name"].orEmpty())
+        }
+        return HandoffUpload.Accept { body -> receiveFile(from, name, length ?: 0L, body) }
+    }
+
+    /**
+     * Streams one file to disk: into a new file in the person's folder, chunk by chunk, and only [length] bytes can
+     * ever arrive. It is kept only when all of it did; any other end (the phone gave up, the session ended, the disk
+     * said no) deletes what was written. Runs on the server's thread, outside the lock.
+     */
+    private fun receiveFile(from: Generation, wanted: String, length: Long, body: InputStream): HandoffReply {
+        val name = FileNames.unique(wanted) { files.exists(it) }
+            ?: return fileFailure(200, TOO_MANY_OF_NAME)
+        val incoming = runCatching { files.create(name) }.getOrNull()
+        if (incoming == null) {
+            noteFile(from, null, "Could not receive $name: $NO_FOLDER")
+            return fileFailure(200, FILE_NOT_STORED)
+        }
+        val label = "${incoming.name} (${sizeText(length)})"
+        synchronized(this) {
+            if (generation === from && !closed && paired) {
+                receiving = label
+                publish(null)
+            }
+        }
+        val input = LiveInput(from, body)
+        val buffer = ByteArray(CHUNK)
+        var copied = 0L
+        var why: String? = null
+        while (why == null) {
+            val n = try {
+                input.read(buffer)
+            } catch (e: IOException) {
+                why = INTERRUPTED
+                break
+            }
+            if (n < 0) break
+            try {
+                incoming.out.write(buffer, 0, n)
+            } catch (e: IOException) {
+                why = DISK_FAILED
+                break
+            }
+            copied += n
+        }
+        if (why == null && copied != length) why = INTERRUPTED
+        if (why == null) {
+            try {
+                incoming.out.flush()
+                incoming.finish()
+            } catch (e: IOException) {
+                why = DISK_FAILED
+            }
+        }
+        if (why != null) runCatching { incoming.discard() }
+        val line = if (why == null) "Phone sent $label" else "Could not receive ${incoming.name}: $why"
+        noteFile(from, if (why == null) line else null, if (why == null) null else line)
+        return if (why == null) {
+            json("""{"ok":true,"name":${jsonString(incoming.name)},"size":$copied}""")
+        } else {
+            fileFailure(200, if (why == DISK_FAILED) FILE_NOT_STORED else FILE_INCOMPLETE)
+        }
+    }
+
+    /** The end of a transfer for the console: the line that says it arrived, or the notice that it did not; an upload counts as use. */
+    private fun noteFile(from: Generation, arrived: String?, notice: String?) {
+        synchronized(this) {
+            if (generation !== from || closed) return
+            lastActivity = clock()
+            receiving = null
+            if (arrived != null) received = arrived
+            if (paired) publish(notice)
+        }
+    }
+
+    /**
+     * [source] for as long as this listener's session lives: once it has ended, been closed or moved on to a new
+     * listener, a read fails, so closing the session stops a transfer in the middle. Reaching the end of the file counts
+     * as the session being used.
+     */
+    private inner class LiveInput(private val from: Generation, private val source: InputStream) : InputStream() {
+        private fun check() {
+            val alive = synchronized(this@RemoteInput) { generation === from && !closed }
+            if (!alive) throw IOException("The session ended")
+        }
+
+        override fun read(): Int {
+            check()
+            return source.read()
+        }
+
+        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+            check()
+            val n = source.read(buffer, offset, length)
+            if (n < 0) synchronized(this@RemoteInput) { if (generation === from && !closed) lastActivity = clock() }
+            return n
+        }
+
+        override fun close() = source.close()
     }
 
     /** Body limit for a request: a clipboard send may be large, but only once its token is right; everything else is small. */
@@ -308,10 +526,13 @@ class RemoteInput(
 
     /** What the console shows now: the last typing, a notice, and the clip the phone just sent while it is still shown. */
     private fun publish(notice: String?) {
-        state.value = RemoteInputState.Paired(lastSent, notice, clipShown)
+        state.value = RemoteInputState.Paired(
+            lastSent, notice, clipShown, receiving, received,
+            offered?.let { "${FileNames.sanitise(it.name)} (${sizeText(it.size)})" },
+        )
     }
 
-    private fun status(): HandoffReply = json("""{"state":"paired","secret":${router.secret()}}""")
+    private fun status(offer: String): HandoffReply = json("""{"state":"paired","secret":${router.secret()},"offer":$offer}""")
 
     private fun deliver(edit: Verdict.Edit): HandoffReply {
         val delivery = router.deliver(edit.back, edit.text, edit.enter)
@@ -357,6 +578,16 @@ class RemoteInput(
         private const val REBIND_TRIES = 3
         const val CLIP_SHOW_MS = 8_000L
         private const val MAX_TEXT = 1024
+        private const val CHUNK = 64 * 1024
+
+        const val FILE_TOO_LARGE = "That file is over 4 GB, the limit for sending files"
+        const val FILE_NOT_STORED = "The console could not store the file. Choose another folder on the console and try again"
+        const val FILE_INCOMPLETE = "The file did not arrive in full, so the console kept none of it"
+        const val TOO_MANY_OF_NAME = "The console already has too many files of that name"
+        const val NO_FOLDER = "the folder for received files cannot be written to"
+        const val INTERRUPTED = "the transfer did not finish"
+        const val DISK_FAILED = "the console could not write it (is the storage full?)"
+        const val CANNOT_OPEN = "The console could not open that file."
 
         const val NOTHING_TO_SEND = "There is no text to send"
         const val CLIP_TOO_LARGE = "That is more than 64 KB of text, the limit for the shared clipboard"
@@ -378,6 +609,10 @@ class RemoteInput(
         fun spaced(code: String): String = code.chunked(3).joinToString(" ")
 
         private fun json(body: String, status: Int = 200) = HandoffReply(status, body, "application/json")
+
+        private fun fileFailure(status: Int, notice: String) = json("""{"ok":false,"notice":${jsonString(notice)}}""", status)
+
+        private fun sizeText(size: Long): String = if (size < 0) "size unknown" else FileNames.size(size)
 
         private fun clipFailure(status: Int, notice: String) = json("""{"ok":false,"notice":${jsonString(notice)}}""", status)
 

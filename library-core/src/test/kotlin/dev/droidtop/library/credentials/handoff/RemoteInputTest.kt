@@ -71,6 +71,48 @@ class RemoteInputTest {
 
     private val clipboard = FakeClipboard()
 
+    private class FakeIncoming(override val name: String) : IncomingFile {
+        val bytes = java.io.ByteArrayOutputStream()
+        var failWrites = false
+        @Volatile var finished = false
+        @Volatile var discarded = false
+
+        override val out: java.io.OutputStream = object : java.io.OutputStream() {
+            override fun write(b: Int) {
+                if (failWrites) throw java.io.IOException("disk full")
+                bytes.write(b)
+            }
+
+            override fun write(b: ByteArray, off: Int, len: Int) {
+                if (failWrites) throw java.io.IOException("disk full")
+                bytes.write(b, off, len)
+            }
+        }
+
+        override fun finish() { finished = true }
+
+        override fun discard() { discarded = true }
+    }
+
+    private class FakeFiles : ConsoleFiles {
+        val existing = mutableSetOf<String>()
+        val made: MutableList<FakeIncoming> = java.util.Collections.synchronizedList(mutableListOf())
+        var unwritable = false
+        var failWrites = false
+
+        override fun folderLabel() = "Download/droidtop"
+
+        override fun exists(name: String) = name in existing
+
+        override fun create(name: String): IncomingFile? {
+            if (unwritable) return null
+            existing += name
+            return FakeIncoming(name).also { it.failWrites = failWrites; made += it }
+        }
+    }
+
+    private val files = FakeFiles()
+
     private val router = RemoteInputRouter(
         ownField = { own.takeIf { ownFocused } },
         ime = { ime.takeIf { imeFocused } },
@@ -78,7 +120,7 @@ class RemoteInputTest {
     )
 
     private fun session(listen: (HandoffEndpoint) -> HandoffListener = this::fake) =
-        RemoteInput(clock = { now }, router = router, listen = listen, host = "192.168.1.20", random = SecureRandom(), clipboard = clipboard)
+        RemoteInput(clock = { now }, router = router, listen = listen, host = "192.168.1.20", random = SecureRandom(), clipboard = clipboard, files = files)
 
     private fun fake(endpoint: HandoffEndpoint): HandoffListener = FakeListener(endpoint, nextPort++).also { listeners += it }
 
@@ -635,10 +677,12 @@ class RemoteInputTest {
         val input = session()
         input.start()
         val code = input.pair()
+        val token = input.tokenOf()
         input.clip("clipput", "code=$code&text=abc")
         input.close()
         assertEquals(RemoteInputState.Closed(RemoteInputEnd.PERSON), input.state.value)
-        assertEquals(404, input.clip("clipget", "code=$code").status)
+        // The session has no address once closed, so the old token is given by hand.
+        assertEquals(404, input.clip("clipget", "code=$code", token = token).status)
     }
 
     @Test
@@ -705,6 +749,391 @@ class RemoteInputTest {
             assertTrue(headOnly("$path/in", HandoffServer.MAX_BODY + 1).startsWith("HTTP/1.1 413"))
             assertTrue(headOnly("$path/clipget", HandoffServer.MAX_BODY + 1).startsWith("HTTP/1.1 413"))
             assertTrue(headOnly("$path/clipput", ClipRules.MAX_BODY + 1).startsWith("HTTP/1.1 413"))
+        } finally {
+            input.close()
+        }
+    }
+
+    // File transfer (slice 3).
+
+    private fun enc(text: String) = java.net.URLEncoder.encode(text, "UTF-8")
+
+    /** One upload as the server would run it: the head decides, then the body is streamed from [bytes] (or [stream]). */
+    private fun RemoteInput.put(
+        name: String,
+        bytes: ByteArray,
+        code: String?,
+        peer: String = PHONE,
+        token: String = tokenOf(),
+        length: Long? = bytes.size.toLong(),
+        stream: java.io.InputStream = bytes.inputStream(),
+        method: String = "POST",
+    ): HandoffReply {
+        val query = (if (code == null) "" else "code=$code&") + "name=${enc(name)}"
+        val target = "/r/$token/put?$query"
+        val endpoint = listeners.last().endpoint
+        return when (val up = endpoint.receive(method, target, length, peer)) {
+            null -> endpoint.handle(method, target, "", peer)
+            is HandoffUpload.Refuse -> up.reply
+            is HandoffUpload.Accept -> up.accept(stream)
+        }
+    }
+
+    private fun RemoteInput.get(id: Int, code: String?, peer: String = PHONE, token: String = tokenOf()) =
+        listeners.last().endpoint.handle("GET", "/r/$token/get/$id" + (if (code == null) "" else "?code=$code"), "", peer)
+
+    private fun RemoteInput.stateBody() = listeners.last().endpoint.handle("GET", "/r/${tokenOf()}/state", "", PHONE).body
+
+    @Test
+    fun `the console line says what is being received and what arrived`() {
+        assertEquals("Receiving a.bin (1.0 KB)", RemoteInputState.Paired(receiving = "a.bin (1.0 KB)").consoleLine())
+        assertEquals("Phone sent a.bin (1.0 KB)", RemoteInputState.Paired(received = "Phone sent a.bin (1.0 KB)").consoleLine())
+        assertEquals("Phone connected: typing", RemoteInputState.Paired(offered = "b (1 B)").consoleLine())
+    }
+
+    @Test
+    fun `a file from the phone is streamed into the chosen folder and the console says who sent what`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        val data = ByteArray(300_000) { (it % 251).toByte() }
+        val reply = input.put("Holiday.jpg", data, code)
+        assertEquals(200, reply.status)
+        assertEquals("""{"ok":true,"name":"Holiday.jpg","size":300000}""", reply.body)
+        val made = files.made.single()
+        assertEquals("Holiday.jpg", made.name)
+        assertTrue(data.contentEquals(made.bytes.toByteArray()))
+        assertTrue(made.finished)
+        assertFalse(made.discarded)
+        assertEquals(RemoteInputState.Paired(received = "Phone sent Holiday.jpg (293.0 KB)"), input.state.value)
+    }
+
+    @Test
+    fun `the name is sanitised and a taken name becomes Name (2)`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        input.put("../../etc/cron.d/evil", "x".toByteArray(), code)
+        assertEquals("evil", files.made.last().name)
+        input.put("a.txt", "1".toByteArray(), code)
+        input.put("a.txt", "2".toByteArray(), code)
+        input.put("C:\\dir\\a.txt", "3".toByteArray(), code)
+        assertEquals(listOf("evil", "a.txt", "a (2).txt", "a (3).txt"), files.made.map { it.name })
+        assertEquals("2", files.made[2].bytes.toString())
+        // The reply and the console tell the name the file was stored under.
+        assertEquals("Phone sent a (3).txt (1 B)", (input.state.value as RemoteInputState.Paired).received)
+    }
+
+    @Test
+    fun `a file of 4 GB is allowed and one byte over is refused before anything is read or created`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        val endpoint = listeners.last().endpoint
+        val head = "/r/${input.tokenOf()}/put?code=$code&name=big.bin"
+        assertTrue(endpoint.receive("POST", head, FileNames.MAX_BYTES, PHONE) is HandoffUpload.Accept)
+        val over = endpoint.receive("POST", head, FileNames.MAX_BYTES + 1, PHONE) as HandoffUpload.Refuse
+        assertEquals(413, over.reply.status)
+        assertTrue(over.reply.body.contains(RemoteInput.FILE_TOO_LARGE))
+        assertEquals(emptyList<FakeIncoming>(), files.made)
+        assertEquals(RemoteInputState.Paired(), input.state.value)
+    }
+
+    @Test
+    fun `an upload follows the pairing, code, device and token rules, and is refused before the body is read`() {
+        val input = session()
+        input.start()
+        val endpoint = listeners.last().endpoint
+        val token = input.tokenOf()
+        val data = "data".toByteArray()
+        // Nobody has opened the page yet.
+        assertEquals(403, input.put("a.bin", data, "123456").status)
+        input.open()
+        val code = input.codeOf()
+        // The prompt is open: not before Confirm.
+        assertEquals(403, input.put("a.bin", data, code).status)
+        input.confirm()
+        assertEquals(403, input.put("a.bin", data, null).status)
+        assertEquals(403, input.put("a.bin", data, "000000").status)
+        assertEquals(409, input.put("a.bin", data, code, peer = "192.168.1.99").status)
+        // A missing Content-Length is a 411.
+        assertEquals(411, input.put("a.bin", data, code, length = null).status)
+        // A wrong token or another method is not a streamed request at all: the same empty 404.
+        assertNull(endpoint.receive("POST", "/r/wrong/put?code=$code", 4L, PHONE))
+        assertEquals(404, input.put("a.bin", data, code, token = "wrong").status)
+        assertEquals(404, input.put("a.bin", data, code, method = "GET").status)
+        assertNull(endpoint.receive("POST", "/r/$token/in", 4L, PHONE))
+        assertNull(endpoint.receive("POST", "/r/$token/clipput", 4L, PHONE))
+        assertEquals(emptyList<FakeIncoming>(), files.made)
+        // The paired device with the code is served.
+        assertEquals(200, input.put("a.bin", data, code).status)
+        assertEquals(1, files.made.size)
+    }
+
+    @Test
+    fun `the ordinary body cap is not raised for any request an upload does not take`() {
+        val input = session()
+        input.start()
+        val endpoint = listeners.last().endpoint
+        val token = input.tokenOf()
+        for (target in listOf("/r/$token/put", "/r/$token/in", "/r/$token/clipget", "/r/wrong/put")) {
+            assertEquals(target, HandoffServer.MAX_BODY, endpoint.maxBody(target))
+        }
+    }
+
+    @Test
+    fun `a file that stops short is discarded, not kept, and the console says so`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        val reply = input.put("half.bin", ByteArray(10), code, length = 100)
+        assertTrue(reply.body.contains("\"ok\":false"))
+        assertTrue(reply.body.contains(RemoteInput.FILE_INCOMPLETE))
+        val made = files.made.single()
+        assertTrue(made.discarded)
+        assertFalse(made.finished)
+        val shown = input.state.value as RemoteInputState.Paired
+        assertNull(shown.received)
+        assertNull(shown.receiving)
+        assertTrue(shown.notice!!.startsWith("Could not receive half.bin"))
+    }
+
+    @Test
+    fun `a connection that breaks in the middle discards the file`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        val breaking = object : java.io.InputStream() {
+            private var sent = 0
+
+            override fun read(): Int = throw java.io.IOException("reset")
+
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (sent > 0) throw java.io.IOException("reset")
+                sent = 50
+                return 50
+            }
+        }
+        input.put("cut.bin", ByteArray(0), code, length = 500, stream = breaking)
+        assertTrue(files.made.single().discarded)
+        assertNull((input.state.value as RemoteInputState.Paired).received)
+    }
+
+    @Test
+    fun `a full disk or an unwritable folder fails the upload and keeps no part of it`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        files.failWrites = true
+        val full = input.put("a.bin", ByteArray(1000), code)
+        assertTrue(full.body.contains(RemoteInput.FILE_NOT_STORED.take(30)))
+        assertTrue(files.made.single().discarded)
+        files.failWrites = false
+        files.unwritable = true
+        val none = input.put("b.bin", ByteArray(10), code)
+        assertTrue(none.body.contains("\"ok\":false"))
+        assertEquals(1, files.made.size)
+        assertTrue((input.state.value as RemoteInputState.Paired).notice!!.contains(RemoteInput.NO_FOLDER))
+    }
+
+    @Test
+    fun `closing the session in the middle of a file stops it and discards it`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        var reads = 0
+        val closing = object : java.io.InputStream() {
+            override fun read(): Int = 0
+
+            override fun read(b: ByteArray, off: Int, len: Int): Int {
+                if (reads++ == 1) input.close()
+                return minOf(len, 100)
+            }
+        }
+        input.put("long.bin", ByteArray(0), code, length = 10_000_000, stream = closing)
+        assertEquals(2, reads)
+        assertTrue(files.made.single().discarded)
+        assertEquals(RemoteInputState.Closed(RemoteInputEnd.PERSON), input.state.value)
+    }
+
+    @Test
+    fun `an upload counts as the session being used`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        now += 9 * 60_000
+        input.put("a.bin", ByteArray(5), code)
+        now += 9 * 60_000
+        input.tick()
+        assertTrue(input.state.value is RemoteInputState.Paired)
+    }
+
+    @Test
+    fun `the console offers one file and the page learns of it, for this session only`() {
+        val input = session()
+        input.start()
+        val other = OfferedFile("a.txt", 5) { "hello".byteInputStream() }
+        // Offered before the phone is paired: shown once it is.
+        assertTrue(input.offer(other))
+        val code = input.pair()
+        assertEquals(RemoteInputState.Paired(offered = "a.txt (5 B)"), input.state.value)
+        assertEquals("""{"state":"paired","secret":false,"offer":{"id":1,"name":"a.txt","size":"5 B"}}""", input.stateBody())
+        val reply = input.get(1, code)
+        assertEquals(200, reply.status)
+        assertEquals("application/octet-stream", reply.contentType)
+        val download = reply.download!!
+        assertEquals("a.txt", download.name)
+        assertEquals(5L, download.length)
+        assertEquals("hello", download.stream.readBytes().toString(Charsets.UTF_8))
+        // A second offer replaces it: the first link answers nothing.
+        assertTrue(input.offer(OfferedFile("b.txt", 1) { "b".byteInputStream() }))
+        assertEquals(404, input.get(1, code).status)
+        assertEquals(200, input.get(2, code).status)
+        input.withdrawOffer()
+        assertEquals(404, input.get(2, code).status)
+        assertTrue(input.stateBody().contains("\"offer\":null"))
+        assertEquals(RemoteInputState.Paired(), input.state.value)
+    }
+
+    @Test
+    fun `a download follows the pairing, code, device and token rules`() {
+        val input = session()
+        input.start()
+        input.offer(OfferedFile("a.txt", 1) { "a".byteInputStream() })
+        assertEquals(403, input.get(1, "123456").status)
+        input.open()
+        val code = input.codeOf()
+        assertEquals(403, input.get(1, code).status)
+        input.confirm()
+        assertEquals(403, input.get(1, null).status)
+        assertEquals(403, input.get(1, "000000").status)
+        assertEquals(409, input.get(1, code, peer = "192.168.1.99").status)
+        assertEquals(404, input.get(1, code, token = "wrong").status)
+        assertEquals(404, input.get(7, code).status)
+        assertNull(input.get(1, code).takeIf { it.status != 200 }?.download)
+        assertEquals(200, input.get(1, code).status)
+    }
+
+    @Test
+    fun `a refusal, or the end, takes the offer and its link away, and a file that cannot be opened is a page not a crash`() {
+        val input = session()
+        input.start()
+        input.pair()
+        input.offer(OfferedFile("a.txt", 1) { "a".byteInputStream() })
+        input.close()
+        assertFalse(input.offer(OfferedFile("b.txt", 1) { "b".byteInputStream() }))
+        val again = session()
+        again.start()
+        val code = again.pair()
+        again.offer(OfferedFile("gone.txt", 1) { throw java.io.FileNotFoundException("gone") })
+        val reply = again.get(1, code)
+        assertEquals(404, reply.status)
+        assertNull(reply.download)
+        // A refusal while an offer stands starts over without it.
+        val third = session()
+        third.start()
+        third.offer(OfferedFile("a.txt", 1) { "a".byteInputStream() })
+        third.open()
+        third.refuse()
+        val code3 = third.run { open(); codeOf() }
+        third.confirm()
+        assertEquals(404, third.get(1, code3).status)
+        assertTrue(third.stateBody().contains("\"offer\":null"))
+    }
+
+    @Test
+    fun `a download in the middle stops when the session closes, and the offered name is cleaned`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        input.offer(OfferedFile("../x/\"y\".bin", 3) { "abc".byteInputStream() })
+        val download = input.get(1, code).download!!
+        assertEquals("_y_.bin", download.name)
+        input.close()
+        val failed = runCatching { download.stream.read(ByteArray(2)) }.exceptionOrNull()
+        assertTrue(failed is java.io.IOException)
+    }
+
+    @Test
+    fun `the page has Send a file and the offered file's link, and nothing from outside`() {
+        val html = RemoteInputPage.html("482913")
+        assertTrue(html.contains("Send a file") && html.contains("id=\"fsend\"") && html.contains("id=\"offer\""))
+        assertTrue(html.contains("/put?code=") && html.contains("/get/"))
+        assertFalse(html.contains("http://") || html.contains("https://"))
+    }
+
+    @Test
+    fun `files travel over a real socket in both directions, streamed, and a broken upload does not end the listener`() {
+        val input = RemoteInput(
+            clock = { now },
+            router = router,
+            listen = { endpoint -> HandoffServer(endpoint, "127.0.0.1") },
+            host = "127.0.0.1",
+            state = MutableStateFlow(RemoteInputState.Idle),
+            files = files,
+        )
+        input.start()
+        val url = input.url()!!
+        val port = url.substringAfterLast(':').substringBefore('/').toInt()
+        val path = url.substringAfter("$port")
+        fun connect() = Socket(InetAddress.getByName("127.0.0.1"), port).also { it.soTimeout = 10_000 }
+        fun text(target: String, method: String = "GET", length: Long? = null): String = connect().use { socket ->
+            val extra = if (length == null) "" else "Content-Length: $length\r\n"
+            socket.getOutputStream().write("$method $target HTTP/1.1\r\n$extra\r\n".toByteArray())
+            socket.getInputStream().readBytes().toString(Charsets.UTF_8)
+        }
+        try {
+            text(path)
+            val code = input.codeOf()
+            input.confirm()
+            // 20 MB: a thousand times the small body cap, held nowhere but on its way to the fake disk.
+            val size = 20 * 1024 * 1024
+            val data = ByteArray(size) { (it * 31 + it / 7).toByte() }
+            connect().use { socket ->
+                val out = socket.getOutputStream()
+                out.write("POST $path/put?code=$code&name=big%20file.bin HTTP/1.1\r\nContent-Length: $size\r\n\r\n".toByteArray())
+                out.write(data)
+                out.flush()
+                val answer = socket.getInputStream().readBytes().toString(Charsets.UTF_8)
+                assertTrue(answer, answer.startsWith("HTTP/1.1 200"))
+                assertTrue(answer.contains("\"name\":\"big file.bin\""))
+            }
+            val stored = files.made.single()
+            assertEquals("big file.bin", stored.name)
+            assertTrue(data.contentEquals(stored.bytes.toByteArray()))
+            // A head that promises more than 4 GB is refused with a 413 and its body is never asked for.
+            val over = text("$path/put?code=$code&name=x", "POST", FileNames.MAX_BYTES + 1)
+            assertTrue(over, over.startsWith("HTTP/1.1 413"))
+            assertTrue(over.contains("4 GB"))
+            // The wrong token gets the small cap, not the file cap.
+            assertTrue(text("/r/wrong/put?code=$code", "POST", 5_000_000).startsWith("HTTP/1.1 413"))
+            // A phone that goes away half way through leaves the listener serving, and no file.
+            connect().use { socket ->
+                socket.getOutputStream().write("POST $path/put?code=$code&name=cut.bin HTTP/1.1\r\nContent-Length: 1000000\r\n\r\n".toByteArray())
+                socket.getOutputStream().write(ByteArray(1000))
+                socket.getOutputStream().flush()
+            }
+            val deadline = System.currentTimeMillis() + 10_000
+            while (files.made.size < 2 && System.currentTimeMillis() < deadline) Thread.sleep(20)
+            while (!files.made.last().discarded && System.currentTimeMillis() < deadline) Thread.sleep(20)
+            assertTrue(files.made[1].discarded)
+            assertTrue(text("$path/state").startsWith("HTTP/1.1 200"))
+            // The console's file comes down with its length and a name the browser must save, never show.
+            val offered = ByteArray(1_500_000) { (it % 97).toByte() }
+            assertTrue(input.offer(OfferedFile("Tr\u00e4ck.bin", offered.size.toLong()) { offered.inputStream() }))
+            val raw = connect().use { socket ->
+                socket.getOutputStream().write("GET $path/get/1?code=$code HTTP/1.1\r\n\r\n".toByteArray())
+                socket.getInputStream().readBytes()
+            }
+            val split = String(raw, Charsets.ISO_8859_1).indexOf("\r\n\r\n")
+            val head = String(raw, 0, split, Charsets.ISO_8859_1)
+            assertTrue(head, head.startsWith("HTTP/1.1 200"))
+            assertTrue(head, head.contains("Content-Length: ${offered.size}"))
+            assertTrue(head, head.contains("Content-Disposition: attachment; filename=\"Tr_ck.bin\"; filename*=UTF-8''Tr%C3%A4ck.bin"))
+            assertTrue(head.contains("X-Content-Type-Options: nosniff"))
+            assertTrue(offered.contentEquals(raw.copyOfRange(split + 4, raw.size)))
+            // And a wrong code gets no file.
+            assertTrue(text("$path/get/1?code=000000").startsWith("HTTP/1.1 403"))
         } finally {
             input.close()
         }
