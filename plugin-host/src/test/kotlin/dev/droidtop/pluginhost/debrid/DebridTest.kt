@@ -319,7 +319,8 @@ class DebridTest {
     fun theServicesSayWhatAJobCostsFromTheAccount() {
         val now = isoMs("2026-10-24T00:00:00Z")!!
         fun torBox(me: String) = TorBox(Canned("GET https://api.torbox.app/v1/api/user/me" to (200 to me)), now = { now })
-        assertEquals(DebridCost.Free, torBox("""{"success":true,"data":{"plan":2,"premium_expires_at":"2026-12-01T00:00:00Z","cooldown_until":"2026-10-25T00:00:00Z"}}""").cost("k", null))
+        assertEquals(DebridCost.Free, torBox("""{"success":true,"data":{"plan":2,"premium_expires_at":"2026-12-01T00:00:00Z","cooldown_until":"2025-02-01T00:00:00Z"}}""").cost("k", null))
+        assertTrue("a cooldown ahead holds any plan", torBox("""{"success":true,"data":{"plan":1,"cooldown_until":"2026-10-25T00:00:00Z"}}""").cost("k", null) is DebridCost.NotNow)
         assertTrue(torBox("""{"success":true,"data":{"plan":1,"premium_expires_at":"2026-10-01T00:00:00Z"}}""").cost("k", null) is DebridCost.NotNow)
         assertEquals(DebridCost.Spends(null), torBox("""{"success":true,"data":{"plan":0,"cooldown_until":null}}""").cost("k", null))
         assertTrue(torBox("""{"success":true,"data":{"plan":0,"cooldown_until":"2026-10-24T05:00:00+00:00"}}""").cost("k", null) is DebridCost.NotNow)
@@ -332,9 +333,9 @@ class DebridTest {
             now = { now },
         )
         assertEquals("a torrent spends no hoster's traffic", DebridCost.Free, rd.cost("t", null))
-        assertEquals(DebridCost.Free, rd.cost("t", "pixeldrain.com"))
-        assertEquals(DebridCost.Spends(0.25), rd.cost("t", "www.katfile.com"))
-        assertTrue(rd.cost("t", "1fichier.com") is DebridCost.NotNow)
+        assertEquals(DebridCost.Free, rd.cost("t", "https://pixeldrain.com/u/abc"))
+        assertEquals(DebridCost.Spends(0.25), rd.cost("t", "https://www.katfile.com/abc/Game.zip"))
+        assertTrue(rd.cost("t", "https://1fichier.com/?abc") is DebridCost.NotNow)
         val lapsed = RealDebrid(Canned("GET https://api.real-debrid.com/rest/1.0/user" to (200 to """{"type":"free","premium":0}""")))
         assertTrue(lapsed.cost("t", null) is DebridCost.NotNow)
         assertTrue(rd.errorState(503, org.json.JSONObject("""{"error":"traffic_exhausted","error_code":23}""")).limit)
@@ -347,15 +348,20 @@ class DebridTest {
             Canned(
                 "GET https://api.torbox.app/v1/api/user/me" to (200 to """{"success":true,"data":{"plan":2,"premium_expires_at":"2026-12-01T00:00:00Z"}}"""),
                 "GET https://api.torbox.app/v1/api/webdl/hosters" to (200 to """{"success":true,"data":[
-                    {"name":"Nitroflare","domains":["nitroflare.com"],"status":true,"daily_link_limit":5,"daily_link_used":4,"daily_bandwidth_limit":10737418240,"daily_bandwidth_used":0},
-                    {"name":"Turbobit","domains":["turbobit.net"],"status":true,"daily_link_limit":5,"daily_link_used":5},
-                    {"name":"Pixeldrain","domains":["pixeldrain.com"],"status":true,"daily_link_limit":0,"daily_link_used":0}]}"""),
+                    {"name":"Nitroflare","domains":["nitroflare.com"],"status":"up","daily_link_limit":5,"daily_link_used":4,"daily_bandwidth_limit":10737418240,"daily_bandwidth_used":0},
+                    {"name":"Turbobit","domains":["turbobit.net"],"status":"up","daily_link_limit":5,"daily_link_used":5},
+                    {"name":"Rapidgator","domains":["rapidgator.net"],"status":"down","daily_link_limit":5,"daily_link_used":0},
+                    {"name":"Send","domains":[],"regex":"^https://send\\.now/","status":"up","daily_link_limit":5,"daily_link_used":1},
+                    {"name":"PixelDrain","domains":["pixeldrain.com"],"status":"up","daily_link_limit":100,"daily_link_used":0,"daily_bandwidth_limit":0,"daily_bandwidth_used":0}]}"""),
             ),
             now = { now },
         )
-        assertEquals("the least left of its caps", DebridCost.Spends(0.2), box.cost("k", "nitroflare.com"))
-        assertTrue(box.cost("k", "turbobit.net") is DebridCost.NotNow)
-        assertEquals("a cap of 0 is no cap", DebridCost.Free, box.cost("k", "pixeldrain.com"))
+        assertEquals("the least left of its caps", DebridCost.Spends(0.2), box.cost("k", "https://nitroflare.com/view/abc"))
+        assertTrue(box.cost("k", "https://turbobit.net/abc.html") is DebridCost.NotNow)
+        assertTrue("a hoster TorBox marks down cannot serve", box.cost("k", "https://rapidgator.net/file/abc") is DebridCost.NotNow)
+        assertEquals("matched by its regex", DebridCost.Spends(0.8), box.cost("k", "https://send.now/abc"))
+        assertEquals("a bandwidth limit of 0 is none", DebridCost.Spends(1.0), box.cost("k", "https://pixeldrain.com/u/abc"))
+        assertEquals("a hoster TorBox does not list is free", DebridCost.Free, box.cost("k", "https://example.org/a.zip"))
         assertEquals(DebridCost.Free, box.cost("k", null))
 
         val rotated = TorBox(Canned("GET https://api.torbox.app/v1/api/user/me" to (401 to """{"success":false,"error":"BAD_TOKEN"}""")))

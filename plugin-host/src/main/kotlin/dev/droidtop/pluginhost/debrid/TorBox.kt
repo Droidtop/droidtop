@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost.debrid
 
+import dev.droidtop.pluginhost.NetScope
 import java.net.URLEncoder
 import org.json.JSONObject
 
@@ -24,39 +25,59 @@ class TorBox(
      * downloads, and its `cooldown_until` is a wait. A cooldown shown on a paid plan is not taken as one: TorBox says
      * paid plans are not held by it, and a real one is refused as `COOLDOWN_LIMIT`.
      */
-    override fun cost(key: String, host: String?): DebridCost {
+    override fun cost(key: String, link: String?): DebridCost {
         val (status, body) = http.call("GET", "$API/user/me", auth(key), null)
         if (status == 401 || status == 403) return DebridCost.NotNow(KEY_REFUSED, auth = true)
         val data = (jsonOrNull(body) as? JSONObject)?.optJSONObject("data")?.takeIf { status == 200 } ?: return DebridCost.Free
+        // A cooldown counts only while it is ahead: a paid plan shows a past one (owner's account, 2026-10-24).
+        val until = isoMs(data.optString("cooldown_until"))
+        if (until != null && until > now()) return DebridCost.NotNow("TorBox has the account waiting", until)
         val plan = data.optInt("plan", -1)
-        if (plan == 0) {
-            val until = isoMs(data.optString("cooldown_until"))
-            return if (until != null && until > now()) DebridCost.NotNow("TorBox has the free plan waiting", until) else DebridCost.Spends(null)
+        if (plan != 0) {
+            val ends = isoMs(data.optString("premium_expires_at"))
+            if (ends != null && ends <= now()) return DebridCost.NotNow("The TorBox plan has ended")
         }
-        val ends = isoMs(data.optString("premium_expires_at"))
-        if (ends != null && ends <= now()) return DebridCost.NotNow("The TorBox plan has ended")
-        return if (host == null) DebridCost.Free else hosterCost(key, host)
+        if (link != null) return hosterCost(key, link)
+        return if (plan == 0) DebridCost.Spends(null) else DebridCost.Free
     }
 
     /**
-     * A hoster link's cost from the account's own `webdl/hosters` (asked with the key, TorBox's live daily use): some
-     * hosters are capped a day (5 links or 10 GB), and a hoster that says so spends the least that is left of its
-     * caps, none left being not now. Each `daily_*_limit` above 0 is read against its `daily_*_used`; a hoster that
-     * reports no cap is free. The field names are read as they are paired, to be confirmed from TorBox's docs.
+     * A hoster link's cost from the account's own `webdl/hosters`, TorBox's live daily use (read on the owner's account,
+     * 2026-10-24): the hoster is matched by its `regex` or `domains`; one `down` cannot serve; one capped a day
+     * (`daily_link_limit` against `daily_link_used`, `daily_bandwidth_limit` against `daily_bandwidth_used`, a limit of
+     * 0 being none) spends the least that is left of its caps, none left being not now; an uncapped one is free.
      */
-    private fun hosterCost(key: String, host: String): DebridCost {
+    private fun hosterCost(key: String, link: String): DebridCost {
         val (status, body) = http.call("GET", "$API/webdl/hosters", auth(key), null)
         if (status != 200) return DebridCost.Free
-        val hoster = (jsonOrNull(body) as? JSONObject)?.optJSONArray("data")?.objects().orEmpty().firstOrNull { entry ->
-            val domains = entry.optJSONArray("domains")?.let { array -> (0 until array.length()).map { array.optString(it).trim().lowercase() } }.orEmpty()
-            DebridLinks.covers(domains.toSet(), host)
-        } ?: return DebridCost.Free
-        val left = hoster.keys().asSequence().filter { it.startsWith("daily_") && it.endsWith("_limit") }.mapNotNull { limitKey ->
-            val limit = (hoster.opt(limitKey) as? Number)?.toDouble()?.takeIf { it > 0 } ?: return@mapNotNull null
-            val used = (hoster.opt(limitKey.removeSuffix("_limit") + "_used") as? Number)?.toDouble() ?: return@mapNotNull null
+        val list = (jsonOrNull(body) as? JSONObject)?.optJSONArray("data")?.objects().orEmpty()
+        val hoster = hosterFor(list, link) ?: return DebridCost.Free
+        val name = hoster.optString("name").ifBlank { NetScope.hostOf(link).orEmpty() }
+        if (!isUp(hoster)) return DebridCost.NotNow("TorBox says $name is down")
+        val left = listOf("daily_link", "daily_bandwidth").mapNotNull { cap ->
+            val limit = (hoster.opt("${cap}_limit") as? Number)?.toDouble()?.takeIf { it > 0 } ?: return@mapNotNull null
+            val used = (hoster.opt("${cap}_used") as? Number)?.toDouble() ?: 0.0
             ((limit - used) / limit).coerceIn(0.0, 1.0)
         }.minOrNull() ?: return DebridCost.Free
-        return if (left <= 0.0) DebridCost.NotNow("TorBox's daily limit on ${hoster.optString("name").ifBlank { host }} is used up") else DebridCost.Spends(left)
+        return if (left <= 0.0) DebridCost.NotNow("TorBox's daily limit on $name is used up") else DebridCost.Spends(left)
+    }
+
+    /** The hoster [link] is on: by its `regex`, else its `domains`. Pure, for the tests. */
+    internal fun hosterFor(list: List<JSONObject>, link: String): JSONObject? {
+        val host = NetScope.hostOf(link) ?: return null
+        return list.firstOrNull { entry ->
+            entry.optString("regex").takeIf { it.isNotBlank() }?.let { pattern -> runCatching { Regex(pattern).containsMatchIn(link) }.getOrDefault(false) } == true
+        } ?: list.firstOrNull { entry ->
+            val domains = entry.optJSONArray("domains")?.let { array -> (0 until array.length()).map { array.optString(it).trim().lowercase() } }.orEmpty()
+            DebridLinks.covers(domains.toSet(), host)
+        }
+    }
+
+    /** A hoster TorBox marks `down` (or `false`, as older answers did) is left out. */
+    private fun isUp(hoster: JSONObject): Boolean = when (val status = hoster.opt("status")) {
+        false -> false
+        is String -> !status.equals("down", ignoreCase = true)
+        else -> true
     }
 
     private fun auth(key: String) = mapOf("Authorization" to "Bearer ${key.trim()}")
@@ -110,7 +131,7 @@ class TorBox(
         val (status, body) = http.call("GET", "$API/webdl/hosters", auth(key), null)
         if (status != 200) return emptySet()
         val list = (jsonOrNull(body) as? JSONObject)?.optJSONArray("data")?.objects().orEmpty()
-        return list.filter { it.opt("status") != false }.flatMap { hoster ->
+        return list.filter(::isUp).flatMap { hoster ->
             hoster.optJSONArray("domains")?.let { domains -> (0 until domains.length()).map { domains.optString(it).trim().lowercase() } }.orEmpty()
         }.filter { it.isNotEmpty() }.toSet()
     }

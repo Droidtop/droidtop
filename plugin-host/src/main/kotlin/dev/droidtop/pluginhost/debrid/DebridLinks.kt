@@ -36,12 +36,13 @@ object DebridLinks {
     fun resolve(link: String): List<WebSessionDownload>? {
         val host = NetScope.hostOf(link) ?: return null
         val wait = waits()
-        for ((provider, key) in DebridChoice.order(accounts(), host = host)) {
+        for ((provider, key) in DebridChoice.order(accounts(), link = link)) {
             val hosts = hostsOf(provider, key)
             if (!covers(hosts, host)) continue
             val cached = quietly { provider.linkCached(key, link) }
             if (cached == false && !wait) continue
             val ready = settle(provider, key, link, if (cached == true) CACHED_WAIT_MS else FETCH_WAIT_MS) ?: continue
+            DebridChoice.spent(provider, key)
             return ready.files.map { file ->
                 WebSessionDownload(
                     url = file.url,
