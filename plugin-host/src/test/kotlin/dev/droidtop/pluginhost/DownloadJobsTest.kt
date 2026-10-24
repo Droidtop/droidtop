@@ -537,6 +537,15 @@ class DownloadJobsTest {
     }
 
     @Test
+    fun theSummaryBarMovesInWholeStepsAndIsIndeterminateWhileNoJobKnows() {
+        fun entry(percent: Int, paused: Boolean = false) = PluginJobsCenter.Entry("j", "p", "P", null, "t", 0L, percent = percent, paused = paused)
+        // 23 and 48 average 35.5: the bar shows 35, and a paused job is not counted.
+        assertEquals(35, JobsSummary.runningPercent(listOf(entry(23), entry(48), entry(90, paused = true), entry(-1))))
+        assertEquals(-1, JobsSummary.runningPercent(listOf(entry(-1))))
+        assertEquals(-1, JobsSummary.runningPercent(emptyList()))
+    }
+
+    @Test
     fun openGoesToWhatTheDownloadBecameInTheGameFolder() {
         val games = "/sdcard/Games/PC"
         val file = mapOf("targetName" to "Game.exe", "destinationPath" to games)

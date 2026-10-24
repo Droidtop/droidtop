@@ -114,15 +114,30 @@ internal fun leftMenuRowAt(index: Int, running: Boolean, searchable: Boolean): L
     return LeftMenuRow.Destination(left)
 }
 
+/** What a destination row shows beside its name: a dot when something needs the person, a ring while jobs run. */
+internal sealed interface Attention {
+    data object Dot : Attention
+
+    /** How far the running jobs have got together, 0 to 1; negative while none of them knows. */
+    data class Ring(val fraction: Float) : Attention
+}
+
 /**
- * The destinations with something waiting, for the menu's attention dots
- * (DroidDeck's rail badge, ui/FrontEndRail.kt at 9310d19): Downloads while a
- * job is running, Social while a message is unread. Read while the menu is
+ * What each destination has waiting (DroidDeck's rail badge, ui/FrontEndRail.kt at 9310d19; Droidtop/tracker#643: "a
+ * filling ring while active, a dot when something needs the person"): Downloads a dot while a job has failed or waits
+ * for the person's pick ([needYou]), else a ring filling as its running jobs ([running], each one's fraction or
+ * negative when it does not know) get on together; Social a dot while a message is unread. Read while the menu is
  * open, never polled. Pure.
  */
-internal fun leftMenuAttention(runningJobs: Int, unreadMessages: Int): Set<GamingSection> = buildSet {
-    if (runningJobs > 0) add(GamingSection.DOWNLOADS)
-    if (unreadMessages > 0) add(GamingSection.SOCIAL)
+internal fun leftMenuAttention(running: List<Float>, needYou: Int, unreadMessages: Int): Map<GamingSection, Attention> = buildMap {
+    when {
+        needYou > 0 -> put(GamingSection.DOWNLOADS, Attention.Dot)
+        running.isNotEmpty() -> {
+            val known = running.filter { it >= 0f }
+            put(GamingSection.DOWNLOADS, Attention.Ring(if (known.isEmpty()) -1f else known.average().toFloat()))
+        }
+    }
+    if (unreadMessages > 0) put(GamingSection.SOCIAL, Attention.Dot)
 }
 
 /**
@@ -172,7 +187,14 @@ internal fun LeftMenu(
     // What is waiting, for the dots: read while the menu is open, never polled.
     val jobs by PluginJobsCenter.entries().collectAsState()
     val unread by produceState(SocialHub.unread()) { SocialHub.changes().collect { value = SocialHub.unread() } }
-    val attention = leftMenuAttention(jobs.count { !it.done && !it.paused }, unread)
+    val attention = leftMenuAttention(
+        running = jobs.filter { !it.done && !it.paused }.map { if (it.percent >= 0) it.percent / 100f else -1f },
+        needYou = jobs.count { job ->
+            job.state == dev.droidtop.pluginhost.JobState.FAILED ||
+                job.report?.let { it.count(dev.droidtop.pluginhost.Outcome.NEEDS_PICK) > 0 } == true
+        },
+        unreadMessages = unread,
+    )
     // The frame's close slides the panel out first; every way out here goes through it.
     SidePanelFrame(
         edge = PanelEdge.LEFT,
@@ -270,7 +292,7 @@ internal fun LeftMenu(
                     SideMenuRow(
                         entry = entry,
                         isCurrent = entry.isAt(current),
-                        waiting = entry.section in attention,
+                        waiting = attention[entry.section],
                         selected = index + rowsAbove == focusIndex,
                         onClick = {
                             focusIndex = index + rowsAbove
@@ -345,11 +367,11 @@ private fun sideMenuRowHeight(): Dp {
 /**
  * One destination row: an icon and a label, flat to the panel's edges. The
  * destination the user is on carries a short accent pill at the panel's edge
- * (Steam's "you are here"); [waiting] adds an accent dot after the label.
+ * (Steam's "you are here"); [waiting] adds an accent dot or a job ring after the label.
  * The cursor is [sideMenuFocus], and the menu opens with it on the current row.
  */
 @Composable
-private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Boolean, selected: Boolean, onClick: () -> Unit, onHover: () -> Unit) {
+private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Attention?, selected: Boolean, onClick: () -> Unit, onHover: () -> Unit) {
     Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick, onHover)) {
         if (isCurrent) CurrentMark()
         Row(
@@ -377,9 +399,20 @@ private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Boole
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
-            if (waiting) {
-                Spacer(Modifier.width(Space.Sm))
-                Box(Modifier.size(SideMenu.AttentionDot).background(MenuTokens.Accent, Corners.Pill))
+            when (waiting) {
+                null -> Unit
+                Attention.Dot -> {
+                    Spacer(Modifier.width(Space.Sm))
+                    Box(Modifier.size(SideMenu.AttentionDot).background(MenuTokens.Accent, Corners.Pill))
+                }
+                is Attention.Ring -> {
+                    Spacer(Modifier.width(Space.Sm))
+                    dev.droidtop.ui.shared.JobRing(
+                        waiting.fraction,
+                        dev.droidtop.library.settings.JobLook.of(waiting.fraction)!!,
+                        shellJobColors(),
+                    )
+                }
             }
         }
     }

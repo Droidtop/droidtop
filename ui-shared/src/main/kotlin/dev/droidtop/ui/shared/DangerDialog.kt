@@ -160,10 +160,24 @@ private fun DialogButton(label: String, fill: Color, text: Color, outline: Color
 
 /**
  * A flash's card (docs/SPEC.md 7k, "Notices"): at most 320 dp wide, the tone's glyph and up to [maxLines] lines
- * of 14 sp text, the plugin's name leading a plugin's flash. Nothing in it can be pressed.
+ * of 14 sp text, the plugin's name leading a plugin's flash. A job's flash shows the job's own mark instead of the
+ * glyph ([mark], [JobMark]: a check that draws in, drawn again each time the card counts up by [count]; a cross that
+ * shakes) (Droidtop/tracker#643). With [onPress] the card is one target that shows its details in place; without, nothing
+ * in it can be pressed.
  */
 @Composable
-fun FlashCard(text: String, tone: NoticeTone, source: String?, surface: Color, onSurface: Color, maxLines: Int, modifier: Modifier = Modifier) {
+fun FlashCard(
+    text: String,
+    tone: NoticeTone,
+    source: String?,
+    surface: Color,
+    onSurface: Color,
+    maxLines: Int,
+    modifier: Modifier = Modifier,
+    mark: dev.droidtop.library.settings.JobLook? = null,
+    count: Int = 1,
+    onPress: (() -> Unit)? = null,
+) {
     val palette = LocalNoticePalette.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -172,9 +186,18 @@ fun FlashCard(text: String, tone: NoticeTone, source: String?, surface: Color, o
             .clip(RoundedCornerShape(6.dp))
             .background(surface)
             .border(1.dp, palette.ink(tone).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+            .let { if (onPress != null) it.clickable(onClick = onPress) else it }
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Icon(tone.glyph(), contentDescription = null, tint = palette.ink(tone), modifier = Modifier.size(20.dp))
+        if (mark != null) {
+            val ink = palette.ink(tone)
+            // Keyed by the count: the check draws in again as the card counts up.
+            androidx.compose.runtime.key(count) {
+                JobMark(mark, JobProgressColors(track = Color.Transparent, fill = ink, done = ink, failed = ink), size = 20.dp)
+            }
+        } else {
+            Icon(tone.glyph(), contentDescription = null, tint = palette.ink(tone), modifier = Modifier.size(20.dp))
+        }
         Spacer(Modifier.width(10.dp))
         Text(
             if (source != null) "$source: $text" else text,

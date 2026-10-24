@@ -10,6 +10,18 @@ object JobsSummary {
     fun runningCount(entries: List<PluginJobsCenter.Entry>): Int =
         entries.count { !it.done && !it.paused }
 
+    /**
+     * How far the running jobs have got together, in whole steps of [STEP] percent so the notification's bar moves a
+     * few times over a download instead of with every report; -1 while none of them knows (an indeterminate bar).
+     */
+    fun runningPercent(entries: List<PluginJobsCenter.Entry>): Int {
+        val known = entries.filter { !it.done && !it.paused && it.percent >= 0 }.map { it.percent.coerceAtMost(100) }
+        if (known.isEmpty()) return -1
+        return known.average().toInt() / STEP * STEP
+    }
+
+    const val STEP = 5
+
     /** "1 job running", "3 jobs running". */
     fun text(count: Int): String = if (count == 1) "1 job running" else "$count jobs running"
 }

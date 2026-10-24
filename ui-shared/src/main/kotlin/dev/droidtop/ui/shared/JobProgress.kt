@@ -128,6 +128,26 @@ fun JobMark(look: JobLook, colors: JobProgressColors, modifier: Modifier = Modif
     }
 }
 
+/**
+ * The ring form of [JobProgress], for a place too small for a bar: an entry that stands for many jobs (Downloads and
+ * Updates in the left menu, Droidtop/tracker#643: "a filling ring while active, a dot when something needs the
+ * person"). The arc glides to [fraction] as the bar's fill does; with no fraction ([JobLook.CHECKING]) a short arc
+ * turns, standing still with motion off.
+ */
+@Composable
+fun JobRing(fraction: Float, look: JobLook, colors: JobProgressColors, modifier: Modifier = Modifier, size: Dp = 16.dp) {
+    val sweep = animateFloatAsState(if (look == JobLook.CHECKING) 0.25f else fraction.coerceIn(0f, 1f), Motion.progress(), label = "job-ring")
+    val turn = shimmerOf(look == JobLook.CHECKING)
+    Canvas(modifier.size(size)) {
+        val stroke = Stroke(width = this.size.minDimension * 0.16f, cap = StrokeCap.Round)
+        val inset = stroke.width / 2f
+        val arcSize = Size(this.size.width - stroke.width, this.size.height - stroke.width)
+        drawArc(colors.track, 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = stroke)
+        val start = if (look == JobLook.CHECKING) 360f * turn.value - 90f else -90f
+        drawArc(colors.fill, start, 360f * sweep.value, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = stroke)
+    }
+}
+
 /** Figures of equal width, so a percent or a time that changes does not make the text beside it jitter. */
 fun TextStyle.tabularFigures(): TextStyle = copy(fontFeatureSettings = "tnum")
 
