@@ -55,9 +55,9 @@ class AppInterfaceTrustTest {
         assertEquals(AppInterfaceTrust.Verdict.Refused(AppInterfaceTrust.MANY_SIGNERS), AppInterfaceTrust.decide("p.q", listOf(apk(a, b)), setOf(a, b), setOf(a)))
     }
 
-    private fun manifest(extra: String = "", kind: String = "app_interface", origin: String = "enginehost") = PluginManifest.fromJson(
+    private fun manifest(extra: String = "", kind: String = "app_interface", origin: String = "enginehost", id: String = "$origin.saves") = PluginManifest.fromJson(
         JSONObject(
-            """{"id": "$origin.saves", "origin": "$origin", "label": "Enginehost", "version": "1.4.0", "kind": "$kind", "contractVersion": 3,
+            """{"id": "$id", "origin": "$origin", "label": "Enginehost", "version": "1.4.0", "kind": "$kind", "contractVersion": 3,
                "app": {"package": "dev.enginehost", "service": "dev.enginehost.droidtop.DroidtopInterfaceService"},
                "provides": [{"point": "saves.roots", "version": 1, "id": "enginehost"}],
                "permissions": [{"id": "saves.exchange", "reason": "x"}$extra]}""",
@@ -72,6 +72,17 @@ class AppInterfaceTrustTest {
         assertNull(AppInterfaceTrust.manifestProblem(m, "dev.enginehost", "dev.enginehost.droidtop.DroidtopInterfaceService"))
         val record = PluginRecord(m, "d".repeat(64), a, PluginTrustState.PENDING, enabled = false, rootApproved = false, disabledReason = null)
         assertEquals(m.app, PluginRecord.fromJson(record.toJson())!!.manifest.app)
+    }
+
+    @Test
+    fun `an app interface's id is an Android package name, any number of segments and any case`() {
+        assertNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.enginehost.app"), "dev.enginehost", null))
+        assertNull(AppInterfaceTrust.manifestProblem(manifest(id = "Dev.EngineHost.droidtop_plugin"), "dev.enginehost", null))
+        assertNotNull(AppInterfaceTrust.manifestProblem(manifest(id = "enginehost"), "dev.enginehost", null))
+        assertNotNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.1enginehost"), "dev.enginehost", null))
+        assertNotNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.engine-host"), "dev.enginehost", null))
+        // A bundle keeps "<origin>.<name>", lowercase.
+        assertTrue(manifest(kind = "python", id = "dev.enginehost.app")!!.structuralProblems().any { "namespaced" in it })
     }
 
     @Test
