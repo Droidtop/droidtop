@@ -171,12 +171,12 @@ internal object HostNetApis {
                 val answer = fetched.answer
                 if (fetched.challenged || answer == null) {
                     SiteChecks.met(record.manifest.id, target)
-                    android.util.Log.i(TAG, "${record.manifest.id}: $host still checks the browser in droidtop's web view")
+                    note("${record.manifest.id}: $host still checks the browser in droidtop's web view")
                     throw BrokerException(PluginErrorCode.BROWSER_CHECK_REQUIRED, SiteChecks.refusal(host))
                 }
                 NetScope.hostOf(answer.finalUrl)?.takeIf { it != host }?.let { reach(env, record, answer.finalUrl) }
                 SiteChecks.passed(record.manifest.id, host)
-                android.util.Log.i(TAG, "${record.manifest.id}: $host read by droidtop's web view (${answer.status}, ${answer.body.size} bytes)")
+                note("${record.manifest.id}: $host read by droidtop's web view (${answer.status}, ${answer.body.size} bytes)")
                 return answerJson(answer, args)
             }
         }
@@ -190,7 +190,7 @@ internal object HostNetApis {
         if (SiteChecks.isChallenge(answer.status, answer.headers, answer.body)) {
             val at = NetScope.hostOf(answer.finalUrl)?.let { answer.finalUrl } ?: target
             SiteChecks.met(record.manifest.id, at)
-            android.util.Log.i(TAG, "${record.manifest.id}: ${NetScope.hostOf(at)} answered with a browser check (${answer.status})")
+            note("${record.manifest.id}: ${NetScope.hostOf(at)} answered with a browser check (${answer.status})")
             throw BrokerException(PluginErrorCode.BROWSER_CHECK_REQUIRED, SiteChecks.refusal(NetScope.hostOf(at) ?: host.orEmpty()))
         }
         host?.let { SiteChecks.passed(record.manifest.id, it) }
@@ -237,6 +237,11 @@ internal object HostNetApis {
     }
 
     private const val TAG = "droidtop.SiteChecks"
+
+    /** A line in droidtop's log; nothing where there is no Android log (the broker's JVM tests). */
+    private fun note(message: String) {
+        runCatching { android.util.Log.i(TAG, message) }
+    }
 
     val ops: List<HostOp> = listOf(
         // D1: whether the device is online, and how.
