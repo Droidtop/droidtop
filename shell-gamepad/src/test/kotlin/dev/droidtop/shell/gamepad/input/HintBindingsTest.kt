@@ -73,7 +73,7 @@ class HintBindingsTest {
         assertNull(host.bindings)
     }
 
-    private val menus = ShellMenuHints
+    private val menus = shellMenuHints(triggerless = false)
     private val own = listOf(HintBinding(GamepadAction.A, "Select"))
     private val sheet = listOf(HintBinding(GamepadAction.B, "Back"))
 
@@ -82,6 +82,14 @@ class HintBindingsTest {
         assertEquals(
             listOf(GamepadAction.START to "Menu", GamepadAction.R2 to "Quick Menu"),
             activeHintPairs(menus),
+        )
+    }
+
+    @Test
+    fun `on a pad with no triggers the Quick Menu pill says to hold Select`() {
+        assertEquals(
+            listOf(GamepadAction.START to "Menu", GamepadAction.R2 to "Quick Menu (hold Select)"),
+            activeHintPairs(shellMenuHints(triggerless = true)),
         )
     }
 

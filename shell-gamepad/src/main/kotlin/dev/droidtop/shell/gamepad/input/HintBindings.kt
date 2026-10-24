@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad.input
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -63,9 +64,18 @@ fun rememberHintList(bindings: List<HintBinding>): List<Pair<GamepadAction, Stri
  * every row that names them: the shell's footer, a layer that keeps them
  * reachable, the themed Retro Games screen's corner pair ([ShellMenuPills]).
  */
-val ShellMenuHints: List<HintBinding> = listOf(
+val ShellMenuHints: List<HintBinding>
+    @Composable get() {
+        // On a pad with no triggers a held Select is R2 (PadGate), and only there does the pill say so (menu review M9,
+        // Droidtop/tracker#621): everyone else holding Select for options got the Quick Menu with no word why.
+        val triggerless by ControllerLayouts.triggerless.collectAsState()
+        return remember(triggerless) { shellMenuHints(triggerless) }
+    }
+
+/** [ShellMenuHints] for pads that do or do not have triggers. Pure. */
+fun shellMenuHints(triggerless: Boolean): List<HintBinding> = listOf(
     HintBinding(GamepadAction.START, "Menu"),
-    HintBinding(GamepadAction.R2, "Quick Menu"),
+    HintBinding(GamepadAction.R2, if (triggerless) "Quick Menu (hold Select)" else "Quick Menu"),
 )
 
 /**

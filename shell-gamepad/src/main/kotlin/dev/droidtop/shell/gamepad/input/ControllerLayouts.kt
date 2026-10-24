@@ -150,12 +150,27 @@ object ControllerLayouts {
         refreshPadOrKeyboard()
     }
 
+    private val triggerlessState = MutableStateFlow(false)
+
+    /**
+     * Whether the pads attached have no triggers at all, no L2/R2 key and no trigger axis (an SNES-style pad): then a
+     * held Select is how the Quick Menu opens, and the hint says so (menu review M9, Droidtop/tracker#621). False with
+     * no pad, or when any pad has triggers. Read after [listen].
+     */
+    val triggerless: StateFlow<Boolean> = triggerlessState
+
     private fun refreshPadOrKeyboard() {
-        padOrKeyboardState.value = InputDevice.getDeviceIds().any { id ->
-            val device = InputDevice.getDevice(id) ?: return@any false
-            device.isGamepad() || device.isHardwareKeyboard()
-        }
+        val devices = InputDevice.getDeviceIds().mapNotNull { InputDevice.getDevice(it) }
+        padOrKeyboardState.value = devices.any { it.isGamepad() || it.isHardwareKeyboard() }
+        val pads = devices.filter { it.isGamepad() }
+        triggerlessState.value = pads.isNotEmpty() && pads.none { it.hasTriggers() }
     }
+
+    /** An R2 key, or a trigger axis PadGate turns into one. */
+    private fun InputDevice.hasTriggers(): Boolean =
+        hasKeys(KeyEvent.KEYCODE_BUTTON_R2).firstOrNull() == true ||
+            getMotionRange(android.view.MotionEvent.AXIS_RTRIGGER) != null ||
+            getMotionRange(android.view.MotionEvent.AXIS_GAS) != null
 
     /** A real typing keyboard: letters, not a handheld's volume and power keys, and not Android's virtual one. */
     private fun InputDevice.isHardwareKeyboard(): Boolean =

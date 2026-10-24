@@ -7857,7 +7857,10 @@ leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
   delivered) or held for the long-press timeout (one trigger press is delivered, its release dropped); no screen ever
   sees half a hold. A tap of Start therefore opens the left menu on release, as Select's tap already acted. Start here
   is the pad's Start or Menu button (`BUTTON_START`), never the Xbox, PlayStation or Steam button (`BUTTON_MODE`),
-  which Gaming does not use.
+  which Gaming does not use. **The hint says so only where it matters** (menu review M9, approved 2026-10-23): on a
+  pad with no triggers at all (no R2 key, no trigger axis; `ControllerLayouts.triggerless`, live) the Quick Menu pill
+  reads "Quick Menu (hold Select)"; with triggers it reads "Quick Menu", and a person holding Select for options is
+  not told about a fallback they do not need. Rig scripts press Select plainly, never held.
 - Desktop mode hands the pad to the container (§6b), so the activity's
   gate steps aside there. Every D-pad edge is logged under
   `droidtop.input` with what became of it, for console runs read back
