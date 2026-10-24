@@ -63,13 +63,6 @@ object PluginPanels {
     const val QUICK_MENU_SCREEN_ID = "plugin_panels"
 
     /**
-     * The row that leads from the Quick Menu to the Plugins place (getting plugins, updates, permissions). Its
-     * default opens the Plugins screen; the Quick Menu instead closes and opens the place, so the screen has one
-     * home and the sheet never holds a second copy of it (docs/SPEC.md "Places").
-     */
-    const val MANAGE_ROW_ID = "plugin_panels_manage"
-
-    /**
      * One plugin's Quick Menu presence: its `ui.panel` entry if it declared one, its tiles on the Quick Menu, and
      * [facets], its `ui.facets` entry when that declares the `quickmenu` target.
      */
@@ -154,8 +147,10 @@ object PluginPanels {
                             id = "plugin_panels_more",
                             title = null,
                             items = listOf(
+                                // Getting plugins, updates, permissions: the Plugins screen, pushed here in every
+                                // surface (Droidtop/tracker#586).
                                 NestedScreenItem(
-                                    id = MANAGE_ROW_ID,
+                                    id = "plugin_panels_manage",
                                     title = "Get and manage plugins",
                                     subtitle = "The catalog, updates and what each plugin may do",
                                     registryId = AcquireContentSources.PLUGINS_SCREEN_ID,

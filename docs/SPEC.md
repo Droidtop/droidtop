@@ -3543,9 +3543,12 @@ the `ContainerRuntime` interface that already exists (§3):
     (its tiles, its own `ui.panel` view, then Settings, Open <plugin> and App status rows), B comes
     back to the list. It is the catalog navigator over `PluginPanels.quickMenuScreen`, so a panel
     is drawn and navigated like every other droidtop list. The last row, "Get and manage plugins",
-    closes the menu and opens the Plugins place (shown only where the mode has that place), never
-    a second copy of that screen in the sheet. A page a quick tile's press answers with opens over
-    the sheet.
+    pushes the Plugins screen (catalog, updates, each plugin's page and permissions) in the sheet, shown only where the
+    mode has that place. In Gaming this section is where plugins live: the left menu has no Plugins row (decided
+    2026-10-24, Droidtop/tracker#586; owner, 2026-10-17: "The plugin menu on the left pretty much shouldn't exist, the
+    quick menu should be for lots of that stuff"; 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins
+    menu"). What a plugin adds to a page (its facets) stays drawn in place on that page. A page a quick tile's press
+    answers with opens over the sheet.
   Which sections show, where the menu opens (the running game; else Notifications once access is
   granted; else System) and how the shoulders step the rail are pure rules in `QuickTiles`
   (`visibleSections`, `initialSection`, `stepSection`) with unit tests. System, Audio and Display
@@ -17159,7 +17162,10 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   notification (`PlaceLinks`, below). Settings > System no longer
   carries a "Software updates" row of its own.
 - **Plugins** (`plugins`): the existing Plugins screen (installed,
-  approvals, repositories, catalog), opened in place. Each plugin's card and
+  approvals, repositories, catalog), opened in place. In Gaming it is no row of the left menu
+  (`GamingSection.inQuickMenu`): the Quick Menu's Plugins section pushes it (Droidtop/tracker#586, "Quick Menu"
+  above), and a link to it, a plugin update's notification, still opens it as a place (`placeForScreen` asks
+  `Place.reachable`). Standard's settings root and Desktop's Start menu still list it. Each plugin's card and
   each catalog row carries the plugin's own icon (its presentation icon,
   `PluginStore.iconFile`; a catalog row only once the plugin is installed,
   the catalog index having no icon) and its one-line summary under its

@@ -264,7 +264,7 @@ internal fun QuickMenu(
                             QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
                         QuickSection.PERFORMANCE -> PerformanceSection(close)
                         QuickSection.DOWNLOADS -> DownloadsSection(close)
-                        QuickSection.PLUGINS -> PluginsTab(runningEntry, openPlace, placeAvailable, close)
+                        QuickSection.PLUGINS -> PluginsTab(runningEntry, placeAvailable, close)
                     }
                 }
             }
@@ -802,13 +802,13 @@ private data class GameQuickTile(
 /**
  * The Plugins section (docs/plugin-api.md C17, Droidtop/tracker#316): Decky Loader's list and panels as one catalog
  * navigator. A on a plugin pushes its panel, B pops back to the list and from the list closes the sheet. The last
- * row leads out to the Plugins place instead of pushing that screen into the sheet (one screen, one home). A page a
- * quick tile's press answered with opens over the sheet, as before panels existed.
+ * row, Get and manage plugins, pushes the Plugins screen here too: Gaming's plugins live in this section, not in the
+ * left menu (docs/SPEC.md 4, Droidtop/tracker#586). A page a quick tile's press answered with opens over the sheet,
+ * as before panels existed.
  */
 @Composable
 private fun PluginsTab(
     runningEntry: dev.droidtop.library.LibraryEntry?,
-    openPlace: (screenId: String) -> Boolean,
     placeAvailable: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
 ) {
@@ -821,11 +821,7 @@ private fun PluginsTab(
             onReplyScreen = { replyScreen = it },
         )
     }
-    CatalogNavigator(
-        root = root,
-        onExit = onDismiss,
-        nativeActions = mapOf(dev.droidtop.library.integrations.PluginPanels.MANAGE_ROW_ID to { openPlace(PLACE_PLUGINS_SCREEN_ID); Unit }),
-    )
+    CatalogNavigator(root = root, onExit = onDismiss)
     replyScreen?.let { screen ->
         val close = { replyScreen = null }
         // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
