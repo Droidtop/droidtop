@@ -31,8 +31,17 @@ sealed interface DebridState {
     /** The service does not have it and will not fetch it (a dead torrent, or none asked: [DebridProvider.cached]). */
     data object NotCached : DebridState
 
-    /** A failure, in one sentence. [auth]: the key is wrong or expired; [permanent]: asking again cannot help. */
-    data class Failed(val message: String, val auth: Boolean = false, val permanent: Boolean = false) : DebridState
+    /**
+     * A failure, in one sentence. [auth]: the key is wrong or expired; [permanent]: asking again cannot help; [limit]:
+     * the account reached one of its limits, and rests until [restUntilMs] when the service says ([DebridChoice]).
+     */
+    data class Failed(
+        val message: String,
+        val auth: Boolean = false,
+        val permanent: Boolean = false,
+        val limit: Boolean = false,
+        val restUntilMs: Long? = null,
+    ) : DebridState
 }
 
 /**
@@ -69,6 +78,15 @@ interface DebridProvider {
 
     /** Whether the service already has [link]'s file, without asking it to fetch it. Null when it cannot say. */
     fun linkCached(key: String, link: String): Boolean? = null
+
+    /** Whether the account's limit is torrents or downloads at once (slots), the kind spread mode shares out. */
+    val slotLimited: Boolean get() = false
+
+    /**
+     * What serving a job costs the account now (a torrent, or a link on [host]), from what the service reports of the
+     * account, never from figures droidtop keeps. [DebridCost.Free] by default.
+     */
+    fun cost(key: String, host: String?): DebridCost = DebridCost.Free
 
     /** Asks the service for [link] on a file hoster (asking again is safe) and says where it stands: its files when ready. */
     fun unrestrict(key: String, link: String): DebridState = DebridState.Failed("$name does not fetch hoster links", permanent = true)
@@ -124,6 +142,14 @@ fun interface DebridTransport {
 internal fun jsonOrNull(text: String): Any? = runCatching { JSONTokener(text).nextValue() }.getOrNull()
 
 internal fun JSONObject.long(key: String): Long? = (opt(key) as? Number)?.toLong()
+
+/** An ISO 8601 time ("2026-11-01T00:00:00Z", with an offset or fraction too) in ms, or null. */
+internal fun isoMs(text: String?): Long? {
+    if (text.isNullOrBlank() || text == "null") return null
+    return runCatching { java.time.OffsetDateTime.parse(text).toInstant().toEpochMilli() }.getOrNull()
+        ?: runCatching { java.time.Instant.parse(text).toEpochMilli() }.getOrNull()
+        ?: runCatching { java.time.LocalDateTime.parse(text).toInstant(java.time.ZoneOffset.UTC).toEpochMilli() }.getOrNull()
+}
 
 internal fun JSONArray.objects(): List<JSONObject> = (0 until length()).mapNotNull { optJSONObject(it) }
 

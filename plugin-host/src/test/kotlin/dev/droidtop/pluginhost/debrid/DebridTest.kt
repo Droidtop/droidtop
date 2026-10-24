@@ -60,7 +60,9 @@ class DebridTest {
     fun torBoxsRefusalsSayWhatTheyAre() {
         val box = TorBox(Canned())
         assertTrue(box.refusal(401, "")!!.auth)
-        assertTrue(box.refusal(200, """{"success":false,"error":"MONTHLY_LIMIT","detail":"Monthly limit reached"}""")!!.permanent)
+        val monthly = box.refusal(200, """{"success":false,"error":"MONTHLY_LIMIT","detail":"Monthly limit reached"}""")!!
+        assertTrue("a limit rests the account, it is not the end of it", monthly.limit && !monthly.permanent && monthly.restUntilMs != null)
+        assertTrue(box.refusal(200, """{"success":false,"error":"INVALID_MAGNET","detail":"Bad magnet"}""")!!.permanent)
         assertNull(box.refusal(200, """{"success":true}"""))
     }
 
@@ -249,5 +251,90 @@ class DebridTest {
         var clock = 0L
         assertEquals(RealDebridSignIn.Outcome.Expired, RealDebridSignIn(pending).await(code, { false }, now = { clock }, sleep = { clock += it }))
         assertEquals(RealDebridSignIn.Outcome.Cancelled, RealDebridSignIn(pending).await(code, { true }, now = { 0L }, sleep = {}))
+    }
+
+    /** A provider with a set cost, for the choice. */
+    private class Priced(override val id: String, override val slotLimited: Boolean = true, var price: DebridCost = DebridCost.Free) : DebridProvider {
+        override val name = id
+        var asked = 0
+        override fun cost(key: String, host: String?): DebridCost { asked++; return price }
+        override fun check(key: String): String? = null
+        override fun cached(key: String, torrent: TorrentRef): Boolean? = null
+        override fun request(key: String, torrent: TorrentRef): DebridState = DebridState.NotCached
+    }
+
+    private fun names(ranked: List<DebridChoice.Account>) = ranked.map { it.provider.id }
+
+    @Test
+    fun theAccountItCostsLeastServesAndTheOrderSettlesATie() {
+        val a = Priced("a"); val b = Priced("b"); val c = Priced("c"); val d = Priced("d")
+        val ranked = DebridChoice.rank(
+            listOf(
+                DebridChoice.Account(a, "k", DebridCost.Spends(0.2)),
+                DebridChoice.Account(b, "k", DebridCost.Free),
+                DebridChoice.Account(c, "k", DebridCost.NotNow("out")),
+                DebridChoice.Account(d, "k", DebridCost.Spends(0.9)),
+            ),
+            spread = false,
+        )
+        assertEquals("free first, then the most left; one that cannot serve is left out", listOf("b", "d", "a"), names(ranked))
+        val tie = DebridChoice.rank(listOf(DebridChoice.Account(a, "k", DebridCost.Free), DebridChoice.Account(b, "k", DebridCost.Free)), spread = false)
+        assertEquals(listOf("a", "b"), names(tie))
+        val unknown = DebridChoice.rank(listOf(DebridChoice.Account(a, "k", DebridCost.Spends(null)), DebridChoice.Account(b, "k", DebridCost.Spends(0.1))), spread = false)
+        assertEquals("a known amount left goes before an unknown one", listOf("b", "a"), names(unknown))
+    }
+
+    @Test
+    fun spreadModeSharesATieByTheJobsRunningOnSlotLimitedAccountsOnly() {
+        val busy = Priced("busy"); val idle = Priced("idle"); val open = Priced("open", slotLimited = false)
+        val accounts = listOf(DebridChoice.Account(busy, "k", DebridCost.Free, running = 2), DebridChoice.Account(idle, "k", DebridCost.Free, running = 0))
+        assertEquals(listOf("busy", "idle"), names(DebridChoice.rank(accounts, spread = false)))
+        assertEquals(listOf("idle", "busy"), names(DebridChoice.rank(accounts, spread = true)))
+        val cheaper = listOf(DebridChoice.Account(busy, "k", DebridCost.Free, running = 3), DebridChoice.Account(idle, "k", DebridCost.Spends(1.0)))
+        assertEquals("spread never puts a spending account before a free one", listOf("busy", "idle"), names(DebridChoice.rank(cheaper, spread = true)))
+        val unlimited = listOf(DebridChoice.Account(open, "k", DebridCost.Free, running = 5), DebridChoice.Account(idle, "k", DebridCost.Free))
+        assertEquals(listOf("open", "idle"), names(DebridChoice.rank(unlimited, spread = true)))
+    }
+
+    @Test
+    fun aLimitRestsTheAccountUntilItsResetAndCostsAreKeptAWhile() {
+        DebridChoice.reset()
+        val first = Priced("first"); val second = Priced("second")
+        var clock = 1_000_000L
+        val accounts = listOf<Pair<DebridProvider, String>>(first to "k", second to "k")
+        assertEquals(listOf("first", "second"), DebridChoice.order(accounts, spread = false, now = { clock }).map { it.first.id })
+        DebridChoice.order(accounts, spread = false, now = { clock })
+        assertEquals("asked once within a few minutes", 1, first.asked)
+        DebridChoice.refused(first, "k", DebridState.Failed("traffic used up", limit = true, restUntilMs = clock + 60_000), now = { clock })
+        DebridChoice.refused(second, "k", DebridState.Failed("bad magnet", permanent = true), now = { clock })
+        assertEquals(listOf("second"), DebridChoice.order(accounts, spread = false, now = { clock }).map { it.first.id })
+        clock += 61_000
+        assertEquals(listOf("first", "second"), DebridChoice.order(accounts, spread = false, now = { clock }).map { it.first.id })
+        DebridChoice.reset()
+    }
+
+    @Test
+    fun theServicesSayWhatAJobCostsFromTheAccount() {
+        val now = isoMs("2026-10-24T00:00:00Z")!!
+        fun torBox(me: String) = TorBox(Canned("GET https://api.torbox.app/v1/api/user/me" to (200 to me)), now = { now })
+        assertEquals(DebridCost.Free, torBox("""{"success":true,"data":{"plan":2,"premium_expires_at":"2026-12-01T00:00:00Z","cooldown_until":"2026-10-25T00:00:00Z"}}""").cost("k", null))
+        assertTrue(torBox("""{"success":true,"data":{"plan":1,"premium_expires_at":"2026-10-01T00:00:00Z"}}""").cost("k", null) is DebridCost.NotNow)
+        assertEquals(DebridCost.Spends(null), torBox("""{"success":true,"data":{"plan":0,"cooldown_until":null}}""").cost("k", null))
+        assertTrue(torBox("""{"success":true,"data":{"plan":0,"cooldown_until":"2026-10-24T05:00:00+00:00"}}""").cost("k", null) is DebridCost.NotNow)
+
+        val rd = RealDebrid(
+            Canned(
+                "GET https://api.real-debrid.com/rest/1.0/user" to (200 to """{"type":"premium","premium":86400}"""),
+                "GET https://api.real-debrid.com/rest/1.0/traffic" to (200 to """{"1fichier.com":{"left":0,"limit":100,"type":"gigabytes"},"katfile.com":{"left":25,"limit":100,"type":"gigabytes"}}"""),
+            ),
+            now = { now },
+        )
+        assertEquals("a torrent spends no hoster's traffic", DebridCost.Free, rd.cost("t", null))
+        assertEquals(DebridCost.Free, rd.cost("t", "pixeldrain.com"))
+        assertEquals(DebridCost.Spends(0.25), rd.cost("t", "www.katfile.com"))
+        assertTrue(rd.cost("t", "1fichier.com") is DebridCost.NotNow)
+        val lapsed = RealDebrid(Canned("GET https://api.real-debrid.com/rest/1.0/user" to (200 to """{"type":"free","premium":0}""")))
+        assertTrue(lapsed.cost("t", null) is DebridCost.NotNow)
+        assertTrue(rd.errorState(503, org.json.JSONObject("""{"error":"traffic_exhausted","error_code":23}""")).limit)
     }
 }
