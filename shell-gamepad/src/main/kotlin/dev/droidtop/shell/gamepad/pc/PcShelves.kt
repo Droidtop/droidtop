@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad.pc
 import dev.droidtop.library.originLabel
 import dev.droidtop.library.runsInEnginehost
 import dev.droidtop.library.CapsuleBadgeStyle
+import dev.droidtop.library.EsDeArtwork
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.LibraryEntryKind
 import dev.droidtop.library.PcSource
@@ -334,21 +335,22 @@ internal val LibraryEntry.inPcFold: Boolean
     get() = appFacts == null && onPcGamesTab
 
 /**
- * Gives the hero card (the first shelf's first card, [isHeroCard]) of a Retro
- * game the landscape art the PC hero rule asks for (docs/SPEC.md 7i, "Home
- * art"): its scraped fanart, else its screenshot, from the media layout it
- * already carries. One file lookup for one card, so the caller runs this off
- * the main thread with the shelves.
+ * What a hero card shows (docs/SPEC.md 7i, "Home art"; Droidtop/tracker#632): [landscape] art when there is some
+ * (the SteamGridDB hero, or a wide, banner or hero picture a source gave), else, or when it does not load, the
+ * [boxOverBlur]: the box art whole beside the name over a blurred copy of itself, never cropped into a landscape
+ * frame. Neither is ever a screenshot; with neither, the plate carries the name.
  */
-internal fun withRetroHero(shelves: List<PcShelf>): List<PcShelf> = shelves.mapIndexed { index, shelf ->
-    val first = shelf.entries.firstOrNull()
-    if (index != 0 || first == null || first.inPcFold || first.heroUri != null || first.mediaLocator == null) {
-        shelf
-    } else {
-        val art = first.mediaForImageTypes(listOf("fanart", "screenshot"))
-        if (art == null) shelf else shelf.copy(entries = listOf(first.copy(heroUri = art)) + shelf.entries.drop(1))
-    }
-}
+internal data class HeroArt(val landscape: String?, val boxOverBlur: String?)
+
+/**
+ * The one landscape-slot order (owner, 2026-10-24, Droidtop/tracker#632: the big card "needs to not use screenshots
+ * too"): the game's landscape art ([LibraryEntry.heroUri], the SteamGridDB hero or a source's wide/banner/hero
+ * picture), else its box art over a blur of itself. A screenshot or a title screen is never either, so a Retro
+ * game whose only "box art" is a screenshot gets the plate. ES-DE fan art of a console game is not used: for those
+ * games it is ScreenScraper's, often an in-game screenshot, and no source marks it as artwork. Pure.
+ */
+internal fun LibraryEntry.heroArt(): HeroArt =
+    HeroArt(heroUri?.takeIf { !EsDeArtwork.isScreenshot(it) }, artworkUri?.takeIf { !EsDeArtwork.isScreenshot(it) })
 
 /**
  * Whether a card is the hero card: the first card of the first shelf, drawn

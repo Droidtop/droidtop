@@ -15172,8 +15172,8 @@ own games, in droidtop's own treatment:
   (or a long press) opens a PC game's menu, and for a Retro game or an app a
   small options menu (details, favourite). Retro cards use their scraped art
   (`artworkUri`, the same media the Retro list shows); the hero card of a
-  Retro game takes its fanart, else its screenshot, and without either is
-  drawn as portrait art beside the title, the PC rule (`withRetroHero`).
+  Retro game is its box art beside the title over a blur of itself, never a
+  screenshot (`heroArt`, "Gaming motion and focus", #632).
 - **Kind badges** (owner, 2026-10-08, Droidtop/tracker#362: "there aren't PC
   and Retro game indicators"). Wherever games of different kinds share a list,
   each card or row says what it is: one word, then its store or system, quieter
@@ -17685,9 +17685,20 @@ theme's roles (section 7k2).
   game page's hero takes hero or fan art. For ES-DE media (`EsDeArtwork`): covers, 3D boxes, miximages (box art
   over a screenshot, so ahead of a bare one), physical media, fan art, marquee, title screens, screenshots. It
   led with the miximage, which is mostly a screenshot. The scraper fetches a cover for any game without box art
-  (`EsDeArtwork.hasCover`): a game with only a screenshot used to count as having art and never got one. A theme
-  that declares its own `<imageType>` order keeps it; stores already give portrait art (Steam's 600x900 library
-  capsule, GOG's vertical cover, SteamGridDB grids). It is cheap by
+  (`EsDeArtwork.hasCover`): a game with only a screenshot used to count as having art and never got one. Stores
+  already give portrait art (Steam's 600x900 library capsule, GOG's vertical cover, SteamGridDB grids).
+- **Theme slots and the hero card never lead with a screenshot either** (owner, 2026-10-24, #632: "the first item on
+  the home screen is the big one ... We need that to not use screenshots too"). A theme's `<imageType>` order is
+  kept except that screenshots and title screens come after any other art the slot accepts (`gameArtFolders`):
+  DEcaffe's `screenshot,cover,titlescreen` shows the cover. A slot that asks only for screens (a screenshot slot)
+  keeps them, and ES-DE's `image` pseudo-type, whose own chain leads with the miximage and then the screenshot,
+  means droidtop's order (without the marquee, which has a slot of its own). Every landscape slot, Home's hero card
+  first, takes one order (`heroArt`): the SteamGridDB hero, or a wide, banner or hero picture a source gave; else
+  the box art whole beside the name over a blurred copy of itself, never cropped into a landscape frame; else the
+  plate with the name. A screenshot or a title screen (`EsDeArtwork.isScreenshot`, by its media folder) is never
+  either. ES-DE fan art of a console game is not used: for those games it is ScreenScraper's, often an in-game
+  screenshot, and no source marks it as artwork, so a Retro game's hero is its box art over its blur. It replaced
+  `withRetroHero`, which gave a Retro hero its fan art, else its screenshot. It is cheap by
   construction: no blur, every animated value read in the layer or draw phase so a focus move
   recomposes nothing. Because of that there is no low-performance mode to switch it off; a blur or
   backdrop effect added later must come with one.

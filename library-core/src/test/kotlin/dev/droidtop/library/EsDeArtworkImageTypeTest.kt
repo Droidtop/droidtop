@@ -13,10 +13,12 @@ import org.junit.rules.TemporaryFolder
  * GamelistView.cpp:1255-1330 (walk the theme's declared order, first
  * type that has a file wins, stop), FileData.cpp:332-358 (the
  * `<media root>/<system>/<subdir>/<name>.<ext>` layout and the
- * extension walk (FileData.h:161: png, jpg, webp)), FileData.cpp:360-379 (the `image`
- * pseudo-type's own miximage -> screenshot -> titlescreen -> cover
- * chain) and FileData.cpp:381-431 (the one-to-one type -> subdirectory
- * names for everything else).
+ * extension walk (FileData.h:161: png, jpg, webp)) and FileData.cpp:381-431
+ * (the one-to-one type -> subdirectory names). Two rules are droidtop's
+ * own (owner, Droidtop/tracker#632, "we never want screenshots to be
+ * what's displayed first"): screenshots and title screens come after any
+ * other art a slot accepts, and the `image` pseudo-type is droidtop's own
+ * order rather than ES-DE's miximage-then-screenshot chain.
  */
 class EsDeArtworkImageTypeTest {
 
@@ -97,20 +99,43 @@ class EsDeArtworkImageTypeTest {
     }
 
     @Test
-    fun `the image pseudo-type is its own fallback chain`() {
+    fun `the image pseudo-type is droidtop's order, box art before screens`() {
         setUpRoot()
-        // FileData::getImagePath order: miximage, screenshot,
-        // titlescreen, cover. With only a titlescreen and a cover
-        // present, "image" must pick the titlescreen.
+        // ES-DE's own chain would pick the title screen here; droidtop's order picks the cover.
         val titlescreen = media("megadrive", "titlescreens", "Sonic")
+        assertEquals(titlescreen.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("image")))
+        val cover = media("megadrive", "covers", "Sonic")
+        assertEquals(cover.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("image")))
+        // ...and a miximage does not outrank the cover.
+        media("megadrive", "miximages", "Sonic")
+        assertEquals(cover.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("image")))
+    }
+
+    @Test
+    fun `a theme's screenshot-first order shows the cover first`() {
+        setUpRoot()
+        // DEcaffe's own `screenshot,cover,titlescreen`.
+        media("megadrive", "screenshots", "Sonic")
+        val cover = media("megadrive", "covers", "Sonic")
+        assertEquals(cover.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("screenshot", "cover", "titlescreen")))
+        assertEquals(listOf("covers", "screenshots", "titlescreens"), EsDeArtwork.gameArtFolders(listOf("screenshot", "cover", "titlescreen")))
+    }
+
+    @Test
+    fun `a slot that asks only for screens still gets the screenshot`() {
+        setUpRoot()
+        val screenshot = media("megadrive", "screenshots", "Sonic")
         media("megadrive", "covers", "Sonic")
-        assertEquals(
-            titlescreen.absolutePath,
-            EsDeArtwork.resolveImageTypes(locator(), listOf("image")),
-        )
-        // ...and a miximage outranks all three.
-        val mix = media("megadrive", "miximages", "Sonic")
-        assertEquals(mix.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("image")))
+        assertEquals(screenshot.absolutePath, EsDeArtwork.resolveImageTypes(locator(), listOf("screenshot", "titlescreen")))
+    }
+
+    @Test
+    fun `a screenshot or title screen is known by its media folder`() {
+        setUpRoot()
+        assertEquals(true, EsDeArtwork.isScreenshot(media("megadrive", "screenshots", "Sonic").absolutePath))
+        assertEquals(true, EsDeArtwork.isScreenshot(media("megadrive", "titlescreens", "Sonic").absolutePath))
+        assertEquals(false, EsDeArtwork.isScreenshot(media("megadrive", "covers", "Sonic").absolutePath))
+        assertEquals(false, EsDeArtwork.isScreenshot(media("megadrive", "fanart", "Sonic").absolutePath))
     }
 
     @Test

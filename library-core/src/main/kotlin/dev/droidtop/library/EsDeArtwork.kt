@@ -88,8 +88,8 @@ object EsDeArtwork {
      * screenshots to be what's displayed first, and that seems to be preferred for emulator games. We want boxart
      * or posters to be there"). It used to lead with ES-DE's miximage, a composite that is mostly a screenshot.
      * A miximage still beats a bare screenshot (it carries the box), and the art that is not a screenshot (the
-     * medium, fan art, the marquee) comes before the title screen and the screenshot. A theme that declares its
-     * own `<imageType>` order keeps it ([resolve] with image types): that is the theme's design.
+     * medium, fan art, the marquee) comes before the title screen and the screenshot. A theme's own `<imageType>`
+     * order is kept except for that one rule ([gameArtFolders], owner 2026-10-24).
      */
     private val MEDIA_TYPES_BY_PRIORITY =
         listOf("covers", "3dboxes", "miximages", "physicalmedia", "fanart", "marquees", "titlescreens", "screenshots")
@@ -125,17 +125,36 @@ object EsDeArtwork {
         "backcover" to "backcovers",
     )
 
+    /** The media folders that hold pictures of the game running, not art of it. */
+    private val SCREEN_FOLDERS = setOf("screenshots", "titlescreens")
+
     /**
-     * Real ES-DE's `image` PSEUDO-TYPE. `image` is the one <imageType>
-     * value that names no folder at all: FileData::getImagePath()
-     * (FileData.cpp:360-379) is itself a fallback chain, trying miximage
-     * first, then screenshot, then title screen, then cover. It is
-     * therefore expanded here rather than looked up, and it is why the
-     * carousel and grid -- which resolve a folder per type directly and
-     * have no such accessor -- do not accept `image` at all.
+     * Whether [path] is a screenshot or a title screen, by the ES-DE media folder it is in: what a hero card and a
+     * card's first picture never show (docs/SPEC.md 7i, "Home art"; Droidtop/tracker#632). Pure.
      */
-    private val IMAGE_PSEUDO_TYPE_CHAIN =
-        listOf("miximages", "screenshots", "titlescreens", "covers")
+    fun isScreenshot(path: String): Boolean =
+        File(path).parentFile?.name?.lowercase() in SCREEN_FOLDERS
+
+    /**
+     * The folders a theme's [imageTypes] are looked up in, in order (owner, 2026-10-23, Droidtop/tracker#632: "we
+     * never want screenshots to be what's displayed first"; 2026-10-24, the same for every slot). The theme's own
+     * order is kept, except that screenshots and title screens go after every other kind of art the slot also
+     * accepts: DEcaffe's `screenshot,cover,titlescreen` shows the cover first. A slot that asks only for screenshots
+     * or title screens (a screenshot slot) keeps them. `image`, ES-DE's pseudo-type (FileData::getImagePath, which
+     * leads with the miximage and then the screenshot), names no folder of its own and means droidtop's own order;
+     * the carousel and grid, which resolve a folder per type directly, do not accept it at all. Pure.
+     */
+    fun gameArtFolders(imageTypes: List<String>): List<String> {
+        val folders = imageTypes.flatMap { type ->
+            when (val t = type.trim().lowercase()) {
+                // A marquee is a logo with a slot of its own; ES-DE's `image` never reaches it either.
+                "image" -> MEDIA_TYPES_BY_PRIORITY - "marquees"
+                else -> listOfNotNull(IMAGE_TYPE_TO_FOLDER[t])
+            }
+        }.distinct()
+        val (screens, art) = folders.partition { it in SCREEN_FOLDERS }
+        return art + screens
+    }
 
     /**
      * The two real `downloaded_media` roots droidtop searches, in order:
@@ -244,16 +263,14 @@ object EsDeArtwork {
 
     /**
      * Same real lookup, but walking [imageTypes] in the CALLER's own order
-     * instead of [MEDIA_TYPES_BY_PRIORITY]'s fixed priority — for a
-     * gameselector-driven element honoring its own theme-declared
-     * `<imageType>screenshot,cover,titlescreen</imageType>` ordering rather
-     * than droidtop's own generic default. Falls back to
+     * ([gameArtFolders]: screenshots after the other art) instead of
+     * [MEDIA_TYPES_BY_PRIORITY]'s fixed priority — for a gameselector-driven
+     * element's theme-declared `<imageType>` list. Falls back to
      * [MEDIA_TYPES_BY_PRIORITY] if [imageTypes] is empty or contains
      * nothing this crate recognizes, same as the no-imageTypes overload.
      */
     fun resolve(gamesRoot: File, system: String, romBaseName: String, imageTypes: List<String>): String? {
-        val folders = imageTypes.mapNotNull { IMAGE_TYPE_TO_FOLDER[it.trim().lowercase()] }
-            .ifEmpty { MEDIA_TYPES_BY_PRIORITY }
+        val folders = gameArtFolders(imageTypes).ifEmpty { MEDIA_TYPES_BY_PRIORITY }
         val mediaRoots = candidateMediaRoots(gamesRoot)
         for (mediaRoot in mediaRoots) {
             for (mediaType in folders) {
@@ -274,14 +291,15 @@ object EsDeArtwork {
      *
      *  * The fallback order is the THEME's order, not a fixed preference
      *    of ES-DE's. `marquee,cover` and `cover,marquee` are different
-     *    requests and neither is "the" priority.
+     *    requests and neither is "the" priority. The one exception is
+     *    droidtop's: screenshots and title screens come after any other
+     *    art the slot accepts ([gameArtFolders]).
      *  * When NOTHING in the list resolves, real ES-DE calls
      *    `comp->setImage("")` -- the element shows its own `<default>`
      *    image if it declared one, and otherwise shows nothing. It
      *    specifically does NOT silently substitute the box art. Callers
      *    get null here and must honour that, not paper over it.
-     *  * `image` expands to a chain of its own, see
-     *    [IMAGE_PSEUDO_TYPE_CHAIN].
+     *  * `image` expands to droidtop's own order ([gameArtFolders]).
      *
      * `none` is not handled here -- it is not a media lookup at all but a
      * per-element instruction (draw the game's name as text in a
@@ -299,15 +317,9 @@ object EsDeArtwork {
         if (imageTypes.isEmpty()) return null
         val gamesRoot = File(locator.gamesRoot)
         val mediaRoots = candidateMediaRoots(gamesRoot)
-        for (imageType in imageTypes) {
-            val folders = when (val type = imageType.trim().lowercase()) {
-                "image" -> IMAGE_PSEUDO_TYPE_CHAIN
-                else -> listOfNotNull(IMAGE_TYPE_TO_FOLDER[type])
-            }
-            for (folder in folders) {
-                for (mediaRoot in mediaRoots) {
-                    find(mediaRoot, locator.system, folder, locator.baseName, EXTENSIONS)?.let { return it }
-                }
+        for (folder in gameArtFolders(imageTypes)) {
+            for (mediaRoot in mediaRoots) {
+                find(mediaRoot, locator.system, folder, locator.baseName, EXTENSIONS)?.let { return it }
             }
         }
         return null

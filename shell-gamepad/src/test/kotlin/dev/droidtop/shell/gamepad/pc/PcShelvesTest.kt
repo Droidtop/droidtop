@@ -417,4 +417,18 @@ class PcShelvesTest {
         assertEquals(listOf("Gamma", "Alpha"), recommendedShelf(listOf("gamma", "Missing", "Alpha"), all)?.entries?.map { it.id })
         assertEquals(null, recommendedShelf(listOf("Missing"), all))
     }
+
+    @Test
+    fun `the hero never shows a screenshot: a game with only a screenshot and a cover gets the cover over its blur`() {
+        val media = "/storage/emulated/0/ROMs/downloaded_media/snes"
+        // The scan's box art is the cover (droidtop's order puts covers first); there is no landscape art.
+        val coverOnly = game("/roms/snes/Game.sfc").copy(artworkUri = "$media/covers/Game.png")
+        assertEquals(HeroArt(landscape = null, boxOverBlur = "$media/covers/Game.png"), coverOnly.heroArt())
+        // A screenshot is neither the landscape art nor the box art behind it: the plate carries the name.
+        val screensOnly = game("/roms/snes/Other.sfc").copy(artworkUri = "$media/screenshots/Other.png", heroUri = "$media/titlescreens/Other.png")
+        assertEquals(HeroArt(landscape = null, boxOverBlur = null), screensOnly.heroArt())
+        // A SteamGridDB hero leads, with the box art kept for when it does not load.
+        val pc = game("folder:A").copy(heroUri = "/media/pc/fanart/A.png", artworkUri = "/media/pc/covers/A.png")
+        assertEquals(HeroArt("/media/pc/fanart/A.png", "/media/pc/covers/A.png"), pc.heroArt())
+    }
 }

@@ -509,7 +509,7 @@ internal fun PcGamesSection(
     LaunchedEffect(games, others, ownership, recentlyAdded) {
         val all = games ?: return@LaunchedEffect
         onHomeActivityChanged(all + others)
-        val own = withContext(Dispatchers.Default) { withRetroHero(homeShelves(all, others, options = ownership, isRecentlyAdded = recentlyAdded)) }
+        val own = withContext(Dispatchers.Default) { homeShelves(all, others, options = ownership, isRecentlyAdded = recentlyAdded) }
         // The first paint shows Home's own rows before the slower ones below. After that the list is set once per
         // change: set twice (without Recommended, then with it) the shelves shifted under the cursor and the
         // scroll that follows it restarted on every update (Droidtop/tracker#616).
