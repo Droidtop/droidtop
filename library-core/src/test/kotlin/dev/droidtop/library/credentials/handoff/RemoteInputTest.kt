@@ -50,6 +50,27 @@ class RemoteInputTest {
         override fun enter() { log += "enter" }
     }
 
+    private class FakeClipboard : ConsoleClipboard {
+        var held: ClipRead = ClipRead.Empty
+        var refuse = false
+        val written = mutableListOf<String>()
+        var reads = 0
+
+        override fun write(text: String): Boolean {
+            if (refuse) return false
+            written += text
+            held = ClipRead.Text(text)
+            return true
+        }
+
+        override fun read(): ClipRead {
+            reads++
+            return held
+        }
+    }
+
+    private val clipboard = FakeClipboard()
+
     private val router = RemoteInputRouter(
         ownField = { own.takeIf { ownFocused } },
         ime = { ime.takeIf { imeFocused } },
@@ -57,7 +78,7 @@ class RemoteInputTest {
     )
 
     private fun session(listen: (HandoffEndpoint) -> HandoffListener = this::fake) =
-        RemoteInput(clock = { now }, router = router, listen = listen, host = "192.168.1.20", random = SecureRandom())
+        RemoteInput(clock = { now }, router = router, listen = listen, host = "192.168.1.20", random = SecureRandom(), clipboard = clipboard)
 
     private fun fake(endpoint: HandoffEndpoint): HandoffListener = FakeListener(endpoint, nextPort++).also { listeners += it }
 
@@ -424,6 +445,269 @@ class RemoteInputTest {
         assertFalse(RemoteInputRouter.isPasswordInputType(0x01))
         assertFalse(RemoteInputRouter.isPasswordInputType(0x21))
         assertFalse(RemoteInputRouter.isPasswordInputType(0x02))
+    }
+
+    // The shared clipboard.
+
+    private fun RemoteInput.clip(
+        path: String,
+        body: String,
+        peer: String = PHONE,
+        token: String = tokenOf(),
+        method: String = "POST",
+    ) = listeners.last().endpoint.handle(method, "/r/$token/$path", body, peer)
+
+    @Test
+    fun `Send to console puts the text on the console clipboard and shows it on the console for a few seconds`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        val reply = input.clip("clipput", "code=$code&text=" + java.net.URLEncoder.encode("two\nlines  of text", "UTF-8"))
+        assertEquals(200, reply.status)
+        assertTrue(reply.body.contains("\"ok\":true"))
+        assertEquals(listOf("two\nlines  of text"), clipboard.written)
+        assertEquals(RemoteInputState.Paired(clip = "two lines of text"), input.state.value)
+        now += 7_000
+        input.tick()
+        assertEquals(RemoteInputState.Paired(clip = "two lines of text"), input.state.value)
+        now += 1_000
+        input.tick()
+        assertEquals(RemoteInputState.Paired(), input.state.value)
+    }
+
+    @Test
+    fun `the console shows only a line of a long clip`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        input.clip("clipput", "code=$code&text=" + "x".repeat(1_000))
+        val shown = (input.state.value as RemoteInputState.Paired).clip!!
+        assertEquals(ClipRules.PREVIEW_CHARS + 1, shown.length)
+        assertTrue(shown.endsWith("\u2026"))
+        assertEquals(1_000, clipboard.written.single().length)
+    }
+
+    @Test
+    fun `typing keeps the clip line while it is shown`() {
+        val input = session()
+        input.start()
+        ownFocused = true
+        val code = input.pair()
+        input.clip("clipput", "code=$code&text=abc")
+        input.send("code=$code&text=z")
+        assertEquals(RemoteInputState.Paired("z", null, "abc"), input.state.value)
+    }
+
+    @Test
+    fun `Get console clipboard returns the text, with every character kept`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        clipboard.held = ClipRead.Text("a \"quoted\" <b>line</b>\nnext\\ \u2028 caf\u00e9")
+        val reply = input.clip("clipget", "code=$code")
+        assertEquals(200, reply.status)
+        assertEquals("application/json", reply.contentType)
+        assertTrue(reply.body.contains("\"ok\":true"))
+        assertEquals("""{"ok":true,"text":"a \"quoted\" \u003cb>line\u003c/b>\nnext\\ \u2028 caf""" + "\u00e9\"}", reply.body)
+        assertFalse(reply.body.contains("<"))
+    }
+
+    @Test
+    fun `a clip marked sensitive is never sent to the phone, and says nothing of what it holds`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        clipboard.held = ClipRead.Sensitive
+        val reply = input.clip("clipget", "code=$code")
+        assertTrue(reply.body.contains("\"ok\":false"))
+        assertTrue(reply.body.contains("sensitive"))
+        assertFalse(reply.body.contains("\"text\""))
+    }
+
+    @Test
+    fun `an empty, non text or unreadable clipboard is told as such and sends no text`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        for ((held, notice) in listOf(
+            ClipRead.Empty to RemoteInput.CLIP_EMPTY,
+            ClipRead.NotText to RemoteInput.CLIP_NOT_TEXT,
+            ClipRead.Unavailable to RemoteInput.CLIP_UNAVAILABLE,
+        )) {
+            clipboard.held = held
+            val reply = input.clip("clipget", "code=$code")
+            assertEquals(RemoteInput.jsonString(notice), reply.body.substringAfter("\"notice\":").removeSuffix("}"))
+            assertTrue(reply.body.contains("\"ok\":false"))
+        }
+    }
+
+    @Test
+    fun `the limit is 64 KB of text each way`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        val atLimit = "a".repeat(ClipRules.MAX_BYTES)
+        assertTrue(input.clip("clipput", "code=$code&text=$atLimit").body.contains("\"ok\":true"))
+        assertEquals(atLimit, clipboard.written.single())
+        val over = input.clip("clipput", "code=$code&text=${atLimit}a")
+        assertEquals(413, over.status)
+        assertEquals(1, clipboard.written.size)
+        // Bytes, not characters: 32 769 two byte characters are over.
+        val wide = "\u00e9".repeat(ClipRules.MAX_BYTES / 2 + 1)
+        assertEquals(413, input.clip("clipput", "code=$code&text=" + java.net.URLEncoder.encode(wide, "UTF-8")).status)
+        assertEquals(1, clipboard.written.size)
+        clipboard.held = ClipRead.Text(atLimit + "a")
+        val get = input.clip("clipget", "code=$code")
+        assertTrue(get.body.contains("\"ok\":false"))
+        assertFalse(get.body.contains("aaaa"))
+    }
+
+    @Test
+    fun `only a clipboard send may carry a large body, and only with the right token`() {
+        val input = session()
+        input.start()
+        val endpoint = listeners.last().endpoint
+        val token = input.tokenOf()
+        assertEquals(ClipRules.MAX_BODY, endpoint.maxBody("/r/$token/clipput"))
+        assertTrue(ClipRules.MAX_BODY >= java.net.URLEncoder.encode("\u00e9".repeat(ClipRules.MAX_BYTES / 2), "UTF-8").length + 64)
+        assertEquals(HandoffServer.MAX_BODY, endpoint.maxBody("/r/$token/in"))
+        assertEquals(HandoffServer.MAX_BODY, endpoint.maxBody("/r/$token/clipget"))
+        assertEquals(HandoffServer.MAX_BODY, endpoint.maxBody("/r/wrong/clipput"))
+        assertEquals(HandoffServer.MAX_BODY, endpoint.maxBody("/r/$token"))
+        input.close()
+        assertEquals(HandoffServer.MAX_BODY, endpoint.maxBody("/r//clipput"))
+    }
+
+    @Test
+    fun `the clipboard follows the pairing, the code and the token rules`() {
+        val input = session()
+        input.start()
+        input.open()
+        val code = input.codeOf()
+        clipboard.held = ClipRead.Text("secret clip")
+        // Before Confirm, nothing is read or written.
+        assertEquals(403, input.clip("clipput", "code=$code&text=x").status)
+        assertEquals(403, input.clip("clipget", "code=$code").status)
+        input.confirm()
+        // A wrong or missing code.
+        assertEquals(403, input.clip("clipget", "code=000000").status)
+        assertEquals(403, input.clip("clipget", "").status)
+        assertEquals(403, input.clip("clipput", "text=x").status)
+        // Another device, a wrong token, a wrong method.
+        assertEquals(409, input.clip("clipget", "code=$code", peer = "192.168.1.99").status)
+        assertEquals(409, input.clip("clipput", "code=$code&text=x", peer = "192.168.1.99").status)
+        assertEquals(404, input.clip("clipget", "code=$code", token = "wrong").status)
+        assertEquals(404, input.clip("clipget", "code=$code", method = "GET").status)
+        assertEquals(404, input.clip("clipput", "code=$code&text=x", method = "PUT").status)
+        assertEquals(0, clipboard.reads)
+        assertEquals(emptyList<String>(), clipboard.written)
+        // The paired device with the code is served.
+        assertTrue(input.clip("clipget", "code=$code").body.contains("secret clip"))
+    }
+
+    @Test
+    fun `a refused clipboard write is told to the phone and shown nowhere`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        clipboard.refuse = true
+        val reply = input.clip("clipput", "code=$code&text=hello")
+        assertTrue(reply.body.contains("\"ok\":false"))
+        assertEquals(RemoteInputState.Paired(), input.state.value)
+        assertEquals(400, input.clip("clipput", "code=$code&text=a%00b").status)
+        assertTrue(input.clip("clipput", "code=$code").body.contains("\"ok\":false"))
+    }
+
+    @Test
+    fun `a clipboard request counts as the session being used`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        now += 9 * 60_000
+        input.clip("clipget", "code=$code")
+        now += 9 * 60_000
+        input.tick()
+        assertTrue(input.state.value is RemoteInputState.Paired)
+    }
+
+    @Test
+    fun `closing the session closes the clipboard with it`() {
+        val input = session()
+        input.start()
+        val code = input.pair()
+        input.clip("clipput", "code=$code&text=abc")
+        input.close()
+        assertEquals(RemoteInputState.Closed(RemoteInputEnd.PERSON), input.state.value)
+        assertEquals(404, input.clip("clipget", "code=$code").status)
+    }
+
+    @Test
+    fun `the clip rules classify a clip before reading it`() {
+        var asked = false
+        val text = { asked = true; "hello" }
+        assertEquals(ClipRead.Empty, ClipRules.classify(present = false, sensitive = false, isText = true, text = text))
+        assertEquals(ClipRead.Sensitive, ClipRules.classify(present = true, sensitive = true, isText = true, text = text))
+        assertEquals(ClipRead.NotText, ClipRules.classify(present = true, sensitive = false, isText = false, text = text))
+        assertFalse("the text of a sensitive or non text clip is never read", asked)
+        assertEquals(ClipRead.Text("hello"), ClipRules.classify(present = true, sensitive = false, isText = true, text = text))
+        assertEquals(ClipRead.NotText, ClipRules.classify(present = true, sensitive = false, isText = true, text = { null }))
+        assertEquals(ClipRead.Empty, ClipRules.classify(present = true, sensitive = false, isText = true, text = { "" }))
+    }
+
+    @Test
+    fun `the page has a clipboard panel with its three buttons and no outside address`() {
+        val html = RemoteInputPage.html("482913")
+        assertTrue(html.contains("id=\"cput\"") && html.contains("id=\"cget\"") && html.contains("id=\"ccopy\""))
+        assertTrue(html.contains("Send to console") && html.contains("Get console clipboard") && html.contains("Copy"))
+        assertTrue(html.contains("'clipput'") && html.contains("'clipget'"))
+        assertFalse(html.contains("http://") || html.contains("https://"))
+    }
+
+    @Test
+    fun `a clipboard send over a real socket is read in full, past the small body limit`() {
+        val input = RemoteInput(
+            clock = { now },
+            router = router,
+            listen = { endpoint -> HandoffServer(endpoint, "127.0.0.1") },
+            host = "127.0.0.1",
+            state = MutableStateFlow(RemoteInputState.Idle),
+            clipboard = clipboard,
+        )
+        input.start()
+        val url = input.url()!!
+        val port = url.substringAfterLast(':').substringBefore('/').toInt()
+        val path = url.substringAfter("$port")
+        fun request(target: String, body: String): String =
+            Socket(InetAddress.getByName("127.0.0.1"), port).use { socket ->
+                socket.soTimeout = 5_000
+                val bytes = body.toByteArray()
+                socket.getOutputStream().write(("POST $target HTTP/1.1\r\nContent-Length: ${bytes.size}\r\n\r\n").toByteArray() + bytes)
+                socket.getInputStream().readBytes().toString(Charsets.UTF_8)
+            }
+        fun headOnly(target: String, length: Int): String =
+            Socket(InetAddress.getByName("127.0.0.1"), port).use { socket ->
+                socket.soTimeout = 5_000
+                socket.getOutputStream().write("POST $target HTTP/1.1\r\nContent-Length: $length\r\n\r\n".toByteArray())
+                socket.getInputStream().readBytes().toString(Charsets.UTF_8)
+            }
+        try {
+            Socket(InetAddress.getByName("127.0.0.1"), port).use { socket ->
+                socket.soTimeout = 5_000
+                socket.getOutputStream().write("GET $path HTTP/1.1\r\n\r\n".toByteArray())
+                socket.getInputStream().readBytes()
+            }
+            val code = input.codeOf()
+            input.confirm()
+            val big = "b".repeat(ClipRules.MAX_BYTES)
+            assertTrue(request("$path/clipput", "code=$code&text=$big").startsWith("HTTP/1.1 200"))
+            assertEquals(big, clipboard.written.single())
+            // A body larger than the path allows is refused from its head, unread (only the head is sent here).
+            assertTrue(headOnly("$path/in", HandoffServer.MAX_BODY + 1).startsWith("HTTP/1.1 413"))
+            assertTrue(headOnly("$path/clipget", HandoffServer.MAX_BODY + 1).startsWith("HTTP/1.1 413"))
+            assertTrue(headOnly("$path/clipput", ClipRules.MAX_BODY + 1).startsWith("HTTP/1.1 413"))
+        } finally {
+            input.close()
+        }
     }
 
     // The page and the socket.

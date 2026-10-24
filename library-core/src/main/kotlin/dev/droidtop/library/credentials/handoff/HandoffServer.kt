@@ -17,6 +17,9 @@ interface HandoffEndpoint {
 
     /** The answer to one request from [peer] (its address); pure of sockets. */
     fun handle(method: String, target: String, body: String, peer: String): HandoffReply
+
+    /** The most body bytes a request for [target] may carry; the server refuses a larger one with a 413 before reading it. */
+    fun maxBody(target: String): Int = HandoffServer.MAX_BODY
 }
 
 /** A listener that can be started and stopped, so what owns one can be tested with a fake. */
@@ -33,7 +36,8 @@ class HandoffReply(val status: Int, val body: String, val contentType: String = 
  * The listening half of a local-network handoff (docs/SPEC.md 7h, "Supplying a key from a phone", and "Type from
  * another device"). Binds [bindHost] (the device's LAN address; every interface when null) on a random port only
  * between [start] and [stop] (or the [endpoint] ending), serves one connection at a time, and answers only peers on
- * the local network. Requests are bounded: head 8 KB, body 4 KB, 5 seconds of silence. All decisions about tokens,
+ * the local network. Requests are bounded: head 8 KB, body 4 KB unless the [endpoint] allows a target more
+ * ([HandoffEndpoint.maxBody]), 5 seconds of silence. All decisions about tokens,
  * devices and codes are the [endpoint]'s; this class only moves bytes. Run [start] off the main thread.
  */
 class HandoffServer(private val endpoint: HandoffEndpoint, private val bindHost: String? = null) : HandoffListener {
@@ -100,7 +104,7 @@ class HandoffServer(private val endpoint: HandoffEndpoint, private val bindHost:
             val length = lines.drop(1).firstNotNullOfOrNull {
                 if (it.startsWith("content-length:", ignoreCase = true)) it.substringAfter(':').trim().toIntOrNull() else null
             } ?: 0
-            if (length < 0 || length > MAX_BODY) return reply(out, HandoffReply(413, ""))
+            if (length < 0 || length > endpoint.maxBody(parts[1])) return reply(out, HandoffReply(413, ""))
             val body = String(readBody(input, length), Charsets.UTF_8)
             endpoint.handle(parts[0], parts[1], body, client.inetAddress.hostAddress.orEmpty())
         } catch (e: java.io.IOException) {
@@ -162,7 +166,7 @@ class HandoffServer(private val endpoint: HandoffEndpoint, private val bindHost:
 
     companion object {
         private const val MAX_HEAD = 8 * 1024
-        private const val MAX_BODY = 4 * 1024
+        const val MAX_BODY = 4 * 1024
         private const val FIRST_PORT = 49152
         private const val LAST_PORT = 65535
         private const val BIND_TRIES = 20
