@@ -131,6 +131,8 @@ object PluginWebAccount {
      */
     fun openForDownloads(context: Context, record: PluginRecord, url: String, max: Int): List<WebSessionDownload> {
         if (!NetScope.isHttps(url) || NetScope.hostOf(url) == null) return emptyList()
+        // A link on a hoster the person's debrid account serves comes from the account, without the page (#638).
+        dev.droidtop.pluginhost.debrid.DebridLinks.resolve(url)?.let { return it.take(max) }
         val domains = WebSessions.declaredDomains(record.manifest.v2.permissions)
         val snapshot = PluginGrants.forContext(context).read(record.manifest.id)
         val grant = PluginGrants.stateOf(record, snapshot, WebSessions.PERMISSION)

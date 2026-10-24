@@ -107,13 +107,18 @@ internal object HostWebApis {
             // A page that offers several files (a game in parts, a game and its patch) is taken in one visit (#419): up to
             // `max` downloads, the acquire reply's limit for several files.
             val max = args.optInt("max", 1).coerceIn(1, MAX_CAPTURED)
-            val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null, maxDownloads = max))
-            // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
-            env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
-            // The site may have renewed the session while the person was there.
-            result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it.copy(account = stored(env, record)?.account)) }
-            if (result.downloads.isEmpty()) return@HostOp JSONObject().put("captured", false)
-            val described = result.downloads.take(max).map { download ->
+            // A link on a hoster the person's debrid account serves comes from the account, without the page (#638);
+            // the plugin gets the files as it would a captured download, and never the account or its key.
+            val downloads = dev.droidtop.pluginhost.debrid.DebridLinks.resolve(url) ?: run {
+                val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null, maxDownloads = max))
+                // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
+                env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
+                // The site may have renewed the session while the person was there.
+                result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it.copy(account = stored(env, record)?.account)) }
+                result.downloads
+            }
+            if (downloads.isEmpty()) return@HostOp JSONObject().put("captured", false)
+            val described = downloads.take(max).map { download ->
                 NetScope.hostOf(download.url) ?: invalid("the page started a download that is not an http or https address")
                 val fileName = WebSessions.safeFileName(WebSessions.fileNameFor(download.url, download.contentDisposition))
                 val headers = buildMap {

@@ -157,4 +157,30 @@ class DebridTest {
         RealDebrid(fresh).apply { request("key", ref); release("key", ref) }
         assertTrue(fresh.calls.contains("DELETE https://api.real-debrid.com/rest/1.0/torrents/delete/R9"))
     }
+
+    @Test
+    fun aHosterLinkIsServedOnlyForAHostTheAccountLists() {
+        val domains = setOf("pixeldrain.com", "mega.nz")
+        assertTrue(DebridLinks.covers(domains, "pixeldrain.com"))
+        assertTrue(DebridLinks.covers(domains, "www.pixeldrain.com"))
+        assertTrue(DebridLinks.covers(domains, "eu.mega.nz"))
+        assertTrue(!DebridLinks.covers(domains, "notpixeldrain.com"))
+        assertTrue(!DebridLinks.covers(domains, "f95zone.to"))
+    }
+
+    @Test
+    fun torBoxListsItsWorkingHostersAndServesAFetchedLinkFileByFile() {
+        val http = Canned(
+            "GET https://api.torbox.app/v1/api/webdl/hosters" to (200 to """{"success":true,"data":[{"name":"Pixeldrain","domains":["pixeldrain.com"],"status":true},{"name":"Down","domains":["down.example"],"status":false}]}"""),
+            "POST https://api.torbox.app/v1/api/webdl/createwebdownload" to (200 to """{"success":true,"data":{"webdownload_id":"w1","hash":"h"}}"""),
+            "GET https://api.torbox.app/v1/api/webdl/mylist?id=w1" to (200 to """{"success":true,"data":{"id":"w1","download_present":true,"download_finished":true,"files":[{"id":3,"name":"x/Game-1.0.zip","short_name":"Game-1.0.zip","size":9}]}}"""),
+            "GET https://api.torbox.app/v1/api/webdl/requestdl" to (200 to """{"success":true,"data":"https://cdn.torbox.example/g"}"""),
+        )
+        val box = TorBox(http)
+        assertEquals(setOf("pixeldrain.com"), box.hosts("key"))
+        val ready = box.unrestrict("key", "https://pixeldrain.com/u/abc") as DebridState.Ready
+        assertEquals(listOf("Game-1.0.zip"), ready.files.map { it.path })
+        assertEquals("https://cdn.torbox.example/g", ready.files.single().url)
+        assertTrue(http.calls.any { it.contains("web_id=w1") && it.contains("file_id=3") })
+    }
 }

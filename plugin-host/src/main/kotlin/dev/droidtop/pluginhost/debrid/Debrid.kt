@@ -60,6 +60,18 @@ interface DebridProvider {
      * it, so asking leaves nothing behind. One that was on the list before droidtop asked stays. Nothing by default.
      */
     fun release(key: String, torrent: TorrentRef) {}
+
+    /**
+     * The file-hoster domains the account can fetch a link from ("pixeldrain.com", "mega.nz"), as the service lists
+     * them for this account now, never a list droidtop keeps. Empty for a service that fetches no hoster links.
+     */
+    fun hosts(key: String): Set<String> = emptySet()
+
+    /** Whether the service already has [link]'s file, without asking it to fetch it. Null when it cannot say. */
+    fun linkCached(key: String, link: String): Boolean? = null
+
+    /** Asks the service for [link] on a file hoster (asking again is safe) and says where it stands: its files when ready. */
+    fun unrestrict(key: String, link: String): DebridState = DebridState.Failed("$name does not fetch hoster links", permanent = true)
 }
 
 /** The HTTP the providers speak, replaceable for the tests. */
