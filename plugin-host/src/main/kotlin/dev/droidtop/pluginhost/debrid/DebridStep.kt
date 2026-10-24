@@ -57,9 +57,7 @@ object DebridStep {
             val chosen = choose(accounts, waits, torrent, status, pollMs, maxWaitMs, asked) ?: return null
             // Chosen before its files come: a download that fails part way keeps it on the list for the retry.
             server = chosen.first
-            DebridChoice.serving(chosen.first, accounts.first { it.first == chosen.first }.second) {
-                download(chosen.first, chosen.second, folder, status, fetch)
-            }
+            download(chosen.first, chosen.second, folder, status, fetch)
             return chosen.first.name
         } finally {
             // Also when the job is cancelled: asking leaves nothing on a list droidtop did not use.
@@ -104,7 +102,8 @@ object DebridStep {
         // 3. Waiting for the service: the first that took it, else the first account, fetches it.
         val (provider, key) = taker ?: accounts.first()
         asked += provider to key
-        return settle(provider, key, torrent, status, pollMs, maxWaitMs)?.let { provider to it }
+        // Only a torrent the service fetches takes one of the account's slots; a cached one takes none (owner, TorBox).
+        return DebridChoice.serving(provider, key) { settle(provider, key, torrent, status, pollMs, maxWaitMs) }?.let { provider to it }
     }
 
     /** Asks [provider] until the torrent is ready, for at most [maxWaitMs]; null when it fails, is not cached or runs out. */

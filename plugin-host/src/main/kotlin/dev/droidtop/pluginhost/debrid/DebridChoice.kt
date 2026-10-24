@@ -89,7 +89,7 @@ object DebridChoice {
         costs.keys.removeIf { it.startsWith(id(provider, key) + "|") }
     }
 
-    /** Runs [block] counted as one of droidtop's jobs on [provider]'s account, for spread mode. */
+    /** Runs [block] counted as one of droidtop's jobs taking a slot on [provider]'s account (a fetch, never a cached one), for spread mode. */
     inline fun <T> serving(provider: DebridProvider, key: String, block: () -> T): T {
         val count = counter(provider, key)
         count.incrementAndGet()
