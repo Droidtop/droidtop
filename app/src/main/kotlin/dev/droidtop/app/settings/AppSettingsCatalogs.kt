@@ -1157,9 +1157,15 @@ object AppSettingsCatalogs {
             CatalogGroup(
                 id = "accounts_debrid",
                 title = "Debrid services",
-                items = listOf(
-                    guidedKeyRow(context, ScraperKeyService.TORBOX, "TorBox"),
-                    guidedKeyRow(context, ScraperKeyService.REALDEBRID, "Real-Debrid"),
+                items = debridAccountRows(context) + listOf(
+                    ToggleItem(
+                        id = "accounts_debrid_spread",
+                        title = "Spread mode",
+                        subtitle = "When two accounts would cost the same, use the one fetching the fewest torrents for " +
+                            "droidtop instead of the first in your order, so one account's slots do not fill while another's sit idle",
+                        current = dev.droidtop.library.debrid.DebridAccounts.spread(context),
+                        onToggle = { ctx, value -> dev.droidtop.library.debrid.DebridAccounts.setSpread(ctx, value) },
+                    ),
                     ToggleItem(
                         id = "accounts_debrid_wait",
                         title = "Wait for the service",
@@ -1199,6 +1205,34 @@ object AppSettingsCatalogs {
      * its state ("Not set", "Not tested", "Connected") as the value, and the
      * numbered guide, QR code and fields behind it (ScraperKeySetupActivity).
      */
+    /**
+     * Each debrid account in the person's order (Droidtop/tracker#638): its key row, whether it is used for downloads,
+     * and moving it in the order, which settles a tie between accounts a job costs the same (the cheapest serves first).
+     */
+    private fun debridAccountRows(context: Context): List<CatalogItem> {
+        val accounts = dev.droidtop.library.debrid.DebridAccounts
+        val services = mapOf("torbox" to (ScraperKeyService.TORBOX to "TorBox"), "realdebrid" to (ScraperKeyService.REALDEBRID to "Real-Debrid"))
+        val order = accounts.order(context)
+        return order.withIndex().flatMap { (index, id) ->
+            val (service, title) = services[id] ?: return@flatMap emptyList()
+            buildList<CatalogItem> {
+                add(guidedKeyRow(context, service, title))
+                if (service.isConfigured(context)) {
+                    add(
+                        ToggleItem(
+                            id = "accounts_debrid_used_$id",
+                            title = "Use $title for downloads",
+                            subtitle = "Off keeps it signed in but unused",
+                            current = accounts.used(context, id),
+                            onToggle = { ctx, value -> accounts.setUsed(ctx, id, value) },
+                        ),
+                    )
+                }
+                if (index > 0) add(ActionItem(id = "accounts_debrid_up_$id", title = "Move $title up", subtitle = "Asked before ${services[order[index - 1]]?.second} when they cost the same", run = { ctx -> accounts.move(ctx, id, earlier = true) }))
+            }
+        }
+    }
+
     private fun guidedKeyRow(context: Context, service: ScraperKeyService, title: String) = ActionItem(
         id = "accounts_" + service.name.lowercase(),
         title = title,
