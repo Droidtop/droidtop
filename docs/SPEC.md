@@ -15336,9 +15336,9 @@ stands for several folders or store copies ON THIS DEVICE (installed
 entries of `LibraryGameGroup`; an owned store game that is not installed
 is not a copy, so it carries no count, and `StoreIdentity` joins rows by an
 install directory only when an installed row stands on it). A running download also draws a thin progress bar along the
-bottom edge. The focus treatment is the one `focusLift` of "Gaming motion
+bottom edge. The focus treatment is the one `focusRise` and `focusZoom` of "Gaming motion
 and focus"; `GameCard` (the launcher and library tiles that are not
-theme-rendered) takes the same `focusLift` and the same state badge, and
+theme-rendered) takes the same pair and the same state badge, and
 the ES-DE theme renderer is untouched. The focused game's one line
 (`focusLine`: name, store, stage, version, size, copies) sits above the
 hint row.
@@ -17656,10 +17656,26 @@ theme's roles (section 7k2).
   (`Motion.ColourMs`); a row's transform takes 320 ms; a capsule's lift, shadow and brightness
   glide in over 300 ms and settle back over 600 ms, because letting go slower than taking reads as
   weight. A press acknowledges itself in 50 ms.
-- **One focus treatment** (`selectionFrame` for the outline and fill, `focusLift` for a
-  capsule): the focused capsule grows 5.3 percent from near its bottom edge (a landscape card 2.4
-  percent), rises 4dp, comes up from 90 to 100 percent brightness, and its platform shadow deepens
-  from 4 to 18dp, black as Steam's. It is cheap by
+- **One focus treatment** (`selectionFrame` for the outline and fill, `focusRise` and `focusZoom` for a
+  capsule, both reading one `rememberFocusLift`): the focused card rises 4dp and its platform shadow deepens
+  from 4 to 18dp, black as Steam's; **its art grows 5.3 percent inside the card's fixed edge** (a landscape card
+  2.4 percent) and comes up from 90 to 100 percent brightness. The card, its clip and the window's ring keep the
+  card's own size (owner on the console, 2026-10-23, Droidtop/tracker#632: the image "scales up but the outline
+  stays at the original size, so the image is clipped by it or pokes through"). When the whole card grew from
+  near its bottom, a tall card's top passed the edge its row clips at and the ring, measured through that clip,
+  landed inside the art, worse the taller the card. **The ring glides between neighbours**: it travels as a drop
+  only to a control far away edge to edge (`glideGap`), not centre to centre, so from the wide first card to the
+  small one beside it, whose centres are far apart while their edges touch, it slides instead of jumping.
+- **A card's picture is its box art** (owner, 2026-10-23, #632: "we never want screenshots to be what's displayed
+  first, and that seems to be preferred for emulator games. We want boxart or posters to be there"). On every
+  card droidtop draws (tiles, Home's rows, grids, the companion) the order is box art or cover, then poster or
+  portrait key art, then the store's capsule or grid art, and a screenshot only when nothing else exists; the
+  game page's hero takes hero or fan art. For ES-DE media (`EsDeArtwork`): covers, 3D boxes, miximages (box art
+  over a screenshot, so ahead of a bare one), physical media, fan art, marquee, title screens, screenshots. It
+  led with the miximage, which is mostly a screenshot. The scraper fetches a cover for any game without box art
+  (`EsDeArtwork.hasCover`): a game with only a screenshot used to count as having art and never got one. A theme
+  that declares its own `<imageType>` order keeps it; stores already give portrait art (Steam's 600x900 library
+  capsule, GOG's vertical cover, SteamGridDB grids). It is cheap by
   construction: no blur, every animated value read in the layer or draw phase so a focus move
   recomposes nothing. Because of that there is no low-performance mode to switch it off; a blur or
   backdrop effect added later must come with one.

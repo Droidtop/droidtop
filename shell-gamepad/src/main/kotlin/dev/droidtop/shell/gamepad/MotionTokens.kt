@@ -105,8 +105,8 @@ object Motion {
      * Gliding: after a move it keeps re-measuring where its control is for
      * [GlideSettleMs] (layer animations move a control without a relayout);
      * two moves closer together than [GlideRepeatMs] are a held direction
-     * (it runs as one piece, no stretch); a move longer than [GlideFarDp]
-     * travels as a droplet; the trailing edge waits [GlideTrailDelayMs].
+     * (it runs as one piece, no stretch); a move to a control more than
+     * [GlideFarDp] away, edge to edge, travels as a droplet; the trailing edge waits [GlideTrailDelayMs].
      */
     const val RingLandMs = 400
     const val RingLandFromDp = 12f

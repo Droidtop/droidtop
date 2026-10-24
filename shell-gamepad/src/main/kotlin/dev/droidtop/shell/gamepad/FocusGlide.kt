@@ -316,7 +316,11 @@ internal fun FocusGlideHost(modifier: Modifier = Modifier, content: @Composable 
                         val isHeld = glideIsHeld((now - lastMove) / 1_000_000)
                         lastMove = now
                         scope.launch { alpha.animateTo(1f, Motion.tw(120)) }
-                        dropped = glideIsFar(isHeld, hypot(dx, dy) / density.density)
+                        // How far apart the two controls are, edge to edge, not centre to centre: from a
+                        // wide card to the small one beside it the centres are far apart while the cards
+                        // touch, and the ring dropped and flew there instead of sliding (Droidtop/tracker#632).
+                        val from = Rect(edges[0].value, edges[1].value, edges[2].value, edges[3].value)
+                        dropped = glideIsFar(isHeld, glideGap(from, b) / density.density)
                         if (dropped) {
                             droplet(src, b)
                         } else {
@@ -405,5 +409,12 @@ internal fun glideLeadEdge(dx: Float, dy: Float): Int =
 /** Whether a move [sinceLastMs] after the last one is a held direction. Pure. */
 internal fun glideIsHeld(sinceLastMs: Long): Boolean = sinceLastMs < Motion.GlideRepeatMs
 
-/** Whether a move of [distanceDp] travels as a drop: a far, single press. Pure. */
+/** How far [to] is from [from], edge to edge: 0 when they touch or overlap. Pure. */
+internal fun glideGap(from: Rect, to: Rect): Float {
+    val x = maxOf(0f, to.left - from.right, from.left - to.right)
+    val y = maxOf(0f, to.top - from.bottom, from.top - to.bottom)
+    return hypot(x, y)
+}
+
+/** Whether a move whose controls are [distanceDp] apart, edge to edge, travels as a drop: a far, single press. Pure. */
 internal fun glideIsFar(held: Boolean, distanceDp: Float): Boolean = !held && distanceDp > Motion.GlideFarDp

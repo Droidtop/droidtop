@@ -82,8 +82,17 @@ data class GameMediaLocator(
  * "Game system customizations" docs, not assumed to already exist).
  */
 object EsDeArtwork {
+    /**
+     * droidtop's own order for a game's picture on a card (tiles, Home's rows, grids, the companion): box art first,
+     * a screenshot only when nothing else exists (owner, 2026-10-23, Droidtop/tracker#632: "we never want
+     * screenshots to be what's displayed first, and that seems to be preferred for emulator games. We want boxart
+     * or posters to be there"). It used to lead with ES-DE's miximage, a composite that is mostly a screenshot.
+     * A miximage still beats a bare screenshot (it carries the box), and the art that is not a screenshot (the
+     * medium, fan art, the marquee) comes before the title screen and the screenshot. A theme that declares its
+     * own `<imageType>` order keeps it ([resolve] with image types): that is the theme's design.
+     */
     private val MEDIA_TYPES_BY_PRIORITY =
-        listOf("miximages", "covers", "screenshots", "titlescreens", "marquees", "physicalmedia", "fanart")
+        listOf("covers", "3dboxes", "miximages", "physicalmedia", "fanart", "marquees", "titlescreens", "screenshots")
     // Real ES-DE's own list is png/jpg/webp (FileData.h:161
     // `sImageExtensions`). `webp` was missing here, so a library scraped
     // by real ES-DE with WebP output resolved nothing at all; `jpeg` is
@@ -193,6 +202,7 @@ object EsDeArtwork {
         val labels = mapOf(
             "miximages" to "Mix image",
             "covers" to "Box art",
+            "3dboxes" to "3D box",
             "screenshots" to "Screenshot",
             "titlescreens" to "Title screen",
             "marquees" to "Marquee",
@@ -219,6 +229,14 @@ object EsDeArtwork {
      * sibling `ES-DE/downloaded_media` layout first, then a direct
      * `downloaded_media` under [gamesRoot] itself.
      */
+    /**
+     * Whether the game has box art (a cover or a 3D box), the art a card leads with. A screenshot or a title screen
+     * is not: the scraper fetches a cover for a game that has only those (Droidtop/tracker#632), where "any art at
+     * all" left the screenshot on the card for good.
+     */
+    fun hasCover(gamesRoot: File, system: String, romBaseName: String): Boolean =
+        resolve(gamesRoot, system, romBaseName, listOf("cover", "3dbox")) != null
+
     fun resolve(gamesRoot: File, system: String, romBaseName: String): String? =
         resolve(gamesRoot, system, romBaseName, MEDIA_TYPES_BY_PRIORITY.mapNotNull { folder ->
             IMAGE_TYPE_TO_FOLDER.entries.firstOrNull { it.value == folder }?.key

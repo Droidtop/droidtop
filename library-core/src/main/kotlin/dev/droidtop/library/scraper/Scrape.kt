@@ -64,7 +64,8 @@ suspend fun scrapeSystemArtwork(
     val resumeIndex = resumeAfter?.let { after -> romFiles.indexOfFirst { it.absolutePath == after.absolutePath } } ?: -1
     val candidates = if (resumeIndex >= 0) romFiles.drop(resumeIndex + 1) else romFiles
     val missing = candidates.filter { romFile ->
-        val noArt = EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null
+        // Only box art counts: a game with nothing but a screenshot still needs its cover (Droidtop/tracker#632).
+        val noArt = !EsDeArtwork.hasCover(gamesRoot, system.id, romFile.nameWithoutExtension)
         val noMeta = romFile.absolutePath !in existingMetadataIds
         when (filter) {
             dev.droidtop.library.scraper.ScrapeFilter.MISSING_ANY -> noArt || noMeta
@@ -215,7 +216,7 @@ suspend fun scrapeSystemArtwork(
                 wantArtwork &&
                 screenScraperResult?.coverUrl == null &&
                 gamesDbResult?.coverUrl == null &&
-                EsDeArtwork.resolve(gamesRoot, system.id, romFile.nameWithoutExtension) == null
+                !EsDeArtwork.hasCover(gamesRoot, system.id, romFile.nameWithoutExtension)
             ) {
                 dev.droidtop.library.scraper.LibretroThumbnails.coverUrl(system.id, romFile.nameWithoutExtension)
             } else null
@@ -223,7 +224,7 @@ suspend fun scrapeSystemArtwork(
             val coverUrl = screenScraperResult?.coverUrl ?: gamesDbResult?.coverUrl ?: thumbnailUrl
             val mediaRoot = File(File(gamesRoot, EsDeArtwork.MEDIA_DIR), system.id)
             val baseName = romFile.nameWithoutExtension
-            val coverWritten = wantArtwork && coverUrl != null && EsDeArtwork.resolve(gamesRoot, system.id, baseName) == null
+            val coverWritten = wantArtwork && coverUrl != null && !EsDeArtwork.hasCover(gamesRoot, system.id, baseName)
             if (coverWritten) downloadImage(coverUrl!!, File(mediaRoot, "covers/$baseName.png"))
             // The full media set (real ES-DE's own Scrape* toggles, all
             // default-on): each type lands in its ES-DE downloaded_media
