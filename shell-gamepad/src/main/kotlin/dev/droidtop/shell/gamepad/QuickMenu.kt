@@ -169,10 +169,10 @@ internal fun QuickMenu(
         val sections = remember(hasPlugins, hasSocial, uiMode, order) {
             QuickTiles.visibleSections(hasPlugins, hasSocial, uiMode, order)
         }
-        var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection(granted)) }
+        var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection) }
         val sectionStates = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
         LaunchedEffect(sections, section) {
-            if (section !in sections) section = QuickTiles.initialSection(granted)
+            if (section !in sections) section = QuickTiles.initialSection
         }
         // What is waiting, for the rail's dots: read while the sheet is open, never polled.
         val notifications by NotificationsStore.items.collectAsState()
