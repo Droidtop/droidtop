@@ -145,6 +145,17 @@ internal suspend fun getDownload(
     say: (String) -> Unit,
 ): String {
     val externalId = record.externalId
+    // The game's own page on the source's site, opened in droidtop's web view when droidtop's own requests are turned
+    // away: the web view passes the site's browser check itself (it is the browser), and the person picks the mirror
+    // there, as on the site; droidtop takes the download the page starts (Droidtop/tracker#600, #599). Cloudflare
+    // refused droidtop's HTTP client on F95zone even with the web view's fresh clearance and user agent (console,
+    // dev.2324), so a mirror with no address is never fetched through it while the site is checking.
+    val sitePage = record.url?.takeIf { it.startsWith("https://") }
+    suspend fun pickOnSitePage(): String {
+        say("Pick ${picked.host} on ${source.label}'s page that opens")
+        return library.openUpdateLink(source.key, externalId, sitePage!!, null, record.version, gameName, newest) { status -> say(status) }
+    }
+    if (picked.url == null && sitePage != null && library.sourceNeedsCheck(source.key)) return pickOnSitePage()
     // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).
     var checked = false
     if (library.sourceNeedsCheck(source.key)) {
@@ -169,7 +180,9 @@ internal suspend fun getDownload(
     } else {
         library.downloadUpdate(source.key, externalId, use.link, record.version, gameName, newest) { status -> say(status) }
     }
-    // Asked again right after a pass: said once, plainly, and the check is not opened again for it.
+    // The source's job was turned away by the site's check: the mirror is picked on the site's page instead.
+    if (url == null && sitePage != null && outcome.contains("checks the browser first")) return pickOnSitePage()
+    // Asked again right after a pass, with no page to open instead: said once, plainly, and the check is not opened again.
     return if (checked && outcome.contains("checks the browser first")) {
         "${source.label}'s site still asked for its check after it was passed, so nothing was downloaded"
     } else {
