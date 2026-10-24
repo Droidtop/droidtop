@@ -19,9 +19,17 @@ class PlaceTest {
 
     @Test
     fun `Kiosk and Kid hide every place`() {
-        assertEquals(Place.entries, Place.visible(UiMode.FULL))
+        assertEquals(Place.entries, Place.reachable(UiMode.FULL))
         assertTrue(Place.visible(UiMode.KIOSK).isEmpty())
         assertTrue(Place.visible(UiMode.KID).isEmpty())
+        assertTrue(Place.reachable(UiMode.KID).isEmpty())
+    }
+
+    @Test
+    fun `Updates is a page of Downloads and Updates, not a place of its own in the lists`() {
+        assertEquals(Place.entries - Place.UPDATES, Place.visible(UiMode.FULL))
+        assertEquals("Downloads and Updates", Place.DOWNLOADS.title)
+        assertTrue(Place.UPDATES in Place.reachable(UiMode.FULL))
     }
 
     @Test

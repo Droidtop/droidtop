@@ -7,6 +7,7 @@ import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.Place
 import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.JobNumbers
@@ -39,14 +40,18 @@ import java.util.concurrent.ConcurrentHashMap
  * nothing on it polls.
  *
  * Registered once (in `:app`'s `AppSettingsCatalogs`) and reached from
- * the "Downloads and installs" entry of Settings and, in the Gaming
+ * the "Downloads and Updates" entry of Settings and, in the Gaming
  * shell, from the left menu's place of the same name (docs/SPEC.md 7j
- * "Places") -- same shared-catalog registry every other cross-module
+ * "Places"), which holds Updates as its first row (Droidtop/tracker#639)
+ * -- same shared-catalog registry every other cross-module
  * management screen uses, so every renderer gets it for free. A store's
  * page lists its own installs with the same rows ([jobRow]).
  */
 object PluginJobsScreen {
     const val ID = "plugin_jobs"
+
+    /** The first row, Updates: a page of this place (Droidtop/tracker#639). Gaming opens its own Updates page for it. */
+    const val UPDATES_ROW_ID = "plugin_jobs_updates"
 
     /** The Download rules screen's registry id, registered by :app (`DownloadRulesCatalog`). */
     const val RULES_SCREEN_ID = "download_rules"
@@ -61,9 +66,9 @@ object PluginJobsScreen {
      */
     fun screen(headed: Boolean = true): CatalogScreen = CatalogScreen(
         id = ID,
-        title = "Downloads and installs",
-        subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from".takeIf { headed },
-        groups = { _ -> groupsFor(PluginJobsCenter.entries().value, System.currentTimeMillis()) + rulesGroup() },
+        title = Place.DOWNLOADS.title,
+        subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from, and updates".takeIf { headed },
+        groups = { _ -> listOf(updatesGroup()) + groupsFor(PluginJobsCenter.entries().value, System.currentTimeMillis()) + rulesGroup() },
         live = PluginJobsCenter.entries(),
     )
 
@@ -100,6 +105,20 @@ object PluginJobsScreen {
         subtitle = "Forgets every finished job and what it did",
         confirmTitle = "Clear every finished job from this list?",
         run = { PluginJobsCenter.clearFinished() },
+    )
+
+    /** Updates, a page of this place (owner, 2026-10-24, Droidtop/tracker#639: "Updates should be in the Downloads and Updates menu"). */
+    private fun updatesGroup() = CatalogGroup(
+        id = "plugin_jobs_updates_group",
+        title = null,
+        items = listOf(
+            NestedScreenItem(
+                id = UPDATES_ROW_ID,
+                title = Place.UPDATES.title,
+                subtitle = "What has a newer version, checking for updates, and Get new games",
+                registryId = Place.ID_UPDATES,
+            ),
+        ),
     )
 
     /** The way to the download rules (network, update window, automatic updates), from the place where downloads are seen. */

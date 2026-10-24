@@ -278,11 +278,17 @@ object UpdatesPage {
                         AsyncActionItem(
                             id = "updates_game_${entry.id}",
                             title = entry.title,
-                            subtitle = "Game. Its source has a newer version; its page has the source's Get",
+                            subtitle = "Game. Its source has a newer version: its downloads, changelog and Get",
                             value = GameUpdates.line(version),
                             run = { ctx, _ ->
-                                ctx.startActivity(dev.droidtop.app.LauncherGamesActivity.pageIntent(ctx, entry.id))
-                                "Opened ${entry.title}'s page"
+                                // The update's downloads in place, over this page (Droidtop/tracker#639); outside
+                                // Gaming, where nothing can draw them, the game's page as before.
+                                if (dev.droidtop.library.GameSurfaces.showUpdate?.invoke(entry.id) == true) {
+                                    GameUpdates.line(version)
+                                } else {
+                                    ctx.startActivity(dev.droidtop.app.LauncherGamesActivity.pageIntent(ctx, entry.id))
+                                    "Opened ${entry.title}'s page"
+                                }
                             },
                         ),
                         null,

@@ -5,11 +5,13 @@ import android.content.Intent
 
 /**
  * The places things live (docs/SPEC.md 7j "Places", Droidtop/tracker#258, #346): Stores, Social,
- * Downloads and installs, Updates and Plugins. Each is a registered settings catalog screen
- * ([screenId], registered by `:app`), and this is the one list of them for every mode: Gaming's left
- * menu lists them as sections, Standard's settings root and droidtop's icon shortcuts link to them,
- * Desktop's Start menu lists them. Kiosk and Kid hide them in every mode ([visible]), because they are
- * the device's management as much as Settings is.
+ * Downloads and Updates, and Plugins. Each is a registered settings catalog screen ([screenId],
+ * registered by `:app`), and this is the one list of them for every mode: Gaming's left menu lists them
+ * as sections, Standard's settings root and droidtop's icon shortcuts link to them, Desktop's Start menu
+ * lists them. Kiosk and Kid hide them in every mode ([visible]), because they are the device's management
+ * as much as Settings is. Updates is a place of its own (its links and notifications open it) but not
+ * [listed]: it is a page of Downloads and Updates (owner, 2026-10-24, Droidtop/tracker#639: "Updates should
+ * be in the Downloads and Updates menu").
  */
 private const val STORES_SCREEN = "stores"
 private const val SOCIAL_SCREEN = "social"
@@ -17,12 +19,12 @@ private const val DOWNLOADS_SCREEN = "plugin_jobs"
 private const val UPDATES_SCREEN = "updates"
 private const val PLUGINS_SCREEN = "plugins"
 
-enum class Place(val screenId: String, val title: String) {
+enum class Place(val screenId: String, val title: String, val listed: Boolean = true) {
     // "Game sources" (Droidtop/tracker#397 slice E): stores, game folders and imports, one place.
     STORES(STORES_SCREEN, "Game sources"),
     SOCIAL(SOCIAL_SCREEN, "Social"),
-    DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and installs"),
-    UPDATES(UPDATES_SCREEN, "Updates"),
+    DOWNLOADS(DOWNLOADS_SCREEN, "Downloads and Updates"),
+    UPDATES(UPDATES_SCREEN, "Updates", listed = false),
     PLUGINS(PLUGINS_SCREEN, "Plugins"),
     ;
 
@@ -38,8 +40,11 @@ enum class Place(val screenId: String, val title: String) {
 
         fun byScreenId(screenId: String?): Place? = entries.firstOrNull { it.screenId == screenId }
 
-        /** The places a UI mode shows: all of them, or none where it hides Settings (Kiosk, Kid). */
-        fun visible(uiMode: UiMode): List<Place> = if (uiMode.hidesSettings) emptyList() else entries
+        /** The places a UI mode lists: every [listed] one, or none where it hides Settings (Kiosk, Kid). */
+        fun visible(uiMode: UiMode): List<Place> = reachable(uiMode).filter { it.listed }
+
+        /** The places a UI mode lets a link or a row open, listed or not: all, or none in Kiosk and Kid. */
+        fun reachable(uiMode: UiMode): List<Place> = if (uiMode.hidesSettings) emptyList() else entries
 
         /**
          * Whether a link to a place (a notification) should open it in Gaming: only when Gaming is the

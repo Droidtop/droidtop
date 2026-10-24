@@ -56,7 +56,7 @@ class CatalogScreenActivity : AppCompatActivity() {
         // Kiosk and Kid hide the places in every mode, as Gaming's left menu does: a shortcut or a
         // notification must not be a way around that.
         val place = Place.byScreenId(screenId)
-        if (place != null && place !in Place.visible(UiModePrefs.get(this))) {
+        if (place != null && place !in Place.reachable(UiModePrefs.get(this))) {
             dev.droidtop.library.settings.Notices.flash("${place.title} is hidden in this UI mode", context = this)
             finish()
             return

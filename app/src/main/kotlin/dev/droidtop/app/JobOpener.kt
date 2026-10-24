@@ -13,7 +13,7 @@ import java.io.File
 
 /**
  * Open on a job or a line of its report (docs/SPEC.md "Jobs and their results", review finding 15), installed into
- * [JobOpen] at start: a game opens its page, a place opens where the person is (Gaming or the screen host), and a
+ * [JobOpen] at start: a game opens its page (in Gaming over the row, [dev.droidtop.library.GameSurfaces]), a place opens where the person is (Gaming or the screen host), and a
  * folder or a file on shared storage opens in Android's own files app, which is what can show it whatever the
  * person has installed. A path outside shared storage (droidtop's private folders) has nothing that can open it, so
  * it does not.
@@ -24,6 +24,8 @@ object JobOpener {
     }
 
     private fun open(context: Context, target: OpenTarget): Boolean {
+        // In Gaming a game's page opens over the job row, so Back returns to it (Droidtop/tracker#639).
+        if (target is OpenTarget.Game && dev.droidtop.library.GameSurfaces.showPage?.invoke(target.entryId) == true) return true
         val intent = when (target) {
             is OpenTarget.Game -> LauncherGamesActivity.pageIntent(context, target.entryId)
             is OpenTarget.Place -> Place.byScreenId(target.id)?.let { PlaceLinks.intent(context, it) }

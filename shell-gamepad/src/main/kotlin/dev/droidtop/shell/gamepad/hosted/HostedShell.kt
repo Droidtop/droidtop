@@ -351,7 +351,7 @@ fun QuickMenuStandalone(
             },
             placeAvailable = { screenId ->
                 val place = Place.byScreenId(screenId)
-                place == null || place in Place.visible(UiModePrefs.get(context))
+                place == null || place in Place.reachable(UiModePrefs.get(context))
             },
             onDismiss = onDismiss,
         )

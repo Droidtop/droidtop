@@ -96,6 +96,18 @@ data class GameLinks(
         get() = sources.sortedBy { it.source }
             .mapNotNull { it.answer?.takeUnless { a -> a.gone }?.version?.takeIf { v -> v.isNotBlank() } }
             .reduceOrNull { best, next -> if (dev.droidtop.runtime.util.Versions.compareLoose(GameUpdates.normalize(next), GameUpdates.normalize(best)) > 0) next else best }
+
+    /**
+     * The link whose record gives [latestKnown], the one an update row shows the downloads of (Droidtop/tracker#639);
+     * the first link when none answered a version. A computer's (`computer:<id>`) has no record page and is passed
+     * over. Pure.
+     */
+    val updateLink: SourceLink?
+        get() {
+            val pages = sources.filter { !it.source.startsWith("computer:") }
+            val newest = latestKnown
+            return pages.firstOrNull { newest != null && it.answer?.takeUnless { a -> a.gone }?.version == newest } ?: pages.firstOrNull()
+        }
 }
 
 /**

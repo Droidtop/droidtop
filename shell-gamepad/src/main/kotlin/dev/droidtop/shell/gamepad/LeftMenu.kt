@@ -10,6 +10,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.HoverInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -37,6 +40,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -243,6 +247,7 @@ internal fun LeftMenu(
                                 focusIndex = 0
                                 press(GamepadAction.A)
                             },
+                            onHover = { focusIndex = 0 },
                         )
                         Spacer(Modifier.height(Space.Sm))
                     }
@@ -255,6 +260,7 @@ internal fun LeftMenu(
                                 focusIndex = resumeRows
                                 press(GamepadAction.A)
                             },
+                            onHover = { focusIndex = resumeRows },
                         )
                         Spacer(Modifier.height(Space.Sm))
                     }
@@ -269,6 +275,7 @@ internal fun LeftMenu(
                             focusIndex = index + rowsAbove
                             press(GamepadAction.A)
                         },
+                        onHover = { focusIndex = index + rowsAbove },
                     )
                 }
             }
@@ -284,7 +291,7 @@ internal fun LeftMenu(
  * in the draw and layer phases, so the animation recomposes nothing. The
  * window's one sliding ring marks the row too, as it marks every selection.
  */
-private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit): Modifier = composed {
+private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit, onHover: () -> Unit): Modifier = composed {
     val shown = selected && PadModality.showsFocus
     val flash = remember { Animatable(0f) }
     LaunchedEffect(shown) {
@@ -296,15 +303,24 @@ private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit): Modi
         }
     }
     val ink = MenuTokens.OnSurface
+    // A pointer over a row moves the cursor to it: pointer and focus are one selection (docs/SPEC.md 7j).
+    val source = remember { MutableInteractionSource() }
+    val hovered = rememberUpdatedState(onHover)
+    LaunchedEffect(source) {
+        source.interactions.collect { if (it is HoverInteraction.Enter) hovered.value() }
+    }
     Modifier
         .fillMaxWidth()
         .heightIn(min = sideMenuRowHeight())
+        .hoverable(source)
         .drawBehind {
             val alpha = flash.value
             if (alpha > 0f) drawRect(ink.copy(alpha = alpha))
         }
         .focusRing(shown, RectangleShape)
-        .clickable(onClick = onClick)
+        // No indication of its own: the cursor above is the one selection. The default one drew a grey plate on the
+        // row under the pointer or with Android's focus while the cursor sat on another (Droidtop/tracker#639).
+        .clickable(interactionSource = source, indication = null, onClick = onClick)
 }
 
 /** The content of a focused row grows rightwards from near its left edge; the plate stays put. */
@@ -332,8 +348,8 @@ private fun sideMenuRowHeight(): Dp {
  * The cursor is [sideMenuFocus], and the menu opens with it on the current row.
  */
 @Composable
-private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Boolean, selected: Boolean, onClick: () -> Unit) {
-    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick)) {
+private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Boolean, selected: Boolean, onClick: () -> Unit, onHover: () -> Unit) {
+    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick, onHover)) {
         if (isCurrent) CurrentMark()
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -349,12 +365,14 @@ private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Boole
                 modifier = Modifier.size(SideMenu.IconSize),
             )
             Spacer(Modifier.width(SideMenu.IconGap))
+            // Two lines, so a long name ("Downloads and Updates") is said whole, never cut (Droidtop/tracker#639); the row
+            // grows past its 48dp for it.
             Text(
                 entry.label,
                 color = MenuTokens.OnSurface,
                 fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Medium,
                 style = TypeRole.rowTitle,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f, fill = false),
             )
@@ -368,8 +386,8 @@ private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Boole
 
 /** The row that opens the one search: the same shape as a destination, without the "you are here" mark. */
 @Composable
-private fun SearchRow(selected: Boolean, onClick: () -> Unit) {
-    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick)) {
+private fun SearchRow(selected: Boolean, onClick: () -> Unit, onHover: () -> Unit) {
+    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick, onHover)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -416,8 +434,8 @@ private fun BoxScope.CurrentMark() {
  * Game section uses.
  */
 @Composable
-private fun ResumeRow(title: String, selected: Boolean, onClick: () -> Unit) {
-    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick)) {
+private fun ResumeRow(title: String, selected: Boolean, onClick: () -> Unit, onHover: () -> Unit) {
+    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick, onHover)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier

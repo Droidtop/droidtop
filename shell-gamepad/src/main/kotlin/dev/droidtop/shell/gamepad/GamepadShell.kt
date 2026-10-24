@@ -721,6 +721,41 @@ private fun GamepadShellBody(
         }
     }
 
+    // A game's own surfaces shown over the row that asked (docs/SPEC.md 7g, "Facets in place", Droidtop/tracker#639):
+    // an update row's downloads and a job row's game page, inside Gaming, so Back returns to the row. The page is the
+    // PC page; a game that has none is left to the caller's own way of opening it.
+    var inPlaceUpdate by remember { mutableStateOf<String?>(null) }
+    var inPlacePage by remember { mutableStateOf<String?>(null) }
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        dev.droidtop.library.GameSurfaces.showUpdate = { id ->
+            inPlaceUpdate = id
+            true
+        }
+        dev.droidtop.library.GameSurfaces.showPage = { id ->
+            val pc = gameEntries?.firstOrNull { it.id == id }?.isPcOrEngineGame == true
+            if (pc) inPlacePage = id
+            pc
+        }
+        onDispose {
+            dev.droidtop.library.GameSurfaces.showUpdate = null
+            dev.droidtop.library.GameSurfaces.showPage = null
+        }
+    }
+    dev.droidtop.shell.gamepad.pc.GameInPlace(
+        library = library,
+        updateId = inPlaceUpdate,
+        pageId = inPlacePage,
+        onOpenPage = { id -> inPlacePage = id },
+        onCloseUpdate = { inPlaceUpdate = null },
+        onClosePage = { inPlacePage = null },
+        onLaunch = onLaunch,
+        onOpenDownloads = {
+            inPlacePage = null
+            inPlaceUpdate = null
+            nav.openSection(GamingSection.DOWNLOADS)
+        },
+    )
+
     // The Quick Menu's Game tab (docs/SPEC.md, Droidtop/tracker#82):
     // which entry the running session (LaunchDisplay.running) is for,
     // resolved when a menu is open. The left menu's Resume row reads the
@@ -1378,11 +1413,16 @@ private fun GamepadShellBody(
                                     put(PcSource.IMPORTED_ITEM_ID, openGames { pcGames.showImported() })
                                     // Updates' Get new games row opens the search here, in place.
                                     put(dev.droidtop.library.integrations.GetGamesEntry.UPDATES_ROW_ID) { nav.openSection(GamingSection.NEW_GAMES) }
+                                    // Downloads and Updates' Updates row opens Updates' own page, whose Back returns there.
+                                    put(dev.droidtop.library.integrations.PluginJobsScreen.UPDATES_ROW_ID) { nav.openSection(GamingSection.UPDATES) }
                                 }
                             }
                             PlaceCatalogView(
                                 screenId = shownSection.placeScreenId.orEmpty(),
-                                onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
+                                // A page of another place goes back to that place (Updates to Downloads and Updates).
+                                onBack = {
+                                    nav.openSection(if (shownSection.menuSection != shownSection) shownSection.menuSection else GamingPrefs.defaultSection(context))
+                                },
                                 nativeActions = storeLibraries,
                             )
                         }
@@ -1399,7 +1439,10 @@ private fun GamepadShellBody(
                             SettingsCatalogView(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                                 browseThemesToken = browseThemesRequest,
-                                placeScreenIds = menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet(),
+                                // The places and their pages (Updates, of Downloads and Updates): each has its one way in.
+                                placeScreenIds = menuSectionsFor(uiMode).let { menu ->
+                                    GamingSection.entries.filter { it.isPlace && it.menuSection in menu }.mapNotNull { it.placeScreenId }.toSet()
+                                },
                                 onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {
                                         helpRowClaimant = screenKey to claim
@@ -2088,7 +2131,8 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
      * Get new games: the one search over the download sources, on its own (owner, 2026-10-23: "add a 'get new games'
      * under 'updates' that's its own UI", Droidtop/tracker#612). A page of Updates, opened by its Get new games row,
      * not a row of the left menu (owner, 2026-10-23: "THe "get new games" menu needs to be UNDER Updates. The left menu
-     * is growing really large", Droidtop/tracker#621). Back returns to Updates, and the left menu marks Updates.
+     * is growing really large", Droidtop/tracker#621). Back returns to Updates, itself a page of Downloads and Updates
+     * (Droidtop/tracker#639), which the left menu marks.
      */
     NEW_GAMES,
     PLUGINS(dev.droidtop.library.settings.Place.PLUGINS),
@@ -2102,8 +2146,11 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
     /** The settings-registry screen a place draws, null for a tab with a view of its own. */
     val placeScreenId: String? get() = place?.screenId
 
-    /** The left menu row that stands for this section: itself, or Updates for Get new games, a page of it. */
-    val menuSection: GamingSection get() = if (this == NEW_GAMES) UPDATES else this
+    /**
+     * The left menu row that stands for this section: itself, or Downloads and Updates for Updates and Get new games,
+     * its pages (Droidtop/tracker#639).
+     */
+    val menuSection: GamingSection get() = if (this == NEW_GAMES || this == UPDATES) DOWNLOADS else this
 }
 
 // Registry ids of the screens the places draw, from the one place list.
@@ -2117,7 +2164,8 @@ internal const val PLACE_PLUGINS_SCREEN_ID = dev.droidtop.library.settings.Place
  * second copy of the screen inside a sheet, so a screen has one home (docs/SPEC.md 7j "Places").
  */
 internal fun placeForScreen(screenId: String, allowed: List<GamingSection>): GamingSection? =
-    allowed.firstOrNull { it.isPlace && it.placeScreenId == screenId }
+    // A page of a listed place (Updates, of Downloads and Updates) opens when its place may.
+    GamingSection.entries.firstOrNull { it.isPlace && it.placeScreenId == screenId && it.menuSection in allowed }
 
 /**
  * The sections a given UI mode allows. Kiosk and Kid hide Settings --
@@ -2135,8 +2183,9 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
  */
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
-    // The places; Kiosk and Kid hide them all, since they manage the device. Get new games is a page of Updates.
-    val places = GamingSection.entries.filter { it.isPlace && !mode.hidesSettings }
+    // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates, with Get new games, is a
+    // page of Downloads and Updates (Place.listed).
+    val places = GamingSection.entries.filter { it.place?.listed == true && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
         when (it) {
