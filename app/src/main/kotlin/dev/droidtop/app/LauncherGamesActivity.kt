@@ -88,7 +88,9 @@ class LauncherGamesActivity : AppCompatActivity() {
         // fresh Home intent forwards to the default mode, so B landed in
         // Gaming (rig, dq-shell2-02). That home screen is reopened as the
         // explicit "Android" one, which never forwards.
-        val openedFromDroidtopHome = referrer?.host == packageName
+        // From droidtop and in Standard: Gaming and Desktop never open this grid, and Back never takes a person from
+        // them to the Android home screen (Droidtop/tracker#639; the console showed START launcher3.Launcher).
+        val openedFromDroidtopHome = referrer?.host == packageName && Modes.lastMode(this) == Mode.LAUNCHER.id
         onBackPressedDispatcher.addCallback(this) {
             if (openedFromDroidtopHome) {
                 dev.droidtop.shell.standard.BackButtonMenu.openHome(

@@ -123,8 +123,9 @@ object UpdatesPage {
                 ),
             )
             // Get new games is a page of Updates (owner, 2026-10-23: "THe "get new games" menu needs to be UNDER
-            // Updates", Droidtop/tracker#621). The search is Gaming's, so outside Gaming the row opens Gaming on it.
-            if (Modes.isEnabled(Mode.GAMING)) {
+            // Updates", Droidtop/tracker#621). The page is Gaming's, which opens it in place by the row's id; in another
+            // mode the row is not listed, since it would open Gaming over that mode (Droidtop/tracker#639).
+            if (Modes.lastMode(context) == Mode.GAMING.id) {
                 add(
                     ActionItem(
                         id = GetGamesEntry.UPDATES_ROW_ID,
