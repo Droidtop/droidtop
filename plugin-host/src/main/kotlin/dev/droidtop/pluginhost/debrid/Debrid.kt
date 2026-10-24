@@ -83,10 +83,10 @@ interface DebridProvider {
     val slotLimited: Boolean get() = false
 
     /**
-     * What serving a job costs the account now (a torrent, or a link on [host]), from what the service reports of the
+     * What serving a job costs the account now (a torrent, or a hoster [link]), from what the service reports of the
      * account, never from figures droidtop keeps. [DebridCost.Free] by default.
      */
-    fun cost(key: String, host: String?): DebridCost = DebridCost.Free
+    fun cost(key: String, link: String?): DebridCost = DebridCost.Free
 
     /** Asks the service for [link] on a file hoster (asking again is safe) and says where it stands: its files when ready. */
     fun unrestrict(key: String, link: String): DebridState = DebridState.Failed("$name does not fetch hoster links", permanent = true)

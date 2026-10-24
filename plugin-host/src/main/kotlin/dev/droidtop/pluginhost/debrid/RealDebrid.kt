@@ -24,7 +24,8 @@ class RealDebrid(
      * From `/user`: an account whose premium ended cannot serve. A link on a hoster Real-Debrid limits spends that
      * hoster's traffic (`/traffic`: `left` of `limit`), and one with none left cannot serve; any other job is free.
      */
-    override fun cost(key: String, host: String?): DebridCost {
+    override fun cost(key: String, link: String?): DebridCost {
+        val host = link?.let { dev.droidtop.pluginhost.NetScope.hostOf(it) ?: return DebridCost.Free }
         val (status, body) = http.call("GET", "$API/user", auth(key), null)
         if (status == 401 || status == 403) return DebridCost.NotNow("Real-Debrid did not take the token: sign in again", auth = true)
         val user = (jsonOrNull(body) as? JSONObject)?.takeIf { status == 200 }

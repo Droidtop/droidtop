@@ -62,22 +62,22 @@ object DebridChoice {
         ).map { it.value }
     }
 
-    /** [accounts] (the person's order) ranked for a job: a torrent, or a link on [host]. Blocking: asks the services. */
-    fun order(accounts: List<Pair<DebridProvider, String>>, spread: Boolean = spreadMode(), host: String? = null, now: () -> Long = System::currentTimeMillis): List<Pair<DebridProvider, String>> {
+    /** [accounts] (the person's order) ranked for a job: a torrent, or a hoster [link]. Blocking: asks the services. */
+    fun order(accounts: List<Pair<DebridProvider, String>>, spread: Boolean = spreadMode(), link: String? = null, now: () -> Long = System::currentTimeMillis): List<Pair<DebridProvider, String>> {
         if (accounts.isEmpty()) return accounts
         val seen = accounts.map { (provider, key) ->
-            Account(provider, key, costOf(provider, key, host, now()), running[id(provider, key)]?.get() ?: 0)
+            Account(provider, key, costOf(provider, key, link, now()), running[id(provider, key)]?.get() ?: 0)
         }
         return rank(seen, spread).map { it.provider to it.key }
     }
 
-    private fun costOf(provider: DebridProvider, key: String, host: String?, now: Long): DebridCost {
+    private fun costOf(provider: DebridProvider, key: String, link: String?, now: Long): DebridCost {
         rests[id(provider, key)]?.let { until -> if (until > now) return DebridCost.NotNow("${provider.name} is resting", until) else rests.remove(id(provider, key)) }
-        val cacheKey = id(provider, key) + "|" + host.orEmpty()
+        val cacheKey = id(provider, key) + "|" + link.orEmpty()
         costs[cacheKey]?.takeIf { now - it.atMs < COST_TTL_MS }?.let { return it.cost }
         // A service that cannot be asked just now is tried as if free: a refusal then rests it.
         val cost = try {
-            provider.cost(key, host)
+            provider.cost(key, link)
         } catch (e: IOException) {
             DebridCost.Free
         } catch (e: org.json.JSONException) {
@@ -94,6 +94,11 @@ object DebridChoice {
         if (failed.auth) onKeyRefused(provider.id, failed.message)
         if (!failed.limit) return
         rests[id(provider, key)] = failed.restUntilMs ?: (now() + REST_DEFAULT_MS)
+        costs.keys.removeIf { it.startsWith(id(provider, key) + "|") }
+    }
+
+    /** [provider]'s account served a job: what it has used is asked of the service again next time, never counted here. */
+    fun spent(provider: DebridProvider, key: String) {
         costs.keys.removeIf { it.startsWith(id(provider, key) + "|") }
     }
 
