@@ -14334,8 +14334,9 @@ again if a code is refused".
 - **The session (`RemoteInput`, `:library-core`, on `HandoffServer`).** `HandoffServer` is the one local-network
   listener, shared with nothing else now that the key form is gone: it binds the device's LAN address
   (`HandoffServer.lanAddress`, a site-local IPv4) on a random port in the dynamic range, answers loopback, site-local
-  and link-local peers only, and reads at most an 8 KB head and a 4 KB body (a clipboard send, below, is the one request allowed more, and only
-  with the right token: `HandoffEndpoint.maxBody`) with a 5 second timeout. What it serves is
+  and link-local peers only, and reads at most an 8 KB head and a 4 KB body (a clipboard send, below, is allowed more, and only
+  with the right token: `HandoffEndpoint.maxBody`; a file upload is the one request whose body is not capped at all, and it is
+  never held: `HandoffEndpoint.receive`, file transfer below) with a 5 second timeout on every read. What it serves is
   a `HandoffEndpoint` (the answer to a request, and whether to keep listening, asked every second). The address is
   `http://<lan address>:<port>/r/<token>`, the token 128 random bits per listener, shown as a QR code and the plain
   address. Every other path, method or token is the same empty 404. The listener exists only while a session does:
@@ -14393,6 +14394,63 @@ again if a code is refused".
     front on the console and try again" rather than showing a stale or empty clip.
   - *The console clipboard is only ever changed by Send,* and is not marked sensitive, so the phone can read back
     what it sent.
+- **File transfer (slice 3, Droidtop/tracker#645; relayed by the coordinator: "file transfer in the existing 'Type from
+  another device' session (RemoteInput / HandoffServer ...) extend it, don't add a new server ... the same pairing,
+  code and token rules. Never write into a game folder unless the person picked it").** The same session, listener and
+  pairing, no new server. The phone page's **Files** panel has **Send a file**, and shows the one file the console
+  offers as a link. Every request follows an edit's rules: nothing before Confirm (403), the code in every request
+  (403 when missing or wrong, constant time), the paired device only (409 for any other), the token in the path (the same
+  empty 404), and each counts as the session being used for the ten minute limit (a transfer counts at its start and its
+  end; the listener serves one connection at a time, so the page stops polling while it uploads).
+  - *Phone to console: `POST /r/<token>/put?code=<code>&name=<file name>`, the body the file itself.* The body is
+    streamed to disk in 64 KB chunks (`RemoteInput.receiveFile`), never held whole, into a new file in the folder the
+    person chose on the console beforehand (below). The server decides from the head alone (`HandoffEndpoint.receive`,
+    before a byte of the body is read): the token is checked first, so only a request with the right token is past the
+    4 KB body cap (any other request, and a `put` with the wrong token, still gets the small cap and the empty 404);
+    then pairing, device, code, a Content-Length (411 without one) and the limit. **The limit is 4 GB (4 GiB,
+    `FileNames.MAX_BYTES`) per file**: one byte more is a 413 with a notice, nothing read, nothing created. The
+    body is bounded by its Content-Length, so no more than that can ever be written. A file is kept only when all of it
+    arrived: a phone that stops, a connection that breaks, the session being closed (a read then fails) or a write that
+    fails (storage full) deletes what was written, so no part of a file is left, and the console says "Could not receive
+    name: why". The listener goes on serving after any of them (a peer that vanishes before it reads its answer does
+    not end the listener either). A refusal is sent without draining an unread body, so on a very large refused upload a
+    browser may see the connection reset rather than the notice; the page checks the 4 GB limit itself first.
+  - *The name.* `FileNames.sanitise`: only what follows the last `/` or `\` (no path parts), control characters and
+    `: * ? " < > |` become `_`, leading dots are dropped (nothing hidden, no `..`), trailing dots and spaces are dropped,
+    at most 120 bytes of whole UTF-8 characters with the extension kept, and `file` when nothing is left. A file never
+    replaces another: a taken name becomes "Name (2)", "Name (3)" before the extension (`FileNames.unique`; "x.tar.gz" is
+    followed by "x (2).tar.gz"). The phone is told the name it was stored under.
+  - *The folder.* The person chooses it on the console beforehand, on the session's screen: **Choose folder** (the
+    system folder picker, `ActivityResultContracts.OpenDocumentTree`, read and write permission persisted) or **Use
+    Download/droidtop**, which is also what a person who chose nothing has. Droidtop picks no folder itself and never
+    looks at a library or a game folder, so a game folder is written into only when the person picked it. No storage
+    permission is used: a chosen folder through its document tree (`DocumentsContract.createDocument`), the default through
+    MediaStore (`Download/droidtop/`, a pending item until all of it has arrived, Android 10 and later; below that
+    there is no default and the console says to choose a folder). A chosen folder that cannot be written to fails the
+    upload ("the folder for received files cannot be written to"), and never falls back to another folder. A file
+    already in the default folder that droidtop did not create (MediaStore shows an app only its own files) can still
+    make MediaStore choose a name of its own; the console shows the name stored.
+  - *On the console.* "Receiving name (size)" while it arrives, then "Phone sent name (size)" (size as `FileNames.size`: 1 024
+    to a step, one decimal), on the screen and in the notification (`RemoteInputState.Paired.receiving`, `received`).
+  - *Console to phone.* The console offers one file at a time: **Send to the phone** on the session's screen (the system
+    document picker, `ActivityResultContracts.OpenDocument`; a persistable read permission is taken so the file can be read
+    when the phone asks, after the screen is gone) and **Stop offering**. The offer is a `content:` URI that is not one
+    of droidtop's own providers' (an app cannot make droidtop hand out droidtop's files); it is read when the phone
+    downloads it and never copied. The page's poll (`/state`) carries `offer` (id, name, size in words) and shows a link,
+    `GET /r/<token>/get/<id>?code=<code>` (the code in the query, since a link has no body; no referrer is sent). It is
+    streamed out in 64 KB chunks as `application/octet-stream` with `Content-Disposition: attachment` (an ASCII fallback
+    name plus the real one in the RFC 5987 form, so a name cannot add a header) and Content-Length (none, ending with the
+    connection, when the provider does not say a size). **For this session only:** the link needs the session's token, so a
+    refusal (new token), the end of the session or **Stop offering** makes it answer nothing, and a new offer has a new
+    id, so the link of the file it replaced answers nothing either. A refusal also takes the offer away, so a device
+    the person has not confirmed is never offered a file; offering before pairing is allowed and shows once the phone is
+    confirmed. Closing the session during a download stops it.
+  - *A share action is not built.* A file shared to droidtop would reach it by a URI whose grant ends with the receiving
+    activity, and the session outlives that activity, so the download would fail after the share screen closed; the
+    picker's persisted permission has no such problem.
+  - *Not done:* resuming an interrupted transfer, ranges, several files at once, a folder of files, a transfer progress
+    bar on the console (the phone page shows a percentage), and a free-space check before a file starts (a full disk
+    fails the write and the file is deleted).
 - **Where an edit lands (`RemoteInputRouter`, the one choice, with fakes in its tests).**
   (a) The focused field is droidtop's own and droidtop's keyboard serves it (`AddonKeyboardRules.droidtopServesField`,
   through `KeyboardTargets.servesField`): the window's own key path, `WindowKeySink`, the path droidtop's own keyboards
@@ -14412,7 +14470,7 @@ again if a code is refused".
   companion's own screen), the **Type from another device** row in the Quick Menu (a catalog item,
   `GamingSettingsCatalog.ID_TYPE_FROM_DEVICE`, in the Power and mode section), and the key setup screens (7h). All
   open the same screen, which starts the session when none runs and shows the running one when one does.
-- **Not built:** remote control of the pointer; files, images and rich text on the shared clipboard; emoji and other characters outside the virtual keyboard's layout in
+- **Not built:** remote control of the pointer; images and rich text on the shared clipboard (a file goes by file transfer, above); emoji and other characters outside the virtual keyboard's layout in
   droidtop's own fields (route a drops what the layout cannot type, route b commits it whole).
 
 **Credentials are stored encrypted (directed 2026-10-08, tracker #264).** Every credential the

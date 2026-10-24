@@ -5,6 +5,7 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
@@ -66,9 +67,25 @@ object RemoteInputs {
             host = host,
             state = current,
             clipboard = AndroidClipboard(context.applicationContext),
+            files = AndroidConsoleFiles(context.applicationContext),
         )
         session = input
         input.start()
+    }
+
+    /**
+     * Offers the file [uri] names (the document picker's result) to the phone's page (docs/SPEC.md, "Type from another
+     * device", file transfer). Reads the file's name and size, so off the main thread. False when no session runs or the
+     * URI is not one droidtop may hand out.
+     */
+    fun offer(context: Context, uri: Uri): Boolean {
+        val file = AndroidConsoleFiles.offered(context.applicationContext, uri) ?: return false
+        return session?.offer(file) ?: false
+    }
+
+    /** Takes the offered file away. */
+    fun withdrawOffer() {
+        session?.withdrawOffer()
     }
 
     fun confirm() {
