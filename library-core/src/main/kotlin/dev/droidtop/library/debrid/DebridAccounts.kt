@@ -10,16 +10,58 @@ import dev.droidtop.runtime.prefs.PrefsFile
 
 /**
  * The person's debrid accounts (Droidtop/tracker#638): the keys they entered under Settings > Accounts and sources, in
- * the order a torrent job asks them (TorBox, then Real-Debrid), and whether a torrent no account has yet waits for the
- * service or falls back to peers (falls back unless the person chose to wait).
+ * the person's order (TorBox, then Real-Debrid, until moved), which settles a tie between accounts a job costs the
+ * same ([dev.droidtop.pluginhost.debrid.DebridChoice]); whether each is used for downloads; spread mode; and whether a
+ * torrent no account has yet waits for the service or falls back to peers (falls back unless the person chose to wait).
  */
 object DebridAccounts {
     const val KEY_WAITS = "droidtop_debrid_waits"
+    const val KEY_ORDER = "droidtop_debrid_order"
+    const val KEY_SPREAD = "droidtop_debrid_spread"
 
     private val ORDER = listOf("torbox" to CredentialStore.TORBOX_API_KEY, "realdebrid" to CredentialStore.REALDEBRID_TOKEN)
 
-    /** The connected accounts in their order, each a provider and its key. May refresh a sign-in's token: off the main thread. */
-    fun connected(context: Context): List<Pair<DebridProvider, String>> = ORDER.mapNotNull { (id, storeKey) ->
+    /** The services' ids in the person's order: the stored order, then any service it does not name yet. Pure, for the tests. */
+    fun ordered(stored: String?): List<String> {
+        val known = ORDER.map { it.first }
+        val named = stored.orEmpty().split(',').map { it.trim() }.filter { it in known }.distinct()
+        return named + known.filter { it !in named }
+    }
+
+    fun order(context: Context): List<String> = ordered(PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(KEY_ORDER, null))
+
+    /** Moves [id] one place earlier ([earlier]) or later in the person's order. Pure, for the tests. */
+    fun moved(order: List<String>, id: String, earlier: Boolean): List<String> {
+        val at = order.indexOf(id)
+        val to = if (earlier) at - 1 else at + 1
+        if (at < 0 || to !in order.indices) return order
+        return order.toMutableList().apply { add(to, removeAt(at)) }
+    }
+
+    fun move(context: Context, id: String, earlier: Boolean) {
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putString(KEY_ORDER, moved(order(context), id, earlier).joinToString(","))
+    }
+
+    private fun usedKey(id: String) = "droidtop_debrid_used_$id"
+
+    /** Whether the account is used for downloads: on until the person turns it off, so it stays signed in but unused. */
+    fun used(context: Context, id: String): Boolean = PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getBoolean(usedKey(id), true)
+
+    fun setUsed(context: Context, id: String, on: Boolean) {
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putBoolean(usedKey(id), on)
+    }
+
+    /** Spread mode: a tie between slot-limited accounts goes to the one with the fewest of droidtop's fetches running. Off by default. */
+    fun spread(context: Context): Boolean = PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getBoolean(KEY_SPREAD, false)
+
+    fun setSpread(context: Context, on: Boolean) {
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putBoolean(KEY_SPREAD, on)
+    }
+
+    /** The connected accounts used for downloads, in the person's order, each a provider and its key. May refresh a sign-in's token: off the main thread. */
+    fun connected(context: Context): List<Pair<DebridProvider, String>> = order(context).mapNotNull { id ->
+        if (!used(context, id)) return@mapNotNull null
+        val storeKey = ORDER.first { it.first == id }.second
         val key = (if (id == "realdebrid") realDebridToken(context) else CredentialStore.get(context, storeKey)).trim()
         if (key.isEmpty()) return@mapNotNull null
         DebridProviders.byId(id)?.let { it to key }
