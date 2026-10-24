@@ -160,7 +160,7 @@ object ControllerLayouts {
     val triggerless: StateFlow<Boolean> = triggerlessState
 
     private fun refreshPadOrKeyboard() {
-        val devices = InputDevice.getDeviceIds().mapNotNull { InputDevice.getDevice(it) }
+        val devices = InputDevice.getDeviceIds().asList().mapNotNull { InputDevice.getDevice(it) }
         padOrKeyboardState.value = devices.any { it.isGamepad() || it.isHardwareKeyboard() }
         val pads = devices.filter { it.isGamepad() }
         triggerlessState.value = pads.isNotEmpty() && pads.none { it.hasTriggers() }
