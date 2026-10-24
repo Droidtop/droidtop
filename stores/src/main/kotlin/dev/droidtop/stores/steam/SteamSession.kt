@@ -63,9 +63,12 @@ import timber.log.Timber
  * keeps the process alive for that is the app's. A Steam install runs inside
  * its job, which is what keeps the process alive while it downloads.
  *
- * Not carried from GameNative's service: achievements, family sharing, game
- * invites, collections and the continuous product-info watcher; droidtop's
- * library reads product info when it syncs.
+ * Achievements are read, never written (`SteamAchievements`, owner
+ * 2026-10-23: "read-only and for display", Droidtop/tracker#230): droidtop
+ * shows them on a game's page and sets no stat. Collections are read when the
+ * library syncs (`SteamCollections`). Not carried from GameNative's service:
+ * unlocking achievements, family sharing, game invites and the continuous
+ * product-info watcher; droidtop's library reads product info when it syncs.
  */
 internal object SteamSession {
     private const val TAG = "SteamSession"

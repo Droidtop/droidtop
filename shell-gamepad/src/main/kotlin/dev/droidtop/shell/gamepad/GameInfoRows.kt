@@ -171,8 +171,79 @@ internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long): 
 
 private fun offline(message: String) = message.startsWith("No connection")
 
-internal fun achievementRows(context: Context, entry: LibraryEntry): List<GameInfoRow> =
-    achievementRowsFor(RetroAchievements.lookup(context, entry))
+internal suspend fun achievementRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
+    // A console game: RetroAchievements. A store's game: the store's own (Steam, Droidtop/tracker#230), in the same row.
+    val retro = achievementRowsFor(RetroAchievements.lookup(context, entry))
+    if (retro.isNotEmpty()) return retro
+    val key = entry.pcInfo?.storeId ?: return emptyList()
+    val store = dev.droidtop.library.stores.StoreLibraries.forKey(key) ?: return emptyList()
+    return storeAchievementRowsFor(store.label, key.substringAfter(':'), store.achievements(context, key.substringAfter(':')))
+}
+
+/**
+ * The Achievements row of a store's game (Droidtop/tracker#230): earned of all, opening the same page of rows
+ * RetroAchievements' row opens. None when the store reports none, nobody is signed in, or the device is offline; a
+ * game with no achievements has no row. Pure, for the tests.
+ */
+internal fun storeAchievementRowsFor(storeLabel: String, gameId: String, result: Result<dev.droidtop.library.stores.StoreAchievements>?): List<GameInfoRow> {
+    result ?: return emptyList()
+    val list = result.getOrElse { failure ->
+        val message = failure.message ?: "$storeLabel did not answer"
+        return if (offline(message) || message.contains("could not be reached")) emptyList()
+        else listOf(GameInfoRow("Achievements", "Not loaded", message))
+    }
+    if (list.total == 0) return emptyList()
+    return listOf(
+        GameInfoRow(
+            "Achievements",
+            "${list.earned} of ${list.total}",
+            "From $storeLabel, as your account has them",
+            screen = storeAchievementsScreen(storeLabel, gameId, list),
+            chip = "Achievements",
+        ),
+    )
+}
+
+/** A store game's achievements as a page of rows, laid out as RetroAchievements' are: earned first, then the rest. */
+internal fun storeAchievementsScreen(storeLabel: String, gameId: String, list: dev.droidtop.library.stores.StoreAchievements): CatalogScreen = CatalogScreen(
+    id = "store_achievements_${storeLabel.lowercase()}_$gameId",
+    title = "Achievements",
+    subtitle = "${list.earned} of ${list.total} earned on $storeLabel",
+    groups = {
+        val (earned, locked) = list.achievements.partition { it.earnedAtMs != null }
+        listOfNotNull(
+            CatalogGroup("store_earned", "Earned (${earned.size})", earned.sortedByDescending { it.earnedAtMs }.map(::storeAchievementItem)).takeIf { earned.isNotEmpty() },
+            CatalogGroup("store_locked", "Not yet earned (${locked.size})", locked.map(::storeAchievementItem)).takeIf { locked.isNotEmpty() },
+            list.pageUrl?.let { url ->
+                CatalogGroup(
+                    "store_site",
+                    null,
+                    listOf(ActionItem(id = "store_open_site", title = "Open on $storeLabel", run = { context -> openAddress(context, url) })),
+                )
+            },
+        )
+    },
+)
+
+private val EARNED_DATE = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.ROOT)
+
+internal fun storeAchievementItem(achievement: dev.droidtop.library.stores.StoreAchievement): ActionItem {
+    val earned = achievement.earnedAtMs
+    val secret = achievement.hidden && earned == null
+    val progress = achievement.progress
+    val max = achievement.progressMax
+    return ActionItem(
+        id = "store_${achievement.id}",
+        title = if (secret) "Hidden achievement" else achievement.title,
+        subtitle = if (secret) "Described once you earn it" else achievement.description.ifBlank { null },
+        value = when {
+            earned != null -> synchronized(EARNED_DATE) { EARNED_DATE.format(java.util.Date(earned)) }
+            progress != null && max != null -> "${progress.toInt()} of ${max.toInt()}"
+            else -> null
+        },
+        run = {},
+    )
+}
 
 /** The rows for what RetroAchievements said about a game. Pure, for the tests. */
 internal fun achievementRowsFor(result: RaResult): List<GameInfoRow> =

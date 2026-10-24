@@ -85,6 +85,10 @@ class SteamStore : StoreLibrary {
 
     override fun accountName(context: Context): String? = SteamCredentials.load(context)?.accountName
 
+    /** [gameId]'s achievements and this account's progress, read-only (Droidtop/tracker#230). */
+    override suspend fun achievements(context: Context, gameId: String): Result<dev.droidtop.library.stores.StoreAchievements>? =
+        gameId.toIntOrNull()?.let { SteamAchievements.read(context, it) }
+
     /** The signed-in account and the DLC droidtop installed with [gameId] (the Steamworks shim's player). */
     override suspend fun player(context: Context, gameId: String): StorePlayer? = withContext(Dispatchers.IO) {
         val credentials = SteamCredentials.load(context)?.takeIf { it.steamId64 != 0L } ?: return@withContext null

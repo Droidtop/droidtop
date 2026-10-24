@@ -201,6 +201,28 @@ data class StorePlayOption(val id: String, val title: String, val detail: String
 /** The account a store game is played as ([StoreLibrary.player]): its 64-bit id, its name, and the DLC ids of the game it has. */
 data class StorePlayer(val steamId64: Long, val name: String, val dlc: Set<String>)
 
+/**
+ * One of a store game's achievements and the signed-in account's progress in it (Droidtop/tracker#230). [earnedAtMs]
+ * is when it was earned, null while it is not; [hidden] is a secret one, described only once earned; [progress] and
+ * [progressMax] a counted one's way there ("45 of 100"), null for one that is simply earned or not.
+ */
+data class StoreAchievement(
+    val id: String,
+    val title: String,
+    val description: String,
+    val earnedAtMs: Long?,
+    val hidden: Boolean = false,
+    val iconUrl: String? = null,
+    val progress: Float? = null,
+    val progressMax: Float? = null,
+)
+
+/** A store game's achievements as the store reports them, read-only, for its page (Droidtop/tracker#230). */
+data class StoreAchievements(val achievements: List<StoreAchievement>, val pageUrl: String? = null) {
+    val total: Int get() = achievements.size
+    val earned: Int get() = achievements.count { it.earnedAtMs != null }
+}
+
 /** Progress of a store job, as the Downloads place shows it. */
 fun interface StoreProgress {
     /** [fraction] 0 to 1, or a negative number while the size is not known yet. */
@@ -401,6 +423,13 @@ interface StoreLibrary {
      * when nobody is signed in or the store has no such client (the default).
      */
     suspend fun player(context: Context, gameId: String): StorePlayer? = null
+
+    /**
+     * [gameId]'s achievements and the signed-in account's progress, read-only, for the game's page
+     * (Droidtop/tracker#230). Null when the store reports none or nobody is signed in (the default); a failure is
+     * the store's sentence. Network work: never on the main thread.
+     */
+    suspend fun achievements(context: Context, gameId: String): Result<StoreAchievements>? = null
 
     /** Whether the store keeps its games' saves in a cloud of its own that [syncSaves] reaches (Steam Cloud). */
     val hasCloudSaves: Boolean get() = false
