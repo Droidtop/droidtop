@@ -4071,6 +4071,7 @@ internal fun GameCard(
     onToggleFavorite: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
+    val lift = rememberFocusLift(focused)
     val window = LocalShellWindow.current
     Box(
         modifier = modifier
@@ -4144,13 +4145,15 @@ internal fun GameCard(
             // third one. The rig counted three at once -- this card's 1px
             // white rectangle, the menus' brightened card, and the
             // theme's own highlight.
-            .focusLift(focused, RoundedCornerShape(12.dp))
+            // The card rises with its ring at its own edge; its art grows inside that edge (focusZoom).
+            .focusRise(lift, RoundedCornerShape(12.dp))
             .selectionFrame(
                 selected = focused,
                 shape = RoundedCornerShape(12.dp),
                 rest = MenuTokens.Surface,
                 restOutline = MenuTokens.CardOutline,
-            ),
+            )
+            .focusZoom(lift, RoundedCornerShape(12.dp)),
     ) {
         if (entry.artworkUri != null) {
             AsyncImage(

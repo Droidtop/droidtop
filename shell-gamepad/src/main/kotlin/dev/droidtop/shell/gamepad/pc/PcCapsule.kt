@@ -59,7 +59,9 @@ import dev.droidtop.shell.gamepad.ShellProgressBar
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.StatusChip
 import dev.droidtop.shell.gamepad.TypeRole
-import dev.droidtop.shell.gamepad.focusLift
+import dev.droidtop.shell.gamepad.focusRise
+import dev.droidtop.shell.gamepad.focusZoom
+import dev.droidtop.shell.gamepad.rememberFocusLift
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.shine
@@ -160,7 +162,7 @@ internal fun capsuleStatusOf(entry: LibraryEntry, download: PluginJobsCenter.Ent
  * this shell follows.
  *
  * The focus look is Steam's (docs/SPEC.md "Gaming motion and focus"): the
- * capsule lifts ([focusLift]), the window's ring sits just outside its
+ * capsule lifts ([focusRise]; its art grows inside its edge, [focusZoom]), the window's ring sits just outside its
  * crisp corners, and a sheen crosses it once as the cursor arrives.
  *
  * [badge], set on the shelves, says what the game is (PC, Retro, App,
@@ -191,6 +193,7 @@ internal fun PcCapsule(
 ) {
     val shape = Corners.Crisp
     val ring = selected && PadModality.showsFocus
+    val lift = rememberFocusLift(ring)
     val title = GameNaming.displayName(entry.title)
     // A hero card wants the landscape art; a capsule the box art.
     val art = if (hero) entry.heroUri else entry.artworkUri
@@ -220,7 +223,9 @@ internal fun PcCapsule(
                     Modifier
                 },
             )
-            .focusLift(ring, shape, wide = hero)
+            // The card rises with its ring just outside its own edge; its art grows inside that edge (focusZoom),
+            // so the ring and the clip match at every card size (Droidtop/tracker#632).
+            .focusRise(lift, shape)
             .selectionFrame(
                 selected,
                 shape,
@@ -228,6 +233,7 @@ internal fun PcCapsule(
                 restOutline = MenuTokens.CardOutline,
                 ringOutset = FocusLook.RingOffsetDp.dp,
             )
+            .focusZoom(lift, shape, wide = hero)
             .shine(ring),
     ) {
         if (art != null && !artFailed) {
