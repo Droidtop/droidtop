@@ -816,12 +816,12 @@ private fun GamepadShellBody(
                 leftMenuOpen = true
             },
             openPlace = { screenId ->
-                placeForScreen(screenId, menuSectionsFor(uiMode))?.let { place ->
+                placeForScreen(screenId, uiMode)?.let { place ->
                     quickMenuOpen = false
                     nav.openSection(place)
                 } != null
             },
-            placeAvailable = { screenId -> placeForScreen(screenId, menuSectionsFor(uiMode)) != null },
+            placeAvailable = { screenId -> placeForScreen(screenId, uiMode) != null },
             onDismiss = { quickMenuOpen = false },
         )
     }
@@ -1426,10 +1426,9 @@ private fun GamepadShellBody(
                             SettingsCatalogView(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                                 browseThemesToken = browseThemesRequest,
-                                // The places and their pages (Updates, of Downloads and Updates): each has its one way in.
-                                placeScreenIds = menuSectionsFor(uiMode).let { menu ->
-                                    GamingSection.entries.filter { it.isPlace && it.menuSection in menu }.mapNotNull { it.placeScreenId }.toSet()
-                                },
+                                // The places and their pages (Updates, of Downloads and Updates; Plugins, in the Quick
+                                // Menu): each has its one way in.
+                                placeScreenIds = dev.droidtop.library.settings.Place.reachable(uiMode).map { it.screenId }.toSet(),
                                 onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {
                                         helpRowClaimant = screenKey to claim
@@ -2137,6 +2136,14 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
      * its pages (Droidtop/tracker#639).
      */
     val menuSection: GamingSection get() = if (this == NEW_GAMES || this == UPDATES) DOWNLOADS else this
+
+    /**
+     * A place Gaming keeps in the Quick Menu instead of the left menu: Plugins, whose management is the last row of the
+     * Quick Menu's Plugins section and opens there (owner, 2026-10-17, Droidtop/tracker#586: "The plugin menu on the
+     * left pretty much shouldn't exist, the quick menu should be for lots of that stuff"; 2026-10-24: "move ALL the
+     * plugin menu stuff to the QAM plugins menu"). A link to it (a plugin update's notification) still opens it.
+     */
+    val inQuickMenu: Boolean get() = this == PLUGINS
 }
 
 // Registry ids of the screens the places draw, from the one place list.
@@ -2145,13 +2152,13 @@ internal const val PLACE_UPDATES_SCREEN_ID = dev.droidtop.library.settings.Place
 internal const val PLACE_PLUGINS_SCREEN_ID = dev.droidtop.library.settings.Place.ID_PLUGINS
 
 /**
- * The place a settings screen id IS, when the left menu lists it ([allowed]: a mode that hides
- * Settings hides the places). A link to such a screen opens the place in the shell instead of a
- * second copy of the screen inside a sheet, so a screen has one home (docs/SPEC.md 7j "Places").
+ * The place a settings screen id IS, when [mode] lets a link open it ([dev.droidtop.library.settings.Place.reachable]:
+ * a mode that hides Settings hides the places). A link to such a screen opens the place in the shell instead of a
+ * second copy of the screen inside a sheet, so a screen has one home (docs/SPEC.md 7j "Places"). That covers the
+ * places the left menu does not list: Updates, a page of Downloads and Updates, and Plugins, kept in the Quick Menu.
  */
-internal fun placeForScreen(screenId: String, allowed: List<GamingSection>): GamingSection? =
-    // A page of a listed place (Updates, of Downloads and Updates) opens when its place may.
-    GamingSection.entries.firstOrNull { it.isPlace && it.placeScreenId == screenId && it.menuSection in allowed }
+internal fun placeForScreen(screenId: String, mode: dev.droidtop.library.settings.UiMode): GamingSection? =
+    GamingSection.entries.firstOrNull { it.isPlace && it.placeScreenId == screenId && it.place in dev.droidtop.library.settings.Place.reachable(mode) }
 
 /**
  * The sections a given UI mode allows. Kiosk and Kid hide Settings --
@@ -2170,8 +2177,8 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
     // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates, with Get new games, is a
-    // page of Downloads and Updates (Place.listed).
-    val places = GamingSection.entries.filter { it.place?.listed == true && !mode.hidesSettings }
+    // page of Downloads and Updates (Place.listed), and Plugins is in the Quick Menu (inQuickMenu).
+    val places = GamingSection.entries.filter { it.place?.listed == true && !it.inQuickMenu && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
         when (it) {

@@ -15,8 +15,9 @@ class LeftMenuTest {
     fun `every destination the mode allows is a row, named as the top bar names it`() {
         assertEquals(menuSectionsFor(UiMode.FULL), all.map { it.section })
         assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.map { it.label })
-        // No section is unreachable: each is a row, or a page of one (Updates and Get new games, of Downloads and Updates).
-        assertEquals(GamingSection.entries.map { it.menuSection }.toSet(), all.map { it.section }.toSet())
+        // No section is unreachable: each is a row, or a page of one (Updates and Get new games, of Downloads and Updates),
+        // or in the Quick Menu (Plugins).
+        assertEquals(GamingSection.entries.filterNot { it.inQuickMenu }.map { it.menuSection }.toSet(), all.map { it.section }.toSet())
     }
 
     @Test
@@ -33,7 +34,6 @@ class LeftMenuTest {
             listOf(
                 GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
                 GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS,
-                GamingSection.PLUGINS,
                 GamingSection.SETTINGS,
             ),
             menuSectionsFor(UiMode.FULL),
@@ -120,10 +120,18 @@ class LeftMenuTest {
 
     @Test
     fun `a link to a place's screen opens the place`() {
-        val full = menuSectionsFor(UiMode.FULL)
-        assertEquals(GamingSection.SOCIAL, placeForScreen(PLACE_SOCIAL_SCREEN_ID, full))
-        assertEquals(GamingSection.UPDATES, placeForScreen(PLACE_UPDATES_SCREEN_ID, full))
-        assertEquals(GamingSection.PLUGINS, placeForScreen(PLACE_PLUGINS_SCREEN_ID, full))
+        assertEquals(GamingSection.SOCIAL, placeForScreen(PLACE_SOCIAL_SCREEN_ID, UiMode.FULL))
+        assertEquals(GamingSection.UPDATES, placeForScreen(PLACE_UPDATES_SCREEN_ID, UiMode.FULL))
+        // Plugins is no row of the left menu, but a plugin update's notification still opens it.
+        assertEquals(GamingSection.PLUGINS, placeForScreen(PLACE_PLUGINS_SCREEN_ID, UiMode.FULL))
+    }
+
+    @Test
+    fun `Plugins is in the Quick Menu, not the left menu`() {
+        // Owner, 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins menu" (Droidtop/tracker#586).
+        assertFalse(GamingSection.PLUGINS in menuSectionsFor(UiMode.FULL))
+        assertEquals(listOf(GamingSection.PLUGINS), GamingSection.entries.filter { it.inQuickMenu })
+        assertTrue(all.none { it.isAt(GamingSection.PLUGINS) })
     }
 
     @Test
@@ -148,7 +156,8 @@ class LeftMenuTest {
 
     @Test
     fun `a screen that is no place, or a place the mode hides, stays a nested screen`() {
-        assertEquals(null, placeForScreen("android_settings", menuSectionsFor(UiMode.FULL)))
-        assertEquals(null, placeForScreen(PLACE_UPDATES_SCREEN_ID, menuSectionsFor(UiMode.KIOSK)))
+        assertEquals(null, placeForScreen("android_settings", UiMode.FULL))
+        assertEquals(null, placeForScreen(PLACE_UPDATES_SCREEN_ID, UiMode.KIOSK))
+        assertEquals(null, placeForScreen(PLACE_PLUGINS_SCREEN_ID, UiMode.KIOSK))
     }
 }
