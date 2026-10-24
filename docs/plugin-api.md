@@ -401,7 +401,14 @@ store". Its adapter is the app itself:
 - **The manifest** is an APK asset, `assets/droidtop-plugin.json`: a
   contract 3 manifest with `"kind": "app_interface"` and
   `"app": {"package", "service"}` (the APK's own package and its service
-  class), and no `payload` or `entryClass`. `host.full_trust` and
+  class), and no `payload` or `entryClass`. Its `id` follows Android's
+  package-name rules, not a bundle's lowercase `<origin>.<name>`: two or
+  more segments of letters, digits and underscores, each starting with a
+  letter, in any case (`dev.enginehost.app`; the owner, 2026-10-24:
+  "droidtop refuses to add enginehost as an application interface plugin.
+  It apparently requires everything be lowercase, and rejects appnames
+  with more than two segments"). What droidtop checks for this kind is
+  the app's package and its signature. `host.full_trust` and
   `gpu.render` are refused for this kind: the app never runs in a droidtop
   process. Its `version` moves whenever the asset changes, and droidtop
   treats a changed asset as an update (new points and permissions wait for

@@ -261,7 +261,13 @@ data class PluginManifest(
         if (hasNativeLibs && !abis.containsAll(REQUIRED_ABIS)) {
             add("native bundle ships a .so but declares abis=$abis, not both $REQUIRED_ABIS")
         }
-        if (id != id.lowercase() || !id.startsWith("$origin.")) {
+        // An app interface is an Android app: its id follows Android's package-name rules ("dev.enginehost.app"), and its
+        // app's package and signature are what droidtop checks (Droidtop/tracker#547). A bundle's stays "<origin>.<name>".
+        if (kind == PluginKind.APP_INTERFACE) {
+            if (!AppTarget.isPackageName(id)) {
+                add("id \"$id\" must be an Android package-style name: segments of letters, digits and underscores, each starting with a letter")
+            }
+        } else if (id != id.lowercase() || !id.startsWith("$origin.")) {
             add("id \"$id\" must be lowercase and namespaced as \"<origin>.<name>\"")
         }
         // Contract 2 declarations (docs/plugin-api.md 1.5, 2.7, 4.1). Unknown ids are NOT a problem here: see [unsupportedDeclarations].

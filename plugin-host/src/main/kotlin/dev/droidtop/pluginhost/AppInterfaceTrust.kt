@@ -9,6 +9,12 @@ data class AppTarget(val packageName: String, val service: String) {
     companion object {
         private val NAME = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
 
+        /**
+         * Whether [name] is a full Android package-style name: two or more segments of letters, digits and underscores,
+         * each starting with a letter, in any case. An app interface plugin's id follows these rules, as its app's does.
+         */
+        fun isPackageName(name: String): Boolean = NAME.matches(name)
+
         /** The manifest's `app`, or null when it is missing or either name is not a full Java-style name. */
         fun fromJson(json: JSONObject?): AppTarget? {
             json ?: return null
