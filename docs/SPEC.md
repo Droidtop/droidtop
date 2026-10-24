@@ -14087,10 +14087,9 @@ the same care as the art.
   pick' appears in a list the person can work through with the pad, not only in the log." A pass that gets
   candidates with none exact stores `scrape_confidence = "needs_pick"` on the game's row (`PcScraper.NEEDS_PICK`;
   the column was there, so no migration), never over a game already matched by id, by name or by the person.
-  "Choose matches (N)" in the PC Games tab's options and the library's own options, shown while N is more than
-  0, opens `ChooseMatchesList`: one row per waiting game, Up and Down to move, A opens its manual match picker,
-  B closes. Any match replaces the state, so a matched game leaves the list as the picker closes and focus stays
-  where it was; a later pass that finds nothing at all clears it. The pass's summary points at the row.
+  The row that opens them is now **Review matches (N)** (Droidtop/tracker#318 slice 3, below), which replaced the
+  first list, `ChooseMatchesList`, with cards. Any match replaces the state; a later pass that finds nothing at all
+  clears it. The pass's summary points at the row.
 - **Review Matches: the queue keeps what the source answered (2026-10-24, Droidtop/tracker#318 slice 3).** The
   coordinator's queue for this lane (tracker `coordination/LANES-NOW.md`): "#318 matching slice 3: the bulk review
   queue, clearable on the handheld." A PC pass that does not take a match keeps the game in `match_queue` (database
@@ -14102,6 +14101,25 @@ the same care as the art.
   the score likes waits here, since the score is not live until its calibration set passes. **Unsure** holds tier
   D and **Not found** tier E. **Local only**, which the person sets, keeps a game out of the queue and is never
   overwritten by a pass. `needs_pick` stays on the row as before, for the filters that read it.
+  - **The cards (`ReviewMatches`).** "Review matches (N)" in the PC Games tab's options and the library's own
+    options opens it, shown while N is more than 0. N counts the queued games still in the library, plus the games
+    a pass marked before the queue kept answers, less Local only. It is a panel over the list it came from, with
+    three tabs and their counts: Likely, Unsure, Not found. A card shows the game as it is on disk on the left: its
+    folder or file name, the title and version read from it, and what was searched where. On the right are the
+    kept answers, best first and the best chosen, each with its cover, title, year, source and the score as four
+    pips (never the number). Games of one tab that searched for the same name (two versions' folders, a copy) are
+    one card marked `xN`, and a pick applies to all of them. Buttons, from droidtop's existing map:
+    - Up and Down choose an answer; Left and Right move between cards; L1 and R1 move between tabs.
+    - A applies the chosen answer (`PcScraper.apply`, as the picker does) and the next card comes under focus.
+    - X marks the card's games Local only.
+    - Y shows the chosen answer's description.
+    - L2 searches the source again in the match picker.
+    - B closes, and nothing is lost.
+
+    A card with no kept answer (a game marked before the queue) searches again on A. Not built yet: editing the
+    name before searching again (the plan's on-screen keyboard pre-filled with the title). The sources take any
+    name (`PcMetadataSource.search`), but `PcScraper.candidates` searches the game's own title, and the shell has
+    no plain text entry for the pad to reuse.
 - **A source's own match: plugins search by name and link what they find (2026-10-17, Droidtop/tracker#575).**
   The coordinator: the F95 plugin's metadata fetch needs a thread id, so the PC scrape got no F95 text for a game
   nobody had linked. A metadata plugin (docs/plugin-api.md 3 A3) is now asked like a built-in source:

@@ -38,4 +38,24 @@ class MatchQueueTest {
         assertEquals(null, MatchQueue.itemOf(MatchQueueEntity("g", MatchQueue.QUEUED, "GONE", "IGDB", "x", "[]", 0)))
         assertEquals(emptyList<MatchQueue.Choice>(), MatchQueue.choicesFrom("not json"))
     }
+
+    private fun item(id: String, tab: MatchQueue.Tab, searched: String) = MatchQueue.Item(id, tab, "IGDB", searched, emptyList(), 0)
+
+    @Test fun `games of one tab that searched for the same name are one card, and cards go Likely, Unsure, Not found`() {
+        val cards = MatchQueue.cards(
+            listOf(
+                item("/g/Zeta v2", MatchQueue.Tab.LIKELY, "Zeta"),
+                item("/g/Lost", MatchQueue.Tab.NOT_FOUND, "Lost"),
+                item("/g/Zeta v1", MatchQueue.Tab.LIKELY, "ZETA"),
+                item("/g/Alpha", MatchQueue.Tab.UNSURE, "Alpha"),
+                item("/g/Beta", MatchQueue.Tab.LIKELY, "Beta"),
+            ),
+        )
+        assertEquals(listOf("beta", "zeta", "alpha", "lost"), cards.map { it.searched.lowercase() })
+        assertEquals(listOf("/g/Zeta v1", "/g/Zeta v2"), cards[1].items.map { it.gameId })
+    }
+
+    @Test fun `pips follow the bars, never the number`() {
+        assertEquals(listOf(4, 3, 2, 1), listOf(95, 75, 45, 10).map(MatchQueue::pips))
+    }
 }

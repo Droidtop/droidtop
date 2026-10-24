@@ -347,7 +347,19 @@ object PcScraper {
     const val NEEDS_PICK = "needs_pick"
 
     /** The PC Games options row that lists [needingPick], named here so the pass's summary can point at it. */
-    const val CHOOSE_MATCHES = "Choose matches"
+    /** The review queue's name, on the options row that opens it and in a pass's summary (Droidtop/tracker#318 §5). */
+    const val REVIEW_MATCHES = "Review matches"
+
+    /**
+     * How many games wait in Review Matches: the queued ones still in the library, and the ones a pass marked
+     * [NEEDS_PICK] before the queue kept answers, less those marked Local only. Database work: off the main thread.
+     */
+    suspend fun waitingForReview(context: Context): Int = withContext(Dispatchers.IO) {
+        val games = LibraryScrapeJob.libraryGames(context).filter { it.isPcOrEngineGame && !it.missing }.map { it.id }.toSet()
+        val queued = dev.droidtop.library.identity.MatchQueue.items(context).map { it.gameId }.filter { it in games }
+        val older = needingPick(context).map { it.id }.filter { !dev.droidtop.library.identity.MatchQueue.isLocalOnly(context, it) }
+        (queued + older).toSet().size
+    }
 
     /** The library's PC and engine games a pass left at [NEEDS_PICK], by title. Database work: call it off the main thread. */
     suspend fun needingPick(context: Context): List<LibraryEntry> = withContext(Dispatchers.IO) {
@@ -1130,7 +1142,7 @@ internal fun formatPcScrapeSummary(sourceLabel: String, counts: PcScrapeCounts):
     return buildString {
         append("$sourceLabel: matched $matched of ${counts.targeted}")
         if (counts.byStoreId > 0) append(" (${counts.byStoreId} by store id)")
-        if (counts.needsPicking > 0) append(", ${counts.needsPicking} need a match you pick (PC Games options > ${PcScraper.CHOOSE_MATCHES}, or Choose match on the game)")
+        if (counts.needsPicking > 0) append(", ${counts.needsPicking} need a match you pick (PC Games options > ${PcScraper.REVIEW_MATCHES}, or Choose match on the game)")
         if (counts.noMatch > 0) append(", ${counts.noMatch} had no result at all")
         if (counts.failed > 0) append(", ${counts.failed} failed")
         if (counts.refused > 0) append(", ${counts.refused} refused by the server")

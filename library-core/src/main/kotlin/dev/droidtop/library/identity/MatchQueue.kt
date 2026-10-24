@@ -93,6 +93,32 @@ object MatchQueue {
         RomDatabase.get(context).romDao().matchQueueRows(QUEUED).mapNotNull(::itemOf)
     }
 
+    /**
+     * One card in Review Matches (§5.1): the games of one tab that searched for the same name, compared as
+     * [PcMatching.normalize][dev.droidtop.library.scraper.PcMatching.normalize] does (two versions' folders, a copy).
+     * Picking for the card picks for all of them. [choices] are the first game's.
+     */
+    data class Card(val tab: Tab, val items: List<Item>) {
+        val choices: List<Choice> get() = items.first().choices
+        val searched: String get() = items.first().searched
+    }
+
+    /** [items] as cards, by tab then name; games in no tab's order are left out. Pure. */
+    fun cards(items: List<Item>): List<Card> =
+        items.groupBy { it.tab to dev.droidtop.library.scraper.PcMatching.normalize(it.searched).ifEmpty { it.gameId } }
+            .map { (key, group) -> Card(key.first, group.sortedBy { it.gameId }) }
+            .sortedWith(compareBy<Card> { it.tab.ordinal }.thenBy { it.searched.lowercase() })
+
+    /** The pips a choice shows for its score, out of [PIPS] (§5.1: the tier's pips, never the number). Pure. */
+    fun pips(score: Int): Int = when {
+        score >= MatchScore.TAKE_AT -> 4
+        score >= MatchScore.LIKELY_AT -> 3
+        score >= MatchScore.UNSURE_AT -> 2
+        else -> 1
+    }
+
+    const val PIPS = 4
+
     /** How many games wait in each tab. */
     suspend fun counts(context: Context): Map<Tab, Int> = items(context).groupingBy { it.tab }.eachCount()
 

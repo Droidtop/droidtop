@@ -140,18 +140,18 @@ internal fun GamelistOptionsMenu(
         else -> "Search: ${searchText.trim()}"
     }
     var searchOpen by remember { mutableStateOf(false) }
-    // The games a scrape left at "needs a pick" (docs/SPEC.md 7h, "Games that need your pick"), offered where the
-    // PC scrape is: the PC Games tab and the library's own options. Counted when the menu opens, and again when the
-    // list closes.
+    // Review Matches (docs/SPEC.md 7h; Droidtop/tracker#318 §5): the games a scrape did not take a match for, offered
+    // where the PC scrape is: the PC Games tab and the library's own options. Counted when the menu opens, and again
+    // when the queue closes.
     val offersChooseMatches = libraryScope || systemId == PC_SYSTEM_ID
     var choosingMatches by remember { mutableStateOf(false) }
     var needPickCount by remember { mutableIntStateOf(0) }
     androidx.compose.runtime.LaunchedEffect(offersChooseMatches, choosingMatches) {
         if (offersChooseMatches && !choosingMatches) {
-            needPickCount = dev.droidtop.library.scraper.PcScraper.needingPick(context).size
+            needPickCount = dev.droidtop.library.scraper.PcScraper.waitingForReview(context)
         }
     }
-    val chooseMatchesLabel = "${dev.droidtop.library.scraper.PcScraper.CHOOSE_MATCHES} ($needPickCount)"
+    val chooseMatchesLabel = "${dev.droidtop.library.scraper.PcScraper.REVIEW_MATCHES} ($needPickCount)"
     val actions = buildList {
         if (libraryScope) {
             // The library-wide actions that used to live in Settings. Getting new games is the left menu's place and
@@ -391,7 +391,7 @@ internal fun GamelistOptionsMenu(
     }
 
     if (choosingMatches) {
-        ChooseMatchesList {
+        ReviewMatches {
             choosingMatches = false
             // A pick writes the game's art and details: rescan so the list shows them.
             onScraped()
