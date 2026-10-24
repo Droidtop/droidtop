@@ -28,6 +28,10 @@ class GameIdentitiesTest {
         override suspend fun addClaim(uid: String, claim: StoredClaim) {
             claims += uid to claim
         }
+        val missing = LinkedHashMap<String, Long>()
+        override suspend fun missingSince(uid: String, sinceMs: Long?) {
+            if (sinceMs == null) missing.remove(uid) else missing.putIfAbsent(uid, sinceMs)
+        }
     }
 
     private var clock = 1_000L
@@ -104,5 +108,29 @@ class GameIdentitiesTest {
         assertNull(Claim.store(null))
         assertEquals("rom:snes:md5:0123456789abcdef0123456789abcdef", Claim.romMd5("SNES", "0123456789ABCDEF0123456789ABCDEF")!!.value)
         assertNull(Claim.romMd5("snes", "not a hash"))
+    }
+
+    @Test
+    fun `a game gone missing is marked from its first day and kept, and loses the mark when it is back`() = runBlocking {
+        val game = identities.register(here, "/games/Foo", "RENPY", emptyList(), "library")
+        clock = 5_000L
+        identities.reconcileMissing(here, present = emptyList(), missing = listOf("/games/Foo"))
+        assertEquals(5_000L, store.missing[game])
+        clock = 9_000L
+        identities.reconcileMissing(here, present = emptyList(), missing = listOf("/games/Foo"))
+        assertEquals("the first date stays", 5_000L, store.missing[game])
+        assertEquals("nothing is deleted", setOf(game), store.games.keys)
+        identities.reconcileMissing(here, present = listOf("/games/Foo"), missing = emptyList())
+        assertNull(store.missing[game])
+    }
+
+    @Test
+    fun `a game still present at another locator is not missing`() = runBlocking {
+        val id = Claim.store("steam:440")!!
+        val game = identities.register(here, "steam:440", "WINE_PROFILE", listOf(id), "library")
+        assertEquals(game, identities.register(here, "/games/TF2", "WINE_PROFILE", listOf(id), "library"))
+        identities.reconcileMissing(here, present = listOf("steam:440"), missing = listOf("/games/TF2", "/never/registered"))
+        assertNull(store.missing[game])
+        assertEquals(emptyMap<String, Long>(), store.missing)
     }
 }

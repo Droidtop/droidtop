@@ -644,6 +644,16 @@ interface GameIdentityDao {
 
     @Query("SELECT * FROM game_locators WHERE uid = :uid")
     suspend fun locatorsOf(uid: String): List<GameLocatorEntity>
+
+    // Missing games are marked and kept (Droidtop/tracker#318 §7.3); the first date stays.
+    @Query("UPDATE games SET orphan_since = :sinceMs WHERE uid = :uid AND orphan_since IS NULL")
+    suspend fun markMissing(uid: String, sinceMs: Long)
+
+    @Query("UPDATE games SET orphan_since = NULL WHERE uid = :uid AND orphan_since IS NOT NULL")
+    suspend fun clearMissing(uid: String)
+
+    @Query("SELECT orphan_since FROM games WHERE uid = :uid")
+    suspend fun missingSince(uid: String): Long?
 }
 
 @Database(

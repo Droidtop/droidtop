@@ -31,6 +31,10 @@ class RoomIdentityStore(private val dao: GameIdentityDao) : IdentityStore {
 
     override suspend fun putLocator(device: String, locator: String, uid: String) = dao.putLocator(GameLocatorEntity(device, locator, uid))
 
+    override suspend fun missingSince(uid: String, sinceMs: Long?) {
+        if (sinceMs == null) dao.clearMissing(uid) else dao.markMissing(uid, sinceMs)
+    }
+
     override suspend fun addClaim(uid: String, claim: StoredClaim) =
         dao.insertClaim(GameClaimEntity(uid, claim.claim.namespace, claim.claim.value, claim.origin, claim.sinceMs, claim.supersededBy))
 }
@@ -59,8 +63,15 @@ object LibraryIdentities {
     /** Registers [entries] not registered with these claims yet this process. A failure is logged, never thrown. */
     suspend fun register(context: Context, entries: List<LibraryEntry>) {
         val identities = of(context)
-        for (entry in entries) {
-            if (entry.missing) continue
+        // A game whose files went missing is marked with the date and kept (§7.3); one seen again loses the mark.
+        val (gone, here) = entries.partition { it.missing }
+        gone.forEach { registered.remove(it.id) }
+        try {
+            identities.reconcileMissing(GameIdentities.THIS_DEVICE, here.map { it.id }, gone.map { it.id })
+        } catch (e: Exception) {
+            Log.w(TAG, "could not note missing games: ${e.message}")
+        }
+        for (entry in here) {
             val claims = claimsOf(entry)
             if (registered[entry.id] == claims) continue
             try {

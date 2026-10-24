@@ -107,6 +107,9 @@ interface IdentityStore {
     suspend fun mint(uid: String, kind: String?, nowMs: Long)
     suspend fun putLocator(device: String, locator: String, uid: String)
     suspend fun addClaim(uid: String, claim: StoredClaim)
+
+    /** Marks [uid] missing since [sinceMs] when it is not marked yet; null takes the mark off (Droidtop/tracker#318 §7.3). */
+    suspend fun missingSince(uid: String, sinceMs: Long?)
 }
 
 /**
@@ -133,6 +136,18 @@ class GameIdentities(
             }
         addClaims(uid, claims, origin)
         return uid
+    }
+
+    /**
+     * The library's view of [present] and [missing] locators on [device] (Droidtop/tracker#318 §7.3; owner,
+     * 2026-10-24: missing games are kept, never deleted automatically): a game none of whose locators is present is
+     * marked missing from now, a mark it already has keeps its first date, and a game seen again loses the mark.
+     * Nothing is deleted. A locator never registered is left alone.
+     */
+    suspend fun reconcileMissing(device: String, present: Collection<String>, missing: Collection<String>) {
+        val here = present.mapNotNull { store.uidAt(device, it) }.toSet()
+        here.forEach { store.missingSince(it, null) }
+        missing.mapNotNull { store.uidAt(device, it) }.distinct().filter { it !in here }.forEach { store.missingSince(it, now()) }
     }
 
     /** Adds [claims] to [uid] that it does not hold yet; one it holds already is left as it was. */

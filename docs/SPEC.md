@@ -14143,6 +14143,21 @@ the same care as the art.
     Fields the person edited are never written, as before. Not built yet: each field's own state (`asked-empty`,
     `refused`, `never-asked`) with the time it was asked, the 30-day re-ask of an empty answer, and the game page's
     glyph per field group (§7.1). Today's per-field record is still only the source of what was written.
+  - **A game whose files go missing is marked and kept (Droidtop/tracker#318 slice 6, §7.3; owner, 2026-10-24).**
+    The plan purged a missing game after 90 days. The owner chose instead: "Keep, don't auto-delete", since
+    droidtop's cleanup deletes real files only after the person has seen the count (`OrphanedMedia`). So:
+    - When the library sees a game's files gone, the game's identity is marked with the date it was first missing
+      (`games.orphan_since`, `GameIdentities.reconcileMissing`), unless another of its locations is still present
+      (a store row and its folder).
+    - The first date stays, and a game seen again loses the mark. Its row, favourites, history and saves stay
+      throughout.
+    - A game that comes back elsewhere with the same store id or ROM hash re-attaches to the same identity, with no
+      new scrape (`GameIdentities.register`, slice 1).
+    - Missing games stay out of bulk scrapes and Review matches, as before.
+    - Nothing is deleted automatically. **Delete orphaned media** stays the one delete, after the person sees the
+      count.
+    - Not built yet: the "missing" glyph on a game's tile (the UI lane's tile work, #644), and the date shown in
+      Delete orphaned media's count.
 
     A card with no kept answer (a game marked before the queue) searches again on A. Not built yet: editing the
     name before searching again (the plan's on-screen keyboard pre-filled with the title). The sources take any
