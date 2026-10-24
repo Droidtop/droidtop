@@ -14,8 +14,11 @@ import org.json.JSONTokener
  * notice is in NOTICE.md), and widened from one file to a whole torrent.
  */
 
-/** The torrent a job asks a service for: its info hash (40 lower-case hex digits) and a magnet for it. */
-data class TorrentRef(val infoHash: String, val magnet: String)
+/**
+ * The torrent a job asks a service for: its info hash (40 lower-case hex digits) and a magnet for it. [private]: its
+ * `info` says `private` 1 (a private tracker's torrent, such as RPDL's), which is never handed to a debrid service.
+ */
+data class TorrentRef(val infoHash: String, val magnet: String, val private: Boolean = false)
 
 /** One file a service has ready: its path inside the torrent, its size when known, and a direct address for it. */
 data class DebridFile(val path: String, val size: Long?, val url: String)
