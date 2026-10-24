@@ -43,17 +43,7 @@ object DebridLinks {
             if (cached == false && !wait) continue
             val ready = settle(provider, key, link, if (cached == true) CACHED_WAIT_MS else FETCH_WAIT_MS) ?: continue
             DebridChoice.spent(provider, key)
-            return ready.files.map { file ->
-                WebSessionDownload(
-                    url = file.url,
-                    userAgent = null,
-                    contentDisposition = "attachment; filename=\"${file.path.substringAfterLast('/').replace("\"", "")}\"",
-                    mimeType = null,
-                    size = file.size,
-                    referer = null,
-                    cookie = null,
-                )
-            }
+            return ready.files.map { file -> WebSessionDownload.direct(file.url, file.path, file.size) }
         }
         return null
     }

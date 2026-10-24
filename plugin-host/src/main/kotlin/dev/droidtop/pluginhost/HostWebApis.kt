@@ -107,9 +107,9 @@ internal object HostWebApis {
             // A page that offers several files (a game in parts, a game and its patch) is taken in one visit (#419): up to
             // `max` downloads, the acquire reply's limit for several files.
             val max = args.optInt("max", 1).coerceIn(1, MAX_CAPTURED)
-            // A link on a hoster the person's debrid account serves comes from the account, without the page (#638);
+            // A link a host account, a debrid account or the host's own API serves comes from there, without the page (#638);
             // the plugin gets the files as it would a captured download, and never the account or its key.
-            val downloads = dev.droidtop.pluginhost.debrid.DebridLinks.resolve(url) ?: run {
+            val downloads = dev.droidtop.pluginhost.hosts.HostLinks.resolve(url) ?: run {
                 val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null, maxDownloads = max))
                 // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
                 env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
@@ -125,6 +125,8 @@ internal object HostWebApis {
                     download.cookie?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
                     download.userAgent?.takeIf { it.isNotBlank() }?.let { put("User-Agent", it) }
                     download.referer?.takeIf { it.isNotBlank() }?.let { put("Referer", it) }
+                    // A host's API gives its own, such as the person's account on the host (#638): in memory, by the token.
+                    putAll(download.headers)
                 }
                 val token = WebSessions.keep(
                     WebSessions.Captured(record.manifest.id, download.url, fileName, download.size?.takeIf { it > 0 }, download.mimeType, headers, env.nowMs()),

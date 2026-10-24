@@ -102,6 +102,17 @@ class UpdatePlacementTest {
     }
 
     @Test
+    fun aFileHostsOwnHeadersAndDigestTravelWithTheDownload() {
+        val digest = "ab".repeat(32)
+        val one = UpdateLinks.descriptorsFor(
+            listOf(WebSessionDownload.direct("https://pixeldrain.com/api/file/abc?download", "Game.zip", 5L, mapOf("Authorization" to "Basic OnNlY3JldA=="), digest, "via your PixelDrain")),
+        ).single()
+        assertEquals(mapOf("Authorization" to "Basic OnNlY3JldA=="), one.headers)
+        assertEquals(digest, one.sha256)
+        assertEquals("Game.zip", one.fileName)
+    }
+
+    @Test
     fun aRecordIsSavedWholeAndRefusesAPathForAName() {
         val cache = RecordCache(File(dir, "records"))
         cache.save("f95zone", "18978", JSONObject().put("title", "Sample"), nowMs = 42L)

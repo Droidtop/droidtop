@@ -131,6 +131,11 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // And a source's link on a file hoster the account serves (Pixeldrain, Mega, ...), before the page opens.
         dev.droidtop.pluginhost.debrid.DebridLinks.accounts = { dev.droidtop.library.debrid.DebridAccounts.connected(this@DroidtopApplication) }
         dev.droidtop.pluginhost.debrid.DebridLinks.waits = { dev.droidtop.library.debrid.DebridAccounts.waits(this@DroidtopApplication) }
+        // The person's own account on a file host (PixelDrain): its premium downloads are asked before any debrid account.
+        dev.droidtop.pluginhost.hosts.HostLinks.accounts = { hostId ->
+            dev.droidtop.library.scraper.ScraperKeyService.entries.firstOrNull { it.hostId == hostId }
+                ?.read(this@DroidtopApplication)?.values?.firstOrNull()?.takeIf { it.isNotBlank() }
+        }
         dev.droidtop.pluginhost.debrid.DebridChoice.spreadMode = { dev.droidtop.library.debrid.DebridAccounts.spread(this@DroidtopApplication) }
         dev.droidtop.pluginhost.debrid.DebridChoice.onKeyRefused = { id, message -> dev.droidtop.library.debrid.DebridAccounts.refused(this@DroidtopApplication, id, message) }
         dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->

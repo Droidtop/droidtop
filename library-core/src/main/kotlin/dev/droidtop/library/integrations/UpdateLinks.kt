@@ -36,9 +36,10 @@ object UpdateLinks {
                     add("Cookie", download.cookie)
                     add("User-Agent", download.userAgent)
                     add("Referer", download.referer)
+                    download.headers.forEach { (name, value) -> add(name, value) }
                 },
                 fileName = names[index],
-                sha256 = null,
+                sha256 = download.sha256,
                 size = download.size?.takeIf { it > 0 },
                 unpack = unpack,
             )

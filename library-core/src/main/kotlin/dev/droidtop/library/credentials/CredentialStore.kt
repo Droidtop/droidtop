@@ -32,6 +32,7 @@ object CredentialStore {
     const val RETROACHIEVEMENTS_API_KEY = "droidtop_retroachievements_apikey"
     const val TORBOX_API_KEY = "droidtop_torbox_apikey"
     const val REALDEBRID_TOKEN = "droidtop_realdebrid_token"
+    const val PIXELDRAIN_API_KEY = "droidtop_pixeldrain_apikey"
 
     /** A Real-Debrid device sign-in (its device credentials and refresh token, JSON); its access token is [REALDEBRID_TOKEN]. */
     const val REALDEBRID_SIGNIN = "droidtop_realdebrid_signin"
@@ -41,7 +42,7 @@ object CredentialStore {
         IGDB_CLIENT_ID, IGDB_CLIENT_SECRET, STEAMGRIDDB_API_KEY,
         THEGAMESDB_API_KEY, SCREENSCRAPER_USER, SCREENSCRAPER_PASSWORD,
         RETROACHIEVEMENTS_USER, RETROACHIEVEMENTS_API_KEY,
-        TORBOX_API_KEY, REALDEBRID_TOKEN, REALDEBRID_SIGNIN,
+        TORBOX_API_KEY, REALDEBRID_TOKEN, REALDEBRID_SIGNIN, PIXELDRAIN_API_KEY,
     )
 
     @Volatile private var vault: CredentialVault? = null
