@@ -243,6 +243,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(WineOptionsCatalog.gameScreen())
         SettingsScreenRegistry.register(WindowsInstallCatalog.screen())
         SettingsScreenRegistry.register(LinuxGameToolsCatalog.screen())
+        SettingsScreenRegistry.register(RunInPrefixCatalog.screen())
+        SettingsScreenRegistry.register(PrefixToolsCatalog.gameScreen())
         SettingsScreenRegistry.register(StoresCatalog.screen())
         SettingsScreenRegistry.register(SocialCatalog.screen())
         SettingsScreenRegistry.register(accountsAndSourcesScreen())

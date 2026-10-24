@@ -159,16 +159,14 @@ object WineOptionsCatalog {
                     inline = PrefixSettingsCatalog.screen(if (overGame) null else entryId, title),
                 ),
             )
-            if (state.setUp) add(
+            // A game's Prefix tools are in its menu's Manage section (docs/SPEC.md 7i, "Manage"); here only the
+            // shared environment's, in Settings.
+            if (state.setUp && shared) add(
                 NestedScreenItem(
                     id = "wine_options_tools",
                     title = "Prefix tools",
-                    subtitle = if (overGame) {
-                        "Wine configuration, the registry editor and a command prompt, running a program, and stopping Wine, for the shared prefix. They apply to every game that shares it"
-                    } else {
-                        "Wine configuration, the registry editor and a command prompt, running a program, and stopping Wine, for this prefix"
-                    },
-                    inline = PrefixToolsCatalog.screen(if (overGame) null else entryId, title, shared = overGame || shared),
+                    subtitle = "Wine configuration, the registry editor and a command prompt, running a program, and stopping Wine, for the shared prefix",
+                    inline = PrefixToolsCatalog.screen(null, title, shared = true),
                 ),
             )
             add(

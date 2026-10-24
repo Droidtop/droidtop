@@ -1817,8 +1817,12 @@ class EngineGameProvider(
         val resolved = resolveEntry(entry)
         val gameRoot = resolved.gameRoot
         val available = availableStrategies(entry)
-        val overrideStrategy = LaunchStrategyOverridePrefs.get(context, entry.id)
-        val strategy = available.firstOrNull { it.name == overrideStrategy } ?: available.firstOrNull()
+        // A "Run once with…" choice that cannot run says so rather than starting the game some other way.
+        val once = LaunchStrategyOverridePrefs.isOnce(entry.id)
+        val overrideStrategy = LaunchStrategyOverridePrefs.forLaunch(context, entry.id)
+        val chosen = available.firstOrNull { it.name == overrideStrategy }
+        check(chosen != null || !once) { "Can't run ${entry.title} that way on this device right now; it was not started" }
+        val strategy = chosen ?: available.firstOrNull()
             ?: error(
                 "No way to launch ${entry.title} — install Enginehost (Ren'Py/RPG Maker/etc) " +
                     "or Kirikiroid2 (Kirikiri), or point it at a Windows .exe (Wine) or a Linux " +

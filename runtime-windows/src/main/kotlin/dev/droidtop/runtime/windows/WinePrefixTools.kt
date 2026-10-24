@@ -86,18 +86,34 @@ object WinePrefixTools {
         return if (result.succeeded) "Started ${file.name}" else "Couldn't start ${file.name}: ${result.detail}"
     }
 
-    /** [file] in [container]: the one place a program the person picked starts ([launchOf]). */
+    /**
+     * [file] in [container]: the one place a program the person picked starts ([launchOf]). It starts in its
+     * own folder, and that folder is put on a drive of the prefix first when no drive holds it yet
+     * ([PrefixDrives.withFolder]), so what it writes beside itself (a translation updater rewriting the game's
+     * files, Droidtop/tracker#636) lands in that folder. Nothing is copied.
+     */
     internal suspend fun runIn(context: Context, container: Container, file: File): PcLaunchResult {
+        val folder = file.parentFile ?: file
+        withContext(Dispatchers.IO) {
+            PrefixDrives.withFolder(container.drives.orEmpty(), folder)?.takeIf { it.added }?.let { mapped ->
+                container.drives = mapped.drives
+                container.saveData()
+            }
+        }
         val launch = launchOf(file)
         return launchInPrefix(
             BionicWineEngine(context),
             container,
             launch.target,
-            file.parentFile ?: file,
+            folder,
             launch.arguments,
             tool = file.name,
         )
     }
+
+    /** Whether [entryId] starts in the prefix games share (true), its own (false), or there is no prefix yet (null). IO. */
+    fun sharesPrefix(context: Context, entryId: String?): Boolean? =
+        PcContainers.forGame(context, entryId)?.let { !PcContainers.isOwnPrefix(entryId, it) }
 
     /**
      * Stops every Wine process, droidtop's own guests and any a game left behind (the same list a

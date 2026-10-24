@@ -56,12 +56,14 @@ internal fun RunnerPicker(
     overridden: Boolean,
     onPick: (GameLaunchStrategy?) -> Unit,
     onDismiss: () -> Unit,
+    // "Run once with" offers the same choices for one launch (docs/SPEC.md 7i, Droidtop/tracker#636).
+    title: String = "Runs with",
 ) {
     var showWhyNot by remember { mutableStateOf(false) }
     val offered = options.filter { it.state != RunnerState.NOT_FOR_THIS_GAME }
     val hidden = options.filter { it.state == RunnerState.NOT_FOR_THIS_GAME }
 
-    PickerPage(title = "Runs with", onDismiss = onDismiss) {
+    PickerPage(title = title, onDismiss = onDismiss) {
         if (overridden) {
             item {
                 RunnerRow(

@@ -1,5 +1,7 @@
 package dev.droidtop.app.settings
 
+import dev.droidtop.library.LinuxToolsScreen
+import dev.droidtop.library.ManageScreens
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
@@ -22,6 +24,31 @@ object PrefixToolsCatalog {
 
     /** The path typed into "Path to a program", until it is run. */
     @Volatile private var typedPath: String = ""
+
+    /**
+     * The Prefix tools of the prefix a game starts in, from its menu's Manage section (docs/SPEC.md 7i,
+     * "Manage"; [ManageScreens.PREFIX_TOOLS]): its own prefix when it has one, else the shared one, for every
+     * kind of game, an engine game Enginehost plays included.
+     */
+    fun gameScreen(): CatalogScreen = CatalogScreen(
+        id = ManageScreens.PREFIX_TOOLS,
+        title = "Prefix tools",
+        groups = { _ -> emptyList() },
+        indexGroups = { _ -> emptyList() },
+        forDeepLink = { argument ->
+            val target = LinuxToolsScreen.parse(argument)
+            CatalogScreen(
+                id = ManageScreens.PREFIX_TOOLS,
+                title = "Prefix tools",
+                subtitle = target.title,
+                groups = { context ->
+                    val shared = withContext(Dispatchers.IO) { WinePrefixTools.sharesPrefix(context, target.entryId) } ?: true
+                    screen(target.entryId, target.title, shared).groups(context)
+                },
+                indexGroups = { _ -> emptyList() },
+            )
+        },
+    )
 
     fun screen(entryId: String?, title: String?, shared: Boolean): CatalogScreen = CatalogScreen(
         id = "wine_prefix_tools",
