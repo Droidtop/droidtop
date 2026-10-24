@@ -429,7 +429,7 @@ class RemoteInputTest {
     // The page and the socket.
 
     @Test
-    fun `the page is static: no outside address, one box and its buttons`() {
+    fun `the page is static - no outside address, one box and its buttons`() {
         val html = RemoteInputPage.html("482913")
         assertTrue(html.contains("482 913"))
         assertTrue(html.contains("id=\"send\"") && html.contains("id=\"enter\"") && html.contains("id=\"back\"") && html.contains("id=\"live\""))
