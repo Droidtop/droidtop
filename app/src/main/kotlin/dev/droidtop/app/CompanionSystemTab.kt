@@ -140,7 +140,7 @@ private fun storageVolumes(context: android.content.Context): List<StorageVolume
     return listOfNotNull(internal) + removable.distinctBy { it.name to it.total }
 }
 
-/** A thin filled bar, [fraction] of the way: storage used, a download's progress. */
+/** A thin filled bar, [fraction] of the way: storage used. A job's bar is the shared one ([companionJobColors]). */
 @Composable
 internal fun CompanionBar(fraction: Float) {
     Box(
@@ -159,4 +159,9 @@ internal fun CompanionBar(fraction: Float) {
     }
 }
 
-
+/** The companion's colours for a job's bar and mark (dev.droidtop.ui.shared.JobProgress), from its Material roles. */
+@Composable
+internal fun companionJobColors(): dev.droidtop.ui.shared.JobProgressColors {
+    val colors = MaterialTheme.colorScheme
+    return dev.droidtop.ui.shared.JobProgressColors(track = colors.surfaceVariant, fill = colors.primary, done = colors.tertiary, failed = colors.error)
+}

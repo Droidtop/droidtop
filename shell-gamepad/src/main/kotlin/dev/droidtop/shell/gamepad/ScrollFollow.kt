@@ -4,6 +4,7 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.grid.LazyGridState
+import dev.droidtop.ui.shared.Motion
 
 /*
  * Keeping the selection on screen, once per kind of container (docs/

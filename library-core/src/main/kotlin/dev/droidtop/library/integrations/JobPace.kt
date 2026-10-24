@@ -1,5 +1,6 @@
 package dev.droidtop.library.integrations
 
+import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.pluginhost.JobState
 import dev.droidtop.pluginhost.PluginJobsCenter
 import java.util.concurrent.ConcurrentHashMap
@@ -123,13 +124,6 @@ internal object JobPace {
     fun steady(said: String?, saidAtMs: Long, fresh: String?, nowMs: Long): String? =
         if (said != null && nowMs - saidAtMs < HOLD_MS) said else fresh ?: said
 
-    /** The time left in the coarsest words that are honest. Pure. */
-    fun words(ms: Long): String {
-        val minutes = (ms + 30_000L) / 60_000L
-        return when {
-            ms < 45_000L -> "Under a minute left"
-            minutes < 60 -> "About ${minutes.coerceAtLeast(1)} min left"
-            else -> "About ${(minutes + 30) / 60} h left"
-        }
-    }
+    /** The time left in the one formatter's words (ValueFormat.remaining: whole minutes, quarter hours above one). Pure. */
+    fun words(ms: Long): String = ValueFormat.remaining((ms / 1000L).coerceAtLeast(1L))
 }

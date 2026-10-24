@@ -93,6 +93,12 @@ sealed interface CatalogItem {
     val progress: Float? get() = null
 
     /**
+     * Where that job stands, for how its bar moves ([JobLook]: a queued pulse, a moving fill, a checking shimmer, a check
+     * when done, a shake when it failed). Follows [progress] unless the row says.
+     */
+    val progressLook: JobLook? get() = JobLook.of(progress)
+
+    /**
      * A short tag drawn beside the title, on the row itself ("Unofficial" on a plugin from a catalog that is not
      * droidtop's): a fact the person must see without opening anything, never a tooltip. Null draws none.
      */
@@ -204,6 +210,7 @@ class ActionItem(
     // in a settings row and on a Quick Menu tile alike; null for an action with no such state.
     val state: Boolean? = null,
     override val progress: Float? = null,
+    override val progressLook: JobLook? = JobLook.of(progress),
     override val chip: String? = null,
     override val iconFile: String? = null,
     val run: (Context) -> Unit,
@@ -392,6 +399,7 @@ class NestedScreenItem(
     val accent: Int? = null,
     override val icon: CatalogIcon? = null,
     override val progress: Float? = null,
+    override val progressLook: JobLook? = JobLook.of(progress),
     override val chip: String? = null,
     override val iconFile: String? = null,
     override val summaryShown: Boolean = false,

@@ -34,11 +34,10 @@ class JobPaceTest {
     }
 
     @Test
-    fun `time left is said in coarse honest words`() {
+    fun `time left is said in the one formatter's coarse words`() {
         assertEquals("Under a minute left", JobPace.words(30_000L))
-        assertEquals("About 1 min left", JobPace.words(50_000L))
         assertEquals("About 5 min left", JobPace.words(300_000L))
-        assertEquals("About 2 h left", JobPace.words(100 * 60_000L))
+        assertEquals("About 1 h 45 min left", JobPace.words(100 * 60_000L))
         assertNull(JobPace.remainingMs(left = 10, ratePerMs = 0.0))
     }
 

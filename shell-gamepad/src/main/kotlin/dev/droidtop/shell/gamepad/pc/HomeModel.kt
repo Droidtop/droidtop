@@ -66,14 +66,20 @@ internal sealed interface HomeCard {
         override val line: String get() = activity
     }
 
-    /** A download that is running or paused: "45% · About 8 min left". Opens the job. */
-    data class Download(val jobId: String, override val title: String, val percent: Int, val remainingSeconds: Long, val paused: Boolean) : HomeCard {
+    /**
+     * A download that is running or paused: its bar ([percent], moving as [look] says) over the Downloads place's own
+     * line for it ([said]: "About 8 min left", "Paused"), never a percent that changes with each report
+     * (Droidtop/tracker#643). Opens the job.
+     */
+    data class Download(
+        val jobId: String,
+        override val title: String,
+        val percent: Int,
+        val said: String,
+        val look: dev.droidtop.library.settings.JobLook,
+    ) : HomeCard {
         override val id: String get() = "job:$jobId"
-        override val line: String get() = when {
-            paused -> "Paused"
-            percent < 0 -> "Starting"
-            else -> listOf(ValueFormat.percent(percent / 100f), ValueFormat.remaining(remainingSeconds)).filter { it.isNotEmpty() }.joinToString(" · ")
-        }
+        override val line: String get() = said
     }
 }
 

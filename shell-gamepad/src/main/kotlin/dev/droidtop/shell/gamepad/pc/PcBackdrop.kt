@@ -21,7 +21,7 @@ import coil3.request.ImageRequest
 import coil3.size.Size
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.shell.gamepad.MenuTokens
-import dev.droidtop.shell.gamepad.Motion
+import dev.droidtop.ui.shared.Motion
 
 /**
  * The art-led backdrop of the PC Games home (docs/SPEC.md 7i, "Home art"):

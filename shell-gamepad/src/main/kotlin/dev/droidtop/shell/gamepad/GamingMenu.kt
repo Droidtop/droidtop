@@ -61,6 +61,8 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.gestures.animateScrollBy
+import dev.droidtop.ui.shared.Motion
+import dev.droidtop.ui.shared.tabularFigures
 import kotlinx.coroutines.launch
 import androidx.compose.ui.unit.isSpecified
 import dev.droidtop.library.settings.CatalogIcon
@@ -442,6 +444,9 @@ internal fun MenuRow(
     // A job's progress (CatalogItem.progress): a thin bar under the title, the title then one line so
     // the row keeps its height. Null: not a job.
     progress: Float? = null,
+    // How that job's bar moves (CatalogItem.progressLook, Droidtop/tracker#643); a finished job's row, which has no
+    // bar, draws its check or cross beside the title.
+    progressLook: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
     // [icon] win when given, since a row carries one leading mark at most.
     leading: (@Composable () -> Unit)? = null,
@@ -540,13 +545,30 @@ internal fun MenuRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
+                if (progress == null && progressLook != null) {
+                    Spacer(Modifier.width(Space.Sm))
+                    dev.droidtop.ui.shared.JobMark(progressLook, shellJobColors())
+                }
                 if (chip != null) {
                     Spacer(Modifier.width(Space.Sm))
                     StatusChip(chip, ink = MenuTokens.OnSurface, fill = MenuTokens.SurfaceSelected)
                 }
             }
             if (progress != null) {
-                ShellProgressBar(progress, Modifier.fillMaxWidth().padding(top = Space.Sm))
+                Row(Modifier.padding(top = Space.Sm), verticalAlignment = Alignment.CenterVertically) {
+                    ShellProgressBar(progress, Modifier.weight(1f), progressLook ?: dev.droidtop.library.settings.JobLook.of(progress)!!)
+                    // The percent only where the cursor is, in figures that keep their width (Droidtop/tracker#643:
+                    // "Percent only on focus, in tabular figures").
+                    if (selected && progress >= 0f && progressLook == dev.droidtop.library.settings.JobLook.ACTIVE) {
+                        Spacer(Modifier.width(Space.Sm))
+                        Text(
+                            "${(progress * 100).toInt()}%",
+                            color = MenuTokens.OnSurfaceMuted,
+                            style = MaterialTheme.typography.labelSmall.tabularFigures(),
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
             // Wraps in full: rows grow with their text, so nothing is cut
             // (owner, tracker#154). The Info sheet still shows the row whole.
@@ -744,19 +766,30 @@ internal fun ShellSlider(fraction: Float, selected: Boolean, modifier: Modifier 
 }
 
 /**
- * The shell's one progress bar ([ProgressLook]): a thin track in the scrim role filled to
- * [fraction] in the accent, Steam's black track and blue fill in the theme's roles. A negative
- * [fraction] (a job under way whose size is not known yet) is the track alone. Drawn in one pass;
- * [modifier] gives it its width. A download's row and a capsule being installed both draw it.
+ * The shell's one progress bar ([ProgressLook]): the shared job bar ([dev.droidtop.ui.shared.JobProgress],
+ * Droidtop/tracker#643) in Gaming's roles, a thin track in the scrim role filled in the accent, Steam's black track
+ * and blue fill. The fill glides between reports; a negative [fraction] (a job under way whose size is not known yet)
+ * is the checking shimmer. [modifier] gives it its width. A download's row, a capsule being installed and Home's
+ * download cards all draw it.
  */
 @Composable
-internal fun ShellProgressBar(fraction: Float, modifier: Modifier = Modifier) {
-    val track = MenuTokens.Scrim
-    val fill = MenuTokens.Accent
-    androidx.compose.foundation.Canvas(modifier.height(ProgressLook.Height)) {
-        drawRect(track)
-        if (fraction > 0f) drawRect(fill, size = size.copy(width = size.width * fraction.coerceAtMost(1f)))
-    }
+internal fun ShellProgressBar(
+    fraction: Float,
+    modifier: Modifier = Modifier,
+    look: dev.droidtop.library.settings.JobLook = dev.droidtop.library.settings.JobLook.of(fraction)!!,
+) {
+    dev.droidtop.ui.shared.JobProgress(fraction, look, shellJobColors(), modifier, height = ProgressLook.Height)
+}
+
+/** Gaming's colours for a job's bar and mark. */
+@Composable
+internal fun shellJobColors(): dev.droidtop.ui.shared.JobProgressColors {
+    return dev.droidtop.ui.shared.JobProgressColors(
+        track = MenuTokens.Scrim,
+        fill = MenuTokens.Accent,
+        done = MenuTokens.Affirmative,
+        failed = MenuTokens.Danger,
+    )
 }
 
 /**

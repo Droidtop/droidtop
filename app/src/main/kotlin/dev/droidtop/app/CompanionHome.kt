@@ -46,6 +46,7 @@ import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.PlatformsDatabase
 import dev.droidtop.library.consoles.resolvePlayer
+import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.displayName
 import dev.droidtop.library.settings.CompanionHomeLayout
 import dev.droidtop.library.settings.CompanionHomePrefs
@@ -59,6 +60,7 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.tabularFigures
 
 /**
  * The companion Home's sections and the pieces they share (docs/SPEC.md "The companion's tabs",
@@ -368,17 +370,38 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
     CompanionHomeSectionFrame(CompanionHomeSection.ACTIVITY, layout, summary = summary) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             active.take(MAX_JOB_ROWS).forEach { job ->
-                Column(modifier = Modifier.fillMaxWidth()) {
+                // The bar says how far and the line the Downloads place's words ("About 4 min left"); a tap shows the
+                // figures, as focus does on the pad (Droidtop/tracker#643: never a live percent on a touch surface).
+                var figures by remember(job.jobId) { mutableStateOf(false) }
+                Column(modifier = Modifier.fillMaxWidth().clickable { figures = !figures }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(job.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                         Text(
-                            if (job.paused) "Paused" else if (job.percent >= 0) "${job.percent}%" else job.statusLine,
+                            PluginJobsScreen.oneLine(job),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(start = 8.dp),
                         )
                     }
-                    if (job.percent >= 0) CompanionBar(job.percent / 100f)
+                    dev.droidtop.ui.shared.JobProgress(
+                        job.percent.takeIf { it >= 0 }?.let { it / 100f } ?: -1f,
+                        PluginJobsScreen.lookOf(job),
+                        companionJobColors(),
+                        Modifier.fillMaxWidth().padding(top = 4.dp),
+                        height = 6.dp,
+                    )
+                    if (figures) {
+                        PluginJobsScreen.detailLine(job, System.currentTimeMillis())?.let {
+                            Text(
+                                it,
+                                style = MaterialTheme.typography.bodySmall.tabularFigures(),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 2.dp),
+                            )
+                        }
+                    }
                 }
             }
             if (updates.isNotEmpty()) {

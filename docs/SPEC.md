@@ -17100,7 +17100,8 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   counts them, else things, else its percent; a screen drawn again between
   reports is no sample. It says nothing until the job has moved for 5 s, a time
   it said stands 5 s before it may change, and it starts again after a pause or
-  a wait: "Under a minute left", "About 8 min left", "About 2 h left". The speed
+  a wait, in `ValueFormat.remaining`'s words: "Under a minute left", "About 8 min left",
+  "About 1 h 45 min left". The speed
   on a job's page is smoothed the same way. A on a running
   or paused job opens its page: its progress, Pause or Resume where the job
   supports them, and Cancel (two presses). The screen is live on the jobs
@@ -17902,6 +17903,35 @@ this section is tested against:
 - `Goodbye Eternity` in two folders, `...-0.8.1-pc-animated-unc` beside one
   with no version in its name, is one game with **two VERSIONS**, and
   `v0.8.1` is what Play starts.
+
+### Motion and visual status (decided 2026-10-24, Droidtop/tracker#643)
+
+The owner, 2026-10-24: "how we do notifications and stuff is very text based. Can we move to more animations and
+intuitive design? The current 'flickery numbers for download progress', for instance, is bad." **Rule: status is shown,
+not read; text explains on demand, and is never the primary way to see state.**
+
+- **One job bar, every surface.** `JobProgress` and `JobMark` (`:ui-shared`) draw every job: the Downloads and Updates
+  rows in Gaming's place and the Quick Menu (`ShellProgressBar`, Gaming's colours), a game page's Play area, a PC
+  capsule's foot, Home's download cards, the companion's home and catalog rows (`companionJobColors`), and Standard's
+  settings rows (`JobViews`, a Preference layout of its own). Each host gives its colours (`JobProgressColors`).
+- **States as motion** (`JobLook`, `:runtime-common`, from `PluginJobsScreen.lookOf`): queued (held, or waiting for a
+  connection or its next try) is a dim bar with a slow pulse; active glides its fill to each new value over
+  `Motion.ProgressMs`, longer than the gap between two reports, so it never stops between them; checking (under way,
+  no fraction) runs a shimmer along the track; paused stands dimmed; done fills and a check draws itself in; failed
+  turns the track to the danger colour and shakes once, the reason on the row's press. A finished row has no bar and
+  shows its check or cross beside the title (`CatalogItem.progressLook`). Every moving value is read while drawing, so
+  a list of jobs is drawn again and never laid out again as they move.
+- **No flickering numbers.** A row's line is where the job stands or its time left (`JobPace`, see the Downloads
+  place); the percent shows only where the cursor is, in tabular figures (`tabularFigures`), and on a touch surface a
+  tap shows the percent and speed (the companion's home row; a job row opens its page). Home's download card and the
+  capsule chip name the state; the bar says how far.
+- **Motion is one switch for the whole process.** `Motion` lives in `:ui-shared`; `MotionWatch` (installed by the
+  application) keeps Android's animator duration scale current for every host, and Gaming's Animations setting is
+  laid on top in Gaming. With "Remove animations" on, every role is a snap: the bar stands, the check is drawn, nothing
+  pulses or shakes. The notice card and the danger dialog read the same switch.
+- **Still to come (Droidtop/tracker#643):** notices as cards that slide in with an icon and one line, grouped and
+  counting up; an animated ring and dot on the Downloads entry and the status bar; Enginehost's side, a follow-up of
+  its own. The Downloads widget and the notification still say a percent in text.
 
 ### A version is a FOLDER (decided 2026-09-17; a Godot single-file build amended 2026-10-10)
 
