@@ -170,7 +170,7 @@ class WebSessionActivity : Activity() {
                     val host = url?.let { NetScope.hostOf(it) }
                     if (asked.mode == WebSessionRequest.Mode.CHECK && host != null &&
                         (asked.domains.isEmpty() || WebSessions.covers(host, asked.domains)) &&
-                        SiteChecks.passed(view.title, cookies.getCookie("https://$host"))
+                        SiteChecks.isPassed(view.title, cookies.getCookie("https://$host"))
                     ) {
                         finishWith(completed = true, download = null)
                         return
