@@ -132,7 +132,8 @@ object PluginWebAccount {
     fun openForDownloads(context: Context, record: PluginRecord, url: String, max: Int): List<WebSessionDownload> {
         if (!NetScope.isHttps(url) || NetScope.hostOf(url) == null) return emptyList()
         // A link a host account, a debrid account or the host's own API serves comes from there, without the page (#638).
-        dev.droidtop.pluginhost.hosts.HostLinks.resolve(url)?.let { return it.take(max) }
+        var refusal: String? = null
+        dev.droidtop.pluginhost.hosts.HostLinks.resolve(url, refused = { refusal = it })?.let { return it.take(max) }
         val domains = WebSessions.declaredDomains(record.manifest.v2.permissions)
         val snapshot = PluginGrants.forContext(context).read(record.manifest.id)
         val grant = PluginGrants.stateOf(record, snapshot, WebSessions.PERMISSION)
@@ -145,7 +146,8 @@ object PluginWebAccount {
         result.session?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {
             vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, it.copy(account = stored?.account).toJson())
         }
-        return result.downloads.take(max)
+        // A host whose API refused the link (Mega's limit on anonymous downloads) says so in the job's line.
+        return result.downloads.take(max).map { download -> refusal?.let { download.copy(via = "from the web page ($it)") } ?: download }
     }
 
     /** The line shown when [open] kept no session: the person backed out, or the permission is off. */

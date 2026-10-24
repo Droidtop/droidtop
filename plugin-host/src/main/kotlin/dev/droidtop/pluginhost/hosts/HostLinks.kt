@@ -17,31 +17,42 @@ object HostLinks {
     /** :app sets this: the person's key for the host with this id ("pixeldrain"), or null when they have none. */
     @Volatile var accounts: (hostId: String) -> String? = { null }
 
-    val resolvers: List<HostResolver> by lazy { listOf(PixelDrain()) }
+    val resolvers: List<HostResolver> by lazy { listOf(PixelDrain(), Mega()) }
 
-    /** [link]'s files, or null when no way serves it. [debrid] and [resolvers] are replaceable for the tests. */
+    /**
+     * [link]'s files, or null when no way serves it. [debrid] and [resolvers] are replaceable for the tests. [refused] is
+     * told the host's sentence each time its API refuses the link (a limit, a missing file, a refused key): when the link
+     * then comes back null, the web view opens it and the caller can say why.
+     */
     fun resolve(
         link: String,
         debrid: (String) -> List<WebSessionDownload>? = DebridLinks::resolve,
         resolvers: List<HostResolver> = this.resolvers,
+        refused: (String) -> Unit = {},
     ): List<WebSessionDownload>? {
         val host = resolvers.firstOrNull { it.matches(link) }
         val key = host?.let { accounts(it.id)?.trim()?.takeIf { k -> k.isNotEmpty() } }
-        if (host != null && key != null) serve(host, link, key, "via your ${host.name}")?.let { return it }
+        if (host != null && key != null) serve(host, link, key, "via your ${host.name}", refused)?.let { return it }
         debrid(link)?.let { return it }
-        return host?.let { serve(it, link, null, "direct from ${it.name}") }
+        return host?.let { serve(it, link, null, "direct from ${it.name}", refused) }
     }
 
     /** [host]'s files for [link] as downloads, or null when it refuses, cannot be asked, or has more files than one job takes. */
-    private fun serve(host: HostResolver, link: String, key: String?, via: String): List<WebSessionDownload>? {
+    private fun serve(host: HostResolver, link: String, key: String?, via: String, refused: (String) -> Unit): List<WebSessionDownload>? {
         val files = try {
-            (host.resolve(link, key) as? HostResolution.Files)?.files
+            when (val answer = host.resolve(link, key)) {
+                is HostResolution.Files -> answer.files
+                is HostResolution.Refused -> { refused(answer.reason); null }
+            }
         } catch (e: IOException) {
             null
         } catch (e: org.json.JSONException) {
             null
         }
         if (files.isNullOrEmpty() || files.size > DownloadJobs.MAX_FILES) return null
-        return files.map { WebSessionDownload.direct(it.url, it.name, it.size, it.headers, it.sha256, via) }
+        return files.map { file ->
+            val own = file.decrypt?.let { mapOf(HostDecryption.SECRET to it) }.orEmpty()
+            WebSessionDownload.direct(file.url, file.name, file.size, file.headers + own, file.sha256, via)
+        }
     }
 }

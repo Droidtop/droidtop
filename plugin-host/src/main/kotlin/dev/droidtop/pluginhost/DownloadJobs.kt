@@ -22,8 +22,10 @@ import dev.droidtop.net.engine.EngineHost
 import dev.droidtop.net.engine.EnginePrefs
 import dev.droidtop.net.engine.TransferException
 import dev.droidtop.net.engine.TransferRequest
+import dev.droidtop.pluginhost.hosts.HostDecryption
 import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
@@ -607,7 +609,9 @@ object DownloadJobs {
                 .any { marker -> entry.key.contains(marker, ignoreCase = true) }
         }
         if (secret.isNotEmpty()) secretHeaders[name] = secret.associate { it.key to it.value }
-        return plain.associate { it.key to it.value }
+        // The key to decrypt with stays in memory; what is persisted says there was one, so a restart fails instead of placing the encrypted file.
+        val marker = if (HostDecryption.SECRET in headers) mapOf(HostDecryption.PENDING to "1") else emptyMap()
+        return plain.associate { it.key to it.value } + marker
     }
 
     /** The most files one download job has. */
@@ -913,7 +917,24 @@ object DownloadJobs {
         maxBytes: Long,
         numbers: TransferNumbers,
         report: (percent: Int, statusLine: String, checkpoint: String?) -> Unit,
-    ) = fetchWithEngine(context, url, headers, destination, maxBytes, numbers, report, sitesGuard(args[ARG_ALLOW_SITES]))
+    ) {
+        // A host that serves the file encrypted (Mega) gave the key as a header of droidtop's own: it goes to no server.
+        val (wire, key) = HostDecryption.split(headers)
+        fetchWithEngine(context, url, wire, destination, maxBytes, numbers, report, sitesGuard(args[ARG_ALLOW_SITES]))
+        if (key == null) return
+        // The file is decrypted where it lies and its MAC checked; one that fails is deleted, never placed, and a
+        // cancelled or failed decryption leaves nothing half done for a restart to take for a whole file.
+        report(100, "Decrypting…", null)
+        try {
+            withContext(Dispatchers.IO) { HostDecryption.decrypt(key, destination) { ensureActive() } }
+        } catch (e: Throwable) {
+            withContext(NonCancellable) {
+                destination.delete()
+                TransferRequest.controlFile(destination).delete()
+            }
+            throw e
+        }
+    }
 
     /**
      * What a transfer tells its job besides its line (docs/SPEC.md "Jobs and their results"): its bytes and speed, and
