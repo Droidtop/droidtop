@@ -65,6 +65,13 @@ interface GameSourceProvider {
         ids: Map<String, String> = emptyMap(),
     ): Result<List<AcquireContentResult>> = search(context, title, platform)
 
+    /**
+     * What the source features now, newest or most popular first, for Get new games' page (docs/plugin-api.md 1.8
+     * "featured", Droidtop/tracker#612): the same results [search] gives, scoped to [platform] when given. A source
+     * with no such list has nothing, which is not a failure.
+     */
+    suspend fun featured(context: Context, platform: String?, limit: Int): Result<List<AcquireContentResult>> = Result.success(emptyList())
+
     fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen
 
     fun settingsScreen(): CatalogScreen? = null
@@ -125,14 +132,34 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         // A slow site is slow, not broken: a search that misses its budget is "didn't answer in time", not a crash.
         val reply = PluginViews.call(context, source.record, "library.sources", "search", args, timeoutMs = SEARCH_TIMEOUT_MS)
         if (!reply.ok) return Result.failure(SourceReplyFailure(reply.code ?: dev.droidtop.pluginhost.PluginErrorCode.FAILED, reply.message, reply.detail))
-        return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).let { rows -> if (limit != null) rows.take(limit) else rows }.map { row ->
-            AcquireContentResult(
-                row.id, row.title, row.subtitle, row.sizeBytes?.let(SourceSize::label), row.platform, null, emptyList(), row.refJson,
-                columns = listOfNotNull(row.version) + row.columns, badges = row.badges,
-                version = row.version, sizeBytes = row.sizeBytes, getValuesJson = row.get?.valuesJson, getTitle = row.get?.title,
-            )
-        })
+        return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).let { rows -> if (limit != null) rows.take(limit) else rows }.map(::resultOf))
     }
+
+    /**
+     * `featured {platform, limit, context}` (docs/plugin-api.md 1.8, Droidtop/tracker#612): optional, so a source that
+     * answers UNSUPPORTED, or a contract 1 one that has no such op, features nothing. Any other failure is the
+     * source's to show, as a search's is. The same budget as a search.
+     */
+    override suspend fun featured(context: Context, platform: String?, limit: Int): Result<List<AcquireContentResult>> {
+        if (source.record.manifest.contractVersion < 2) return Result.success(emptyList())
+        val hostContext = org.json.JSONObject().put("system", org.json.JSONObject().put("id", platform.orEmpty()))
+        val args = org.json.JSONObject().put("limit", limit).put("context", hostContext)
+        platform?.takeIf { it.isNotBlank() }?.let { args.put("platform", it) }
+        val reply = PluginViews.call(context, source.record, "library.sources", "featured", args, timeoutMs = SEARCH_TIMEOUT_MS)
+        if (!reply.ok) {
+            if (reply.code == dev.droidtop.pluginhost.PluginErrorCode.UNSUPPORTED) return Result.success(emptyList())
+            return Result.failure(SourceReplyFailure(reply.code ?: dev.droidtop.pluginhost.PluginErrorCode.FAILED, reply.message, reply.detail))
+        }
+        return Result.success(dev.droidtop.pluginhost.SourceResultProtocol.results(reply.data).take(limit).map(::resultOf))
+    }
+
+    private fun resultOf(row: dev.droidtop.pluginhost.SourceResultRow) = AcquireContentResult(
+        row.id, row.title, row.subtitle, row.sizeBytes?.let(SourceSize::label), row.platform,
+        dev.droidtop.pluginhost.SourceResultProtocol.boxArt(row.facets), emptyList(), row.refJson,
+        columns = listOfNotNull(row.version) + row.columns, badges = row.badges,
+        version = row.version, sizeBytes = row.sizeBytes, getValuesJson = row.get?.valuesJson, getTitle = row.get?.title,
+        facets = row.facets,
+    )
 
     override fun canGet(result: AcquireContentResult): Boolean = source.record.manifest.contractVersion >= 2 && result.getValuesJson != null
 

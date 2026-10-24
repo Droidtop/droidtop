@@ -144,6 +144,8 @@ data class AcquireContentResult(
     val sizeBytes: Long? = null,
     val getValuesJson: String? = null,
     val getTitle: String? = null,
+    /** The result's own facets (contract 3); its box art is already [artUrl]. */
+    val facets: List<dev.droidtop.pluginhost.Facet> = emptyList(),
 )
 
 /** A result's size in bytes as a row shows it: "640 KB", "1.2 GB" (decimal units, as Android's own Files app). */
