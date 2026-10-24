@@ -103,7 +103,10 @@ object PluginPanels {
     fun summary(panel: Panel): String? = panel.tiles.firstNotNullOfOrNull { tile -> PluginTiles.cached(tile)?.let(::tileValue) }
 
     /**
-     * The Quick Menu's Plugins section: one row per plugin that opens its panel, then the way to the Plugins place.
+     * The Quick Menu's Plugins section, the one home of plugin menus (Droidtop/tracker#644, "Quick Menu > Plugins"):
+     * every installed plugin, one row each with its icon, its name and one status glyph ([PluginStatus]), A opening its
+     * panel in the sheet (a plugin with no panel of its own still has its Settings, Permissions and App status rows
+     * there); then Manage plugins.
      * [game] is the running game, handed to a panel as `context.game` under the `library.read` rule
      * ([targetArg]). [onReplyScreen] shows a page a quick tile's press answered with, over the sheet.
      */
@@ -118,26 +121,43 @@ object PluginPanels {
         title = "Plugins",
         groups = { context ->
             withContext(Dispatchers.IO) {
-                val panels = panelsFor(context, PluginModes.ofSurface(surface))
+                val panels = panelsFor(context, PluginModes.ofSurface(surface)).associateBy { it.pluginId }
                 // The catalogs as last fetched, never a network call: Decky's badge on a plugin with an update.
                 val listings = PluginCatalog.listings(context)
                 val userKeys = dev.droidtop.pluginhost.UserOriginKeys.load(dev.droidtop.pluginhost.UserOriginKeys.storeFile(context))
-                val rows: List<CatalogItem> = panels.map { panel ->
-                    val update = PluginCatalog.offerFor(listings, panel.record, userKeys) != null
-                    val value = if (update) "Update available" else summary(panel)
+                val grantStore = dev.droidtop.pluginhost.PluginGrants.forContext(context)
+                val waiting = dev.droidtop.pluginhost.PluginApiResolver.current(context).waiting
+                val busy = dev.droidtop.pluginhost.PluginJobsCenter.entries().value.filter { !it.done }.mapTo(HashSet()) { it.pluginId }
+                val rows: List<CatalogItem> = PluginStore.installed(context).map { record ->
+                    val id = record.manifest.id
+                    // A plugin with no panel, tiles or Quick Menu facets is still listed: its panel is its other pages.
+                    val panel = panels[id] ?: Panel(record, entry = null, tiles = emptyList())
+                    val status = PluginStatus.of(
+                        record,
+                        grantStore.read(id),
+                        dev.droidtop.pluginhost.PluginRuntimeNeeds.missing(context, record.manifest),
+                        updateAvailable = PluginCatalog.offerFor(listings, record, userKeys) != null,
+                        waiting = waiting[id],
+                        working = id in busy,
+                    )
+                    // The glyph says how it stands; the value is its first tile's state, or the state in words when that
+                    // needs the person.
+                    val value = if (status.mark != null && status.mark != dev.droidtop.library.settings.StatusMark.WORKING) status.word else summary(panel)
                     NestedScreenItem(
-                        id = "plugin_panel_${panel.pluginId}",
+                        id = "plugin_panel_$id",
                         title = panel.label,
                         inline = panelScreen(context, panel, surface, game, withMore = true, onReplyScreen = onReplyScreen),
                         valueLabel = { value },
+                        iconFile = PluginStore.iconFile(context, record),
+                        statusMark = status.mark,
                     )
-                }
+                }.sortedBy { it.title.lowercase() }
                 listOfNotNull(
                     CatalogGroup(
                         id = "plugin_panels_list",
                         title = null,
                         items = rows.ifEmpty {
-                            listOf(ActionItem(id = "plugin_panels_none", title = "No plugin has a panel", subtitle = "Plugins you approve show their panels here", run = {}))
+                            listOf(ActionItem(id = "plugin_panels_none", title = "No plugins yet", subtitle = "Plugins you add show here, each with its own panel", run = {}))
                         },
                     ),
                     if (!showManage) {
@@ -151,8 +171,8 @@ object PluginPanels {
                                 // surface (Droidtop/tracker#586).
                                 NestedScreenItem(
                                     id = "plugin_panels_manage",
-                                    title = "Get and manage plugins",
-                                    subtitle = "The catalog, updates and what each plugin may do",
+                                    title = "Manage plugins",
+                                    subtitle = "Get plugins, update them, and say what each may do",
                                     registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
                                 ),
                             ),

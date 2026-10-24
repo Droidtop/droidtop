@@ -3538,12 +3538,16 @@ the `ContainerRuntime` interface that already exists (§3):
     "Downloads and installs") hosted in the sheet by `CatalogNavigator`, without its own heading
     (`PluginJobsScreen.screen(headed = false)`: the rail header already names it). Its empty state is
     one short row, "Nothing running", with the longer sentence as its HintTip.
-  - **Plugins** (only while a running plugin has a panel or tiles here; Decky-style since
-    2026-10-07, Droidtop/tracker#316, 12a "Plugin UI, Decky-style"): one row per plugin, by name,
-    its value the plugin's first tile state or "Update available"; A opens that plugin's **panel**
-    (its tiles, its own `ui.panel` view, then Settings, Open <plugin> and App status rows), B comes
-    back to the list. It is the catalog navigator over `PluginPanels.quickMenuScreen`, so a panel
-    is drawn and navigated like every other droidtop list. The last row, "Get and manage plugins",
+  - **Plugins** (whenever a plugin is installed or plugins can be managed from here; Decky-style since
+    2026-10-07, Droidtop/tracker#316, 12a "Plugin UI, Decky-style"; the one home of plugin menus since
+    2026-10-24, Droidtop/tracker#644): every installed plugin, one row each with its icon, its name and one
+    status glyph from the host set (`PluginStatus`, `StatusMark`, `StatusGlyph`: a turning ring while a job of
+    it runs, a circled "!" when it needs the person, an octagon "!" when it cannot run, nothing when it runs
+    well), its value the plugin's first tile state, or its state in words when that needs the person; A opens
+    that plugin's **panel** (its tiles, its own `ui.panel` view, then Settings, Open <plugin> and App status
+    rows; a plugin with no panel of its own still has those rows), B comes back to the list. It is the catalog
+    navigator over `PluginPanels.quickMenuScreen`, so a panel is drawn and navigated like every other droidtop
+    list. The last row, "Manage plugins",
     pushes the Plugins screen (catalog, updates, each plugin's page and permissions) in the sheet, shown only where the
     mode has that place. In Gaming this section is where plugins live: the left menu has no Plugins row (decided
     2026-10-24, Droidtop/tracker#586; owner, 2026-10-17: "The plugin menu on the left pretty much shouldn't exist, the

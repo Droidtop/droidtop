@@ -122,7 +122,7 @@ internal fun CompanionCatalogItems(
                 is SliderItem -> CatalogSliderRow(item, onChanged)
                 is ToggleItem -> CatalogToggleRow(item, onChanged)
                 is ChoiceItem -> CatalogChoiceRow(item, onChanged)
-                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile, progress = item.progress, look = item.progressLook) {
+                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile, progress = item.progress, look = item.progressLook, statusMark = item.statusMark) {
                     if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
                 }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
@@ -192,6 +192,8 @@ private fun CatalogRow(
     // finished job's row has no bar and draws its check or cross. A tap opens the job's page, where its figures are.
     progress: Float? = null,
     look: dev.droidtop.library.settings.JobLook? = null,
+    // One status glyph beside the title (CatalogItem.statusMark): a plugin that needs you or cannot run.
+    statusMark: dev.droidtop.library.settings.StatusMark? = null,
     onClick: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -216,6 +218,7 @@ private fun CatalogRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(title, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface, modifier = Modifier.weight(1f, fill = false))
                 if (progress == null && look != null) dev.droidtop.ui.shared.JobMark(look, companionJobColors(), Modifier.padding(start = 8.dp))
+                if (statusMark != null) dev.droidtop.ui.shared.StatusGlyph(statusMark, MaterialTheme.colorScheme.primary, Modifier.padding(start = 8.dp))
             }
             if (progress != null) {
                 dev.droidtop.ui.shared.JobProgress(

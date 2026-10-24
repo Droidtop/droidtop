@@ -163,10 +163,12 @@ internal fun QuickMenu(
         // opening, same as runningEntry itself is (GamepadShell only
         // re-resolves it when quickMenuOpen flips true).
         val context = androidx.compose.ui.platform.LocalContext.current
-        // Read from manifests off the main thread; the section appears only when there is something to show.
-        val hasPlugins by androidx.compose.runtime.produceState(false) {
-            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                dev.droidtop.library.integrations.PluginPanels.panelsFor(context, dev.droidtop.pluginhost.PluginModes.GAMING).isNotEmpty()
+        // The Plugins section is the one way to plugins (Droidtop/tracker#644): it shows whenever a plugin is installed or
+        // plugins can be managed from here, never only when one has a panel. Read off the main thread.
+        val canManagePlugins = placeAvailable(PLACE_PLUGINS_SCREEN_ID)
+        val hasPlugins by androidx.compose.runtime.produceState(canManagePlugins) {
+            value = canManagePlugins || kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                dev.droidtop.pluginhost.PluginStore.installed(context).isNotEmpty()
             }
         }
         val granted = remember { NotificationsStore.isGranted(context) }
@@ -802,7 +804,7 @@ private data class GameQuickTile(
 /**
  * The Plugins section (docs/plugin-api.md C17, Droidtop/tracker#316): Decky Loader's list and panels as one catalog
  * navigator. A on a plugin pushes its panel, B pops back to the list and from the list closes the sheet. The last
- * row, Get and manage plugins, pushes the Plugins screen here too: Gaming's plugins live in this section, not in the
+ * row, Manage plugins, pushes the Plugins screen here too: Gaming's plugins live in this section, not in the
  * left menu (docs/SPEC.md 4, Droidtop/tracker#586). A page a quick tile's press answered with opens over the sheet,
  * as before panels existed.
  */

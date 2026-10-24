@@ -30,7 +30,7 @@ enum class Place(val screenId: String, val title: String, val listed: Boolean = 
 
     companion object {
         // The registry ids, as constants so code that names one screen (the Quick Menu's
-        // "Get and manage plugins") can use them where a constant is needed. The enum entries use the
+        // "Manage plugins") can use them where a constant is needed. The enum entries use the
         // top-level constants because an entry cannot read its own companion while it is initialised.
         const val ID_STORES = STORES_SCREEN
         const val ID_SOCIAL = SOCIAL_SCREEN

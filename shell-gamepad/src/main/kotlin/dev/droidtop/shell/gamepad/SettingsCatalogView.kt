@@ -1617,6 +1617,7 @@ private fun CatalogRowView(
         sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
         progress = item.progress,
         progressLook = item.progressLook,
+        statusMark = item.statusMark,
     )
 }
 

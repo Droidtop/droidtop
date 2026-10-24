@@ -1633,31 +1633,14 @@ object AppSettingsCatalogs {
         dev.droidtop.library.integrations.PluginCatalogSources.added(dev.droidtop.library.integrations.PluginCatalogSources.storeFile(context))
             .associate { it.id to it.name }
 
-    /** A plugin's state in one word or two, the same on its list card and in its page's header (Droidtop/tracker#512). */
+    /** A plugin's state in one word or two, the same on its list card, its page's header and the Quick Menu (PluginStatus). */
     private fun pluginState(
         record: dev.droidtop.pluginhost.PluginRecord,
         grants: PluginGrants.Snapshot,
         runtimeNeed: RuntimeNeed?,
         updateAvailable: Boolean,
         waiting: List<dev.droidtop.pluginhost.RequiredApi>?,
-    ): String = when {
-        record.trust == PluginTrustState.PENDING -> "Needs approval"
-        record.trust == PluginTrustState.DENIED -> "Denied"
-        // A plugin that stopped has a way forward on the list too: a newer version to install, or its page's "Try again".
-        record.disabledReason != null -> if (updateAvailable) "Needs an update" else "Stopped"
-        // Written before it could ask for the access it needs (PluginTiers.refusal): only a newer version can run.
-        record.trust == PluginTrustState.APPROVED && PluginTiers.refusal(record, grants) != null &&
-            !PluginTiers.declaresFullTrust(record.manifest) -> "Needs an update"
-        record.trust == PluginTrustState.APPROVED && !record.enabled -> "Off"
-        // Approved but its runtime is not on the device: it cannot run, so it is never "Running".
-        runtimeNeed != null -> "Needs setup"
-        // Waiting is not disabled: the plugin resumes by itself when a provider returns (docs/plugin-api.md 2.3).
-        waiting != null -> "Waiting"
-        record.trust == PluginTrustState.APPROVED && grants.wantsNewAccess -> "Wants new access"
-        record.trust == PluginTrustState.APPROVED && updateAvailable -> "Update available"
-        record.trust == PluginTrustState.APPROVED -> "Running"
-        else -> "Unknown"
-    }
+    ): String = dev.droidtop.library.integrations.PluginStatus.of(record, grants, runtimeNeed, updateAvailable, waiting).word
 
     /** The installed-plugins list row: what it's called, what it adds in plain words, its trust badge and its state -- the whole card, one tap into [pluginDetailScreen]. */
     private fun pluginCard(

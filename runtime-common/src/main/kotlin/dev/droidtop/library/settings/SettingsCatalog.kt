@@ -98,6 +98,9 @@ sealed interface CatalogItem {
      */
     val progressLook: JobLook? get() = JobLook.of(progress)
 
+    /** One status glyph beside the name ([StatusMark]); null for a row that is fine or has no status. */
+    val statusMark: StatusMark? get() = null
+
     /**
      * A short tag drawn beside the title, on the row itself ("Unofficial" on a plugin from a catalog that is not
      * droidtop's): a fact the person must see without opening anything, never a tooltip. Null draws none.
@@ -400,6 +403,7 @@ class NestedScreenItem(
     override val icon: CatalogIcon? = null,
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
+    override val statusMark: StatusMark? = null,
     override val chip: String? = null,
     override val iconFile: String? = null,
     override val summaryShown: Boolean = false,

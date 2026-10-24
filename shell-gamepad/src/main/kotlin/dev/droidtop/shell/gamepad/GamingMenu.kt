@@ -487,6 +487,8 @@ internal fun MenuRow(
     // How that job's bar moves (CatalogItem.progressLook, Droidtop/tracker#643); a finished job's row, which has no
     // bar, draws its check or cross beside the title.
     progressLook: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
+    // One status glyph beside the title (CatalogItem.statusMark, Droidtop/tracker#644): a plugin that needs you.
+    statusMark: dev.droidtop.library.settings.StatusMark? = null,
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
     // [icon] win when given, since a row carries one leading mark at most.
     leading: (@Composable () -> Unit)? = null,
@@ -588,6 +590,10 @@ internal fun MenuRow(
                 if (progress == null && progressLook != null) {
                     Spacer(Modifier.width(Space.Sm))
                     dev.droidtop.ui.shared.JobMark(progressLook, shellJobColors())
+                }
+                if (statusMark != null) {
+                    Spacer(Modifier.width(Space.Sm))
+                    dev.droidtop.ui.shared.StatusGlyph(statusMark, MenuTokens.Accent)
                 }
                 if (chip != null) {
                     Spacer(Modifier.width(Space.Sm))
