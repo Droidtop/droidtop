@@ -126,8 +126,14 @@ internal class ShellBackStack(initialSection: GamingSection) {
      * Drill into a group, or (with null) leave the one that is open. Moving
      * from one group straight to its neighbour -- ES-DE's Left/Right quick
      * system select -- is the same call: a sideways move, not a level.
+     *
+     * Opening a group also records it as the entry focused in the section
+     * it sits in, by id, so B back to the section lands on the system the
+     * person came from (and a rescan that reorders the cards cannot move
+     * it). Droidtop/tracker#642.
      */
     fun openGroup(key: String?) {
+        if (key != null) focus[ShellPlace.Section(section).key] = key
         groupKey = key
         detailId = null
         optionsOpen = false

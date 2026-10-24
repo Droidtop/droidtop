@@ -2471,6 +2471,14 @@ internal object CollectionsRefresh {
 private fun LibraryEntry.gameGroup(): GameGroup =
     GameGroup.System(checkNotNull(systemId) { "Retro Games entries must have a console system id" })
 
+/**
+ * The card a list starts on when it is rebuilt: the one whose [keys] entry is
+ * [focusKey], else the first. By id, so the order changing under a rescan
+ * does not move it (Droidtop/tracker#642).
+ */
+internal fun restoredFocusIndex(keys: List<String>, focusKey: String?): Int =
+    keys.indexOf(focusKey).coerceAtLeast(0)
+
 /** System cards shown by Retro Games after applying its PC Games ownership rule. */
 internal fun retroGamesSystemIds(entries: List<LibraryEntry>): List<String> =
     entries.asSequence()
@@ -3024,7 +3032,15 @@ private fun GamesSection(
                         // focusedSystemIndex is fed by EsDeThemedView's own
                         // onFocusedIndexChanged, driven by whichever carousel
                         // item actually has focus right now.
-                        var focusedSystemIndex by remember { mutableStateOf(0) }
+                        // Starts on the system the person came from when they
+                        // press Back out of its gamelist (this branch is rebuilt
+                        // every time), found by id in the current carousel so a
+                        // rescan that reorders the cards cannot move it
+                        // (Droidtop/tracker#642).
+                        val restoredSystemIndex = remember {
+                            restoredFocusIndex(orderedGroups.map { it.key }, nav.focusHere)
+                        }
+                        var focusedSystemIndex by remember { mutableStateOf(restoredSystemIndex) }
                         // ES-DE's system-to-system FADE (SystemView.cpp:
                         // 447-458): the element layer fades to black over
                         // the first fifth of the animation, holds, swaps
@@ -3261,6 +3277,7 @@ private fun GamesSection(
                                     firstItemFocus = firstFocus,
                                     modifier = Modifier.fillMaxSize(),
                                     onFocusedIndexChanged = onSystemFocused,
+                                    initialFocusIndex = restoredSystemIndex,
                                     focusedSystemEntries = focusedSystemEntries,
                                     systemContext = systemContext,
                                     backgroundDimmed = gamelistOptionsOpen,
@@ -3300,6 +3317,7 @@ private fun GamesSection(
                                     firstItemFocus = firstFocus,
                                     modifier = Modifier.fillMaxSize(),
                                     onFocusedIndexChanged = onSystemFocused,
+                                    initialFocusIndex = restoredSystemIndex,
                                     focusedSystemEntries = focusedSystemEntries,
                                     hints = systemListHints,
                                     systemContext = systemContext,
@@ -3330,6 +3348,7 @@ private fun GamesSection(
                                 items = items,
                                 firstItemFocus = firstFocus,
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = LocalShellWindow.current.edgePadding),
+                                initialFocusIndex = restoredSystemIndex,
                             )
                             if (continuePlaying.isNotEmpty()) {
                                 HomeSectionRow(
@@ -3387,6 +3406,7 @@ private fun GamesSection(
                         if (it != focusedGameIndex) EsDeNavigationSounds.play(UiSound.MOVE)
                         focusedGameIndex = it
                     },
+                    initialFocusIndex = focusedGameIndex,
                     focusedSystemEntries = systemGamesForGroup,
                     focusedGameIndex = focusedGameIndex,
                     hints = rememberHintList(

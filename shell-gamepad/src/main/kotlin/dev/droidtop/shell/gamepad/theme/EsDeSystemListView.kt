@@ -268,6 +268,10 @@ fun EsDeSystemListView(
     // textlist steps its cursor instantly, so neither animates between
     // entries for a layer to follow.
     onCamOffsetChanged: ((Float) -> Unit)? = null,
+    // Where the cursor starts: the entry the person last had focused in this
+    // list, so a view rebuilt on Back lands where they left it rather than
+    // on the first entry (Droidtop/tracker#642). Clamped to the entries.
+    initialFocusIndex: Int = 0,
 ) {
     // Real ES-DE `fontSize`/`itemSize`/`itemSpacing` etc. are fractions of
     // the THEMED area (see LocalEsDeThemedAreaSize's own doc comment for
@@ -369,21 +373,21 @@ fun EsDeSystemListView(
         // The grid doesn't get onFocusedIndexChanged wired through -- it
         // still delegates its cursor to LazyVerticalGrid's own focus
         // traversal and has no single cursor of its own to report.
-        "grid" -> EsDeGrid(element, typedItems, firstItemFocus, modifier, resolvedWidth, resolvedHeight, gamelist = gamelist)
+        "grid" -> EsDeGrid(element, typedItems, firstItemFocus, modifier, resolvedWidth, resolvedHeight, gamelist = gamelist, initialFocusIndex = initialFocusIndex)
         // textlist DOES get onFocusedIndexChanged now: it owns its own
         // cursor (real TextListComponent architecture, see EsDeTextList),
         // so a theme whose system view is a textlist rather than a
         // carousel gets the same real per-system theme reloading.
         "textlist" -> EsDeTextList(
             element, items, firstItemFocus, modifier, onFocusedIndexChanged, resolvedWidth, resolvedHeight,
-            gamelist = gamelist,
+            gamelist = gamelist, initialFocusIndex = initialFocusIndex,
         )
         // "carousel", or no theme-declared element at all -- carousel is
         // ES-DE's own real default shape and the one droidtop already
         // shipped, so it's the honest fallback rather than an arbitrary one.
         else -> EsDeCarousel(
             element, typedItems, firstItemFocus, modifier, onFocusedIndexChanged,
-            resolvedWidth, resolvedHeight, onCamOffsetChanged,
+            resolvedWidth, resolvedHeight, onCamOffsetChanged, initialFocusIndex,
         )
     }
 }
@@ -482,6 +486,7 @@ private fun EsDeCarousel(
     screenWidth: Dp,
     screenHeight: Dp,
     onCamOffsetChanged: ((Float) -> Unit)? = null,
+    initialFocusIndex: Int = 0,
 ) {
     // Real default text color/background (CarouselComponent's own real
     // constructor defaults, distinct from a generic "text" element's own
@@ -562,9 +567,10 @@ private fun EsDeCarousel(
         esDeCarouselConfig(element, screenWidth.value, screenHeight.value)
     }
 
-    var focusedIndex by remember { mutableStateOf(0) }
+    val startIndex = initialFocusIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+    var focusedIndex by remember { mutableStateOf(startIndex) }
     var positiveDirection by remember { mutableStateOf(false) }
-    val camOffset = remember { Animatable(0f) }
+    val camOffset = remember { Animatable(startIndex.toFloat()) }
 
     // ES-DE's `mCamOffset`, published for whoever composes this carousel
     // (the system view's own element layer follows it; see
@@ -1255,6 +1261,7 @@ private fun EsDeTextList(
     // changing it without a theme to verify against risks a regression
     // nobody asked for.
     gamelist: Boolean = false,
+    initialFocusIndex: Int = 0,
 ) {
     // Real ES-DE default font size for a textlist. Fraction of the THEMED
     // area (see EsDeSystemListView's own screenWidth/screenHeight doc
@@ -1264,7 +1271,7 @@ private fun EsDeTextList(
     val fontSizeSp = with(LocalDensity.current) { fontSizeDp.dp.toSp() }
     val rowFontFamily = themeFontFamily(element)
 
-    var cursor by remember { mutableStateOf(0) }
+    var cursor by remember { mutableStateOf(initialFocusIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))) }
 
     // Real `TextListComponent::input` -> `List::listInput`: the LIST owns
     // the cursor and the keys, rows are render output. Real ES-DE builds
@@ -1532,6 +1539,7 @@ private fun EsDeGrid(
     // unthemed grids (GridPad.kt's own doc comment). A SYSTEM-level grid
     // keeps its previous always-consumed behaviour.
     gamelist: Boolean = false,
+    initialFocusIndex: Int = 0,
 ) {
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.045f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(screenWidth, screenHeight).value).dp.toSp() }
@@ -1549,7 +1557,7 @@ private fun EsDeGrid(
         esDeGridConfig(element, screenWidth.value, screenHeight.value)
     }
 
-    var cursor by remember { mutableStateOf(0) }
+    var cursor by remember { mutableStateOf(initialFocusIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))) }
 
     BoxWithConstraints(modifier = modifier.clipToBounds()) {
         val layout = remember(config, maxWidth, maxHeight) {
