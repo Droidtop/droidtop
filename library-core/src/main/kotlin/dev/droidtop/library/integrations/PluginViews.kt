@@ -487,11 +487,21 @@ private class PluginPage(
         )
     }
 
+    /** A status facet's state as the host's status glyph; null for a quiet state or a plain fact. Pure. */
+    internal fun markOf(state: String?): dev.droidtop.library.settings.StatusMark? = when (state) {
+        "busy" -> dev.droidtop.library.settings.StatusMark.WORKING
+        "warning" -> dev.droidtop.library.settings.StatusMark.ATTENTION
+        "error" -> dev.droidtop.library.settings.StatusMark.ERROR
+        else -> null
+    }
+
     private fun item(screenId: String, node: ViewNode): CatalogItem {
         val itemId = "pv_${screenId}_${node.id}"
         return when (node) {
             is ViewNode.Notice -> noticeItem(screenId, itemId, node)
-            is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, run = {})
+            // A status facet's state is the host's glyph (Droidtop/tracker#644): busy turns a ring, warning asks for the
+            // person, error is the danger octagon; ok, on and off are quiet.
+            is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, statusMark = markOf(node.state), run = {})
             // A plugin's progress is the host's job bar (Droidtop/tracker#643, #644), not a percent in text: the bar glides,
             // and one with no percent is the checking shimmer.
             is ViewNode.Progress -> ActionItem(

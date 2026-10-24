@@ -391,7 +391,7 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
             else -> Unit
         }
     }
-    CatalogRow(item.title, item.subtitle, value, progress = item.progress, look = item.progressLook) { if (asksFirst) asking = true else run() }
+    CatalogRow(item.title, item.subtitle, value, progress = item.progress, look = item.progressLook, statusMark = item.statusMark) { if (asksFirst) asking = true else run() }
     if (asking) {
         Column(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
             Text(item.confirmText ?: "${item.title}?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)

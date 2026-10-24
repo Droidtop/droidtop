@@ -1406,10 +1406,10 @@ Every facet is one JSON object:
 | Kind | Fields | Drawn as |
 |---|---|---|
 | `info` | `label`, `value` (a string, or a typed value as in §1.6: bool, number with unit, enum), `sub?`, `filterable?`, `sortable?` | A label and value. With `filterable` or `sortable`, an item's info becomes a filter facet or a sort of the lists it is in (the label names it; values group by equality, numbers by range) |
-| `status` | `label`, `state` (`on`, `off`, `busy`, `ok`, `warning`, `error`, `unknown`), `tone?` (`neutral`, `positive`, `caution`, `danger`), `value?` | A state dot or chip with its words; in the status area, only the dot and the label |
+| `status` | `label`, `state` (`on`, `off`, `busy`, `ok`, `warning`, `error`, `unknown`), `tone?` (`neutral`, `positive`, `caution`, `danger`), `value?` | Its words in the value column and the host's status glyph beside the label: `busy` a turning ring, `warning` the caution circled "!", `error` the danger octagon; `ok`, `on` and `off` show no glyph (Droidtop/tracker#644) |
 | `badge` | `text` (at most 16 characters), `tone?` | A small chip on a row, a capsule or a tile ("Update", "Beta", "3 new") |
 | `progress` | `label`, `value` (0 to 100, or -1 for unknown), `sub?`, `cancel?` (an action) | A bar with its words; a job's progress is a job's, in Downloads and installs (§8) |
-| `meter` | `label`, `value`, `max`, `unit?`, `warnAt?`, `dangerAt?` | A gauge or fill bar (storage, battery, a quota) |
+| `meter` | `label`, `value`, `max`, `unit?`, `warnAt?`, `dangerAt?` | The host's bar, filled to `value` of `max`, with "120 of 512 MB" under it (storage, battery, a quota; Droidtop/tracker#644) |
 | `chart` | `label`, `style` (`line` or `bars`), `points` (at most 60 numbers; for `bars`, at most 12 `{label, value}`), `unit?` | A sparkline (a speed, a temperature over the last minutes) or a small bar chart (storage by folder). Nothing larger: no axes the plugin draws, no colours of its own |
 | `action` | `label`, `sub?`, `call` (an action, below), `confirm?` (`none`, `confirm`, `danger`), `icon?` (from droidtop's icon set) | A button, a menu entry or a row, as the target draws actions. `confirm` is droidtop's two-step confirm; `danger` adds danger colours and names what is lost (`sub`) |
 | `toggle` | `label`, `value: bool`, `sub?`, `call` | A switch; the change is sent at once |

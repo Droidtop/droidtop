@@ -214,6 +214,7 @@ class ActionItem(
     val state: Boolean? = null,
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
+    override val statusMark: StatusMark? = null,
     override val chip: String? = null,
     override val iconFile: String? = null,
     val run: (Context) -> Unit,

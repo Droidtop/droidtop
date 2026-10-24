@@ -159,7 +159,11 @@ sealed interface ViewNode {
     val title: String
     val subtitle: String?
 
-    data class Info(override val id: String, override val title: String, override val subtitle: String?, val value: String?) : ViewNode
+    /**
+     * [state] is a status facet's state (`busy`, `warning`, `error`, ...), drawn as the host's status glyph beside the
+     * title (Droidtop/tracker#644); null for a plain fact.
+     */
+    data class Info(override val id: String, override val title: String, override val subtitle: String?, val value: String?, val state: String? = null) : ViewNode
 
     data class Row(
         override val id: String,

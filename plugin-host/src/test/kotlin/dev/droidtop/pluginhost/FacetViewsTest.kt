@@ -25,7 +25,8 @@ class FacetViewsTest {
         val view = FacetViews.toView(Facets.read(JSONObject(romgi)).facets)
         assertEquals(listOf("facets", "storage"), view.sections.map { it.id })
         val main = view.sections[0].nodes
-        assertEquals(ViewNode.Info("index", "Index", "Updated 2 days ago", "OK"), main[0])
+        // A status keeps its state, for the host's glyph (Droidtop/tracker#644).
+        assertEquals(ViewNode.Info("index", "Index", "Updated 2 days ago", "OK", state = "ok"), main[0])
         val update = main[1] as ViewNode.Button
         assertEquals(ViewAction.Kind.JOB, update.action.kind)
         assertEquals("updateIndex", update.action.op)
@@ -33,7 +34,10 @@ class FacetViewsTest {
         assertEquals("Clear cache", (main[3] as ViewNode.Button).confirm)
         val storage = view.sections[1]
         assertEquals("Storage", storage.title)
-        assertEquals("120 of 512 MB", (storage.nodes[0] as ViewNode.Info).value)
+        // A meter is the host's bar with its figures under it, not words alone.
+        val meter = storage.nodes[0] as ViewNode.Progress
+        assertEquals("120 of 512 MB", meter.subtitle)
+        assertEquals(23, meter.percent)
         assertTrue((storage.nodes[1] as ViewNode.Toggle).value)
     }
 

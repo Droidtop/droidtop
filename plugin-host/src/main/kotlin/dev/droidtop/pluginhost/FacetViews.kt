@@ -51,10 +51,12 @@ object FacetViews {
         val id = facet.id
         return when (val b = facet.body) {
             is FacetBody.Info -> ViewNode.Info(id, b.label, b.sub, b.value)
-            is FacetBody.Status -> ViewNode.Info(id, b.label, b.value, stateWords(b.state))
+            // A status keeps its state for the host's glyph (Droidtop/tracker#644), and its words for the value column.
+            is FacetBody.Status -> ViewNode.Info(id, b.label, b.value, stateWords(b.state), state = b.state)
             is FacetBody.Badge -> ViewNode.Info(id, b.text, null, null)
             is FacetBody.Progress -> ViewNode.Progress(id, b.label, b.sub, b.value)
-            is FacetBody.Meter -> ViewNode.Info(id, b.label, null, meterWords(b))
+            // A meter is the host's bar, filled to how much of its maximum it holds, with its figures under it.
+            is FacetBody.Meter -> ViewNode.Progress(id, b.label, meterWords(b), meterPercent(b))
             is FacetBody.Chart -> ViewNode.Info(id, b.label, null, chartWords(b))
             is FacetBody.Action -> ViewNode.Button(id, b.label, b.sub, null, if (b.confirm == "none") null else b.label, action(b.call, id, null))
             is FacetBody.Toggle -> ViewNode.Toggle(id, b.label, b.sub, b.value, action(b.call, id, "bool"))
@@ -98,6 +100,10 @@ object FacetViews {
         "error" -> "Error"
         else -> "Unknown"
     }
+
+    /** How full a meter is, 0 to 100; -1 when its maximum says nothing. Pure. */
+    fun meterPercent(m: FacetBody.Meter): Int =
+        if (m.max > 0) ((m.value / m.max) * 100).toInt().coerceIn(0, 100) else -1
 
     fun meterWords(m: FacetBody.Meter): String {
         val unit = m.unit?.let { " $it" }.orEmpty()

@@ -23,4 +23,12 @@ class PluginStatusTest {
         assertEquals(StatusMark.ERROR, PluginStatus.markOf("Denied", working = false))
         assertNull(PluginStatus.markOf("Off", working = false))
     }
+
+    @Test
+    fun `a status facet's state is the host's glyph, quiet when good`() {
+        assertEquals(StatusMark.WORKING, PluginViews.markOf("busy"))
+        assertEquals(StatusMark.ATTENTION, PluginViews.markOf("warning"))
+        assertEquals(StatusMark.ERROR, PluginViews.markOf("error"))
+        listOf("ok", "on", "off", null).forEach { assertNull(PluginViews.markOf(it)) }
+    }
 }
