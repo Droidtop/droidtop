@@ -221,6 +221,15 @@ class SecondScreenInputView(
         val chordSink = requestAwareSink(keyboardSink())
         val player = org.pocketworkstation.pckeyboard.MacroPlayer({ code, down -> chordSink.key(code, down) }, { chordSink.text(it) })
         val chords = LinearLayout(context).apply { orientation = HORIZONTAL }
+        // Typing from a phone or PC on the same network (Droidtop/tracker#645), opened on this screen.
+        chords.addView(
+            Button(context).apply {
+                text = "Type from another device"
+                isAllCaps = false
+                setOnClickListener { RemoteInputActivity.open(context, display?.displayId) }
+            },
+            LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
+        )
         CompanionChords.ALL.forEach { macro ->
             chords.addView(
                 Button(context).apply {

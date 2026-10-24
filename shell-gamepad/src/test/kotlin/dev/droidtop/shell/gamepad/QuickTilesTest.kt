@@ -121,6 +121,7 @@ class QuickTilesTest {
             GamingSettingsCatalog.ID_COMPANION_WAKE to QuickGlyph.SECOND_SCREEN,
             GamingSettingsCatalog.ID_SYSTEM_LOCATION to QuickGlyph.LOCATION,
             GamingSettingsCatalog.ID_SYSTEM_FLASHLIGHT to QuickGlyph.FLASHLIGHT,
+            GamingSettingsCatalog.ID_TYPE_FROM_DEVICE to QuickGlyph.KEYBOARD,
         ).forEach { (id, glyph) -> assertEquals(id, glyph, QuickTiles.glyphFor(toggle(id, false))) }
     }
 

@@ -3512,7 +3512,8 @@ the `ContainerRuntime` interface that already exists (§3):
     Network, Wi-Fi, Bluetooth, **Airplane mode**, VPN and Location (`QuickTiles.CONNECTION_IDS`). The companion's
     Connections card shows the same items.
   - **Power and mode** (was System): the quick-settings tile grid over the rest of the catalog's quick System group with
-    its status header: Battery, **Power menu**, Sleep, Restart, Power off, Switch mode, Screenshot, Stop the app in
+    its status header: Battery, **Power menu**, Sleep, Restart, Power off, Switch mode, Screenshot, **Type from another
+    device** (7h, "Type from another device"), Stop the app in
     front, updates and the Android settings index. Android gives an ordinary app
     no write to airplane mode and no call that opens the power menu, so Airplane mode shows the
     real state and opens the system screen, and Power menu is a tile marked "Needs privilege"
@@ -14264,7 +14265,7 @@ is its state (`Not set`, `Not tested`, `Connected`; `Built in` for TheGamesDB on
 carries the application key, `No account` for ScreenScraper, `ScraperKeyState`) and whose guide is
 a screen behind the row (`ScraperKeySetupActivity`). Store sign-ins (Steam, GOG, Epic, Amazon,
 itch.io) and the GitHub token have their own flows (7g, 12a) and are not repeated here. A
-service's fields (`ScraperKeyService.fields`) have the same ids in the phone page, the key page and
+service's fields (`ScraperKeyService.fields`) have the same ids in the key page and
 the vault. The state is `Connected` only after a test passed with the stored credential; any change
 to it clears that. Test (`ScraperKeyCheck`) is the one place a request is made with the person's
 key, and only when they press it: saving a key, from any path below, runs nothing. No prose on the
@@ -14308,20 +14309,81 @@ Details already credits each source for the fields it supplied ("Where these fac
    generated on the device and "Open on this device" for the system browser, the numbered
    steps, and the fields. Each field has Paste (the clipboard) beside it, and takes text from the
    on-screen keyboard.
-3. **A phone page on the local network (nobody types a 30 character secret on a gamepad).**
-   "Use my phone" (`HandoffSession`, `HandoffHttp`, `HandoffServer`) shows a QR code for
-   `http://<lan address>:<port>/h/<token>`. The token is 128 random bits and is the whole
-   address; it works once. The server listens on an ephemeral port only while the code is on
-   screen (cancel, leaving the screen, five minutes, or sixty seconds after a submit end it),
-   answers only loopback, site-local and link-local peers, and parses at most an 8 KB head and a
-   4 KB body with a 5 second read timeout. HTTPS is not used on the LAN. The page is one inline
-   form with no script or outside resource and `Cache-Control: no-store`, a content security
-   policy, and no referrer; it takes exactly the service's declared fields (an undeclared field,
-   or one that is empty, over its length or holds a control character, is refused), at most twenty
-   requests a minute, and five wrong tokens close the session. Every wrong path answers the same
-   empty 404. What the phone sent is held in memory and shown on the console masked (a secret as
-   its last four characters and its length) with Save and Discard; only Save stores it. The page
-   is never an HTTP client of anything else.
+3. **Type from another device (nobody types a 30 character secret on a gamepad).** "Type from another
+   device" is the one session that types a phone's or PC's text into the field in focus (Droidtop/tracker#645, the
+   section below). The screen has the button under its fields, and "Use browser and phone", after a provider refused
+   the pane, opens the browser and the same session over it. The person scans the code, confirms it on the console,
+   puts the cursor in a field of the key screen and types on the phone; the field takes it like any typed text, and
+   nothing is stored or tested until Save and Test are pressed there. The earlier one-time form page with a
+   field per credential (`HandoffSession`, `HandoffHttp`) is deleted, as is its rate limit and its five-wrong-tokens
+   close: the token is 128 random bits, one device only is served, and a refused code replaces the listener.
+
+### Type from another device (owner, 2026-10-24, Droidtop/tracker#645)
+
+The owner: "I wish we could scan a QR code from a device on the same network to copy text over ... a button on the
+companion launches a web server to allow remote control and input", and "how readily could we standardize that QR
+solution to every login and input field". Slice 1 is typing; remote control of the pointer is not built. The answer
+to the second question is one session that types into whichever field has focus, so every login and input field
+droidtop shows, and any field of another app while droidtop's input method is the active one, takes text from a
+phone with no per-field code.
+
+Security (owner, 2026-10-24): "for security, it can display a 6 digit code on the screen, and ask you to confirm it
+on the console before it accepts input. It'll also only allow one connected device. It'll reset the server and try
+again if a code is refused".
+
+- **The session (`RemoteInput`, `:library-core`, on `HandoffServer`).** `HandoffServer` is the one local-network
+  listener, shared with nothing else now that the key form is gone: it binds the device's LAN address
+  (`HandoffServer.lanAddress`, a site-local IPv4) on a random port in the dynamic range, answers loopback, site-local
+  and link-local peers only, and reads at most an 8 KB head and a 4 KB body with a 5 second timeout. What it serves is
+  a `HandoffEndpoint` (the answer to a request, and whether to keep listening, asked every second). The address is
+  `http://<lan address>:<port>/r/<token>`, the token 128 random bits per listener, shown as a QR code and the plain
+  address. Every other path, method or token is the same empty 404. The listener exists only while a session does:
+  no listener survives it.
+- **Pairing.** The first device to open the page is shown a random six digit code (`SecureRandom`), large, on the
+  phone page. The console shows "Does your device show 482 913?" with Confirm and Refuse (`RemoteInputActivity`; with
+  droidtop not in front, the service's notification carries the same question with the same two buttons). Nothing is
+  accepted before Confirm: an edit sent earlier is a 403 and reaches no field. After Confirm the paired device
+  alone is served (it is known by its address), and every other client gets a 409 with a short page, before and
+  after pairing. Each edit carries the code back, so the server can tell the paired page from any other request;
+  the token and the code are compared in constant time (`MessageDigest.isEqual`).
+- **A refusal starts over.** Refuse, or sixty seconds with no answer to the prompt, closes the listener's socket and
+  starts a new listener on a new random port (never the one just closed) with a new token, and shows the new QR code;
+  pairing starts over. A code is never used twice in a session (the used ones are remembered and skipped), so an old
+  code, an old token and an old address are worthless. The phone whose code was refused finds its connection gone
+  and says so.
+- **The end.** The person closes it (Close on the screen or on the notification), or ten minutes pass with nothing
+  asked of it (the page opening and an edit count; the page's own status polling does not), or there is no
+  network at the start ("No network. Connect to Wi-Fi and try again"). Leaving the screen does not end it, so the
+  person can go to a field: a foreground service (`RemoteInputService`, `specialUse`, one notification) is the reason
+  Android keeps the process while droidtop is not in front, started only by opening the session and stopped when it
+  ends. The idle limit and the prompt timeout are applied by `RemoteInput.tick`, which the listener's own loop calls
+  every second.
+- **The phone page (`RemoteInputPage`).** Static HTML and a little script served by the session itself, nothing
+  fetched from outside, a content security policy that allows only itself: the code until the console confirms,
+  then one text box with **Send** (commit the text), **Enter**, **Backspace** and a **Live typing** switch (each
+  keystroke sent as the difference from the last, backspaces then text). An edit is one POST of `back`, `text` and
+  `enter` (text up to 1024 characters, no control characters), applied in that order. It works in a phone browser.
+- **Where an edit lands (`RemoteInputRouter`, the one choice, with fakes in its tests).**
+  (a) The focused field is droidtop's own and droidtop's keyboard serves it (`AddonKeyboardRules.droidtopServesField`,
+  through `KeyboardTargets.servesField`): the window's own key path, `WindowKeySink`, the path droidtop's own keyboards
+  type through (`InWindowKeyboard.focusedOwnField`: the droidtop window with focus, else any other on screen whose
+  focused view is a text editor). (b) Otherwise, when droidtop's input method is the active one and has an editor
+  (`SecondScreenKeyboard.androidTarget`): its `InputConnection`, `commitText`, `deleteSurroundingText` (a selection is
+  replaced by nothing first) and the Enter key event. (c) Otherwise the console says "Switch to droidtop's keyboard to
+  type from another device", or "Tap a text field on this device first" when droidtop's input method is active and no
+  field has focus, and the phone is told nothing was typed. Delivery runs on the main thread (the server's thread
+  waits two seconds for it); the server's thread never touches a view.
+- **On the console while it is active:** "Phone connected: typing", with what was last sent. A password hides it:
+  when the focused field is a password (`EditorInfo.inputType` for the input method's field,
+  `RemoteInputRouter.isPasswordInputType`; a text view's input type or transformation for droidtop's own; a field
+  whose kind cannot be read, such as a Compose or web field with no accessibility node, counts as a password), the
+  console shows bullets, never the text, and the phone's box becomes a password box.
+- **Ways in:** the **Type from another device** button on the companion's Keys screen (the Input tab, opened on the
+  companion's own screen), the **Type from another device** row in the Quick Menu (a catalog item,
+  `GamingSettingsCatalog.ID_TYPE_FROM_DEVICE`, in the Power and mode section), and the key setup screens (7h). All
+  open the same screen, which starts the session when none runs and shows the running one when one does.
+- **Not built:** remote control of the pointer; emoji and other characters outside the virtual keyboard's layout in
+  droidtop's own fields (route a drops what the layout cannot type, route b commits it whole).
 
 **Credentials are stored encrypted (directed 2026-10-08, tracker #264).** Every credential the
 person supplies (the eight fields above) is kept by `CredentialStore`, one helper for all of them:

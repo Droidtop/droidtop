@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -39,9 +38,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.app.ui.QrCode
-import dev.droidtop.library.credentials.handoff.HandoffHttp
-import dev.droidtop.library.credentials.handoff.HandoffServer
-import dev.droidtop.library.credentials.handoff.HandoffSession
 import dev.droidtop.library.credentials.web.KeyPageSpec
 import dev.droidtop.library.credentials.web.KeyPages
 import dev.droidtop.library.debrid.DebridAccounts
@@ -51,7 +47,6 @@ import dev.droidtop.library.scraper.ScraperKeyState
 import dev.droidtop.library.scraper.ScraperKeyVerified
 import dev.droidtop.pluginhost.debrid.RealDebridSignIn
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -60,8 +55,9 @@ import kotlinx.coroutines.withContext
  * credential (docs/SPEC.md 7h, "Supplying your own keys"). Three ways in, one
  * screen: the service's own page in a browser pane that reads the key off the
  * page when the person confirms ([KeyWebPane]); a QR code and button that open
- * the official page elsewhere; and a one-time page on the local network so the
- * key is pasted from a phone or PC instead of typed on a gamepad. Fields also
+ * the official page elsewhere; and "Type from another device" ([RemoteInputActivity]),
+ * the one session that types a phone's or PC's text into the field in focus, so
+ * the key is typed there instead of on a gamepad. Fields also
  * take the clipboard. Every path ends in the same encrypted store, and nothing
  * is tested until Test is pressed. Opened from the source's row under
  * Settings > Accounts and sources.
@@ -129,8 +125,6 @@ private fun SetupHost(
     val context = LocalContext.current
     val paneAvailable = page != null && KeyWebProfiles.supported()
     var mode by remember { mutableStateOf(if (paneAvailable) SetupMode.WEB else SetupMode.MANUAL) }
-    // Set when the provider refused the pane: the manual screen opens the browser and starts the phone page.
-    var fellBack by remember { mutableStateOf(false) }
     if (mode == SetupMode.WEB && page != null) {
         KeyWebPane(
             service = service,
@@ -138,9 +132,10 @@ private fun SetupHost(
             panelFocus = panelFocus,
             onOtherWays = { mode = SetupMode.MANUAL },
             onFallback = {
-                fellBack = true
+                // The provider refused the pane: the browser opens on its page and the session to type from a phone over it.
                 mode = SetupMode.MANUAL
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                RemoteInputActivity.open(context)
             },
             onClose = onClose,
         )
@@ -151,7 +146,6 @@ private fun SetupHost(
         ) {
             ManualSetup(
                 service = service,
-                autoPhone = fellBack,
                 browserPaneAvailable = paneAvailable,
                 onBrowserPane = { mode = SetupMode.WEB },
             )
@@ -159,10 +153,8 @@ private fun SetupHost(
     }
 }
 
-private class HandoffRun(val session: HandoffSession, val server: HandoffServer, val url: String)
-
 @Composable
-private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserPaneAvailable: Boolean, onBrowserPane: () -> Unit) {
+private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolean, onBrowserPane: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf("") }
@@ -171,8 +163,6 @@ private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserP
     var loaded by remember { mutableStateOf(false) }
     // The fields buffer here and are stored on Test; the vault is read off the main thread.
     val buffer = remember { mutableStateMapOf<String, String>() }
-    var handoff by remember { mutableStateOf<HandoffRun?>(null) }
-    var phoneError by remember { mutableStateOf<String?>(null) }
 
     suspend fun refresh() {
         state = withContext(Dispatchers.IO) { ScraperKeyCheck.state(context, service) }
@@ -181,39 +171,6 @@ private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserP
         withContext(Dispatchers.IO) { buffer.putAll(service.read(context)) }
         refresh()
         loaded = true
-    }
-
-    fun stopPhone() {
-        handoff?.server?.stop()
-        handoff = null
-    }
-
-    fun startPhone() {
-        stopPhone()
-        phoneError = null
-        scope.launch {
-            val started = withContext(Dispatchers.IO) {
-                val host = HandoffServer.lanAddress() ?: return@withContext null
-                val session = HandoffSession(service.handoffFields(), System::currentTimeMillis)
-                val server = HandoffServer(session, HandoffHttp(session, "${service.title} key"))
-                val port = runCatching { server.start() }.getOrNull() ?: return@withContext null
-                HandoffRun(session, server, HandoffServer.url(host, port, session.token))
-            }
-            if (started == null) phoneError = "No network" else handoff = started
-        }
-    }
-    LaunchedEffect(autoPhone) { if (autoPhone) startPhone() }
-    DisposableEffect(Unit) { onDispose { handoff?.server?.stop() } }
-
-    // Ends the page when it expires or is closed; the server stops itself, the screen follows.
-    var tick by remember { mutableStateOf(0) }
-    LaunchedEffect(handoff) {
-        while (handoff != null) {
-            delay(500)
-            tick++
-            val current = handoff ?: break
-            if (!current.session.isLive()) stopPhone()
-        }
     }
 
     Text(service.title, style = MaterialTheme.typography.headlineMedium)
@@ -257,29 +214,8 @@ private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserP
         }
     }
 
-    val current = handoff
-    if (current == null) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = { startPhone() }) { Text("Use my phone") }
-            phoneError?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-        }
-    } else {
-        PhonePanel(
-            service = service,
-            handoff = current,
-            tick = tick,
-            onSave = { values ->
-                scope.launch {
-                    withContext(Dispatchers.IO) { service.write(context, values) }
-                    values.forEach { (id, value) -> buffer[id] = value }
-                    stopPhone()
-                    result = null
-                    refresh()
-                }
-            },
-            onCancel = { stopPhone() },
-        )
-    }
+    // The same session as everywhere: scan, confirm the code, then type from the phone into the field in focus.
+    Button(onClick = { RemoteInputActivity.open(context) }) { Text("Type from another device") }
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Button(enabled = !testing && loaded, onClick = {
@@ -304,43 +240,6 @@ private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserP
                     refresh()
                 }
             }) { Text("Clear") }
-        }
-    }
-}
-
-@Composable
-private fun PhonePanel(
-    service: ScraperKeyService,
-    handoff: HandoffRun,
-    tick: Int,
-    onSave: (Map<String, String>) -> Unit,
-    onCancel: () -> Unit,
-) {
-    // tick only forces a redraw of the countdown and of a freshly received page.
-    val received = remember(tick) { handoff.session.received() }
-    if (received == null) {
-        val seconds = (handoff.session.remainingMs() / 1000).toInt()
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            QrCode(content = handoff.url, size = 200.dp)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("%d:%02d".format(seconds / 60, seconds % 60), style = MaterialTheme.typography.titleMedium)
-                Button(onClick = onCancel) { Text("Cancel") }
-            }
-        }
-    } else {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Received", style = MaterialTheme.typography.titleMedium)
-            service.fields.forEach { field ->
-                Text(
-                    "${field.label}: ${HandoffSession.maskForReview(received[field.id].orEmpty(), field.secret)}",
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { onSave(received) }) { Text("Save") }
-                TextButton(onClick = onCancel) { Text("Discard") }
-            }
         }
     }
 }

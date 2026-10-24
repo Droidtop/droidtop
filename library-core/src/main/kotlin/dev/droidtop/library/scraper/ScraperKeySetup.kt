@@ -2,7 +2,6 @@ package dev.droidtop.library.scraper
 
 import android.content.Context
 import dev.droidtop.library.credentials.CredentialStore
-import dev.droidtop.library.credentials.handoff.HandoffField
 import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
 import dev.droidtop.runtime.prefs.PrefsFile
 
@@ -165,10 +164,6 @@ enum class ScraperKeyService(
     }
 
     fun isConfigured(context: Context): Boolean = read(context).values.all { it.isNotBlank() }
-
-    /** The fields a phone page for this service asks for. */
-    fun handoffFields(): List<HandoffField> =
-        fields.map { HandoffField(id = it.id, label = it.label, secret = it.secret) }
 
     /** The word in `droidtop_<word>_verified`; the two older services keep their keys. */
     internal val prefsWord: String get() = name.lowercase()

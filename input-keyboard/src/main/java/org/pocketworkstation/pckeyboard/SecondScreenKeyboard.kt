@@ -70,15 +70,24 @@ object SecondScreenKeyboard {
     @Volatile
     private var activeInputConnection: InputConnection? = null
 
-    /** Called by LatinIME's input lifecycle, which is independent of its window lifecycle. */
+    @Volatile
+    private var activeInputType: Int = 0
+
+    /**
+     * Called by LatinIME's input lifecycle, which is independent of its window lifecycle. [inputType] is the
+     * editor's `EditorInfo.inputType`, kept so what is typed from another device can be masked for a password.
+     */
     @JvmStatic
-    fun onStartInput(connection: InputConnection?) {
+    @JvmOverloads
+    fun onStartInput(connection: InputConnection?, inputType: Int = 0) {
         activeInputConnection = connection
+        activeInputType = inputType
     }
 
     @JvmStatic
     fun onFinishInput() {
         activeInputConnection = null
+        activeInputType = 0
         onShowEnded()
     }
 
@@ -173,6 +182,9 @@ object SecondScreenKeyboard {
      * inferred from the IME window being visible.
      */
     val androidTarget: InputConnection? get() = activeInputConnection
+
+    /** The focused editor's `EditorInfo.inputType`; 0 when there is none. */
+    val androidInputType: Int get() = activeInputType
 
     /** Whether the Android route currently has anywhere to type. */
     fun androidTargetAvailable(): Boolean = androidTarget != null

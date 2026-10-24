@@ -9,6 +9,8 @@ import android.view.ViewGroup
 import android.view.ViewTreeObserver
 import android.view.Window
 import android.widget.FrameLayout
+import dev.droidtop.library.credentials.handoff.RemoteInputRouter
+import dev.droidtop.library.credentials.handoff.RemoteTarget
 import org.pocketworkstation.pckeyboard.KeyboardPanel
 import org.pocketworkstation.pckeyboard.WindowKeySink
 import java.util.WeakHashMap
@@ -40,6 +42,48 @@ object InWindowKeyboard {
     internal fun ownFieldShown(root: View, shown: Boolean) {
         val count = (ownFieldRoots[root] ?: 0) + if (shown) 1 else -1
         if (count <= 0) ownFieldRoots.remove(root) else ownFieldRoots[root] = count
+    }
+
+    /**
+     * The text field of a droidtop window that droidtop's keyboard serves right now ([KeyboardTargets.servesField]),
+     * as a target for text typed on another device (docs/SPEC.md, "Type from another device"): the window that has
+     * focus first, else any other droidtop window on screen whose focused view is a text editor. Text and keys go
+     * into the window's own key path ([WindowKeySink]), as droidtop's keyboards do. Null when there is none.
+     * A field whose kind cannot be read (not an `EditText`, and the window gives no accessibility node for it:
+     * Compose, a web page) counts as a password, so nothing typed into it is shown. Main thread only.
+     */
+    fun focusedOwnField(): RemoteTarget? {
+        val decors = attached.keys.mapNotNull { it.window?.decorView }
+            .filter { it.isAttachedToWindow && it.windowVisibility == View.VISIBLE }
+            .sortedByDescending { it.hasWindowFocus() }
+        for (decor in decors) {
+            val field = decor.findFocus()?.takeIf { it.onCheckIsTextEditor() } ?: continue
+            if (!KeyboardTargets.servesField(decor.display?.displayId, KeyboardTargets.assistiveOn(decor.context))) continue
+            return WindowTarget(WindowKeySink { decor }, isSecret(field))
+        }
+        return null
+    }
+
+    private fun isSecret(field: View): Boolean {
+        if (field is android.widget.TextView) {
+            return RemoteInputRouter.isPasswordInputType(field.inputType) ||
+                field.transformationMethod is android.text.method.PasswordTransformationMethod
+        }
+        val node = runCatching { field.accessibilityNodeProvider?.findFocus(android.view.accessibility.AccessibilityNodeInfo.FOCUS_INPUT) }.getOrNull()
+        return node == null || node.isPassword
+    }
+
+    private class WindowTarget(private val sink: WindowKeySink, override val secret: Boolean) : RemoteTarget {
+        override fun commit(text: String) = sink.text(text)
+
+        override fun backspace(count: Int) = repeat(count) { press(android.view.KeyEvent.KEYCODE_DEL) }
+
+        override fun enter() = press(android.view.KeyEvent.KEYCODE_ENTER)
+
+        private fun press(code: Int) {
+            sink.key(code, true)
+            sink.key(code, false)
+        }
     }
 
     /** Watches [activity]'s window from now on; calling it again does nothing. */
