@@ -289,7 +289,7 @@ private fun GamesGrid(
                             GameCard(
                                 entry = entry,
                                 modifier = Modifier.focusRequester(pad.requester(index)),
-                                onLaunch = { play(entry) },
+                                onActivate = { play(entry) },
                                 onFocused = { pad.focused = index },
                                 // A long press: the shell's "act on this one", the game's options.
                                 onShowDetail = {

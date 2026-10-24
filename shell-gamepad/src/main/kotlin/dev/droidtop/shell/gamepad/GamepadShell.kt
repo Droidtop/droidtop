@@ -1454,7 +1454,6 @@ private fun GamepadShellBody(
                                     if (uiMode.kidGamesOnly) all.filter { it.kidGame } else all
                                 }.filterNot { it.onPcGamesTab },
                                 library = library,
-                                onLaunch = onLaunch,
                                 nav = nav,
                                 onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
                                 onDrillDownChanged = { canGoBack = it },
@@ -2479,7 +2478,6 @@ private fun GamesSection(
     entries: List<LibraryEntry>,
     library: Library,
     nav: ShellBackStack,
-    onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
@@ -2753,7 +2751,8 @@ private fun GamesSection(
                 key = entry.id,
                 label = labels[index],
                 logoPath = entry.artworkUri,
-                onSelect = { onLaunch(entry) },
+                // A opens the game's details, where Play is (Droidtop/tracker#641).
+                onSelect = { onShowDetail(entry) },
                 // Lets a themed carousel/grid honour its own real
                 // <imageType> for this game instead of always drawing the
                 // one pre-resolved artwork. Coordinates only, no I/O here.
@@ -2896,7 +2895,7 @@ private fun GamesSection(
                         focusedGameIndex = next
                         true
                     }
-                    GamepadAction.A -> headless && systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onLaunch(it) } != null
+                    GamepadAction.A -> headless && systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
                     // Y/Info, with or without a list widget.
                     GamepadAction.Y -> group != null && themed &&
                         systemGamesForGroup.getOrNull(focusedGameIndex)?.let { onShowDetail(it) } != null
@@ -3322,7 +3321,6 @@ private fun GamesSection(
                                 HomeSectionRow(
                                     HomeSection("Continue Playing", continuePlaying),
                                     firstCardFocus = null,
-                                    onLaunch = onLaunch,
                                     onShowDetail = onShowDetail,
                                     onFocusedEntryChanged = onFocusedEntryChanged,
                                     modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
@@ -3490,7 +3488,8 @@ private fun GamesSection(
                                 modifier = Modifier
                                     .focusRequester(pad.requester(index))
                                     .then(if (index == 0) Modifier.focusRequester(firstFocus) else Modifier),
-                                onLaunch = { onLaunch(entry) },
+                                // A opens the details, where Play is (Droidtop/tracker#641).
+                                onActivate = { onShowDetail(entry) },
                                 onShowDetail = { onShowDetail(entry) },
                                 onFocused = {
                                     pad.focused = index
@@ -3758,7 +3757,6 @@ private fun AppsSection(
                         HomeSectionRow(
                             homeSection,
                             firstCardFocus = if (!firstAssigned) firstFocus else null,
-                            onLaunch = onLaunch,
                             onShowDetail = onShowDetail,
                             onFocusedEntryChanged = onFocusedEntryChanged,
                             onToggleFavorite = onToggleFavorite,
@@ -4065,7 +4063,6 @@ internal fun buildAppSections(entries: List<LibraryEntry>): List<HomeSection> {
 private fun HomeSectionRow(
     section: HomeSection,
     firstCardFocus: FocusRequester?,
-    onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
     modifier: Modifier = Modifier,
@@ -4091,7 +4088,8 @@ private fun HomeSectionRow(
                 GameCard(
                     entry = entry,
                     modifier = if (index == 0 && firstCardFocus != null) Modifier.focusRequester(firstCardFocus) else Modifier,
-                    onLaunch = { onLaunch(entry) },
+                    // A opens the details, where Play is (Droidtop/tracker#641).
+                    onActivate = { onShowDetail(entry) },
                     onShowDetail = { onShowDetail(entry) },
                     onFocused = { onFocusedEntryChanged(entry) },
                     onToggleFavorite = { onToggleFavorite(entry) },
@@ -4106,7 +4104,9 @@ private fun HomeSectionRow(
 internal fun GameCard(
     entry: LibraryEntry,
     modifier: Modifier = Modifier,
-    onLaunch: () -> Unit,
+    // What A and a tap do. Gaming opens the game's details, where Play is (owner, 2026-10-24, Droidtop/tracker#641:
+    // "it should open the game's page"); Standard's games screen plays.
+    onActivate: () -> Unit,
     onShowDetail: () -> Unit,
     onFocused: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
@@ -4144,7 +4144,7 @@ internal fun GameCard(
             .onPad { press ->
                 when (press.action) {
                     GamepadAction.A -> {
-                        onLaunch()
+                        onActivate()
                         true
                     }
                     GamepadAction.Y -> {
@@ -4180,7 +4180,7 @@ internal fun GameCard(
             // second button, on a surface that only has one gesture.
             // Android's own list convention, and the one Daijisho and
             // the platform launchers already train.
-            .combinedClickable(onClick = onLaunch, onLongClick = onShowDetail)
+            .combinedClickable(onClick = onActivate, onLongClick = onShowDetail)
             // ONE selection idiom across the shell: the menus' own
             // accent border over a brightened surface (MenuTokens), not a
             // third one. The rig counted three at once -- this card's 1px

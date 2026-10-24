@@ -668,14 +668,18 @@ internal fun PcGamesSection(
         onOpenDownloads = { onOpenSection(GamingSection.DOWNLOADS) },
     )
     val launch: (LibraryEntry) -> Unit = pcLaunch.launch
-    // A on a capsule plays it, except a Windows game whose environment is not
-    // set up yet: that opens the game page, whose primary button is the setup
-    // step, rather than a download offer over the grid (Droidtop/tracker#293).
+    // A on a game opens its page, never a launch (owner, 2026-10-24, Droidtop/tracker#641: "hitting A on the page
+    // shouldn't immediately launch the game, it should open the game's page"): a PC game's page with Play focused, a
+    // Retro game's details; an app, which has no game page, opens. X is Play now ([playsNow]).
     val activate: (LibraryEntry) -> Unit = { entry ->
-        val needsWindowsSetup = entry.inPcFold && entry.id == focusedEntry?.id &&
-            focusedPlay?.second?.option?.let { it.state != RunnerState.READY && it.action == RunnerAction.SET_UP_WINDOWS_GAMES } == true
-        if (needsWindowsSetup) state.pageId = entry.id else launch(entry)
+        when (cardPress(entry)) {
+            CardPress.PAGE -> state.pageId = entry.id
+            CardPress.DETAILS -> onShowDetail(entry)
+            CardPress.LAUNCH -> launch(entry)
+        }
     }
+    // X plays the focused game as it is: only where Play works without a setup step first.
+    val playsNow = focusedEntry != null && (focusedPlay == null || focusedPlay.second?.option?.state == RunnerState.READY)
     // Select and a long press on a PC game open its menu and page; on a Retro
     // game or an app from Home's mixed shelves, a small options menu that
     // launches through the same path as its own tab.
@@ -837,7 +841,7 @@ internal fun PcGamesSection(
     // Sort By (docs/SPEC.md 7j), L2 the focused thing's menu and Select the
     // list's options: only what dispatches, re-read as the cursor moves.
     val verb = focusedPlay?.first?.verb
-    val hints = remember(verb, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile, state.headingFocused, onHomeStrip, homeTab?.cards?.size) {
+    val hints = remember(verb, playsNow, state.stripFocused, focusedEntry?.id, state.view, onDest, onFreeRow, focusedTile, state.headingFocused, onHomeStrip, homeTab?.cards?.size) {
         // Steam's order: the list's own actions, then A and B. Start (Menu)
         // is the shell's, drawn at the row's left; L1/R1 are the glyphs at
         // the strip's ends, not hints.
@@ -847,19 +851,20 @@ internal fun PcGamesSection(
                 HintBinding(GamepadAction.L, "Switch tab"),
                 HintBinding(GamepadAction.Y, "Search"),
                 HintBinding(GamepadAction.L2, "Options") { focusedEntry != null },
-                HintBinding(GamepadAction.A, if (onDest || onHomeStrip) "Open" else verb ?: "Play") {
+                HintBinding(GamepadAction.X, "Play now") { playsNow && !onDest && !onHomeStrip },
+                HintBinding(GamepadAction.A, if (onDest || onHomeStrip || focusedEntry != null) "Open" else verb ?: "Play") {
                     onDest || focusedEntry != null || (onHomeStrip && homeTab?.cards?.isNotEmpty() == true)
                 },
             )
         } else listOf(
-            HintBinding(GamepadAction.X, "Filter"),
+            HintBinding(GamepadAction.X, "Play now") { playsNow && !onDest && !state.stripFocused },
             HintBinding(GamepadAction.Y, "Sort By"),
             HintBinding(GamepadAction.L2, "Options") {
                 focusedEntry != null || focusedTile != null ||
                     (state.stripFocused && (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.builtIn == false)
             },
             HintBinding(GamepadAction.SELECT, "List options"),
-            HintBinding(GamepadAction.A, if (onDest || focusedTile != null || (state.onShelves && state.headingFocused)) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
+            HintBinding(GamepadAction.A, if (onDest || focusedTile != null || (state.onShelves && state.headingFocused) || focusedEntry != null) "Open" else if (state.stripFocused || onFreeRow) "Select" else verb ?: "Play") {
                 onDest || state.stripFocused || onFreeRow || focusedTile != null || focusedEntry != null
             },
             HintBinding(GamepadAction.B, "Back") { state.view != PcView.HOME },
@@ -1051,8 +1056,8 @@ internal fun PcGamesSection(
                             else if (focusedTile != null) state.showGrid(focusedTile.query)
                             else focusedEntry?.let(activate)
                         }
-                        // Home is not a list: X does nothing there and Y is Search (docs/SPEC.md 7i, "Home").
-                        GamepadAction.X -> if (!state.home) state.filterOpen = true
+                        // X is Play now on a game (Droidtop/tracker#641); Filter is in the list options. Y is Search on Home.
+                        GamepadAction.X -> if (playsNow && !onDest && !onHomeStrip && !state.stripFocused) focusedEntry?.let(launch) else return@onPad false
                         GamepadAction.Y -> if (state.home) state.searchOpen = true else state.sortOpen = true
                         // L2 is the focused thing's menu, as R2 is the global
                         // one; a long press opens the same menu. Select is the
@@ -1371,6 +1376,11 @@ internal fun PcGamesSection(
             // The ownership List options (docs/SPEC.md 7j) and the strip's
             // optional tabs (7i): global, not part of a view.
             listOptions = listOf(
+                // X is Play now on a game (Droidtop/tracker#641), so the list's filter is here.
+                "Filter" to {
+                    state.optionsOpen = false
+                    state.filterOpen = true
+                },
                 ("Favourites tab: " + if (stripTabs.favourites) "Shown" else "Hidden") to {
                     setStripTabs(stripTabs.copy(favourites = !stripTabs.favourites))
                 },
@@ -1872,3 +1882,13 @@ private fun HomeDestinations(selected: Int?, onOpen: (Int) -> Unit, modifier: Mo
 
 /** The most PC games the search lists as rows; the grid behind it narrows to all of them. */
 private const val SEARCH_GAME_ROWS = 20
+
+/** What A does on a game card in Gaming (owner, 2026-10-24, Droidtop/tracker#641): open it, never launch it. */
+internal enum class CardPress { PAGE, DETAILS, LAUNCH }
+
+/** A PC game opens its page, a Retro game its details, and an app, which has no game page, opens. Pure. */
+internal fun cardPress(entry: LibraryEntry): CardPress = when {
+    entry.inPcFold -> CardPress.PAGE
+    entry.appFacts != null -> CardPress.LAUNCH
+    else -> CardPress.DETAILS
+}
