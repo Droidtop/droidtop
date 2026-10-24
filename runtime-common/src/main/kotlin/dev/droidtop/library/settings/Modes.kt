@@ -309,6 +309,22 @@ object Modes {
         reload(context)
     }
 
+    /**
+     * On a Home intent droidtop sends itself (taking an ended app off the screen): go to the mode in use, not the
+     * default one, so droidtop never opens another mode over the one the person is in (docs/SPEC.md 2c, "A mode never
+     * opens another"; Droidtop/tracker#639). A Home press by the person carries none and goes to [homeTarget].
+     */
+    const val EXTRA_MODE_IN_USE = "dev.droidtop.extra.MODE_IN_USE"
+
+    /** Where a Home intent goes: [homeTarget], or the mode in use when droidtop sent it with [EXTRA_MODE_IN_USE]. */
+    @JvmStatic
+    fun homeTarget(context: Context, intent: android.content.Intent?): String {
+        val last = lastMode(context)
+        val inUse = intent?.getBooleanExtra(EXTRA_MODE_IN_USE, false) == true &&
+            Mode.byId(last)?.let { it == Mode.LAUNCHER || it in snapshot } == true
+        return if (inUse) last else homeTarget(context)
+    }
+
     @JvmStatic
     fun lastMode(context: Context): String =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

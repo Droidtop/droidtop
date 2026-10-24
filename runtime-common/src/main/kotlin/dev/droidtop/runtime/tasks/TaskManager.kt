@@ -62,7 +62,10 @@ object TaskManager {
     private fun sendToBackground(context: Context, packageName: String) {
         if (packageName == context.packageName) return
         val display = LaunchLedger.entries().firstOrNull { it.packageName == packageName }?.displayId ?: return
+        // Home on that screen, to the mode in use rather than the default one: ending a game from Desktop landed in
+        // Gaming (Droidtop/tracker#639). The Home activities still route a companion screen to the companion.
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            .putExtra(dev.droidtop.library.settings.Modes.EXTRA_MODE_IN_USE, true)
         try {
             context.startActivity(home, ActivityOptions.makeBasic().setLaunchDisplayId(display).toBundle())
             Thread.sleep(BACKGROUND_SETTLE_MS)

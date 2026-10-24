@@ -85,7 +85,7 @@ class HomeTrampolineActivity : Activity() {
             return
         }
 
-        val target = if (ThemeSafeMode.active) Mode.GAMING.id else Modes.homeTarget(this)
+        val target = if (ThemeSafeMode.active) Mode.GAMING.id else Modes.homeTarget(this, intent)
         if (target != Mode.LAUNCHER.id || ThemeSafeMode.active) {
             val nowMs = SystemClock.elapsedRealtime()
             val doubleTap = nowMs - lastHomePressMs < DOUBLE_TAP_WINDOW_MS
