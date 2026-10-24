@@ -665,7 +665,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .selectionFrame(focused, MenuTokens.RowShape)
+                            .selectionFrame(focused, MenuTokens.RowShape, row = true)
                             .clickable { focusIndex = index }
                             .padding(10.dp),
                     ) {
@@ -711,7 +711,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .selectionFrame(focused, MenuTokens.RowShape)
+                            .selectionFrame(focused, MenuTokens.RowShape, row = true)
                             // Without this a notification could only be
                             // reached with a pad: the rows carried no
                             // touch route at all, in the one sheet a

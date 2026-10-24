@@ -148,12 +148,9 @@ object Elevation {
  * stops [VerticalInset] short of the top (the bottom is the menu's own hint
  * row), so it reads as a panel over the page rather than a wall; rows
  * [RowHeight] tall with [RowPaddingStart] and [RowPaddingEnd]. The row under
- * the cursor grows by [FocusScale] from a point [FocusPivotX] in from its left
- * edge (it grows rightwards, not outwards) and its plate flashes from
- * [FlashFrom] of the text ink down to [FlashTo] ([Motion.FlashMs]); the
- * destination the person is on carries a short accent pill at the panel's edge
- * ([CurrentMarkWidth] by [CurrentMarkHeight]), and a destination with something
- * waiting an accent dot ([AttentionDot]).
+ * the cursor and the destination the person is on are the one row focus every
+ * menu has (rowFocus, Droidtop/tracker#644); a destination with something
+ * waiting carries an accent dot ([AttentionDot]) or a job ring.
  */
 object SideMenu {
     val Width: Dp = 240.dp
@@ -165,16 +162,10 @@ object SideMenu {
     val RowPaddingEnd: Dp = 16.dp
     val IconSize: Dp = 24.dp
     val IconGap: Dp = 16.dp
-    val CurrentMarkWidth: Dp = 4.dp
-    val CurrentMarkHeight: Dp = 20.dp
     val AttentionDot: Dp = 8.dp
     /** The running game's live dot, and the ring that pulses out of it while motion is on. */
     val LiveDot: Dp = 8.dp
     val LiveRing: Dp = 16.dp
-    const val FocusScale = 1.1f
-    const val FocusPivotX = 0.12f
-    const val FlashFrom = 0.30f
-    const val FlashTo = 0.10f
     /** How far the live ring grows before it has faded out, as a multiple of [LiveRing]. */
     const val LiveRingGrowth = 1.6f
 }
@@ -183,10 +174,8 @@ object SideMenu {
  * Settings' two panes (docs/SPEC.md "Settings layout"), as Steam's settings
  * measure: the category column takes [ColumnFraction] of the page and never
  * less than [ColumnMinWidth], on a plate of its own ([MenuTokens.Card]). The
- * entry under the cursor is an accent gradient from its left edge
- * ([FocusedGradient] fading to clear) with a [Border] of the accent along that
- * edge, its content grown by [SideMenu.FocusScale]; the category being shown
- * wears the same at [CurrentGradient]. Scrolling keeps the selected row
+ * entry under the cursor and the category being shown are the one row focus
+ * (rowFocus, Droidtop/tracker#644). Scrolling keeps the selected row
  * [ScrollRoomAbove] of the list's height clear above it and [ScrollRoomBelow]
  * below (Steam's 250 and 60 of 800), so the cursor is never against an edge.
  */
@@ -194,9 +183,6 @@ object SettingsLayout {
     const val ColumnFraction = 0.2f
     val ColumnMinWidth: Dp = 240.dp
     val CategoryIcon: Dp = 22.dp
-    const val FocusedGradient = 0.40f
-    const val CurrentGradient = 0.22f
-    val Border: Dp = 2.dp
     const val ScrollRoomAbove = 0.3125f
     const val ScrollRoomBelow = 0.075f
 

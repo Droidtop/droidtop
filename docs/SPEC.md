@@ -16198,10 +16198,11 @@ hint row underneath never shows through. The page behind is dimmed by the scrim 
 the Quick Menu keeps its lighter 55%, because the page behind it is still what
 the person is looking at). Each row is an icon and a label, 48 dp tall (one touch
 target in a touch window), 24 dp in from the left and 16 dp from the right, and no
-prose: no "Go to" heading and no "Here" value. The row under the cursor flashes
-its plate from 30% of the text ink to 10% over 0.5 s and its content grows by 10%
-from a point 12% in from its left edge (it grows rightwards), with the window's one
-sliding ring on it; motion off, the plate is simply 10% and nothing grows. The
+prose: no "Go to" heading and no "Here" value. The row under the cursor is the one
+row focus every menu has (decided 2026-10-24, Droidtop/tracker#644; owner: the
+Quick Menu, Settings and left menu rows "are among the most important changes in
+the new UI"): the accent at 22% behind it and a 4 dp accent bar its full height at
+the leading edge (`rowFocus`), no ring, no flash, nothing growing. The
 destination the user is on is marked by a short accent pill on the panel's edge
 (4 by 20 dp, Steam's "you are here"; the 4 dp bar and filled row it replaces are
 gone), and the cursor starts on that row. The cursor is the one selection
@@ -17599,11 +17600,11 @@ Settings tab, the left menu's places, Console systems and Containers.
   console's 768dp window), on a plate of its own (the card role) that runs the
   page's height from its left edge. It starts with a Search entry, then one
   entry per category: a glyph and a name. The entry under the pad's cursor is
-  an accent gradient from its left edge, 40% fading to clear, with a 2dp accent
-  edge, its glyph and name grown 10% from the left (the entry stays put), and
-  the shell's one sliding ring; the category being shown wears the same
-  gradient and edge at 22%, whether or not the pad is in the column. The fill
-  and the 3dp rail the current entry had are gone. The pane holds the current
+  the one row focus (`rowFocus`, Droidtop/tracker#644: the accent at 22% and a
+  4dp accent bar at the leading edge, no ring, nothing growing); the category
+  being shown keeps the left menu's short accent pill on that edge, whether or
+  not the pad is in the column. The gradient, the 2dp edge and the 10% growth
+  it had are gone. The pane holds the current
   category's rows, grouped under small section labels; on a page the selected
   row keeps Steam's room round it as the list scrolls, about 31% of the list's
   height clear above and 7.5% below (Steam's 250 and 60 of 800; shrunk together

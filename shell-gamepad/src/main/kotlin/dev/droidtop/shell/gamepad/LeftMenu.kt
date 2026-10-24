@@ -1,9 +1,7 @@
 package dev.droidtop.shell.gamepad
 
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -49,10 +47,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -307,25 +302,12 @@ internal fun LeftMenu(
 }
 
 /**
- * Steam's side-menu row focus (docs/SPEC.md 7k): while the pad drives and the
- * cursor is on the row, its plate flashes the text ink at [SideMenu.FlashFrom]
- * and settles to [SideMenu.FlashTo] ([Motion.FlashMs]), and [grow] eases its
- * content to [SideMenu.FocusScale]. The colour is drawn and the growth applied
- * in the draw and layer phases, so the animation recomposes nothing. The
- * window's one sliding ring marks the row too, as it marks every selection.
+ * A side-menu row's focus: the one row focus every menu has ([rowFocus], Droidtop/tracker#644: the accent at 22 percent
+ * and a 4 dp accent bar at the leading edge, no ring, no flash, nothing growing), and [current]'s "you are here" pill on
+ * that edge while the cursor is elsewhere. A pointer over the row moves the cursor to it.
  */
-private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit, onHover: () -> Unit): Modifier = composed {
+private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit, onHover: () -> Unit, current: Boolean = false): Modifier = composed {
     val shown = selected && PadModality.showsFocus
-    val flash = remember { Animatable(0f) }
-    LaunchedEffect(shown) {
-        if (shown) {
-            flash.snapTo(SideMenu.FlashFrom)
-            flash.animateTo(SideMenu.FlashTo, Motion.flash())
-        } else {
-            flash.snapTo(0f)
-        }
-    }
-    val ink = MenuTokens.OnSurface
     // A pointer over a row moves the cursor to it: pointer and focus are one selection (docs/SPEC.md 7j).
     val source = remember { MutableInteractionSource() }
     val hovered = rememberUpdatedState(onHover)
@@ -336,25 +318,10 @@ private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit, onHov
         .fillMaxWidth()
         .heightIn(min = sideMenuRowHeight())
         .hoverable(source)
-        .drawBehind {
-            val alpha = flash.value
-            if (alpha > 0f) drawRect(ink.copy(alpha = alpha))
-        }
-        .focusRing(shown, RectangleShape)
+        .rowFocus(shown, current = current)
         // No indication of its own: the cursor above is the one selection. The default one drew a grey plate on the
         // row under the pointer or with Android's focus while the cursor sat on another (Droidtop/tracker#639).
         .clickable(interactionSource = source, indication = null, onClick = onClick)
-}
-
-/** The content of a focused row grows rightwards from near its left edge; the plate stays put. */
-private fun Modifier.sideMenuGrow(selected: Boolean): Modifier = composed {
-    // Growth is motion: with Animations off (or Android's animator scale at 0) the row does not grow at all.
-    val grow by animateFloatAsState(if (selected && PadModality.showsFocus && Motion.enabled) SideMenu.FocusScale else 1f, Motion.focus(), label = "side menu grow")
-    Modifier.graphicsLayer {
-        scaleX = grow
-        scaleY = grow
-        transformOrigin = TransformOrigin(SideMenu.FocusPivotX, 0.5f)
-    }
 }
 
 /** A side-menu row's height: Steam's 48dp, and at least one touch target where fingers are the input. */
@@ -368,17 +335,15 @@ private fun sideMenuRowHeight(): Dp {
  * One destination row: an icon and a label, flat to the panel's edges. The
  * destination the user is on carries a short accent pill at the panel's edge
  * (Steam's "you are here"); [waiting] adds an accent dot or a job ring after the label.
- * The cursor is [sideMenuFocus], and the menu opens with it on the current row.
+ * The cursor and the mark are [sideMenuFocus], and the menu opens with the cursor on the current row.
  */
 @Composable
 private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Attention?, selected: Boolean, onClick: () -> Unit, onHover: () -> Unit) {
-    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick, onHover)) {
-        if (isCurrent) CurrentMark()
+    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick, onHover, current = isCurrent)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .sideMenuGrow(selected)
                 .padding(start = SideMenu.RowPaddingStart, end = SideMenu.RowPaddingEnd),
         ) {
             Icon(
@@ -426,7 +391,6 @@ private fun SearchRow(selected: Boolean, onClick: () -> Unit, onHover: () -> Uni
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .sideMenuGrow(selected)
                 .padding(start = SideMenu.RowPaddingStart, end = SideMenu.RowPaddingEnd),
         ) {
             Icon(
@@ -448,17 +412,6 @@ private fun SearchRow(selected: Boolean, onClick: () -> Unit, onHover: () -> Uni
     }
 }
 
-/** "You are here": a short accent pill on the panel's own edge. */
-@Composable
-private fun BoxScope.CurrentMark() {
-    Box(
-        Modifier
-            .align(Alignment.CenterStart)
-            .size(width = SideMenu.CurrentMarkWidth, height = SideMenu.CurrentMarkHeight)
-            .background(MenuTokens.Accent, Corners.Pill),
-    )
-}
-
 /**
  * The running game, one press from the menu (DroidDeck's Resume item,
  * ui/FrontEndRail.kt at 9310d19, reworked to the menu's row and the shell's
@@ -474,7 +427,6 @@ private fun ResumeRow(title: String, selected: Boolean, onClick: () -> Unit, onH
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .sideMenuGrow(selected)
                 .padding(start = SideMenu.RowPaddingStart, end = SideMenu.RowPaddingEnd, top = Space.Xs, bottom = Space.Xs),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.size(SideMenu.IconSize)) {

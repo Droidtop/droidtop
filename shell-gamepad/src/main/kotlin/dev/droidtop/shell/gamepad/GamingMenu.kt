@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -156,20 +157,8 @@ fun Modifier.selectionFrame(
 ): Modifier = composed {
     val shown = selected && PadModality.showsFocus
     Modifier
-        .background(if (shown) selectedFill else rest, shape)
-        .then(
-            if (row && shown) {
-                val bar = MenuTokens.Accent
-                Modifier.drawWithContent {
-                    drawContent()
-                    val w = RowFocusBar.toPx()
-                    val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Ltr) 0f else size.width - w
-                    drawRoundRect(bar, topLeft = androidx.compose.ui.geometry.Offset(x, 0f), size = androidx.compose.ui.geometry.Size(w, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2f))
-                }
-            } else {
-                Modifier
-            },
-        )
+        .background(if (shown && !row) selectedFill else rest, shape)
+        .then(if (row) Modifier.rowFocus(shown) else Modifier)
         .then(
             // Never a 0.dp stroke: it would draw as a 1px line, so "no
             // outline" is a transparent colour and nothing is drawn.
@@ -185,6 +174,38 @@ fun Modifier.selectionFrame(
         )
         .focusRing(shown && !row, shape, ringOutset)
 }
+
+/**
+ * The one way a row shows the cursor, in every menu (Droidtop/tracker#644, docs/DESIGN-LANGUAGE.md "Type and focus"):
+ * the accent at 22 percent behind it ([MenuTokens.SurfaceSelected]) and a 4 dp accent bar the row's full height at its
+ * leading edge. No ring, no growth, no flash: the row never moves under the cursor. [shown] is the cursor being here
+ * while a pad drives ([PadModality]). [current] is "you are here" (the left menu's destination, the Settings category
+ * on show): a short accent pill on that edge while the cursor is elsewhere.
+ */
+internal fun Modifier.rowFocus(shown: Boolean, current: Boolean = false): Modifier = composed {
+    if (!shown && !current) return@composed Modifier
+    val fill = MenuTokens.SurfaceSelected
+    val bar = MenuTokens.Accent
+    Modifier.drawBehind {
+        val w = RowFocusBar.toPx()
+        val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Ltr) 0f else size.width - w
+        if (shown) {
+            drawRect(fill)
+            drawRect(bar, topLeft = androidx.compose.ui.geometry.Offset(x, 0f), size = androidx.compose.ui.geometry.Size(w, size.height))
+        } else {
+            val h = minOf(RowCurrentMark.toPx(), size.height)
+            drawRoundRect(
+                bar,
+                topLeft = androidx.compose.ui.geometry.Offset(x, (size.height - h) / 2f),
+                size = androidx.compose.ui.geometry.Size(w, h),
+                cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2f),
+            )
+        }
+    }
+}
+
+/** How tall "you are here" is on a row's edge. */
+private val RowCurrentMark = 20.dp
 
 /** A focused row's leading bar (Droidtop/tracker#644). */
 private val RowFocusBar = 4.dp

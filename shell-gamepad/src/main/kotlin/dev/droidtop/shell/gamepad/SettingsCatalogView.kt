@@ -58,7 +58,6 @@ import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.focus.FocusRequester
@@ -1267,54 +1266,26 @@ private fun SettingsCategoryColumn(
 }
 
 /**
- * One entry of the category column, Steam's settings list item (docs/SPEC.md
- * "Settings layout", [SettingsLayout]): under the cursor, an accent gradient
- * from the left edge at [SettingsLayout.FocusedGradient] fading to clear, a
- * [SettingsLayout.Border] of the accent on that edge, and the glyph and name
- * grown by [SideMenu.FocusScale] from the left (the entry itself stays put);
- * the category being shown wears the same gradient and edge at
- * [SettingsLayout.CurrentGradient], whether or not the pad is in the column.
- * The colour answers at once; the growth glides ([Motion.focus]) in the layer
- * phase. The window's one sliding ring marks the cursor as everywhere else.
+ * One entry of the category column (docs/SPEC.md "Settings layout", [SettingsLayout]): under the cursor it is the one
+ * row focus every menu has ([rowFocus], Droidtop/tracker#644: the accent at 22 percent and a 4 dp accent bar at the
+ * leading edge, nothing growing, no ring); the category being shown keeps a short accent pill on that edge, whether or
+ * not the pad is in the column, and its name in the full text colour.
  */
 @Composable
 private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, cursor: Boolean, onClick: () -> Unit, iconFile: String? = null) {
     val shown = cursor && PadModality.showsFocus
-    val strength = when {
-        shown -> SettingsLayout.FocusedGradient
-        current -> SettingsLayout.CurrentGradient
-        else -> 0f
-    }
-    val accent = MenuTokens.Accent
-    val grow by androidx.compose.animation.core.animateFloatAsState(
-        // Growth is motion: none with Animations off, the gradient and edge alone mark the cursor.
-        if (shown && Motion.enabled) SideMenu.FocusScale else 1f,
-        Motion.focus(),
-        label = "category grow",
-    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = MenuTokens.CategoryRowMinHeight)
-            .drawBehind {
-                if (strength > 0f) {
-                    drawRect(Brush.horizontalGradient(listOf(accent.copy(alpha = accent.alpha * strength), Color.Transparent)))
-                    drawRect(accent, size = Size(SettingsLayout.Border.toPx(), size.height))
-                }
-            }
-            .focusRing(shown, androidx.compose.ui.graphics.RectangleShape)
+            // The one row focus (Droidtop/tracker#644): the accent fill and bar under the cursor, the short pill on the
+            // category on show.
+            .rowFocus(shown, current = current)
             .clickable(onClick = onClick)
             .padding(start = LocalShellWindow.current.edgePadding, end = Space.Md, top = Space.Sm, bottom = Space.Sm),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.graphicsLayer {
-                scaleX = grow
-                scaleY = grow
-                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0.5f)
-            },
-        ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null || iconFile != null) {
                 CatalogGlyph(
                     icon,
@@ -1669,7 +1640,7 @@ private fun TextBlockRow(block: TextBlockItem, selected: Boolean, onShown: () ->
         Modifier
             .fillMaxWidth()
             .clip(MenuTokens.RowShape)
-            .selectionFrame(selected, MenuTokens.RowShape)
+            .selectionFrame(selected, MenuTokens.RowShape, row = true)
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = MenuTokens.RowVerticalPadding),
     ) {
