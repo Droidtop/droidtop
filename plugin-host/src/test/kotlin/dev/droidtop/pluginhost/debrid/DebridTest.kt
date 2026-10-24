@@ -395,4 +395,30 @@ class DebridTest {
         assertNull(served)
         assertTrue("nothing was asked", !asked)
     }
+
+    /** A service that serves one hoster's links at once. */
+    private class Hoster(override val name: String) : DebridProvider {
+        override val id = name.lowercase()
+        override fun check(key: String): String? = null
+        override fun cached(key: String, torrent: TorrentRef): Boolean? = null
+        override fun request(key: String, torrent: TorrentRef): DebridState = DebridState.NotCached
+        override fun hosts(key: String) = setOf("pixeldrain.com")
+        override fun linkCached(key: String, link: String) = true
+        override fun unrestrict(key: String, link: String) = DebridState.Ready(listOf(DebridFile("Game.zip", 7, "https://cdn.example/g")))
+    }
+
+    @Test
+    fun aHosterLinkADebridAccountServedSaysWhichAccountOnTheJobsLine() {
+        DebridChoice.reset()
+        val before = DebridLinks.accounts
+        DebridLinks.accounts = { listOf(Hoster("TorBox") to "k") }
+        try {
+            val served = DebridLinks.resolve("https://pixeldrain.com/u/abc")!!
+            assertEquals(listOf("https://cdn.example/g"), served.map { it.url })
+            assertEquals("via your TorBox", served.single().via)
+        } finally {
+            DebridLinks.accounts = before
+            DebridChoice.reset()
+        }
+    }
 }

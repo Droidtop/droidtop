@@ -43,7 +43,8 @@ object DebridLinks {
             if (cached == false && !wait) continue
             val ready = settle(provider, key, link, if (cached == true) CACHED_WAIT_MS else FETCH_WAIT_MS) ?: continue
             DebridChoice.spent(provider, key)
-            return ready.files.map { file -> WebSessionDownload.direct(file.url, file.path, file.size) }
+            // The job's line says which account served it, as a host account's does ("via your PixelDrain").
+            return ready.files.map { file -> WebSessionDownload.direct(file.url, file.path, file.size, via = "via your ${provider.name}") }
         }
         return null
     }
