@@ -259,6 +259,18 @@ class GameGroupingTest {
     }
 
     @Test
+    fun `an update row names both versions in words, and an unknown one as unknown`() {
+        // Owner, 2026-10-24 (Droidtop/tracker#639): "show current and newest available version, in a way that makes it obvious which is which".
+        assertEquals("Available: v0.38", GameUpdates.availableLabel("0.38"))
+        assertEquals("Available: v0.38", GameUpdates.availableLabel("v0.38"))
+        assertEquals("Installed: v0.37", GameUpdates.installedLabel("0.37"))
+        assertEquals("Installed: unknown", GameUpdates.installedLabel(null))
+        assertEquals("Installed: unknown", GameUpdates.installedLabel(" "))
+        assertEquals("Available: Final", GameUpdates.availableLabel("Final"))
+        assertEquals("Available: a newer build", GameUpdates.availableLabel(GameUpdates.NEWER_BUILD))
+    }
+
+    @Test
     fun `a folder the user made part of a game is grouped under that game's name`() {
         val games = GameGrouping.group(
             listOf(

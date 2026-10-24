@@ -547,6 +547,7 @@ internal fun PcGameMenu(
             },
             onClose = { viewingRecord = null },
             startTab = viewing.third,
+            installedVersion = grouping?.game?.defaultVersion?.version ?: versions.firstOrNull(),
         )
     }
 

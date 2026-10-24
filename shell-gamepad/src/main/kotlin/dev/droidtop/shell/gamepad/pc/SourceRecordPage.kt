@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.UpdateSources
@@ -171,7 +172,8 @@ internal fun recordRows(record: UpdateSources.Record, tab: RecordTab, picked: St
  * The record page of [source]'s record [externalId], linked to the game whose newest version is [newest]. [scope] is
  * the caller's and outlives the page: a download goes on after it closes, in Downloads. [say] shows a line on the
  * game page; [onRelink] opens the link sheet; [onOpen] opens a web page. [onOpenGame], when the page was opened from
- * outside the game (an update row), is its last row and X: the game's page, the secondary way out.
+ * outside the game (an update row), is its last row and X: the game's page, the secondary way out. [installedVersion] is
+ * the version here, said under the title beside the record's ("Available: v0.38", "Installed: v0.37").
  */
 @Composable
 internal fun SourceRecordPage(
@@ -187,6 +189,7 @@ internal fun SourceRecordPage(
     onClose: () -> Unit,
     startTab: RecordTab = RecordTab.OVERVIEW,
     onOpenGame: (() -> Unit)? = null,
+    installedVersion: String? = null,
 ) {
     // droidtop's saved copy first, so the page shows at once, then the source's answer (Droidtop/tracker#599).
     // Asked again after a sign-in, which gives the source's download links.
@@ -335,6 +338,20 @@ internal fun SourceRecordPage(
                 color = MenuTokens.OnSurface,
                 fontWeight = FontWeight.SemiBold,
             )
+            // Which version is which, in words: the one on offer stands out, the one here is secondary (Droidtop/tracker#639).
+            record?.version?.takeIf { it.isNotBlank() }?.let { available ->
+                Text(
+                    GameUpdates.availableLabel(available),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MenuTokens.OnSurface,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    GameUpdates.installedLabel(installedVersion),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MenuTokens.OnSurfaceMuted,
+                )
+            }
             Text(
                 RecordTab.entries.joinToString("   ") { if (it == tab) "[ ${it.label} ]" else it.label },
                 style = MaterialTheme.typography.titleSmall,
