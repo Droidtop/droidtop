@@ -1,7 +1,6 @@
 package dev.droidtop.ui.shared
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,11 +71,9 @@ fun ConfirmDialogCard(
     val notice = request.notice
     val tone = if (request.danger) NoticeTone.Danger else notice.tone
     val ink = palette.ink(tone)
-    val scale = animatorScale(androidx.compose.ui.platform.LocalContext.current)
-    val appear = remember { Animatable(if (scale == 0f) 1f else 0f) }
-    LaunchedEffect(Unit) {
-        if (scale > 0f) appear.animateTo(1f, tween((OPEN_MS * scale).toInt())) else appear.snapTo(1f)
-    }
+    // Motion's switch: Android's Remove animations makes it a snap (Droidtop/tracker#643). Compose scales the tween itself.
+    val appear = remember { Animatable(if (Motion.enabled) 0f else 1f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, Motion.tw(OPEN_MS)) }
     BoxWithConstraints(contentAlignment = Alignment.Center) {
         val width = minOf(MAX_WIDTH, maxWidth * 0.9f)
         Column(

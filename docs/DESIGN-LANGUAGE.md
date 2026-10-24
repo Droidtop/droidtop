@@ -19,6 +19,8 @@ what it learned last.
   not the patch filename).
 - Ship no unbound controls, no empty states without a next action, no status shown
   without its reason.
+- Status is shown, not read: a job's state is its bar's motion (one `JobProgress` everywhere), and text explains on
+  demand; no figure on a row changes with every report (owner, 2026-10-24, Droidtop/tracker#643).
 
 ## Layout
 - Never a single narrow centred column with large margins; content fills the window

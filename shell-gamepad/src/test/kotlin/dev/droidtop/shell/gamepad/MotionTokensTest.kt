@@ -2,6 +2,7 @@ package dev.droidtop.shell.gamepad
 
 import androidx.compose.animation.core.SnapSpec
 import androidx.compose.animation.core.TweenSpec
+import dev.droidtop.ui.shared.Motion
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,6 +44,26 @@ class MotionTokensTest {
         assertTrue(Motion.isOn(appSwitchOn = true, animatorDurationScale = 0.5f))
         assertFalse(Motion.isOn(appSwitchOn = false, animatorDurationScale = 1f))
         assertFalse(Motion.isOn(appSwitchOn = true, animatorDurationScale = 0f))
+    }
+
+    @Test
+    fun androidsScaleAloneKeepsGamingsSwitch() {
+        // The process-wide watch (MotionWatch) says only Android's scale; Gaming's own switch stays as Gaming set it.
+        Motion.update(appSwitchOn = false, animatorDurationScale = 1f)
+        Motion.updateScale(1f)
+        assertFalse(Motion.enabled)
+        Motion.update(appSwitchOn = true, animatorDurationScale = 1f)
+        Motion.updateScale(0f)
+        assertFalse(Motion.enabled)
+        Motion.updateScale(1f)
+        assertTrue(Motion.enabled)
+    }
+
+    @Test
+    fun aJobsFillOutlastsTheGapBetweenReports() {
+        // Reports come at most four times a second (ProgressThrottle): the fill must still be moving when the next lands.
+        assertTrue(Motion.ProgressMs > 250)
+        assertTrue(Motion.progress<Float>() is TweenSpec)
     }
 
     @Test

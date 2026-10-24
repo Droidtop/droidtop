@@ -34,6 +34,7 @@ import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
+import dev.droidtop.ui.shared.Motion
 import kotlinx.coroutines.launch
 
 /** The edge a [SidePanelFrame] slides in from. */

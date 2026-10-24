@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.ui.shared.Motion
 import kotlinx.coroutines.delay
 
 /**

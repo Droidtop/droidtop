@@ -122,7 +122,7 @@ internal fun CompanionCatalogItems(
                 is SliderItem -> CatalogSliderRow(item, onChanged)
                 is ToggleItem -> CatalogToggleRow(item, onChanged)
                 is ChoiceItem -> CatalogChoiceRow(item, onChanged)
-                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile) {
+                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile, progress = item.progress, look = item.progressLook) {
                     if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
                 }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
@@ -188,6 +188,10 @@ private fun CatalogRow(
     valueTone: NoticeTone? = null,
     // A picture before the title (CatalogItem.iconFile: a plugin's own icon, a store's mark; tracker#513).
     iconFile: String? = null,
+    // A job's bar under the title and how it moves (CatalogItem.progress and progressLook, Droidtop/tracker#643); a
+    // finished job's row has no bar and draws its check or cross. A tap opens the job's page, where its figures are.
+    progress: Float? = null,
+    look: dev.droidtop.library.settings.JobLook? = null,
     onClick: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -209,7 +213,19 @@ private fun CatalogRow(
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface, modifier = Modifier.weight(1f, fill = false))
+                if (progress == null && look != null) dev.droidtop.ui.shared.JobMark(look, companionJobColors(), Modifier.padding(start = 8.dp))
+            }
+            if (progress != null) {
+                dev.droidtop.ui.shared.JobProgress(
+                    progress,
+                    look ?: dev.droidtop.library.settings.JobLook.of(progress)!!,
+                    companionJobColors(),
+                    Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    height = 6.dp,
+                )
+            }
             if (!subtitle.isNullOrBlank()) RowSubtitle(subtitle)
         }
         if (!value.isNullOrBlank()) {
@@ -372,7 +388,7 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
             else -> Unit
         }
     }
-    CatalogRow(item.title, item.subtitle, value) { if (asksFirst) asking = true else run() }
+    CatalogRow(item.title, item.subtitle, value, progress = item.progress, look = item.progressLook) { if (asksFirst) asking = true else run() }
     if (asking) {
         Column(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
             Text(item.confirmText ?: "${item.title}?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)

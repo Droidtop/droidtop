@@ -65,6 +65,7 @@ import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.PadModality
 import dev.droidtop.shell.gamepad.input.menuStep
 import dev.droidtop.shell.gamepad.input.onPad
+import dev.droidtop.ui.shared.Motion
 
 /**
  * One place the left menu can take the user: a section, Home included, which is a section of its own since

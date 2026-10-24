@@ -112,4 +112,18 @@ class PluginJobsScreenTest {
         // A finished job with no error is done; only an error makes it a failure.
         assertEquals("GOG · Done", done.subtitle)
     }
+
+    @Test
+    fun `a job's bar moves as it stands`() {
+        val look = dev.droidtop.library.settings.JobLook
+        assertEquals(look.ACTIVE, PluginJobsScreen.lookOf(job("a", 42)))
+        assertEquals(look.CHECKING, PluginJobsScreen.lookOf(job("u")))
+        assertEquals(look.PAUSED, PluginJobsScreen.lookOf(job("p", 42, paused = true)))
+        assertEquals(look.QUEUED, PluginJobsScreen.lookOf(job("h", 42, paused = true).copy(hold = "Waiting for Wi-Fi")))
+        assertEquals(look.DONE, PluginJobsScreen.lookOf(job("d", 100, done = true)))
+        val failed = job("f", 100, done = true).copy(result = dev.droidtop.pluginhost.PluginResult.failure("Steam refused"))
+        assertEquals(look.FAILED, PluginJobsScreen.lookOf(failed))
+        // A finished row has no bar, but says how it ended by its mark.
+        assertEquals(look.FAILED, PluginJobsScreen.jobRow(failed, nowMs = 0L).progressLook)
+    }
 }

@@ -6,6 +6,7 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.CatalogScreen
+import dev.droidtop.library.settings.JobLook
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.Place
 import dev.droidtop.net.DownloadPolicy
@@ -226,10 +227,22 @@ object PluginJobsScreen {
      * How far a running job has got in figures, for where the person asked (its page; a focused row): "42%, 120 MB of
      * 300 MB, 4 MB/s", the speed smoothed ([JobPace]). Null when the job gives no figures. Pure but for the pace.
      */
-    internal fun detailLine(entry: PluginJobsCenter.Entry, nowMs: Long): String? {
+    fun detailLine(entry: PluginJobsCenter.Entry, nowMs: Long): String? {
         val percent = entry.percent.takeIf { it in 0..100 }?.let { "$it%" }
         val amount = amountLine(entry.numbers, speedBps = JobPace.speed(entry, nowMs) ?: entry.numbers?.downloadBps)
         return listOfNotNull(percent, amount).joinToString(", ").ifEmpty { null }
+    }
+
+    /**
+     * How [entry]'s bar moves (Droidtop/tracker#643): waiting its turn or for a connection is queued, stopped by the
+     * person is paused, under way with no fraction is checking, and a finished job is done or failed. Pure.
+     */
+    fun lookOf(entry: PluginJobsCenter.Entry): JobLook = when (entry.state) {
+        JobState.FAILED -> JobLook.FAILED
+        JobState.DONE -> JobLook.DONE
+        JobState.HELD, JobState.WAITING_FOR_NETWORK, JobState.WAITING_TO_RETRY -> JobLook.QUEUED
+        JobState.PAUSED -> JobLook.PAUSED
+        JobState.RUNNING -> if (entry.percent >= 0) JobLook.ACTIVE else JobLook.CHECKING
     }
 
     /**
@@ -255,6 +268,7 @@ object PluginJobsScreen {
                 subtitle = "${jobSource(entry)} · $said",
                 inline = jobPage(entry.jobId, jobTitle(entry)),
                 valueLabel = { if (entry.state == JobState.FAILED) "Failed" else "Done" },
+                progressLook = lookOf(entry),
             )
         }
         val line = progressLine(entry, JobPace.line(entry, nowMs))
@@ -265,6 +279,7 @@ object PluginJobsScreen {
             inline = jobPage(entry.jobId, jobTitle(entry)),
             valueLabel = { line },
             progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
+            progressLook = lookOf(entry),
         )
     }
 
@@ -306,6 +321,7 @@ object PluginJobsScreen {
                     subtitle = listOfNotNull(detailLine(entry, System.currentTimeMillis()), entry.statusLine.takeIf { it.isNotBlank() }).joinToString("\n"),
                     value = progressLine(entry, JobPace.line(entry, System.currentTimeMillis())),
                     progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
+                    progressLook = lookOf(entry),
                     run = {},
                 ),
             )

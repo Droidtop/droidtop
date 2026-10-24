@@ -63,10 +63,11 @@ class HomeModelTest {
         val tabs = HomeModel.tabs(emptyList(), friendsOn = false, friends = emptyList(), downloads = emptyList())
         assertEquals(listOf(HomeTabKind.WHATS_NEW), tabs.map { it.kind })
         assertEquals("You're up to date", tabs.single().empty)
-        val job = HomeCard.Download("j", "Hades", 45, 8 * 60, paused = false)
+        val job = HomeCard.Download("j", "Hades", 45, said = "About 8 min left", look = dev.droidtop.library.settings.JobLook.ACTIVE)
         val busy = HomeModel.tabs(emptyList(), friendsOn = true, friends = emptyList(), downloads = listOf(job))
         assertEquals(listOf("What's new", "Friends", "Downloads · 1"), busy.map { it.label })
-        assertEquals("45% · About 8 min left", job.line)
+        // The bar shows how far; the line is the Downloads place's, never a percent (Droidtop/tracker#643).
+        assertEquals("About 8 min left", job.line)
         // The download finished while the cursor was on its tab: the tab stays, empty.
         val kept = HomeModel.tabs(emptyList(), friendsOn = false, friends = emptyList(), downloads = emptyList(), keep = HomeTabKind.DOWNLOADS)
         assertEquals(listOf(HomeTabKind.WHATS_NEW, HomeTabKind.DOWNLOADS), kept.map { it.kind })

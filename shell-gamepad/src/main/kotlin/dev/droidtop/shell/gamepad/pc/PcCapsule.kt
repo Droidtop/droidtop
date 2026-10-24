@@ -418,7 +418,8 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: PluginJo
     val status = capsuleStatusOf(entry, download) ?: return
     val (text, fill, ink) = when (status) {
         CapsuleStatus.UPDATE -> Triple("Update", MenuTokens.Affirmative, MenuTokens.OnSelected)
-        CapsuleStatus.DOWNLOADING -> Triple("${download?.percent?.coerceIn(0, 100) ?: 0}%", MenuTokens.Selected, MenuTokens.OnSelected)
+        // How far is the bar along the capsule's foot; the chip names the state and never counts (Droidtop/tracker#643).
+        CapsuleStatus.DOWNLOADING -> Triple("Downloading", MenuTokens.Selected, MenuTokens.OnSelected)
         CapsuleStatus.WAITING -> Triple("Waiting", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.PAUSED -> Triple("Paused", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.FAILED -> Triple("Failed", MenuTokens.Scrim, MenuTokens.Danger)
@@ -445,8 +446,14 @@ private fun BoxScope.CapsuleCorners(entry: LibraryEntry, download: PluginJobsCen
     listOfNotNull(glyph, copies).joinToString(" ").takeIf { it.isNotEmpty() }?.let {
         CapsuleChip(it, MenuTokens.OnSurface, MenuTokens.Scrim, Modifier.align(Alignment.BottomEnd))
     }
-    // The shell's one progress bar, the same a download's row in the Downloads place draws.
-    download?.takeIf { !it.done }?.fraction()?.let { ShellProgressBar(it, Modifier.align(Alignment.BottomStart).fillMaxWidth()) }
+    // The shell's one progress bar, the same a download's row in the Downloads place draws, moving as the job stands.
+    download?.takeIf { !it.done }?.let {
+        ShellProgressBar(
+            it.fraction() ?: -1f,
+            Modifier.align(Alignment.BottomStart).fillMaxWidth(),
+            dev.droidtop.library.integrations.PluginJobsScreen.lookOf(it),
+        )
+    }
 }
 
 /**

@@ -125,6 +125,7 @@ import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.ThemeBrowserScreen
 import dev.droidtop.shell.gamepad.theme.UiSound
+import dev.droidtop.ui.shared.Motion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.drop
@@ -1644,6 +1645,7 @@ private fun CatalogRowView(
         switchOn = if (status == null) toggle?.current ?: (item as? ActionItem)?.state else null,
         sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
         progress = item.progress,
+        progressLook = item.progressLook,
     )
 }
 

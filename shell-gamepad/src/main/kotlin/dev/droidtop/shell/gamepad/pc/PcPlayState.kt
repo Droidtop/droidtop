@@ -56,6 +56,8 @@ internal data class PcPlayState(
     val store: StoreStage? = null,
     /** How far a running download is, 0 to 1; null when none is. */
     val progress: Float? = null,
+    /** How the download's bar moves (Droidtop/tracker#643); null when the page shows no download. */
+    val look: dev.droidtop.library.settings.JobLook? = null,
     /** Set when no runner offers the game: the button opens the Engine picker, the one place to say what it is. */
     val chooseEngine: Boolean = false,
 )
@@ -111,8 +113,10 @@ internal fun LibraryEntry.downloadKey(): String? = pcInfo?.storeId
  * shows its download in the Downloads place; Steam still opens its own screen.
  */
 internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: PluginJobsCenter.Entry?): PcPlayState {
-    // The job's own words, as the Downloads place says them ("Waiting for Wi-Fi", "120 MB of 300 MB · About 3 min left").
+    // The job's own words, as the Downloads place says them ("Waiting for Wi-Fi", "About 3 min left"); the bar under the
+    // button shows how far (Droidtop/tracker#643).
     val said = download?.let { PluginJobsScreen.oneLine(it) }.orEmpty()
+    val look = download?.let { PluginJobsScreen.lookOf(it) }
     val own = entry.ownStore() != null
     return when (stage) {
         StoreStage.INSTALL -> {
@@ -134,18 +138,18 @@ internal fun storePlayState(stage: StoreStage, entry: LibraryEntry, download: Pl
             pressable = true, ready = false, store = stage,
         )
         StoreStage.DOWNLOADING -> PcPlayState(
-            "Downloading", said, pressable = true, ready = false, store = stage, progress = download?.fraction(),
+            "Downloading", said, pressable = true, ready = false, store = stage, progress = download?.fraction(), look = look,
         )
         // Held by the download rules: Download now puts it first in line, and it still waits for a connection downloads
         // may use (docs/SPEC.md 12a).
         StoreStage.WAITING -> PcPlayState(
-            "Download now", said, pressable = true, ready = false, store = stage, progress = download?.fraction(),
+            "Download now", said, pressable = true, ready = false, store = stage, progress = download?.fraction(), look = look,
         )
         StoreStage.PAUSED -> PcPlayState(
-            "Resume", said, pressable = true, ready = false, store = stage, progress = download?.fraction(),
+            "Resume", said, pressable = true, ready = false, store = stage, progress = download?.fraction(), look = look,
         )
         StoreStage.FAILED -> PcPlayState(
-            "Try again", said, pressable = true, ready = false, store = stage,
+            "Try again", said, pressable = true, ready = false, store = stage, look = look,
         )
         StoreStage.WISHLIST -> PcPlayState(
             "Find on ${entry.storeLabel() ?: "the store"}",
