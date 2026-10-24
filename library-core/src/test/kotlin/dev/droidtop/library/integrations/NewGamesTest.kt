@@ -68,4 +68,11 @@ class NewGamesTest {
         )
         assertEquals(listOf("A game", "b game"), updates.map { it.title })
     }
+
+    @Test
+    fun `a source's featured list alone is something to show`() {
+        val featured = NewGames.Featured("F95zone", listOf(find("New Game")))
+        assertEquals(false, NewGames.Loaded(listOf(featured), emptyList(), emptyList(), sources = 1).empty)
+        assertEquals(true, NewGames.Loaded(emptyList(), emptyList(), emptyList(), sources = 1).empty)
+    }
 }

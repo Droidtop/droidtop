@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 /**
  * Get new games, a page of Updates (docs/SPEC.md 13, "Get new games"; owner, 2026-10-23, Droidtop/tracker#612: "It
  * should open to a recommendations list, with the ability to search at the top"). It opens on a list, never on a
- * blank search bar: Search first, a row like the rest, then the person's games a source names a newer version of
- * (each opens Updates, where updates live), then what the sources answer for the games they play most
- * ([NewGames]). A picked game opens the one search on its title, where getting it works as it always does. The
+ * blank search bar: Search first, a row like the rest, then what each source features under its name, with its box
+ * art, then the person's games a source names a newer version of (each opens Updates, where updates live), then what
+ * the sources answer for the games they play most ([NewGames]). A picked game opens the one search on its title, where getting it works as it always does. The
  * Search row shows at once; the rest joins as the sources answer. Drawn by the settings list, so the D-pad, the
  * scrolling and the hint bar are the ones every list has.
  */
@@ -73,6 +73,24 @@ private fun newGamesGroups(
     if (loaded == null) {
         add(CatalogGroup(id = "new_games_asking", title = null, items = listOf(TextBlockItem(id = "new_games_asking_text", text = "Asking your sources…"))))
         return@buildList
+    }
+    // What each source features now (docs/plugin-api.md 1.8 "featured"), under the source's name.
+    loaded.featured.forEachIndexed { index, featured ->
+        add(
+            CatalogGroup(
+                id = "new_games_featured_$index",
+                title = featured.sourceLabel,
+                items = featured.finds.mapIndexed { at, find ->
+                    ActionItem(
+                        id = "new_games_featured_${index}_$at",
+                        title = find.result.title,
+                        subtitle = find.result.subtitle?.takeIf { it.isNotBlank() },
+                        iconFile = find.result.artUrl,
+                        run = { onSearch(find.result.title, false) },
+                    )
+                },
+            ),
+        )
     }
     if (loaded.updates.isNotEmpty()) {
         add(
@@ -126,7 +144,7 @@ private fun newGamesGroups(
                 ),
             ),
         )
-        loaded.shelves.isEmpty() && loaded.updates.isEmpty() -> add(
+        loaded.empty -> add(
             CatalogGroup(
                 id = "new_games_nothing",
                 title = null,
