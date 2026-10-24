@@ -516,6 +516,8 @@ object PcScraper {
         // A game the person asked to scrape by name (its page or menu) is scraped whatever the library filter says;
         // the filter is for passes over the library (docs/SPEC.md 7h).
         filter: ScrapeFilter? = null,
+        // The automatic pass (PcAutoScrape) only fills gaps (Droidtop/tracker#318 §7.2).
+        auto: Boolean = false,
     ): String = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext it }
@@ -533,6 +535,9 @@ object PcScraper {
         val existing = ordered.map { it.id }.chunked(METADATA_READ_CHUNK)
             .flatMap { dao.getGameMetadata(it) }.associateBy { it.id }
         val filter = filter ?: ScrapeOptionsPrefs.filter(context)
+        // Only a pass the person started over everything (a game's own Scrape, or "Everything") replaces what a game
+        // already has; any other pass fills what is missing (Droidtop/tracker#318 §7.2).
+        val refresh = !auto && filter == ScrapeFilter.ALL
         val candidates = if (resumeAfter == null) ordered else ordered.filter { orderKey(it) > resumeAfter }
         val (targets, passedOver) = candidates.partition { entry ->
             val row = existing[entry.id]
@@ -580,7 +585,7 @@ object PcScraper {
             if (index > 0) kotlinx.coroutines.delay(GAME_PACE_MS)
             counts.attempted++
             try {
-                val outcome = scrapeOne(context, entry, source, flavour, steamStopped)
+                val outcome = scrapeOne(context, entry, source, flavour, steamStopped, refresh)
                 logOutcome(source.label, entry, outcome)
                 // A plugin source whose best candidates tie leaves the game for the person to pick, as a built-in one does.
                 val pluginTie = plugins?.let { fillFromPlugins(context, entry, it) } ?: false
@@ -852,6 +857,7 @@ object PcScraper {
         source: PcMetadataSource,
         flavour: PcFlavour,
         steamStopped: ScrapeLookup.Refused? = null,
+        refresh: Boolean = false,
     ): PcOutcome {
         val own = PcGameIds.of(entry)
         own.steamAppId?.let { appId ->
@@ -859,7 +865,7 @@ object PcScraper {
             when (val lookup = SteamStoreClient.appDetails(appId)) {
                 is ScrapeLookup.Found -> {
                     recordAnswers(context, entry, "Steam", "id", "steam:$appId", "taken", listOf(lookup.value))
-                    write(context, entry, flavour.complete(entry, lookup.value), confidence = "id", replaceExisting = false)
+                    write(context, entry, flavour.complete(entry, lookup.value), confidence = "id", replaceExisting = refresh)
                     return PcOutcome.ByStoreId
                 }
                 is ScrapeLookup.Refused -> return PcOutcome.Refused(lookup)
@@ -868,14 +874,14 @@ object PcScraper {
         }
         own.gogId?.let { gogId ->
             flavour.igdbByStore(PcStoreId(PcStoreId.GOG, gogId))?.let { record ->
-                write(context, entry, flavour.complete(entry, record), confidence = "id", replaceExisting = false)
+                write(context, entry, flavour.complete(entry, record), confidence = "id", replaceExisting = refresh)
                 return PcOutcome.ByStoreId
             }
         }
         val title = searchTitleFor(entry)
         // A name the person matched by hand before is that match, with no search (Droidtop/tracker#318 §6.4, tier A-).
         dev.droidtop.library.identity.MatchAliases.find(context, title)?.let { taught ->
-            write(context, entry, flavour.complete(entry, taught), confidence = "alias", replaceExisting = false)
+            write(context, entry, flavour.complete(entry, taught), confidence = "alias", replaceExisting = refresh)
             return PcOutcome.ByName
         }
         val lookup = source.search(title)
@@ -891,13 +897,13 @@ object PcScraper {
         }
         recordAnswers(context, entry, source.label, "name", title, today, if (lookup is ScrapeLookup.Found) lookup.value else emptyList())
         if (decision is PcMatching.Decision.Confident) {
-            write(context, entry, flavour.complete(entry, decision.match), confidence = "name", replaceExisting = false)
+            write(context, entry, flavour.complete(entry, decision.match), confidence = "name", replaceExisting = refresh)
             return PcOutcome.ByName
         }
         // Not certain from the selected source: the keyless Steam store's own search, held to the same exact, unique
         // bar (docs/SPEC.md 7h, "A game with only a name"), so a folder game that is on Steam gets the store's text.
         flavour.steamByName(title)?.let { record ->
-            write(context, entry, flavour.complete(entry, record), confidence = "name", replaceExisting = false)
+            write(context, entry, flavour.complete(entry, record), confidence = "name", replaceExisting = refresh)
             return PcOutcome.ByName
         }
         return when (decision) {
@@ -935,9 +941,11 @@ object PcScraper {
      * path rather than by a file under a games root, so the row is the only
      * thing that can carry artwork back to them.
      *
-     * [replaceExisting] is the manual route's: the files already there are
-     * pictures of the game the person just rejected. The automatic pass
-     * keeps a file that is already there.
+     * [replaceExisting] is a pick's or a refresh the person asked for: what is
+     * already there may be of the game the person just rejected. It replaces
+     * only when [confidence] ranks at least as high as the row's match
+     * ([FieldSources.replaces]); any other write keeps what is there and
+     * fills what is missing (Droidtop/tracker#318 §7.2).
      *
      * Every field written records its source (docs/SPEC.md 7h); a field the
      * person edited is never written over ([FieldSources.keep]).
@@ -953,6 +961,10 @@ object PcScraper {
         val row = dao.getGameMetadataSingle(entry.id)
         val had = row?.fieldSources
         val sources = mutableMapOf<String, String>()
+        // A field or picture already there is replaced only by a refresh at least as strong as the row's match
+        // (Droidtop/tracker#318 §7.1, §7.2); otherwise only what is missing is filled, so a name match never overwrites
+        // what a store id or the person's pick put there.
+        val replaces = FieldSources.replaces(confidence, row?.scrapeConfidence, replaceExisting)
         val systemFolder = PcMediaLayout.systemFolderFor(entry)
         val gamesRoot = mediaRootFor(context, entry)
         // A title is not a file name: "Half-Life: Alyx" cannot be written
@@ -964,7 +976,7 @@ object PcScraper {
         fun fetch(field: String, enabled: Boolean, folder: String, candidates: List<Sourced<String>>): String? {
             if (!enabled || candidates.isEmpty() || systemFolder == null || gamesRoot == null) return null
             val destination = PcMediaLayout.mediaFile(gamesRoot, systemFolder, folder, baseName)
-            if (!replaceExisting && destination.isFile) return destination.absolutePath
+            if (!replaces && destination.isFile) return destination.absolutePath
             val won = candidates.firstOrNull { candidate ->
                 runCatching { downloadImage(candidate.value, destination) }
                     .onFailure { android.util.Log.w("droidtop.Scraper", "${FieldSources.LABELS[field]} for ${entry.title} failed: ${it.message}") }
@@ -982,12 +994,13 @@ object PcScraper {
         val wantMetadata = ScrapeOptionsPrefs.scrapeMetadata(context)
         fun <T> text(field: String, scraped: Sourced<T>?, current: T?): T? {
             if (!wantMetadata || scraped == null || !FieldSources.writable(had, field)) return current
+            if (current != null && !replaces) return current
             sources[field] = scraped.source
             return scraped.value
         }
         val base = row ?: GameMetadataEntity(id = entry.id)
         val updated = base.copy(
-            scrapeConfidence = confidence,
+            scrapeConfidence = FieldSources.keptConfidence(confidence, row?.scrapeConfidence, replaces),
             description = text(FieldSources.DESCRIPTION, record.description, row?.description),
             developer = text(FieldSources.DEVELOPER, record.developer, row?.developer),
             publisher = text(FieldSources.PUBLISHER, record.publisher, row?.publisher),

@@ -58,7 +58,7 @@ object PcAutoScrape {
             val state = app.getSharedPreferences(STATE, Context.MODE_PRIVATE)
             if (!due(enabled(app), state.getLong(KEY_LAST, 0L), now)) return@launch
             state.edit().putLong(KEY_LAST, now).apply()
-            runCatching { LibraryScrapeJob.start(app, TITLE, pcOnly = true) }
+            runCatching { LibraryScrapeJob.start(app, TITLE, pcOnly = true, auto = true) }
         }
     }
 }

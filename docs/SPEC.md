@@ -14131,6 +14131,18 @@ the same care as the art.
     for the same name replaces the old one, and automatic matches teach nothing. A name with nothing to compare
     (only punctuation) is not learned. Not built yet: carrying aliases to other devices, which comes with the sync
     of match records (#318 rollout 6).
+  - **What a pass may overwrite: gap-only refresh by match rank (Droidtop/tracker#318 slice 5, §7.1, §7.2).** A
+    row's match ranks, from its `scrape_confidence`, as: the person's pick (`manual`), then a name they picked
+    before (`alias`), then a store id or a hash, then a name; a row waiting for a pick or never matched ranks
+    lowest (`FieldSources.rank`). Most writes only fill what is missing, text and pictures alike. Two kinds of write
+    replace what a game already has: a pick, and a pass the person started over everything (a game's own Scrape, or
+    the library filter "Everything", not the automatic pass `PcAutoScrape`, which marks its job `auto`). Even these
+    replace only with a match at least as strong as the row's (`FieldSources.replaces`). So a name match never
+    overwrites what a store id or the person's pick put there, and the automatic pass never changes a description
+    another device already shows the same. A fill never lowers the row's rank (`FieldSources.keptConfidence`).
+    Fields the person edited are never written, as before. Not built yet: each field's own state (`asked-empty`,
+    `refused`, `never-asked`) with the time it was asked, the 30-day re-ask of an empty answer, and the game page's
+    glyph per field group (§7.1). Today's per-field record is still only the source of what was written.
 
     A card with no kept answer (a game marked before the queue) searches again on A. Not built yet: editing the
     name before searching again (the plan's on-screen keyboard pre-filled with the title). The sources take any

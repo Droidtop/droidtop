@@ -176,4 +176,29 @@ object FieldSources {
         changed(PLAYERS, before?.players, after.players)
         return encode(sources)
     }
+
+    /**
+     * How strongly a row's match says which game it is, from its `scrape_confidence` (Droidtop/tracker#318 §7.1):
+     * the person's pick, then a name they picked before, then a store id or a hash, then a name. Anything else, a row
+     * waiting for a pick or one never matched, ranks lowest.
+     */
+    fun rank(confidence: String?): Int = when (confidence) {
+        "manual" -> 4
+        "alias" -> 3
+        "id", "hash" -> 2
+        "name" -> 1
+        else -> 0
+    }
+
+    /**
+     * Whether a write by a match of [confidence] may replace the fields a row of [current] already has (§7.1, §7.2): only
+     * when it [refreshes] (a pick, or a refresh the person asked for, never the automatic pass) and ranks at least as
+     * high, so a name match never overwrites what a store id or the person put there. Otherwise it fills only what is
+     * empty. Fields the person edited are never written either way ([writable]).
+     */
+    fun replaces(confidence: String, current: String?, refreshes: Boolean): Boolean = refreshes && rank(confidence) >= rank(current)
+
+    /** The confidence a row keeps after a write of [confidence] over [current]: a fill never lowers it. */
+    fun keptConfidence(confidence: String, current: String?, replaced: Boolean): String =
+        if (replaced || rank(confidence) >= rank(current)) confidence else current!!
 }

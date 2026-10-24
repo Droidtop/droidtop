@@ -39,6 +39,8 @@ object LibraryScrapeJob {
     private const val ARG_FOLDER = "folder"
     private const val ARG_PC_ONLY = "pc_only"
     private const val ARG_PC_IDS = "pc_ids"
+    // The automatic pass (PcAutoScrape): it only fills gaps, never refreshes (Droidtop/tracker#318 §7.2).
+    private const val ARG_AUTO = "auto"
 
     /** The queue item that stands for every PC and engine game; its checkpoint is the last entry id finished. */
     internal const val PC_ITEM = "pc:library"
@@ -88,6 +90,8 @@ object LibraryScrapeJob {
         pcOnly: Boolean = false,
         // Only these PC and engine games (the list a person is looking at); implies [pcOnly].
         pcIds: List<String>? = null,
+        // The automatic pass, which only fills what is missing (Droidtop/tracker#318 §7.2).
+        auto: Boolean = false,
         onFinished: (String) -> Unit = {},
     ): String? = PluginJobsCenter.startNative(
         context = context,
@@ -98,6 +102,7 @@ object LibraryScrapeJob {
             folder?.let { put(ARG_FOLDER, it.absolutePath) }
             if (pcOnly || pcIds != null) put(ARG_PC_ONLY, "1")
             pcIds?.let { put(ARG_PC_IDS, it.joinToString("\n")) }
+            if (auto) put(ARG_AUTO, "1")
         },
         onComplete = { result -> onFinished(if (result.ok) result.values["summary"] ?: "Done" else (result.error ?: "Failed")) },
     )
@@ -112,6 +117,7 @@ object LibraryScrapeJob {
         val folderArg = args[ARG_FOLDER]
         val pcOnly = args[ARG_PC_ONLY] == "1"
         val pcIds = args[ARG_PC_IDS]?.split("\n")?.toSet()
+        val auto = args[ARG_AUTO] == "1"
         // Everything (no system named) covers the PC and engine games too; one system or folder does not.
         val wantConsoles = !pcOnly
         val wantPc = pcOnly || systemId == null
@@ -150,7 +156,7 @@ object LibraryScrapeJob {
                 if (index >= queue.size) {
                     val games = libraryGames(context).filter { it.isPcOrEngineGame && !it.missing && (pcIds == null || it.id in pcIds) }
                     StepResult(
-                        PcScraper.scrape(context, games, resumeAfter = resumeAfter, onEntryDone = romDone, onProgress = progress),
+                        PcScraper.scrape(context, games, resumeAfter = resumeAfter, onEntryDone = romDone, onProgress = progress, auto = auto),
                     )
                 } else if (consolesStopped) {
                     // The console source refused everything; the later systems would be refused the same way.
