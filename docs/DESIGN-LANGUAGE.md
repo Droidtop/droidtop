@@ -59,6 +59,90 @@ what it learned last.
 - State from code and rigs, not from status tables; verify on an emulator or the real
   device, both orientations, and on the oldest supported Android.
 
+## The approved design (owner, 2026-10-24, Droidtop/tracker#644)
+
+The owner approved the menus and visual-language proposal as recommended ("I guess I'll approve them"); it is
+`coordination/design/proposals/2026-10-24-menus-and-visual-language.md` in the tracker (dda41db), and this section is
+its standing form. Two corrections apply: Enginehost keeps its own full UI in this language (decision 8 overruled), and
+a selected ES-DE theme's colours drive droidtop's chrome, azure being only the fallback (decision 9 corrected:
+"do we still grant accents and stuff from the selected retro theme?"). droidtop implements it in
+`GamingThemeColors.DEFAULT` and `shell-gamepad/.../DesignTokens.kt`; Enginehost in its own tokens, same values.
+
+### Ten rules
+1. One shell: every menu is an overlay or a page in the same frame (header, body, hint bar); nothing swaps the look.
+2. The edge tells the scope: left sheet navigation, right sheet system and plugins, bottom sheet the current list's
+   options, anchored menu this one item.
+3. A dedicated button for every scope, never timing alone (L2 is the item button; long-press is an alias).
+4. Shallow: common tasks in two presses at most; no menu deeper than two levels.
+5. A on a game opens its page with Play focused; X plays at once, everywhere a game is focused.
+6. Quick is separate from full: the Quick Menu (R2) is not Settings.
+7. Plugins supply facets; the host draws them with host components. Plugin menu content lives in Quick Menu > Plugins.
+8. Imagery first, text second: art carries identity; text-only is the fallback.
+9. Status is a glyph, a ring or a bar, never a sentence that changes; quiet when good.
+10. The focus ring is the only thing that moves when the pad moves; layout never shifts under it.
+
+### Overlays and depth
+Six overlay types and no more: left sheet (25% width, Start), right sheet (30%, R2), bottom sheet (up to 40% height,
+Select), anchored menu (beside the item, up to 8 rows, L2), work panel (about 90%, one task), dialog (centre, a yes or
+no). The screen beneath stays visible under a scrim and keeps its focus; one overlay at a time; B closes one level and
+restores the exact item and scroll position; the hint bar stays and shows the overlay's hints. Depth: left menu, item
+menu and Select sheet one level; Quick Menu section then panel; Settings category then pane; the game page one page with
+tabs.
+
+### Surfaces and depth
+| Level | Use | Fallback colour | Depth |
+|---|---|---|---|
+| 0 | background | #11151C, never pure black | none |
+| 1 | cards, rows, tile plates | #181D26 | one luminance step |
+| 2 | sheets, work panel | #1E2430 | blur or opaque, a 12% edge line, a 55% scrim beneath |
+| 3 | anchored menu, dialog | #262D3A | one more step; 40% scrim for dialogs |
+
+No drop shadows on chrome. Shape: 12 dp on sheets, cards, dialogs and art tiles; 8 dp on rows and buttons; pills for
+chips. 8 dp grid, 32 dp safe margin, 16 dp between tiles.
+
+### Colour
+- One accent, used for focus, the primary button, the active tab and what is chosen, and nothing else. It is the
+  selected ES-DE theme's (its declared colours: selection, help icons, variables); azure #3BB5FF only when there is no
+  theme or the theme names no usable colour. The surfaces take the theme's tint the same way.
+- Contrast is guarded, not hoped for: text 4.5:1 on every surface it is drawn on, glyphs 3:1; a colour that fails moves
+  in lightness only, never in hue.
+- Text #F2F5F9 (not pure white), secondary #A9B4C4, disabled at 40%.
+- Tones, each with its own glyph so colour is never the only signal: good #4CD28A, warning #F5B33D, danger #FF5A5F;
+  the accent is info.
+- Chrome stays neutral; colour comes from art. Tokens are named by role so a light set can follow.
+- Themed library views are the theme's own; sheets, menus, dialogs and the hint bar stay droidtop's components in the
+  theme's colours.
+
+### Type and focus
+| Role | Size | Use |
+|---|---|---|
+| Display | 32 Bold | a game's name with no logo, page titles |
+| Title | 24 Bold | sheet and section titles |
+| Body | 18 Regular | rows, descriptions |
+| Label | 15 Medium | chips, tabs, buttons, hints |
+| Section | 13 Medium, uppercase, +4% tracking, secondary colour | group headers |
+| Caption | 13 Regular | provenance, units; nothing important |
+
+One sans family (a theme may supply its fonts); tabular figures wherever numbers change; at most two lines in a row,
+then an ellipsis. Focus has two styles, never mixed on one surface: art gets a 3 dp accent ring and a 6% lift; a row
+gets the accent at 22% behind it and a 4 dp accent bar at its leading edge. Focus never gets lost (a list that updates
+keeps the item; a removed item passes focus to the next), the ring shows with pad input and hides with touch, and
+returning to a screen restores its item.
+
+### One component set
+Page frame, sheet (left, right, bottom), anchored menu, work panel, dialog, row (nav, action, toggle, choice, slider,
+info, text, progress), group header, tile (cover, wide, plate; host badge bottom-left, plugin badge bottom-right),
+shelf, tab strip, chip, badge, button (one primary per surface), progress (ring, bar, segmented bar), art slot (owns
+the fallback chain: hero, else blurred cover, else a generated plate), toast (two lines, never persistent status),
+empty state (glyph, one sentence, one action), keyboard slab, hint bar (one 48 dp bar, up to five hints for the
+focused thing). Used by droidtop, Enginehost and every plugin; a screen that needs something else adds it here first.
+
+### Plugins inherit it
+A plugin supplies content (rows, groups, progress values, tiles, facets, short strings, a tone name, a glyph by name or
+one monochrome SVG, art URLs, a suggested first focus row, live values at most once a second) and never styling (no
+raw views, fonts, sizes, colours, positions, focus moves). The acceptance test: a plugin with no style fields looks
+like the Settings pane at the same level.
+
 ## Lessons log (append; one line each, dated, project)
 - 2026-10-01 droidtop: a companion's layout follows its own window bounds; an external display can keep its shape while the handheld rotates.
 - 2026-09-10 enginehost: hover focuses, focus moves the cursor, A acts on the one selection; hide our ring when the game's own highlight is the selection.

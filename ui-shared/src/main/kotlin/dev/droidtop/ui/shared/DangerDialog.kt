@@ -85,7 +85,7 @@ fun ConfirmDialogCard(
                 }
                 .widthIn(max = width)
                 .heightIn(max = maxHeight * 0.9f)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(surface)
                 .semantics { paneTitle = notice.title }
                 .padding(20.dp),
@@ -138,7 +138,7 @@ fun ConfirmDialogCard(
 
 @Composable
 private fun DialogButton(label: String, fill: Color, text: Color, outline: Color?, ring: Modifier, modifier: Modifier, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(8.dp)
     Box(
         contentAlignment = Alignment.Center,
         modifier = modifier
@@ -183,9 +183,9 @@ fun FlashCard(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .widthIn(max = 320.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(surface)
-            .border(1.dp, palette.ink(tone).copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+            .border(1.dp, palette.ink(tone).copy(alpha = 0.6f), RoundedCornerShape(12.dp))
             .let { if (onPress != null) it.clickable(onClick = onPress) else it }
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {

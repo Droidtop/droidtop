@@ -16494,7 +16494,7 @@ dim, so a panel that wraps its content paints nothing outside itself), and glide
 `Motion.PanelInMs` from 96 percent of its size and transparent. While rows remain below the
 fold its last 36dp fade out over a small down chevron (DroidDeck's anchored menu), so a cut row
 reads as "more below"; the fade is a layer only while there is more to scroll to. Corners are the
-panel radius (`Corners.Panel`, 6dp). The X Filter and Y Sort By sheets take their titles from it.
+panel radius (`Corners.Panel`, 12dp). The X Filter and Y Sort By sheets take their titles from it.
 **One window at a time:** a menu that opens a sheet of its own (the game menu's DLC and versions,
 its install offer, pickers and text fields) is not drawn while that sheet is open and comes back,
 where it was, when it closes; under a smaller sheet it showed round it with its own Close row
@@ -16585,13 +16585,16 @@ and structure"): every colour stays a theme role (section 7k2), and a theme's ow
 replace the families. The content gutter (`ShellWindow.edgePadding`) is 2.8 percent of the
 window's width (4 percent from 1500dp, never under 16dp), so shelves, page content and settings
 share one left edge; the header and footer use 12dp plus 1.4 percent (`barPadding`) and are 40dp
-tall at least. Corners are three radii and the pill (`Corners`): crisp 3dp on capsules, art,
-rows and buttons (a large radius crops art and makes it read smaller), 6dp on panels, sheets and
-dialogs, a 16dp plate for a large generic focused surface, pills for tabs, badges and glyphs.
-The type ladder: a screen or shelf heading 22/28 bold, a title over art 26 at 1.1 lines
-(`heroTitle`), body and buttons 16/20, supporting 14/18, a tab label 12/22 bold uppercase tracked
-(`tabLabel`), a section label and a label set over a value 12/16 semibold uppercase tracked
-(`sectionLabel`, `eyebrow`). Elevation is the platform shadow only, by role (`Elevation`,
+tall at least. Corners follow the visual language (decided 2026-10-24, Droidtop/tracker#644,
+docs/DESIGN-LANGUAGE.md "The approved design"): 8dp on rows, buttons and chips that are not pills
+(`Corners.Crisp`), 12dp on art tiles and cards (`Corners.Tile`) and on panels, sheets and dialogs
+(`Corners.Panel`), a 16dp plate for a large generic focused surface, pills for tabs, badges and
+glyphs. The type ladder is the same document's: Display 32 bold (`heroTitle`), Title 24 bold
+(`screenTitle`), body 18 (rows, prose and values; a row's name 18 medium), Label 15 medium (tabs,
+buttons, a row's supporting line), Section 13 medium uppercase tracked 4 percent (`sectionLabel`,
+`eyebrow`), Caption 13 (`caption`); 13 sp is the floor. A focused row (`MenuRow`) is the accent
+at 22 percent behind it and a 4dp accent bar at its leading edge, with no ring; art keeps the
+ring and lifts 6 percent; the two never mix on one surface. Elevation is the platform shadow only, by role (`Elevation`,
 `FocusLook`): shadows are black, as Steam's are.
 
 **Type.** droidtop's chrome has its own type scale, supplied to the theme alongside the colour
@@ -17741,7 +17744,7 @@ theme's roles (section 7k2).
   weight. A press acknowledges itself in 50 ms.
 - **One focus treatment** (`selectionFrame` for the outline and fill, `focusRise` and `focusZoom` for a
   capsule, both reading one `rememberFocusLift`): the focused card rises 4dp and its platform shadow deepens
-  from 4 to 18dp, black as Steam's; **its art grows 5.3 percent inside the card's fixed edge** (a landscape card
+  from 4 to 18dp, black as Steam's; **its art grows 6 percent (Droidtop/tracker#644) inside the card's fixed edge** (a landscape card
   2.4 percent) and comes up from 90 to 100 percent brightness. The card, its clip and the window's ring keep the
   card's own size (owner on the console, 2026-10-23, Droidtop/tracker#632: the image "scales up but the outline
   stays at the original size, so the image is clipped by it or pokes through"). When the whole card grew from
@@ -17836,7 +17839,10 @@ is no second theme reader and no per-surface rule. What it reads, in order:
   `backgroundColor` (the plate ES-DE draws menus and hints on), flattened onto the ground.
 - *Accent and the focus ring*: the first declared colour with real chroma (saturation 0.35 or
   more) among the help icons, the list's selected and selector colours, the carousel, clock and
-  text colours; a theme with only greys gets its text colour as the accent, a neutral ring.
+  text colours; a theme with only greys gets droidtop's azure, moved only in lightness as far as the theme's surfaces
+  need (decided 2026-10-24, Droidtop/tracker#644; owner: "do we still grant accents and stuff from the selected retro
+  theme?": the theme's colours drive droidtop's chrome, and azure is only the fallback). A focused row's fill is the
+  accent at 22 percent, so a theme's accent tints its focus too.
 - *Fonts*: the help row's `fontPath` for UI text, the carousel's (else the first title text's) for
   headings; only a file that exists counts. *Texture*: a tiled `image_background` path that
   exists.
@@ -17845,7 +17851,9 @@ What the theme does not declare keeps droidtop's own value, and the rest of the 
 from what was declared so it stays coherent (cards are the ground mixed toward the text ink,
 row fills and outlines are the ink at low alpha, which is why a light theme works). A theme that
 declares none of the above, or no theme at all, is droidtop's own palette untouched
-(`GamingThemeColors.DEFAULT`, the values `MenuTokens` held as literals before).
+(`GamingThemeColors.DEFAULT`): since 2026-10-24 the approved visual language's (Droidtop/tracker#644, "Visual
+language" in coordination/design/DESIGN-LANGUAGE.md): ground #11151C, cards #181D26, sheets #1E2430, menus and dialogs
+#262D3A, text #F2F5F9 and #A9B4C4, one azure accent #3BB5FF, good #4CD28A, danger #FF5A5F.
 
 **Contrast is a guarantee, not a hope.** Every text role (text, muted, value, placeholder,
 section label, accent, danger, affirmative, favourite) is forced to WCAG AA, 4.5:1, over every

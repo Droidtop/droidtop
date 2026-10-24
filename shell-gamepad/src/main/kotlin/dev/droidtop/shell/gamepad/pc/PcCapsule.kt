@@ -191,7 +191,7 @@ internal fun PcCapsule(
     // with no art carries its name on its plate whatever this says; a hero card has its own name under it.
     nameUnder: Boolean = false,
 ) {
-    val shape = Corners.Crisp
+    val shape = Corners.Tile
     val ring = selected && PadModality.showsFocus
     val lift = rememberFocusLift(ring)
     val title = GameNaming.displayName(entry.title)
@@ -267,7 +267,7 @@ internal fun PcCapsule(
                     contentDescription = null,
                     // Whole, at its own shape (owner, Droidtop/tracker#632): never cropped.
                     contentScale = ContentScale.Fit,
-                    modifier = Modifier.fillMaxHeight().aspectRatio(CAPSULE_ASPECT).clip(Corners.Crisp),
+                    modifier = Modifier.fillMaxHeight().aspectRatio(CAPSULE_ASPECT).clip(Corners.Tile),
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
                     Text(

@@ -310,7 +310,7 @@ internal fun HomeStripRow(
                 modifier = Modifier
                     .padding(horizontal = window.edgePadding)
                     .heightIn(min = HOME_CARD_HEIGHT)
-                    .focusRing(selected != null, Corners.Crisp),
+                    .focusRing(selected != null, Corners.Tile),
             )
         } else {
             LazyRow(
@@ -334,8 +334,8 @@ private fun HomeCardView(card: HomeCard, selected: Boolean, onClick: () -> Unit)
         modifier = Modifier
             .width(HOME_CARD_WIDTH)
             .heightIn(min = HOME_CARD_HEIGHT)
-            .focusRing(selected, Corners.Crisp)
-            .background(if (selected) MenuTokens.CardFocused else MenuTokens.Card, Corners.Crisp)
+            .focusRing(selected, Corners.Tile)
+            .background(if (selected) MenuTokens.CardFocused else MenuTokens.Card, Corners.Tile)
             .clickable(onClick = onClick)
             .padding(Space.Md),
     ) {
