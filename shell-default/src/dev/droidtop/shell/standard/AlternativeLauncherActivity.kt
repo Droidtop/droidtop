@@ -38,7 +38,7 @@ class AlternativeLauncherActivity : Activity() {
             return
         }
 
-        val target = dev.droidtop.library.settings.Modes.homeTarget(this)
+        val target = dev.droidtop.library.settings.Modes.homeTarget(this, intent)
         if (savedInstanceState == null &&
             !BackButtonMenu.isExplicitHome(intent) &&
             target != dev.droidtop.library.settings.Mode.LAUNCHER.id

@@ -505,8 +505,15 @@ internal object StoresCatalog {
         )
     }
 
-    /** Outside the Gaming shell, which opens PC Games filtered by the row's id, a library row opens the games screen. */
+    /**
+     * Outside the Gaming shell, which opens PC Games filtered by the row's id, a library row opens Standard's games
+     * screen, in Standard only: Desktop has its own Start menu, and a row never opens another mode (Droidtop/tracker#639).
+     */
     private fun openGames(context: Context) {
+        if (dev.droidtop.library.settings.Modes.lastMode(context) != dev.droidtop.library.settings.Mode.LAUNCHER.id) {
+            dev.droidtop.library.settings.Notices.flash("Your games are in this mode's own library", context = context)
+            return
+        }
         context.startActivity(
             Intent(context, LauncherGamesActivity::class.java)
                 .setAction(LauncherGamesActivity.ACTION_SHOW_GAMES)

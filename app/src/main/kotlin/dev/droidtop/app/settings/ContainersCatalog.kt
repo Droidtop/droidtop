@@ -107,7 +107,11 @@ object ContainersCatalog {
         groups = { context -> rootGroups(context) },
     )
 
-    /** Desktop mode, which starts the desktop session if none runs; where every terminal and container window appears. */
+    /**
+     * Desktop mode, which starts the desktop session if none runs; where every terminal and container window appears.
+     * Only the row that says it switches ("Open Desktop") calls it: no other row takes a person to another mode
+     * (Droidtop/tracker#639).
+     */
     private fun openDesktop(context: Context) {
         context.startActivity(
             Intent(context, MainActivity::class.java)
@@ -226,8 +230,8 @@ object ContainersCatalog {
                 primary -> add(
                     ActionItem(
                         id = "container_start",
-                        title = "Start the desktop",
-                        subtitle = "Opens Desktop, which starts it",
+                        title = "Open Desktop",
+                        subtitle = "Switches to Desktop mode, which starts the desktop",
                         value = stateLabel(info, runtime),
                         run = { ctx -> openDesktop(ctx) },
                     ),
@@ -773,8 +777,8 @@ object ContainersCatalog {
             return ActionItem(
                 id = "container_terminal",
                 title = "Terminal",
-                subtitle = "A terminal opens as a window on the desktop, which is not running. This starts the desktop; then choose Terminal again",
-                run = { ctx -> openDesktop(ctx) },
+                subtitle = "A terminal opens as a window on the desktop, which is not running. Open Desktop first, then choose Terminal again",
+                run = {},
             )
         }
         val container = info.container
@@ -790,8 +794,8 @@ object ContainersCatalog {
                     ContainerTerminal.failureMessage(ContainerTerminal.open(sessionRuntime, container, info.displayName))
                 }
                 check(started) { "the desktop stopped. Start it again, then open the terminal." }
-                withContext(Dispatchers.Main) { openDesktop(ctx) }
-                "Opened on the desktop."
+                // On the desktop, where it is; this row does not switch modes (Droidtop/tracker#639).
+                "Opened on the desktop. Switch to Desktop to use it."
             },
         )
     }

@@ -484,7 +484,7 @@ public class Launcher extends StatefulActivity<LauncherState>
                 // over it with nothing saying setup was unfinished.
                 mDroidtopResumeOnboarding = true;
             } else {
-                String target = dev.droidtop.library.settings.Modes.homeTarget(this);
+                String target = dev.droidtop.library.settings.Modes.homeTarget(this, getIntent());
                 if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(target)) {
                     mDroidtopPendingModeRedirect = target;
                 }
@@ -1837,7 +1837,7 @@ public class Launcher extends StatefulActivity<LauncherState>
             long nowMs = android.os.SystemClock.elapsedRealtime();
             boolean doubleTap = nowMs - sDroidtopLastHomePressMs < 600;
             sDroidtopLastHomePressMs = nowMs;
-            String droidtopHomeTarget = dev.droidtop.library.settings.Modes.homeTarget(this);
+            String droidtopHomeTarget = dev.droidtop.library.settings.Modes.homeTarget(this, intent);
             if (!dev.droidtop.library.settings.Mode.LAUNCHER.getId().equals(droidtopHomeTarget)) {
                 Intent redirect = new Intent(Intent.ACTION_MAIN);
                 redirect.setClassName(getPackageName(), "dev.droidtop.app.MainActivity");

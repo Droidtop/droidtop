@@ -754,6 +754,27 @@ game is not put in the drawer as its own icon: the drawer is
 `LauncherApps`, which lists installed activities only, and faking entries
 into it would mean rewriting the fork's app model.
 
+**A mode never opens another (owner, 2026-10-24, Droidtop/tracker#639).** "While sections can share code, we
+absolutely should NOT be seeing jumps between modes." On the console an update row in Gaming opened Standard's games
+screen, whose Back opened Android's home screen (`START com.android.launcher3.Launcher`). Nothing in Gaming,
+Standard, Desktop or the companion starts another mode's screen (MainActivity in another mode, Standard's games
+screen, the Android home screen, the mode switcher); only the person's own switch does: the mode menu and switcher,
+a widget's or the app icon's mode buttons, a row that says it switches ("Open Desktop"), and entries from outside
+droidtop (Open with, an exported launch). A physical Home press goes where Home goes (below). Audited 2026-10-24:
+- an update row is a nested screen, never the game's page (7g, "Facets in place");
+- Standard's games screen goes Back to Standard's home only when opened in Standard;
+- a job row's game opens Standard's games screen only in Standard, Gaming's own page in Gaming, nothing in Desktop;
+- a store's library row in Settings opens Standard's games screen only in Standard;
+- Updates lists Get new games only in Gaming;
+- the Containers screen's Terminal row no longer switches to Desktop (it says the terminal is on the desktop), and
+  "Start the desktop" became "Open Desktop", which says it switches;
+- the play-time and launch-problem notifications return to the mode in use (`ModeReturn`), and an ended app leaves
+  the screen by a Home press marked for the mode in use (`Modes.EXTRA_MODE_IN_USE`, which every Home activity reads
+  through `Modes.homeTarget(context, intent)`, so a companion screen still gets the companion); before, MainActivity
+  with no mode named, or a plain Home press, opened the DEFAULT mode over it.
+`ModeBoundaryTest` lists every place in droidtop's sources that starts a mode's screen, with its count and its
+reason; a new one fails until it is reviewed and listed.
+
 **Home goes to the default mode (decided 2026-09-25).** A Home press goes
 where `ModeGate.homeTarget` says: the default mode the person chose (in
 onboarding, or Global settings > Default mode), when it is on; else the

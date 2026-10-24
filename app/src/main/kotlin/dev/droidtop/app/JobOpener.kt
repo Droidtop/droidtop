@@ -24,10 +24,12 @@ object JobOpener {
     }
 
     private fun open(context: Context, target: OpenTarget): Boolean {
-        // In Gaming a game's page opens over the job row, so Back returns to it (Droidtop/tracker#639).
+        // In Gaming a game's page opens over the job row, so Back returns to it; Standard's own games screen has its
+        // page; any other mode has none to offer, and a job row never opens another mode's (Droidtop/tracker#639).
         if (target is OpenTarget.Game && dev.droidtop.library.GameSurfaces.showPage?.invoke(target.entryId) == true) return true
+        val inStandard = dev.droidtop.library.settings.Modes.lastMode(context) == dev.droidtop.library.settings.Mode.LAUNCHER.id
         val intent = when (target) {
-            is OpenTarget.Game -> LauncherGamesActivity.pageIntent(context, target.entryId)
+            is OpenTarget.Game -> if (inStandard) LauncherGamesActivity.pageIntent(context, target.entryId) else null
             is OpenTarget.Place -> Place.byScreenId(target.id)?.let { PlaceLinks.intent(context, it) }
                 ?: CatalogScreenLink.intent(context, target.id)
             is OpenTarget.Folder -> documentIntent(File(target.path), DocumentsContract.Document.MIME_TYPE_DIR)
