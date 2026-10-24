@@ -198,6 +198,10 @@ suspend fun scrapeSystemArtwork(
                 screenScraperResult == null -> null
                 localMd5 != null && screenScraperResult.romMd5 == localMd5 -> {
                     hashMatched++
+                    // For the calibration set when recording is on (Droidtop/tracker#318): a hash match is a certain answer.
+                    screenScraperResult.name?.let { name ->
+                        dev.droidtop.library.identity.MatchRecorder.romByHash(context, romFile.absolutePath, system.id, romFile.length(), localMd5, "ScreenScraper", name)
+                    }
                     "hash"
                 }
                 else -> "name"

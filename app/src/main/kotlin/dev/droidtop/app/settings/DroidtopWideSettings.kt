@@ -528,6 +528,22 @@ object DroidtopWideSettings {
                         debugCrashItem(context),
                     ),
                 ),
+                // The calibration set for name matching (Droidtop/tracker#318 §3.3): a scrape run with this on writes what
+                // each source answered, and a person fills in which answer was right.
+                CatalogGroup(
+                    id = "developer_matching",
+                    title = "Matching",
+                    items = listOf(
+                        ToggleItem(
+                            id = "developer_record_match_answers",
+                            title = "Record match answers",
+                            subtitle = "While on, each scrape adds what the source answered for every PC game, and every " +
+                                "ROM it matched by hash, to Download/droidtop/${dev.droidtop.library.identity.MatchRecorder.FILE_NAME}",
+                            current = dev.droidtop.library.identity.MatchRecorder.on(context),
+                            onToggle = { ctx, on -> dev.droidtop.library.identity.MatchRecorder.set(ctx, on) },
+                        ),
+                    ),
+                ),
                 CatalogGroup(
                     id = "developer_menu",
                     title = "Developer menu",

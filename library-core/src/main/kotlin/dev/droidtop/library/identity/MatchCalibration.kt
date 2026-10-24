@@ -17,7 +17,8 @@ import org.json.JSONObject
  * ```
  *
  * `truth` names the right id per source; a source missing from it, or given null, means the game is not in that
- * source and taking any of its answers is wrong. `by` is how the source was asked: `name` answers are scored, `hash`
+ * source and taking any of its answers is wrong. `"?"` means nobody has checked it yet ([MatchRecorder] writes that),
+ * and the answer is left out of the grade. `by` is how the source was asked: `name` answers are scored, `hash`
  * and `id` answers are certain (tier A) and `alias` ones come from a pick the person made (tier A-).
  */
 object MatchCalibration {
@@ -43,7 +44,7 @@ object MatchCalibration {
         val wrong: Boolean get() = picked != null && picked != right
     }
 
-    data class Report(val graded: List<Graded>, val kinds: Map<String, Int>) {
+    data class Report(val graded: List<Graded>, val kinds: Map<String, Int>, val unchecked: Int = 0) {
         val takenAtB get() = graded.count { it.tier == MatchScore.Tier.B }
         val wrongAtB get() = graded.count { it.tier == MatchScore.Tier.B && it.wrong }
         val wrongTaken get() = graded.count { it.wrong }
@@ -58,7 +59,8 @@ object MatchCalibration {
         val passes get() = wrongAtB * 100 <= takenAtB && auto >= 0.70
 
         fun summary(): String = buildString {
-            append("${kinds.values.sum()} games (").append(kinds.entries.joinToString { "${it.key} ${it.value}" }).append("), ${graded.size} answers\n")
+            append("${kinds.values.sum()} games (").append(kinds.entries.joinToString { "${it.key} ${it.value}" }).append("), ${graded.size} answers")
+            append(if (unchecked > 0) "; $unchecked not checked yet, left out\n" else "\n")
             MatchScore.Tier.entries.forEach { tier -> append("  ${tier.name}: ${graded.count { it.tier == tier }}\n") }
             append("  wrong at B: $wrongAtB of $takenAtB; wrong taken in all: $wrongTaken\n")
             append("  answered without asking: ${"%.1f".format(auto * 100)}%\n")
@@ -66,11 +68,13 @@ object MatchCalibration {
         }
     }
 
+    /** Grades every answer whose `truth` a person has filled in; one still [MatchRecorder.UNCHECKED] is counted, not graded. */
     fun grade(fixtures: List<Fixture>): Report {
-        val graded = fixtures.flatMap { fixture ->
-            fixture.answers.map { (source, answers) -> gradeOne(fixture, source, answers) }
+        val checked = fixtures.filter { fixture -> fixture.answers.keys.any { fixture.truth[it] != MatchRecorder.UNCHECKED } }
+        val graded = checked.flatMap { fixture ->
+            fixture.answers.filterKeys { fixture.truth[it] != MatchRecorder.UNCHECKED }.map { (source, answers) -> gradeOne(fixture, source, answers) }
         }
-        return Report(graded, fixtures.groupingBy { it.kind }.eachCount())
+        return Report(graded, checked.groupingBy { it.kind }.eachCount(), unchecked = fixtures.size - checked.size)
     }
 
     private fun gradeOne(fixture: Fixture, source: String, answers: Answers): Graded {
