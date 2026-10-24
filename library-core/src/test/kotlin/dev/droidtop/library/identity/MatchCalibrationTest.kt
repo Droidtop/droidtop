@@ -13,6 +13,7 @@ class MatchCalibrationTest {
         val report = MatchCalibration.grade(MatchCalibration.read(resource("seeds.jsonl")!!))
         val tiers = report.graded.associate { it.fixture to it.tier }
         assertEquals(
+            report.summary(),
             mapOf(
                 "s01" to Tier.B, // the version on the slug does not stop the match
                 "s02" to Tier.C, // "Hollow Knight" is not "Hollow Knight: Silksong"
