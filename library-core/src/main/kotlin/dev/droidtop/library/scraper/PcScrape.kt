@@ -487,6 +487,8 @@ object PcScraper {
         val record = flavour.complete(entry, match)
         write(context, entry, record, confidence = "manual", replaceExisting = true)
         dev.droidtop.library.identity.MatchQueue.clear(context, entry.id)
+        // The pick teaches its name (Droidtop/tracker#318 §6.4): the next folder that searches it is matched without asking.
+        dev.droidtop.library.identity.MatchAliases.learn(context, searchTitleFor(entry), match)
         "Matched ${entry.title} to ${match.name} (${match.sourceLabel})." + flavour.notes().let { if (it.isEmpty()) "" else " $it" }
     }
 
@@ -871,6 +873,11 @@ object PcScraper {
             }
         }
         val title = searchTitleFor(entry)
+        // A name the person matched by hand before is that match, with no search (Droidtop/tracker#318 §6.4, tier A-).
+        dev.droidtop.library.identity.MatchAliases.find(context, title)?.let { taught ->
+            write(context, entry, flavour.complete(entry, taught), confidence = "alias", replaceExisting = false)
+            return PcOutcome.ByName
+        }
         val lookup = source.search(title)
         val decision = when (lookup) {
             is ScrapeLookup.Refused -> return PcOutcome.Refused(lookup)

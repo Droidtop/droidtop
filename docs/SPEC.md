@@ -14122,6 +14122,15 @@ the same care as the art.
 
     The count shows on the options row, "Review matches (N)". Not built yet: the count glyph on the game tiles
     themselves (#318 §5), which belongs to the tile work in the UI lane's #644 pass.
+  - **A pick teaches its name (Droidtop/tracker#318 slice 4, §6.4).** A match the person applies, from a card,
+    Accept all Likely or the match picker (`PcScraper.apply`), records the name the game searched with the match
+    picked, in `match_aliases` (database v13, `identity/MatchAliases`). The name is compacted as `PcMatching`
+    compares names: case, spacing, punctuation and a leading article do not count. A later pass that searches the
+    same name, for another folder, a new version's folder or a copy, takes that match with no search (tier A-,
+    `scrape_confidence` "alias"). It is still asked after the game's own store id, which outranks it. A new pick
+    for the same name replaces the old one, and automatic matches teach nothing. A name with nothing to compare
+    (only punctuation) is not learned. Not built yet: carrying aliases to other devices, which comes with the sync
+    of match records (#318 rollout 6).
 
     A card with no kept answer (a game marked before the queue) searches again on A. Not built yet: editing the
     name before searching again (the plan's on-screen keyboard pre-filled with the title). The sources take any

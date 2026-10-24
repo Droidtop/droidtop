@@ -208,6 +208,13 @@ interface RomDao {
     @Query("DELETE FROM match_queue WHERE game_id = :gameId AND state = :state")
     suspend fun deleteQueuedMatch(gameId: String, state: String)
 
+    // Aliases learned from the person's picks (Droidtop/tracker#318 §6.4, identity.MatchAliases).
+    @Query("SELECT * FROM match_aliases WHERE `key` = :key")
+    suspend fun matchAlias(key: String): MatchAliasEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putMatchAlias(row: MatchAliasEntity)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGameMetadata(metadata: GameMetadataEntity)
 
@@ -536,9 +543,9 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
 }
 
 /**
- * v12 -> v13 (Droidtop/tracker#318 §4.1, §5): the review queue, the games a scrape did not take a match for with their
- * best five candidates kept, so Review Matches opens at once and offline. Empty to begin with: the next pass fills it,
- * and a game a pass already left at "needs a pick" is asked again then.
+ * v12 -> v13 (Droidtop/tracker#318 §4.1, §5, §6.4): the review queue, the games a scrape did not take a match for with
+ * their best five candidates kept, so Review Matches opens at once and offline; and the aliases the person's picks
+ * teach, so the next folder with the same name is matched without a search. Both empty to begin with.
  */
 val MIGRATION_12_13 = object : Migration(12, 13) {
     override fun migrate(db: SupportSQLiteDatabase) {
@@ -547,8 +554,20 @@ val MIGRATION_12_13 = object : Migration(12, 13) {
                 "`source` TEXT NOT NULL, `searched` TEXT NOT NULL, `candidates` TEXT NOT NULL, `asked_at` INTEGER NOT NULL, " +
                 "PRIMARY KEY(`game_id`))",
         )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `match_aliases` (`key` TEXT NOT NULL, `match` TEXT NOT NULL, `since` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`key`))",
+        )
     }
 }
+
+/** A name the person matched by hand ([key], compacted) and the match they picked, as JSON ([dev.droidtop.library.identity.MatchAliases]). */
+@Entity(tableName = "match_aliases")
+data class MatchAliasEntity(
+    @PrimaryKey val key: String,
+    val match: String,
+    val since: Long,
+)
 
 /**
  * One game in the review queue ([dev.droidtop.library.identity.MatchQueue]): `queued` with its [tab] and [candidates]
@@ -632,7 +651,7 @@ interface GameIdentityDao {
         GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
         GameEntity::class, GameClaimEntity::class, GameLocatorEntity::class,
-        MatchQueueEntity::class,
+        MatchQueueEntity::class, MatchAliasEntity::class,
     ],
     version = 13,
     exportSchema = false,

@@ -144,6 +144,7 @@ class RomDatabaseMigrationTest {
         // v13 (Droidtop/tracker#318 §5): the review queue exists and starts empty; the next pass fills it.
         assertEquals(null, runBlocking { room.romDao().matchQueueRow(GAME_ID) })
         assertEquals(emptyList<Any>(), runBlocking { room.romDao().matchQueueRows(dev.droidtop.library.identity.MatchQueue.QUEUED) })
+        assertEquals(null, runBlocking { room.romDao().matchAlias("anything") })
 
         room.close()
     }
