@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Lists the arm64-v8a native libraries a fat APK has no x86_64 build of.
+"""Lists the arm64-v8a native libraries a fat APK has no x86_64 build of, and fails on any other ABI.
 
 An Android-x86 device with ARM translation installs a fat APK as x86_64 only
 when its x86_64 set holds every arm64-v8a library name (Android-x86's
@@ -11,10 +11,17 @@ Usage: abi_sets.py <apk> [--require-complete]
 
 Without the flag it reports and exits 0, as a GitHub Actions warning; with
 it a missing name fails the step. SPEC 10b says when the flag goes on.
+
+droidtop ships arm64-v8a and x86_64 only (owner, 2026-10-24: "Drop 32-bit ABIs
+everywhere"): a library for any other ABI (armeabi-v7a, x86) fails the step
+whatever the flag, so a dependency that brings one cannot slip in.
 """
 import os
 import sys
 import zipfile
+
+
+SHIPPED = {"arm64-v8a", "x86_64"}
 
 
 def libs(names, abi):
@@ -35,6 +42,10 @@ def main():
         return 0
     with zipfile.ZipFile(apks[0]) as apk:
         names = apk.namelist()
+    others = sorted({n.split("/")[1] for n in names if n.startswith("lib/") and n.count("/") >= 2} - SHIPPED)
+    if others:
+        print(f"::error::the APK carries libraries for ABIs droidtop does not ship: {' '.join(others)}")
+        return 1
     arm64 = libs(names, "arm64-v8a")
     x86_64 = libs(names, "x86_64")
     missing = sorted(arm64 - x86_64)

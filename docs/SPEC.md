@@ -19566,6 +19566,12 @@ build both ways on the same device and library (build 567 on the BlueStacks
 rig: 3955/3765/4023 ms debug against 685/738/728 ms release), because a person
 who leaves it on has quietly chosen a build that starts five times slower.
 
+**64-bit only (decided 2026-10-24; owner: "Drop 32-bit ABIs everywhere").** droidtop and every one of its native modules
+build arm64-v8a and x86_64 and nothing else: the app's ABI splits list those two, its packaging excludes
+`lib/armeabi*` and `lib/x86`, each module with native code filters to the two (`abiFilters`), and the CI workflows
+build only them. `build-scripts/abi_sets.py` fails the build when the universal APK carries a library for any other
+ABI. (`libproot-loader32.so` is not a 32-bit ABI: it is proot's 64-bit loader for 32-bit guest programs.)
+
 **Fat APKs only (user, 2026-09-24: "We build fat APKs").** The channel
 publishes one universal APK (arm64-v8a + x86_64) per build type and nothing
 per ABI. An Android-x86 device with ARM translation installs a fat APK as
