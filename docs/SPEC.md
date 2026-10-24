@@ -12332,6 +12332,20 @@ linked answers for exactly that record. Its downloads go through
 id) that pins the placed game to that engine's Enginehost player before it is
 indexed. Neither is part of the update check.
 
+**Facets in place (owner, 2026-10-24, Droidtop/tracker#639).** On the console an update row opened the game's
+page as a separate activity in a new task, so Back left droidtop for the Standard launcher. The owner: "One of the
+benefits of facets is that we don't have to do stuff like that. Clicking the update should present the facet
+containing the downloads." A row that exists to act on one facet shows it over the screen it is on and never
+navigates away to reach it. In Gaming (`GameSurfaces`, installed by the shell while it is drawn):
+- **An update row** shows its update's downloads: the record page of the linked source that gave the newest
+  version (`GameLinks.updateLink`; a computer's link has no page), opened at its Downloads tab over Updates
+  (`GameInPlace`). Its last row, and X, is **Open game page**, which opens the page over it; Back closes the page,
+  then the record, then returns to the row. A game with no source page to show opens its page instead.
+- **A job row** for a game opens the game's page over the jobs list, the same way (`JobOpener`).
+- **A Get new games result** opens the one search on its title in place, as it already did.
+The page is the PC page (`PcGameStandalone`), so a game without one is left to the caller's own way of opening it.
+Outside Gaming, where nothing can draw them, the rows open the game's page as before.
+
 **Getting an update: the source's record page (2026-10-17).** The owner, from
 the console: "we need actual update management. the f95 plugin surfaces
 updates, but tapping on them doesn't give the link list to actually download
@@ -16157,7 +16171,12 @@ from a point 12% in from its left edge (it grows rightwards), with the window's 
 sliding ring on it; motion off, the plate is simply 10% and nothing grows. The
 destination the user is on is marked by a short accent pill on the panel's edge
 (4 by 20 dp, Steam's "you are here"; the 4 dp bar and filled row it replaces are
-gone), and the cursor starts on that row. A destination with something waiting
+gone), and the cursor starts on that row. The cursor is the one selection
+(Droidtop/tracker#639: on the console "Retro Games" had the ring while "Apps" had a
+grey plate, the rows' own default indication for the pointer or Android's focus):
+a row draws no indication of its own, and a pointer over a row moves the cursor to
+it. A label too long for the panel ("Downloads and Updates") wraps to a second line
+and the row grows; it is never cut off. A destination with something waiting
 carries an accent dot after its label: Downloads while a job runs, Social while a
 message is unread (`leftMenuAttention`, read while the menu is open, never polled).
 While a game runs, a **Resume** row leads the menu (DroidDeck's Resume item, owner
@@ -17016,7 +17035,12 @@ function (`menuSectionsFor`, built on `sectionsFor`).
 - **Social** (`social`, `SocialCatalog`; Droidtop/tracker#313, #327): the friends
   and conversations of every social provider, Steam and plugins alike, see
   "Social" below. It sits after Stores in the left menu.
-- **Downloads and installs** (`plugin_jobs`, `PluginJobsScreen`): the one
+- **Downloads and Updates** (`plugin_jobs`, `PluginJobsScreen`; "Downloads and installs" until 2026-10-24): its
+  first row is **Updates**, a page of this place rather than a place of its own (owner, 2026-10-24,
+  Droidtop/tracker#639: "Updates should be in the Downloads and Updates menu"): `Place.UPDATES` is not `listed`, so
+  no left menu, settings root or Start menu lists it, while its links, notifications and the Quick Menu still open
+  it (`Place.reachable`), and in Gaming its page and Get new games mark this row (`menuSection`) and Back from Updates
+  returns here. Then the one
   jobs list (plugin work, library scrapes, store depots, single-file
   downloads, plugin updates) with progress, Pause, Resume and Cancel where
   the job supports them (12a "Jobs"); every store installs as a
@@ -17053,7 +17077,7 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   list ends with a **Download rules** row that opens that screen.
   The name stays the one the rest of the app already uses. Theme downloads
   and update installs are not yet jobs in that list; folding them in is open.
-- **Updates** (`updates`) is **one list, never tabs** (decided 2026-10-16, Droidtop/tracker#570; the owner: "the
+- **Updates** (`updates`, a page of Downloads and Updates since 2026-10-24) is **one list, never tabs** (decided 2026-10-16, Droidtop/tracker#570; the owner: "the
   updates menu is fucky, it has a tab that just always shows up to date. WE don't have an option to ask the user if
   they want to install an update (that's an issue), so it will never know about an update, taht tab is useless.
   Updates should be a single tab"). It was a group per kind plus droidtop's settings and Android apps, at least
@@ -17071,8 +17095,9 @@ function (`menuSectionsFor`, built on `sectionsFor`).
     app, emulators among them, with a newer version in an app catalog (an offer signed by another key says why it is
     not offered), each store game its store named an update for (`StoreAutoUpdates.startUpdate`, the one starter the
     automatic updates use; it goes to Downloads), and each folder game whose linked source names a newer version
-    (Update opens that source's record page at Downloads, 7g "Getting an update"; the version picked lands as a new
-    version folder, and droidtop never replaces a folder's files). With
+    (in Gaming, Update shows that source's record page at Downloads over the list, 7g "Facets in place"; outside
+    Gaming it opens the game's page; the version picked lands as a new version folder, and droidtop never replaces a
+    folder's files). With
     nothing to update after a check that worked: "Everything is up to date", once.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a

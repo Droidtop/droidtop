@@ -15,7 +15,7 @@ class LeftMenuTest {
     fun `every destination the mode allows is a row, named as the top bar names it`() {
         assertEquals(menuSectionsFor(UiMode.FULL), all.map { it.section })
         assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.map { it.label })
-        // No section is unreachable: each is a row, or a page of one (Get new games, of Updates).
+        // No section is unreachable: each is a row, or a page of one (Updates and Get new games, of Downloads and Updates).
         assertEquals(GamingSection.entries.map { it.menuSection }.toSet(), all.map { it.section }.toSet())
     }
 
@@ -32,7 +32,7 @@ class LeftMenuTest {
         assertEquals(
             listOf(
                 GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
-                GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS, GamingSection.UPDATES,
+                GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS,
                 GamingSection.PLUGINS,
                 GamingSection.SETTINGS,
             ),
@@ -41,12 +41,15 @@ class LeftMenuTest {
     }
 
     @Test
-    fun `Get new games is a page of Updates, not a row of its own`() {
-        // Owner, 2026-10-23: "THe "get new games" menu needs to be UNDER Updates" (Droidtop/tracker#621).
+    fun `Updates and Get new games are pages of Downloads and Updates, not rows of their own`() {
+        // Owner, 2026-10-24: "Updates should be in the Downloads and Updates menu" (Droidtop/tracker#639).
         assertFalse(GamingSection.NEW_GAMES in menuSectionsFor(UiMode.FULL))
-        val updates = all.single { it.section == GamingSection.UPDATES }
-        assertTrue(updates.isAt(GamingSection.NEW_GAMES))
-        assertEquals(listOf(updates), all.filter { it.isAt(GamingSection.NEW_GAMES) })
+        assertFalse(GamingSection.UPDATES in menuSectionsFor(UiMode.FULL))
+        val downloads = all.single { it.section == GamingSection.DOWNLOADS }
+        assertEquals("Downloads and Updates", downloads.label)
+        assertTrue(downloads.isAt(GamingSection.NEW_GAMES))
+        assertTrue(downloads.isAt(GamingSection.UPDATES))
+        assertEquals(listOf(downloads), all.filter { it.isAt(GamingSection.UPDATES) })
     }
 
     @Test

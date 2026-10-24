@@ -308,8 +308,8 @@ object GamingSettingsCatalog {
                 add(
                     NestedScreenItem(
                         id = ID_DOWNLOADS,
-                        title = "Downloads and installs",
-                        subtitle = "Active and recent",
+                        title = "Downloads and Updates",
+                        subtitle = "Active and recent, and what has a newer version",
                         registryId = "plugin_jobs",
                         icon = CatalogIcon.INTEGRATIONS,
                     ),

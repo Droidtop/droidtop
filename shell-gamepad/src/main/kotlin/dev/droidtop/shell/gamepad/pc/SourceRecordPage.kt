@@ -58,6 +58,9 @@ internal sealed interface RecordAction {
 
     /** The source's site checks the browser first: its check, in droidtop's web view (Droidtop/tracker#600). */
     data object PassCheck : RecordAction
+
+    /** The game's own page, when the record was opened from somewhere else (an update row, Droidtop/tracker#639). */
+    data object OpenGame : RecordAction
 }
 
 /** The row every tab starts with while [sourceLabel]'s site waits for the person to pass its browser check. */
@@ -167,7 +170,8 @@ internal fun recordRows(record: UpdateSources.Record, tab: RecordTab, picked: St
 /**
  * The record page of [source]'s record [externalId], linked to the game whose newest version is [newest]. [scope] is
  * the caller's and outlives the page: a download goes on after it closes, in Downloads. [say] shows a line on the
- * game page; [onRelink] opens the link sheet; [onOpen] opens a web page.
+ * game page; [onRelink] opens the link sheet; [onOpen] opens a web page. [onOpenGame], when the page was opened from
+ * outside the game (an update row), is its last row and X: the game's page, the secondary way out.
  */
 @Composable
 internal fun SourceRecordPage(
@@ -182,6 +186,7 @@ internal fun SourceRecordPage(
     onOpen: (String) -> Unit,
     onClose: () -> Unit,
     startTab: RecordTab = RecordTab.OVERVIEW,
+    onOpenGame: (() -> Unit)? = null,
 ) {
     // droidtop's saved copy first, so the page shows at once, then the source's answer (Droidtop/tracker#599).
     // Asked again after a sign-in, which gives the source's download links.
@@ -205,11 +210,14 @@ internal fun SourceRecordPage(
     // With no page to show, the one thing to do is Change link: the page never relinks by itself (Droidtop/tracker#619).
     val rows = remember(record, tab, picked, answer, signedOut, needsCheck) {
         val check = listOfNotNull(checkRow(source.label).takeIf { needsCheck })
-        record?.let { r ->
-            val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS && !needsCheck }
-            check + listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
-        }
-            ?: if (answer != null) check + RecordRow("Change link", "#$externalId", action = RecordAction.Relink) else emptyList()
+        val game = listOfNotNull(if (onOpenGame != null) RecordRow("Open game page", gameName, action = RecordAction.OpenGame) else null)
+        (
+            record?.let { r ->
+                val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS && !needsCheck }
+                check + listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
+            }
+                ?: if (answer != null) check + RecordRow("Change link", "#$externalId", action = RecordAction.Relink) else emptyList()
+            ) + game
     }
 
     fun pickSystem(step: Int) {
@@ -229,6 +237,7 @@ internal fun SourceRecordPage(
             null -> Unit
             is RecordAction.Open -> onOpen(action.url)
             RecordAction.Relink -> onRelink()
+            RecordAction.OpenGame -> onOpenGame?.invoke()
             RecordAction.PickSystem -> pickSystem(1)
             RecordAction.SignIn -> scope.launch {
                 if (library.signInToSource(source.key)) asked++
@@ -313,6 +322,7 @@ internal fun SourceRecordPage(
                     GamepadAction.L -> switchTab(-1)
                     GamepadAction.R -> switchTab(1)
                     GamepadAction.A -> act(focusIndex)
+                    GamepadAction.X -> onOpenGame?.invoke()
                     GamepadAction.B -> onClose()
                     else -> Unit
                 }
