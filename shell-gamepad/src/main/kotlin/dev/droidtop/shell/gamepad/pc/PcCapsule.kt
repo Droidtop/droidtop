@@ -195,8 +195,10 @@ internal fun PcCapsule(
     val ring = selected && PadModality.showsFocus
     val lift = rememberFocusLift(ring)
     val title = GameNaming.displayName(entry.title)
-    // A hero card wants the landscape art; a capsule the box art.
-    val art = if (hero) entry.heroUri else entry.artworkUri
+    // A hero card wants the landscape art, else the box art over its blur (heroArt: never a screenshot); a capsule the box art.
+    val heroArt = if (hero) entry.heroArt() else null
+    val art = if (heroArt != null) heroArt.landscape else entry.artworkUri
+    val boxOverBlur = heroArt?.boxOverBlur
     // Art that names a file which will not load (moved, not an image Android decodes) is no
     // art: the card falls back to the plate with the name instead of staying an empty frame
     // (console, build 1386: three blank cards on Home's Recently added).
@@ -238,12 +240,12 @@ internal fun PcCapsule(
     ) {
         if (art != null && !artFailed) {
             CapsuleArt(art, title, wholeIfWide = !hero, onError = { artFailed = true })
-        } else if (hero && entry.artworkUri != null && entry.artworkUri != art) {
+        } else if (hero && boxOverBlur != null && boxOverBlur != art) {
             // Only portrait art: it is never stretched across a landscape
             // card. It sits whole at its own shape beside the title, over a
             // soft, darkened copy of itself that fills the card (DroidDeck's
             // GameHero, ui/FrontEndGames.kt at 9310d19), never a flat slab.
-            SoftArt(entry.artworkUri!!)
+            SoftArt(boxOverBlur)
             Box(
                 Modifier
                     .fillMaxSize()
@@ -261,9 +263,10 @@ internal fun PcCapsule(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AsyncImage(
-                    model = entry.artworkUri,
+                    model = boxOverBlur,
                     contentDescription = null,
-                    contentScale = ContentScale.Crop,
+                    // Whole, at its own shape (owner, Droidtop/tracker#632): never cropped.
+                    contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxHeight().aspectRatio(CAPSULE_ASPECT).clip(Corners.Crisp),
                 )
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.Hair)) {

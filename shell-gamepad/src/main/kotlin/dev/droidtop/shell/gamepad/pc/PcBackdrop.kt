@@ -119,8 +119,8 @@ internal fun PreloadBackdrops(arts: List<String>) {
     }
 }
 
-/** The art the backdrop shows for a game: its landscape hero when scraped, else its box art. */
-internal fun LibraryEntry.backdropArt(): String? = heroUri ?: artworkUri
+/** The art the backdrop shows for a game: the hero card's ([heroArt]), its landscape art, else its box art; never a screenshot. */
+internal fun LibraryEntry.backdropArt(): String? = heroArt().let { it.landscape ?: it.boxOverBlur }
 
 /**
  * The games whose backdrops are worth having ready: [reach] either side of
