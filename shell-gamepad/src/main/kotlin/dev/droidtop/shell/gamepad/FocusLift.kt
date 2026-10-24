@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import dev.droidtop.ui.shared.Motion
 
 /*
  * The focus treatment for a capsule (docs/SPEC.md "Gaming motion and focus", [FocusLook]): while focused the card

@@ -21,7 +21,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.LibraryEntry
-import dev.droidtop.shell.gamepad.Motion
+import dev.droidtop.ui.shared.Motion
 import kotlinx.coroutines.delay
 
 /**

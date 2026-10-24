@@ -144,7 +144,11 @@ internal fun rememberHomeStrip(all: List<LibraryEntry>, systemNames: Map<String,
             )
             val whatsNew = HomeModel.whatsNew(HomeModel.updates(all), added, pluginUpdates = pluginUpdates, attention = attention.size)
             val downloads = jobs.filter { !it.done && PluginJobsCenter.isDownloadKind(it.nativeKind) }.map { job ->
-                HomeCard.Download(job.jobId, job.title, job.percent, remainingSeconds = 0L, paused = job.paused)
+                HomeCard.Download(
+                    job.jobId, job.title, job.percent,
+                    said = dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job),
+                    look = dev.droidtop.library.integrations.PluginJobsScreen.lookOf(job),
+                )
             }
             val running = jobs.firstOrNull { !it.done && !it.paused }
             HomeStripData(
@@ -209,12 +213,23 @@ internal fun HomeTopBand(
         ) {
             data.downloading?.let { progress ->
                 BandButton(Icons.Outlined.Download, "Downloads", onDownloads) {
-                    CircularProgressIndicator(
-                        progress = { progress.coerceIn(0f, 1f) },
-                        color = MenuTokens.Accent,
-                        strokeWidth = 2.dp,
-                        modifier = Modifier.size(32.dp),
-                    )
+                    // A ring that fills while a download runs, gliding between reports; one whose size is not known
+                    // turns, unless motion is off (Droidtop/tracker#643).
+                    if (progress < 0f && dev.droidtop.ui.shared.Motion.enabled) {
+                        CircularProgressIndicator(color = MenuTokens.Accent, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
+                    } else {
+                        val shown by androidx.compose.animation.core.animateFloatAsState(
+                            progress.coerceIn(0f, 1f),
+                            dev.droidtop.ui.shared.Motion.progress(),
+                            label = "downloads-ring",
+                        )
+                        CircularProgressIndicator(
+                            progress = { shown },
+                            color = MenuTokens.Accent,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(32.dp),
+                        )
+                    }
                 }
             }
             BandButton(Icons.Outlined.Search, "Search", onSearch)
@@ -327,8 +342,8 @@ private fun HomeCardView(card: HomeCard, selected: Boolean, onClick: () -> Unit)
         Text(card.title, color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f, fill = false))
         Text(card.line, color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        (card as? HomeCard.Download)?.takeIf { it.percent >= 0 }?.let {
-            dev.droidtop.shell.gamepad.ShellProgressBar(it.percent / 100f, Modifier.fillMaxWidth())
+        (card as? HomeCard.Download)?.let {
+            dev.droidtop.shell.gamepad.ShellProgressBar(if (it.percent >= 0) it.percent / 100f else -1f, Modifier.fillMaxWidth(), it.look)
         }
     }
 }

@@ -1,7 +1,6 @@
 package dev.droidtop.ui.shared
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -80,11 +79,9 @@ fun NoticeCard(
     val on = palette.on(tone)
     val shape = RoundedCornerShape(if (placement == NoticePlacement.Page) PAGE_CORNER else ROW_CORNER)
     val density = LocalDensity.current
-    val scale = animatorScale(androidx.compose.ui.platform.LocalContext.current)
-    val appear = remember { Animatable(if (scale == 0f) 1f else 0f) }
-    LaunchedEffect(Unit) {
-        if (scale > 0f) appear.animateTo(1f, tween((FADE_MS * scale).toInt())) else appear.snapTo(1f)
-    }
+    // Motion's switch: Android's Remove animations makes it a snap (Droidtop/tracker#643). Compose scales the tween itself.
+    val appear = remember { Animatable(if (Motion.enabled) 0f else 1f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, Motion.tw(FADE_MS)) }
     val press = notice.aPress()
     val onPress: (() -> Unit)? = when (press) {
         NoticePress.ACTION -> onAction
@@ -175,8 +172,3 @@ private val TITLE = TextStyle(fontSize = 16.sp, lineHeight = 20.sp, fontWeight =
 private val BODY = TextStyle(fontSize = 15.sp, lineHeight = 19.sp)
 private val FROM = TextStyle(fontSize = 14.sp, lineHeight = 18.sp)
 private val CHIP = TextStyle(fontSize = 14.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
-
-/** The system animator duration scale (Developer options, or reduced motion); 0 means no motion at all. */
-internal fun animatorScale(context: android.content.Context): Float =
-    runCatching { android.provider.Settings.Global.getFloat(context.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) }
-        .getOrDefault(1f)

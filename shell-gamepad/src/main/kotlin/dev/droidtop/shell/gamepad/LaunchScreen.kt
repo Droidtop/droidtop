@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.droidtop.library.LibraryEntry
+import dev.droidtop.ui.shared.Motion
 
 /**
  * The screen shown while a game is starting (real ES-DE has one too --

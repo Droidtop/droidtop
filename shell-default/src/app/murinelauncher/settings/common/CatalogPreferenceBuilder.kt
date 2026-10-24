@@ -62,6 +62,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.ui.shared.JobViews
 import dev.droidtop.ui.shared.NoticeViews
 import dev.droidtop.ui.shared.PageViews
 
@@ -661,6 +662,21 @@ class CatalogPreferenceNavigator(
     }
 
 
+    /**
+     * A plain row, or for a job's row (CatalogItem.progressLook) the shared job bar under its title, the same Gaming and
+     * the companion draw (Droidtop/tracker#643: "Standard's settings rows get the same bar: one mechanism everywhere").
+     */
+    private fun rowFor(context: Context, item: CatalogItem): Preference {
+        val look = item.progressLook ?: return Preference(context)
+        val fraction = item.progress
+        return object : Preference(context) {
+            override fun onBindViewHolder(holder: PreferenceViewHolder) {
+                super.onBindViewHolder(holder)
+                JobViews.bind(holder.itemView, fraction, look)
+            }
+        }.apply { layoutResource = JobViews.LAYOUT }
+    }
+
     private fun toPreference(context: Context, item: CatalogItem): Preference = when (item) {
         is ChoiceItem -> ListPreference(context).apply {
             key = item.id
@@ -788,7 +804,7 @@ class CatalogPreferenceNavigator(
                 true
             }
         }
-        is ActionItem -> Preference(context).apply {
+        is ActionItem -> rowFor(context, item).apply {
             key = item.id
             title = titleWithChip(item.title, item.chip)
             summary = item.subtitle
@@ -903,7 +919,7 @@ class CatalogPreferenceNavigator(
                 true
             }
         }
-        is NestedScreenItem -> Preference(context).apply {
+        is NestedScreenItem -> rowFor(context, item).apply {
             key = item.id
             title = titleWithChip(item.title, item.chip)
             summary = listOfNotNull(item.subtitle, item.valueLabel?.invoke(context)?.takeIf { it.isNotBlank() })

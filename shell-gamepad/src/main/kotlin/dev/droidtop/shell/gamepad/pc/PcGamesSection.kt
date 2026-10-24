@@ -57,7 +57,6 @@ import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.GamingSection
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
-import dev.droidtop.shell.gamepad.Motion
 import dev.droidtop.shell.gamepad.rise
 import dev.droidtop.shell.gamepad.OwnShoulders
 import dev.droidtop.shell.gamepad.StatusClusterRoom
@@ -85,6 +84,7 @@ import dev.droidtop.library.CollectionMembership
 import dev.droidtop.library.CollectionScope
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.runtime.rememberCoroutineScope
+import dev.droidtop.ui.shared.Motion
 import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.query.pillText
 import dev.droidtop.shell.gamepad.query.LibraryFilterSheet

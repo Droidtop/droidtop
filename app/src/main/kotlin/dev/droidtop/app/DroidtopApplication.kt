@@ -79,6 +79,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.pluginhost.WebSessionActivity.webViewSetup = WebViewKeys::attach
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
+        // Android's Remove animations reaches every surface's motion, not only Gaming's (Droidtop/tracker#643).
+        dev.droidtop.ui.shared.MotionWatch.install(this)
         // Which release line each catalog and plugin is offered on (SPEC 12a "Channels", Droidtop/tracker#179).
         dev.droidtop.library.integrations.PluginChannels.install(this)
         // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).

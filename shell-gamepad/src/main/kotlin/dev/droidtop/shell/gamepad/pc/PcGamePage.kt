@@ -94,7 +94,6 @@ import dev.droidtop.shell.gamepad.PageFlood
 import dev.droidtop.shell.gamepad.QuickGlyph
 import dev.droidtop.shell.gamepad.QuickGlyphIcon
 import dev.droidtop.shell.gamepad.screenRect
-import dev.droidtop.shell.gamepad.Motion
 import dev.droidtop.shell.gamepad.ShellChip
 import dev.droidtop.shell.gamepad.ShoulderGlyph
 
@@ -118,6 +117,7 @@ import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
 import dev.droidtop.shell.gamepad.TextEditDialog
 import androidx.compose.runtime.collectAsState
+import dev.droidtop.ui.shared.Motion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1057,6 +1057,14 @@ private fun PageActionBand(
                 }
                 icons()
             }
+        }
+        // The download's bar: how far, seen rather than read (Droidtop/tracker#643); the line under it says the time left.
+        play.look?.let { look ->
+            dev.droidtop.shell.gamepad.ShellProgressBar(
+                play.progress ?: -1f,
+                Modifier.fillMaxWidth().padding(top = Space.Sm),
+                look,
+            )
         }
         if (play.detail.isNotBlank()) {
             Text(
