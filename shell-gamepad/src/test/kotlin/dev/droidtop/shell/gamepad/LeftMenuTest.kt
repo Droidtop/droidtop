@@ -16,8 +16,8 @@ class LeftMenuTest {
         assertEquals(menuSectionsFor(UiMode.FULL), all.map { it.section })
         assertEquals(menuSectionsFor(UiMode.FULL).map { it.displayName() }, all.map { it.label })
         // No section is unreachable: each is a row, or a page of one (Updates and Get new games, of Downloads and Updates),
-        // or in the Quick Menu (Plugins).
-        assertEquals(GamingSection.entries.filterNot { it.inQuickMenu }.map { it.menuSection }.toSet(), all.map { it.section }.toSet())
+        // or kept elsewhere (Plugins and Social in the Quick Menu, Game sources reached from Downloads and Settings).
+        assertEquals(GamingSection.entries.filterNot { it.offLeftMenu }.map { it.menuSection }.toSet(), all.map { it.section }.toSet())
     }
 
     @Test
@@ -33,7 +33,7 @@ class LeftMenuTest {
         assertEquals(
             listOf(
                 GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
-                GamingSection.STORES, GamingSection.SOCIAL, GamingSection.DOWNLOADS,
+                GamingSection.DOWNLOADS,
                 GamingSection.SETTINGS,
             ),
             menuSectionsFor(UiMode.FULL),
@@ -99,13 +99,12 @@ class LeftMenuTest {
     }
 
     @Test
-    fun `Downloads has a ring while jobs run and a dot when one needs the person, Social a dot while a message is unread`() {
-        assertEquals(emptyMap<GamingSection, Attention>(), leftMenuAttention(running = emptyList(), needYou = 0, unreadMessages = 0))
-        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(0.5f)), leftMenuAttention(listOf(0.25f, 0.75f, -1f), 0, 0))
-        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(-1f)), leftMenuAttention(listOf(-1f), 0, 0))
+    fun `Downloads has a ring while jobs run and a dot when one needs the person`() {
+        assertEquals(emptyMap<GamingSection, Attention>(), leftMenuAttention(running = emptyList(), needYou = 0))
+        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(0.5f)), leftMenuAttention(listOf(0.25f, 0.75f, -1f), 0))
+        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Ring(-1f)), leftMenuAttention(listOf(-1f), 0))
         // Needing the person outranks the ring (Droidtop/tracker#643).
-        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Dot), leftMenuAttention(listOf(0.5f), needYou = 1, unreadMessages = 0))
-        assertEquals(mapOf(GamingSection.SOCIAL to Attention.Dot), leftMenuAttention(emptyList(), 0, unreadMessages = 1))
+        assertEquals(mapOf(GamingSection.DOWNLOADS to Attention.Dot), leftMenuAttention(listOf(0.5f), needYou = 1))
     }
 
     @Test
@@ -124,16 +123,19 @@ class LeftMenuTest {
     fun `a link to a place's screen opens the place`() {
         assertEquals(GamingSection.SOCIAL, placeForScreen(PLACE_SOCIAL_SCREEN_ID, UiMode.FULL))
         assertEquals(GamingSection.UPDATES, placeForScreen(PLACE_UPDATES_SCREEN_ID, UiMode.FULL))
-        // Plugins is no row of the left menu, but a plugin update's notification still opens it.
+        // Plugins, Social and Game sources are no rows of the left menu, but a link (a notification, Settings' row) still opens each.
         assertEquals(GamingSection.PLUGINS, placeForScreen(PLACE_PLUGINS_SCREEN_ID, UiMode.FULL))
+        assertEquals(GamingSection.STORES, placeForScreen(dev.droidtop.library.settings.Place.ID_STORES, UiMode.FULL))
     }
 
     @Test
-    fun `Plugins is in the Quick Menu, not the left menu`() {
-        // Owner, 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins menu" (Droidtop/tracker#586).
-        assertFalse(GamingSection.PLUGINS in menuSectionsFor(UiMode.FULL))
-        assertEquals(listOf(GamingSection.PLUGINS), GamingSection.entries.filter { it.inQuickMenu })
-        assertTrue(all.none { it.isAt(GamingSection.PLUGINS) })
+    fun `Plugins, Social and Game sources are not rows of the left menu`() {
+        // Owner, 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins menu" (Droidtop/tracker#586); "Downloads and
+        // Updates stays too, learning from steam. Game sources go into the qam, as does social" (Droidtop/tracker#644).
+        val off = listOf(GamingSection.STORES, GamingSection.SOCIAL, GamingSection.PLUGINS)
+        assertEquals(off, GamingSection.entries.filter { it.offLeftMenu })
+        off.forEach { section -> assertTrue(section.name, all.none { it.isAt(section) }) }
+        assertTrue(GamingSection.DOWNLOADS in menuSectionsFor(UiMode.FULL))
     }
 
     @Test

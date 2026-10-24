@@ -2139,12 +2139,15 @@ internal enum class GamingSection(val place: dev.droidtop.library.settings.Place
     val menuSection: GamingSection get() = if (this == NEW_GAMES || this == UPDATES) DOWNLOADS else this
 
     /**
-     * A place Gaming keeps in the Quick Menu instead of the left menu: Plugins, whose management is the last row of the
-     * Quick Menu's Plugins section and opens there (owner, 2026-10-17, Droidtop/tracker#586: "The plugin menu on the
-     * left pretty much shouldn't exist, the quick menu should be for lots of that stuff"; 2026-10-24: "move ALL the
-     * plugin menu stuff to the QAM plugins menu"). A link to it (a plugin update's notification) still opens it.
+     * A place that is no row of Gaming's left menu (Droidtop/tracker#644 slice 3). Plugins and Social are sections of
+     * the Quick Menu: Plugins' management is the last row of its section (owner, 2026-10-17, Droidtop/tracker#586:
+     * "The plugin menu on the left pretty much shouldn't exist, the quick menu should be for lots of that stuff";
+     * 2026-10-24: "move ALL the plugin menu stuff to the QAM plugins menu"), and Social is drawn in its section
+     * (owner, 2026-10-24: "Game sources go into the qam, as does social"). Game sources is no destination: getting
+     * games and each source's standing lead Downloads and Updates, and setting one up is Settings > Accounts and
+     * sources. A link to any of them (a notification, that Settings row) still opens it.
      */
-    val inQuickMenu: Boolean get() = this == PLUGINS
+    val offLeftMenu: Boolean get() = this == PLUGINS || this == SOCIAL || this == STORES
 }
 
 // Registry ids of the screens the places draw, from the one place list.
@@ -2178,8 +2181,8 @@ internal fun sectionsFor(mode: dev.droidtop.library.settings.UiMode): List<Gamin
 internal fun menuSectionsFor(mode: dev.droidtop.library.settings.UiMode): List<GamingSection> {
     val tabs = sectionsFor(mode)
     // The listed places; Kiosk and Kid hide them all, since they manage the device. Updates, with Get new games, is a
-    // page of Downloads and Updates (Place.listed), and Plugins is in the Quick Menu (inQuickMenu).
-    val places = GamingSection.entries.filter { it.place?.listed == true && !it.inQuickMenu && !mode.hidesSettings }
+    // page of Downloads and Updates (Place.listed); Plugins, Social and Game sources are elsewhere (offLeftMenu).
+    val places = GamingSection.entries.filter { it.place?.listed == true && !it.offLeftMenu && !mode.hidesSettings }
     // Home leads, then PC Games (Home, PC Games, Retro Games, Apps); a stable sort keeps the rest in order.
     val main = tabs.filterNot { it == GamingSection.SETTINGS }.sortedBy {
         when (it) {

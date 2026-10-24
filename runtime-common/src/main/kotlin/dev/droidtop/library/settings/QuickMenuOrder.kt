@@ -19,6 +19,8 @@ object QuickMenuOrder {
         ControlPanel.GAME to "Game",
         ControlPanel.APPS to "Running apps",
         ControlPanel.NOTIFICATIONS to "Notifications",
+        // Steam's Friends, moved off the left menu (owner, 2026-10-24: "Game sources go into the qam, as does social").
+        ControlPanel.SOCIAL to "Social",
         ControlPanel.CONNECTIONS to "Connections",
         ControlPanel.SYSTEM to "Power and mode",
         ControlPanel.PERFORMANCE to "Performance",

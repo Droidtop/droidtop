@@ -182,8 +182,9 @@ internal fun QuickMenu(
             }
         }
         val order by dev.droidtop.library.settings.QuickMenuOrder.order.collectAsState()
-        val sections = remember(gameRunning, hasPlugins, uiMode, order) {
-            QuickTiles.visibleSections(gameRunning, hasPlugins, uiMode, order)
+        val hasSocial = placeAvailable(PLACE_SOCIAL_SCREEN_ID)
+        val sections = remember(gameRunning, hasPlugins, hasSocial, uiMode, order) {
+            QuickTiles.visibleSections(gameRunning, hasPlugins, hasSocial, uiMode, order)
         }
         var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning, granted)) }
         LaunchedEffect(sections, section) {
@@ -193,7 +194,11 @@ internal fun QuickMenu(
         val notifications by NotificationsStore.items.collectAsState()
         val recentUnread by dev.droidtop.library.settings.Notices.unread.collectAsState()
         val jobs by PluginJobsCenter.entries().collectAsState()
+        val unreadMessages by androidx.compose.runtime.produceState(dev.droidtop.library.social.SocialHub.unread()) {
+            dev.droidtop.library.social.SocialHub.changes().collect { value = dev.droidtop.library.social.SocialHub.unread() }
+        }
         val dots = buildSet {
+            if (unreadMessages > 0) add(QuickSection.SOCIAL)
             if (granted && notifications.isNotEmpty()) add(QuickSection.NOTIFICATIONS)
             if (recentUnread > 0) add(QuickSection.NOTIFICATIONS)
             if (JobsSummary.runningCount(jobs) > 0) add(QuickSection.DOWNLOADS)
@@ -262,6 +267,7 @@ internal fun QuickMenu(
                         }
                         QuickSection.APPS -> AppsTab(close)
                         QuickSection.NOTIFICATIONS -> NotificationsTab(close)
+                        QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
                         QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
                             QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
                         QuickSection.PERFORMANCE -> PerformanceSection(close)

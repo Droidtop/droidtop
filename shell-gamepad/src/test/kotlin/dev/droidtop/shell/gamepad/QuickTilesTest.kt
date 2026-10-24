@@ -259,6 +259,16 @@ class QuickTilesTest {
     }
 
     @Test
+    fun `Social is a section of the rail, gone where its place does not open`() {
+        // Owner, 2026-10-24: "Game sources go into the qam, as does social" (Droidtop/tracker#644).
+        assertTrue(QuickSection.SOCIAL in QuickTiles.visibleSections(gameRunning = false, hasPlugins = false))
+        assertFalse(QuickSection.SOCIAL in QuickTiles.visibleSections(gameRunning = false, hasPlugins = false, hasSocial = false))
+        assertEquals("Social", QuickSection.SOCIAL.label)
+        // Guest keeps the owner's friends private.
+        assertFalse(QuickSection.SOCIAL in QuickTiles.visibleSections(true, true, mode = dev.droidtop.library.settings.UiMode.GUEST))
+    }
+
+    @Test
     fun `Kid and Kiosk sections come from ControlAccess and match Full's, without the restriction's own items`() {
         for (mode in listOf(dev.droidtop.library.settings.UiMode.KID, dev.droidtop.library.settings.UiMode.KIOSK)) {
             assertEquals(

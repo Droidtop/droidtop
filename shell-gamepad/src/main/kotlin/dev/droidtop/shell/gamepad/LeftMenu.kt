@@ -36,7 +36,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -52,7 +51,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import dev.droidtop.library.social.SocialHub
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
@@ -121,10 +119,10 @@ internal sealed interface Attention {
  * What each destination has waiting (DroidDeck's rail badge, ui/FrontEndRail.kt at 9310d19; Droidtop/tracker#643: "a
  * filling ring while active, a dot when something needs the person"): Downloads a dot while a job has failed or waits
  * for the person's pick ([needYou]), else a ring filling as its running jobs ([running], each one's fraction or
- * negative when it does not know) get on together; Social a dot while a message is unread. Read while the menu is
- * open, never polled. Pure.
+ * negative when it does not know) get on together. Social's unread dot is on the Quick Menu's rail, where Social is.
+ * Read while the menu is open, never polled. Pure.
  */
-internal fun leftMenuAttention(running: List<Float>, needYou: Int, unreadMessages: Int): Map<GamingSection, Attention> = buildMap {
+internal fun leftMenuAttention(running: List<Float>, needYou: Int): Map<GamingSection, Attention> = buildMap {
     when {
         needYou > 0 -> put(GamingSection.DOWNLOADS, Attention.Dot)
         running.isNotEmpty() -> {
@@ -132,7 +130,6 @@ internal fun leftMenuAttention(running: List<Float>, needYou: Int, unreadMessage
             put(GamingSection.DOWNLOADS, Attention.Ring(if (known.isEmpty()) -1f else known.average().toFloat()))
         }
     }
-    if (unreadMessages > 0) put(GamingSection.SOCIAL, Attention.Dot)
 }
 
 /**
@@ -181,14 +178,12 @@ internal fun LeftMenu(
     val rowCount = rowsAbove + entries.size
     // What is waiting, for the dots: read while the menu is open, never polled.
     val jobs by PluginJobsCenter.entries().collectAsState()
-    val unread by produceState(SocialHub.unread()) { SocialHub.changes().collect { value = SocialHub.unread() } }
     val attention = leftMenuAttention(
         running = jobs.filter { !it.done && !it.paused }.map { if (it.percent >= 0) it.percent / 100f else -1f },
         needYou = jobs.count { job ->
             job.state == dev.droidtop.pluginhost.JobState.FAILED ||
                 job.report?.let { it.count(dev.droidtop.pluginhost.Outcome.NEEDS_PICK) > 0 } == true
         },
-        unreadMessages = unread,
     )
     // The frame's close slides the panel out first; every way out here goes through it.
     SidePanelFrame(

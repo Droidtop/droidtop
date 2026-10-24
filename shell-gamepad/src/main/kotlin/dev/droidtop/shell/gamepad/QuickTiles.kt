@@ -43,13 +43,16 @@ enum class QuickGlyph {
 /**
  * The Quick Menu's sections: the icon rail (docs/SPEC.md "Quick Menu: a
  * branching panel", Droidtop/tracker#258). Order is rail order. The rail is
- * for quick management only; destinations and the places things live are
- * the left menu's, and Get games is a contextual action that is not here.
+ * for quick management and for the two places kept here, Social and
+ * Plugins; the other destinations are the left menu's, and Get games leads
+ * Downloads and Updates.
  */
 enum class QuickSection(val glyph: QuickGlyph, val panel: ControlPanel) {
     GAME(QuickGlyph.GAMEPAD, ControlPanel.GAME),
     APPS(QuickGlyph.APPS, ControlPanel.APPS),
     NOTIFICATIONS(QuickGlyph.BELL, ControlPanel.NOTIFICATIONS),
+    // The Social place in the sheet: friends and their games, then conversations, a chat opening in place (Droidtop/tracker#644).
+    SOCIAL(QuickGlyph.PEOPLE, ControlPanel.SOCIAL),
     // The radios, out of what was one System wall of about 20 tiles (owner, 2026-10-23, Droidtop/tracker#610).
     CONNECTIONS(QuickGlyph.NETWORK, ControlPanel.CONNECTIONS),
     // Everything else the System tab held: switching mode, power, screenshot, the app in front.
@@ -132,18 +135,21 @@ object QuickTiles {
 
     /**
      * The sections the rail shows now: those [mode] allows on the Quick Menu ([ControlAccess], the one
-     * restriction model), Game only while a game runs, Plugins only when a plugin has a panel or tiles here.
+     * restriction model), Game only while a game runs, Plugins only when a plugin is installed or plugins can be
+     * managed, Social only where its place opens ([hasSocial]: not in Kiosk and Kid, which hide the places).
      */
     fun visibleSections(
         gameRunning: Boolean,
         hasPlugins: Boolean,
+        hasSocial: Boolean = true,
         mode: UiMode = UiMode.FULL,
         // The person's order (Settings > Shell > Quick Menu order); a section it does not name keeps its own place.
         order: List<ControlPanel> = QuickSection.entries.map { it.panel },
     ): List<QuickSection> {
         val allowed = ControlAccess.panels(mode, ControlSurface.QUICK_MENU)
         return QuickSection.entries.filter {
-            it.panel in allowed && (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPlugins)
+            it.panel in allowed && (it != QuickSection.GAME || gameRunning) && (it != QuickSection.PLUGINS || hasPlugins) &&
+                (it != QuickSection.SOCIAL || hasSocial)
         }.sortedBy { section -> order.indexOf(section.panel).takeIf { it >= 0 } ?: (order.size + section.ordinal) }
     }
 

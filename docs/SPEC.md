@@ -3508,6 +3508,12 @@ the `ContainerRuntime` interface that already exists (§3):
     decision the companion's Game tab asks by, so turning Ask before stopping off makes both act at once.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
+  - **Social** (moved off the left menu 2026-10-24, Droidtop/tracker#644 slice 3; owner: "Game sources go into the
+    qam, as does social", and "Its own section", Steam's Friends model): the Social place (`SocialCatalog`, below)
+    drawn in the sheet by `PlaceCatalogView`, so friends who are online and what they play lead, then the
+    conversations, and a chat opens in the sheet; B comes back to the list. Its rail icon wears a dot while a message
+    is unread (`SocialHub.unread`), the dot the left menu's Social row used to wear. Shown only where the mode has the
+    place (not Kiosk and Kid), and never in Guest (`ControlAccess`).
   - **Connections** (split out of System, 2026-10-23, Droidtop/tracker#610: System had grown to about 20 tiles):
     Network, Wi-Fi, Bluetooth, **Airplane mode**, VPN and Location (`QuickTiles.CONNECTION_IDS`). The companion's
     Connections card shows the same items.
@@ -3562,7 +3568,7 @@ the `ContainerRuntime` interface that already exists (§3):
   still appears with no edit to the menu, and none appears twice. **L1/R1 step the rail** (the
   panel is its own window and owns the shoulders), wrapping at the ends; the rail is not a focus
   target (the pad's focus stays in the section) and its icons tap for touch; a dot on a rail icon
-  says something is waiting (notifications, running jobs). B closes; R2 closes. **Get games is
+  says something is waiting (notifications, running jobs, an unread message). B closes; R2 closes. **Get games is
   not in the Quick Menu**: it is a contextual action on the pages that need it (#151, #258).
   Colours and type come from `MenuTokens` only, so the panel follows the theme.
   **Frame (decided 2026-10-02, #273 slice 6, Steam's right panel):** in landscape the Quick Menu is a
@@ -13534,7 +13540,7 @@ follows:
   `SocialProvider`; the place, the tile, the companion tab and the
   notifications are every provider's, see "Social" after "Places",
   Droidtop/tracker#327). Steam is the first social provider: its friends and
-  conversations appear in the **Social place** in the Gaming left menu, the
+  conversations appear in the **Social place** (the Gaming Quick Menu's Social section), the
   companion's Social tab and the Quick Menu's Social tile beside every other
   provider's. What Steam carries:
   the friends list and personas arrive by JavaSteam's callbacks; messages use
@@ -17126,8 +17132,8 @@ nothing else.
 The bar names every button that acts, and Start and R2 always sit first, on the left. When the hints do not fit on one line at the current text size (measured, not estimated), the bar gives up room in a fixed order (`HintFit`): first Start and R2 become their glyphs alone (a count such as "3 new" stays beside R2), then L1/R1 drop (the strip they step shows its own shoulder glyphs), then Select drops. **A and B never drop.** Whatever still does not fit wraps in a sheet's bar and scrolls in a full-width one, as before. A screen reader hears the whole set as the bar's description, however much was folded, and the bar offers the custom action **Read controls**. Long-press Select is not used for this: it is the Quick Menu fallback.
 ### Places: stores, friends, downloads, updates and plugins (directed 2026-10-01, Droidtop/tracker#258)
 
-The left menu is where things live. Beside the three tabs it lists five
-**places** (Social joined on 2026-10-08 as Friends, Droidtop/tracker#313, and took every provider as Social the same day, #327), each one a registered settings screen drawn in the shell's
+The left menu is where things live. Five **places** exist (Social joined on 2026-10-08 as Friends,
+Droidtop/tracker#313, and took every provider as Social the same day, #327), each one a registered settings screen drawn in the shell's
 content area by the same navigator Settings uses (`PlaceCatalogView`, so
 the same B, Info sheet and touch behaviour). Which places exist is one list
 for every mode, `Place` (`:runtime-common`: screen id and title); a
@@ -17137,6 +17143,15 @@ main destinations first, then the places, then Settings), and a mode
 that hides Settings (Kiosk, Kid) hides the places too, because they are
 device management (`GamingSection.managesDevice`). The list is one pure
 function (`menuSectionsFor`, built on `sectionsFor`).
+
+**Gaming's left menu (decided 2026-10-24, Droidtop/tracker#644 slice 3):** Resume (while a game runs), Home, PC
+Games, Retro Games, Apps, Search, Downloads and Updates, Settings. PC Games, Retro Games and Apps stay three rows
+(owner: "Those are deliberately three different modes, optimized for three different appsets"), and Downloads and
+Updates stays a row ("Downloads and Updates stays too, learning from steam"). The other places are no rows of it
+(`GamingSection.offLeftMenu`) but every link to one still opens it (`placeForScreen`): Plugins and Social are sections
+of the Quick Menu ("Game sources go into the qam, as does social"), and Game sources is no destination of its own,
+reached from Settings > Accounts and sources where a source is set up. Standard's settings root and Desktop's Start
+menu still list every `listed` place.
 
 - **Game sources** (`stores`, `StoresCatalog`, called Stores until
   Droidtop/tracker#397 slice E): where games come from, in one list. Signed-in
@@ -17260,7 +17275,7 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   (**Open library**), not a second place to browse it.
 - **Social** (`social`, `SocialCatalog`; Droidtop/tracker#313, #327): the friends
   and conversations of every social provider, Steam and plugins alike, see
-  "Social" below. It sits after Stores in the left menu.
+  "Social" below. In Gaming it is the Quick Menu's Social section, not a left menu row.
 - **Downloads and Updates** (`plugin_jobs`, `PluginJobsScreen`; "Downloads and installs" until 2026-10-24): its
   first row is **Updates**, a page of this place rather than a place of its own (owner, 2026-10-24,
   Droidtop/tracker#639: "Updates should be in the Downloads and Updates menu"): `Place.UPDATES` is not `listed`, so
