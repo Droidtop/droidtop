@@ -95,7 +95,8 @@ internal fun LeftMenuEntry.glyph(): ImageVector = when (section) {
 internal fun CatalogGlyph(icon: CatalogIcon?, iconFile: String?, tint: androidx.compose.ui.graphics.Color, modifier: androidx.compose.ui.Modifier) {
     when {
         iconFile != null -> coil3.compose.AsyncImage(
-            model = java.io.File(iconFile),
+            // A file in droidtop's storage, or a picture's address (CatalogItem.iconFile), which Coil fetches and caches.
+            model = if (iconFile.startsWith("https://") || iconFile.startsWith("http://")) iconFile else java.io.File(iconFile),
             contentDescription = null,
             contentScale = androidx.compose.ui.layout.ContentScale.Fit,
             modifier = modifier,

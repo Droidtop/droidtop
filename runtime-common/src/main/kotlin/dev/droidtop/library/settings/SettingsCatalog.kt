@@ -67,7 +67,9 @@ sealed interface CatalogItem {
 
     /**
      * A picture drawn in place of [icon] when it is there: a file in droidtop's own storage (a store's cached mark,
-     * Droidtop/tracker#503). [icon] stays the fallback while the file is missing. Renderers load it off the main thread.
+     * Droidtop/tracker#503), or the http(s) address of one (a source's box art on Get new games, Droidtop/tracker#612),
+     * which the renderer fetches and caches. [icon] stays the fallback while it is missing. Renderers load it off the
+     * main thread.
      */
     val iconFile: String? get() = null
 
@@ -203,6 +205,7 @@ class ActionItem(
     val state: Boolean? = null,
     override val progress: Float? = null,
     override val chip: String? = null,
+    override val iconFile: String? = null,
     val run: (Context) -> Unit,
 ) : CatalogItem
 

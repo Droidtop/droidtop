@@ -14,13 +14,16 @@ import kotlinx.coroutines.withTimeoutOrNull
  * What Get new games opens on (docs/SPEC.md 13, "Get new games"; owner, 2026-10-23, Droidtop/tracker#612): "The
  * 'get new games' page should NOT open to a blank search bar. It should open to a recommendations list, with the
  * ability to search at the top." Everything here comes from the person's library and their sources; nothing is
- * invented. The sources have no list of new or popular games of their own yet (a `featured` call is the plugin
- * lane's to add), so the page has what the library already knows and what the sources answer for it.
+ * invented: what each source features ([GameSourceProvider.featured], docs/plugin-api.md 1.8), what the library
+ * already knows, and what the sources answer for the games the person plays.
  */
 object NewGames {
     /** How many of the most played games are asked about, and how many of each answer are kept. */
     const val ASKS = 3
     const val PER_ASK = 6
+
+    /** How many of one source's featured games the page shows. */
+    const val FEATURED = 10
 
     /** One question for the sources: [query] (a developer or a series), asked because the person played [because]. */
     data class Ask(val query: String, val because: String)
@@ -31,8 +34,14 @@ object NewGames {
     /** One "More from ..." list. */
     data class Shelf(val ask: Ask, val finds: List<Find>)
 
-    /** What the page shows: the person's games with a newer version, and the lists the sources answered. */
-    data class Loaded(val updates: List<LibraryEntry>, val shelves: List<Shelf>, val sources: Int)
+    /** What one source features now, under its name, less the games the person has. */
+    data class Featured(val sourceLabel: String, val finds: List<Find>)
+
+    /** What the page shows: what the sources feature, the person's games with a newer version, and the lists the sources answered. */
+    data class Loaded(val featured: List<Featured>, val updates: List<LibraryEntry>, val shelves: List<Shelf>, val sources: Int) {
+        /** Nothing to show from the sources or the library: the page says so, under Search. */
+        val empty: Boolean get() = featured.isEmpty() && updates.isEmpty() && shelves.isEmpty()
+    }
 
     /** The person's games a source names a newer version of, by title. Pure. */
     fun updates(entries: List<LibraryEntry>): List<LibraryEntry> =
@@ -70,24 +79,35 @@ object NewGames {
     suspend fun load(context: Context, entries: List<LibraryEntry>): Loaded = withContext(Dispatchers.IO) {
         val sources = GameSources.plugins(context)
         val asks = asks(entries)
-        val shelves = if (sources.isEmpty()) {
-            emptyList()
-        } else {
-            coroutineScope {
-                asks.map { ask ->
-                    async {
-                        val finds = sources.map { source ->
-                            async {
-                                withTimeoutOrNull(PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS) {
-                                    source.search(context, ask.query, null).getOrNull()
-                                }.orEmpty().map { Find(source.label, it) }
-                            }
-                        }.awaitAll().flatten()
-                        Shelf(ask, fresh(finds, entries))
-                    }
-                }.awaitAll().filter { it.finds.isNotEmpty() }
+        if (sources.isEmpty()) return@withContext Loaded(emptyList(), updates(entries), emptyList(), 0)
+        coroutineScope {
+            // Each source's own list, in the order the sources are listed; a source without one features nothing.
+            val featured = sources.map { source ->
+                async {
+                    val finds = withTimeoutOrNull(PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS) {
+                        source.featured(context, null, FEATURED).getOrNull()
+                    }.orEmpty().map { Find(source.label, it) }
+                    Featured(source.label, fresh(finds, entries, FEATURED))
+                }
             }
+            val shelves = asks.map { ask ->
+                async {
+                    val finds = sources.map { source ->
+                        async {
+                            withTimeoutOrNull(PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS) {
+                                source.search(context, ask.query, null).getOrNull()
+                            }.orEmpty().map { Find(source.label, it) }
+                        }
+                    }.awaitAll().flatten()
+                    Shelf(ask, fresh(finds, entries))
+                }
+            }
+            Loaded(
+                featured.awaitAll().filter { it.finds.isNotEmpty() },
+                updates(entries),
+                shelves.awaitAll().filter { it.finds.isNotEmpty() },
+                sources.size,
+            )
         }
-        Loaded(updates(entries), shelves, sources.size)
     }
 }
