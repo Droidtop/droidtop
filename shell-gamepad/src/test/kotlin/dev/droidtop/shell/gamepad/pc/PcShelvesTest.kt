@@ -419,7 +419,7 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `the hero never shows a screenshot: a game with only a screenshot and a cover gets the cover over its blur`() {
+    fun `the hero never shows a screenshot, so a game with only a screenshot and a cover gets the cover over its blur`() {
         val media = "/storage/emulated/0/ROMs/downloaded_media/snes"
         // The scan's box art is the cover (droidtop's order puts covers first); there is no landscape art.
         val coverOnly = game("/roms/snes/Game.sfc").copy(artworkUri = "$media/covers/Game.png")
