@@ -12336,16 +12336,21 @@ indexed. Neither is part of the update check.
 **Facets in place (owner, 2026-10-24, Droidtop/tracker#639).** On the console an update row opened the game's
 page as a separate activity in a new task, so Back left droidtop for the Standard launcher. The owner: "One of the
 benefits of facets is that we don't have to do stuff like that. Clicking the update should present the facet
-containing the downloads." A row that exists to act on one facet shows it over the screen it is on and never
-navigates away to reach it. In Gaming (`GameSurfaces`, installed by the shell while it is drawn):
-- **An update row** shows its update's downloads: the record page of the linked source that gave the newest
-  version (`GameLinks.updateLink`; a computer's link has no page), opened at its Downloads tab over Updates
-  (`GameInPlace`). Its last row, and X, is **Open game page**, which opens the page over it; Back closes the page,
-  then the record, then returns to the row. A game with no source page to show opens its page instead.
-- **A job row** for a game opens the game's page over the jobs list, the same way (`JobOpener`).
+containing the downloads", and after a first fix that depended on Gaming's shell and so did nothing where Updates
+was drawn without it: "Facets go where they fit. No clunky redirects". A row that exists to act on one facet shows
+it over the screen it is on and never navigates away to reach it:
+- **An update row** is a nested screen (`UpdatesPage.sourceUpdateRow`): A pushes the update's own screen,
+  `SourceRecordScreen`, in whatever draws Updates (Gaming's place, Standard's settings, the screen host, the
+  companion), and has nothing of its own to run, so no activity starts and no game page opens from it. The screen is
+  the record of the linked source that gave the newest version (`GameLinks.updateLink`; a computer's link has no
+  page): Available and Installed first, then Downloads (a System choice when the links differ by system, sign-in and
+  the site's check when it asks, each link asking once more before it is got), the changelog, the overview and the
+  details. Its rows are the record page's own (`recordRows`, `downloadRows`) and a download is the record page's one
+  sequence (`getDownload`). A game with no source page says so; it does not open anything. Change link is the game
+  page's, where its sources are.
+- **A job row** for a game opens the game's page over the jobs list, inside Gaming (`GameSurfaces.showPage`,
+  `GameInPlace`, `JobOpener`).
 - **A Get new games result** opens the one search on its title in place, as it already did.
-The page is the PC page (`PcGameStandalone`), so a game without one is left to the caller's own way of opening it.
-Outside Gaming, where nothing can draw them, the rows open the game's page as before.
 
 **Getting an update: the source's record page (2026-10-17).** The owner, from
 the console: "we need actual update management. the f95 plugin surfaces
@@ -17096,14 +17101,13 @@ function (`menuSectionsFor`, built on `sectionsFor`).
     the version on offer in the value column, emphasised ("Available: v0.38"), and the version here first on the
     secondary line ("Installed: v0.37", or "Installed: unknown" when it is not known; `GameUpdates.availableLabel`,
     `installedLabel`). A game's version here is its store's installed build, else its newest version folder. The
-    record page a game's update opens (7g "Facets in place") says the same two under its title. Then Update: droidtop (Update
+    update's screen and the record page (7g "Facets in place") say the same two first. Then Update: droidtop (Update
     installs it, Android asks), each plugin with a newer catalog release (`PluginCatalog.installOutcome`), each Android
     app, emulators among them, with a newer version in an app catalog (an offer signed by another key says why it is
     not offered), each store game its store named an update for (`StoreAutoUpdates.startUpdate`, the one starter the
     automatic updates use; it goes to Downloads), and each folder game whose linked source names a newer version
-    (in Gaming, Update shows that source's record page at Downloads over the list, 7g "Facets in place"; outside
-    Gaming it opens the game's page; the version picked lands as a new version folder, and droidtop never replaces a
-    folder's files). With
+    (its row pushes the update's own screen in place, 7g "Facets in place"; the version picked lands as a new version
+    folder, and droidtop never replaces a folder's files). With
     nothing to update after a check that worked: "Everything is up to date", once.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a

@@ -277,28 +277,31 @@ object UpdatesPage {
                         install,
                     )
                 } else {
-                    Update(
-                        AsyncActionItem(
-                            id = "updates_game_${entry.id}",
-                            title = entry.title,
-                            subtitle = "$installed. Game: its downloads, changelog and Get",
-                            value = available(version),
-                            run = { ctx, _ ->
-                                // The update's downloads in place, over this page (Droidtop/tracker#639); outside
-                                // Gaming, where nothing can draw them, the game's page as before.
-                                if (dev.droidtop.library.GameSurfaces.showUpdate?.invoke(entry.id) == true) {
-                                    available(version)
-                                } else {
-                                    ctx.startActivity(dev.droidtop.app.LauncherGamesActivity.pageIntent(ctx, entry.id))
-                                    "Opened ${entry.title}'s page"
-                                }
-                            },
-                        ),
-                        null,
-                    )
+                    Update(sourceUpdateRow({ ctx -> LibraryCore.library(ctx) }, entry.id, entry.title, installed, available(version)), null)
                 }
             }
     }
+
+    /**
+     * A folder game whose linked source names a newer version: the update's own screen, pushed in place by whatever
+     * draws Updates (owner, 2026-10-24, Droidtop/tracker#639: "Clicking the update should present the facet containing
+     * the downloads"; "Facets go where they fit. No clunky redirects"). It is a nested screen, so A has nothing to run:
+     * no activity starts and no game page opens from this row, in any mode.
+     */
+    internal fun sourceUpdateRow(
+        library: (Context) -> dev.droidtop.library.Library,
+        entryId: String,
+        title: String,
+        installed: String,
+        available: String,
+    ): CatalogItem =
+        NestedScreenItem(
+            id = "updates_game_$entryId",
+            title = title,
+            subtitle = "$installed. Game: its downloads, changelog and Get",
+            valueLabel = { available },
+            inline = dev.droidtop.shell.gamepad.pc.SourceRecordScreen.forUpdate(library, entryId, title),
+        )
 
     /** droidtop's own update settings and the apps' install-without-asking, one screen under the list. */
     private fun settingsScreen() = CatalogScreen(
