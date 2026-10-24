@@ -293,9 +293,8 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `the menu opens on notifications when granted, else system`() {
-        assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.initialSection(notificationsGranted = true))
-        assertEquals(QuickSection.SYSTEM, QuickTiles.initialSection(notificationsGranted = false))
+    fun `the menu opens on Power and mode whether or not notification access is granted`() {
+        assertEquals(QuickSection.SYSTEM, QuickTiles.initialSection)
     }
 
     @Test
