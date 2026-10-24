@@ -55,7 +55,7 @@ class AppInterfaceTrustTest {
         assertEquals(AppInterfaceTrust.Verdict.Refused(AppInterfaceTrust.MANY_SIGNERS), AppInterfaceTrust.decide("p.q", listOf(apk(a, b)), setOf(a, b), setOf(a)))
     }
 
-    private fun manifest(extra: String = "", kind: String = "app_interface", origin: String = "enginehost", id: String = "$origin.saves") = PluginManifest.fromJson(
+    private fun manifest(extra: String = "", kind: String = "app_interface", origin: String = "enginehost", id: String = "dev.enginehost") = PluginManifest.fromJson(
         JSONObject(
             """{"id": "$id", "origin": "$origin", "label": "Enginehost", "version": "1.4.0", "kind": "$kind", "contractVersion": 3,
                "app": {"package": "dev.enginehost", "service": "dev.enginehost.droidtop.DroidtopInterfaceService"},
@@ -75,9 +75,12 @@ class AppInterfaceTrustTest {
     }
 
     @Test
-    fun `an app interface's id is an Android package name, any number of segments and any case`() {
+    fun `an app interface's id is an Android package name under its app's, any number of segments and any case`() {
+        assertNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.enginehost"), "dev.enginehost", null))
         assertNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.enginehost.app"), "dev.enginehost", null))
-        assertNull(AppInterfaceTrust.manifestProblem(manifest(id = "Dev.EngineHost.droidtop_plugin"), "dev.enginehost", null))
+        assertNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.enginehost.Droidtop_Plugin"), "dev.enginehost", null))
+        assertNotNull("never another plugin's id", AppInterfaceTrust.manifestProblem(manifest(id = "f95.updates"), "dev.enginehost", null))
+        assertNotNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.enginehostx"), "dev.enginehost", null))
         assertNotNull(AppInterfaceTrust.manifestProblem(manifest(id = "enginehost"), "dev.enginehost", null))
         assertNotNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.1enginehost"), "dev.enginehost", null))
         assertNotNull(AppInterfaceTrust.manifestProblem(manifest(id = "dev.engine-host"), "dev.enginehost", null))

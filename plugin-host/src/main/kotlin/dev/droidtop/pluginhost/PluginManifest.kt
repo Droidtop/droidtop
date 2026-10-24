@@ -266,6 +266,9 @@ data class PluginManifest(
         if (kind == PluginKind.APP_INTERFACE) {
             if (!AppTarget.isPackageName(id)) {
                 add("id \"$id\" must be an Android package-style name: segments of letters, digits and underscores, each starting with a letter")
+            } else if (app != null && id != app.packageName && !id.startsWith("${app.packageName}.")) {
+                // The app's own name space: an app cannot take another plugin's id.
+                add("id \"$id\" must be the app's package (${app.packageName}) or a name under it")
             }
         } else if (id != id.lowercase() || !id.startsWith("$origin.")) {
             add("id \"$id\" must be lowercase and namespaced as \"<origin>.<name>\"")

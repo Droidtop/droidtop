@@ -407,8 +407,10 @@ store". Its adapter is the app itself:
   letter, in any case (`dev.enginehost.app`; the owner, 2026-10-24:
   "droidtop refuses to add enginehost as an application interface plugin.
   It apparently requires everything be lowercase, and rejects appnames
-  with more than two segments"). What droidtop checks for this kind is
-  the app's package and its signature. `host.full_trust` and
+  with more than two segments"). It is the app's own package or a name
+  under it (`dev.enginehost.app`, `dev.enginehost.app.saves`), so an app
+  can never take another plugin's id. What droidtop checks for this kind
+  is the app's package and its signature. `host.full_trust` and
   `gpu.render` are refused for this kind: the app never runs in a droidtop
   process. Its `version` moves whenever the asset changes, and droidtop
   treats a changed asset as an update (new points and permissions wait for
