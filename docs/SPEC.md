@@ -14115,6 +14115,13 @@ the same care as the art.
     - Y shows the chosen answer's description.
     - L2 searches the source again in the match picker.
     - B closes, and nothing is lost.
+    - Select opens **Accept all Likely**. This is a confirm sheet: every Likely card with a kept answer, as its
+      local name over the cover of the answer it would take, 12 a page in a 4 by 3 grid, with the game count in its
+      title. L1 and R1 page, A applies every one, and B goes back with nothing written. This is LaunchBox's review
+      before committing, without a stop per game (#318 §5.3).
+
+    The count shows on the options row, "Review matches (N)". Not built yet: the count glyph on the game tiles
+    themselves (#318 §5), which belongs to the tile work in the UI lane's #644 pass.
 
     A card with no kept answer (a game marked before the queue) searches again on A. Not built yet: editing the
     name before searching again (the plan's on-screen keyboard pre-filled with the title). The sources take any

@@ -59,8 +59,19 @@ private val REVIEW_HINTS = listOf(
     HintBinding(GamepadAction.X, "Local only"),
     HintBinding(GamepadAction.Y, "Details"),
     HintBinding(GamepadAction.L2, "Search again"),
+    HintBinding(GamepadAction.SELECT, "Accept all Likely"),
     HintBinding(GamepadAction.B, "Close"),
 )
+
+private val SHEET_HINTS = listOf(
+    HintBinding(GamepadAction.A, "Accept all"),
+    HintBinding(GamepadAction.L, "Page"),
+    HintBinding(GamepadAction.R, "Page"),
+    HintBinding(GamepadAction.B, "Back"),
+)
+
+/** How many Likely cards the Accept all sheet shows a page (§5.3). */
+private const val SHEET_PAGE = 12
 
 /**
  * Review Matches (docs/SPEC.md 7h, "Review Matches"; Droidtop/tracker#318 §5): the games a scrape did not take a match
@@ -68,8 +79,8 @@ private val REVIEW_HINTS = listOf(
  * on the left and the source's best five answers on the right, the best chosen, each with its cover and the score's
  * pips. Up and Down choose, A applies the chosen one and moves to the next card, Left and Right move between cards,
  * L1 and R1 between tabs, X marks the game Local only (never asked about again), Y shows the chosen answer's
- * description, L2 searches the source again in the match picker, B closes. Games that searched for the same name are one
- * card, and a pick applies to all of them. A game a pass marked before the queue kept answers searches again on A.
+ * description, L2 searches the source again in the match picker, Select opens Accept all Likely, B closes. Games that
+ * searched for the same name are one card, and a pick applies to all of them. A game a pass marked before the queue kept answers searches again on A.
  * Everything is read from the queue, so it opens at once and offline.
  */
 @Composable
@@ -85,6 +96,7 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var status by remember { mutableStateOf<String?>(null) }
     var searching by remember { mutableStateOf<LibraryEntry?>(null) }
+    var acceptingAll by remember { mutableStateOf(false) }
     // Bumped after anything that changes the queue, so it is read again.
     var reads by remember { mutableIntStateOf(0) }
 
@@ -160,6 +172,37 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
         }
     }
 
+    // Accept all Likely (§5.3): every Likely card with a kept answer takes its best one, after the sheet is confirmed.
+    val likely = all.filter { it.tab == MatchQueue.Tab.LIKELY && it.choices.isNotEmpty() }
+    if (acceptingAll) {
+        AcceptAllSheet(
+            cards = likely,
+            entries = entries,
+            onAccept = {
+                acceptingAll = false
+                busy = true
+                scope.launch {
+                    var done = 0
+                    likely.forEach { c ->
+                        val best = c.choices.first().match
+                        c.items.mapNotNull { entries[it.gameId] }.forEach { game ->
+                            status = "Applying ${done + 1}: ${best.name}..."
+                            PcScraper.apply(context, game, best)
+                            done++
+                        }
+                    }
+                    status = "Matched $done games"
+                    busy = false
+                    cardIndex = 0
+                    choiceIndex = 0
+                    reads++
+                }
+            },
+            onDismiss = { acceptingAll = false },
+        )
+        return
+    }
+
     fun localOnly() {
         val c = card ?: return
         if (busy) return
@@ -194,7 +237,8 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
                     GamepadAction.X -> localOnly()
                     GamepadAction.Y -> details = !details
                     GamepadAction.L2 -> card?.let { c -> searching = gamesOf(c).firstOrNull() }
-                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
+                    GamepadAction.SELECT -> if (likely.isNotEmpty() && !busy) acceptingAll = true else status = "No Likely card has an answer to accept"
+                    GamepadAction.B -> onDismiss()
                     else -> Unit
                 }
                 true
@@ -322,3 +366,64 @@ private fun Pips(filled: Int) {
     }
 }
 
+/**
+ * The confirm for Accept all Likely (§5.3): every Likely card's local name over the cover of the answer it would take,
+ * [SHEET_PAGE] a page, so the whole set is seen before anything is written. L1 and R1 page, A accepts them all, B goes
+ * back to the cards with nothing applied.
+ */
+@Composable
+private fun AcceptAllSheet(cards: List<MatchQueue.Card>, entries: Map<String, LibraryEntry>, onAccept: () -> Unit, onDismiss: () -> Unit) {
+    var page by remember { mutableIntStateOf(0) }
+    val pages = ((cards.size + SHEET_PAGE - 1) / SHEET_PAGE).coerceAtLeast(1)
+    val games = cards.sumOf { it.items.size }
+    BackHandler { onDismiss() }
+    Dialog(onDismissRequest = onDismiss) {
+        GatePadInThisDialog()
+        MenuPanel(
+            modifier = Modifier.width(LocalShellWindow.current.panelWidth(760.dp)),
+            focusLabel = "Accept all Likely",
+            hints = SHEET_HINTS,
+            onPad = { press ->
+                when (press.action) {
+                    GamepadAction.L, GamepadAction.LEFT -> page = (page - 1).coerceAtLeast(0)
+                    GamepadAction.R, GamepadAction.RIGHT -> page = (page + 1).coerceAtMost(pages - 1)
+                    GamepadAction.A -> onAccept()
+                    GamepadAction.B -> onDismiss()
+                    else -> Unit
+                }
+                true
+            },
+        ) {
+            Text(
+                "Accept $games ${if (games == 1) "game" else "games"}?",
+                style = MaterialTheme.typography.titleMedium,
+                color = MenuTokens.OnSurface,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                "Each takes the answer shown. Page ${page + 1} of $pages",
+                style = MaterialTheme.typography.labelMedium,
+                color = MenuTokens.OnSurfaceMuted,
+            )
+            cards.drop(page * SHEET_PAGE).take(SHEET_PAGE).chunked(4).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { card ->
+                        val best = card.choices.first().match
+                        val local = entries[card.items.first().gameId]?.let { File(it.id).name } ?: card.searched
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Box(Modifier.size(width = 72.dp, height = 96.dp).background(MenuTokens.Placeholder)) {
+                                best.coverUrl?.let {
+                                    AsyncImage(model = it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(width = 72.dp, height = 96.dp))
+                                }
+                            }
+                            Text(local + if (card.items.size > 1) " x${card.items.size}" else "", style = MaterialTheme.typography.labelSmall, color = MenuTokens.OnSurfaceMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(best.name, style = MaterialTheme.typography.labelMedium, color = MenuTokens.OnSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                    // A short last row keeps its cells the size of a full row's.
+                    repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+        }
+    }
+}
