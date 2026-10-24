@@ -15407,7 +15407,9 @@ false "you have nothing", while it runs.
   nothing. A opens the same page of rows RetroAchievements' row opens: earned first with the date, then the rest, a
   secret one "Hidden achievement" until earned, a counted one "45 of 100", and "Open on Steam". No row when nobody is
   signed in, the game has none, or Steam cannot be reached; another failure says "Not loaded" with Steam's sentence.
-  GOG and Epic have no such call yet.
+  GOG and Epic have no such call yet. A game neither RetroAchievements nor its store covers gets the same row from
+  a plugin that provides achievements (docs/plugin-api.md 3 A8, `PluginAchievements`), told only the game's title,
+  system and store id.
 - **A rig check** of the tab by pad and touch on the emulator, and of the
   swapped face-button layout on the page, is listed in this change's
   commit message.

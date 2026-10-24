@@ -2406,8 +2406,10 @@ difference:
 - **For:** achievement sets and progress, for example RetroAchievements
   (#14) or a store's own achievements.
 - **Ops:**
-  - `set {entry ids/hashes} → [{id, title, desc, points, badgeUrl}]`;
-  - `progress {entry} → [{id, unlockedAt}]`;
+  - `set {entry} → {achievements: [{id, title, desc?, points?, badgeUrl?, hidden?}]}`;
+  - `progress {entry} → {unlocked: [{id, unlockedAt}]}`, `unlockedAt` in epoch milliseconds or an ISO date;
+  - `entry` is `{title, system?, store?: {id, gameId}}`: what the game is called, droidtop's system id, and the
+    store and its id for a store's game. Never a folder or a file on the device;
   - `account`, handled through G5.
 - **Events:** `achievements.unlocked` (host → plugins, for an overlay
   plugin).
@@ -2417,7 +2419,11 @@ difference:
   - D: the library object view.
 - **Permission:** `provide:achievements.provider`, `net.domains`, and
   `library.history` if the provider reads play sessions.
-- **Status:** not built.
+- **Status (2026-10-24, Droidtop/tracker#143):** `set` and `progress` built (`PluginAchievements`): when a game's
+  page opens and neither RetroAchievements nor the game's store has achievements for it, each provider is asked in
+  turn (10 s each) and the first with any fills the page's Achievements row and its page, the same row and page as
+  RetroAchievements' and Steam's. An `https` badge is kept, anything else dropped; 1000 at most. The event and the
+  Quick Menu surface are not built.
 
 **A9 Media and files library.** API `media.read@1`. Risk high.
 - **For:** a general-computer need: music, video, pictures and
