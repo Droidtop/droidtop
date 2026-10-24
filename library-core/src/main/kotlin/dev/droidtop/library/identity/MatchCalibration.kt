@@ -79,8 +79,10 @@ object MatchCalibration {
             "hash", "id" -> (if (answers.results.isEmpty()) MatchScore.Tier.E else MatchScore.Tier.A) to answers.results.firstOrNull()?.id
             "alias" -> (if (answers.results.isEmpty()) MatchScore.Tier.E else MatchScore.Tier.A_ALIAS) to answers.results.firstOrNull()?.id
             else -> {
-                val parsed = GameTitleParser.parseName(fixture.local)
-                val verdict = MatchScore.verdict(MatchScore.Local(parsed.title, fixture.local, fixture.year, fixture.system), answers.results)
+                // A ROM is a file: its name is searched without the extension, as the scraper does (romFile.nameWithoutExtension).
+                val name = if (fixture.kind == "rom") java.io.File(fixture.local).nameWithoutExtension else fixture.local
+                val parsed = GameTitleParser.parseName(name)
+                val verdict = MatchScore.verdict(MatchScore.Local(parsed.title, name, fixture.year, fixture.system), answers.results)
                 verdict.tier to verdict.best?.id
             }
         }
