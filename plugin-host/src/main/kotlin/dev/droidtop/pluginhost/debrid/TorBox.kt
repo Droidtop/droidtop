@@ -59,6 +59,61 @@ class TorBox(private val http: DebridTransport = DebridTransport.HTTP) : DebridP
         return DebridState.Ready(ready)
     }
 
+    /** `webdl/hosters`: each hoster's `domains`, of those whose `status` is not false (a hoster down for now). */
+    override fun hosts(key: String): Set<String> {
+        val (status, body) = http.call("GET", "$API/webdl/hosters", auth(key), null)
+        if (status != 200) return emptySet()
+        val list = (jsonOrNull(body) as? JSONObject)?.optJSONArray("data")?.objects().orEmpty()
+        return list.filter { it.opt("status") != false }.flatMap { hoster ->
+            hoster.optJSONArray("domains")?.let { domains -> (0 until domains.length()).map { domains.optString(it).trim().lowercase() } }.orEmpty()
+        }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    /** `webdl/checkcached` by the link's MD5. */
+    override fun linkCached(key: String, link: String): Boolean? {
+        val md5 = java.security.MessageDigest.getInstance("MD5").digest(link.toByteArray()).joinToString("") { "%02x".format(it) }
+        val (status, body) = http.call("GET", "$API/webdl/checkcached?hash=$md5&format=object", auth(key), null)
+        if (status != 200) return null
+        return when (val data = (jsonOrNull(body) as? JSONObject)?.opt("data")) {
+            is JSONObject -> data.length() > 0
+            null, JSONObject.NULL -> false
+            else -> null
+        }
+    }
+
+    /** `webdl/createwebdownload` (`webdownload_id`), its state from `webdl/mylist`, then `webdl/requestdl` per file. */
+    override fun unrestrict(key: String, link: String): DebridState {
+        val (status, body) = http.call("POST", "$API/webdl/createwebdownload", auth(key), mapOf("link" to link))
+        refusal(status, body)?.let { return it }
+        val id = (jsonOrNull(body) as? JSONObject)?.optJSONObject("data")?.opt("webdownload_id")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+            ?: return DebridState.Caching(null)
+        val (listed, listBody) = http.call("GET", "$API/webdl/mylist?id=${enc(id)}&bypass_cache=true", auth(key), null)
+        if (listed != 200) return DebridState.Caching(null)
+        val item = when (val data = (jsonOrNull(listBody) as? JSONObject)?.opt("data")) {
+            is JSONObject -> data
+            is org.json.JSONArray -> data.optJSONObject(0)
+            else -> null
+        } ?: return DebridState.Caching(null)
+        if (!(item.optBoolean("download_present") && item.optBoolean("download_finished"))) {
+            return DebridState.Caching((item.opt("progress") as? Number)?.toDouble())
+        }
+        val files = item.optJSONArray("files")?.objects().orEmpty()
+        if (files.isEmpty()) return DebridState.NotCached
+        return DebridState.Ready(
+            files.map { file ->
+                val fileId = file.opt("id")?.toString() ?: return DebridState.Failed("TorBox listed a file without an id")
+                val ask = "$API/webdl/requestdl?token=${enc(key.trim())}&web_id=${enc(id)}&file_id=${enc(fileId)}"
+                val (dlStatus, dlBody) = http.call("GET", ask, auth(key), null)
+                refusal(dlStatus, dlBody)?.let { return it }
+                // The address is `data` itself; an object with `download_link` is read too.
+                val data = (jsonOrNull(dlBody) as? JSONObject)?.opt("data")
+                val url = ((data as? JSONObject)?.optString("download_link") ?: data as? String)?.takeIf { it.startsWith("https://") }
+                    ?: return DebridState.Failed("TorBox gave no download address")
+                DebridFile(file.optString("short_name").ifBlank { file.optString("name").substringAfterLast('/') }, file.long("size"), url)
+            },
+        )
+    }
+
     private fun torrentById(key: String, id: Long): JSONObject? {
         val (status, body) = http.call("GET", "$API/torrents/mylist?id=$id&bypass_cache=true", auth(key), null)
         if (status != 200) return null

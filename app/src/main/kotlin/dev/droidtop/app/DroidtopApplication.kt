@@ -126,6 +126,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Debrid (Droidtop/tracker#638): a torrent job asks the person's accounts first, from the keys they entered.
         dev.droidtop.pluginhost.debrid.DebridStep.accounts = { context -> dev.droidtop.library.debrid.DebridAccounts.connected(context) }
         dev.droidtop.pluginhost.debrid.DebridStep.waitsForService = { context -> dev.droidtop.library.debrid.DebridAccounts.waits(context) }
+        // And a source's link on a file hoster the account serves (Pixeldrain, Mega, ...), before the page opens.
+        dev.droidtop.pluginhost.debrid.DebridLinks.accounts = { dev.droidtop.library.debrid.DebridAccounts.connected(this@DroidtopApplication) }
+        dev.droidtop.pluginhost.debrid.DebridLinks.waits = { dev.droidtop.library.debrid.DebridAccounts.waits(this@DroidtopApplication) }
         dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->
             dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
             listOfNotNull(
