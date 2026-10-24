@@ -51,7 +51,9 @@ class DebridTest {
             "GET https://api.torbox.app/v1/api/torrents/mylist?id=7" to (200 to """{"success":true,"data":{"id":7,"download_present":true,"download_finished":true,"files":[{"id":0,"name":"Game/a.bin","size":5},{"id":1,"name":"Game/b.bin","size":6}]}}"""),
             "GET https://api.torbox.app/v1/api/torrents/requestdl" to (200 to """{"success":true,"data":"https://cdn.torbox.example/x"}"""),
         )
-        val state = TorBox(http).request("key", ref) as DebridState.Ready
+        val sent = mutableListOf<Map<String, String>>()
+        val state = TorBox({ method, url, headers, form -> form?.let { sent += it }; http.call(method, url, headers, form) }).request("key", ref) as DebridState.Ready
+        assertEquals("a torrent droidtop adds is never seeded", "3", sent.first()["seed"])
         assertEquals(listOf("Game/a.bin", "Game/b.bin"), state.files.map { it.path })
         assertEquals(2, http.calls.count { it.contains("requestdl") })
     }

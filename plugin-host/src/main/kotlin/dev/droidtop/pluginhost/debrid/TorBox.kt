@@ -60,7 +60,7 @@ class TorBox(
     }
 
     override fun request(key: String, torrent: TorrentRef): DebridState {
-        val (status, body) = http.call("POST", "$API/torrents/createtorrent", auth(key), mapOf("magnet" to torrent.magnet, "allow_zip" to "false"))
+        val (status, body) = http.call("POST", "$API/torrents/createtorrent", auth(key), mapOf("magnet" to torrent.magnet, "allow_zip" to "false", "seed" to NO_SEEDING))
         refusal(status, body)?.let { return it }
         val id = ((jsonOrNull(body) as? JSONObject)?.optJSONObject("data"))?.long("torrent_id")
         val listed = if (id != null) torrentById(key, id) else torrentByHash(key, torrent.infoHash)
@@ -178,6 +178,12 @@ class TorBox(
 
     private companion object {
         const val API = "https://api.torbox.app/v1/api"
+
+        /**
+         * `seed` 3, "don't seed" (TorBox's CreateTorrentRequest: 1 auto, 2 seed, 3 don't seed; it overrides the account's
+         * setting for this torrent): a seeding torrent counts as active on TorBox (owner, 2026-10-24), and droidtop never seeds.
+         */
+        const val NO_SEEDING = "3"
         val AUTH_CODES = setOf("AUTH_ERROR", "BAD_TOKEN", "OAUTH_VERIFICATION_ERROR", "NO_AUTH")
         /** The refusals of a limit, and how long the account rests after one (a cooldown's end comes from `user/me`). */
         val LIMIT_CODES = mapOf(
