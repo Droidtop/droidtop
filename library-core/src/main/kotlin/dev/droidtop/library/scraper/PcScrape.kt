@@ -834,7 +834,7 @@ object PcScraper {
             steamStopped?.let { return PcOutcome.Refused(it, asked = false) }
             when (val lookup = SteamStoreClient.appDetails(appId)) {
                 is ScrapeLookup.Found -> {
-                    recordAnswers(context, entry, "steam", "id", listOf(lookup.value))
+                    recordAnswers(context, entry, "Steam", "id", "steam:$appId", "taken", listOf(lookup.value))
                     write(context, entry, flavour.complete(entry, lookup.value), confidence = "id", replaceExisting = false)
                     return PcOutcome.ByStoreId
                 }
@@ -849,11 +849,18 @@ object PcScraper {
             }
         }
         val title = searchTitleFor(entry)
-        val decision = when (val lookup = source.search(title)) {
+        val lookup = source.search(title)
+        val decision = when (lookup) {
             is ScrapeLookup.Refused -> return PcOutcome.Refused(lookup)
-            ScrapeLookup.NoMatch -> PcMatching.Decision.None.also { recordAnswers(context, entry, source.label, "name", emptyList()) }
-            is ScrapeLookup.Found -> PcMatching.decide(title, lookup.value).also { recordAnswers(context, entry, source.label, "name", lookup.value) }
+            ScrapeLookup.NoMatch -> PcMatching.Decision.None
+            is ScrapeLookup.Found -> PcMatching.decide(title, lookup.value)
         }
+        val today = when (decision) {
+            is PcMatching.Decision.Confident -> "taken"
+            is PcMatching.Decision.Ambiguous -> "asked"
+            PcMatching.Decision.None -> "none"
+        }
+        recordAnswers(context, entry, source.label, "name", title, today, if (lookup is ScrapeLookup.Found) lookup.value else emptyList())
         if (decision is PcMatching.Decision.Confident) {
             write(context, entry, flavour.complete(entry, decision.match), confidence = "name", replaceExisting = false)
             return PcOutcome.ByName
@@ -1012,12 +1019,9 @@ object PcScraper {
      * What [source] answered for [entry], for the calibration set when recording is on (Droidtop/tracker#318). A game the
      * person named is left out: its search is their name, not one droidtop read from the disk.
      */
-    private fun recordAnswers(context: Context, entry: LibraryEntry, source: String, by: String, matches: List<PcMatch>) {
+    private fun recordAnswers(context: Context, entry: LibraryEntry, source: String, by: String, searched: String, today: String, matches: List<PcMatch>) {
         if (!entry.gameName.isNullOrBlank()) return
-        val own = PcGameIds.of(entry)
-        val kind = if (own.steamAppId != null || own.gogId != null) "store" else "folder"
-        val local = File(entry.id).takeIf { it.isDirectory }?.name ?: entry.title
-        dev.droidtop.library.identity.MatchRecorder.pc(context, entry.id, kind, local, entry.pcInfo?.sizeBytes?.takeIf { it > 0 }, source, by, matches)
+        dev.droidtop.library.identity.MatchRecorder.pc(context, entry, source, by, searched, today, matches)
     }
 
     internal fun searchTitleFor(entry: LibraryEntry): String {

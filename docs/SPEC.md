@@ -8361,8 +8361,9 @@ catalog (no second settings system):
 - **What the menu holds** (droidtop-wide rows, moved out of everyday
   groups): **Rebuild the library index**
   (from the Library group, recovery for a list that looks wrong), **Install
-  debug builds** (from Updates), and on a debug build **Debug: force a
-  crash**.
+  debug builds** (from Updates), on a debug build **Debug: force a
+  crash**, and **Matching > Record match answers** (Droidtop/tracker#318: see
+  "Calibrating name matching from recorded answers" under 7).
 - **Technical rows stay on their own page, shown only while it is on:**
   a plugin's **Advanced** group (its id, origin, archive digest and the
   containment check), **Plugin messages**, every **Technical details** row
@@ -14039,6 +14040,28 @@ the same care as the art.
     plugin declares one) are asked with the game's title, folder name and source links for every game the
     pass reaches, after the built-in sources, filling only what those left empty; that is unchanged, and
     now reaches the engine games the old "has details" rule passed over.
+- **Calibrating name matching from recorded answers (decided 2026-10-24, Droidtop/tracker#318 §3.3).** The score
+  and tiers that will replace `PcMatching`'s exact-only bar (`identity/MatchScore`) are graded offline against a set
+  of games with the right answers (`identity/MatchCalibration`, one JSON line per game). The set is built from real
+  scrapes, and nobody labels it game by game. The owner, 2026-10-24: "The log needs to be automated. Provide all
+  the information we have about the game, possible matches, and etc. Have an agent review it and fix. But it
+  shouldn't require my manual intervention for every game, unless I'm doing manual fixes." So:
+  - **Developer > Matching > Record match answers** (off by default) makes each scrape append a line per game to
+    `Download/droidtop/match-answers.jsonl` (`identity/MatchRecorder`). For a PC game the line carries everything
+    droidtop knew: the parsed name (title, version, release tag, language, platform, subtitle), the library kind
+    (an engine game is `engine`, a Steam or GOG game `store`, else `folder`), store and external ids, install path,
+    size, the parent folder, up to 40 of the folder's file names, what was searched, what droidtop does with the
+    answers today, and the new score's tier. It also holds every candidate the selected source returned, with its
+    ids, release date, developer, publisher, genre, series, cover and the first 600 characters of its description.
+    A Steam game asked by its app id is recorded the same way, and a ROM ScreenScraper matched by hash is recorded
+    as a certain answer. A ROM matched by name is not recorded: today's ROM sources return one picked answer, not
+    the candidates. A game the person named is not recorded either, since its search is their name.
+  - Each line's `truth` starts as `"?"`. A reviewing agent settles it from the facts and candidates, writing in
+    `review` that the agent settled it, whether it is sure, and why. The grade leaves out a `"?"` line and any
+    answer whose reviewer was not sure. A person only overrides, with `"by":"person"`, which stands over the agent.
+    Where the reviewing agent runs is the coordinator's to decide.
+  - The set gates auto-accept at tier B once it holds 200 games, with 40 or more each of rom, store, folder and
+    engine. It allows at most 1 wrong in 100 at B, and needs at least 70% answered without asking.
 - **What counts as art (decided 2026-10-17).** The owner, from the console: "Games missing artwork" always said
   `nothing matches the "Games missing artwork" scrape filter`, because a folder or engine game counted as having
   art when it showed any picture (its .exe's icon, a store's icon, a screenshot in downloaded_media). For every PC
