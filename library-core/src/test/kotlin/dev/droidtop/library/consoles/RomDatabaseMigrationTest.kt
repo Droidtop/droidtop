@@ -99,7 +99,7 @@ class RomDatabaseMigrationTest {
         // not depend on WAL support in the test JVM; no destructive
         // fallback is registered, on purpose (see the class comment).
         val room = Room.databaseBuilder(context, RomDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
             .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
             .allowMainThreadQueries()
             .build()
@@ -140,6 +140,10 @@ class RomDatabaseMigrationTest {
         assertEquals(emptyList<Any>(), runBlocking { room.identityDao().claimsOf(uid!!) })
         val games = room.openHelper.readableDatabase.query("SELECT COUNT(*) FROM games WHERE uid = ?", arrayOf<Any>(uid!!)).use { it.moveToFirst(); it.getInt(0) }
         assertEquals(1, games)
+
+        // v13 (Droidtop/tracker#318 §5): the review queue exists and starts empty; the next pass fills it.
+        assertEquals(null, runBlocking { room.romDao().matchQueueRow(GAME_ID) })
+        assertEquals(emptyList<Any>(), runBlocking { room.romDao().matchQueueRows(dev.droidtop.library.identity.MatchQueue.QUEUED) })
 
         room.close()
     }

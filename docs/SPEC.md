@@ -14091,6 +14091,17 @@ the same care as the art.
   0, opens `ChooseMatchesList`: one row per waiting game, Up and Down to move, A opens its manual match picker,
   B closes. Any match replaces the state, so a matched game leaves the list as the picker closes and focus stays
   where it was; a later pass that finds nothing at all clears it. The pass's summary points at the row.
+- **Review Matches: the queue keeps what the source answered (2026-10-24, Droidtop/tracker#318 slice 3).** The
+  coordinator's queue for this lane (tracker `coordination/LANES-NOW.md`): "#318 matching slice 3: the bulk review
+  queue, clearable on the handheld." A PC pass that does not take a match keeps the game in `match_queue` (database
+  v13, `identity/MatchQueue`) with what it searched, the source, when, and the source's best five candidates as
+  `PcScraper.apply` needs them. The queue therefore opens at once and offline, and nothing is asked again to show
+  it. A tie or an answer without an exact match is queued with its candidates; no answer at all is queued with
+  none. A match by id, by name, by the person's pick or by a plugin's takes it off. The tab comes from the new
+  score (`MatchScore`, #318 §3.2). **Likely** holds tiers A to C; a best answer today's matcher would not take but
+  the score likes waits here, since the score is not live until its calibration set passes. **Unsure** holds tier
+  D and **Not found** tier E. **Local only**, which the person sets, keeps a game out of the queue and is never
+  overwritten by a pass. `needs_pick` stays on the row as before, for the filters that read it.
 - **A source's own match: plugins search by name and link what they find (2026-10-17, Droidtop/tracker#575).**
   The coordinator: the F95 plugin's metadata fetch needs a thread id, so the PC scrape got no F95 text for a game
   nobody had linked. A metadata plugin (docs/plugin-api.md 3 A3) is now asked like a built-in source:

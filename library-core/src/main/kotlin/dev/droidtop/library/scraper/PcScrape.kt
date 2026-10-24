@@ -474,6 +474,7 @@ object PcScraper {
         val flavour = PcFlavour(context)
         val record = flavour.complete(entry, match)
         write(context, entry, record, confidence = "manual", replaceExisting = true)
+        dev.droidtop.library.identity.MatchQueue.clear(context, entry.id)
         "Matched ${entry.title} to ${match.name} (${match.sourceLabel})." + flavour.notes().let { if (it.isEmpty()) "" else " $it" }
     }
 
@@ -581,6 +582,13 @@ object PcScraper {
                 } else {
                     refusedInARow = 0
                     if (outcome == PcOutcome.ByStoreId) steamInARow = 0
+                }
+                // Review Matches (Droidtop/tracker#318 §5): a game not taken waits with what the source answered; a match takes it off.
+                when (outcome) {
+                    PcOutcome.ByStoreId, PcOutcome.ByName -> dev.droidtop.library.identity.MatchQueue.clear(context, entry.id)
+                    is PcOutcome.NeedsPicking -> dev.droidtop.library.identity.MatchQueue.put(context, entry, source.label, outcome.searched, outcome.matches)
+                    is PcOutcome.NoMatch -> if (!pluginTie) dev.droidtop.library.identity.MatchQueue.put(context, entry, source.label, outcome.searched, emptyList())
+                    is PcOutcome.Refused -> Unit
                 }
                 when (outcome) {
                     PcOutcome.ByStoreId -> counts.byStoreId++
@@ -793,6 +801,7 @@ object PcScraper {
             writePluginFields(context, entry, listOfNotNull(answer.fields?.takeUnless { it.isEmpty }))
             coverFromPlugins(context, entry, listOf(answer))
             markNeedsPick(context, entry, needs = false)
+            dev.droidtop.library.identity.MatchQueue.clear(context, entry.id)
             "Matched ${entry.title} to ${pick.name} (${pick.source.label})."
         } finally {
             session.close()
@@ -803,7 +812,8 @@ object PcScraper {
     private sealed interface PcOutcome {
         data object ByStoreId : PcOutcome
         data object ByName : PcOutcome
-        data class NeedsPicking(val searched: String, val candidates: Int) : PcOutcome
+        /** [matches] are what the source answered, kept for Review Matches (Droidtop/tracker#318 §5). */
+        data class NeedsPicking(val searched: String, val candidates: Int, val matches: List<PcMatch> = emptyList()) : PcOutcome
         data class NoMatch(val searched: String) : PcOutcome
         /** [asked] false: the source had already refused [REFUSAL_ABORT_THRESHOLD] in a row and this game was not sent to it. */
         data class Refused(val refusal: ScrapeLookup.Refused, val asked: Boolean = true) : PcOutcome
@@ -872,7 +882,7 @@ object PcScraper {
             return PcOutcome.ByName
         }
         return when (decision) {
-            is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking(title, decision.matches.size)
+            is PcMatching.Decision.Ambiguous -> PcOutcome.NeedsPicking(title, decision.matches.size, decision.matches)
             else -> PcOutcome.NoMatch(title)
         }
     }

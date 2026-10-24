@@ -195,6 +195,19 @@ interface RomDao {
     @Query("SELECT id FROM game_metadata WHERE scrape_confidence = :confidence")
     suspend fun idsWithScrapeConfidence(confidence: String): List<String>
 
+    // Review Matches (Droidtop/tracker#318 §5): the games waiting for a pick, with their candidates (identity.MatchQueue).
+    @Query("SELECT * FROM match_queue WHERE game_id = :gameId")
+    suspend fun matchQueueRow(gameId: String): MatchQueueEntity?
+
+    @Query("SELECT * FROM match_queue WHERE state = :state ORDER BY tab, game_id")
+    suspend fun matchQueueRows(state: String): List<MatchQueueEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putMatchQueueRow(row: MatchQueueEntity)
+
+    @Query("DELETE FROM match_queue WHERE game_id = :gameId AND state = :state")
+    suspend fun deleteQueuedMatch(gameId: String, state: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGameMetadata(metadata: GameMetadataEntity)
 
@@ -522,6 +535,36 @@ val MIGRATION_11_12 = object : Migration(11, 12) {
     }
 }
 
+/**
+ * v12 -> v13 (Droidtop/tracker#318 §4.1, §5): the review queue, the games a scrape did not take a match for with their
+ * best five candidates kept, so Review Matches opens at once and offline. Empty to begin with: the next pass fills it,
+ * and a game a pass already left at "needs a pick" is asked again then.
+ */
+val MIGRATION_12_13 = object : Migration(12, 13) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `match_queue` (`game_id` TEXT NOT NULL, `state` TEXT NOT NULL, `tab` TEXT NOT NULL, " +
+                "`source` TEXT NOT NULL, `searched` TEXT NOT NULL, `candidates` TEXT NOT NULL, `asked_at` INTEGER NOT NULL, " +
+                "PRIMARY KEY(`game_id`))",
+        )
+    }
+}
+
+/**
+ * One game in the review queue ([dev.droidtop.library.identity.MatchQueue]): `queued` with its [tab] and [candidates]
+ * (JSON, best first), or `local_only`, which the person set to stop being asked.
+ */
+@Entity(tableName = "match_queue")
+data class MatchQueueEntity(
+    @PrimaryKey @ColumnInfo(name = "game_id") val gameId: String,
+    val state: String,
+    val tab: String,
+    val source: String,
+    val searched: String,
+    val candidates: String,
+    @ColumnInfo(name = "asked_at") val askedAt: Long,
+)
+
 /** A game's identity (Droidtop/tracker#318): minted at first sight, never changed on this device. */
 @Entity(tableName = "games")
 data class GameEntity(
@@ -589,8 +632,9 @@ interface GameIdentityDao {
         GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
         GameEntity::class, GameClaimEntity::class, GameLocatorEntity::class,
+        MatchQueueEntity::class,
     ],
-    version = 12,
+    version = 13,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
@@ -616,7 +660,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12, MIGRATION_12_13)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }
