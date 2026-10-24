@@ -44,9 +44,12 @@ import dev.droidtop.library.credentials.handoff.HandoffServer
 import dev.droidtop.library.credentials.handoff.HandoffSession
 import dev.droidtop.library.credentials.web.KeyPageSpec
 import dev.droidtop.library.credentials.web.KeyPages
+import dev.droidtop.library.debrid.DebridAccounts
 import dev.droidtop.library.scraper.ScraperKeyCheck
 import dev.droidtop.library.scraper.ScraperKeyService
 import dev.droidtop.library.scraper.ScraperKeyState
+import dev.droidtop.library.scraper.ScraperKeyVerified
+import dev.droidtop.pluginhost.debrid.RealDebridSignIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -217,6 +220,14 @@ private fun ManualSetup(service: ScraperKeyService, autoPhone: Boolean, browserP
     Text(result ?: state, style = MaterialTheme.typography.titleMedium)
     Text(service.credit, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Text(service.gets, style = MaterialTheme.typography.labelLarge)
+    if (service == ScraperKeyService.REALDEBRID) {
+        RealDebridSignInPanel(onSignedIn = { token ->
+            buffer["api_token"] = token
+            result = ScraperKeyState.CONNECTED
+            scope.launch { refresh() }
+        })
+        Text("Or paste a token", style = MaterialTheme.typography.titleMedium)
+    }
     if (browserPaneAvailable) {
         Button(onClick = onBrowserPane) { Text("Open the key page here") }
     }
@@ -329,6 +340,78 @@ private fun PhonePanel(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(onClick = { onSave(received) }) { Text("Save") }
                 TextButton(onClick = onCancel) { Text("Discard") }
+            }
+        }
+    }
+}
+
+/**
+ * Real-Debrid's device sign-in (Droidtop/tracker#638): a short code to enter at real-debrid.com/device on any device,
+ * with the page as a QR code. Approval stores the sign-in, whose token droidtop refreshes itself; leaving the screen
+ * or Cancel stops the wait.
+ */
+@Composable
+private fun RealDebridSignInPanel(onSignedIn: (String) -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var code by remember { mutableStateOf<RealDebridSignIn.Code?>(null) }
+    var secondsLeft by remember { mutableStateOf(0) }
+    var line by remember { mutableStateOf<String?>(null) }
+    var waiting by remember { mutableStateOf(false) }
+    val cancelled = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    DisposableEffect(Unit) { onDispose { cancelled.set(true) } }
+
+    fun start() {
+        cancelled.set(false)
+        waiting = true
+        line = null
+        scope.launch {
+            val ended = withContext(Dispatchers.IO) {
+                val flow = RealDebridSignIn()
+                val (issued, refused) = try {
+                    flow.code()
+                } catch (e: java.io.IOException) {
+                    null to "Can't reach Real-Debrid. Try again when you are online"
+                }
+                if (issued == null) return@withContext refused
+                code = issued
+                val outcome = try {
+                    flow.await(issued, isCancelled = { cancelled.get() }, onWaiting = { secondsLeft = it })
+                } catch (e: java.io.IOException) {
+                    RealDebridSignIn.Outcome.Failed("Lost the connection to Real-Debrid")
+                }
+                when (outcome) {
+                    is RealDebridSignIn.Outcome.SignedIn -> {
+                        DebridAccounts.saveRealDebrid(context, outcome.credential)
+                        ScraperKeyVerified.set(context, ScraperKeyService.REALDEBRID, true)
+                        withContext(Dispatchers.Main) { onSignedIn(outcome.credential.accessToken) }
+                        "Signed in"
+                    }
+                    RealDebridSignIn.Outcome.Expired -> "The code ran out before it was approved. Start again for a new one"
+                    RealDebridSignIn.Outcome.Cancelled -> "Sign-in cancelled. Nothing was saved"
+                    is RealDebridSignIn.Outcome.Failed -> outcome.reason
+                }
+            }
+            code = null
+            waiting = false
+            line = ended
+        }
+    }
+
+    val shown = code
+    if (shown == null) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Button(enabled = !waiting, onClick = { start() }) { Text("Sign in with a code") }
+            line?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        }
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            QrCode(content = shown.verificationUrl, size = 180.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Enter this code at ${shown.verificationUrl.removePrefix("https://")}", style = MaterialTheme.typography.bodyLarge)
+                Text(shown.userCode, style = MaterialTheme.typography.headlineMedium)
+                Text("%d:%02d left".format(secondsLeft / 60, secondsLeft % 60), style = MaterialTheme.typography.bodyMedium)
+                TextButton(onClick = { cancelled.set(true) }) { Text("Cancel") }
             }
         }
     }

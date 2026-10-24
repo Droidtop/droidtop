@@ -87,6 +87,53 @@ class RealDebrid(private val http: DebridTransport = DebridTransport.HTTP) : Deb
         return DebridState.Ready(files)
     }
 
+    /**
+     * The hosters this account can fetch from now: `hosts/status`, the supported ones not down; `hosts/domains` when
+     * Real-Debrid does not answer that. Real-Debrid fetches a hoster link as it is asked, so there is no cache to ask.
+     */
+    override fun hosts(key: String): Set<String> {
+        val (status, body) = http.call("GET", "$API/hosts/status", auth(key), null)
+        val byDomain = (jsonOrNull(body) as? JSONObject)?.takeIf { status == 200 }
+        if (byDomain != null) {
+            return byDomain.keys().asSequence().filter { domain ->
+                val host = byDomain.optJSONObject(domain)
+                host != null && host.optInt("supported") == 1 && host.optString("status") != "down"
+            }.map { it.trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+        }
+        val (listed, domains) = http.call("GET", "$API/hosts/domains", emptyMap(), null)
+        val array = (jsonOrNull(domains) as? JSONArray)?.takeIf { listed == 200 } ?: return emptySet()
+        return (0 until array.length()).map { array.optString(it).trim().lowercase() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    /** `unrestrict/link`: the hoster's file as one direct download, or why not. */
+    override fun unrestrict(key: String, link: String): DebridState {
+        val (status, body) = http.call("POST", "$API/unrestrict/link", auth(key), mapOf("link" to link))
+        val answer = jsonOrNull(body) as? JSONObject
+        if (status in 200..299) {
+            val url = answer?.optString("download")?.takeIf { it.startsWith("https://") } ?: return DebridState.Failed("Real-Debrid gave no download address")
+            val name = answer.optString("filename").takeIf { it.isNotBlank() } ?: url.substringAfterLast('/').substringBefore('?')
+            return DebridState.Ready(listOf(DebridFile(name, answer.long("filesize")?.takeIf { it > 0 }, url)))
+        }
+        return errorState(status, answer)
+    }
+
+    /** Real-Debrid's `{error, error_code}` as a state: the codes its documentation lists, else by status. Pure, for the tests. */
+    internal fun errorState(status: Int, answer: JSONObject?): DebridState.Failed {
+        val code = answer?.opt("error_code") as? Number
+        val said = answer?.optString("error")?.takeIf { it.isNotBlank() }?.replace('_', ' ')
+        return when (code?.toInt()) {
+            8 -> DebridState.Failed("Real-Debrid did not take the token", auth = true)
+            16 -> DebridState.Failed("Real-Debrid does not support that hoster", permanent = true)
+            18 -> DebridState.Failed("Real-Debrid has reached its limit on that hoster for now")
+            21 -> DebridState.Failed("Real-Debrid has too many of this account's downloads running")
+            23 -> DebridState.Failed("This Real-Debrid account's traffic is used up")
+            34 -> DebridState.Failed("Real-Debrid asked to wait: too many requests")
+            35 -> DebridState.Failed("Real-Debrid refuses that file", permanent = true)
+            36 -> DebridState.Failed("This Real-Debrid account reached its fair-usage limit")
+            else -> refusal(status) ?: DebridState.Failed("Real-Debrid did not fetch the link (${said ?: "answered $status"})")
+        }
+    }
+
     /** A refused answer as one sentence, or null when it was taken. Pure, for the tests. */
     internal fun refusal(status: Int): DebridState.Failed? = when (status) {
         401, 403 -> DebridState.Failed("Real-Debrid did not take the token", auth = true)

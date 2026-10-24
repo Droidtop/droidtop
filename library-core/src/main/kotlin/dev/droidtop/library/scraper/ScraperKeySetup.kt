@@ -152,6 +152,7 @@ enum class ScraperKeyService(
     /** Stores [values] (by field id) in the encrypted store and clears the tested state. */
     fun write(context: Context, values: Map<String, String>) {
         fields.forEach { field -> values[field.id]?.let { CredentialStore.put(context, field.storeKey, it.trim()) } }
+        if (this == REALDEBRID) dev.droidtop.library.debrid.DebridAccounts.forgetStaleSignIn(context)
         ScraperKeyVerified.set(context, this, false)
     }
 
@@ -257,7 +258,7 @@ object ScraperKeyCheck {
                     dev.droidtop.library.achievements.RetroAchievementsClient.profile(values.getValue("username"), values.getValue("api_key")),
                 )
                 ScraperKeyService.TORBOX -> debridOutcome("torbox", values.getValue("api_key"))
-                ScraperKeyService.REALDEBRID -> debridOutcome("realdebrid", values.getValue("api_token"))
+                ScraperKeyService.REALDEBRID -> debridOutcome("realdebrid", dev.droidtop.library.debrid.DebridAccounts.realDebridToken(context))
             }
         }
         // A network failure says nothing about the credential: keep the last verdict.

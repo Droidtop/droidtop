@@ -183,4 +183,71 @@ class DebridTest {
         assertEquals("https://cdn.torbox.example/g", ready.files.single().url)
         assertTrue(http.calls.any { it.contains("web_id=w1") && it.contains("file_id=3") })
     }
+
+    @Test
+    fun realDebridListsItsSupportedHostersAndServesALinkAsOneDownload() {
+        val http = Canned(
+            "GET https://api.real-debrid.com/rest/1.0/hosts/status" to (200 to """{"pixeldrain.com":{"supported":1,"status":"up"},"mega.nz":{"supported":1,"status":"down"},"gofile.io":{"supported":0,"status":"up"}}"""),
+            "POST https://api.real-debrid.com/rest/1.0/unrestrict/link" to (200 to """{"filename":"Game.zip","filesize":123,"download":"https://dl.real-debrid.example/Game.zip"}"""),
+        )
+        val rd = RealDebrid(http)
+        assertEquals(setOf("pixeldrain.com"), rd.hosts("t"))
+        val ready = rd.unrestrict("t", "https://pixeldrain.com/u/abc") as DebridState.Ready
+        assertEquals(listOf(DebridFile("Game.zip", 123, "https://dl.real-debrid.example/Game.zip")), ready.files)
+        val fallback = Canned("GET https://api.real-debrid.com/rest/1.0/hosts/domains" to (200 to """["1fichier.com","Pixeldrain.com"]"""))
+        assertEquals(setOf("1fichier.com", "pixeldrain.com"), RealDebrid(fallback).hosts("t"))
+    }
+
+    @Test
+    fun realDebridsErrorCodesSayWhatTheyAre() {
+        val rd = RealDebrid(Canned())
+        assertTrue(rd.errorState(401, org.json.JSONObject("""{"error":"bad_token","error_code":8}""")).auth)
+        assertTrue(rd.errorState(503, org.json.JSONObject("""{"error":"hoster_unsupported","error_code":16}""")).permanent)
+        val traffic = rd.errorState(503, org.json.JSONObject("""{"error":"traffic_exhausted","error_code":23}"""))
+        assertEquals("This Real-Debrid account's traffic is used up", traffic.message)
+        assertTrue(!traffic.permanent)
+        assertEquals("Real-Debrid did not fetch the link (unknown thing)", rd.errorState(503, org.json.JSONObject("""{"error":"unknown_thing","error_code":99}""")).message)
+    }
+
+    @Test
+    fun aDeviceSignInWaitsForApprovalThenTurnsTheCodeIntoAToken() {
+        var approved = false
+        val form = mutableListOf<Map<String, String>>()
+        val http = DebridTransport { method, url, _, sent ->
+            sent?.let { form += it }
+            when {
+                url.startsWith("https://api.real-debrid.com/oauth/v2/device/code?client_id=X245A4XAIBGVM&new_credentials=yes") ->
+                    200 to """{"device_code":"DEV","user_code":"ABCD1234","interval":5,"expires_in":1800,"verification_url":"https://real-debrid.com/device"}"""
+                url.startsWith("https://api.real-debrid.com/oauth/v2/device/credentials?client_id=X245A4XAIBGVM&code=DEV") ->
+                    if (approved) 200 to """{"client_id":"MINE","client_secret":"SECRET"}""" else { approved = true; 403 to """{"error":"authorization_pending"}""" }
+                method == "POST" && url == "https://api.real-debrid.com/oauth/v2/token" ->
+                    200 to """{"access_token":"ACCESS","expires_in":3600,"token_type":"Bearer","refresh_token":"REFRESH"}"""
+                else -> 404 to ""
+            }
+        }
+        val flow = RealDebridSignIn(http)
+        val code = flow.code().first!!
+        assertEquals("ABCD1234", code.userCode)
+        var clock = 1_000L
+        val slept = mutableListOf<Long>()
+        val outcome = flow.await(code, isCancelled = { false }, now = { clock }, sleep = { slept += it; clock += it })
+        val credential = (outcome as RealDebridSignIn.Outcome.SignedIn).credential
+        assertEquals(RealDebridSignIn.Credential("MINE", "SECRET", "ACCESS", "REFRESH", clock + 3_600_000L), credential)
+        assertEquals(5_000L, slept.sum())
+        assertEquals(mapOf("client_id" to "MINE", "client_secret" to "SECRET", "code" to "DEV", "grant_type" to RealDebridSignIn.DEVICE_GRANT), form.single())
+        assertEquals(credential, RealDebridSignIn.Credential.fromJson(credential.toJson()))
+        assertTrue("the secret half is never printed", !credential.toString().contains("SECRET") && !code.toString().contains("DEV"))
+
+        flow.refresh(credential)
+        assertEquals("REFRESH", form.last()["code"])
+    }
+
+    @Test
+    fun aCodeNobodyApprovesRunsOutAndCancelStopsTheWait() {
+        val pending = DebridTransport { _, _, _, _ -> 403 to """{"error":"authorization_pending"}""" }
+        val code = RealDebridSignIn.Code("DEV", "ABCD", "https://real-debrid.com/device", 5, 12)
+        var clock = 0L
+        assertEquals(RealDebridSignIn.Outcome.Expired, RealDebridSignIn(pending).await(code, { false }, now = { clock }, sleep = { clock += it }))
+        assertEquals(RealDebridSignIn.Outcome.Cancelled, RealDebridSignIn(pending).await(code, { true }, now = { 0L }, sleep = {}))
+    }
 }

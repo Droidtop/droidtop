@@ -33,12 +33,15 @@ object CredentialStore {
     const val TORBOX_API_KEY = "droidtop_torbox_apikey"
     const val REALDEBRID_TOKEN = "droidtop_realdebrid_token"
 
+    /** A Real-Debrid device sign-in (its device credentials and refresh token, JSON); its access token is [REALDEBRID_TOKEN]. */
+    const val REALDEBRID_SIGNIN = "droidtop_realdebrid_signin"
+
     /** Every key the vault holds; also the set a settings backup exports when the person opts in. */
     val KEYS: Set<String> = setOf(
         IGDB_CLIENT_ID, IGDB_CLIENT_SECRET, STEAMGRIDDB_API_KEY,
         THEGAMESDB_API_KEY, SCREENSCRAPER_USER, SCREENSCRAPER_PASSWORD,
         RETROACHIEVEMENTS_USER, RETROACHIEVEMENTS_API_KEY,
-        TORBOX_API_KEY, REALDEBRID_TOKEN,
+        TORBOX_API_KEY, REALDEBRID_TOKEN, REALDEBRID_SIGNIN,
     )
 
     @Volatile private var vault: CredentialVault? = null
