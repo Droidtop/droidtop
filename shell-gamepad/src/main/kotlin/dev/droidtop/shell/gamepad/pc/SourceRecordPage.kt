@@ -59,9 +59,6 @@ internal sealed interface RecordAction {
 
     /** The source's site checks the browser first: its check, in droidtop's web view (Droidtop/tracker#600). */
     data object PassCheck : RecordAction
-
-    /** The game's own page, when the record was opened from somewhere else (an update row, Droidtop/tracker#639). */
-    data object OpenGame : RecordAction
 }
 
 /** The row every tab starts with while [sourceLabel]'s site waits for the person to pass its browser check. */
@@ -133,9 +130,48 @@ internal fun downloadRows(record: UpdateSources.Record, picked: String?): List<R
     return head + links.ifEmpty { listOf(RecordRow("No links for $label")) } + group("Extras", extras) + group("Other", other)
 }
 
+/**
+ * Gets [picked], one of [record]'s downloads of [source], as the new version of the game whose newest version is
+ * [newest]: the one sequence the record page and the record screen ([SourceRecordScreen]) both run. [say] carries the
+ * progress lines; the return is the last line. Suspends for the source's check and sign-in when its site asks.
+ */
+internal suspend fun getDownload(
+    library: Library,
+    source: UpdateSources.Source,
+    record: UpdateSources.Record,
+    picked: UpdateSources.Download,
+    gameName: String,
+    newest: LibraryEntry,
+    say: (String) -> Unit,
+): String {
+    val externalId = record.externalId
+    // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).
+    if (library.sourceNeedsCheck(source.key)) {
+        say("${source.label} checks the browser first")
+        if (!library.passSourceCheck(source.key)) return "${source.label}'s check was not passed, so nothing was downloaded"
+    }
+    // A link the source gave is opened in droidtop's web view, where the person starts the download and droidtop takes it
+    // over (Droidtop/tracker#599). A mirror with no link is looked up in the record asked again first: the token of a
+    // saved record goes stale when the source's page changes. Only a mirror that still has no link goes to the source's
+    // job, with the fresh token.
+    var use = if (picked.url != null) picked else library.freshDownload(source.key, externalId, picked, record.downloads) ?: picked
+    // Still no address, and the source's links are for signed-in people: its sign-in, not "no link now".
+    if (use.url == null && library.sourceSignedOut(source.key)) {
+        say("Sign in to ${source.label} to get download links")
+        if (!library.signInToSource(source.key)) return "Not signed in to ${source.label}, so nothing was downloaded"
+        use = library.freshDownload(source.key, externalId, picked, record.downloads) ?: use
+    }
+    val url = use.url
+    return if (url != null) {
+        library.openUpdateLink(source.key, externalId, url, record.url, record.version, gameName, newest) { status -> say(status) }
+    } else {
+        library.downloadUpdate(source.key, externalId, use.link, record.version, gameName, newest) { status -> say(status) }
+    }
+}
+
 /** Where the record page keeps the system last picked per source. */
-private const val RECORD_PREFS = "source_record_page"
-private const val SYSTEM_KEY_PREFIX = "system:"
+internal const val RECORD_PREFS = "source_record_page"
+internal const val SYSTEM_KEY_PREFIX = "system:"
 
 /** The system [step] away from [picked] among [offered], wrapping round. */
 internal fun nextSystem(offered: List<String>, picked: String?, step: Int): String? {
@@ -171,8 +207,7 @@ internal fun recordRows(record: UpdateSources.Record, tab: RecordTab, picked: St
 /**
  * The record page of [source]'s record [externalId], linked to the game whose newest version is [newest]. [scope] is
  * the caller's and outlives the page: a download goes on after it closes, in Downloads. [say] shows a line on the
- * game page; [onRelink] opens the link sheet; [onOpen] opens a web page. [onOpenGame], when the page was opened from
- * outside the game (an update row), is its last row and X: the game's page, the secondary way out. [installedVersion] is
+ * game page; [onRelink] opens the link sheet; [onOpen] opens a web page. [installedVersion] is
  * the version here, said under the title beside the record's ("Available: v0.38", "Installed: v0.37").
  */
 @Composable
@@ -188,7 +223,6 @@ internal fun SourceRecordPage(
     onOpen: (String) -> Unit,
     onClose: () -> Unit,
     startTab: RecordTab = RecordTab.OVERVIEW,
-    onOpenGame: (() -> Unit)? = null,
     installedVersion: String? = null,
 ) {
     // droidtop's saved copy first, so the page shows at once, then the source's answer (Droidtop/tracker#599).
@@ -213,14 +247,11 @@ internal fun SourceRecordPage(
     // With no page to show, the one thing to do is Change link: the page never relinks by itself (Droidtop/tracker#619).
     val rows = remember(record, tab, picked, answer, signedOut, needsCheck) {
         val check = listOfNotNull(checkRow(source.label).takeIf { needsCheck })
-        val game = listOfNotNull(if (onOpenGame != null) RecordRow("Open game page", gameName, action = RecordAction.OpenGame) else null)
-        (
-            record?.let { r ->
-                val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS && !needsCheck }
-                check + listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
-            }
-                ?: if (answer != null) check + RecordRow("Change link", "#$externalId", action = RecordAction.Relink) else emptyList()
-            ) + game
+        record?.let { r ->
+            val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS && !needsCheck }
+            check + listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
+        }
+            ?: if (answer != null) check + RecordRow("Change link", "#$externalId", action = RecordAction.Relink) else emptyList()
     }
 
     fun pickSystem(step: Int) {
@@ -240,7 +271,6 @@ internal fun SourceRecordPage(
             null -> Unit
             is RecordAction.Open -> onOpen(action.url)
             RecordAction.Relink -> onRelink()
-            RecordAction.OpenGame -> onOpenGame?.invoke()
             RecordAction.PickSystem -> pickSystem(1)
             RecordAction.SignIn -> scope.launch {
                 if (library.signInToSource(source.key)) asked++
@@ -258,39 +288,8 @@ internal fun SourceRecordPage(
                 onClose()
                 say("Getting ${version?.let { "v" + it.removePrefix("v") } ?: "the new version"} from ${action.download.host}...")
                 val picked = action.download
-                val pickedFrom = record?.downloads.orEmpty()
-                scope.launch {
-                    // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).
-                    if (library.sourceNeedsCheck(source.key)) {
-                        say("${source.label} checks the browser first")
-                        if (!library.passSourceCheck(source.key)) {
-                            say("${source.label}'s check was not passed, so nothing was downloaded")
-                            return@launch
-                        }
-                    }
-                    // A link the source gave is opened in droidtop's web view, where the person starts the download and
-                    // droidtop takes it over (Droidtop/tracker#599). A mirror with no link is looked up in the record asked
-                    // again first: the token of a saved record goes stale when the source's page changes. Only a mirror
-                    // that still has no link goes to the source's job, with the fresh token.
-                    var use = if (picked.url != null) picked else library.freshDownload(source.key, externalId, picked, pickedFrom) ?: picked
-                    // Still no address, and the source's links are for signed-in people: its sign-in, not "no link now".
-                    if (use.url == null && library.sourceSignedOut(source.key)) {
-                        say("Sign in to ${source.label} to get download links")
-                        if (!library.signInToSource(source.key)) {
-                            say("Not signed in to ${source.label}, so nothing was downloaded")
-                            return@launch
-                        }
-                        use = library.freshDownload(source.key, externalId, picked, pickedFrom) ?: use
-                    }
-                    val url = use.url
-                    say(
-                        if (url != null) {
-                            library.openUpdateLink(source.key, externalId, url, record?.url, version, gameName, newest) { status -> say(status) }
-                        } else {
-                            library.downloadUpdate(source.key, externalId, use.link, version, gameName, newest) { status -> say(status) }
-                        },
-                    )
-                }
+                val current = record ?: return
+                scope.launch { say(getDownload(library, source, current, picked, gameName, newest, say)) }
             }
         }
     }
@@ -325,7 +324,6 @@ internal fun SourceRecordPage(
                     GamepadAction.L -> switchTab(-1)
                     GamepadAction.R -> switchTab(1)
                     GamepadAction.A -> act(focusIndex)
-                    GamepadAction.X -> onOpenGame?.invoke()
                     GamepadAction.B -> onClose()
                     else -> Unit
                 }

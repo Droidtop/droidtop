@@ -721,37 +721,24 @@ private fun GamepadShellBody(
         }
     }
 
-    // A game's own surfaces shown over the row that asked (docs/SPEC.md 7g, "Facets in place", Droidtop/tracker#639):
-    // an update row's downloads and a job row's game page, inside Gaming, so Back returns to the row. The page is the
-    // PC page; a game that has none is left to the caller's own way of opening it.
-    var inPlaceUpdate by remember { mutableStateOf<String?>(null) }
+    // A job row's game page shown over the row that asked (docs/SPEC.md 7g, "Facets in place", Droidtop/tracker#639),
+    // inside Gaming, so Back returns to the row. The page is the PC page; a game that has none is left to the caller.
     var inPlacePage by remember { mutableStateOf<String?>(null) }
     androidx.compose.runtime.DisposableEffect(Unit) {
-        dev.droidtop.library.GameSurfaces.showUpdate = { id ->
-            inPlaceUpdate = id
-            true
-        }
         dev.droidtop.library.GameSurfaces.showPage = { id ->
             val pc = gameEntries?.firstOrNull { it.id == id }?.isPcOrEngineGame == true
             if (pc) inPlacePage = id
             pc
         }
-        onDispose {
-            dev.droidtop.library.GameSurfaces.showUpdate = null
-            dev.droidtop.library.GameSurfaces.showPage = null
-        }
+        onDispose { dev.droidtop.library.GameSurfaces.showPage = null }
     }
     dev.droidtop.shell.gamepad.pc.GameInPlace(
         library = library,
-        updateId = inPlaceUpdate,
         pageId = inPlacePage,
-        onOpenPage = { id -> inPlacePage = id },
-        onCloseUpdate = { inPlaceUpdate = null },
         onClosePage = { inPlacePage = null },
         onLaunch = onLaunch,
         onOpenDownloads = {
             inPlacePage = null
-            inPlaceUpdate = null
             nav.openSection(GamingSection.DOWNLOADS)
         },
     )
