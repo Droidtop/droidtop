@@ -390,7 +390,7 @@ class DebridTest {
         val fake = Priced("never")
         var asked = false
         val served = runBlocking {
-            DebridStep.serve(listOf<Pair<DebridProvider, String>>(fake to "k"), waits = true, torrent = ref, folder = File("/tmp/job"), status = { _, _ -> asked = true }) { _, _, _ -> asked = true }
+            DebridStep.serve(listOf<Pair<DebridProvider, String>>(fake to "k"), waits = true, torrent = ref, folder = File("/tmp/job"), status = { _, _ -> asked = true }, fetch = { _, _, _ -> asked = true })
         }
         assertNull(served)
         assertTrue("nothing was asked", !asked)
