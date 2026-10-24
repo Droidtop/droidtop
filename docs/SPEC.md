@@ -11402,6 +11402,7 @@ it does not own the answer and so cannot lose it.
   grid scrolls to that card and focuses it, and a themed gamelist opens on
   that game. A group this session has not been in opens at the top, which
   is ES-DE's own "selection resets per gamelist".
+- Back from a system's gamelist restores the Retro Games system view on the system the person came from, focused and scrolled where it was, kept by system id so a rescan does not move it (owner, 2026-10-24; Droidtop/tracker#642).
 - Opening another version or part of a game from its own detail (SPEC 7m)
   is a move SIDEWAYS, not a level: B from it still means "back to the grid
   I came from".

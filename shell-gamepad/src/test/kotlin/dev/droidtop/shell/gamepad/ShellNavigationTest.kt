@@ -113,6 +113,37 @@ class ShellNavigationTest {
     }
 
     @Test
+    fun `back from a system's gamelist returns to the system view on that system`() {
+        val nav = stack()
+        nav.openGroup("system:snes")
+        assertEquals(ShellPlace.Section(GamingSection.GAMES), nav.back())
+
+        assertNull(nav.groupKey)
+        assertEquals("system:snes", nav.focusHere)
+    }
+
+    @Test
+    fun `quick system select moves the system view's focus with it`() {
+        val nav = stack()
+        nav.openGroup("system:gb")
+        nav.openGroup("system:snes")
+        nav.back()
+
+        assertEquals("system:snes", nav.focusHere)
+    }
+
+    @Test
+    fun `the system the person came from survives a recreate`() {
+        val nav = stack()
+        nav.openGroup("system:snes")
+        nav.back()
+        val saved = with(ShellBackStack.Saver) { saverScope.save(nav) }
+        val restored = ShellBackStack.Saver.restore(saved!!)!!
+
+        assertEquals("system:snes", restored.focusHere)
+    }
+
+    @Test
     fun `a group this session has not been in has nothing to return to`() {
         val nav = stack()
         nav.openGroup("system:gc")

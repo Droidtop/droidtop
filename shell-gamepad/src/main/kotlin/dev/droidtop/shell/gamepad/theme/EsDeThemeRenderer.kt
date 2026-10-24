@@ -292,6 +292,9 @@ fun EsDeThemedView(
     // its own -- never overrides a real, theme-declared one (e.g. the
     // "system" view's random game-preview collage).
     focusedGameIndex: Int? = null,
+    // Where the view's list widget starts its cursor (Droidtop/tracker#642):
+    // the entry the person last had focused, so Back lands on it.
+    initialFocusIndex: Int = 0,
     // System-level bindings for `systemdata` text elements (see
     // [EsDeSystemContext]) -- null for callers with no system concept.
     systemContext: EsDeSystemContext? = null,
@@ -531,7 +534,7 @@ fun EsDeThemedView(
                 // was ever wrong.
                 "carousel", "grid", "textlist" -> EsDeThemedListElement(
                     element, items, firstItemFocus, viewWidth, viewHeight, onFocusedIndexChanged,
-                    gamelist, onCamOffsetChanged,
+                    gamelist, onCamOffsetChanged, initialFocusIndex,
                 )
                 // helpsystem is deliberately NOT dispatched per element --
                 // see the singleton merge/render after this loop. Real,
@@ -636,6 +639,7 @@ private fun EsDeThemedListElement(
     onFocusedIndexChanged: (Int) -> Unit,
     gamelist: Boolean,
     onCamOffsetChanged: ((Float) -> Unit)?,
+    initialFocusIndex: Int,
 ) {
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
@@ -647,6 +651,7 @@ private fun EsDeThemedListElement(
         onFocusedIndexChanged = onFocusedIndexChanged,
         gamelist = gamelist,
         onCamOffsetChanged = onCamOffsetChanged,
+        initialFocusIndex = initialFocusIndex,
     )
 }
 

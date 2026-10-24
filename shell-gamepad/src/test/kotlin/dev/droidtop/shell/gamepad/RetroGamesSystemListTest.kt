@@ -17,6 +17,21 @@ class RetroGamesSystemListTest {
         assertEquals(listOf("nes"), retroGamesSystemIds(entries))
     }
 
+    @Test
+    fun `the system view starts on the system the person came from, by id`() {
+        val keys = listOf("collection:all", "system:gb", "system:snes")
+        assertEquals(2, restoredFocusIndex(keys, "system:snes"))
+        // A rescan that adds a system ahead of it moves the index, not the system.
+        assertEquals(3, restoredFocusIndex(listOf("collection:all", "system:atari2600", "system:gb", "system:snes"), "system:snes"))
+    }
+
+    @Test
+    fun `the system view starts on the first card with nothing to return to`() {
+        val keys = listOf("collection:all", "system:gb")
+        assertEquals(0, restoredFocusIndex(keys, null))
+        assertEquals(0, restoredFocusIndex(keys, "system:gone"))
+    }
+
     private fun entry(id: String, systemId: String) = LibraryEntry(
         id = id,
         title = id,
