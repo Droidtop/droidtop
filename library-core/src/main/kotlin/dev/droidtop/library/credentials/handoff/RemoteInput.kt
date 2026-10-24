@@ -24,8 +24,11 @@ sealed interface RemoteInputState {
     /** A device opened the page and shows [code]; the console asks whether it does too. */
     data class Confirming(val code: String) : RemoteInputState
 
-    /** One device is paired and typing. [lastSent] is already masked for a password; [notice] says why nothing went. */
-    data class Paired(val lastSent: String? = null, val notice: String? = null) : RemoteInputState
+    /**
+     * One device is paired and typing. [lastSent] is already masked for a password; [notice] says why nothing went.
+     * [clip] is a line of the text the phone just put on the console's clipboard, shown for a few seconds.
+     */
+    data class Paired(val lastSent: String? = null, val notice: String? = null, val clip: String? = null) : RemoteInputState
 
     data class Closed(val reason: RemoteInputEnd) : RemoteInputState
 }
@@ -49,6 +52,10 @@ fun RemoteInputState.consoleLine(): String = when (this) {
  * token and, for the next device, a new code: pairing starts over, and a code is never used twice. The session ends
  * when the person closes it or after ten minutes with no request, and the listener goes with it.
  *
+ * The same session carries a shared clipboard (`clipput` and `clipget`, each request carrying the code like an edit):
+ * text of at most [ClipRules.MAX_BYTES] bytes goes onto the console's [clipboard] and is shown on the console briefly,
+ * and the console's clip text goes to the phone unless the source marked it sensitive.
+ *
  * The token and the code are compared in constant time. Typing is delivered by [router]; it is called outside this
  * class's lock, because it waits for the main thread. Time passes in [tick], which the server's own loop calls
  * every second ([HandoffEndpoint.isLive]); a test calls it with its own clock.
@@ -62,6 +69,8 @@ class RemoteInput(
     private val random: SecureRandom = SecureRandom(),
     private val promptTimeoutMs: Long = PROMPT_TIMEOUT_MS,
     private val idleTimeoutMs: Long = IDLE_TIMEOUT_MS,
+    private val clipboard: ConsoleClipboard = ConsoleClipboard.None,
+    private val clipShowMs: Long = CLIP_SHOW_MS,
 ) {
     private var generation: Generation? = null
     private var listener: HandoffListener? = null
@@ -75,6 +84,8 @@ class RemoteInput(
     private var started = false
     private var closed = false
     private var lastSent: String? = null
+    private var clipShown: String? = null
+    private var clipUntil = 0L
     private val usedCodes = HashSet<String>()
 
     /** One listener's endpoint: once the session has moved on to another, it answers nothing and ends its loop. */
@@ -86,6 +97,8 @@ class RemoteInput(
 
         override fun handle(method: String, target: String, body: String, peer: String): HandoffReply =
             respond(this, method, target, body, peer)
+
+        override fun maxBody(target: String): Int = maxBodyFor(target)
     }
 
     /** The address the QR code shows; null while no listener is up. */
@@ -107,7 +120,7 @@ class RemoteInput(
         if (closed || code == null || paired) return
         paired = true
         lastActivity = clock()
-        state.value = RemoteInputState.Paired()
+        publish(null)
     }
 
     /** The person says it does not: the listener is replaced and pairing starts over. */
@@ -128,6 +141,10 @@ class RemoteInput(
         val now = clock()
         when {
             now - lastActivity >= idleTimeoutMs -> end(RemoteInputEnd.IDLE)
+            clipShown != null && now >= clipUntil -> {
+                clipShown = null
+                (state.value as? RemoteInputState.Paired)?.let { state.value = it.copy(clip = null) }
+            }
             code != null && !paired && now >= promptDeadline -> listenAgain(refused = true)
         }
     }
@@ -141,6 +158,7 @@ class RemoteInput(
         token = ""
         device = null
         code = null
+        clipShown = null
         state.value = RemoteInputState.Closed(reason)
     }
 
@@ -153,6 +171,7 @@ class RemoteInput(
         code = null
         paired = false
         lastSent = null
+        clipShown = null
         val next = Generation()
         generation = next
         var tries = 0
@@ -182,6 +201,10 @@ class RemoteInput(
         class Edit(val back: Int, val text: String, val enter: Boolean) : Verdict
 
         data object Status : Verdict
+
+        class ClipPut(val text: String) : Verdict
+
+        data object ClipGet : Verdict
     }
 
     private fun respond(from: Generation, method: String, target: String, body: String, peer: String): HandoffReply {
@@ -190,6 +213,8 @@ class RemoteInput(
             is Verdict.Answer -> verdict.reply
             Verdict.Status -> status()
             is Verdict.Edit -> deliver(verdict)
+            is Verdict.ClipPut -> putClip(verdict.text)
+            Verdict.ClipGet -> getClip()
         }
     }
 
@@ -219,6 +244,8 @@ class RemoteInput(
         return when {
             method == "GET" && what == "state" -> if (paired) Verdict.Status else Verdict.Answer(json("""{"state":"confirming"}"""))
             method == "POST" && what == "in" -> judgeEdit(body, now)
+            method == "POST" && what == "clipput" -> judgeClip(body, now, put = true)
+            method == "POST" && what == "clipget" -> judgeClip(body, now, put = false)
             else -> Verdict.Answer(NOT_FOUND)
         }
     }
@@ -234,6 +261,56 @@ class RemoteInput(
         return Verdict.Edit(back, text, form["enter"] == "1")
     }
 
+    /** A clipboard request is an edit's equal: paired, the code in the body, and it counts as the session being used. */
+    private fun judgeClip(body: String, now: Long, put: Boolean): Verdict {
+        if (!paired) return Verdict.Answer(HandoffReply(403, page("Confirm the code on the console first.")))
+        val form = parseForm(body)
+        if (!sameSecret(form["code"].orEmpty(), code.orEmpty())) return Verdict.Answer(HandoffReply(403, page("Wrong code.")))
+        lastActivity = now
+        if (!put) return Verdict.ClipGet
+        val text = form["text"].orEmpty()
+        return when {
+            text.any { it == '\u0000' } -> Verdict.Answer(HandoffReply(400, ""))
+            text.isEmpty() -> Verdict.Answer(clipFailure(200, NOTHING_TO_SEND))
+            !ClipRules.fits(text) -> Verdict.Answer(clipFailure(413, CLIP_TOO_LARGE))
+            else -> Verdict.ClipPut(text)
+        }
+    }
+
+    /** Body limit for a request: a clipboard send may be large, but only once its token is right; everything else is small. */
+    @Synchronized
+    private fun maxBodyFor(target: String): Int {
+        val parts = target.substringBefore('?').split('/')
+        val clip = !closed && parts.size == 4 && parts[1] == "r" && sameSecret(parts[2], token) && parts[3] == "clipput"
+        return if (clip) ClipRules.MAX_BODY else HandoffServer.MAX_BODY
+    }
+
+    private fun putClip(text: String): HandoffReply {
+        val written = clipboard.write(text)
+        synchronized(this) {
+            if (written && !closed && paired) {
+                clipShown = ClipRules.preview(text)
+                clipUntil = clock() + clipShowMs
+                publish(null)
+            }
+        }
+        return if (written) json("""{"ok":true}""") else clipFailure(200, CLIP_REFUSED)
+    }
+
+    private fun getClip(): HandoffReply = when (val read = clipboard.read()) {
+        is ClipRead.Text -> if (ClipRules.fits(read.text)) json("""{"ok":true,"text":${jsonString(read.text)}}""") else clipFailure(200, CLIP_TOO_LARGE)
+        ClipRead.Empty -> clipFailure(200, CLIP_EMPTY)
+        // Said without a word of what it holds, and never read.
+        ClipRead.Sensitive -> clipFailure(200, CLIP_SENSITIVE)
+        ClipRead.NotText -> clipFailure(200, CLIP_NOT_TEXT)
+        ClipRead.Unavailable -> clipFailure(200, CLIP_UNAVAILABLE)
+    }
+
+    /** What the console shows now: the last typing, a notice, and the clip the phone just sent while it is still shown. */
+    private fun publish(notice: String?) {
+        state.value = RemoteInputState.Paired(lastSent, notice, clipShown)
+    }
+
     private fun status(): HandoffReply = json("""{"state":"paired","secret":${router.secret()}}""")
 
     private fun deliver(edit: Verdict.Edit): HandoffReply {
@@ -243,9 +320,9 @@ class RemoteInput(
                 when (delivery) {
                     is Delivery.Sent -> {
                         lastSent = RemoteInputRouter.forConsole(describe(edit), delivery.secret)
-                        state.value = RemoteInputState.Paired(lastSent)
+                        publish(null)
                     }
-                    is Delivery.Refused -> state.value = RemoteInputState.Paired(lastSent, delivery.notice)
+                    is Delivery.Refused -> publish(delivery.notice)
                 }
             }
         }
@@ -278,7 +355,16 @@ class RemoteInput(
         const val PROMPT_TIMEOUT_MS = 60_000L
         const val IDLE_TIMEOUT_MS = 10 * 60_000L
         private const val REBIND_TRIES = 3
+        const val CLIP_SHOW_MS = 8_000L
         private const val MAX_TEXT = 1024
+
+        const val NOTHING_TO_SEND = "There is no text to send"
+        const val CLIP_TOO_LARGE = "That is more than 64 KB of text, the limit for the shared clipboard"
+        const val CLIP_REFUSED = "The console would not take it"
+        const val CLIP_EMPTY = "The console's clipboard is empty"
+        const val CLIP_SENSITIVE = "The console's clipboard holds something marked sensitive, so it is not sent"
+        const val CLIP_NOT_TEXT = "The console's clipboard holds something other than text"
+        const val CLIP_UNAVAILABLE = "Android did not let droidtop read the console's clipboard. Bring droidtop to the front on the console and try again"
 
         val NOT_FOUND = HandoffReply(404, "")
         private val GONE = HandoffReply(410, page("This session has ended."))
@@ -291,7 +377,26 @@ class RemoteInput(
         /** "482913" as the console and the phone say it: "482 913". */
         fun spaced(code: String): String = code.chunked(3).joinToString(" ")
 
-        private fun json(body: String) = HandoffReply(200, body, "application/json")
+        private fun json(body: String, status: Int = 200) = HandoffReply(status, body, "application/json")
+
+        private fun clipFailure(status: Int, notice: String) = json("""{"ok":false,"notice":${jsonString(notice)}}""", status)
+
+        /** [text] as a JSON string literal; `<` and the two line separators are escaped too, so it is safe in a script. */
+        fun jsonString(text: String): String {
+            val out = StringBuilder("\"")
+            for (c in text) {
+                when {
+                    c == '"' -> out.append("\\\"")
+                    c == '\\' -> out.append("\\\\")
+                    c == '\n' -> out.append("\\n")
+                    c == '\r' -> out.append("\\r")
+                    c == '\t' -> out.append("\\t")
+                    c < ' ' || c == '<' || c == '\u2028' || c == '\u2029' -> out.append(String.format(Locale.ROOT, "\\u%04x", c.code))
+                    else -> out.append(c)
+                }
+            }
+            return out.append('"').toString()
+        }
 
         private fun page(message: String) = RemoteInputPage.message(message)
 

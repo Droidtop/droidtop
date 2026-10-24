@@ -53,7 +53,7 @@ class RemoteInputService : Service() {
                     }
                 }
                 // Binding a port is not for the main thread.
-                Thread({ RemoteInputs.begin() }, "droidtop-remote-input").apply { isDaemon = true; start() }
+                Thread({ RemoteInputs.begin(applicationContext) }, "droidtop-remote-input").apply { isDaemon = true; start() }
             }
         }
         // A notification button pressed after the session ended starts this service for nothing.
