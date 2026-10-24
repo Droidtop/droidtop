@@ -4,6 +4,7 @@ import android.content.Context
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
@@ -47,11 +48,40 @@ object DebridStep {
     ): String? {
         if (accounts.isEmpty()) return null
         status(-1, "Asking ${accounts.joinToString(" and ") { it.first.name }}…")
+        // Every service asked by adding the torrent; the ones that did not serve it take it back off the list after.
+        val asked = mutableSetOf<Pair<DebridProvider, String>>()
+        var server: DebridProvider? = null
+        try {
+            val chosen = choose(accounts, waits, torrent, status, pollMs, maxWaitMs, asked) ?: return null
+            // Chosen before its files come: a download that fails part way keeps it on the list for the retry.
+            server = chosen.first
+            download(chosen.first, chosen.second, folder, status, fetch)
+            return chosen.first.name
+        } finally {
+            // Also when the job is cancelled: asking leaves nothing on a list droidtop did not use.
+            withContext(NonCancellable) {
+                for ((provider, key) in asked) if (provider != server) ask { provider.release(key, torrent) }
+            }
+        }
+    }
+
+    private suspend fun choose(
+        accounts: List<Pair<DebridProvider, String>>,
+        waits: Boolean,
+        torrent: TorrentRef,
+        status: (Int, String) -> Unit,
+        pollMs: Long,
+        maxWaitMs: Long,
+        asked: MutableSet<Pair<DebridProvider, String>>,
+    ): Pair<DebridProvider, DebridState.Ready>? {
         // 1. A service that says it has the torrent whole serves it.
         val unknown = mutableListOf<Pair<DebridProvider, String>>()
         for ((provider, key) in accounts) {
             when (ask { provider.cached(key, torrent) }) {
-                true -> settle(provider, key, torrent, status, pollMs, CACHED_WAIT_MS)?.let { return download(provider, it, folder, status, fetch) }
+                true -> {
+                    asked += provider to key
+                    settle(provider, key, torrent, status, pollMs, CACHED_WAIT_MS)?.let { return provider to it }
+                }
                 null -> unknown += provider to key
                 false -> Unit
             }
@@ -59,8 +89,9 @@ object DebridStep {
         // 2. A service that cannot say is asked by adding it; one that has it whole serves it.
         var taker: Pair<DebridProvider, String>? = null
         for ((provider, key) in unknown) {
+            asked += provider to key
             when (val state = ask { provider.request(key, torrent) }) {
-                is DebridState.Ready -> return download(provider, state, folder, status, fetch)
+                is DebridState.Ready -> return provider to state
                 is DebridState.Caching -> if (taker == null) taker = provider to key
                 else -> Unit
             }
@@ -68,7 +99,8 @@ object DebridStep {
         if (!waits) return null
         // 3. Waiting for the service: the first that took it, else the first account, fetches it.
         val (provider, key) = taker ?: accounts.first()
-        return settle(provider, key, torrent, status, pollMs, maxWaitMs)?.let { download(provider, it, folder, status, fetch) }
+        asked += provider to key
+        return settle(provider, key, torrent, status, pollMs, maxWaitMs)?.let { provider to it }
     }
 
     /** Asks [provider] until the torrent is ready, for at most [maxWaitMs]; null when it fails, is not cached or runs out. */

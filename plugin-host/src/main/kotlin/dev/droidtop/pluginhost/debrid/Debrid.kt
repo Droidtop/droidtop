@@ -54,6 +54,12 @@ interface DebridProvider {
 
     /** Adds [torrent] when the service does not have it yet (asking again is safe) and says where it stands. */
     fun request(key: String, torrent: TorrentRef): DebridState
+
+    /**
+     * Takes [torrent] back off the person's list on the service when droidtop put it there and the job did not use
+     * it, so asking leaves nothing behind. One that was on the list before droidtop asked stays. Nothing by default.
+     */
+    fun release(key: String, torrent: TorrentRef) {}
 }
 
 /** The HTTP the providers speak, replaceable for the tests. */

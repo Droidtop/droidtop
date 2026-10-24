@@ -88,6 +88,8 @@ class DebridTest {
         override val id = name.lowercase()
         private val queue = states.toMutableList()
         var asked = 0
+        var released = 0
+        override fun release(key: String, torrent: TorrentRef) { released++ }
         override fun check(key: String): String? = null
         override fun cached(key: String, torrent: TorrentRef) = cached
         override fun request(key: String, torrent: TorrentRef): DebridState {
@@ -123,5 +125,36 @@ class DebridTest {
         assertEquals("Real-Debrid", serve(listOf(Fake("Real-Debrid", cached = null, ready)), waits = false))
         // A wait that runs out falls back.
         assertNull(serve(listOf(Fake("TorBox", cached = false, DebridState.Caching(0.1))), waits = true))
+    }
+
+    @Test
+    fun aServiceAskedByAddingThatDidNotServeTakesItBackOffAndTheOneThatServedKeepsIt() {
+        val couldNotSay = Fake("Real-Debrid", cached = null, DebridState.Caching(0.0))
+        val served = Fake("TorBox", cached = null, ready)
+        assertEquals("TorBox", serve(listOf(couldNotSay, served), waits = false))
+        assertEquals(1, couldNotSay.released)
+        assertEquals(0, served.released)
+        // Nobody served it: everything asked by adding is taken back off.
+        val alone = Fake("Real-Debrid", cached = null, DebridState.Caching(0.0))
+        assertNull(serve(listOf(alone), waits = false))
+        assertEquals(1, alone.released)
+    }
+
+    @Test
+    fun realDebridTakesOffOnlyATorrentDroidtopAdded() {
+        val already = Canned(
+            "GET https://api.real-debrid.com/rest/1.0/torrents?" to (200 to """[{"id":"R1","hash":"$hash"}]"""),
+            "GET https://api.real-debrid.com/rest/1.0/torrents/info/R1" to (200 to """{"status":"downloading","progress":10}"""),
+        )
+        RealDebrid(already).apply { request("key", ref); release("key", ref) }
+        assertTrue("one that was on the list stays", already.calls.none { it.startsWith("DELETE") })
+
+        val fresh = Canned(
+            "GET https://api.real-debrid.com/rest/1.0/torrents?" to (200 to "[]"),
+            "POST https://api.real-debrid.com/rest/1.0/torrents/addMagnet" to (201 to """{"id":"R9"}"""),
+            "GET https://api.real-debrid.com/rest/1.0/torrents/info/R9" to (200 to """{"status":"queued"}"""),
+        )
+        RealDebrid(fresh).apply { request("key", ref); release("key", ref) }
+        assertTrue(fresh.calls.contains("DELETE https://api.real-debrid.com/rest/1.0/torrents/delete/R9"))
     }
 }
