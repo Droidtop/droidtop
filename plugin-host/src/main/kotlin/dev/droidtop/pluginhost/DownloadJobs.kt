@@ -718,21 +718,35 @@ object DownloadJobs {
         val numbers = TransferNumbers(job)
         if (!(checkpoint == FETCHED && folder.isDirectory)) {
             val source = swarmSource(context, args, folder, numbers, report)
-            try {
-                EngineFetch.fetchSwarm(
-                    engineFor(context, area), SwarmRequest(source, folder, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L),
-                    report = { progress ->
-                        report(progress.percent, progress.line, null)
-                        val transfer = progress.transfer
-                        when {
-                            progress.waiting -> numbers.waiting()
-                            transfer != null -> numbers.bytes(transfer.completedLength, transfer.totalLength, transfer.downloadSpeed)
-                        }
-                    },
-                    size = ValueFormat::size,
-                )
-            } catch (e: TransferException) {
-                throw IllegalStateException(e.message)
+            // A debrid account that has the torrent serves it as direct links into this same folder (#638); no peer is
+            // contacted then. With none, or none that has it and no wait chosen, the torrent runs as before.
+            val torrent = when (source) {
+                is SwarmSource.Magnet -> dev.droidtop.pluginhost.debrid.TorrentRefs.ofMagnet(source.uri)
+                is SwarmSource.Torrent -> dev.droidtop.pluginhost.debrid.TorrentRefs.ofTorrent(source.bytes)
+                else -> null
+            }
+            val served = torrent?.let { ref ->
+                dev.droidtop.pluginhost.debrid.DebridStep.serve(context, ref, folder, { percent, line -> report(percent, line, null) }) { file, into, line ->
+                    fetchWithEngine(context, file.url, emptyMap(), into, 0L, numbers, { percent, _, _ -> report(percent, line, null) })
+                }
+            }
+            if (served == null) {
+                try {
+                    EngineFetch.fetchSwarm(
+                        engineFor(context, area), SwarmRequest(source, folder, args[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L),
+                        report = { progress ->
+                            report(progress.percent, progress.line, null)
+                            val transfer = progress.transfer
+                            when {
+                                progress.waiting -> numbers.waiting()
+                                transfer != null -> numbers.bytes(transfer.completedLength, transfer.totalLength, transfer.downloadSpeed)
+                            }
+                        },
+                        size = ValueFormat::size,
+                    )
+                } catch (e: TransferException) {
+                    throw IllegalStateException(e.message)
+                }
             }
             withContext(Dispatchers.IO) { swarmFileFor(folder, args[ARG_SWARM].orEmpty()).delete() }
             report(100, "Checking the download…", FETCHED)

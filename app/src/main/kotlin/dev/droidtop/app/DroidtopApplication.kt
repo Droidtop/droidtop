@@ -123,6 +123,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.library.scraper.ScraperKeySetupLink.open = { context, service ->
             context.startActivity(ScraperKeySetupActivity.intent(context, service).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         }
+        // Debrid (Droidtop/tracker#638): a torrent job asks the person's accounts first, from the keys they entered.
+        dev.droidtop.pluginhost.debrid.DebridStep.accounts = { context -> dev.droidtop.library.debrid.DebridAccounts.connected(context) }
+        dev.droidtop.pluginhost.debrid.DebridStep.waitsForService = { context -> dev.droidtop.library.debrid.DebridAccounts.waits(context) }
         dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->
             dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
             listOfNotNull(
