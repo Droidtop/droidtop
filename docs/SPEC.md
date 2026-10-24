@@ -14459,7 +14459,8 @@ again if a code is refused".
 - **The session (`RemoteInput`, `:library-core`, on `HandoffServer`).** `HandoffServer` is the one local-network
   listener, shared with nothing else now that the key form is gone: it binds the device's LAN address
   (`HandoffServer.lanAddress`, a site-local IPv4) on a random port in the dynamic range, answers loopback, site-local
-  and link-local peers only, and reads at most an 8 KB head and a 4 KB body with a 5 second timeout. What it serves is
+  and link-local peers only, and reads at most an 8 KB head and a 4 KB body (a clipboard send, below, is the one request allowed more, and only
+  with the right token: `HandoffEndpoint.maxBody`) with a 5 second timeout. What it serves is
   a `HandoffEndpoint` (the answer to a request, and whether to keep listening, asked every second). The address is
   `http://<lan address>:<port>/r/<token>`, the token 128 random bits per listener, shown as a QR code and the plain
   address. Every other path, method or token is the same empty 404. The listener exists only while a session does:
@@ -14487,7 +14488,36 @@ again if a code is refused".
   fetched from outside, a content security policy that allows only itself: the code until the console confirms,
   then one text box with **Send** (commit the text), **Enter**, **Backspace** and a **Live typing** switch (each
   keystroke sent as the difference from the last, backspaces then text). An edit is one POST of `back`, `text` and
-  `enter` (text up to 1024 characters, no control characters), applied in that order. It works in a phone browser.
+  `enter` (text up to 1024 characters, no control characters), applied in that order. Under them is the Clipboard panel
+  (the section's next bullet). It works in a phone browser.
+- **A shared clipboard (slice 2, Droidtop/tracker#645; relayed by the coordinator: "a shared clipboard in the existing
+  'Type from another device' session ... Extend the same session; add no new server").** The same session, the same listener and the same pairing, no
+  new server. The phone page's **Clipboard** panel has a text area and three buttons. **Send to console** puts the
+  text on the console's clipboard (`ConsoleClipboard.write`, a plain-text clip) and the console shows a line of it
+  ("Clipboard from the device: ...", one line, 200 characters at most) for eight seconds
+  (`RemoteInputState.Paired.clip`, cleared by `RemoteInput.tick`). **Get console clipboard** fills the text area
+  with the console's current clip text, and **Copy** puts the area's text on the phone's clipboard (the browser's
+  clipboard API where the page's context allows it, which a plain `http` address does not, else a selection and
+  `execCommand("copy")`; where neither works the page says to select and copy it). On the wire they are two more
+  POSTs on the session's address, `/r/<token>/clipput` and `/r/<token>/clipget`, with the same rules as an edit:
+  nothing before Confirm (403), the code in every request's body (403 when missing or wrong, compared in constant
+  time), the paired device only (409 for any other), the token in the path (the same empty 404), and each counts as
+  the session being used for the ten minute limit. Rules of the clipboard:
+  - *Sensitive.* A clip the source marked sensitive (`ClipDescription.EXTRA_IS_SENSITIVE`,
+    `android.content.extra.IS_SENSITIVE`) is never sent to the phone. It is classified before any of its content is
+    read (`ClipRules.classify`), and the phone is told only that the clipboard "holds something marked sensitive, so
+    it is not sent", never what it holds.
+  - *Text only, 64 KB.* Only plain text is read (`ClipData.Item.text`, never `coerceToText`, which would query a
+    content provider); an image, file or URI clip is "something other than text". The limit is 64 KB (65 536 bytes of
+    UTF-8) each way. A larger send is refused with a 413 and nothing is written, and a larger console clip is
+    refused and not cut. The page checks the size before it sends, and the server refuses a body over
+    `ClipRules.MAX_BODY` from its head, unread, and any body over 4 KB on every other path.
+  - *Android's clipboard rules.* Android lets only the app in front, or the active input method, read the clipboard
+    (6d). Writing is allowed from the background; **reading is not**, so with droidtop not in front (and its keyboard
+    not the active one) Get says "Android did not let droidtop read the console's clipboard. Bring droidtop to the
+    front on the console and try again" rather than showing a stale or empty clip.
+  - *The console clipboard is only ever changed by Send,* and is not marked sensitive, so the phone can read back
+    what it sent.
 - **Where an edit lands (`RemoteInputRouter`, the one choice, with fakes in its tests).**
   (a) The focused field is droidtop's own and droidtop's keyboard serves it (`AddonKeyboardRules.droidtopServesField`,
   through `KeyboardTargets.servesField`): the window's own key path, `WindowKeySink`, the path droidtop's own keyboards
@@ -14507,7 +14537,7 @@ again if a code is refused".
   companion's own screen), the **Type from another device** row in the Quick Menu (a catalog item,
   `GamingSettingsCatalog.ID_TYPE_FROM_DEVICE`, in the Power and mode section), and the key setup screens (7h). All
   open the same screen, which starts the session when none runs and shows the running one when one does.
-- **Not built:** remote control of the pointer; emoji and other characters outside the virtual keyboard's layout in
+- **Not built:** remote control of the pointer; files, images and rich text on the shared clipboard; emoji and other characters outside the virtual keyboard's layout in
   droidtop's own fields (route a drops what the layout cannot type, route b commits it whole).
 
 **Credentials are stored encrypted (directed 2026-10-08, tracker #264).** Every credential the

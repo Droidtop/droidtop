@@ -1,11 +1,17 @@
 package dev.droidtop.app
 
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
+import dev.droidtop.library.credentials.handoff.ClipRead
+import dev.droidtop.library.credentials.handoff.ClipRules
+import dev.droidtop.library.credentials.handoff.ConsoleClipboard
 import dev.droidtop.library.credentials.handoff.FieldThread
 import dev.droidtop.library.credentials.handoff.HandoffServer
 import dev.droidtop.library.credentials.handoff.RemoteInput
@@ -47,7 +53,7 @@ object RemoteInputs {
     }
 
     /** Binds the LAN address and starts listening. Off the main thread, from the service. */
-    fun begin() {
+    fun begin(context: Context) {
         val host = HandoffServer.lanAddress()
         if (host == null) {
             current.value = RemoteInputState.Closed(RemoteInputEnd.NO_NETWORK)
@@ -59,6 +65,7 @@ object RemoteInputs {
             listen = { endpoint -> HandoffServer(endpoint, host) },
             host = host,
             state = current,
+            clipboard = AndroidClipboard(context.applicationContext),
         )
         session = input
         input.start()
@@ -88,6 +95,49 @@ object RemoteInputs {
         imeSelected = { SecondScreenKeyboard.imeRunning },
         fieldThread = MainThread,
     )
+}
+
+/**
+ * The console's clipboard for the shared clipboard (docs/SPEC.md, "Type from another device", Droidtop/tracker#645),
+ * both calls on the main thread. Reading follows what Android allows: only the app in front or the active input
+ * method gets the clip, so from the background it is [ClipRead.Unavailable]. A clip marked sensitive
+ * (`ClipDescription.EXTRA_IS_SENSITIVE`) is classified before any of its content is read, and only plain text
+ * is read (`ClipData.Item.text`, never `coerceToText`, which would query a content provider).
+ */
+private class AndroidClipboard(private val context: Context) : ConsoleClipboard {
+    private val manager get() = context.getSystemService(ClipboardManager::class.java)
+
+    override fun write(text: String): Boolean = MainThread.call {
+        val clipboard = manager ?: return@call false
+        try {
+            clipboard.setPrimaryClip(ClipData.newPlainText("droidtop shared clipboard", text))
+            true
+        } catch (e: SecurityException) {
+            false
+        }
+    }
+
+    override fun read(): ClipRead = MainThread.call {
+        val clipboard = manager ?: return@call ClipRead.Unavailable
+        try {
+            if (!clipboard.hasPrimaryClip()) return@call ClipRead.Empty
+            val clip = clipboard.primaryClip ?: return@call ClipRead.Unavailable
+            val description = clip.description
+            ClipRules.classify(
+                present = clip.itemCount > 0,
+                sensitive = description?.extras?.getBoolean(EXTRA_IS_SENSITIVE, false) == true,
+                isText = description?.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) == true ||
+                    description?.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML) == true,
+                text = { clip.getItemAt(0).text },
+            )
+        } catch (e: SecurityException) {
+            ClipRead.Unavailable
+        }
+    }
+
+    private companion object {
+        const val EXTRA_IS_SENSITIVE = "android.content.extra.IS_SENSITIVE"
+    }
 }
 
 /** Delivers on the main thread, where the views and droidtop's input method live; the server's thread waits for it. */

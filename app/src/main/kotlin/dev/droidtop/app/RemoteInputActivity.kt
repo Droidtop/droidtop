@@ -100,6 +100,7 @@ private fun RemoteInputScreen(onLeave: () -> Unit, onClose: () -> Unit, modifier
             is RemoteInputState.Paired -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 shown.lastSent?.let { Text("Last sent: $it", style = MaterialTheme.typography.bodyLarge) }
                 shown.notice?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                shown.clip?.let { Text("Clipboard from the device: $it", style = MaterialTheme.typography.bodyLarge) }
                 Text(
                     "Leave this screen and put the cursor in a field. Close ends it, here or on the notification.",
                     style = MaterialTheme.typography.bodyMedium,
