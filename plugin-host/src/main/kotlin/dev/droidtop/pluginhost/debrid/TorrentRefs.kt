@@ -25,12 +25,26 @@ object TorrentRefs {
         return TorrentRef(hex, magnet)
     }
 
-    /** A `.torrent`'s info hash (the SHA-1 of its bencoded `info`) and a magnet for it; null when it cannot be read. */
+    /** A `.torrent`'s info hash (the SHA-1 of its bencoded `info`), a magnet for it and its `private` flag; null when it cannot be read. */
     fun ofTorrent(bytes: ByteArray): TorrentRef? {
         val span = runCatching { infoSpan(bytes) }.getOrNull() ?: return null
         val digest = MessageDigest.getInstance("SHA-1").digest(bytes.copyOfRange(span.first, span.last + 1))
         val hex = digest.joinToString("") { "%02x".format(it) }
-        return TorrentRef(hex, "magnet:?xt=urn:btih:$hex")
+        val private = runCatching { privateFlag(bytes, span.first) }.getOrDefault(true) // unreadable: kept off debrid
+        return TorrentRef(hex, "magnet:?xt=urn:btih:$hex", private)
+    }
+
+    /** Whether the `info` dictionary at [from] says `private` 1 (BEP 27). */
+    private fun privateFlag(bytes: ByteArray, from: Int): Boolean {
+        if (bytes[from] != 'd'.code.toByte()) return false
+        var at = from + 1
+        while (bytes[at] != 'e'.code.toByte()) {
+            val (key, afterKey) = readString(bytes, at)
+            val end = skip(bytes, afterKey)
+            if (key == "private") return String(bytes, afterKey, end - afterKey, Charsets.ISO_8859_1) == "i1e"
+            at = end
+        }
+        return false
     }
 
     /** Where the top-level dictionary's `info` value lies in [bytes], first to last byte. */

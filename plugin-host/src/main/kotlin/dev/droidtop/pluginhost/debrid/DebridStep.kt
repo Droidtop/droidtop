@@ -48,7 +48,8 @@ object DebridStep {
         pollMs: Long = POLL_MS,
         maxWaitMs: Long = MAX_WAIT_MS,
     ): String? {
-        if (accounts.isEmpty()) return null
+        // A private tracker's torrent is the person's account there, its ratio and its rules: never a debrid service's.
+        if (accounts.isEmpty() || torrent.private) return null
         status(-1, "Asking ${accounts.joinToString(" and ") { it.first.name }}…")
         // Every service asked by adding the torrent; the ones that did not serve it take it back off the list after.
         val asked = mutableSetOf<Pair<DebridProvider, String>>()

@@ -378,4 +378,21 @@ class DebridTest {
             DebridChoice.reset()
         }
     }
+
+    @Test
+    fun aPrivateTorrentIsNeverHandedToADebridService() {
+        val info = "d6:lengthi5e4:name5:a.bin12:piece lengthi16384e6:pieces20:" + "A".repeat(20) + "7:privatei1ee"
+        val torrent = ("d8:announce3:x:y4:info" + info + "e").toByteArray(Charsets.ISO_8859_1)
+        val ref = TorrentRefs.ofTorrent(torrent)!!
+        assertTrue(ref.private)
+        val open = "d6:lengthi5e4:name5:a.bin12:piece lengthi16384e6:pieces20:" + "A".repeat(20) + "e"
+        assertTrue(!TorrentRefs.ofTorrent(("d4:info" + open + "e").toByteArray(Charsets.ISO_8859_1))!!.private)
+        val fake = Priced("never")
+        var asked = false
+        val served = runBlocking {
+            DebridStep.serve(listOf<Pair<DebridProvider, String>>(fake to "k"), waits = true, torrent = ref, folder = File("/tmp/job"), status = { _, _ -> asked = true }) { _, _, _ -> asked = true }
+        }
+        assertNull(served)
+        assertTrue("nothing was asked", !asked)
+    }
 }
