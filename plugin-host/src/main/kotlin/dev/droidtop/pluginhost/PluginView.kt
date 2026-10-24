@@ -425,6 +425,8 @@ data class SourceResultRow(
     val version: String? = null,
     val sizeBytes: Long? = null,
     val get: SourceGet? = null,
+    /** The result's own facets (contract 3, docs/plugin-api.md 1.8 "featured"): its pictures, facts and badges. */
+    val facets: List<Facet> = emptyList(),
 )
 
 /**
@@ -455,10 +457,26 @@ object SourceResultProtocol {
                         version = obj.text("version")?.cut(PluginView.MAX_TITLE),
                         sizeBytes = (obj.opt("size") as? Number)?.toLong()?.takeIf { it > 0 },
                         get = get(obj.opt("get")),
+                        facets = if (obj.has("facets")) Facets.read(obj).facets else emptyList(),
                     ),
                 )
             }
         }
+    }
+
+    /** The roles a result's picture is taken from, best first: box art, never a screenshot, a video, a logo or an icon. */
+    private val ART_ROLES = listOf("cover", "wide", "banner", "hero")
+
+    /** The address of a result's box art among its `media` and `image` facets, or null when it has none. Pure. */
+    fun boxArt(facets: List<Facet>): String? {
+        val pictures = facets.mapNotNull { facet ->
+            when (val body = facet.body) {
+                is FacetBody.Media -> body
+                is FacetBody.Image -> body.media
+                else -> null
+            }
+        }
+        return ART_ROLES.firstNotNullOfOrNull { role -> pictures.firstOrNull { it.role == role }?.url }
     }
 
     /**

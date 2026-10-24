@@ -23446,6 +23446,13 @@ without its runtime said "Running". Decisions:
   the Select menus (All games, a system, PC Games) and a console game's details are gone with that: a system's own
   search ("Search SNES") shows that system's new games under the same heading. The chips in the empty states and the
   Apps section stay, since an empty place needs a way to fill it.
+  **What the sources feature (coordinator decision, 2026-10-23, Droidtop/tracker#612; built 2026-10-24).** Get new
+  games opens on recommendations, never on a blank search bar (owner, 2026-10-23). A source with a list of its own
+  (F95zone's latest updates, a site's new or popular games) answers the optional `featured {platform, limit}` call
+  (docs/plugin-api.md 1.8): ordinary results, the same shape `search` returns, each with its facets and its box art
+  first (`SourceResultProtocol.boxArt`: the cover, then a wide picture, a banner or a hero, never a screenshot). Its
+  rows join that page under the source's name (`GameSourceProvider.featured`); a source without the call features
+  nothing, which is not a failure. One page and one mechanism: there is no second recommendations surface.
   A source's own filters (its `form` view) and its full browse are its page under Game sources (Places), the
   per-source place that already exists (`SourceScreens`), not a step on the way to a download.
   No sources installed, or none ready, is one line in the search with the way to Plugins (it replaces the Get

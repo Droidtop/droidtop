@@ -847,6 +847,16 @@ no destination, such as the PC library). Ops:
   `acquire` and never parses it (12a checklist point 5). droidtop renders a
   result as a `row` that opens `detail`. At most 200 results are shown (on the source's own page under Game
   sources, which asks without a `limit`).
+- `featured {platform?, limit, context}` → `{results: [result]}`, the same results as `search`: what the source
+  features now (a site's latest updates, its new or popular games), best first, scoped to `platform` (droidtop's
+  system id) when given (proposed and approved 2026-10-23, Droidtop/tracker#612). Optional and additive (§7): a
+  source with no such list answers UNSUPPORTED, or never declares it, and features nothing; a contract 1 source is
+  not asked. Send at most `limit`. The same 10 s budget as `search`, and the same errors. Its rows join Get new
+  games' page under the source's name (docs/SPEC.md 13).
+- **A result's facets (contract 3).** A `search` or `featured` result may carry `facets: [...]` (§1.10): its
+  pictures (`media` or `image`, by role), its `metadata`, its badges. Its box art is the first picture by role
+  `cover`, then `wide`, `banner`, `hero`; a `screenshot`, `video`, `logo` or `icon` is never the box art. Put the
+  box art first. A result without facets is read as before.
 - `detail {ref, context}` → a view: the result's own sections (description
   rows, its files), its pickers (`choice` nodes for version, region,
   format, mirror) and its actions, at least one `job` action with op
