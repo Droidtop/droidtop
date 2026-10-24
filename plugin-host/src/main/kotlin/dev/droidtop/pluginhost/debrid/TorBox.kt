@@ -26,6 +26,7 @@ class TorBox(
      */
     override fun cost(key: String, host: String?): DebridCost {
         val (status, body) = http.call("GET", "$API/user/me", auth(key), null)
+        if (status == 401 || status == 403) return DebridCost.NotNow(KEY_REFUSED, auth = true)
         val data = (jsonOrNull(body) as? JSONObject)?.optJSONObject("data")?.takeIf { status == 200 } ?: return DebridCost.Free
         val plan = data.optInt("plan", -1)
         if (plan == 0) {
@@ -34,7 +35,28 @@ class TorBox(
         }
         val ends = isoMs(data.optString("premium_expires_at"))
         if (ends != null && ends <= now()) return DebridCost.NotNow("The TorBox plan has ended")
-        return DebridCost.Free
+        return if (host == null) DebridCost.Free else hosterCost(key, host)
+    }
+
+    /**
+     * A hoster link's cost from the account's own `webdl/hosters` (asked with the key, TorBox's live daily use): some
+     * hosters are capped a day (5 links or 10 GB), and a hoster that says so spends the least that is left of its
+     * caps, none left being not now. Each `daily_*_limit` above 0 is read against its `daily_*_used`; a hoster that
+     * reports no cap is free. The field names are read as they are paired, to be confirmed from TorBox's docs.
+     */
+    private fun hosterCost(key: String, host: String): DebridCost {
+        val (status, body) = http.call("GET", "$API/webdl/hosters", auth(key), null)
+        if (status != 200) return DebridCost.Free
+        val hoster = (jsonOrNull(body) as? JSONObject)?.optJSONArray("data")?.objects().orEmpty().firstOrNull { entry ->
+            val domains = entry.optJSONArray("domains")?.let { array -> (0 until array.length()).map { array.optString(it).trim().lowercase() } }.orEmpty()
+            DebridLinks.covers(domains.toSet(), host)
+        } ?: return DebridCost.Free
+        val left = hoster.keys().asSequence().filter { it.startsWith("daily_") && it.endsWith("_limit") }.mapNotNull { limitKey ->
+            val limit = (hoster.opt(limitKey) as? Number)?.toDouble()?.takeIf { it > 0 } ?: return@mapNotNull null
+            val used = (hoster.opt(limitKey.removeSuffix("_limit") + "_used") as? Number)?.toDouble() ?: return@mapNotNull null
+            ((limit - used) / limit).coerceIn(0.0, 1.0)
+        }.minOrNull() ?: return DebridCost.Free
+        return if (left <= 0.0) DebridCost.NotNow("TorBox's daily limit on ${hoster.optString("name").ifBlank { host }} is used up") else DebridCost.Spends(left)
     }
 
     private fun auth(key: String) = mapOf("Authorization" to "Bearer ${key.trim()}")
@@ -43,7 +65,7 @@ class TorBox(
         val (status, _) = http.call("GET", "$API/user/me", auth(key), null)
         return when (status) {
             200 -> null
-            401, 403 -> "TorBox did not take that API key"
+            401, 403 -> KEY_REFUSED
             else -> "TorBox answered $status"
         }
     }
@@ -156,7 +178,7 @@ class TorBox(
 
     /** A refused answer as one sentence, or null when it was taken. Pure, for the tests. */
     internal fun refusal(status: Int, body: String): DebridState.Failed? {
-        if (status == 401 || status == 403) return DebridState.Failed("TorBox did not take the API key", auth = true)
+        if (status == 401 || status == 403) return DebridState.Failed(KEY_REFUSED, auth = true)
         if (status == 429) return DebridState.Failed("TorBox asked to wait: too many requests")
         val json = jsonOrNull(body) as? JSONObject
         if (status >= 400 || json?.optBoolean("success", true) == false) {
@@ -164,7 +186,7 @@ class TorBox(
             val detail = json?.optString("detail").orEmpty().ifBlank { code.ifBlank { "the request failed ($status)" } }
             val rest = LIMIT_CODES[code]
             return DebridState.Failed(
-                "TorBox: $detail",
+                if (code in AUTH_CODES) KEY_REFUSED else "TorBox: $detail",
                 auth = code in AUTH_CODES,
                 permanent = code in PERMANENT_CODES,
                 limit = rest != null,
@@ -176,7 +198,7 @@ class TorBox(
 
     private fun enc(text: String) = URLEncoder.encode(text, "UTF-8")
 
-    private companion object {
+    internal companion object {
         const val API = "https://api.torbox.app/v1/api"
 
         /**
@@ -184,6 +206,9 @@ class TorBox(
          * setting for this torrent): a seeding torrent counts as active on TorBox (owner, 2026-10-24), and droidtop never seeds.
          */
         const val NO_SEEDING = "3"
+
+        /** A refused key: TorBox rotates the key after an abuse warning, so the person enters the new one. */
+        const val KEY_REFUSED = "TorBox refused the API key (it changes the key after an abuse warning): enter the new one"
         val AUTH_CODES = setOf("AUTH_ERROR", "BAD_TOKEN", "OAUTH_VERIFICATION_ERROR", "NO_AUTH")
         /** The refusals of a limit, and how long the account rests after one (a cooldown's end comes from `user/me`). */
         val LIMIT_CODES = mapOf(

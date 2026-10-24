@@ -153,7 +153,15 @@ enum class ScraperKeyService(
     fun write(context: Context, values: Map<String, String>) {
         fields.forEach { field -> values[field.id]?.let { CredentialStore.put(context, field.storeKey, it.trim()) } }
         if (this == REALDEBRID) dev.droidtop.library.debrid.DebridAccounts.forgetStaleSignIn(context)
+        debridId?.let { dev.droidtop.library.debrid.DebridAccounts.clearRefusal(context, it) }
         ScraperKeyVerified.set(context, this, false)
+    }
+
+    /** The debrid provider id of a debrid service ("torbox", "realdebrid"); null for the others. */
+    val debridId: String? get() = when (this) {
+        TORBOX -> "torbox"
+        REALDEBRID -> "realdebrid"
+        else -> null
     }
 
     fun isConfigured(context: Context): Boolean = read(context).values.all { it.isNotBlank() }
@@ -278,6 +286,8 @@ object ScraperKeyCheck {
                 else -> ScraperKeyState.NOT_SET
             }
         }
+        // A key a debrid service refused since (TorBox rotates it after an abuse warning) says so, never "Connected".
+        service.debridId?.let { id -> dev.droidtop.library.debrid.DebridAccounts.refusal(context, id)?.let { return dev.droidtop.library.debrid.DebridAccounts.SIGN_IN_AGAIN } }
         return ScraperKeyState.label(configured = true, verified = ScraperKeyVerified.get(context, service))
     }
 }

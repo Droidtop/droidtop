@@ -12,8 +12,8 @@ sealed interface DebridCost {
     /** Spends something that resets (a hoster's daily traffic, points, a free plan's downloads); [left] 0 to 1 when said. */
     data class Spends(val left: Double?) : DebridCost
 
-    /** Cannot serve now: out of quota, a cooldown, its plan ended. [untilMs] when the service says it resets. */
-    data class NotNow(val reason: String, val untilMs: Long? = null) : DebridCost
+    /** Cannot serve now: out of quota, a cooldown, its plan ended; [auth] its key refused. [untilMs] when it resets. */
+    data class NotNow(val reason: String, val untilMs: Long? = null, val auth: Boolean = false) : DebridCost
 }
 
 /**
@@ -26,6 +26,12 @@ sealed interface DebridCost {
 object DebridChoice {
     /** :app sets this: whether spread mode is on (Settings > Accounts and sources > Debrid services). */
     @Volatile var spreadMode: () -> Boolean = { false }
+
+    /**
+     * :app sets this: a service refused the account's key (TorBox changes it after an abuse warning), said with its
+     * sentence on the account's row so it is never a silent skip.
+     */
+    @Volatile var onKeyRefused: (providerId: String, message: String) -> Unit = { _, _ -> }
 
     /** One account as the choice sees it: its place in the person's order is its index in the list given. */
     data class Account(val provider: DebridProvider, val key: String, val cost: DebridCost, val running: Int = 0)
@@ -78,12 +84,14 @@ object DebridChoice {
             DebridCost.Free
         }
         costs[cacheKey] = Kept(now, cost)
+        if (cost is DebridCost.NotNow && cost.auth) onKeyRefused(provider.id, cost.reason)
         return cost
     }
 
     /** Notes a refusal: one of a limit ([DebridState.Failed.restUntilMs] set) rests the account until then. */
     fun refused(provider: DebridProvider, key: String, state: DebridState?, now: () -> Long = System::currentTimeMillis) {
         val failed = state as? DebridState.Failed ?: return
+        if (failed.auth) onKeyRefused(provider.id, failed.message)
         if (!failed.limit) return
         rests[id(provider, key)] = failed.restUntilMs ?: (now() + REST_DEFAULT_MS)
         costs.keys.removeIf { it.startsWith(id(provider, key) + "|") }

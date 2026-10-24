@@ -339,4 +339,37 @@ class DebridTest {
         assertTrue(lapsed.cost("t", null) is DebridCost.NotNow)
         assertTrue(rd.errorState(503, org.json.JSONObject("""{"error":"traffic_exhausted","error_code":23}""")).limit)
     }
+
+    @Test
+    fun aTorBoxHosterCappedADaySpendsWhatIsLeftAndARefusedKeySaysSignInAgain() {
+        val now = isoMs("2026-10-24T00:00:00Z")!!
+        val box = TorBox(
+            Canned(
+                "GET https://api.torbox.app/v1/api/user/me" to (200 to """{"success":true,"data":{"plan":2,"premium_expires_at":"2026-12-01T00:00:00Z"}}"""),
+                "GET https://api.torbox.app/v1/api/webdl/hosters" to (200 to """{"success":true,"data":[
+                    {"name":"Nitroflare","domains":["nitroflare.com"],"status":true,"daily_link_limit":5,"daily_link_used":4,"daily_bandwidth_limit":10737418240,"daily_bandwidth_used":0},
+                    {"name":"Turbobit","domains":["turbobit.net"],"status":true,"daily_link_limit":5,"daily_link_used":5},
+                    {"name":"Pixeldrain","domains":["pixeldrain.com"],"status":true,"daily_link_limit":0,"daily_link_used":0}]}"""),
+            ),
+            now = { now },
+        )
+        assertEquals("the least left of its caps", DebridCost.Spends(0.2), box.cost("k", "nitroflare.com"))
+        assertTrue(box.cost("k", "turbobit.net") is DebridCost.NotNow)
+        assertEquals("a cap of 0 is no cap", DebridCost.Free, box.cost("k", "pixeldrain.com"))
+        assertEquals(DebridCost.Free, box.cost("k", null))
+
+        val rotated = TorBox(Canned("GET https://api.torbox.app/v1/api/user/me" to (401 to """{"success":false,"error":"BAD_TOKEN"}""")))
+        val cost = rotated.cost("old", null) as DebridCost.NotNow
+        assertTrue(cost.auth && cost.reason.contains("enter the new one"))
+        DebridChoice.reset()
+        val said = mutableListOf<String>()
+        DebridChoice.onKeyRefused = { id, message -> said += "$id: $message" }
+        try {
+            assertEquals(emptyList<Pair<DebridProvider, String>>(), DebridChoice.order(listOf<Pair<DebridProvider, String>>(rotated to "old"), spread = false))
+            assertEquals("never a silent skip", listOf("torbox: ${TorBox.KEY_REFUSED}"), said)
+        } finally {
+            DebridChoice.onKeyRefused = { _, _ -> }
+            DebridChoice.reset()
+        }
+    }
 }
