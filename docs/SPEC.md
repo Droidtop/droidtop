@@ -17149,8 +17149,9 @@ Games, Retro Games, Apps, Search, Downloads and Updates, Settings. PC Games, Ret
 (owner: "Those are deliberately three different modes, optimized for three different appsets"), and Downloads and
 Updates stays a row ("Downloads and Updates stays too, learning from steam"). The other places are no rows of it
 (`GamingSection.offLeftMenu`) but every link to one still opens it (`placeForScreen`): Plugins and Social are sections
-of the Quick Menu ("Game sources go into the qam, as does social"), and Game sources is no destination of its own,
-reached from Settings > Accounts and sources where a source is set up. Standard's settings root and Desktop's Start
+of the Quick Menu ("Game sources go into the qam, as does social"), and Game sources is no destination of its own:
+getting games and each source's standing lead and close Downloads and Updates, and the setup page is reached from
+there and from Settings > Accounts and sources. Standard's settings root and Desktop's Start
 menu still list every `listed` place.
 
 - **Game sources** (`stores`, `StoresCatalog`, called Stores until
@@ -17160,7 +17161,10 @@ menu still list every `listed` place.
   (`PcLaunchers.viaByEntry`); a store row reads "Signed in · 1,193 games" or
   "Not signed in", Folders "3 folders · 412 games". The column can be scanned by glyph: the
   stores keep the globe, Folders the folder, Add a game and Imported the game controller, Storage the
-  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. Built (`StoreMarks`, `:library-core`): each store names its own site (`StoreLibrary.siteUrl`). Right after a sign-in, and in the background when Game sources lists a store already signed in without a mark, droidtop reads the site's home page for the icon it declares (a touch icon first, then icons by declared size, then `/favicon.ico`; `StoreMarks.iconCandidates`, tested), keeps it as a 96 px PNG in its own files (`store-marks/<store>.png`), and draws it in the store's row and category entry (`CatalogItem.iconFile`, drawn by both surfaces off the main thread). A fetch is tried once per process. Under the heading **Get games** the place lists every installed
+  disk (Droidtop/tracker#503); the store's own mark is the rule (owner, 2026-10-14, Droidtop/tracker#503: "yep. we should always be able to show it even when we can't bundle it, by caching it on login"): each store shows its own mark; where the mark cannot be bundled, droidtop caches it from the store when the user logs in; the generic glyphs above are only the fallback before login. Marks are never drawn from memory. Built (`StoreMarks`, `:library-core`): each store names its own site (`StoreLibrary.siteUrl`). Right after a sign-in, and in the background when Game sources lists a store already signed in without a mark, droidtop reads the site's home page for the icon it declares (a touch icon first, then icons by declared size, then `/favicon.ico`; `StoreMarks.iconCandidates`, tested), keeps it as a 96 px PNG in its own files (`store-marks/<store>.png`), and draws it in the store's row and category entry (`CatalogItem.iconFile`, drawn by both surfaces off the main thread). A fetch is tried once per process. **Get games moved to Downloads and Updates (2026-10-24,
+  Droidtop/tracker#644 slice 3; owner: game sources "Split, plus a status list"):** this page is where a source is set
+  up, and getting games is a use, so its Get games group and Add a game lead Downloads and Updates
+  (`StoresCatalog.getGamesGroups`). Under the heading **Get games** that place lists every installed
   source plugin (`AcquireContentSources.listings`), ready or not, with its state as the row's value
   (Ready, Waiting for your approval, Denied, Turned off, Disabled), so a newcomer with no folders and an
   empty library reaches a search from the first minute, which is the one route PC Games takes with no game
@@ -17281,7 +17285,13 @@ menu still list every `listed` place.
   Droidtop/tracker#639: "Updates should be in the Downloads and Updates menu"): `Place.UPDATES` is not `listed`, so
   no left menu, settings root or Start menu lists it, while its links, notifications and the Quick Menu still open
   it (`Place.reachable`), and in Gaming its page and Get new games mark this row (`menuSection`) and Back from Updates
-  returns here. Then the one
+  returns here. Then **Get games** (every source plugin's row and Add a game, moved from Game sources; see there), then
+  the one jobs list, then **Sources** (`StoresCatalog.sourcesGroups`): each signed-in store and each game folder, one
+  row each opening its page, with one status glyph from the host set (a turning ring while a store installs, the
+  circled "!" on a folder that cannot be read) and nothing to set up; its last row, **Game sources**, opens the setup
+  page. The two groups are read at most every five seconds while the page shows (`PluginJobsScreen.EXTRA_KEEP_MS`; the
+  page is read again on every job report) and afresh on each visit. The Quick Menu's Downloads panel has neither: it is
+  the jobs. The
   jobs list (plugin work, library scrapes, store depots, single-file
   downloads, plugin updates) with progress, Pause, Resume and Cancel where
   the job supports them (12a "Jobs"); every store installs as a

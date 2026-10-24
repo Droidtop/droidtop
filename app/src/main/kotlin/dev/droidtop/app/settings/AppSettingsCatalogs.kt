@@ -235,7 +235,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.LinkRouter.handlersScreen())
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.AppCatalogScreen.screen())
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.AppCatalogScreen.reviewScreen())
-        SettingsScreenRegistry.register(PluginJobsScreen.screen())
+        // Downloads and Updates leads with getting games and closes with each source's standing (Droidtop/tracker#644).
+        SettingsScreenRegistry.register(PluginJobsScreen.screen(lead = StoresCatalog::getGamesGroups, trail = StoresCatalog::sourcesGroups))
         SettingsScreenRegistry.register(DownloadRulesCatalog.screen())
         SettingsScreenRegistry.register(dev.droidtop.library.integrations.ManualDownloads.screen())
         SettingsScreenRegistry.register(MeteredConnectionCatalog.screen())

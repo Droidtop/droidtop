@@ -1,5 +1,6 @@
 package dev.droidtop.library.integrations
 
+import android.content.Context
 import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
@@ -62,15 +63,55 @@ object PluginJobsScreen {
     /**
      * The one place the list of "what is running" is reached; every store's installs are jobs in
      * it. [headed] false is for a host that already names the screen in its own header (the Quick
-     * Menu's panel), so the heading is not said twice.
+     * Menu's panel), so the heading is not said twice. [lead] comes after Updates and [trail] after the
+     * jobs: the place registered by `:app` puts Get games and the Sources status list there
+     * (Droidtop/tracker#644 slice 3), and the Quick Menu's compact panel leaves them out. The page is read
+     * again on every job report, so the two are kept for [EXTRA_KEEP_MS] rather than read each time (they
+     * read plugins and stat game folders), and read afresh on the next visit.
      */
-    fun screen(headed: Boolean = true): CatalogScreen = CatalogScreen(
-        id = ID,
-        title = Place.DOWNLOADS.title,
-        subtitle = "Plugin downloads, library scrapes and other long-running actions, wherever they were started from, and updates".takeIf { headed },
-        groups = { _ -> listOf(updatesGroup()) + groupsFor(PluginJobsCenter.entries().value, System.currentTimeMillis()) + rulesGroup() },
-        live = PluginJobsCenter.entries(),
-    )
+    fun screen(
+        headed: Boolean = true,
+        lead: suspend (Context) -> List<CatalogGroup> = { emptyList() },
+        trail: suspend (Context) -> List<CatalogGroup> = { emptyList() },
+    ): CatalogScreen {
+        val kept = Kept(lead, trail)
+        return CatalogScreen(
+            id = ID,
+            title = Place.DOWNLOADS.title,
+            subtitle = "Getting games, plugin downloads, library scrapes and other long-running actions, and updates".takeIf { headed },
+            groups = { context ->
+                val nowMs = System.currentTimeMillis()
+                val (before, after) = kept.read(context, nowMs)
+                listOf(updatesGroup()) + before + groupsFor(PluginJobsCenter.entries().value, nowMs) + after + rulesGroup()
+            },
+            onLeave = { kept.clear() },
+            live = PluginJobsCenter.entries(),
+        )
+    }
+
+    /** How long the place's own groups stand before a job report reads them again. */
+    const val EXTRA_KEEP_MS = 5_000L
+
+    /** [lead] and [trail] as last read, for [EXTRA_KEEP_MS]. */
+    private class Kept(
+        val lead: suspend (Context) -> List<CatalogGroup>,
+        val trail: suspend (Context) -> List<CatalogGroup>,
+    ) {
+        @Volatile private var atMs = 0L
+        @Volatile private var groups: Pair<List<CatalogGroup>, List<CatalogGroup>>? = null
+
+        suspend fun read(context: Context, nowMs: Long): Pair<List<CatalogGroup>, List<CatalogGroup>> {
+            groups?.takeIf { nowMs - atMs < EXTRA_KEEP_MS }?.let { return it }
+            return (lead(context) to trail(context)).also {
+                groups = it
+                atMs = nowMs
+            }
+        }
+
+        fun clear() {
+            groups = null
+        }
+    }
 
     /** The screen's sections for [snapshot]: Current, Waiting, Paused, Finished, each only when it has a job. */
     internal fun groupsFor(snapshot: List<PluginJobsCenter.Entry>, nowMs: Long): List<CatalogGroup> {

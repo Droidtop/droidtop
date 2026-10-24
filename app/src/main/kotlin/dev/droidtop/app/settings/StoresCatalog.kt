@@ -27,6 +27,7 @@ import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.SettingsScreenRegistry
+import dev.droidtop.library.settings.StatusMark
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.stores.StoreHolding
@@ -244,25 +245,8 @@ internal object StoresCatalog {
         val storeGames = runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList())
         val folders = FoldersCatalog.counts(context)
         val imported = runCatching { dev.droidtop.library.PcLaunchers.viaByEntry(context) }.getOrDefault(emptyMap())
-        val sources = runCatching { AcquireContentSources.listings(context) }.getOrDefault(emptyList())
-        val sourceEntry = if (sources.any { it.state == SourceState.READY }) runCatching { SourceScreens.entryContext(context) }.getOrNull() else null
-        fun storeRow(store: PcStore): CatalogItem {
-            val signedIn = signedInByStore[store] == true
-            val games = storeCounts(storeGames, store.key).total
-            return NestedScreenItem(
-                id = "store_${store.key}",
-                title = store.label,
-                // How to sign in is only worth saying while the person is not signed in; the value column
-                // already says "Signed in" (Droidtop/tracker#367).
-                subtitle = if (signedIn) null else store.signInNote,
-                inline = storePage(store),
-                valueLabel = { sourceValue(signedIn, games) },
-                icon = CatalogIcon.GLOBAL,
-                // The store's own mark once it was cached at sign-in (#503); the globe until then.
-                iconFile = store.own?.let { dev.droidtop.library.stores.StoreMarks.cached(context, it.id)?.path },
-                progress = busyProgress(storeJobs(store)),
-            )
-        }
+        fun storeRow(store: PcStore): CatalogItem =
+            storeItem(context, store, signedInByStore[store] == true, storeCounts(storeGames, store.key).total, id = "store_${store.key}")
         val (signedInStores, signedOutStores) = PcStore.entries.partition { signedInByStore[it] == true }
         listOfNotNull(
             CatalogGroup(
@@ -303,36 +287,6 @@ internal object StoresCatalog {
                         )
                     }
                 },
-            ),
-            // Every installed source plugin, ready or not, so a newcomer with no folders and no library can still reach
-            // a search: opening one searches it for PC games or asks the system (Droidtop/tracker#540).
-            CatalogGroup(
-                id = "stores_sources_group",
-                title = "Get games",
-                items = sources.map { sourceRow(context, it, sourceEntry) }.ifEmpty {
-                    listOf(
-                        NestedScreenItem(
-                            id = "stores_no_sources",
-                            title = "Get games from a source",
-                            subtitle = "No source is installed yet. Plugins lists the ones you can add",
-                            registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
-                            icon = CatalogIcon.LIBRARY,
-                        ),
-                    )
-                },
-            ),
-            CatalogGroup(
-                id = "stores_add_group",
-                title = null,
-                items = listOf(
-                    NestedScreenItem(
-                        id = "stores_add_game",
-                        title = "Add a game",
-                        subtitle = "A game already on this device, from its folder or file, or one from a store's pages",
-                        inline = addGameScreen(),
-                        icon = CatalogIcon.LIBRARY,
-                    ),
-                ),
             ),
             CatalogGroup(
                 id = "stores_storage_group",
@@ -387,6 +341,119 @@ internal object StoresCatalog {
                     ),
                 ),
             ).takeIf { anySignedIn },
+        )
+    }
+
+    /**
+     * A store's row: its page, with who is signed in and its games in the value column. Game sources lists every
+     * store with it, and Downloads and Updates' Sources the signed-in ones, with the one status glyph.
+     */
+    private fun storeItem(context: Context, store: PcStore, signedIn: Boolean, games: Int, id: String, mark: Boolean = false): CatalogItem {
+        val busy = busyProgress(storeJobs(store))
+        return NestedScreenItem(
+            id = id,
+            title = store.label,
+            // How to sign in is only worth saying while the person is not signed in; the value column
+            // already says "Signed in" (Droidtop/tracker#367).
+            subtitle = if (signedIn) null else store.signInNote,
+            inline = storePage(store),
+            valueLabel = { sourceValue(signedIn, games) },
+            icon = CatalogIcon.GLOBAL,
+            // The store's own mark once it was cached at sign-in (#503); the globe until then.
+            iconFile = store.own?.let { dev.droidtop.library.stores.StoreMarks.cached(context, it.id)?.path },
+            // A status row says it with the glyph alone; the bar is Game sources'.
+            progress = busy.takeIf { !mark },
+            statusMark = if (mark && busy != null) StatusMark.WORKING else null,
+        )
+    }
+
+    /**
+     * Downloads and Updates' Get games, after its Updates row (Droidtop/tracker#644 slice 3; owner, 2026-10-24: Game
+     * sources "Split, plus a status list"): every installed source plugin, ready or not, so a newcomer with no folders
+     * and no library can still reach a search, opening one searches it for PC games or asks the system
+     * (Droidtop/tracker#540); then Add a game. Getting games is a use, so it lives where downloads are seen, not in
+     * the setup of where games come from. Off the main thread.
+     */
+    suspend fun getGamesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val sources = runCatching { AcquireContentSources.listings(context) }.getOrDefault(emptyList())
+        val sourceEntry = if (sources.any { it.state == SourceState.READY }) runCatching { SourceScreens.entryContext(context) }.getOrNull() else null
+        listOf(
+            // With no source installed, one row to Plugins, never a blank.
+            CatalogGroup(
+                id = "stores_sources_group",
+                title = "Get games",
+                items = sources.map { sourceRow(context, it, sourceEntry) }.ifEmpty {
+                    listOf(
+                        NestedScreenItem(
+                            id = "stores_no_sources",
+                            title = "Get games from a source",
+                            subtitle = "No source is installed yet. Plugins lists the ones you can add",
+                            registryId = AcquireContentSources.PLUGINS_SCREEN_ID,
+                            icon = CatalogIcon.LIBRARY,
+                        ),
+                    )
+                },
+            ),
+            CatalogGroup(
+                id = "stores_add_group",
+                title = null,
+                items = listOf(
+                    NestedScreenItem(
+                        id = "stores_add_game",
+                        title = "Add a game",
+                        subtitle = "A game already on this device, from its folder or file, or one from a store's pages",
+                        inline = addGameScreen(),
+                        icon = CatalogIcon.LIBRARY,
+                    ),
+                ),
+            ),
+        )
+    }
+
+    /**
+     * Downloads and Updates' Sources: where games come from, one row each with one status glyph and nothing to set up
+     * (Droidtop/tracker#644 slice 3). The signed-in stores (a turning ring while one installs), then each game folder
+     * ("Not available", with the circled "!", when it cannot be read: a card that is out). Setting a source up is
+     * Game sources, its last row, the page Settings > Accounts and sources opens. Off the main thread.
+     */
+    suspend fun sourcesGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
+        val signedIn = PcStore.entries.filter { it.signedIn(context) }
+        val storeGames = if (signedIn.isEmpty()) emptyList() else runCatching { PcLibrary.storeGames(context) }.getOrDefault(emptyList())
+        val folders = FoldersCatalog.counts(context)
+        val now = System.currentTimeMillis()
+        listOf(
+            CatalogGroup(
+                id = "downloads_sources",
+                title = "Sources",
+                items = buildList {
+                    signedIn.forEach { store ->
+                        val games = storeCounts(storeGames, store.key).total
+                        add(storeItem(context, store, signedIn = true, games = games, id = "downloads_source_${store.key}", mark = true))
+                    }
+                    folders.roots.forEach { root ->
+                        add(
+                            NestedScreenItem(
+                                id = "downloads_source_folder_${root.path}",
+                                title = FoldersCatalog.folderName(root.path),
+                                subtitle = root.path,
+                                inline = FoldersCatalog.screen(),
+                                valueLabel = { FoldersCatalog.rootValue(root, now) },
+                                icon = CatalogIcon.GAME_FOLDERS,
+                                statusMark = StatusMark.ATTENTION.takeIf { !root.available },
+                            ),
+                        )
+                    }
+                    add(
+                        NestedScreenItem(
+                            id = "downloads_sources_setup",
+                            title = "Game sources",
+                            subtitle = "Sign in to a store, add a game folder, storage and sync",
+                            registryId = SCREEN_ID,
+                            icon = CatalogIcon.GLOBAL,
+                        ),
+                    )
+                },
+            ),
         )
     }
 
