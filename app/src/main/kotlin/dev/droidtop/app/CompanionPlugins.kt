@@ -6,10 +6,12 @@ import dev.droidtop.ui.shared.LocalNoticePalette
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +27,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
@@ -89,6 +92,19 @@ internal fun rememberCompanionPanels(mode: String): List<PluginPanels.Panel>? {
     return panels
 }
 
+/** Every installed plugin with how it stands, as the Quick Menu lists them ([PluginPanels.listed]); null while read. */
+@Composable
+private fun rememberCompanionListing(mode: String): List<PluginPanels.Listed>? {
+    val context = LocalContext.current
+    val epoch = PluginEpoch.current()
+    val listed by produceState<List<PluginPanels.Listed>?>(null, mode, epoch) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { PluginPanels.listed(context.applicationContext, mode) }.getOrDefault(emptyList())
+        }
+    }
+    return listed
+}
+
 /** The running game as a plugin target, or null with nothing running. */
 @Composable
 private fun rememberRunningTarget(): ContextTarget? {
@@ -99,26 +115,27 @@ private fun rememberRunningTarget(): ContextTarget? {
 }
 
 /**
- * The Plugins tab ([only] null): every panel by name with its abilities line; a tap opens it, Back returns. With
- * [only] ("plugin:<id>"), that one panel is the whole tab.
+ * The Plugins tab ([only] null): every installed plugin by name, with its icon and status glyph, the same list as the
+ * Quick Menu's (Droidtop/tracker#644); a tap opens its panel, Back returns. With [only] ("plugin:<id>"), that one panel
+ * is the whole tab.
  */
 @Composable
 internal fun CompanionPluginsTab(only: String?) {
     val mode = pluginMode(LocalCompanionMode.current)
-    val panels = rememberCompanionPanels(mode)
+    val listed = rememberCompanionListing(mode)
     var open by remember(only) { mutableStateOf<String?>(null) }
     val colors = MaterialTheme.colorScheme
     Column(
         modifier = Modifier.fillMaxSize().secondScreenScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val list = panels
-        if (list == null) {
+        val all = listed
+        if (all == null) {
             CompanionNote("Reading…")
             return@Column
         }
         val shownId = only?.removePrefix(CompanionPrefs.PLUGIN_PREFIX) ?: open
-        val panel = shownId?.let { id -> list.firstOrNull { it.pluginId == id } }
+        val panel = shownId?.let { id -> all.firstOrNull { it.panel.pluginId == id }?.panel }
         if (panel != null) {
             CompanionPluginPanel(panel, onBack = if (only == null) ({ open = null }) else null)
             return@Column
@@ -128,22 +145,36 @@ internal fun CompanionPluginsTab(only: String?) {
             return@Column
         }
         Text("Plugins", style = MaterialTheme.typography.titleMedium, color = colors.onBackground, modifier = Modifier.semantics { heading() })
-        if (list.isEmpty()) CompanionNote("No plugin has a panel")
-        list.forEach { item ->
+        if (all.isEmpty()) CompanionNote("No plugins yet")
+        all.forEach { item ->
             CompanionTile(
-                onClick = { open = item.pluginId },
+                onClick = { open = item.panel.pluginId },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
             ) {
-                Column(
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 56.dp)
                         .background(colors.surface)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 ) {
+                    item.iconFile?.let { icon ->
+                        coil3.compose.AsyncImage(
+                            model = java.io.File(icon),
+                            contentDescription = null,
+                            modifier = Modifier.padding(end = 12.dp).size(32.dp),
+                        )
+                    }
                     // The plugin's name, as on the shell's list (Droidtop/tracker#515): no line of droidtop's internals under it.
-                    Text(item.label, style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                    Text(item.panel.label, style = MaterialTheme.typography.titleSmall, color = colors.onSurface, modifier = Modifier.weight(1f))
+                    item.status.mark?.let { mark ->
+                        if (mark != dev.droidtop.library.settings.StatusMark.WORKING) {
+                            Text(item.status.word, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, modifier = Modifier.padding(horizontal = 8.dp))
+                        }
+                        dev.droidtop.ui.shared.StatusGlyph(mark, colors.primary)
+                    }
                 }
             }
         }

@@ -4353,8 +4353,10 @@ droidtop 0.2.0-dev.1931).
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
 - **Plugins (slice C9).** A plugin's companion panel is its Quick Menu panel (`ui.panel`, docs/plugin-api.md 3
   C15 and C17), drawn for touch by `CompanionPluginsTab` with `context.surface` `<mode>.companion`: there is no
-  second panel point. The Plugins tab lists every running panel by name (no line of droidtop's internals under
-  it, Droidtop/tracker#515); a tap opens it with Back. **One panel frame** (Droidtop/tracker#515, built
+  second panel point. The Plugins tab lists every installed plugin, the Quick Menu's own list
+  (`PluginPanels.listed`, Droidtop/tracker#644): its icon, its name (no line of droidtop's internals under it,
+  Droidtop/tracker#515) and its status glyph, with the state in words when it needs the person; a tap opens its
+  panel with Back. **One panel frame** (Droidtop/tracker#515, built
   2026-10-16): a panel is a `CatalogScreen` marked `panel`, with the plugin's icon (`iconFile`), and every host
   draws it the same way: the icon before the panel's name at the title size, each row's subtitle as one line under
   it (the whole text in Info on the shell, a tap on the line on the companion), and values in the one muted value

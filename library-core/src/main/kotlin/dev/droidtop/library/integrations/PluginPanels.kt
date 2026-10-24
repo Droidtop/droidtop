@@ -99,6 +99,36 @@ object PluginPanels {
         }.sortedBy { it.label.lowercase() }
     }
 
+    /** One installed plugin as a list shows it: its panel (or an empty one), how it stands, and its icon. */
+    data class Listed(val panel: Panel, val status: PluginStatus.Status, val iconFile: String?)
+
+    /**
+     * Every installed plugin, by name, as the Quick Menu's Plugins section and the companion's Plugins tab list them
+     * (Droidtop/tracker#644): a plugin with no panel, tiles or facets for [mode] is listed too, with an empty panel
+     * whose page is its Settings, Permissions and App status rows. Reads manifests, grants and the catalogs as last
+     * fetched (never the network); call it off the main thread.
+     */
+    fun listed(context: Context, mode: String? = null): List<Listed> {
+        val panels = panelsFor(context, mode).associateBy { it.pluginId }
+        val listings = PluginCatalog.listings(context)
+        val userKeys = dev.droidtop.pluginhost.UserOriginKeys.load(dev.droidtop.pluginhost.UserOriginKeys.storeFile(context))
+        val grantStore = dev.droidtop.pluginhost.PluginGrants.forContext(context)
+        val waiting = dev.droidtop.pluginhost.PluginApiResolver.current(context).waiting
+        val busy = dev.droidtop.pluginhost.PluginJobsCenter.entries().value.filter { !it.done }.mapTo(HashSet()) { it.pluginId }
+        return PluginStore.installed(context).map { record ->
+            val id = record.manifest.id
+            val status = PluginStatus.of(
+                record,
+                grantStore.read(id),
+                dev.droidtop.pluginhost.PluginRuntimeNeeds.missing(context, record.manifest),
+                updateAvailable = PluginCatalog.offerFor(listings, record, userKeys) != null,
+                waiting = waiting[id],
+                working = id in busy,
+            )
+            Listed(panels[id] ?: Panel(record, entry = null, tiles = emptyList()), status, PluginStore.iconFile(context, record))
+        }.sortedBy { it.panel.label.lowercase() }
+    }
+
     /** What a list row says about a plugin before it is opened: its first tile's last known state, from memory. */
     fun summary(panel: Panel): String? = panel.tiles.firstNotNullOfOrNull { tile -> PluginTiles.cached(tile)?.let(::tileValue) }
 
@@ -121,37 +151,21 @@ object PluginPanels {
         title = "Plugins",
         groups = { context ->
             withContext(Dispatchers.IO) {
-                val panels = panelsFor(context, PluginModes.ofSurface(surface)).associateBy { it.pluginId }
-                // The catalogs as last fetched, never a network call: Decky's badge on a plugin with an update.
-                val listings = PluginCatalog.listings(context)
-                val userKeys = dev.droidtop.pluginhost.UserOriginKeys.load(dev.droidtop.pluginhost.UserOriginKeys.storeFile(context))
-                val grantStore = dev.droidtop.pluginhost.PluginGrants.forContext(context)
-                val waiting = dev.droidtop.pluginhost.PluginApiResolver.current(context).waiting
-                val busy = dev.droidtop.pluginhost.PluginJobsCenter.entries().value.filter { !it.done }.mapTo(HashSet()) { it.pluginId }
-                val rows: List<CatalogItem> = PluginStore.installed(context).map { record ->
-                    val id = record.manifest.id
-                    // A plugin with no panel, tiles or Quick Menu facets is still listed: its panel is its other pages.
-                    val panel = panels[id] ?: Panel(record, entry = null, tiles = emptyList())
-                    val status = PluginStatus.of(
-                        record,
-                        grantStore.read(id),
-                        dev.droidtop.pluginhost.PluginRuntimeNeeds.missing(context, record.manifest),
-                        updateAvailable = PluginCatalog.offerFor(listings, record, userKeys) != null,
-                        waiting = waiting[id],
-                        working = id in busy,
-                    )
+                val rows: List<CatalogItem> = listed(context, PluginModes.ofSurface(surface)).map { listed ->
+                    val panel = listed.panel
                     // The glyph says how it stands; the value is its first tile's state, or the state in words when that
                     // needs the person.
-                    val value = if (status.mark != null && status.mark != dev.droidtop.library.settings.StatusMark.WORKING) status.word else summary(panel)
+                    val mark = listed.status.mark
+                    val value = if (mark != null && mark != dev.droidtop.library.settings.StatusMark.WORKING) listed.status.word else summary(panel)
                     NestedScreenItem(
-                        id = "plugin_panel_$id",
+                        id = "plugin_panel_${panel.pluginId}",
                         title = panel.label,
                         inline = panelScreen(context, panel, surface, game, withMore = true, onReplyScreen = onReplyScreen),
                         valueLabel = { value },
-                        iconFile = PluginStore.iconFile(context, record),
-                        statusMark = status.mark,
+                        iconFile = listed.iconFile,
+                        statusMark = mark,
                     )
-                }.sortedBy { it.title.lowercase() }
+                }
                 listOfNotNull(
                     CatalogGroup(
                         id = "plugin_panels_list",
