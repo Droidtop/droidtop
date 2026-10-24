@@ -261,12 +261,14 @@ internal fun SourceRecordPage(
                 val pickedFrom = record?.downloads.orEmpty()
                 scope.launch {
                     // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).
+                    var checked = false
                     if (library.sourceNeedsCheck(source.key)) {
                         say("${source.label} checks the browser first")
                         if (!library.passSourceCheck(source.key)) {
                             say("${source.label}'s check was not passed, so nothing was downloaded")
                             return@launch
                         }
+                        checked = true
                     }
                     // A link the source gave is opened in droidtop's web view, where the person starts the download and
                     // droidtop takes it over (Droidtop/tracker#599). A mirror with no link is looked up in the record asked
@@ -283,11 +285,17 @@ internal fun SourceRecordPage(
                         use = library.freshDownload(source.key, externalId, picked, pickedFrom) ?: use
                     }
                     val url = use.url
+                    val outcome = if (url != null) {
+                        library.openUpdateLink(source.key, externalId, url, record?.url, version, gameName, newest) { status -> say(status) }
+                    } else {
+                        library.downloadUpdate(source.key, externalId, use.link, version, gameName, newest) { status -> say(status) }
+                    }
+                    // Asked again right after a pass: said once, plainly, and the check is not opened again for it.
                     say(
-                        if (url != null) {
-                            library.openUpdateLink(source.key, externalId, url, record?.url, version, gameName, newest) { status -> say(status) }
+                        if (checked && outcome.contains("checks the browser first")) {
+                            "${source.label}'s site still asked for its check after it was passed, so nothing was downloaded"
                         } else {
-                            library.downloadUpdate(source.key, externalId, use.link, version, gameName, newest) { status -> say(status) }
+                            outcome
                         },
                     )
                 }

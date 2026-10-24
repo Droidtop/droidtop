@@ -55,14 +55,37 @@ object SiteChecks {
             .joinToString("; ").takeIf { it.isNotEmpty() }
 
     /**
-     * [header] with [extra]'s cookies added, a cookie [header] already names keeping its own value; either may be
-     * null. Pure.
+     * [header] with [extra]'s cookies added; either may be null. A check's clearance in [extra] replaces one of the same
+     * name in [header]: [extra] is the newest the person earned, and a signed-in session kept from before carries an
+     * older `cf_clearance` that made the site ask again right after a pass (Droidtop/tracker#600). Any other cookie
+     * [header] already names keeps its own value. Pure.
      */
     fun mergeCookies(header: String?, extra: String?): String? {
-        val pairs = header.orEmpty().split(';').map { it.trim() }.filter { it.contains('=') }
+        val added = extra.orEmpty().split(';').map { it.trim() }.filter { it.contains('=') }
+        val replaced = added.map { it.substringBefore('=').trim() }.filter(::isClearanceCookie).toSet()
+        val pairs = header.orEmpty().split(';').map { it.trim() }.filter { it.contains('=') && it.substringBefore('=').trim() !in replaced }
         val named = pairs.map { it.substringBefore('=').trim() }.toSet()
-        val added = extra.orEmpty().split(';').map { it.trim() }.filter { it.contains('=') && it.substringBefore('=').trim() !in named }
-        return (pairs + added).joinToString("; ").takeIf { it.isNotEmpty() }
+        return (pairs + added.filter { it.substringBefore('=').trim() !in named }).joinToString("; ").takeIf { it.isNotEmpty() }
+    }
+
+    /** The titles a check's page has while it checks: Cloudflare's and DDoS-Guard's. */
+    private val CHECK_TITLES = listOf("just a moment", "attention required", "checking your browser", "ddos-guard", "please wait")
+
+    /** Whether a page titled [title] is still a check rather than the site's page; an untitled page counts as one. Pure. */
+    fun isCheckTitle(title: String?): Boolean {
+        val t = title?.trim()?.lowercase().orEmpty()
+        return t.isEmpty() || CHECK_TITLES.any { t.startsWith(it) || t.contains("| cloudflare") }
+    }
+
+    /**
+     * Whether the person has passed a site's check, from what the web view shows: the site's own page (its title is
+     * not a check's), and a pass cookie for it ([cookieHeader]: Cloudflare's `cf_clearance`, DDoS-Guard's `__ddg2_`).
+     * The owner, 2026-10-24: "Can we have it autoclose when we detect the cloudflare pass?" Pure.
+     */
+    fun passed(title: String?, cookieHeader: String?): Boolean {
+        if (isCheckTitle(title)) return false
+        val names = cookieHeader.orEmpty().split(';').map { it.trim().substringBefore('=').trim() }
+        return "cf_clearance" in names || "__ddg2_" in names
     }
 
     /**
