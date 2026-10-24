@@ -8897,7 +8897,10 @@ Two concrete references to build from rather than design blind:
   Windows game that will not start, is one row of both places, "Prefix tools"
   (`PrefixToolsCatalog` over `WinePrefixTools` in `:runtime-windows`), for the prefix the game
   starts in (the shared one for a game that has none of its own, and the row says the changes reach
-  every game sharing it):
+  every game sharing it). The two places are Settings > Windows games, for the shared prefix, and,
+  since 2026-10-23 (Droidtop/tracker#636), the game menu's Manage section (§7i, "Manage"), for every
+  kind of game, an engine game Enginehost plays included; a game's Wine and graphics screen no
+  longer carries it:
   - **Wine's own programs.** Wine configuration (`winecfg`: Windows version, DLL overrides, drives
     and audio, which Wine keeps there, so droidtop does not copy them into rows of its own), the
     Registry editor (`regedit`) and a Command prompt (`wineconsole cmd`: `cmd` has no terminal to
@@ -8910,7 +8913,12 @@ Two concrete references to build from rather than design blind:
     picker (`PickedFiles` turns a shared-storage document into its real path) or typed as a path,
     for what the picker cannot reach, such as a shared folder. It runs where it is, from its own
     folder: nothing is copied or moved, and no folder of the person's is written to by droidtop. The
-    same `WinePrefixTools.runIn` starts a file opened with droidtop (§4b).
+    program itself may write its folder: that folder is put on a drive of the prefix first when no
+    drive holds it yet (`PrefixDrives.withFolder`, as an installer's is), so a translation updater
+    rewriting a game's files writes them there (Droidtop/tracker#636). No Wine sandbox exists yet;
+    when one does (Droidtop/tracker#584) it must leave the folder of the program the person chose
+    writable for that run. The same `WinePrefixTools.runIn` starts a file opened with droidtop (§4b)
+    and the Manage section's "Run a program in a Wine prefix" (§7i).
   - **Stop every Wine process.** `ProcessHelper.killAllWineProcesses`, the list a launch clears
     before it starts, behind a question because it ends every Windows program, in any prefix.
   - **Windows components (the winetricks verbs this runtime has).** A real `winetricks` is a
@@ -8999,8 +9007,8 @@ Two concrete references to build from rather than design blind:
   **Prefix tools for Linux games (2026-10-09, Droidtop/tracker#10).** A native Linux build has no
   prefix: `launchLinux` runs its launcher with `ContainerRuntime.exec` in Desktop mode's primary
   container (through FEX or box64 when its code is x86, §3c) and always has, with the container's
-  home. The Linux counterpart of Prefix tools is therefore a "Linux tools" row on the game's page
-  (shown for a game with a Linux route and no Windows one; screen `linux_game_tools`,
+  home. The Linux counterpart of Prefix tools is therefore a "Linux tools" row, in the game menu's
+  Manage section since 2026-10-23 (§7i; shown for a game with a Linux route; screen `linux_game_tools`,
   `LinuxGameToolsCatalog`), acting on that game's launch environment and never on the shared
   container:
   - **Run a program in place.** A file inside the game's folder, picked or typed, run in the
@@ -23290,9 +23298,30 @@ listed only when it has a row that can be pressed and saying its first rows ("Sc
 - **Install and files:** a store game's DLC and versions, Downloads (the job's own line), Keep up to date, Verify files,
   Uninstall.
 - **Updates:** each update source and Check now.
-- **How it runs:** Runs with, Engine, and the one runner's settings (Wine and graphics, Program, Game properties, the
-  Lutris import; Linux tools; Enginehost's settings).
+- **How it runs:** Runs with, Run once with…, Engine, and the one runner's settings (Wine and graphics, Program, Game
+  properties, the Lutris import; Enginehost's settings).
 - **Controls and saves:** Controls, Saves, Sync cloud saves.
+- **Manage:** Run a program in a Wine prefix, Prefix tools, and Linux tools for a game with a Linux build.
+
+**Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's
+translation updater under Wine while Enginehost plays the game: "We can set the game type. We can probably also do a
+"run once". And maybe in a "management" menu we can run it attached to a wineprefix".
+- **Runs with** is the game type and stays as it is: the saved choice (`LaunchStrategyOverridePrefs`).
+- **Run once with…** sits under it when more than one runner can take the game. It opens the same picker (`RunnerPicker`,
+  titled "Run once with") and starts the game with the chosen runner this one time; the saved choice is not touched.
+  The choice is held in memory for the launch that follows it (`LaunchStrategyOverridePrefs.runOnce`), and both launch
+  paths read it through `forLaunch`, which takes it, so it applies once (`GameEngineDetector.launch`,
+  `PcGameProvider`). A runner that needs setup runs its setup instead and says to choose again; a one-time choice
+  the launch cannot honour stops the launch and says so rather than starting the game another way.
+- **Manage** holds the per-game tools, for every kind of game. "Run a program in a Wine prefix" (`RunInPrefixCatalog`,
+  screen `game_run_in_prefix`) lists the programs (`.exe`, `.msi`, `.bat`, `.cmd`) in the game's own folder first,
+  breadth first so the ones beside the game lead, then "Choose another file" (the system picker, opening in the game's
+  folder when it is on the shared storage). A program then asks which prefix it runs attached to: the game's own
+  prefix when it has one, the shared one, or any other prefix on this device (`WinePrefixes.choicesFor`). It runs
+  through `WinePrefixTools.runIn` (§7c, Prefix tools): nothing is copied, and it may write the game's folder. "Prefix
+  tools" (screen `game_prefix_tools`) is §7c's Prefix tools for the prefix the game starts in, moved here from the
+  game's Wine and graphics screen; Linux tools moved here from How it runs. Both screens are `:app`'s, opened by id
+  (`ManageScreens`) with the game, its title and its folder.
 
 Each opens one page and nothing deeper (`PcMenuPage`); B on a page returns to the top. A row that opens a settings page
 (Wine and graphics, Program, Game properties, Linux tools) or a picker (DLC and versions, Runs with, Engine, Collections)

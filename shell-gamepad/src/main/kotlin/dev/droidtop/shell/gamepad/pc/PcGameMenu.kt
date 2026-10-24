@@ -152,6 +152,8 @@ internal fun PcGameMenu(
     var loaded by remember(entry) { mutableStateOf(false) }
     var reloadToken by remember(entry) { mutableStateOf(0) }
     var picking by remember(entry) { mutableStateOf(false) }
+    // "Run once with…" (docs/SPEC.md 7i, Droidtop/tracker#636): the same choices as Runs with, for one launch.
+    var pickingOnce by remember(entry) { mutableStateOf(false) }
     var status by remember(entry) { mutableStateOf<String?>(null) }
     var viewingMedia by remember(entry) { mutableStateOf(false) }
     var pickingMatch by remember(entry) { mutableStateOf(false) }
@@ -313,6 +315,39 @@ internal fun PcGameMenu(
                     reloadToken++
                 },
                 onDismiss = { picking = false },
+            )
+        }
+        return
+    }
+    if (pickingOnce) {
+        FullScreenOverlay(onDismiss = { pickingOnce = false }) {
+            RunnerPicker(
+                options = runners.options,
+                engine = runners.engine,
+                current = null,
+                overridden = false,
+                title = "Run once with",
+                onPick = { strategy ->
+                    pickingOnce = false
+                    val option = runners.options.firstOrNull { it.strategy == strategy }
+                    val setup = option?.action
+                    when {
+                        option == null -> Unit
+                        // The saved Runs with choice is left as it is; the launch takes this one and forgets it.
+                        option.state == RunnerState.READY -> {
+                            LaunchStrategyOverridePrefs.runOnce(entry.id, option.strategy)
+                            onClose()
+                            onLaunch()
+                        }
+                        setup != null -> scope.launch {
+                            status = PcRunnerOptions.runAction(context, entry, setup) { line -> status = line }
+                                ?: "Set up. Choose Run once with again to start it that way"
+                            reloadToken++
+                        }
+                        else -> status = option.reason ?: "That runner can't start this game yet"
+                    }
+                },
+                onDismiss = { pickingOnce = false },
             )
         }
         return
@@ -772,17 +807,39 @@ internal fun PcGameMenu(
             }.getOrElse { "Enginehost didn't take that: ${FailureText.of("PcGameMenu", it)}" }
         },
         hasWindowsRoute = hasWindowsRoute,
-        hasLinuxRoute = hasLinuxRoute,
-        // The registered Linux tools screen :app builds (LinuxGameToolsCatalog), in the same sheet.
-        onOpenLinuxTools = engineChoice.folder?.let { folder ->
-            {
-                val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get(
-                    dev.droidtop.library.LinuxToolsScreen.ID,
-                    dev.droidtop.library.LinuxToolsScreen.argument(entry.id, gameName, folder),
-                )
-                if (screen != null) wineScreen = screen else status = "Linux tools aren't available in this build"
+        // The Manage section's screens (docs/SPEC.md 7i, "Manage"): registered by :app, opened by id for this
+        // game's folder, in the same sheet. Linux tools only for a game with a Linux build.
+        manageTools = engineChoice.folder?.let { folder ->
+            listOfNotNull(
+                ManageTool(
+                    dev.droidtop.library.ManageScreens.RUN_IN_PREFIX,
+                    "Run a program in a Wine prefix",
+                    "A program from the game's folder or anywhere, in the prefix you pick. It may change the game's files",
+                ),
+                ManageTool(
+                    dev.droidtop.library.ManageScreens.PREFIX_TOOLS,
+                    "Prefix tools",
+                    "Wine configuration, the registry editor, a command prompt and Windows components, for the prefix this game starts in",
+                ),
+                if (hasLinuxRoute) {
+                    ManageTool(
+                        dev.droidtop.library.LinuxToolsScreen.ID,
+                        "Linux tools",
+                        "Run a program from its folder, stop its processes, keep or reset its own saves and settings",
+                    )
+                } else {
+                    null
+                },
+            ).map { tool ->
+                PcActionRow(tool.title, tool.detail) {
+                    val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get(
+                        tool.screenId,
+                        dev.droidtop.library.LinuxToolsScreen.argument(entry.id, gameName, folder),
+                    )
+                    if (screen != null) wineScreen = screen else status = "${tool.title} isn't available in this build"
+                }
             }
-        },
+        }.orEmpty(),
         // The registered settings screen :app builds (WineOptionsCatalog),
         // by id and deep-linked to this game, in a sheet over the menu.
         onOpenWineSettings = {
@@ -836,6 +893,12 @@ internal fun PcGameMenu(
             },
             onSelect = if (loaded && runners.options.isNotEmpty()) ({ picking = true }) else null,
         )
+    } else {
+        null
+    }
+    // Run once with… -- another runner for one launch, the saved one kept: offered when there is a choice to make.
+    val runOnceRow = if (!entry.missing && loaded && runners.options.count { it.selectable } > 1) {
+        PcActionRow("Run once with…", "Start it one time with another runner; Runs with stays as it is", { pickingOnce = true })
     } else {
         null
     }
@@ -1043,8 +1106,9 @@ internal fun PcGameMenu(
         PcMenuPage.Organise to actions.organise.map { PcMenuEntry.Row(it) },
         PcMenuPage.Install to actions.install.map { PcMenuEntry.Row(it) },
         PcMenuPage.Updates to actions.updates.map { PcMenuEntry.Row(it) },
-        PcMenuPage.Runs to (listOfNotNull(runsWithRow) + actions.runs).map { PcMenuEntry.Row(it) },
+        PcMenuPage.Runs to (listOfNotNull(runsWithRow, runOnceRow) + actions.runs).map { PcMenuEntry.Row(it) },
         PcMenuPage.Saves to actions.saves.map { PcMenuEntry.Row(it) },
+        PcMenuPage.Manage to actions.manage.map { PcMenuEntry.Row(it) },
     )
     val entries = buildList {
         when (page) {
@@ -1213,11 +1277,13 @@ internal enum class PcMenuPage(val title: String) {
     Updates("Updates"),
     Runs("How it runs"),
     Saves("Controls and saves"),
+    // The per-game tools, for every kind of game (owner, 2026-10-23, Droidtop/tracker#636).
+    Manage("Manage"),
     ;
 
     companion object {
         /** The categories, in the order the top page lists them (owner, 2026-10-23). */
-        val categories = listOf(Info, Organise, Install, Updates, Runs, Saves)
+        val categories = listOf(Info, Organise, Install, Updates, Runs, Saves, Manage)
     }
 }
 
@@ -1264,7 +1330,11 @@ private data class PcMenuSections(
     val updates: List<PcActionRow>,
     val runs: List<PcActionRow>,
     val saves: List<PcActionRow>,
+    val manage: List<PcActionRow>,
 )
+
+/** One screen of the Manage section: the registered screen it opens and its row's words. */
+private class ManageTool(val screenId: String, val title: String, val detail: String)
 
 /** A store game's own rows, filed by what they are for: other ways to play, the install, and its cloud saves. */
 private data class StoreRows(val play: List<PcActionRow>, val install: List<PcActionRow>, val saves: List<PcActionRow>)
@@ -1317,8 +1387,7 @@ private fun rememberPcActions(
     engineRow: PcActionRow?,
     onEnginehost: (android.content.Intent) -> Unit,
     hasWindowsRoute: Boolean,
-    hasLinuxRoute: Boolean,
-    onOpenLinuxTools: (() -> Unit)?,
+    manageTools: List<PcActionRow>,
     onOpenWineSettings: () -> Unit,
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
@@ -1331,8 +1400,6 @@ private fun rememberPcActions(
     val runnerRows = runnerRows(
         runsOnEnginehost = runsOnEnginehost,
         hasWindowsRoute = hasWindowsRoute,
-        hasLinuxRoute = hasLinuxRoute,
-        onOpenLinuxTools = onOpenLinuxTools,
         isEngineGame = isEngineGame,
         onEnginehost = onEnginehost,
         onOpenPrefix = onOpenWineSettings,
@@ -1389,6 +1456,7 @@ private fun rememberPcActions(
         // nothing with. The Runs with row is added where the runner state lives.
         runs = listOfNotNull(engineRow) + runnerRows.runs,
         saves = runnerRows.saves + storeRows?.saves.orEmpty(),
+        manage = manageTools,
     )
 }
 
@@ -1498,8 +1566,6 @@ internal fun wineRowDetail(x86_64Host: Boolean): String =
 private fun runnerRows(
     runsOnEnginehost: Boolean,
     hasWindowsRoute: Boolean,
-    hasLinuxRoute: Boolean,
-    onOpenLinuxTools: (() -> Unit)?,
     isEngineGame: Boolean,
     onEnginehost: (android.content.Intent) -> Unit,
     onOpenPrefix: () -> Unit,
@@ -1555,17 +1621,7 @@ private fun runnerRows(
         PcActionRow("Controls", "In its prefix's controller tab", null),
         PcActionRow("Saves", "Inside its Windows prefix", null),
     ))
-    // A native Linux build (docs/SPEC.md 7c, "Prefix tools for Linux games").
-    hasLinuxRoute -> RunnerRows(
-        runs = listOf(
-            PcActionRow(
-                "Linux tools",
-                "Run a program from its folder, stop its processes, keep or reset its own saves and settings",
-                onOpenLinuxTools,
-            ),
-        ),
-        saves = emptyList(),
-    )
+    // A native Linux build's tools are in Manage, with the Wine ones (docs/SPEC.md 7i, "Manage").
     else -> RunnerRows.NONE
 }
 

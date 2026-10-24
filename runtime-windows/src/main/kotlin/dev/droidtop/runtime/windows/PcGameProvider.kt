@@ -455,8 +455,12 @@ class PcGameProvider(
 
         // Folder listings, the package manager and enginehost's provider:
         // never on whatever thread the launch was asked from.
+        val once = dev.droidtop.library.LaunchStrategyOverridePrefs.isOnce(entry.id)
         val resolved = withContext(Dispatchers.IO) {
-            PcRunnerOptions.resolvedFor(context, entry, PcRunnerOptions.forEntry(context, entry))
+            val override = dev.droidtop.library.LaunchStrategyOverridePrefs.forLaunch(context, entry.id)
+            PcRunnerOptions.resolvedFor(context, entry, PcRunnerOptions.forEntry(context, entry), override)
+                // A "Run once with…" choice this game cannot take is said, not swapped for another runner.
+                ?.also { check(!once || it.option.strategy.name == override) { "Can't run ${entry.title} that way on this device right now; it was not started" } }
         } ?: error(
             "Can't launch ${entry.title}: there's no Windows executable or native Linux build in " +
                 "${gameRoot.absolutePath}.",

@@ -210,11 +210,19 @@ object PcRunnerOptions {
         }
     }
 
-    /** [RunnerAvailability.resolve] over [forEntry], with the user's stored override applied. */
-    fun resolvedFor(context: Context, entry: LibraryEntry, runners: PcRunners): ResolvedRunner? =
+    /**
+     * [RunnerAvailability.resolve] over [forEntry], with the user's stored override applied, or [override]: a
+     * launch passes [LaunchStrategyOverridePrefs.forLaunch], so a "Run once with…" choice applies to it alone.
+     */
+    fun resolvedFor(
+        context: Context,
+        entry: LibraryEntry,
+        runners: PcRunners,
+        override: String? = LaunchStrategyOverridePrefs.get(context, entry.id),
+    ): ResolvedRunner? =
         RunnerAvailability.resolve(
             runners.options,
-            LaunchStrategyOverridePrefs.get(context, entry.id),
+            override,
             engine = runners.engine,
             defaultLabel = entry.kind.takeIf { it != LibraryEntryKind.WINE_PROFILE }?.displayName(),
         )

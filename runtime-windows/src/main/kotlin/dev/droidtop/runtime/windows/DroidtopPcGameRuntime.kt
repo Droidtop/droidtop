@@ -807,4 +807,28 @@ object WinePrefixes {
         } ?: return PcLaunchResult(false, "that Windows environment no longer exists")
         return WinePrefixTools.runIn(context, container, file)
     }
+
+    /** Whose a prefix in [choicesFor] is: the game's own, the one games share, or another one on this device. */
+    enum class Role { OWN, SHARED, OTHER }
+
+    /** A prefix a program can run attached to, for one game. */
+    data class Choice(val id: String, val name: String, val role: Role)
+
+    /**
+     * The prefixes a program can run attached to for [entryId] (docs/SPEC.md 7i, "Manage"): the game's own
+     * when it has one, then the shared one, then every other prefix on this device. Disk work: IO only.
+     */
+    fun choicesFor(context: Context, entryId: String?): List<Choice> {
+        val containers = runCatching { ContainerManager(context).containers }.getOrNull().orEmpty()
+        return containers
+            .map { container ->
+                val role = when {
+                    PcContainers.isOwnPrefix(entryId, container) -> Role.OWN
+                    container.id == DroidtopPcGameRuntime.CONTAINER_ID -> Role.SHARED
+                    else -> Role.OTHER
+                }
+                Choice(container.id, container.name?.takeIf(String::isNotBlank) ?: container.id, role)
+            }
+            .sortedBy { it.role.ordinal }
+    }
 }
