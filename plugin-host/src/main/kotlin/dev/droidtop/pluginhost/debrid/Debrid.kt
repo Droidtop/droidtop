@@ -100,8 +100,25 @@ fun interface DebridTransport {
     /** [method] GET, POST or DELETE; [form] sent url-encoded for a POST. Returns the status and the body. */
     fun call(method: String, url: String, headers: Map<String, String>, form: Map<String, String>?): Pair<Int, String>
 
+    /** A POST of [json] as the body, for an API that takes JSON (Mega's). A transport that does not send it says so. */
+    fun postJson(url: String, json: String): Pair<Int, String> = throw IOException("This transport sends no JSON")
+
     companion object {
-        val HTTP = DebridTransport { method, url, headers, form ->
+        val HTTP: DebridTransport = object : DebridTransport {
+            override fun call(method: String, url: String, headers: Map<String, String>, form: Map<String, String>?) =
+                exchange(
+                    method, url, headers,
+                    form?.let { fields ->
+                        "application/x-www-form-urlencoded" to
+                            fields.entries.joinToString("&") { (k, v) -> URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8") }
+                    },
+                )
+
+            override fun postJson(url: String, json: String) = exchange("POST", url, emptyMap(), "application/json" to json)
+        }
+
+        /** One request: [body] is the content type and the text to send, or null for none. */
+        private fun exchange(method: String, url: String, headers: Map<String, String>, body: Pair<String, String>?): Pair<Int, String> {
             val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = method
                 connectTimeout = 15_000
@@ -110,16 +127,15 @@ fun interface DebridTransport {
                 headers.forEach { (name, value) -> setRequestProperty(name, value) }
             }
             try {
-                if (form != null) {
+                if (body != null) {
                     connection.doOutput = true
-                    connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                    val body = form.entries.joinToString("&") { (k, v) -> URLEncoder.encode(k, "UTF-8") + "=" + URLEncoder.encode(v, "UTF-8") }
-                    connection.outputStream.use { it.write(body.toByteArray()) }
+                    connection.setRequestProperty("Content-Type", body.first)
+                    connection.outputStream.use { it.write(body.second.toByteArray()) }
                 }
                 val status = connection.responseCode
                 val stream = if (status >= 400) connection.errorStream else connection.inputStream
                 val text = stream?.use { input -> readBounded(input) }.orEmpty()
-                status to text
+                return status to text
             } catch (e: IOException) {
                 throw IOException("The service could not be reached", e)
             } finally {
