@@ -148,15 +148,12 @@ object QuickTiles {
     }
 
     /**
-     * Where the menu opens: the running game, else Notifications once
-     * notification access is granted, else System rather than an empty
-     * Notifications list (Droidtop/tracker#180).
+     * Where the menu opens, the same tab every time (owner-approved menu review M7, 2026-10-23,
+     * Droidtop/tracker#621: it opened on Notifications or Power and mode depending on whether
+     * notification access was granted, so R2 did not land anywhere predictable): the running game's
+     * section while a game runs, its Resume and Quit, else Power and mode.
      */
-    fun initialSection(gameRunning: Boolean, notificationsGranted: Boolean): QuickSection = when {
-        gameRunning -> QuickSection.GAME
-        notificationsGranted -> QuickSection.NOTIFICATIONS
-        else -> QuickSection.SYSTEM
-    }
+    fun initialSection(gameRunning: Boolean): QuickSection = if (gameRunning) QuickSection.GAME else QuickSection.SYSTEM
 
     /** L1/R1 on the rail: the neighbouring section, wrapping at the ends; [current] missing from [visible] lands on the first. */
     fun stepSection(visible: List<QuickSection>, current: QuickSection, step: Int): QuickSection {

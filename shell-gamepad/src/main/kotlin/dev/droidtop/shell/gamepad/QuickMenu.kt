@@ -183,9 +183,9 @@ internal fun QuickMenu(
         val sections = remember(gameRunning, hasPlugins, uiMode, order) {
             QuickTiles.visibleSections(gameRunning, hasPlugins, uiMode, order)
         }
-        var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning, granted)) }
+        var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning)) }
         LaunchedEffect(sections, section) {
-            if (section !in sections) section = QuickTiles.initialSection(gameRunning, granted)
+            if (section !in sections) section = QuickTiles.initialSection(gameRunning)
         }
         // What is waiting, for the rail's dots: read while the sheet is open, never polled.
         val notifications by NotificationsStore.items.collectAsState()

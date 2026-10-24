@@ -3345,9 +3345,10 @@ the `ContainerRuntime` interface that already exists (§3):
   dependency). Notifications need the
   notification-access grant (NotificationListenerService in `:app`
   feeding `runtime-common`'s NotificationsStore); until granted the tab
-  offers the grant, never a silently empty list. When notification access
-  is not granted the Quick Menu opens on System (or Game when a game is
-  running) rather than on an empty Notifications sheet; the Notifications
+  offers the grant, never a silently empty list. **The Quick Menu opens on the same tab every time**: the
+  running game's section while a game runs, else Power and mode (menu review M7, approved by the owner
+  2026-10-23, Droidtop/tracker#621). It used to open on Notifications once notification access was granted
+  and on Power and mode before, so R2 landed somewhere different from one device to the next. The Notifications
   tab then shows the grant as one `MenuRow` at the top using the same
   shape as the brightness and DND grant rows (`QuickMenu.kt:326`), so
   there is one empty-state rule for grants (Droidtop/tracker#180, decided

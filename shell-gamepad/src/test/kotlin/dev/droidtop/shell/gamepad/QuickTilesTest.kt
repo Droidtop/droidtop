@@ -281,10 +281,9 @@ class QuickTilesTest {
     }
 
     @Test
-    fun `the menu opens on the game, else notifications when granted, else system`() {
-        assertEquals(QuickSection.GAME, QuickTiles.initialSection(gameRunning = true, notificationsGranted = false))
-        assertEquals(QuickSection.NOTIFICATIONS, QuickTiles.initialSection(gameRunning = false, notificationsGranted = true))
-        assertEquals(QuickSection.SYSTEM, QuickTiles.initialSection(gameRunning = false, notificationsGranted = false))
+    fun `the menu opens on the running game, else always on Power and mode`() {
+        assertEquals(QuickSection.GAME, QuickTiles.initialSection(gameRunning = true))
+        assertEquals(QuickSection.SYSTEM, QuickTiles.initialSection(gameRunning = false))
     }
 
     @Test
