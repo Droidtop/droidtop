@@ -95,8 +95,13 @@ object PluginWebAccount {
         // The view starts with what was cleared before, so a check still good is not asked again.
         val withClearance = withClearance(stored, SiteChecks.read(vault, record.manifest.id), domains.distinct())
         val mode = if (need == Need.SIGN_IN) WebSessionRequest.Mode.SIGN_IN else WebSessionRequest.Mode.CHECK
-        val done = if (need == Need.SIGN_IN) doneCookie(record) else null
-        val result = WebSessionActivity.show(context, WebSessionRequest(record.manifest.label, mode, url, domains.distinct(), withClearance, done))
+        // A check on a site the plugin signs in to also waits for the sign-in: a page past the check but signed out has
+        // no download links (Droidtop/tracker#600, owner: "f95zone requires users to be logged in to see links").
+        val done = if (account != null) doneCookie(record) else null
+        val result = WebSessionActivity.show(
+            context,
+            WebSessionRequest(record.manifest.label, mode, url, domains.distinct(), withClearance, done, signInUrl = account?.signInUrl),
+        )
         // What the view cleared is kept whether or not the person pressed Done: droidtop's requests to the site send it.
         SiteChecks.keep(vault, record.manifest.id, result.session)
         val cleared = SiteChecks.Clearance.from(result.session) != null
@@ -140,7 +145,7 @@ object PluginWebAccount {
         val vault = PluginVault.forContext(context)
         // Without the permission the page still opens, signed out: the person may still start a public download.
         val stored = if (grant == GrantState.GRANTED) WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY)) else null
-        val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (stored != null) domains else emptyList(), stored, null, maxDownloads = max.coerceIn(1, 16))
+        val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (stored != null) domains else emptyList(), stored, null, maxDownloads = max.coerceIn(1, 16), signInUrl = signInUrl(record))
         val result = WebSessionActivity.show(context, request)
         SiteChecks.keep(vault, record.manifest.id, result.session)
         result.session?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {

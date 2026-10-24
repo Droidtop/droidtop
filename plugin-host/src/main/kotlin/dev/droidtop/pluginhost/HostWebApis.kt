@@ -162,6 +162,11 @@ data class WebSessionRequest(
      * stays open, says how many it has, and Done ends it sooner.
      */
     val maxDownloads: Int = 1,
+    /**
+     * The site's own sign-in page, when the plugin declares one: a check or a download page offers it as a full page
+     * (no in-page overlay), and with [doneCookie] a check stays open until the person is signed in (Droidtop/tracker#600).
+     */
+    val signInUrl: String? = null,
 ) {
     /**
      * A plugin's sign-in, a site's browser check passed in the plugin's session (docs/plugin-api.md 1.3

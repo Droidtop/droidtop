@@ -9,7 +9,11 @@ import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
+import android.webkit.WebResourceError
+import android.webkit.WebResourceResponse
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
@@ -108,6 +112,15 @@ class WebSessionActivity : Activity() {
                 setOnClickListener { finishWith(completed = true, download = null) }
             })
         }
+        // The site's own sign-in page as a full page (Droidtop/tracker#600): F95zone's in-page log-in overlay failed in
+        // this view with "Oops! We ran into some problems", and a signed-out page has no download links.
+        val signIn = asked.signInUrl?.takeIf { asked.mode != WebSessionRequest.Mode.SIGN_IN && NetScope.isHttps(it) }
+        if (signIn != null) {
+            bar.addView(Button(this).apply {
+                text = "Sign in"
+                setOnClickListener { webView?.loadUrl(signIn) }
+            })
+        }
         bar.addView(Button(this).apply {
             text = "Close"
             setOnClickListener { finishWith(completed = !asked.mode.endsWithDone, download = null) }
@@ -116,7 +129,11 @@ class WebSessionActivity : Activity() {
         root.addView(TextView(this).apply {
             text = when (asked.mode) {
                 WebSessionRequest.Mode.SIGN_IN -> "Sign in on the site's own page. Press Done when you are signed in. B goes back a page."
-                WebSessionRequest.Mode.CHECK -> "Let the site finish its check and show its page, then press Done. B goes back a page."
+                WebSessionRequest.Mode.CHECK -> if (asked.doneCookie != null) {
+                    "Let the site finish its check, then sign in (Sign in above opens the site's own page) to see download links. This closes by itself once you are signed in. B goes back a page."
+                } else {
+                    "Let the site finish its check and show its page, then press Done. B goes back a page."
+                }
                 WebSessionRequest.Mode.OPEN -> if (several) {
                     "Choose each download on the page, up to ${asked.maxDownloads}; droidtop takes them into Downloads. Press Done when you have them all. B goes back a page."
                 } else {
@@ -151,13 +168,31 @@ class WebSessionActivity : Activity() {
             // that runs the check, and a kept one from an older WebView made Cloudflare ask again and again
             // (Droidtop/tracker#600). What the view ends with is kept, and droidtop's requests send that one.
             cookies.setAcceptThirdPartyCookies(this, true)
-            webChromeClient = WebChromeClient()
+            // What the page reports, in droidtop's log (Droidtop/tracker#600: a site's own error, such as a failed
+            // sign-in request, was otherwise invisible on a device).
+            webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(message: ConsoleMessage): Boolean {
+                    Log.i(LOG_TAG, "console ${message.messageLevel()}: ${message.message()} (${NetScope.hostOf(message.sourceId().orEmpty()).orEmpty()}:${message.lineNumber()})")
+                    return true
+                }
+            }
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                     // Only web pages: an intent:, market: or other app link never leaves droidtop from here. A store's
                     // pages, where people pay, load only over https.
                     val scheme = request.url.scheme?.lowercase()
                     return if (browse) scheme != "https" else scheme != "http" && scheme != "https"
+                }
+
+                override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
+                    if (response.statusCode >= 400) {
+                        val kind = if (request.isForMainFrame) "page" else request.requestHeaders["X-Requested-With"]?.let { "request ($it)" } ?: "request"
+                        Log.w(LOG_TAG, "$kind ${request.method} ${NetScope.hostOf(request.url.toString())}${request.url.path.orEmpty()} answered ${response.statusCode}")
+                    }
+                }
+
+                override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                    Log.w(LOG_TAG, "${if (request.isForMainFrame) "page" else "request"} ${NetScope.hostOf(request.url.toString())}${request.url.path.orEmpty()} failed: ${error.description} (${error.errorCode})")
                 }
 
                 override fun onPageFinished(view: WebView, url: String?) {
@@ -168,19 +203,21 @@ class WebSessionActivity : Activity() {
                     // page has a check's title, and a clearance cookie alone (`__cf_bm` is set on the challenge) is not a pass.
                     // A clearance still good from before passes at once.
                     val host = url?.let { NetScope.hostOf(it) }
+                    // On a site the plugin signs in to, the check also waits for the sign-in ([WebSessionRequest.doneCookie]).
+                    val signedIn = asked.doneCookie?.let { done ->
+                        asked.domains.any { domain -> cookies.getCookie("https://$domain").orEmpty().split(';').any { it.trim().startsWith("$done=") } }
+                    }
                     if (asked.mode == WebSessionRequest.Mode.CHECK && host != null &&
                         (asked.domains.isEmpty() || WebSessions.covers(host, asked.domains)) &&
                         SiteChecks.pagePassed(view.title, cookies.getCookie("https://$host"))
                     ) {
-                        finishWith(completed = true, download = null)
-                        return
+                        if (signedIn != false) {
+                            finishWith(completed = true, download = null)
+                            return
+                        }
+                        Log.i(LOG_TAG, "$host: past the check, signed out; waiting for the sign-in")
                     }
-                    val done = asked.doneCookie ?: return
-                    if (asked.mode != WebSessionRequest.Mode.SIGN_IN) return
-                    val set = asked.domains.any { domain ->
-                        cookies.getCookie("https://$domain").orEmpty().split(';').any { it.trim().startsWith("$done=") }
-                    }
-                    if (set) finishWith(completed = true, download = null)
+                    if (asked.mode == WebSessionRequest.Mode.SIGN_IN && signedIn == true) finishWith(completed = true, download = null)
                 }
             }
             setDownloadListener { url, userAgent, contentDisposition, mimeType, contentLength ->
@@ -276,6 +313,7 @@ class WebSessionActivity : Activity() {
         var webViewSetup: ((WebView) -> Unit)? = null
 
         private const val EXTRA_ID = "dev.droidtop.pluginhost.web.id"
+        private const val LOG_TAG = "droidtop.WebSession"
 
         /** How long a plugin's call waits for the person ([show]); then the answer is "nothing done". */
         private const val TIMEOUT_MS = 10L * 60 * 1000

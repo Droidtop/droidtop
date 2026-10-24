@@ -17613,6 +17613,21 @@ A condition the person should know about (an unofficial plugin, a feature that i
     itself, and the person picks the mirror there as on the site; droidtop takes the download the page starts, as for any
     link it opens (7g, #599). The same page opens when a source's download job comes back with "checks the browser
     first". Only the file host is then fetched by droidtop.
+  - **Signed in, not only past the check (2026-10-24).** The owner's hand test of dev.2334: the web view passed
+    F95zone's check but was a guest ("f95zone requires users to be logged in to see links"), and F95's in-page log-in
+    overlay failed with "Oops! We ran into some problems". So:
+    - A check or a download page on a site the plugin signs in to offers **Sign in**, which opens the plugin's
+      declared `signIn` page as a full page, not the site's in-page overlay.
+    - A check view on such a site closes by itself only once the page is past the check **and** the plugin's
+      `doneCookie` is set. Signed out, it says to sign in and stays open; Done still ends it.
+    - The view's requests carry no app-named `X-Requested-With` where the WebView allows turning it off
+      (`WebSettingsCompat.setRequestedWithHeaderOriginAllowList`, from `:app`), since XenForo reads that header to
+      recognise its own in-page requests.
+    - The page's console messages, and every page or in-page request that fails or answers 400 or above, go to the
+      log under `droidtop.WebSession`, so a site's own error shows in a device's logs.
+
+    Not built yet (next): a plugin's own requests to a checked host fetched by the signed-in web view instead of
+    droidtop's client, and "needs sign-in" for a guest page, not "could not read".
   - **Asked once, never in a loop:** nothing retries by itself; a background call that meets a check fails with the error and waits for the person. A download asked again right after the person passed the check says so once ("<source>'s site still asked for its check after it was passed, so nothing was downloaded") and does not open the check again for it.
 - **Sign-in and browser checks.** A source answers `SIGN_IN_REQUIRED` or the new `BROWSER_CHECK_REQUIRED` (no made-up "Sign in to <site>" result row, no paragraph about opening Settings). The search shows "Sign in to search here" / "The site checks the browser first" under the source's name with droidtop's own Sign in / Open the site, which searches again after; a view page offers the same as its notice's action and reads the page again. Both open the plugin's `web.session` in droidtop's web view (`PluginWebAccount`, a new `CHECK` mode with Done for the browser check): the `signIn` page the plugin declares on its `web.session` entry, or the site's home page.
 - **The account row.** A plugin holding `web.session` gets "<site> account", Signed in / Not signed in, with Sign in or Sign out and "Your sign-in stays in droidtop: <plugin> never sees your password", on its page, from the session droidtop keeps (the vault entry the plugin cannot read). Pressing droidtop's Sign in is the person allowing `web.session`: an unanswered grant becomes allowed when a session is kept; a refused one is never overridden, and the row says to turn it on in Permissions.

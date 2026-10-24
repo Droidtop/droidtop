@@ -76,7 +76,14 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // shell instead of leaving keys without a window (SPEC 4c, console build 1386 ANR).
         ForegroundShell.installPadReturn(this)
         // A plugin's web sign-in follows the keyboard placement droidtop's own pages do (WebViewKeys, docs/SPEC.md 4c).
-        dev.droidtop.pluginhost.WebSessionActivity.webViewSetup = WebViewKeys::attach
+        dev.droidtop.pluginhost.WebSessionActivity.webViewSetup = { view ->
+            WebViewKeys.attach(view)
+            // No app-named X-Requested-With on a site's requests (Droidtop/tracker#600): XenForo, which F95zone runs,
+            // reads that header to tell its own in-page requests, and its log-in overlay failed in this view.
+            if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
+                androidx.webkit.WebSettingsCompat.setRequestedWithHeaderOriginAllowList(view.settings, emptySet())
+            }
+        }
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
         // Android's Remove animations reaches every surface's motion, not only Gaming's (Droidtop/tracker#643).
