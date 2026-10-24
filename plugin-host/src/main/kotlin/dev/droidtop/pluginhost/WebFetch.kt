@@ -15,6 +15,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * A page fetched by droidtop's web view instead of its HTTP client (Droidtop/tracker#600): Cloudflare tells
@@ -27,6 +28,10 @@ object WebFetch {
     /** How long a check page may take to pass by itself before it is the person's. */
     private const val SETTLE_MS = 12_000L
     private const val TAG = "droidtop.WebFetch"
+
+    /** The document's type, its markup, and its text, as one JSON string. */
+    private const val READ_DOCUMENT = "JSON.stringify({type: document.contentType, html: document.documentElement.outerHTML, " +
+        "text: document.body ? document.body.innerText : document.documentElement.textContent})"
 
     /** What the view ended on: the page ([answer]), or a check it could not pass ([challenged]), and the cookies it now holds for the host. */
     data class Result(val answer: HttpAnswer?, val challenged: Boolean, val cookies: String?)
@@ -97,13 +102,18 @@ object WebFetch {
                     }
                     return
                 }
-                view.evaluateJavascript("document.documentElement.outerHTML") { quoted ->
-                    val html = runCatching { JSONArray("[$quoted]").getString(0) }.getOrDefault("")
-                    val bytes = html.toByteArray(Charsets.UTF_8)
+                // The document as the site sent it: an HTML page's markup, or the text of anything else (a JSON reply,
+                // which the view shows wrapped in a page of its own).
+                view.evaluateJavascript(READ_DOCUMENT) { quoted ->
+                    val read = runCatching { JSONObject(JSONArray("[$quoted]").getString(0)) }.getOrNull()
+                    val type = read?.optString("type").orEmpty().ifBlank { "text/html" }
+                    val html = type.equals("text/html", ignoreCase = true)
+                    val text = read?.optString(if (html) "html" else "text").orEmpty()
+                    val bytes = text.toByteArray(Charsets.UTF_8)
                     val answer = HttpAnswer(
                         status = status,
                         finalUrl = at,
-                        headers = mapOf("content-type" to "text/html; charset=utf-8"),
+                        headers = mapOf("content-type" to "$type; charset=utf-8"),
                         body = if (bytes.size > maxBytes) bytes.copyOf(maxBytes) else bytes,
                         truncated = bytes.size > maxBytes,
                     )

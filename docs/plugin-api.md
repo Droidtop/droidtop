@@ -333,8 +333,10 @@ to do the same." A plugin no longer has to recognise a check:
   person earned. So once a host has shown the plugin a check (met and not
   passed, or a clearance kept for it), a `GET` to it through `net.http` or
   `web.session fetch` is loaded by an off-screen web view with the same
-  cookies, and the plugin gets the final page's HTML as an ordinary answer
-  (`status`, the final `url`, `content-type: text/html`, `body`). A check the
+  cookies, and the plugin gets an ordinary answer: `status`, the final `url`,
+  the document's own `content-type`, and as `body` an HTML page's markup or the
+  text of anything else (a JSON reply as JSON, not the page the view wraps it
+  in). A check the
   view passes by itself within about 12 seconds is waited for; one it does not
   pass is `BROWSER_CHECK_REQUIRED` as before. Other methods still go through
   droidtop's client. A page the site shows signed out (a guest page with no

@@ -17629,8 +17629,9 @@ A condition the person should know about (an unofficial plugin, a feature that i
   - **A checked host is read by the web view (2026-10-24).** Once a host has shown a plugin a check (met and not
     passed, or a clearance kept for it), the plugin's `GET` to it (`net.http`, `web.session fetch`) is loaded by an
     off-screen web view (`WebFetch`) with the cookies the request would have carried, never by droidtop's HTTP
-    client. The plugin gets the final page's HTML as an ordinary answer, and the cookies the view ends with are kept
-    as the plugin's clearance. A check that passes by itself within about 12 seconds is waited for; otherwise
+    client. The plugin gets an ordinary answer: an HTML page's markup, or the text of anything else with its own
+    content type (a JSON reply stays JSON, not the page the view wraps it in). The cookies the view ends with are
+    kept as the plugin's clearance. A check that passes by itself within about 12 seconds is waited for; otherwise
     `BROWSER_CHECK_REQUIRED` as before. Other methods still use the client. A guest page is still the site's page:
     the plugin answers `SIGN_IN_REQUIRED` for it, not "could not read" (docs/plugin-api.md 1.3), and that change is
     the F95 plugin's.
