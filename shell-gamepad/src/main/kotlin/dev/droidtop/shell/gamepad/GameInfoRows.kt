@@ -175,9 +175,15 @@ internal suspend fun achievementRows(context: Context, entry: LibraryEntry): Lis
     // A console game: RetroAchievements. A store's game: the store's own (Steam, Droidtop/tracker#230), in the same row.
     val retro = achievementRowsFor(RetroAchievements.lookup(context, entry))
     if (retro.isNotEmpty()) return retro
-    val key = entry.pcInfo?.storeId ?: return emptyList()
-    val store = dev.droidtop.library.stores.StoreLibraries.forKey(key) ?: return emptyList()
-    return storeAchievementRowsFor(store.label, key.substringAfter(':'), store.achievements(context, key.substringAfter(':')))
+    val key = entry.pcInfo?.storeId
+    val store = key?.let { dev.droidtop.library.stores.StoreLibraries.forKey(it) }
+    if (key != null && store != null) {
+        val rows = storeAchievementRowsFor(store.label, key.substringAfter(':'), store.achievements(context, key.substringAfter(':')))
+        if (rows.isNotEmpty()) return rows
+    }
+    // Neither: a plugin that provides achievements (docs/plugin-api.md 3 A8, Droidtop/tracker#143), in the same row.
+    val (label, list) = dev.droidtop.library.integrations.PluginAchievements.read(context, entry) ?: return emptyList()
+    return storeAchievementRowsFor(label, entry.id.hashCode().toUInt().toString(), Result.success(list))
 }
 
 /**
