@@ -843,6 +843,20 @@
                 android:value="Runs the plugin tasks the person switched on to keep running in the background" />
         </service>
 
+        <!--
+          Type from another device (docs/SPEC.md): the reason Android keeps the process, and the local-network listener
+          in it, while the person is in another app: one notification with the code's Confirm and Refuse and a Close.
+          Started only when the person opens the session and stopped when it ends; nothing listens otherwise.
+        -->
+        <service
+            android:name="dev.droidtop.app.RemoteInputService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps the local-network page that lets another device type into this one, while the person has it open" />
+        </service>
+
         <!-- Plugin schedules (docs/plugin-api.md 3 E9): a periodic system job, scheduled only while one is on. -->
         <service
             android:name="dev.droidtop.app.PluginScheduleJobService"
@@ -884,6 +898,11 @@
         <!-- The guided key setup for IGDB, SteamGridDB, TheGamesDB and ScreenScraper, opened from their rows under Accounts and sources. -->
         <activity
             android:name=".ScraperKeySetupActivity"
+            android:exported="false" />
+
+        <!-- Type from another device (docs/SPEC.md): the console side, opened from the companion's Keys, the Quick Menu and the key setup screens. -->
+        <activity
+            android:name=".RemoteInputActivity"
             android:exported="false" />
 
         <!-- Pairing a computer running droidtop-agent, opened from Accounts and sources, Computers (docs/SPEC.md 7o). -->

@@ -297,6 +297,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_PERFORMANCE_MODE -> QuickGlyph.GAUGE
         GamingSettingsCatalog.ID_DOWNLOADS -> QuickGlyph.DOWNLOAD
         GamingSettingsCatalog.ID_CONTROLLER -> QuickGlyph.GAMEPAD
+        GamingSettingsCatalog.ID_TYPE_FROM_DEVICE,
         GamingSettingsCatalog.ID_DISPLAY_KEYBOARD,
         GamingSettingsCatalog.ID_DISPLAY_KEYBOARD_ACCESSIBILITY,
         GamingSettingsCatalog.ID_DISPLAY_KEYBOARD_PLACEMENT,

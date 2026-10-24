@@ -77,6 +77,7 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_BRIGHTNESS = "pref_gaming_system_brightness"
     const val ID_COMPANION_WAKE = "pref_companion_screen_wake"
     const val ID_SCREENSHOT = "pref_screenshot"
+    const val ID_TYPE_FROM_DEVICE = "pref_type_from_device"
     const val ID_STOP_FOREGROUND = "pref_stop_foreground_app"
     const val ID_SYSTEM_BRIGHTNESS_GRANT = "pref_gaming_system_brightness_grant"
     const val ID_SYSTEM_BLUETOOTH = "pref_gaming_system_bluetooth"
@@ -595,6 +596,16 @@ object GamingSettingsCatalog {
                         title = "Screenshot",
                         subtitle = "Saves a picture of the main screen to Pictures/Screenshots",
                         run = { ctx, _ -> dev.droidtop.runtime.Capture.take(ctx.applicationContext, android.view.Display.DEFAULT_DISPLAY).message },
+                    ),
+                )
+                // Typing from a phone or PC on the same network into the field in focus (Droidtop/tracker#645): the
+                // console screen with the QR code, where the code is confirmed.
+                add(
+                    ActionItem(
+                        id = ID_TYPE_FROM_DEVICE,
+                        title = "Type from another device",
+                        subtitle = "Scan a QR code with a phone on this network to type into the field in focus",
+                        run = launchComponent("dev.droidtop.app.RemoteInputActivity"),
                     ),
                 )
                 // Stops the app in front on the main screen (slice C20), only with the helper app: one stop route,

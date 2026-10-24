@@ -29,8 +29,6 @@ class ScraperKeySetupTest {
         for (service in ScraperKeyService.entries) {
             assertTrue(service.title, service.fields.isNotEmpty())
             assertTrue(service.title, service.gets.isNotBlank())
-            assertEquals(service.fields.map { it.id }, service.handoffFields().map { it.id })
-            assertEquals(service.fields.map { it.secret }, service.handoffFields().map { it.secret })
         }
         assertEquals(listOf("client_id", "client_secret"), ScraperKeyService.IGDB.fields.map { it.id })
         assertEquals(listOf("username", "password"), ScraperKeyService.SCREENSCRAPER.fields.map { it.id })

@@ -766,7 +766,7 @@ public class LatinIME extends InputMethodService implements
         // InputMethodService starts an editor session independently of
         // showing its soft-input window. The second-screen keyboard uses
         // this connection even when Android declines to draw that window.
-        SecondScreenKeyboard.onStartInput(getCurrentInputConnection());
+        SecondScreenKeyboard.onStartInput(getCurrentInputConnection(), attribute.inputType);
     }
 
     @Override

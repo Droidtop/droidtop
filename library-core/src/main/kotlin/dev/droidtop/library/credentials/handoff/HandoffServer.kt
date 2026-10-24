@@ -8,24 +8,42 @@ import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
+import kotlin.random.Random
+
+/** What a [HandoffServer] serves: the answer to each request, and whether to keep listening at all. */
+interface HandoffEndpoint {
+    /** Asked about once a second; false ends the listener, which then closes its socket. */
+    fun isLive(): Boolean
+
+    /** The answer to one request from [peer] (its address); pure of sockets. */
+    fun handle(method: String, target: String, body: String, peer: String): HandoffReply
+}
+
+/** A listener that can be started and stopped, so what owns one can be tested with a fake. */
+interface HandoffListener {
+    /** Binds and starts serving; returns the port. Off the main thread. */
+    fun start(): Int
+
+    fun stop()
+}
+
+class HandoffReply(val status: Int, val body: String, val contentType: String = "text/html; charset=utf-8")
 
 /**
- * The listening half of a phone handoff (docs/SPEC.md 7h). Binds an ephemeral
- * port only between [start] and [stop] (or the session ending), serves one
- * connection at a time, and answers only peers on the local network. Requests
- * are bounded: head 8 KB, body 4 KB, 5 seconds of silence. All decisions about
- * tokens, fields and rate limits are the [session]'s; this class only moves
- * bytes. Run [start] off the main thread.
+ * The listening half of a local-network handoff (docs/SPEC.md 7h, "Supplying a key from a phone", and "Type from
+ * another device"). Binds [bindHost] (the device's LAN address; every interface when null) on a random port only
+ * between [start] and [stop] (or the [endpoint] ending), serves one connection at a time, and answers only peers on
+ * the local network. Requests are bounded: head 8 KB, body 4 KB, 5 seconds of silence. All decisions about tokens,
+ * devices and codes are the [endpoint]'s; this class only moves bytes. Run [start] off the main thread.
  */
-class HandoffServer(private val session: HandoffSession, private val http: HandoffHttp) {
+class HandoffServer(private val endpoint: HandoffEndpoint, private val bindHost: String? = null) : HandoffListener {
     @Volatile private var socket: ServerSocket? = null
     @Volatile private var thread: Thread? = null
 
-    /** Binds and starts serving; returns the port. */
     @Synchronized
-    fun start(): Int {
+    override fun start(): Int {
         socket?.let { return it.localPort }
-        val bound = ServerSocket(0, 4)
+        val bound = bind()
         bound.soTimeout = 1_000
         socket = bound
         thread = Thread({ serve(bound) }, "droidtop-handoff").apply { isDaemon = true; start() }
@@ -33,15 +51,28 @@ class HandoffServer(private val session: HandoffSession, private val http: Hando
     }
 
     @Synchronized
-    fun stop() {
+    override fun stop() {
         socket?.runCatching { close() }
         socket = null
-        session.close()
+    }
+
+    /** A random port in the dynamic range, so a restarted listener does not come back on the one just closed. */
+    private fun bind(): ServerSocket {
+        val address = bindHost?.let { InetAddress.getByName(it) }
+        repeat(BIND_TRIES) {
+            val port = Random.nextInt(FIRST_PORT, LAST_PORT + 1)
+            try {
+                return ServerSocket(port, 4, address)
+            } catch (e: java.io.IOException) {
+                // taken: try another
+            }
+        }
+        return ServerSocket(0, 4, address)
     }
 
     private fun serve(bound: ServerSocket) {
         try {
-            while (!bound.isClosed && session.isLive()) {
+            while (!bound.isClosed && endpoint.isLive()) {
                 val client = try {
                     bound.accept()
                 } catch (e: SocketTimeoutException) {
@@ -71,9 +102,12 @@ class HandoffServer(private val session: HandoffSession, private val http: Hando
             } ?: 0
             if (length < 0 || length > MAX_BODY) return reply(out, HandoffReply(413, ""))
             val body = String(readBody(input, length), Charsets.UTF_8)
-            http.handle(parts[0], parts[1], body)
+            endpoint.handle(parts[0], parts[1], body, client.inetAddress.hostAddress.orEmpty())
         } catch (e: java.io.IOException) {
             return
+        } catch (e: RuntimeException) {
+            // A failure in what the endpoint does must not end the listener.
+            HandoffReply(500, "")
         }
         reply(out, answer)
     }
@@ -82,7 +116,7 @@ class HandoffServer(private val session: HandoffSession, private val http: Hando
         val bytes = reply.body.toByteArray(Charsets.UTF_8)
         val head = StringBuilder("HTTP/1.1 ${reply.status} ${reason(reply.status)}\r\n")
         head.append("Content-Type: ${reply.contentType}\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n")
-        HandoffHttp.SECURITY_HEADERS.forEach { (k, v) -> head.append("$k: $v\r\n") }
+        SECURITY_HEADERS.forEach { (k, v) -> head.append("$k: $v\r\n") }
         head.append("\r\n")
         out.write(head.toString().toByteArray(Charsets.UTF_8))
         out.write(bytes)
@@ -92,10 +126,13 @@ class HandoffServer(private val session: HandoffSession, private val http: Hando
     private fun reason(status: Int) = when (status) {
         200 -> "OK"
         400 -> "Bad Request"
+        403 -> "Forbidden"
         404 -> "Not Found"
+        409 -> "Conflict"
         410 -> "Gone"
         413 -> "Payload Too Large"
         429 -> "Too Many Requests"
+        500 -> "Internal Server Error"
         else -> "Error"
     }
 
@@ -126,7 +163,18 @@ class HandoffServer(private val session: HandoffSession, private val http: Hando
     companion object {
         private const val MAX_HEAD = 8 * 1024
         private const val MAX_BODY = 4 * 1024
+        private const val FIRST_PORT = 49152
+        private const val LAST_PORT = 65535
+        private const val BIND_TRIES = 20
         private val TERMINATOR = byteArrayOf('\r'.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte(), '\n'.code.toByte())
+
+        /** Headers every reply carries: nothing cached, nothing embedded, nothing leaked in a Referer. */
+        val SECURITY_HEADERS = listOf(
+            "Cache-Control" to "no-store",
+            "Content-Security-Policy" to "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'",
+            "Referrer-Policy" to "no-referrer",
+            "X-Content-Type-Options" to "nosniff",
+        )
 
         /** Loopback, site-local (192.168/10/172.16) and link-local peers; nothing routed from the internet. */
         fun isLocalPeer(address: InetAddress?): Boolean =
@@ -144,6 +192,6 @@ class HandoffServer(private val session: HandoffSession, private val http: Hando
         fun pickLanAddress(candidates: List<InetAddress>): String? =
             candidates.filterIsInstance<Inet4Address>().firstOrNull { it.isSiteLocalAddress }?.hostAddress
 
-        fun url(host: String, port: Int, token: String): String = "http://$host:$port/h/$token"
+        fun url(host: String, port: Int, token: String): String = "http://$host:$port/r/$token"
     }
 }
