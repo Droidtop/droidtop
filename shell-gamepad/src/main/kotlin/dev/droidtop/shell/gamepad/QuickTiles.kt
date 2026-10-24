@@ -36,6 +36,8 @@ enum class QuickGlyph {
     APPS, BELL, GAUGE, DOWNLOAD, POWER, AIRPLANE,
     // The companion's tabs (docs/SPEC.md "The companion's tabs"), drawn by the same rail.
     HOME, KEYBOARD, PEOPLE, MORE,
+    // The Search tile (menu review M4).
+    SEARCH,
     // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
     CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
 }
@@ -292,6 +294,7 @@ object QuickTiles {
         GamingSettingsCatalog.ID_PERFORMANCE_MODE -> QuickGlyph.GAUGE
         GamingSettingsCatalog.ID_DOWNLOADS -> QuickGlyph.DOWNLOAD
         GamingSettingsCatalog.ID_CONTROLLER -> QuickGlyph.GAMEPAD
+        QuickSearchTile.ID -> QuickGlyph.SEARCH
         GamingSettingsCatalog.ID_DISPLAY_KEYBOARD,
         GamingSettingsCatalog.ID_DISPLAY_KEYBOARD_ACCESSIBILITY,
         GamingSettingsCatalog.ID_DISPLAY_KEYBOARD_PLACEMENT,

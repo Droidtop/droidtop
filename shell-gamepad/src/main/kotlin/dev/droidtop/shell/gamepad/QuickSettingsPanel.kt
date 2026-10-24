@@ -497,7 +497,7 @@ fun quickSectionGroups(
     mode: dev.droidtop.library.settings.UiMode,
 ): List<CatalogGroup> {
     val base = QuickTiles.sectionGroups(catalog, section, mode)
-    return if (section != QuickSection.SYSTEM) base else base.map { it.copy(items = it.items + ControllerLayoutTiles.items()) }
+    return if (section != QuickSection.SYSTEM) base else base.map { it.copy(items = QuickSearchTile.items() + it.items + ControllerLayoutTiles.items()) }
 }
 
 /**
@@ -755,6 +755,10 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
             }
             QuickGlyph.MORE -> {
                 dot(5f, 12f, 2f); dot(12f, 12f, 2f); dot(19f, 12f, 2f)
+            }
+            QuickGlyph.SEARCH -> {
+                ring(10f, 10f, 6f)
+                line(14.5f, 14.5f, 20f, 20f)
             }
         }
     }

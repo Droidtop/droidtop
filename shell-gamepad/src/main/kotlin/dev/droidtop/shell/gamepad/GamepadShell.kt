@@ -821,17 +821,22 @@ private fun GamepadShellBody(
                 leftMenuOpen = false
                 quickMenuOpen = true
             },
-            // Kiosk and Kid keep the library and leave out what manages the device, downloads and settings with it.
-            onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
-                {
-                    leftMenuOpen = false
-                    globalSearchOpen = true
-                }
-            } else {
-                null
-            },
             onDismiss = { leftMenuOpen = false },
         )
+    }
+    // The Quick Menu's Search tile opens the one search (menu review M4, Droidtop/tracker#621). Kiosk and Kid keep
+    // the library and leave out what manages the device, so they have no tile, as they had no left-menu row.
+    val searchAllowed = menuSectionsFor(uiMode).any { it.managesDevice }
+    androidx.compose.runtime.DisposableEffect(searchAllowed) {
+        QuickSearchTile.open = if (searchAllowed) {
+            {
+                quickMenuOpen = false
+                globalSearchOpen = true
+            }
+        } else {
+            null
+        }
+        onDispose { QuickSearchTile.open = null }
     }
     if (globalSearchOpen) {
         dev.droidtop.shell.gamepad.query.LauncherSearchScreen(

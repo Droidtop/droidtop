@@ -85,29 +85,22 @@ internal fun leftMenuEntries(sections: List<GamingSection>): List<LeftMenuEntry>
 internal fun leftMenuStartIndex(entries: List<LeftMenuEntry>, current: GamingSection, rowsAbove: Int = 0): Int =
     rowsAbove + entries.indexOfFirst { it.isAt(current) }.coerceAtLeast(0)
 
-/** What a row of the left menu is, by its place in the list: the running game's Resume, Search, then the destinations. */
+/**
+ * What a row of the left menu is, by its place in the list: the running game's Resume, then the destinations. Search
+ * is not a row: it is not a place (menu review M4, approved by the owner 2026-10-23, Droidtop/tracker#621); it is Y,
+ * Home's magnifier and a Quick Menu tile.
+ */
 internal sealed interface LeftMenuRow {
     object Resume : LeftMenuRow
-    object Search : LeftMenuRow
     class Destination(val index: Int) : LeftMenuRow
 }
 
-/** How many rows sit above the destinations: Resume while a game runs, and Search when the mode has one. */
-internal fun leftMenuRowsAbove(running: Boolean, searchable: Boolean): Int = (if (running) 1 else 0) + (if (searchable) 1 else 0)
+/** How many rows sit above the destinations: Resume while a game runs. */
+internal fun leftMenuRowsAbove(running: Boolean): Int = if (running) 1 else 0
 
-/** The row at [index] of the whole list (the rows above, then the destinations). */
-internal fun leftMenuRowAt(index: Int, running: Boolean, searchable: Boolean): LeftMenuRow {
-    var left = index
-    if (running) {
-        if (left == 0) return LeftMenuRow.Resume
-        left--
-    }
-    if (searchable) {
-        if (left == 0) return LeftMenuRow.Search
-        left--
-    }
-    return LeftMenuRow.Destination(left)
-}
+/** The row at [index] of the whole list (Resume, then the destinations). */
+internal fun leftMenuRowAt(index: Int, running: Boolean): LeftMenuRow =
+    if (running && index == 0) LeftMenuRow.Resume else LeftMenuRow.Destination(index - leftMenuRowsAbove(running))
 
 /**
  * The destinations with something waiting, for the menu's attention dots
@@ -155,14 +148,11 @@ internal fun LeftMenu(
     onSelect: (LeftMenuEntry) -> Unit,
     onOpenQuickMenu: () -> Unit,
     onDismiss: () -> Unit,
-    // Opens the one search; null in a mode that has none (Kiosk and Kid), which then has no Search row.
-    onSearch: (() -> Unit)? = null,
 ) {
     val window = currentShellWindow()
     val resumeRows = if (runningTitle != null) 1 else 0
     val running = runningTitle != null
-    val searchable = onSearch != null
-    val rowsAbove = leftMenuRowsAbove(running, searchable)
+    val rowsAbove = leftMenuRowsAbove(running)
     val rowCount = rowsAbove + entries.size
     // What is waiting, for the dots: read while the menu is open, never polled.
     val jobs by PluginJobsCenter.entries().collectAsState()
@@ -215,9 +205,8 @@ internal fun LeftMenu(
                             moveCue(next != focusIndex, p.repeat)
                             focusIndex = next
                         }
-                        GamepadAction.A -> when (val row = leftMenuRowAt(focusIndex, running, searchable)) {
+                        GamepadAction.A -> when (val row = leftMenuRowAt(focusIndex, running)) {
                             LeftMenuRow.Resume -> onResume()
-                            LeftMenuRow.Search -> onSearch?.invoke()
                             is LeftMenuRow.Destination -> entries.getOrNull(row.index)?.let(onSelect)
                         }
                         GamepadAction.B, GamepadAction.START -> close()
@@ -241,18 +230,6 @@ internal fun LeftMenu(
                             selected = focusIndex == 0,
                             onClick = {
                                 focusIndex = 0
-                                press(GamepadAction.A)
-                            },
-                        )
-                        Spacer(Modifier.height(Space.Sm))
-                    }
-                }
-                if (searchable) {
-                    item(key = "search") {
-                        SearchRow(
-                            selected = focusIndex == resumeRows,
-                            onClick = {
-                                focusIndex = resumeRows
                                 press(GamepadAction.A)
                             },
                         )
@@ -367,35 +344,6 @@ private fun SideMenuRow(entry: LeftMenuEntry, isCurrent: Boolean, waiting: Boole
 }
 
 /** The row that opens the one search: the same shape as a destination, without the "you are here" mark. */
-@Composable
-private fun SearchRow(selected: Boolean, onClick: () -> Unit) {
-    Box(contentAlignment = Alignment.CenterStart, modifier = Modifier.sideMenuFocus(selected, onClick)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .sideMenuGrow(selected)
-                .padding(start = SideMenu.RowPaddingStart, end = SideMenu.RowPaddingEnd),
-        ) {
-            Icon(
-                dev.droidtop.library.settings.CatalogIcon.SEARCH.glyph(),
-                contentDescription = null,
-                tint = if (selected) MenuTokens.OnSurface else MenuTokens.OnSurfaceMuted,
-                modifier = Modifier.size(SideMenu.IconSize),
-            )
-            Spacer(Modifier.width(SideMenu.IconGap))
-            Text(
-                "Search",
-                color = MenuTokens.OnSurface,
-                fontWeight = FontWeight.Medium,
-                style = TypeRole.rowTitle,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
 /** "You are here": a short accent pill on the panel's own edge. */
 @Composable
 private fun BoxScope.CurrentMark() {

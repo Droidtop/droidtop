@@ -51,3 +51,29 @@ internal object ControllerLayoutTiles {
         )
     }
 }
+
+/**
+ * The Quick Menu's Search tile, on Power and mode (menu review M4, approved by the owner 2026-10-23,
+ * Droidtop/tracker#621): Search is not a left-menu row, since it is not a place; it is Y, Home's magnifier and this.
+ * [open] is set by the shell to open its one search; it is null in a mode without search (Kiosk, Kid), and then
+ * there is no tile.
+ */
+internal object QuickSearchTile {
+    const val ID = "quick_search"
+
+    @Volatile
+    var open: (() -> Unit)? = null
+
+    fun items(): List<CatalogItem> {
+        val opener = open ?: return emptyList()
+        return listOf(
+            ActionItem(
+                id = ID,
+                title = "Search",
+                subtitle = "Your games and apps, settings, and the sources",
+                icon = CatalogIcon.SEARCH,
+                run = { opener() },
+            ),
+        )
+    }
+}

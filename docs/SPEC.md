@@ -16088,10 +16088,10 @@ view strip, the game page's tabs, the Quick Menu's rail). The D-pad never reache
 a header or status cluster. The hint row and the left menu are touch routes to
 their corresponding actions.
 
-The left menu's order is a Search row (not in Kiosk and Kid), Home, PC Games, Retro Games,
-Apps, the places, then Settings. Search opens the one search (12a "One search"), is
-not a destination, and carries no "you are here" mark; while a game runs, Resume leads
-and Search follows it. Home (the PC section's shelves, §7i "Home art") is the first row;
+The left menu's order is Home, PC Games, Retro Games, Apps, the places, then Settings; while a game runs, Resume
+leads. **Search is not a row** (menu review M4, approved by the owner 2026-10-23, Droidtop/tracker#621): it is not a
+destination, so it is Y, Home's magnifier and a **Search** tile first on the Quick Menu's Power and mode tab
+(`QuickSearchTile`), all opening the one search (12a "One search"). Kiosk and Kid have no search, so no tile. Home (the PC section's shelves, §7i "Home art") is the first row;
 the current-destination mark follows which of Home and PC Games is showing.
 
 The left menu is Steam's main menu, measured (Droidtop/tracker#273 slice 4;
@@ -22793,7 +22793,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 
 **One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
 
-- **Everything**: **Y on Home** and the search target in Home's top band: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The left menu has one **Search** row, the one in its order above (under Resume, not in Kiosk and Kid), which opens the same runner through `LauncherSearchScreen` with the matching settings too; there is no second Search row under Home (two branches each added one; the merge of 2026-10-15 kept that one).
+- **Everything**: **Y on Home** and the search target in Home's top band: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The Quick Menu's **Search** tile opens the same runner through `LauncherSearchScreen` with the matching settings too (not in Kiosk and Kid); the left menu has no Search row since menu review M4 (7j).
 - **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The Quick Menu's Game section has the same row for a running console game's system ("Search SNES", between Emulator and Restart; it opens the one search over that system's games and the sources that serve it, the Quick Menu closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
 
