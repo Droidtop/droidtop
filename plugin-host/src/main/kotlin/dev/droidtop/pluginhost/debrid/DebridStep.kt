@@ -95,7 +95,10 @@ object DebridStep {
             when (val state = ask { provider.request(key, torrent) }) {
                 is DebridState.Ready -> return provider to state
                 is DebridState.Caching -> if (taker == null) taker = provider to key
-                else -> DebridChoice.refused(provider, key, state)
+                else -> {
+                    DebridChoice.refused(provider, key, state)
+                    (state as? DebridState.Failed)?.takeIf { it.auth }?.let { status(-1, it.message) }
+                }
             }
         }
         if (!waits) return null
@@ -121,6 +124,7 @@ object DebridStep {
                 }
                 is DebridState.Failed, DebridState.NotCached, null -> {
                     DebridChoice.refused(provider, key, state)
+                    (state as? DebridState.Failed)?.takeIf { it.auth }?.let { status(-1, it.message) }
                     return null
                 }
             }

@@ -26,6 +26,7 @@ class RealDebrid(
      */
     override fun cost(key: String, host: String?): DebridCost {
         val (status, body) = http.call("GET", "$API/user", auth(key), null)
+        if (status == 401 || status == 403) return DebridCost.NotNow("Real-Debrid did not take the token: sign in again", auth = true)
         val user = (jsonOrNull(body) as? JSONObject)?.takeIf { status == 200 }
         if (user != null && user.optString("type") == "free") return DebridCost.NotNow("Real-Debrid premium has ended")
         if (host == null) return DebridCost.Free
@@ -148,7 +149,7 @@ class RealDebrid(
         val code = answer?.opt("error_code") as? Number
         val said = answer?.optString("error")?.takeIf { it.isNotBlank() }?.replace('_', ' ')
         return when (code?.toInt()) {
-            8 -> DebridState.Failed("Real-Debrid did not take the token", auth = true)
+            8 -> DebridState.Failed("Real-Debrid did not take the token: sign in again", auth = true)
             16 -> DebridState.Failed("Real-Debrid does not support that hoster", permanent = true)
             18 -> DebridState.Failed("Real-Debrid has reached its limit on that hoster for now", limit = true, restUntilMs = now() + HOUR)
             21 -> DebridState.Failed("Real-Debrid has too many of this account's downloads running", limit = true, restUntilMs = now() + 10 * MINUTE)
@@ -162,7 +163,7 @@ class RealDebrid(
 
     /** A refused answer as one sentence, or null when it was taken. Pure, for the tests. */
     internal fun refusal(status: Int): DebridState.Failed? = when (status) {
-        401, 403 -> DebridState.Failed("Real-Debrid did not take the token", auth = true)
+        401, 403 -> DebridState.Failed("Real-Debrid did not take the token: sign in again", auth = true)
         429 -> DebridState.Failed("Real-Debrid asked to wait: too many requests")
         else -> null
     }

@@ -49,6 +49,7 @@ object DebridAccounts {
     fun saveRealDebrid(context: Context, credential: RealDebridSignIn.Credential) {
         CredentialStore.put(context, CredentialStore.REALDEBRID_SIGNIN, credential.toJson())
         CredentialStore.put(context, CredentialStore.REALDEBRID_TOKEN, credential.accessToken)
+        clearRefusal(context, "realdebrid")
     }
 
     /** Drops a device sign-in whose token is no longer the account's (a token pasted over it, or cleared). */
@@ -57,6 +58,25 @@ object DebridAccounts {
         if (saved.accessToken != CredentialStore.get(context, CredentialStore.REALDEBRID_TOKEN).trim()) {
             CredentialStore.put(context, CredentialStore.REALDEBRID_SIGNIN, "")
         }
+    }
+
+    /** The row's word for an account whose key a service refused (TorBox rotates a key after an abuse warning). */
+    const val SIGN_IN_AGAIN = "Sign in again"
+
+    private fun refusedKey(id: String) = "droidtop_debrid_refused_$id"
+
+    /** Notes that the service refused [id]'s key, with its sentence; the account's row says so until a new key is set. */
+    fun refused(context: Context, id: String, message: String) {
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putString(refusedKey(id), message)
+    }
+
+    /** The sentence of the last refusal of [id]'s key, or null. */
+    fun refusal(context: Context, id: String): String? =
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getString(refusedKey(id), "")?.takeIf { it.isNotBlank() }
+
+    /** A new key or sign-in for [id]: the refusal no longer applies. */
+    fun clearRefusal(context: Context, id: String) {
+        PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putString(refusedKey(id), "")
     }
 
     fun waits(context: Context): Boolean = PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).getBoolean(KEY_WAITS, false)
