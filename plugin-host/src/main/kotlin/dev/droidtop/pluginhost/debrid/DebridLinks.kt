@@ -36,7 +36,7 @@ object DebridLinks {
     fun resolve(link: String): List<WebSessionDownload>? {
         val host = NetScope.hostOf(link) ?: return null
         val wait = waits()
-        for ((provider, key) in accounts()) {
+        for ((provider, key) in DebridChoice.order(accounts(), host = host)) {
             val hosts = hostsOf(provider, key)
             if (!covers(hosts, host)) continue
             val cached = quietly { provider.linkCached(key, link) }
@@ -76,7 +76,10 @@ object DebridLinks {
                     Thread.sleep(POLL_MS)
                     waited += POLL_MS
                 }
-                else -> return null
+                else -> {
+                    DebridChoice.refused(provider, key, state)
+                    return null
+                }
             }
         }
     }

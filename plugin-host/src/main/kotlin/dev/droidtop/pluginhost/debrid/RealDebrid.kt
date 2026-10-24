@@ -10,9 +10,35 @@ import org.json.JSONObject
  * API token (real-debrid.com/apitoken) or a device sign-in's access token, as a bearer token. Real-Debrid no longer
  * says what it has cached without adding it, so [cached] cannot say.
  */
-class RealDebrid(private val http: DebridTransport = DebridTransport.HTTP) : DebridProvider {
+class RealDebrid(
+    private val http: DebridTransport = DebridTransport.HTTP,
+    private val now: () -> Long = System::currentTimeMillis,
+) : DebridProvider {
     override val id = "realdebrid"
     override val name = "Real-Debrid"
+
+    /** Real-Debrid limits the torrents active at once. */
+    override val slotLimited = true
+
+    /**
+     * From `/user`: an account whose premium ended cannot serve. A link on a hoster Real-Debrid limits spends that
+     * hoster's traffic (`/traffic`: `left` of `limit`), and one with none left cannot serve; any other job is free.
+     */
+    override fun cost(key: String, host: String?): DebridCost {
+        val (status, body) = http.call("GET", "$API/user", auth(key), null)
+        val user = (jsonOrNull(body) as? JSONObject)?.takeIf { status == 200 }
+        if (user != null && user.optString("type") == "free") return DebridCost.NotNow("Real-Debrid premium has ended")
+        if (host == null) return DebridCost.Free
+        val (listed, traffic) = http.call("GET", "$API/traffic", auth(key), null)
+        val byHost = (jsonOrNull(traffic) as? JSONObject)?.takeIf { listed == 200 } ?: return DebridCost.Free
+        val h = host.lowercase().removePrefix("www.")
+        val entry = byHost.keys().asSequence().firstOrNull { d -> val dl = d.lowercase(); h == dl || h.endsWith(".$dl") }
+            ?.let { byHost.optJSONObject(it) } ?: return DebridCost.Free
+        val left = (entry.opt("left") as? Number)?.toDouble() ?: return DebridCost.Spends(null)
+        val limit = (entry.opt("limit") as? Number)?.toDouble()
+        if (left <= 0) return DebridCost.NotNow("Real-Debrid's traffic for $h is used up for today")
+        return DebridCost.Spends(limit?.takeIf { it > 0 }?.let { (left / it).coerceIn(0.0, 1.0) })
+    }
 
     private fun auth(key: String) = mapOf("Authorization" to "Bearer ${key.trim()}")
 
@@ -124,12 +150,12 @@ class RealDebrid(private val http: DebridTransport = DebridTransport.HTTP) : Deb
         return when (code?.toInt()) {
             8 -> DebridState.Failed("Real-Debrid did not take the token", auth = true)
             16 -> DebridState.Failed("Real-Debrid does not support that hoster", permanent = true)
-            18 -> DebridState.Failed("Real-Debrid has reached its limit on that hoster for now")
-            21 -> DebridState.Failed("Real-Debrid has too many of this account's downloads running")
-            23 -> DebridState.Failed("This Real-Debrid account's traffic is used up")
-            34 -> DebridState.Failed("Real-Debrid asked to wait: too many requests")
+            18 -> DebridState.Failed("Real-Debrid has reached its limit on that hoster for now", limit = true, restUntilMs = now() + HOUR)
+            21 -> DebridState.Failed("Real-Debrid has too many of this account's downloads running", limit = true, restUntilMs = now() + 10 * MINUTE)
+            23 -> DebridState.Failed("This Real-Debrid account's traffic is used up", limit = true, restUntilMs = now() + DAY)
+            34 -> DebridState.Failed("Real-Debrid asked to wait: too many requests", limit = true, restUntilMs = now() + MINUTE)
             35 -> DebridState.Failed("Real-Debrid refuses that file", permanent = true)
-            36 -> DebridState.Failed("This Real-Debrid account reached its fair-usage limit")
+            36 -> DebridState.Failed("This Real-Debrid account reached its fair-usage limit", limit = true, restUntilMs = now() + DAY)
             else -> refusal(status) ?: DebridState.Failed("Real-Debrid did not fetch the link (${said ?: "answered $status"})")
         }
     }
@@ -143,5 +169,8 @@ class RealDebrid(private val http: DebridTransport = DebridTransport.HTTP) : Deb
 
     private companion object {
         const val API = "https://api.real-debrid.com/rest/1.0"
+        const val MINUTE = 60_000L
+        const val HOUR = 60 * MINUTE
+        const val DAY = 24 * HOUR
     }
 }

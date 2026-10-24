@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
 
 /**
  * The debrid step of a torrent or magnet job (docs/SPEC.md "Download rules", Droidtop/tracker#638): before any peer is
- * contacted, the person's debrid accounts are asked in their order, and the first that has the torrent whole serves
+ * contacted, the person's debrid accounts are asked, cheapest first ([DebridChoice]), and the first that has it whole serves
  * it: its files come down as direct links into the job's own folder, so placing, updates and saves are as for any
  * torrent, and no peer is contacted and nothing is seeded. When none has it, the job either waits for the first
  * service that took it ([waits]) or falls back to the torrent. With no account connected nothing changes.
@@ -32,8 +32,10 @@ object DebridStep {
     }
 
     /** Serves [torrent] into [folder] from the person's accounts. Returns the service's name when one did, else null. */
-    suspend fun serve(context: Context, torrent: TorrentRef, folder: File, status: (Int, String) -> Unit, fetch: Fetch): String? =
-        serve(accounts(context), waitsForService(context), torrent, folder, status, fetch)
+    suspend fun serve(context: Context, torrent: TorrentRef, folder: File, status: (Int, String) -> Unit, fetch: Fetch): String? {
+        val ranked = withContext(Dispatchers.IO) { DebridChoice.order(accounts(context)) }
+        return serve(ranked, waitsForService(context), torrent, folder, status, fetch)
+    }
 
     /** [serve] with the accounts and the choice given, for the tests. */
     suspend fun serve(
@@ -55,7 +57,9 @@ object DebridStep {
             val chosen = choose(accounts, waits, torrent, status, pollMs, maxWaitMs, asked) ?: return null
             // Chosen before its files come: a download that fails part way keeps it on the list for the retry.
             server = chosen.first
-            download(chosen.first, chosen.second, folder, status, fetch)
+            DebridChoice.serving(chosen.first, accounts.first { it.first == chosen.first }.second) {
+                download(chosen.first, chosen.second, folder, status, fetch)
+            }
             return chosen.first.name
         } finally {
             // Also when the job is cancelled: asking leaves nothing on a list droidtop did not use.
@@ -93,7 +97,7 @@ object DebridStep {
             when (val state = ask { provider.request(key, torrent) }) {
                 is DebridState.Ready -> return provider to state
                 is DebridState.Caching -> if (taker == null) taker = provider to key
-                else -> Unit
+                else -> DebridChoice.refused(provider, key, state)
             }
         }
         if (!waits) return null
@@ -116,7 +120,10 @@ object DebridStep {
                     delay(pollMs)
                     waited += pollMs
                 }
-                is DebridState.Failed, DebridState.NotCached, null -> return null
+                is DebridState.Failed, DebridState.NotCached, null -> {
+                    DebridChoice.refused(provider, key, state)
+                    return null
+                }
             }
         }
     }

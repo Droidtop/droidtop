@@ -9,9 +9,33 @@ import org.json.JSONObject
  * `requestdl` for each file's direct address (valid for some hours). The key is the account's API key, as a bearer
  * token. Every answer is `{success, error, detail, data}`, a refusal `success: false` even on a 200.
  */
-class TorBox(private val http: DebridTransport = DebridTransport.HTTP) : DebridProvider {
+class TorBox(
+    private val http: DebridTransport = DebridTransport.HTTP,
+    private val now: () -> Long = System::currentTimeMillis,
+) : DebridProvider {
     override val id = "torbox"
     override val name = "TorBox"
+
+    /** TorBox limits torrents and downloads at once, by plan. */
+    override val slotLimited = true
+
+    /**
+     * From `user/me`: a paid plan that has not ended spends nothing; a free plan (`plan` 0) spends its monthly
+     * downloads, and its `cooldown_until` is a wait. A cooldown shown on a paid plan is not taken as one: TorBox says
+     * paid plans are not held by it, and a real one is refused as `COOLDOWN_LIMIT`.
+     */
+    override fun cost(key: String, host: String?): DebridCost {
+        val (status, body) = http.call("GET", "$API/user/me", auth(key), null)
+        val data = (jsonOrNull(body) as? JSONObject)?.optJSONObject("data")?.takeIf { status == 200 } ?: return DebridCost.Free
+        val plan = data.optInt("plan", -1)
+        if (plan == 0) {
+            val until = isoMs(data.optString("cooldown_until"))
+            return if (until != null && until > now()) DebridCost.NotNow("TorBox has the free plan waiting", until) else DebridCost.Spends(null)
+        }
+        val ends = isoMs(data.optString("premium_expires_at"))
+        if (ends != null && ends <= now()) return DebridCost.NotNow("The TorBox plan has ended")
+        return DebridCost.Free
+    }
 
     private fun auth(key: String) = mapOf("Authorization" to "Bearer ${key.trim()}")
 
@@ -138,7 +162,14 @@ class TorBox(private val http: DebridTransport = DebridTransport.HTTP) : DebridP
         if (status >= 400 || json?.optBoolean("success", true) == false) {
             val code = json?.optString("error").orEmpty()
             val detail = json?.optString("detail").orEmpty().ifBlank { code.ifBlank { "the request failed ($status)" } }
-            return DebridState.Failed("TorBox: $detail", auth = code in AUTH_CODES, permanent = code in PERMANENT_CODES)
+            val rest = LIMIT_CODES[code]
+            return DebridState.Failed(
+                "TorBox: $detail",
+                auth = code in AUTH_CODES,
+                permanent = code in PERMANENT_CODES,
+                limit = rest != null,
+                restUntilMs = rest?.let { now() + it },
+            )
         }
         return null
     }
@@ -148,8 +179,14 @@ class TorBox(private val http: DebridTransport = DebridTransport.HTTP) : DebridP
     private companion object {
         const val API = "https://api.torbox.app/v1/api"
         val AUTH_CODES = setOf("AUTH_ERROR", "BAD_TOKEN", "OAUTH_VERIFICATION_ERROR", "NO_AUTH")
+        /** The refusals of a limit, and how long the account rests after one (a cooldown's end comes from `user/me`). */
+        val LIMIT_CODES = mapOf(
+            "ACTIVE_LIMIT" to 10L * 60 * 1000,
+            "COOLDOWN_LIMIT" to 60L * 60 * 1000,
+            "MONTHLY_LIMIT" to 24L * 60 * 60 * 1000,
+        )
         val PERMANENT_CODES = setOf(
-            "ACTIVE_LIMIT", "MONTHLY_LIMIT", "COOLDOWN_LIMIT", "DOWNLOAD_TOO_LARGE", "INVALID_MAGNET", "INVALID_TORRENT",
+            "DOWNLOAD_TOO_LARGE", "INVALID_MAGNET", "INVALID_TORRENT",
             "PLAN_RESTRICTED_FEATURE", "MISSING_REQUIRED_OPTION", "INVALID_OPTION",
         )
     }
