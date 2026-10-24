@@ -488,16 +488,114 @@ val MIGRATION_10_11 = object : Migration(10, 11) {
     }
 }
 
+/**
+ * v12 (Droidtop/tracker#318, "One identity model"): the identity tables beside the path-keyed ones, added and filled,
+ * nothing re-keyed. Each `game_metadata` row gets a uid, and its path (the row's key today) becomes that uid's first
+ * locator on this device, so the readers can move to uids one at a time. The uid is SQLite's own random 128 bits as
+ * hex; nothing else about a row is known here to claim (its store id and hashes are minted as the library and the
+ * scraper next see the game).
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `games` (`uid` TEXT NOT NULL, `kind` TEXT, `created_at` INTEGER NOT NULL, " +
+                "`orphan_since` INTEGER, PRIMARY KEY(`uid`))",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `game_claims` (`uid` TEXT NOT NULL, `namespace` TEXT NOT NULL, `value` TEXT NOT NULL, " +
+                "`origin` TEXT NOT NULL, `since` INTEGER NOT NULL, `superseded_by` TEXT, PRIMARY KEY(`uid`, `namespace`, `value`))",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_game_claims_namespace_value` ON `game_claims` (`namespace`, `value`)")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `game_locators` (`device` TEXT NOT NULL, `locator` TEXT NOT NULL, `uid` TEXT NOT NULL, " +
+                "`version` TEXT, PRIMARY KEY(`device`, `locator`))",
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_game_locators_uid` ON `game_locators` (`uid`)")
+        db.execSQL(
+            "INSERT OR IGNORE INTO `game_locators` (`device`, `locator`, `uid`, `version`) " +
+                "SELECT '${dev.droidtop.library.identity.GameIdentities.THIS_DEVICE}', `id`, lower(hex(randomblob(16))), NULL FROM `game_metadata`",
+        )
+        db.execSQL(
+            "INSERT OR IGNORE INTO `games` (`uid`, `kind`, `created_at`, `orphan_since`) " +
+                "SELECT `uid`, NULL, CAST(strftime('%s', 'now') AS INTEGER) * 1000, NULL FROM `game_locators`",
+        )
+    }
+}
+
+/** A game's identity (Droidtop/tracker#318): minted at first sight, never changed on this device. */
+@Entity(tableName = "games")
+data class GameEntity(
+    @PrimaryKey val uid: String,
+    val kind: String? = null,
+    @ColumnInfo(name = "created_at") val createdAt: Long,
+    /** Set when every locator of the game went missing; the game is kept a while for a file that comes back. */
+    @ColumnInfo(name = "orphan_since") val orphanSince: Long? = null,
+)
+
+/** One claim about which game a uid is; append-only, a retired one names what replaced it ([dev.droidtop.library.identity.Claim]). */
+@Entity(
+    tableName = "game_claims",
+    primaryKeys = ["uid", "namespace", "value"],
+    indices = [androidx.room.Index(value = ["namespace", "value"])],
+)
+data class GameClaimEntity(
+    val uid: String,
+    val namespace: String,
+    val value: String,
+    val origin: String,
+    val since: Long,
+    @ColumnInfo(name = "superseded_by") val supersededBy: String? = null,
+)
+
+/** Where a game lives on a device: a path or a store row, and the version found there. */
+@Entity(
+    tableName = "game_locators",
+    primaryKeys = ["device", "locator"],
+    indices = [androidx.room.Index(value = ["uid"])],
+)
+data class GameLocatorEntity(
+    val device: String,
+    val locator: String,
+    val uid: String,
+    val version: String? = null,
+)
+
+@Dao
+interface GameIdentityDao {
+    @Query("SELECT uid FROM game_locators WHERE device = :device AND locator = :locator")
+    suspend fun uidAt(device: String, locator: String): String?
+
+    @Query("SELECT DISTINCT uid FROM game_claims WHERE namespace = :namespace AND value = :value AND superseded_by IS NULL")
+    suspend fun uidsWithLiveClaim(namespace: String, value: String): List<String>
+
+    @Query("SELECT * FROM game_claims WHERE uid = :uid")
+    suspend fun claimsOf(uid: String): List<GameClaimEntity>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertGame(game: GameEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun putLocator(locator: GameLocatorEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertClaim(claim: GameClaimEntity)
+
+    @Query("SELECT * FROM game_locators WHERE uid = :uid")
+    suspend fun locatorsOf(uid: String): List<GameLocatorEntity>
+}
+
 @Database(
     entities = [
         GameMetadataEntity::class,
         CollectionEntity::class, CollectionMemberEntity::class,
+        GameEntity::class, GameClaimEntity::class, GameLocatorEntity::class,
     ],
-    version = 11,
+    version = 12,
     exportSchema = false,
 )
 abstract class RomDatabase : RoomDatabase() {
     abstract fun romDao(): RomDao
+    abstract fun identityDao(): GameIdentityDao
 
     companion object {
         @Volatile private var instance: RomDatabase? = null
@@ -518,7 +616,7 @@ abstract class RomDatabase : RoomDatabase() {
                     // because game_metadata holds real user data that
                     // must survive it -- see that migration's own doc
                     // comment.
-                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+                    .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                     .fallbackToDestructiveMigration(dropAllTables = true)
                     .build().also { instance = it }
             }

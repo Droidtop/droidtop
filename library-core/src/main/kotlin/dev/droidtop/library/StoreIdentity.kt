@@ -22,7 +22,11 @@ import java.text.Normalizer
  *    ("The same game as...") groups the row under that name.
  * 4. **The same title once it is spelled the same way** ([titleKey]): case,
  *    punctuation, trademark symbols and a trailing edition label
- *    ("Deluxe Edition", "GOTY") do not make a different game.
+ *    ("Deluxe Edition", "GOTY") do not make a different game. The weakest
+ *    rung: it never joins rows that hold two different ids from the same
+ *    store (steam:440 and steam:620 are two games, whatever their titles
+ *    say; Droidtop/tracker#318, "One identity model"). A Steam row and a
+ *    GOG row still join on it.
  *
  * The title key is an EXACT comparison, never a similarity: `Doom` and
  * `Doom 3`, `Fallout` and `Fallout 3`, `Doom` and `Doom (2016)` stay
@@ -160,10 +164,22 @@ object StoreIdentity {
             }
             return x
         }
+        // Each group's store ids, by store, so a title never joins two different games of one store.
+        val idsByRoot = HashMap<Int, MutableMap<String, MutableSet<String>>>()
         fun union(a: Int, b: Int) {
             val ra = find(a)
             val rb = find(b)
-            if (ra != rb) parent[maxOf(ra, rb)] = minOf(ra, rb)
+            if (ra == rb) return
+            val keep = minOf(ra, rb)
+            val gone = maxOf(ra, rb)
+            parent[gone] = keep
+            idsByRoot.remove(gone)?.forEach { (store, ids) -> idsByRoot.getOrPut(keep) { HashMap() }.getOrPut(store) { HashSet() } += ids }
+        }
+        fun contradicts(a: Int, b: Int): Boolean {
+            val left = idsByRoot[find(a)] ?: return false
+            val right = idsByRoot[find(b)] ?: return false
+            // Ids from one store in common say one game; none in common says two.
+            return left.any { (store, ids) -> right[store]?.let { other -> other.none { it in ids } } == true }
         }
         val byDir = HashMap<String, Int>()
         // A directory joins rows only when an installed row stands on it: an
@@ -173,10 +189,19 @@ object StoreIdentity {
         val byTitle = HashMap<String, Int>()
         val byStoreId = HashMap<String, Int>()
         rows.forEachIndexed { index, row ->
+            storeKeys(row).forEach { key -> idsByRoot.getOrPut(index) { HashMap() }.getOrPut(key.substringBefore(':')) { HashSet() } += key }
+        }
+        // The stronger rungs first, so the title rung sees each group's ids whole.
+        rows.forEachIndexed { index, row ->
             storeKeys(row).forEach { key -> union(index, byStoreId.getOrPut(key) { index }) }
             row.pcInfo?.installPath?.asInstallKey()?.takeIf { it in installedDirs }?.let { dir -> union(index, byDir.getOrPut(dir) { index }) }
-            titleKey(row.gameName ?: row.title).takeIf { it.isNotEmpty() }
-                ?.let { key -> union(index, byTitle.getOrPut(key) { index }) }
+        }
+        rows.forEachIndexed { index, row ->
+            titleKey(row.gameName ?: row.title).takeIf { it.isNotEmpty() }?.let { key ->
+                val first = byTitle.getOrPut(key) { index }
+                // A name the person gave is their word (rung 3): it joins whatever ids the rows hold.
+                if (row.gameName != null || !contradicts(index, first)) union(index, first)
+            }
         }
         val components = LinkedHashMap<Int, MutableList<LibraryEntry>>()
         rows.forEachIndexed { index, row -> components.getOrPut(find(index)) { mutableListOf() } += row }

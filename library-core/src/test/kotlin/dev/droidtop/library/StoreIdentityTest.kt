@@ -192,6 +192,32 @@ class StoreIdentityTest {
     }
 
     @Test
+    fun `two ids from one store are two games whatever their titles say`() {
+        val merged = StoreIdentity.group(
+            listOf(
+                row("steam:440", "Doom"),
+                row("steam:620", "DOOM"),
+                row("gog:7", "Doom"),
+            ),
+        )
+
+        assertEquals("the title joins the GOG row to one of them, never the two Steam games", 2, merged.size)
+        assertTrue(merged.all { group -> group.entries.count { it.id.startsWith("steam:") } == 1 })
+    }
+
+    @Test
+    fun `a name the person set joins rows even with two ids from one store`() {
+        val merged = StoreIdentity.group(
+            listOf(
+                row("steam:440", "Doom Demo", gameName = "Doom"),
+                row("steam:620", "Doom", gameName = "Doom"),
+            ),
+        )
+
+        assertEquals(1, merged.size)
+    }
+
+    @Test
     fun `a blank store id joins nothing`() {
         val merged = StoreIdentity.group(
             listOf(

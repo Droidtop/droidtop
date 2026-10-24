@@ -158,6 +158,13 @@ suspend fun scrapeSystemArtwork(
             val localMd5 = if (screenScraperSystemId != null) {
                 dev.droidtop.library.scraper.RomHash.md5OrNull(romFile)
             } else null
+            // The file's own hash is what the game is, whatever the source answers (Droidtop/tracker#318).
+            localMd5?.let { md5 ->
+                dev.droidtop.library.identity.LibraryIdentities.claim(
+                    context, romFile.absolutePath, dev.droidtop.library.LibraryEntryKind.CONSOLE_ROM.name,
+                    listOfNotNull(dev.droidtop.library.identity.Claim.romMd5(system.id, md5)), origin = "scrape",
+                )
+            }
             val screenScraperLookup = screenScraperSystemId?.let {
                 ScreenScraperClient.findMetadata(
                     systemeId = it.toString(),
