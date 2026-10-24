@@ -5949,9 +5949,12 @@ one:
   `nativeKind`, as the download rules do; they read `kind`, which is "native" for every job droidtop runs itself,
   so no native download showed in either.
   **The Downloads place reads it (2026-10-22).** Its sections are Current, Waiting (held by the download rules),
-  Paused and Finished, each with its count, and Finished ends with "Clear finished". A running row says how far
-  from the job's numbers ("120 MB of 300 MB, 4 MB/s", "12 of 40"), then the time left (`JobEta`), then the job's
-  line for what the numbers cannot say. A finished row says what it did counted ("1 failed, 2 done, 1 skipped") or
+  Paused and Finished, each with its count, and Finished ends with "Clear finished". A running row's bar says how
+  far and its line says where it stands or the time left (`JobPace`, below), never a figure that changes with each
+  report (decided 2026-10-24, Droidtop/tracker#643; owner: "The current 'flickery numbers for download progress', for
+  instance, is bad"; "text explains on demand"). The figures ("42%, 120 MB of 300 MB, 4 MB/s", "12 of 40",
+  `detailLine`, the speed smoothed) are on the job's page, where the person asked. A job that sends no numbers keeps
+  its own line under the row's. A finished row says what it did counted ("1 failed, 2 done, 1 skipped") or
   how it ended, and opens the job's page: how it ended, then Open (what it made, `JobOpen`), Retry and Clear, then
   its report, a section per outcome, failures first, each line opening its own target. Open is :app's
   (`JobOpener`): a game opens its page, a place opens where the person is, a folder or file on shared storage opens
@@ -15453,7 +15456,7 @@ id, the newest per game while it runs, waits, is paused or failed (`byGame`, der
 nothing publishes it). `StoreDownloads`, a copy that kept only a percent and paused-or-not, is deleted: with it the game
 page read "Stopped at 40%" for a download held for Wi-Fi, "Downloading" for one waiting for its connection, and plain
 "Install" again after a failure. The words are the Downloads place's, one line (`PluginJobsScreen.oneLine`), so the
-game page cannot say less than Downloads: running reads "Downloading" over "120 MB of 300 MB · About 3 min left";
+game page cannot say less than Downloads: running reads "Downloading" over "About 3 min left" (Droidtop/tracker#643);
 waiting for its connection or its next try reads "Downloading" over that; held by the download rules reads **Download now** over the reason ("Waiting for Wi-Fi"), and pressing it is Download now (12a: first
 in line, still waiting for the connection); paused reads Resume; failed reads **Try again** over why, and runs the job
 again with its arguments (`PluginJobsCenter.retry`). The capsule badge says Waiting, Paused or Failed. The droidtop
@@ -17092,10 +17095,14 @@ function (`menuSectionsFor`, built on `sectionsFor`).
   downloader, weighted by the depot's size and kept from going back (its
   events arrive out of order); the fraction is of what that depot needs
   after its manifest, so an update's bar runs over the difference it moves,
-  and the status line names the phase, not each file. Time left (`JobEta`) is
-  measured from how fast the job has moved since droidtop first saw it, says
-  nothing until it has moved 1% over 5 s, and starts again after a pause:
-  "Under a minute left", "About 8 min left", "About 2 h left". A on a running
+  and the status line names the phase, not each file. Time left (`JobPace`,
+  Droidtop/tracker#643) comes from an exponential moving average of the job's
+  rate over about 5 s, weighted by the time between reports, in bytes where it
+  counts them, else things, else its percent; a screen drawn again between
+  reports is no sample. It says nothing until the job has moved for 5 s, a time
+  it said stands 5 s before it may change, and it starts again after a pause or
+  a wait: "Under a minute left", "About 8 min left", "About 2 h left". The speed
+  on a job's page is smoothed the same way. A on a running
   or paused job opens its page: its progress, Pause or Resume where the job
   supports them, and Cancel (two presses). The screen is live on the jobs
   list (`CatalogScreen.live`), so nothing polls; the earlier progress row,
