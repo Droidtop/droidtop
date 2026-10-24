@@ -75,12 +75,12 @@ class SiteChecksTest {
 
     @Test
     fun `a pass is the site's own page with a pass cookie, never the challenge or a bot cookie alone`() {
-        assertFalse(SiteChecks.passed("Just a moment...", "cf_clearance=abc"))
-        assertFalse(SiteChecks.passed("Just a moment\u2026", "cf_clearance=abc"))
-        assertFalse(SiteChecks.passed("Attention Required! | Cloudflare", "cf_clearance=abc"))
-        assertFalse("a page still loading", SiteChecks.passed("", "cf_clearance=abc"))
-        assertFalse("__cf_bm is set on the challenge itself", SiteChecks.passed("F95zone", "__cf_bm=x; xf_csrf=y"))
-        assertTrue(SiteChecks.passed("F95zone", "xf_csrf=y; cf_clearance=abc"))
-        assertTrue(SiteChecks.passed("Latest Updates | F95zone", "__ddg2_=z"))
+        assertFalse(SiteChecks.pagePassed("Just a moment...", "cf_clearance=abc"))
+        assertFalse(SiteChecks.pagePassed("Just a moment\u2026", "cf_clearance=abc"))
+        assertFalse(SiteChecks.pagePassed("Attention Required! | Cloudflare", "cf_clearance=abc"))
+        assertFalse("a page still loading", SiteChecks.pagePassed("", "cf_clearance=abc"))
+        assertFalse("__cf_bm is set on the challenge itself", SiteChecks.pagePassed("F95zone", "__cf_bm=x; xf_csrf=y"))
+        assertTrue(SiteChecks.pagePassed("F95zone", "xf_csrf=y; cf_clearance=abc"))
+        assertTrue(SiteChecks.pagePassed("Latest Updates | F95zone", "__ddg2_=z"))
     }
 }

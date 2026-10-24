@@ -82,7 +82,7 @@ object SiteChecks {
      * not a check's), and a pass cookie for it ([cookieHeader]: Cloudflare's `cf_clearance`, DDoS-Guard's `__ddg2_`).
      * The owner, 2026-10-24: "Can we have it autoclose when we detect the cloudflare pass?" Pure.
      */
-    fun passed(title: String?, cookieHeader: String?): Boolean {
+    fun pagePassed(title: String?, cookieHeader: String?): Boolean {
         if (isCheckTitle(title)) return false
         val names = cookieHeader.orEmpty().split(';').map { it.trim().substringBefore('=').trim() }
         return "cf_clearance" in names || "__ddg2_" in names
