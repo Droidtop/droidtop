@@ -270,13 +270,20 @@ object PluginTileProtocol {
         return packages.isEmpty() || runningPackage in packages
     }
 
-    /** `state` answers `{label, value, on?, severity?}`. A missing label falls back to the tile's own. */
+    /**
+     * `state` answers `{label, value, on?, severity?}`. A missing label falls back to the tile's own. The label and the
+     * value are cut to the view limits' `tileLabel` and `tileValue` (32 and 16): a tile is a host row of fixed height,
+     * so a long answer ellipsizes instead of growing it (Droidtop/tracker#644, "Plugins inherit it").
+     */
     fun state(data: JSONObject, fallbackLabel: String): TileState = TileState(
-        label = data.optString("label").takeIf { it.isNotBlank() && !data.isNull("label") } ?: fallbackLabel,
-        value = if (data.isNull("value")) null else data.optString("value").takeIf { it.isNotBlank() },
+        label = cut(data.optString("label").takeIf { it.isNotBlank() && !data.isNull("label") } ?: fallbackLabel, PluginViewLimits.length("tileLabel")),
+        value = if (data.isNull("value")) null else data.optString("value").takeIf { it.isNotBlank() }?.let { cut(it, PluginViewLimits.length("tileValue")) },
         on = if (data.has("on") && !data.isNull("on")) parseBoolean(data.opt("on")) else null,
         severity = if (data.isNull("severity")) null else data.optString("severity").takeIf { it.isNotBlank() },
     )
+
+    /** [text] at most [max] characters, an ellipsis standing for what was cut. Pure. */
+    private fun cut(text: String, max: Int): String = if (text.length <= max) text else text.take(max - 1).trimEnd() + "\u2026"
 
     private fun parseBoolean(value: Any?): Boolean? = when (value) {
         is Boolean -> value

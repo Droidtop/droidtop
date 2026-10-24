@@ -688,7 +688,7 @@ still renders on an older droidtop):
 | `choice` | `title`, `subtitle?`, `options[{value,label}]`, `value`, `action?` | a pick-one (the version, region and format pickers of a download) |
 | `slider` | `title`, `subtitle?`, `min`, `max`, `value`, `action?` | an integer stepper |
 | `text` | `title`, `subtitle?`, `value`, `action?` | a text field (controller and touch text entry). **Never secret**: there is no password field; secrets wait for the vault (G1, #69) |
-| `progress` | `title`, `value` (0 to 100, or -1 for unknown), `subtitle?` | a read-only status row ("45%") |
+| `progress` | `title`, `value` (0 to 100, or -1 for unknown), `subtitle?` | a read-only row with the host's job bar (gliding; -1 is the checking shimmer), never a percent in text (Droidtop/tracker#644) |
 | `notice` | `title`, `subtitle?`, `details?`, `tone` (`info`, `caution`, `danger`), `placement?` (`section`, `banner`), `action?` | droidtop's notice card, "from <plugin>" (see "Notices" above) |
 
 **Typed values (Droidtop/tracker#521 item 7).** An `info` or `row`
@@ -2745,7 +2745,9 @@ Risk low.
 **C2 Quick Menu tiles.** EP `ui.quick_tile@1`. Risk low.
 - **For:** a toggle or a value in Gaming's Quick Menu and in Android's
   quick-settings-like surfaces: "VPN on", "Sync now", "Fan: quiet".
-- **Ops:** `state → {label, value, on?, icon}` and `toggle` or `action`.
+- **Ops:** `state → {label, value, on?, icon}` and `toggle` or `action`. The label is cut to 32 characters and the value to
+  16 (`tileLabel`, `tileValue` in docs/view-limits/plugin-view-limits.json), with an ellipsis: a tile is a host row
+  of fixed height (Droidtop/tracker#644).
 - **Surfaces:**
   - G: the plugin's panel in the Quick Menu (C17), first rows;
   - A: an `android.service.quicksettings.TileService` slot that droidtop

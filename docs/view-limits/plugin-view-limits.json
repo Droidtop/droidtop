@@ -9,6 +9,8 @@
     "noticeDetails": 500,
     "actionLabel": 20,
     "toast": 80,
+    "tileLabel": 32,
+    "tileValue": 16,
     "argsBytes": 16384
   },
   "counts": {

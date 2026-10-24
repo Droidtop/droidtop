@@ -492,11 +492,13 @@ private class PluginPage(
         return when (node) {
             is ViewNode.Notice -> noticeItem(screenId, itemId, node)
             is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, run = {})
+            // A plugin's progress is the host's job bar (Droidtop/tracker#643, #644), not a percent in text: the bar glides,
+            // and one with no percent is the checking shimmer.
             is ViewNode.Progress -> ActionItem(
                 id = itemId,
                 title = node.title,
                 subtitle = node.subtitle,
-                value = if (node.percent >= 0) "${node.percent}%" else null,
+                progress = if (node.percent >= 0) node.percent.coerceAtMost(100) / 100f else -1f,
                 run = {},
             )
             is ViewNode.Row -> actionItem(screenId, itemId, node.title, node.shownSubtitle(), node.shownValue(), null, node.action)

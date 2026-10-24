@@ -169,6 +169,15 @@ class ExtensionProtocolsTest {
     }
 
     @Test
+    fun `a tile's label and value are cut to the view limits, never grown`() {
+        // Droidtop/tracker#644: a tile is a host row of fixed height; a long answer ellipsizes.
+        val long = PluginTileProtocol.state(obj("label" to "A".repeat(50), "value" to "Connected to the office network"), "x")
+        assertEquals(PluginViewLimits.length("tileLabel"), long.label.length)
+        assertEquals(PluginViewLimits.length("tileValue"), long.value!!.length)
+        assertTrue(long.value!!.endsWith("\u2026"))
+    }
+
+    @Test
     fun `a shelf keeps only real entries, once each, in the plugin's order`() {
         val known = setOf("a", "b", "c")
         val shelves = PluginShelfProtocol.shelves(
