@@ -27,12 +27,20 @@ class RealDebrid(private val http: DebridTransport = DebridTransport.HTTP) : Deb
 
     override fun cached(key: String, torrent: TorrentRef): Boolean? = null
 
+    /** The torrents droidtop added to the person's list this run, by info hash: only these does [release] take off. */
+    private val added = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    override fun release(key: String, torrent: TorrentRef) {
+        val id = added.remove(torrent.infoHash) ?: return
+        http.call("DELETE", "$API/torrents/delete/$id", auth(key), null)
+    }
+
     override fun request(key: String, torrent: TorrentRef): DebridState {
         val id = find(key, torrent.infoHash) ?: run {
             val (status, body) = http.call("POST", "$API/torrents/addMagnet", auth(key), mapOf("magnet" to torrent.magnet))
             refusal(status)?.let { return it }
-            (jsonOrNull(body) as? JSONObject)?.optString("id")?.takeIf { it.isNotBlank() }
-                ?: return DebridState.Failed("Real-Debrid did not add the torrent")
+            ((jsonOrNull(body) as? JSONObject)?.optString("id")?.takeIf { it.isNotBlank() }
+                ?: return DebridState.Failed("Real-Debrid did not add the torrent")).also { added[torrent.infoHash] = it }
         }
         val (status, body) = http.call("GET", "$API/torrents/info/$id", auth(key), null)
         refusal(status)?.let { return it }
