@@ -1179,6 +1179,13 @@ object AppSettingsCatalogs {
                 ),
             ),
             CatalogGroup(
+                id = "accounts_hosts",
+                title = "File hosts",
+                items = listOf(
+                    guidedKeyRow(context, ScraperKeyService.PIXELDRAIN, "PixelDrain"),
+                ),
+            ),
+            CatalogGroup(
                 id = "accounts_plugins",
                 title = "Plugins and integrations",
                 items = ElevatedAccessCatalog.rows(context) + listOf(

@@ -150,4 +150,27 @@ data class WebSessionDownload(
     val size: Long?,
     val referer: String?,
     val cookie: String?,
-)
+    /** Further headers droidtop sends for it, never shown to a plugin: a file host's API gives the person's own account here (Droidtop/tracker#638). */
+    val headers: Map<String, String> = emptyMap(),
+    /** The file's SHA-256 when the host said it, checked once the file is whole. */
+    val sha256: String? = null,
+    /** How droidtop got it when the page did not ("via your PixelDrain", "direct from PixelDrain"), for the job's line. */
+    val via: String? = null,
+) {
+    companion object {
+        /** A file droidtop knows the address of, named as a page's download would be. */
+        fun direct(url: String, fileName: String, size: Long?, headers: Map<String, String> = emptyMap(), sha256: String? = null, via: String? = null) =
+            WebSessionDownload(
+                url = url,
+                userAgent = null,
+                contentDisposition = "attachment; filename=\"${fileName.substringAfterLast('/').replace("\"", "")}\"",
+                mimeType = null,
+                size = size,
+                referer = null,
+                cookie = null,
+                headers = headers,
+                sha256 = sha256,
+                via = via,
+            )
+    }
+}

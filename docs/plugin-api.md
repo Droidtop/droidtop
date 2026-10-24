@@ -965,6 +965,16 @@ no destination, such as the PC library). Ops:
   names the torrent and does nothing else for it: it never asks a debrid
   service itself and never sees the person's keys.
 
+  **File hosts are droidtop's too (2026-10-24, Droidtop/tracker#638 part 5).**
+  A link a source gives on a host droidtop has an API for (PixelDrain first)
+  is served by the person's own account on the host, then by a debrid
+  account, then by the host's anonymous API, before droidtop's web view
+  opens the page (docs/SPEC.md 12a "Host resolvers"). For a plugin it is
+  the same as a page's download: `web.session open_in_session` replies with
+  `captured`, `download` and `downloads` and a token for each, and droidtop
+  adds the headers (the person's key among them) by the token, in memory. A
+  plugin never sees the key.
+
   A torrent or magnet carries no digests (its pieces are checked), no
   `unpack`, no web-session token and no `auth`, and a magnet carries no
   headers. It is a download of its own, never one of `downloads`. Seeding

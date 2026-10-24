@@ -576,7 +576,11 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         }
         val descriptors = UpdateLinks.descriptorsFor(captured)
         val title = "Download $name"
-        val done = AcquireDownload.run(app, record, title, JSONObject(), emptyMap(), descriptors, onStatus, update = placement)
+        // Files a host account or the host's own API served say so in the job's line (#638), no page having opened.
+        val via = captured.firstNotNullOfOrNull { it.via }
+        via?.let { onStatus("Downloading $it") }
+        val say: (String) -> Unit = { line -> onStatus(if (via == null) line else "$via: $line") }
+        val done = AcquireDownload.run(app, record, title, JSONObject(), emptyMap(), descriptors, say, update = placement)
         if (!done.ok) Log.w(TAG, "update $source/$externalId: the download from the web view failed: ${done.error}")
         return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
     }

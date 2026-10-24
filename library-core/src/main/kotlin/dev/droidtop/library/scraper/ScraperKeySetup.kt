@@ -142,6 +142,23 @@ enum class ScraperKeyService(
             KeyField("api_token", "API token", secret = true, storeKey = CredentialStore.REALDEBRID_TOKEN),
         ),
     ),
+    // A file host's own account (Droidtop/tracker#638): its premium downloads come first. droidtop ships no key of its own.
+    PIXELDRAIN(
+        title = "PixelDrain",
+        url = "https://pixeldrain.com/user/api_keys",
+        steps = listOf(
+            "Open pixeldrain.com",
+            "Sign in to your account",
+            "Open Account, API keys",
+            "Create and copy a key",
+            "Enter it here",
+        ),
+        credit = "Downloaded from PixelDrain",
+        gets = "Downloads with your premium",
+        fields = listOf(
+            KeyField("api_key", "API key", secret = true, storeKey = CredentialStore.PIXELDRAIN_API_KEY),
+        ),
+    ),
     ;
 
     /** The stored values, by field id; blank where none is set. */
@@ -160,6 +177,12 @@ enum class ScraperKeyService(
     val debridId: String? get() = when (this) {
         TORBOX -> "torbox"
         REALDEBRID -> "realdebrid"
+        else -> null
+    }
+
+    /** The host resolver id of a file host's account ("pixeldrain", [dev.droidtop.pluginhost.hosts.HostResolver.id]); null for the others. */
+    val hostId: String? get() = when (this) {
+        PIXELDRAIN -> "pixeldrain"
         else -> null
     }
 
@@ -231,6 +254,10 @@ object ScraperKeyCheck {
     private fun debridOutcome(id: String, key: String): String =
         dev.droidtop.pluginhost.debrid.DebridProviders.byId(id)?.check(key) ?: ScraperKeyState.CONNECTED
 
+    /** A file host's own check of its key: [ScraperKeyState.CONNECTED], or its one sentence. */
+    private fun hostOutcome(id: String, key: String): String =
+        dev.droidtop.pluginhost.hosts.HostLinks.resolvers.firstOrNull { it.id == id }?.check(key) ?: ScraperKeyState.CONNECTED
+
     /** Tests the stored credential of [service], records the result, and returns the line to show. */
     fun test(context: Context, service: ScraperKeyService): String {
         if (!service.isConfigured(context)) return ScraperKeyState.NOT_SET
@@ -262,6 +289,7 @@ object ScraperKeyCheck {
                 )
                 ScraperKeyService.TORBOX -> debridOutcome("torbox", values.getValue("api_key"))
                 ScraperKeyService.REALDEBRID -> debridOutcome("realdebrid", dev.droidtop.library.debrid.DebridAccounts.realDebridToken(context))
+                ScraperKeyService.PIXELDRAIN -> hostOutcome("pixeldrain", values.getValue("api_key"))
             }
         }
         // A network failure says nothing about the credential: keep the last verdict.
