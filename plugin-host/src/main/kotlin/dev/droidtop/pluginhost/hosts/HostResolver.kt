@@ -1,9 +1,10 @@
 package dev.droidtop.pluginhost.hosts
 
 /**
- * One file a file host serves directly: its name, its size and SHA-256 when the host says, the address to download it
- * from, and the [headers] that address needs (the person's own account, as a header that goes to that host only). A host
- * that serves the file encrypted gives the key to decrypt it with as [decrypt] ([HostDecryption]); it goes to no server.
+ * One file a file host serves directly: its name, its size and SHA-256 (or MD5, for a host that gives only that) when
+ * the host says, the address to download it from, and the [headers] that address needs (the person's own account, as
+ * a header that goes to that host only). A host that serves the file encrypted gives the key to decrypt it with as
+ * [decrypt] ([HostDecryption]); it goes to no server.
  */
 data class HostFile(
     val name: String,
@@ -12,6 +13,7 @@ data class HostFile(
     val headers: Map<String, String> = emptyMap(),
     val sha256: String? = null,
     val decrypt: String? = null,
+    val md5: String? = null,
 )
 
 /** What a file host's own API says of a link. */

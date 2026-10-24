@@ -113,6 +113,17 @@ class UpdatePlacementTest {
     }
 
     @Test
+    fun anMd5AndACookieAHostGivesTravelWithTheDownload() {
+        val md5 = "0f8adc1149b1a2c3d4e5f60718293a4b"
+        val one = UpdateLinks.descriptorsFor(
+            listOf(WebSessionDownload.direct("https://store-1.gofile.io/download/web/f1/Game.zip", "Game.zip", 5L, mapOf("Cookie" to "accountToken=tok"), null, "via your GoFile", md5)),
+        ).single()
+        assertEquals(md5, one.md5)
+        assertNull(one.sha256)
+        assertEquals(mapOf("Cookie" to "accountToken=tok"), one.headers)
+    }
+
+    @Test
     fun aRecordIsSavedWholeAndRefusesAPathForAName() {
         val cache = RecordCache(File(dir, "records"))
         cache.save("f95zone", "18978", JSONObject().put("title", "Sample"), nowMs = 42L)

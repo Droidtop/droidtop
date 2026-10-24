@@ -131,7 +131,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // And a source's link on a file hoster the account serves (Pixeldrain, Mega, ...), before the page opens.
         dev.droidtop.pluginhost.debrid.DebridLinks.accounts = { dev.droidtop.library.debrid.DebridAccounts.connected(this@DroidtopApplication) }
         dev.droidtop.pluginhost.debrid.DebridLinks.waits = { dev.droidtop.library.debrid.DebridAccounts.waits(this@DroidtopApplication) }
-        // The person's own account on a file host (PixelDrain): its premium downloads are asked before any debrid account.
+        // The person's own account on a file host (PixelDrain, GoFile): its premium downloads are asked before any debrid account.
         dev.droidtop.pluginhost.hosts.HostLinks.accounts = { hostId ->
             dev.droidtop.library.scraper.ScraperKeyService.entries.firstOrNull { it.hostId == hostId }
                 ?.read(this@DroidtopApplication)?.values?.firstOrNull()?.takeIf { it.isNotBlank() }

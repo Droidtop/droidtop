@@ -1183,6 +1183,7 @@ object AppSettingsCatalogs {
                 title = "File hosts",
                 items = listOf(
                     guidedKeyRow(context, ScraperKeyService.PIXELDRAIN, "PixelDrain"),
+                    guidedKeyRow(context, ScraperKeyService.GOFILE, "GoFile"),
                 ),
             ),
             CatalogGroup(
