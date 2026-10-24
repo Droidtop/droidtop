@@ -8,13 +8,13 @@ import dev.droidtop.ui.shared.Motion
  * little, at full brightness with a deeper shadow; unfocused ones sit at 90
  * percent brightness with a small shadow. [progress] is the focus animation,
  * 0 unfocused to 1 focused. The ratios are Steam's (a portrait capsule grows
- * 5.3 percent, a landscape one 2.4), and the shadow is black, as Steam's is.
+ * 6 percent (the visual language, Droidtop/tracker#644), a landscape one 2.4), and the shadow is black, as Steam's is.
  *
  * Cheap on purpose (no blur anywhere; the shadow is the platform's own), so
  * there is no separate low-performance mode to switch off.
  */
 object FocusLook {
-    const val LiftScale = 1.053f
+    const val LiftScale = 1.06f
     const val LiftScaleWide = 1.024f
 
     /** How far the focused capsule rises, in dp. */

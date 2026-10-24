@@ -106,21 +106,23 @@ object Measure {
 }
 
 /**
- * The corner scale: three radii and the pill, and nothing in between. The
- * values are Steam's (measured, docs/SPEC.md 7k): crisp corners on the
- * things that hold art and the controls beside them, because a large radius
- * crops art and makes it read smaller; a little more on the panels that
- * float over a page; one soft plate for a large generic focused surface.
+ * The corner scale, from the approved visual language (Droidtop/tracker#644, coordination/design/DESIGN-LANGUAGE.md
+ * "Shape"): 8 dp on rows, buttons and chips that are not pills; 12 dp on sheets, cards, dialogs and art tiles; one soft
+ * plate for a large generic focused surface; pills for chips and badges. Nothing in between.
  * A `RoundedCornerShape(N.dp)` in a Gaming screen is a defect.
  */
 object Corners {
     /** [Crisp]'s radius, for what draws the shape itself (a flood leaving a button, PageFlood.kt). */
-    val CrispRadius: Dp = 3.dp
+    val CrispRadius: Dp = 8.dp
 
-    /** Capsules, art, rows, buttons, chips that are not pills. */
+    /** Rows, buttons, chips that are not pills. */
     val Crisp = RoundedCornerShape(CrispRadius)
+
+    /** Art tiles and cards: a capsule, a shelf item, a Home card. */
+    val Tile = RoundedCornerShape(12.dp)
+
     /** Panels, sheets, dialogs, the Quick Menu and the left menu when they float. */
-    val Panel = RoundedCornerShape(6.dp)
+    val Panel = RoundedCornerShape(12.dp)
     /** A large soft plate: the one generic focused surface that is not a card. */
     val Plate = RoundedCornerShape(16.dp)
     /** Tabs, status badges, hint glyphs: fully round ends. */
@@ -280,12 +282,16 @@ object TypeRole {
     val value: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodyMedium
 
-    /** A group marker above a run of rows. Drawn uppercase, tracked out. */
+    /** A group marker above a run of rows. Drawn uppercase, tracked out 4 percent, in the secondary colour. */
     val sectionLabel: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelMedium.copy(
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.5.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.52.sp,
         )
+
+    /** Provenance lines and units: the smallest text, 13 sp. Nothing important lives here. */
+    val caption: TextStyle
+        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.labelSmall
 
     /** The label on a button. */
     val button: TextStyle
@@ -293,40 +299,31 @@ object TypeRole {
 }
 
 /**
- * The scale itself: Steam's gamepad ladder (measured, docs/SPEC.md 7k),
- * re-expressed in Material's roles. A heading 22/28 bold, a title over art
- * 26 at 1.1 lines, body and buttons 16/20, supporting 14/18, tab labels and
- * small labels 12 with tracking. The sizes and weights are droidtop's; the
- * typeface is not decided here: a Gaming theme's own fonts replace the
- * families (GamingTheme), so a theme keeps control of its look.
+ * The scale itself, from the approved visual language (Droidtop/tracker#644, coordination/design/DESIGN-LANGUAGE.md
+ * "Type"), re-expressed in Material's roles for a 1080p handheld read at arm's length:
+ *
+ * - Display 32 Bold (headlineMedium): a game's name over its art, a page title.
+ * - Title 24 Bold (headlineSmall): sheet and section titles.
+ * - Body 18 Regular (bodyLarge, bodyMedium): rows and descriptions; a row's name is 18 Medium (titleMedium).
+ * - Label 15 Medium (titleSmall, labelLarge): tabs, chips, buttons, hints; a row's supporting line is 15 (bodySmall).
+ * - Section 13 Medium (labelMedium): group headers, uppercase, tracked out ([TypeRole.sectionLabel]).
+ * - Caption 13 (labelSmall): provenance and units. 13 sp is the floor.
+ *
+ * The typeface is not decided here: a Gaming theme's own fonts replace the families (GamingTheme), so a theme keeps
+ * control of its look. Where numbers change, callers ask for tabular figures (dev.droidtop.ui.shared.tabularFigures).
  */
 val DroidtopTypography: Typography = Typography().let { stock ->
     stock.copy(
-        headlineMedium = stock.headlineMedium.copy(
-            fontSize = 26.sp,
-            lineHeight = 29.sp,
-            fontWeight = FontWeight.SemiBold,
-        ),
-        headlineSmall = stock.headlineSmall.copy(
-            fontSize = 22.sp,
-            lineHeight = 28.sp,
-            fontWeight = FontWeight.Bold,
-        ),
-        titleMedium = stock.titleMedium.copy(
-            fontSize = 16.sp,
-            lineHeight = 20.sp,
-            fontWeight = FontWeight.Medium,
-        ),
-        titleSmall = stock.titleSmall.copy(
-            fontSize = 12.sp,
-            lineHeight = 22.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 0.5.sp,
-        ),
-        bodyMedium = stock.bodyMedium.copy(fontSize = 16.sp, lineHeight = 20.sp),
-        bodySmall = stock.bodySmall.copy(fontSize = 14.sp, lineHeight = 18.sp),
-        labelMedium = stock.labelMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
-        labelLarge = stock.labelLarge.copy(fontSize = 16.sp, lineHeight = 20.sp),
+        headlineMedium = stock.headlineMedium.copy(fontSize = 32.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold),
+        headlineSmall = stock.headlineSmall.copy(fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold),
+        titleMedium = stock.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Medium),
+        titleSmall = stock.titleSmall.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.5.sp),
+        bodyLarge = stock.bodyLarge.copy(fontSize = 18.sp, lineHeight = 24.sp),
+        bodyMedium = stock.bodyMedium.copy(fontSize = 18.sp, lineHeight = 24.sp),
+        bodySmall = stock.bodySmall.copy(fontSize = 15.sp, lineHeight = 20.sp),
+        labelLarge = stock.labelLarge.copy(fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium),
+        labelMedium = stock.labelMedium.copy(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
+        labelSmall = stock.labelSmall.copy(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal),
     )
 }
 
@@ -342,9 +339,13 @@ val DroidtopTypography: Typography = Typography().let { stock ->
  * screens that use them are ordinary Android screens a person can reach
  * with the system in either colour state.
  *
- * The dark palette is the exact set of colours the chrome used as
- * literals before any theme existed, so dark mode did not move when the
- * theme was introduced; the light palette is its counterpart. Both are
+ * The dark palette is droidtop's own visual language (Droidtop/tracker#644,
+ * coordination/design/DESIGN-LANGUAGE.md "Surfaces" and "Colour"), the
+ * same values as GamingThemeColors.DEFAULT: a blue-grey ground, surfaces
+ * one step apart, text that is not pure white, one azure accent. Material's
+ * surface containers (what its sheets, menus and dialogs paint) are the
+ * same levels, so no stock purple-grey shows anywhere. The light palette is
+ * its counterpart. Both are
  * held to a contrast floor by `ChromeColorsContrastTest`, which is the
  * half of the system that had no test at all -- the two low-contrast
  * cases found on the rig (onboarding's disabled Continue, the gamelist's
@@ -360,17 +361,22 @@ object ChromeColors {
      */
     const val DisabledAlpha = 0.5f
 
-    val DarkBackground = Color(0xFF161616)
-    val DarkOnBackground = Color(0xFFEDEDED)
-    val DarkSurface = Color(0xFF1A1A1A)
-    val DarkOnSurface = Color(0xFFEDEDED)
-    val DarkSurfaceVariant = Color(0xFF242424)
-    val DarkOnSurfaceVariant = Color(0xFFB9B9B9)
-    val DarkPrimary = Color(0xFF8AB4FF)
+    val DarkBackground = Color(0xFF11151C)
+    val DarkOnBackground = Color(0xFFF2F5F9)
+    val DarkSurface = Color(0xFF181D26)
+    val DarkOnSurface = Color(0xFFF2F5F9)
+    val DarkSurfaceVariant = Color(0xFF262D3A)
+    val DarkOnSurfaceVariant = Color(0xFFA9B4C4)
+    val DarkPrimary = Color(0xFF3BB5FF)
     val DarkOnPrimary = Color(0xFF0B1220)
-    val DarkTertiary = Color(0xFFCC8800)
-    val DarkOnTertiary = Color(0xFF161616)
-    val DarkOutline = Color(0xFF3A3A3A)
+    val DarkTertiary = Color(0xFFF5B33D)
+    val DarkOnTertiary = Color(0xFF11151C)
+    val DarkOutline = Color(0xFF3A4352)
+
+    /** The four levels (4.1): content, sheets, menus and dialogs, as Material's surface containers. */
+    val DarkSurfaceLow = Color(0xFF141920)
+    val DarkSheet = Color(0xFF1E2430)
+    val DarkMenu = Color(0xFF262D3A)
 
     val LightBackground = Color(0xFFF5F5F3)
     val LightOnBackground = Color(0xFF1C1C1E)
@@ -396,6 +402,13 @@ object ChromeColors {
         tertiary = DarkTertiary,
         onTertiary = DarkOnTertiary,
         outline = DarkOutline,
+        surfaceDim = DarkBackground,
+        surfaceContainerLowest = DarkBackground,
+        surfaceContainerLow = DarkSurfaceLow,
+        surfaceContainer = DarkSurface,
+        surfaceContainerHigh = DarkSheet,
+        surfaceContainerHighest = DarkMenu,
+        surfaceBright = DarkMenu,
     )
 
     val Light = lightColorScheme(

@@ -53,36 +53,47 @@ data class GamingThemeColors(
     val isLight: Boolean get() = ColorMath.luminance(ground) > 0.4
 
     companion object {
+        /**
+         * droidtop's own palette, from the approved visual language (owner, 2026-10-24, Droidtop/tracker#644,
+         * coordination/design/proposals/2026-10-24-menus-and-visual-language.md 4.1 and 4.2): a blue-grey ground, never
+         * pure black, and three surfaces one luminance step apart (cards, sheets, menus and dialogs); text that is not
+         * pure white; one azure accent, used for focus, the primary button and what is chosen. It is the fallback: an
+         * ES-DE theme's own colours win wherever it declares them ([GamingThemeMapping]).
+         */
         val DEFAULT = GamingThemeColors(
-            ground = 0xFF000000.toInt(),
-            overlaySurface = 0xFF1C2027.toInt(),
-            card = 0xFF1A1A1A.toInt(),
-            cardFocused = 0xFF2A2A2A.toInt(),
-            cardInset = 0xFF141414.toInt(),
-            hintBar = 0xFF111111.toInt(),
-            onSurface = 0xFFFFFFFF.toInt(),
-            onSurfaceMuted = 0xFF8A93A1.toInt(),
-            value = 0xFFAEB7C4.toInt(),
-            placeholder = 0xFF6B7480.toInt(),
-            sectionLabel = 0xFF7D8794.toInt(),
-            onSurfaceDisabled = 0x80FFFFFF.toInt(),
-            accent = 0xFF8AB4FF.toInt(),
+            ground = 0xFF11151C.toInt(),
+            overlaySurface = 0xFF1E2430.toInt(),
+            card = 0xFF181D26.toInt(),
+            cardFocused = 0xFF262D3A.toInt(),
+            cardInset = 0xFF141920.toInt(),
+            hintBar = 0xFF151A21.toInt(),
+            onSurface = 0xFFF2F5F9.toInt(),
+            onSurfaceMuted = 0xFFA9B4C4.toInt(),
+            value = 0xFFC9D1DC.toInt(),
+            placeholder = 0xFF95A0AF.toInt(),
+            sectionLabel = 0xFFA9B4C4.toInt(),
+            // 40 percent of the text, as the visual language has it.
+            onSurfaceDisabled = 0x66F2F5F9,
+            accent = 0xFF3BB5FF.toInt(),
             onAccent = 0xFF0B1220.toInt(),
-            danger = 0xFFFFB4AB.toInt(),
-            affirmative = 0xFF7FE08A.toInt(),
+            danger = 0xFFFF5A5F.toInt(),
+            affirmative = 0xFF4CD28A.toInt(),
             favourite = 0xFFFFD700.toInt(),
             rowFill = 0x0DFFFFFF,
-            rowFillSelected = 0x2BFFFFFF,
+            // A focused row: the accent at 22 percent behind it (4.5, "Focus").
+            rowFillSelected = 0x383BB5FF,
             cardOutline = 0x1FFFFFFF,
             hintPillOutline = 0x33FFFFFF,
-            selected = 0xFFFFFFFF.toInt(),
-            onSelected = 0xFF000000.toInt(),
+            selected = 0xFFF2F5F9.toInt(),
+            onSelected = 0xFF11151C.toInt(),
             scrim = 0xCC000000.toInt(),
-            dangerPlate = 0xCC330E0B.toInt(),
-            launch = 0xFF2B5C3C.toInt(),
-            launchFocused = 0xFF3D7A52.toInt(),
-            launchDisabled = 0xFF232323.toInt(),
-            onLaunchMuted = 0xFFD7E6DC.toInt(),
+            // The ground with the danger mixed in at 22 percent, at 80 percent over the page.
+            dangerPlate = 0xCC45242B.toInt(),
+            // The primary button: the ground with the accent at 40 percent, its label in the text colour (7.3:1).
+            launch = 0xFF225577.toInt(),
+            launchFocused = 0xFF3B6887.toInt(),
+            launchDisabled = 0xFF141920.toInt(),
+            onLaunchMuted = 0xFFD7E3EE.toInt(),
             declared = false,
         )
     }
@@ -329,7 +340,10 @@ object GamingThemeMapping {
         val placeholder = m.ensure(m.mix(muted, ground, 0.2), surfaces, TEXT_FLOOR)
         val sectionLabel = m.ensure(m.mix(muted, ground, 0.1), surfaces, TEXT_FLOOR)
         val disabled = m.ensure(m.mix(primary, overlay, 0.5), surfaces, DISABLED_FLOOR)
-        val accent = m.ensure(d.accent ?: primary, surfaces, TEXT_FLOOR)
+        // A theme that names no accent takes droidtop's azure, held to the text floor on its own surfaces by lightness
+        // alone (ColorMath.ensure mixes toward white or black, never another hue): owner, 2026-10-24, Droidtop/tracker#644,
+        // "do we still grant accents and stuff from the selected retro theme?" Its own accent, when it has one, wins.
+        val accent = m.ensure(d.accent ?: base.accent, surfaces, TEXT_FLOOR)
 
         val plate = m.mix(ground, base.danger, 0.22)
         val plateFlat = m.over(m.withAlpha(plate, 0xCC), ground)
@@ -366,7 +380,8 @@ object GamingThemeMapping {
             favourite = favourite,
             // Fills are the ink at low alpha, so they work on a light ground too.
             rowFill = m.withAlpha(ink, 0x0D),
-            rowFillSelected = m.withAlpha(ink, 0x2B),
+            // A focused row is the accent at 22 percent (Droidtop/tracker#644, 4.5 "Focus"): the theme's accent where it has one.
+            rowFillSelected = m.withAlpha(accent, 0x38),
             cardOutline = m.withAlpha(ink, 0x1F),
             hintPillOutline = m.withAlpha(ink, 0x33),
             selected = selected,

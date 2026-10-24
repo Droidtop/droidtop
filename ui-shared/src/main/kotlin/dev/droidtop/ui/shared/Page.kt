@@ -322,7 +322,7 @@ object PageMetrics {
     val ButtonMinWidth = 120.dp
     val PrimaryMinWidth = 160.dp
     val ButtonGap = 12.dp
-    val ButtonCorner = 6.dp
+    val ButtonCorner = 8.dp
     val FocusLineMin = 32.dp
 }
 

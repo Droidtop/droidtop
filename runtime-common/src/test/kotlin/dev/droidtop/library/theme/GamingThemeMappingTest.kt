@@ -194,7 +194,7 @@ class GamingThemeMappingTest {
     }
 
     @Test
-    fun `the first colour with chroma is the accent, and a neutral theme gets a neutral one`() {
+    fun `the first colour with chroma is the accent, and a neutral theme gets droidtop's azure`() {
         val coloured = theme(
             system = listOf(
                 element("image", "background", "color" to color("000000")),
@@ -212,8 +212,13 @@ class GamingThemeMappingTest {
             ),
         )
         val n = GamingThemeMapping.map(neutral)
-        assertEquals(argb("FFFFFF"), n.accent)
+        // Azure is the fallback when a theme names no colour (owner, 2026-10-24, Droidtop/tracker#644), moved only in
+        // lightness as far as this grey ground needs: still blue, and readable.
         assertEquals(argb("FFFFFF"), n.onSurface)
+        val blue = n.accent and 0xFF
+        val red = (n.accent shr 16) and 0xFF
+        assertTrue("the accent stays azure, not ${Integer.toHexString(n.accent)}", blue > red)
+        assertTrue(ColorMath.ratio(n.accent, n.ground) >= 4.5)
     }
 
     @Test
@@ -343,5 +348,23 @@ class GamingThemeMappingTest {
         assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(menuOnly, never))))
         val inView = element("clock", "clock", "scope" to EsDeThemeValue.Str("view"))
         assertTrue(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(inView))))
+    }
+
+    @Test
+    fun `droidtop's own palette is the approved visual language`() {
+        // Owner, 2026-10-24, Droidtop/tracker#644 (docs/DESIGN-LANGUAGE.md, "The approved design"): never pure black or
+        // pure white, three surfaces one step apart, one azure accent, and a focused row in that accent.
+        val d = GamingThemeColors.DEFAULT
+        assertEquals(argb("11151C"), d.ground)
+        assertEquals(argb("181D26"), d.card)
+        assertEquals(argb("1E2430"), d.overlaySurface)
+        assertEquals(argb("262D3A"), d.cardFocused)
+        assertEquals(argb("F2F5F9"), d.onSurface)
+        assertEquals(argb("A9B4C4"), d.onSurfaceMuted)
+        assertEquals(argb("3BB5FF"), d.accent)
+        assertEquals(argb("FF5A5F"), d.danger)
+        assertEquals(argb("4CD28A"), d.affirmative)
+        assertEquals(0x38, d.rowFillSelected ushr 24)
+        assertEquals(d.accent and 0xFFFFFF, d.rowFillSelected and 0xFFFFFF)
     }
 }

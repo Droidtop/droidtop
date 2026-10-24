@@ -150,10 +150,26 @@ fun Modifier.selectionFrame(
     restOutline: Color = Color.Transparent,
     selectedFill: Color = MenuTokens.SurfaceSelected,
     ringOutset: Dp = 0.dp,
+    // A row (Droidtop/tracker#644, the visual language's "Focus"): focused, it is the accent at 22 percent behind it and
+    // a 4 dp accent bar at its leading edge, and no ring. Art and controls keep the ring; the two never mix on a surface.
+    row: Boolean = false,
 ): Modifier = composed {
     val shown = selected && PadModality.showsFocus
     Modifier
         .background(if (shown) selectedFill else rest, shape)
+        .then(
+            if (row && shown) {
+                val bar = MenuTokens.Accent
+                Modifier.drawWithContent {
+                    drawContent()
+                    val w = RowFocusBar.toPx()
+                    val x = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Ltr) 0f else size.width - w
+                    drawRoundRect(bar, topLeft = androidx.compose.ui.geometry.Offset(x, 0f), size = androidx.compose.ui.geometry.Size(w, size.height), cornerRadius = androidx.compose.ui.geometry.CornerRadius(w / 2f))
+                }
+            } else {
+                Modifier
+            },
+        )
         .then(
             // Never a 0.dp stroke: it would draw as a 1px line, so "no
             // outline" is a transparent colour and nothing is drawn.
@@ -167,8 +183,11 @@ fun Modifier.selectionFrame(
                 Modifier
             },
         )
-        .focusRing(shown, shape, ringOutset)
+        .focusRing(shown && !row, shape, ringOutset)
 }
+
+/** A focused row's leading bar (Droidtop/tracker#644). */
+private val RowFocusBar = 4.dp
 
 /**
  * The shell's one chip and button: a pill that is focusable for the pad
@@ -501,7 +520,7 @@ internal fun MenuRow(
                 },
             )
             .clip(MenuTokens.RowShape)
-            .selectionFrame(selected, MenuTokens.RowShape)
+            .selectionFrame(selected, MenuTokens.RowShape, row = true)
             // Touch works on every row, always -- the shell is
             // gamepad-first, never gamepad-only.
             .then(

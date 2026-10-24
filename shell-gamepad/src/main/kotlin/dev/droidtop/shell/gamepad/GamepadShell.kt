@@ -4215,14 +4215,14 @@ internal fun GameCard(
             // white rectangle, the menus' brightened card, and the
             // theme's own highlight.
             // The card rises with its ring at its own edge; its art grows inside that edge (focusZoom).
-            .focusRise(lift, RoundedCornerShape(12.dp))
+            .focusRise(lift, Corners.Tile)
             .selectionFrame(
                 selected = focused,
-                shape = RoundedCornerShape(12.dp),
+                shape = Corners.Tile,
                 rest = MenuTokens.Surface,
                 restOutline = MenuTokens.CardOutline,
             )
-            .focusZoom(lift, RoundedCornerShape(12.dp)),
+            .focusZoom(lift, Corners.Tile),
     ) {
         if (entry.artworkUri != null) {
             AsyncImage(

@@ -159,8 +159,8 @@ fun NoticeTone.glyph(): ImageVector = when (this) {
     NoticeTone.Danger -> Icons.Rounded.Report
 }
 
-private val ROW_CORNER = 3.dp
-private val PAGE_CORNER = 6.dp
+private val ROW_CORNER = 8.dp
+private val PAGE_CORNER = 12.dp
 private val EDGE = 4.dp
 private val GLYPH = 20.dp
 private val MIN_HEIGHT = 48.dp
