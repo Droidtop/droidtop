@@ -1157,6 +1157,22 @@ object AppSettingsCatalogs {
                 ),
             ),
             CatalogGroup(
+                id = "accounts_debrid",
+                title = "Debrid services",
+                items = listOf(
+                    guidedKeyRow(context, ScraperKeyService.TORBOX, "TorBox"),
+                    guidedKeyRow(context, ScraperKeyService.REALDEBRID, "Real-Debrid"),
+                    ToggleItem(
+                        id = "accounts_debrid_wait",
+                        title = "Wait for the service",
+                        subtitle = "When no account has a torrent yet, wait while the service fetches it instead of " +
+                            "downloading it from other people. A torrent an account has is always fetched from it",
+                        current = dev.droidtop.library.debrid.DebridAccounts.waits(context),
+                        onToggle = { ctx, value -> dev.droidtop.library.debrid.DebridAccounts.setWaits(ctx, value) },
+                    ),
+                ),
+            ),
+            CatalogGroup(
                 id = "accounts_plugins",
                 title = "Plugins and integrations",
                 items = ElevatedAccessCatalog.rows(context) + listOf(

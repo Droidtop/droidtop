@@ -111,6 +111,38 @@ enum class ScraperKeyService(
             KeyField("api_key", "Web API Key", secret = true, storeKey = CredentialStore.RETROACHIEVEMENTS_API_KEY),
         ),
     ),
+    // Debrid services (Droidtop/tracker#638): a torrent job asks them first. droidtop ships no key of its own.
+    TORBOX(
+        title = "TorBox",
+        url = "https://torbox.app/settings",
+        steps = listOf(
+            "Open torbox.app",
+            "Sign in to your account",
+            "Open Settings",
+            "Copy the API key",
+            "Enter it here",
+        ),
+        credit = "Downloaded via TorBox",
+        gets = "Torrents as direct downloads",
+        fields = listOf(
+            KeyField("api_key", "API key", secret = true, storeKey = CredentialStore.TORBOX_API_KEY),
+        ),
+    ),
+    REALDEBRID(
+        title = "Real-Debrid",
+        url = "https://real-debrid.com/apitoken",
+        steps = listOf(
+            "Open real-debrid.com/apitoken",
+            "Sign in to your account",
+            "Copy the API token",
+            "Enter it here",
+        ),
+        credit = "Downloaded via Real-Debrid",
+        gets = "Torrents as direct downloads",
+        fields = listOf(
+            KeyField("api_token", "API token", secret = true, storeKey = CredentialStore.REALDEBRID_TOKEN),
+        ),
+    ),
     ;
 
     /** The stored values, by field id; blank where none is set. */
@@ -191,6 +223,10 @@ object ScraperKeyCheck {
             ScraperKeyState.NO_CONNECTION
         }
 
+    /** A debrid service's own check of its key: [ScraperKeyState.CONNECTED], or its one sentence. */
+    private fun debridOutcome(id: String, key: String): String =
+        dev.droidtop.pluginhost.debrid.DebridProviders.byId(id)?.check(key) ?: ScraperKeyState.CONNECTED
+
     /** Tests the stored credential of [service], records the result, and returns the line to show. */
     fun test(context: Context, service: ScraperKeyService): String {
         if (!service.isConfigured(context)) return ScraperKeyState.NOT_SET
@@ -220,6 +256,8 @@ object ScraperKeyCheck {
                 ScraperKeyService.RETROACHIEVEMENTS -> ScraperKeyState.outcome(
                     dev.droidtop.library.achievements.RetroAchievementsClient.profile(values.getValue("username"), values.getValue("api_key")),
                 )
+                ScraperKeyService.TORBOX -> debridOutcome("torbox", values.getValue("api_key"))
+                ScraperKeyService.REALDEBRID -> debridOutcome("realdebrid", values.getValue("api_token"))
             }
         }
         // A network failure says nothing about the credential: keep the last verdict.

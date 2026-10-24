@@ -951,6 +951,13 @@ no destination, such as the PC library). Ops:
   game folder, so a source that fetches a torrent elsewhere and hands over
   its files (a debrid service) can produce the same thing.
 
+  **Debrid is droidtop's (2026-10-24, Droidtop/tracker#638).** Every torrent
+  or magnet a reply names may be served by the person's debrid accounts
+  (TorBox, Real-Debrid) before any peer is contacted: a service that has it
+  whole hands over its files as direct links into the same folder. A source
+  names the torrent and does nothing else for it: it never asks a debrid
+  service itself and never sees the person's keys.
+
   A torrent or magnet carries no digests (its pieces are checked), no
   `unpack`, no web-session token and no `auth`, and a magnet carries no
   headers. It is a download of its own, never one of `downloads`. Seeding

@@ -111,6 +111,12 @@ This project is distributed under the GNU General Public License v3.0 (see
 - **libffi** — `vendor/libffi`, https://github.com/libffi/libffi — MIT.
   Runtime dependency of `libwayland-client`, cross-compiled by
   `build-scripts/build-vendor-deps.sh`.
+- **romgi** — https://github.com/caprado/romgi — MIT, Copyright (c) 2025 Christian Prado. The debrid
+  request flows in `plugin-host/.../debrid/` (TorBox, Real-Debrid) are ported to Kotlin from its
+  `lib/services/debrid/` (Droidtop/tracker#638). Permission is hereby granted, free of charge, to any person
+  obtaining a copy of this software and associated documentation files, to deal in the Software without
+  restriction, subject to the condition that the above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software. The full text is in romgi's LICENSE.MIT.
 - **Hacker's Keyboard** — `input-keyboard`, https://github.com/klausw/hackerskeyboard — Apache-2.0.
   Forked in as its own module (not a submodule): the upstream Java tree is
   unchanged apart from build-compat fixes and one hook in `LatinIME`, and
