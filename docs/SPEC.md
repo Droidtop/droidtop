@@ -17090,7 +17090,12 @@ function (`menuSectionsFor`, built on `sectionsFor`).
     (which install by themselves when that is on), and every app catalog. Every check of droidtop, the scheduled one,
     Check now or Update, records what it saw (`AppSelfUpdate.recordSeen`) or that it failed (`recordFailure`).
   - **Update all** when two or more can be installed from here, each the way its own Update does, one after another.
-  - **One row per update**, each with its version on offer ("<version> available") and Update: droidtop (Update
+  - **One row per update**, each naming both versions in words (owner, 2026-10-24, Droidtop/tracker#639: "the
+    updates page should show current and newest available version, in a way that makes it obvious which is which"):
+    the version on offer in the value column, emphasised ("Available: v0.38"), and the version here first on the
+    secondary line ("Installed: v0.37", or "Installed: unknown" when it is not known; `GameUpdates.availableLabel`,
+    `installedLabel`). A game's version here is its store's installed build, else its newest version folder. The
+    record page a game's update opens (7g "Facets in place") says the same two under its title. Then Update: droidtop (Update
     installs it, Android asks), each plugin with a newer catalog release (`PluginCatalog.installOutcome`), each Android
     app, emulators among them, with a newer version in an app catalog (an offer signed by another key says why it is
     not offered), each store game its store named an update for (`StoreAutoUpdates.startUpdate`, the one starter the

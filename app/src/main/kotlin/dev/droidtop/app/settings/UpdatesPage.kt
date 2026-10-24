@@ -152,7 +152,8 @@ object UpdatesPage {
         }
     }
 
-    private fun available(version: String): String = "$version available"
+    // Every row names both versions in words, the available one in the value column (Droidtop/tracker#639).
+    private fun available(version: String): String = GameUpdates.availableLabel(version)
 
     // Gaming's section name for Get new games (GamingSection is internal to the shell; its names are the deep link's).
     private const val GAMING_NEW_GAMES = "NEW_GAMES"
@@ -167,7 +168,7 @@ object UpdatesPage {
                 AsyncActionItem(
                     id = "updates_droidtop",
                     title = "droidtop",
-                    subtitle = "Installed ${AppSelfUpdate.installedVersionName(context)}. Android asks you to confirm the install",
+                    subtitle = "${GameUpdates.installedLabel(AppSelfUpdate.installedVersionName(context))}. Android asks you to confirm the install",
                     value = updating ?: available(newer),
                     run = install,
                 ),
@@ -189,7 +190,7 @@ object UpdatesPage {
                 AsyncActionItem(
                     id = "updates_plugin_${record.manifest.id}",
                     title = record.manifest.label,
-                    subtitle = "Plugin, installed ${record.manifest.version}" + if (offer.source.official) "" else ". Unofficial, from ${offer.source.name}",
+                    subtitle = "${GameUpdates.installedLabel(record.manifest.version)}. Plugin" + if (offer.source.official) "" else ", unofficial, from ${offer.source.name}",
                     value = available(offer.release.version),
                     run = install,
                 ),
@@ -211,7 +212,7 @@ object UpdatesPage {
                         AsyncActionItem(
                             id = "updates_app_${state.offer.id}",
                             title = state.offer.name,
-                            subtitle = "App, installed ${state.installed.versionName ?: state.installed.versionCode}. From ${state.offer.source ?: state.pluginLabel}",
+                            subtitle = "${GameUpdates.installedLabel(state.installed.versionName ?: state.installed.versionCode.toString())}. App, from ${state.offer.source ?: state.pluginLabel}",
                             value = available(state.offer.version),
                             run = install,
                         ),
@@ -248,11 +249,13 @@ object UpdatesPage {
     private fun games(context: Context): List<Update> {
         val published = LibraryCore.library(context).backgroundScanState(LibraryKinds.GAMES).value ?: return emptyList()
         return LibraryGrouping.group(published)
-            .mapNotNull { group -> group.displayEntry.let { entry -> entry.availableUpdate?.let { entry to it } } }
+            .mapNotNull { group -> group.displayEntry.let { entry -> entry.availableUpdate?.let { Triple(entry, it, group) } } }
             .sortedBy { it.first.title.lowercase() }
             .take(MAX_GAME_ROWS)
-            .map { (entry, version) ->
+            .map { (entry, version, group) ->
                 val pc = entry.pcInfo
+                // What is here: the store's installed build, else the newest version folder of the game.
+                val installed = GameUpdates.installedLabel(pc?.installedVersion ?: group.game.defaultVersion?.version)
                 val path = pc?.installPath
                 if (pc != null && pc.installed && path != null && GameUpdates.forStore(pc) != null) {
                     val key = pc.storeId ?: entry.id
@@ -267,8 +270,8 @@ object UpdatesPage {
                         AsyncActionItem(
                             id = "updates_game_${entry.id}",
                             title = entry.title,
-                            subtitle = "Game, from its store",
-                            value = GameUpdates.line(version),
+                            subtitle = "$installed. Game, from its store",
+                            value = available(version),
                             run = install,
                         ),
                         install,
@@ -278,13 +281,13 @@ object UpdatesPage {
                         AsyncActionItem(
                             id = "updates_game_${entry.id}",
                             title = entry.title,
-                            subtitle = "Game. Its source has a newer version: its downloads, changelog and Get",
-                            value = GameUpdates.line(version),
+                            subtitle = "$installed. Game: its downloads, changelog and Get",
+                            value = available(version),
                             run = { ctx, _ ->
                                 // The update's downloads in place, over this page (Droidtop/tracker#639); outside
                                 // Gaming, where nothing can draw them, the game's page as before.
                                 if (dev.droidtop.library.GameSurfaces.showUpdate?.invoke(entry.id) == true) {
-                                    GameUpdates.line(version)
+                                    available(version)
                                 } else {
                                     ctx.startActivity(dev.droidtop.app.LauncherGamesActivity.pageIntent(ctx, entry.id))
                                     "Opened ${entry.title}'s page"

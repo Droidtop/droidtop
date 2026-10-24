@@ -42,7 +42,14 @@ internal fun GameInPlace(
 }
 
 /** The facet itself: what the update row's game is linked to, and its record page opened at Downloads. */
-private class UpdateFacet(val entry: LibraryEntry, val gameName: String, val source: UpdateSources.Source, val externalId: String)
+private class UpdateFacet(
+    val entry: LibraryEntry,
+    val gameName: String,
+    val source: UpdateSources.Source,
+    val externalId: String,
+    // The version here: the newest folder of the game.
+    val installed: String?,
+)
 
 @Composable
 private fun UpdateDownloads(library: Library, entryId: String, onOpenPage: (String) -> Unit, onClose: () -> Unit) {
@@ -83,6 +90,7 @@ private fun UpdateDownloads(library: Library, entryId: String, onOpenPage: (Stri
         onClose = onClose,
         startTab = RecordTab.DOWNLOADS,
         onOpenGame = { onOpenPage(entryId) },
+        installedVersion = shown.installed,
     )
 }
 
@@ -93,5 +101,5 @@ private suspend fun facetOf(library: Library, entries: List<LibraryEntry>, entry
     val links: GameLinks = library.gameLinks(group.entriesByPath.keys) ?: return null
     val link = links.updateLink ?: return null
     val source = library.updateSources().firstOrNull { it.key == link.source } ?: return null
-    return UpdateFacet(group.displayEntry, GameNaming.displayName(group.game.name), source, link.externalId)
+    return UpdateFacet(group.displayEntry, GameNaming.displayName(group.game.name), source, link.externalId, group.game.defaultVersion?.version)
 }

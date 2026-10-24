@@ -120,8 +120,26 @@ object GameUpdates {
         LibraryGrouping.group(entries).map { it.displayEntry }.filter { !it.hidden && it.availableUpdate != null }
 
     /** "v0.9.6 is available": a version that starts with a digit gets its `v`, a name ("Final") does not. */
-    fun line(available: String): String =
-        (if (available.firstOrNull()?.isDigit() == true) "v$available" else available) + " is available"
+    fun line(available: String): String = shown(available) + " is available"
+
+    /**
+     * The two versions an update row and the download sheet name, labelled so which is which is never a guess
+     * (owner, 2026-10-24, Droidtop/tracker#639: "the updates page should show current and newest available version,
+     * in a way that makes it obvious which is which"). [availableLabel] is the emphasised one (a row's value column);
+     * [installedLabel] the secondary one, and says "unknown" rather than nothing when the version here is not known.
+     */
+    fun availableLabel(available: String): String =
+        "Available: " + if (available == NEWER_BUILD) "a newer build" else shown(available)
+
+    /** "Installed: v0.37", or "Installed: unknown"; see [availableLabel]. */
+    fun installedLabel(installed: String?): String =
+        "Installed: " + (installed?.trim()?.takeIf { it.isNotEmpty() }?.let(::shown) ?: "unknown")
+
+    /** A version as droidtop writes it: one that starts with a digit gets its `v`, a name ("Final") does not. */
+    private fun shown(version: String): String {
+        val bare = normalize(version)
+        return if (bare.firstOrNull()?.isDigit() == true) "v$bare" else version.trim()
+    }
 
     /**
      * The ONE way both sides of a version comparison lose their leading

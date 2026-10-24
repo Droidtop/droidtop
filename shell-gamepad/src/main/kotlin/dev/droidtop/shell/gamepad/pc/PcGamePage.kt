@@ -885,6 +885,8 @@ internal fun PcGamePage(
             },
             onClose = { viewingRecord = null },
             startTab = viewing.third,
+            // This copy's version first ([installedVersions]).
+            installedVersion = versions.firstOrNull(),
         )
     }
     val linking = editingSource
