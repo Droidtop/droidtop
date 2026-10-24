@@ -191,6 +191,12 @@ interface BrokerEnvironment {
     /** docs/plugin-api.md 3 G3: droidtop's own web view for a plugin's session; blocks until the person is done. Null where there is none. */
     fun webSession(request: WebSessionRequest): WebSessionResult? = null
 
+    /**
+     * A GET loaded by droidtop's web view instead of its HTTP client, for a host that shows a browser check
+     * (Droidtop/tracker#600, [WebFetch]). Null where there is no web view, and then the request goes as before.
+     */
+    fun webFetch(url: String, cookies: String?, timeoutMs: Long, maxBytes: Int): WebFetch.Result? = null
+
     /** D4: opens a picked document (`r`, `w`, `rw`); null when it is gone or its grant was withdrawn. */
     fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = null
 

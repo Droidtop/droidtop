@@ -328,6 +328,19 @@ to do the same." A plugin no longer has to recognise a check:
   Cloudflare's `cf-mitigated: challenge` header, reaches the plugin as the
   error `BROWSER_CHECK_REQUIRED` with one plain sentence ("<host> checks the
   browser first; open it in droidtop to continue"). It never gets the page.
+- **Read by droidtop's web view after that (2026-10-24, Droidtop/tracker#600).**
+  Cloudflare refuses droidtop's HTTP client even with the clearance the
+  person earned. So once a host has shown the plugin a check (met and not
+  passed, or a clearance kept for it), a `GET` to it through `net.http` or
+  `web.session fetch` is loaded by an off-screen web view with the same
+  cookies, and the plugin gets the final page's HTML as an ordinary answer
+  (`status`, the final `url`, `content-type: text/html`, `body`). A check the
+  view passes by itself within about 12 seconds is waited for; one it does not
+  pass is `BROWSER_CHECK_REQUIRED` as before. Other methods still go through
+  droidtop's client. A page the site shows signed out (a guest page with no
+  download links) is still the site's page. A plugin that needs the account
+  should answer `SIGN_IN_REQUIRED`, not a parse failure, so droidtop offers
+  Sign in.
 - **Passed by the person.** droidtop remembers the address the check was met
   at, and its own surfaces (a source's search, a view page, the update page
   of a game) offer **Open the site**, which opens that site in droidtop's

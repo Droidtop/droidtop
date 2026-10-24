@@ -160,6 +160,26 @@ internal object HostNetApis {
         val host = NetScope.hostOf(target)
         val replaced = added.keys.map { it.lowercase() }.toSet()
         val sent = withClearance(env, record, host, headers(args).filterKeys { it.lowercase() !in replaced } + added)
+        // A host that has shown this plugin a browser check is read by droidtop's web view, never its HTTP client,
+        // which Cloudflare refuses even with the clearance (Droidtop/tracker#600). The plugin gets an ordinary answer.
+        if (method == "GET" && host != null && checks(env, record, host)) {
+            hopCheck(target)
+            reach(env, record, target)
+            val cookie = sent.entries.firstOrNull { it.key.equals("Cookie", ignoreCase = true) }?.value
+            env.webFetch(target, cookie, timeout(env, record, args), MAX_BODY)?.let { fetched ->
+                fetched.cookies?.let { jar -> env.vault()?.let { SiteChecks.keep(it, record.manifest.id, WebSessions.Stored(null, mapOf(host to jar))) } }
+                val answer = fetched.answer
+                if (fetched.challenged || answer == null) {
+                    SiteChecks.met(record.manifest.id, target)
+                    android.util.Log.i(TAG, "${record.manifest.id}: $host still checks the browser in droidtop's web view")
+                    throw BrokerException(PluginErrorCode.BROWSER_CHECK_REQUIRED, SiteChecks.refusal(host))
+                }
+                NetScope.hostOf(answer.finalUrl)?.takeIf { it != host }?.let { reach(env, record, answer.finalUrl) }
+                SiteChecks.passed(record.manifest.id, host)
+                android.util.Log.i(TAG, "${record.manifest.id}: $host read by droidtop's web view (${answer.status}, ${answer.body.size} bytes)")
+                return answerJson(answer, args)
+            }
+        }
         val request = HttpCall(method, target, sent, body(args), timeout(env, record, args), MAX_BODY)
         val answer = env.http(request) { hop ->
             hopCheck(hop)
@@ -175,6 +195,14 @@ internal object HostNetApis {
         }
         host?.let { SiteChecks.passed(record.manifest.id, it) }
         return answerJson(answer, args)
+    }
+
+    /** Whether [host] has shown [record] a browser check: one met and not passed, or a clearance earned on it. */
+    private fun checks(env: BrokerEnvironment, record: PluginRecord, host: String): Boolean {
+        SiteChecks.pendingFor(record.manifest.id)?.let { NetScope.hostOf(it) }?.let { at ->
+            if (at == host || at.endsWith(".$host") || host.endsWith(".$at")) return true
+        }
+        return env.vault()?.let { SiteChecks.read(it, record.manifest.id) }?.forHost(host) != null
     }
 
     /**

@@ -487,6 +487,9 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun webSession(request: WebSessionRequest): WebSessionResult? = WebSessionActivity.show(appContext, request)
 
+    override fun webFetch(url: String, cookies: String?, timeoutMs: Long, maxBytes: Int): WebFetch.Result? =
+        WebFetch.fetch(appContext, url, cookies, timeoutMs, maxBytes)
+
     override fun openDocument(uri: String, mode: String): android.os.ParcelFileDescriptor? = runCatching {
         val resolverMode = when (mode) {
             "w" -> "wt"

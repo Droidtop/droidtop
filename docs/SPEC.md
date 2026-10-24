@@ -17626,8 +17626,14 @@ A condition the person should know about (an unofficial plugin, a feature that i
     - The page's console messages, and every page or in-page request that fails or answers 400 or above, go to the
       log under `droidtop.WebSession`, so a site's own error shows in a device's logs.
 
-    Not built yet (next): a plugin's own requests to a checked host fetched by the signed-in web view instead of
-    droidtop's client, and "needs sign-in" for a guest page, not "could not read".
+  - **A checked host is read by the web view (2026-10-24).** Once a host has shown a plugin a check (met and not
+    passed, or a clearance kept for it), the plugin's `GET` to it (`net.http`, `web.session fetch`) is loaded by an
+    off-screen web view (`WebFetch`) with the cookies the request would have carried, never by droidtop's HTTP
+    client. The plugin gets the final page's HTML as an ordinary answer, and the cookies the view ends with are kept
+    as the plugin's clearance. A check that passes by itself within about 12 seconds is waited for; otherwise
+    `BROWSER_CHECK_REQUIRED` as before. Other methods still use the client. A guest page is still the site's page:
+    the plugin answers `SIGN_IN_REQUIRED` for it, not "could not read" (docs/plugin-api.md 1.3), and that change is
+    the F95 plugin's.
   - **Asked once, never in a loop:** nothing retries by itself; a background call that meets a check fails with the error and waits for the person. A download asked again right after the person passed the check says so once ("<source>'s site still asked for its check after it was passed, so nothing was downloaded") and does not open the check again for it.
 - **Sign-in and browser checks.** A source answers `SIGN_IN_REQUIRED` or the new `BROWSER_CHECK_REQUIRED` (no made-up "Sign in to <site>" result row, no paragraph about opening Settings). The search shows "Sign in to search here" / "The site checks the browser first" under the source's name with droidtop's own Sign in / Open the site, which searches again after; a view page offers the same as its notice's action and reads the page again. Both open the plugin's `web.session` in droidtop's web view (`PluginWebAccount`, a new `CHECK` mode with Done for the browser check): the `signIn` page the plugin declares on its `web.session` entry, or the site's home page.
 - **The account row.** A plugin holding `web.session` gets "<site> account", Signed in / Not signed in, with Sign in or Sign out and "Your sign-in stays in droidtop: <plugin> never sees your password", on its page, from the session droidtop keeps (the vault entry the plugin cannot read). Pressing droidtop's Sign in is the person allowing `web.session`: an unanswered grant becomes allowed when a session is kept; a refused one is never overridden, and the row says to turn it on in Permissions.
