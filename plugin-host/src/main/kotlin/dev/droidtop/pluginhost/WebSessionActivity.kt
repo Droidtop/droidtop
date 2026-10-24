@@ -73,8 +73,6 @@ class WebSessionActivity : Activity() {
         cookies.setAcceptCookie(true)
         asked.domains.forEach { purge(cookies, it) }
         asked.session?.cookies?.forEach { (domain, header) -> inject(cookies, domain, header) }
-        // The clearance each site had when the view opened: a check ends once the site gives a new one.
-        val clearedAtOpen = asked.domains.associateWith { SiteChecks.clearanceOf(cookies.getCookie("https://$it").orEmpty()) }
         cookies.flush()
 
         val root = LinearLayout(this).apply {
@@ -165,10 +163,14 @@ class WebSessionActivity : Activity() {
                 override fun onPageFinished(view: WebView, url: String?) {
                     location?.text = url?.let { NetScope.hostOf(it) }.orEmpty()
                     if (url != null && browse) asked.onPage?.invoke(url)
-                    // A browser check is passed when the site hands the view a new clearance (Droidtop/tracker#600).
-                    if (asked.mode == WebSessionRequest.Mode.CHECK && asked.domains.any { domain ->
-                            SiteChecks.clearanceOf(cookies.getCookie("https://$domain").orEmpty())?.let { it != clearedAtOpen[domain] } == true
-                        }
+                    // A browser check is passed once the view shows the site's own page with a pass cookie for it, and the
+                    // view closes by itself (Droidtop/tracker#600). Not on a timer or the first page: a challenge's own
+                    // page has a check's title, and a clearance cookie alone (`__cf_bm` is set on the challenge) is not a pass.
+                    // A clearance still good from before passes at once.
+                    val host = url?.let { NetScope.hostOf(it) }
+                    if (asked.mode == WebSessionRequest.Mode.CHECK && host != null &&
+                        (asked.domains.isEmpty() || WebSessions.covers(host, asked.domains)) &&
+                        SiteChecks.passed(view.title, cookies.getCookie("https://$host"))
                     ) {
                         finishWith(completed = true, download = null)
                         return

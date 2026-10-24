@@ -35,9 +35,10 @@ class SiteChecksTest {
     }
 
     @Test
-    fun `a request's own cookie keeps its value, and the clearance's are added`() {
+    fun `a request's own cookie keeps its value, and the newest clearance replaces an older one`() {
         assertEquals("xf_user=42; cf_clearance=new", SiteChecks.mergeCookies("xf_user=42", "cf_clearance=new"))
-        assertEquals("cf_clearance=mine", SiteChecks.mergeCookies("cf_clearance=mine", "cf_clearance=new"))
+        assertEquals("a session kept from before never sends its old clearance", "xf_user=42; cf_clearance=new", SiteChecks.mergeCookies("xf_user=42; cf_clearance=old", "cf_clearance=new"))
+        assertEquals("xf_user=42", SiteChecks.mergeCookies("xf_user=42", "xf_user=7"))
         assertEquals("cf_clearance=new", SiteChecks.mergeCookies(null, "cf_clearance=new"))
         assertNull(SiteChecks.mergeCookies(null, null))
     }
@@ -70,5 +71,16 @@ class SiteChecksTest {
     @Test
     fun `the plugin gets one plain sentence, never the page`() {
         assertEquals("f95zone.to checks the browser first; open it in droidtop to continue", SiteChecks.refusal("f95zone.to"))
+    }
+
+    @Test
+    fun `a pass is the site's own page with a pass cookie, never the challenge or a bot cookie alone`() {
+        assertFalse(SiteChecks.passed("Just a moment...", "cf_clearance=abc"))
+        assertFalse(SiteChecks.passed("Just a moment\u2026", "cf_clearance=abc"))
+        assertFalse(SiteChecks.passed("Attention Required! | Cloudflare", "cf_clearance=abc"))
+        assertFalse("a page still loading", SiteChecks.passed("", "cf_clearance=abc"))
+        assertFalse("__cf_bm is set on the challenge itself", SiteChecks.passed("F95zone", "__cf_bm=x; xf_csrf=y"))
+        assertTrue(SiteChecks.passed("F95zone", "xf_csrf=y; cf_clearance=abc"))
+        assertTrue(SiteChecks.passed("Latest Updates | F95zone", "__ddg2_=z"))
     }
 }
