@@ -44,6 +44,13 @@ class CompanionCatalogPanelTest {
         assertTrue(all.containsAll(ids))
     }
 
+    @Test fun theCompanionsSystemCardEndsWithItsUpdatesRow() {
+        // The companion has no left menu: Updates is a row of its System card, after the Quick Menu's own items.
+        val updates = ActionItem(id = "companion_updates", title = "Updates", run = {})
+        val system = companionSystemCards(::quick, performance, privacy, updates = updates).first { it.id == "system" }
+        assertEquals(quick(QuickSection.SYSTEM).map { it.id } + "companion_updates", system.items.map { it.id })
+    }
+
     @Test fun performanceModeIsOneCatalogIdOnPower() {
         val cards = companionSystemCards(::quick, performance, privacy)
         assertEquals(listOf(GamingSettingsCatalog.ID_PERFORMANCE_MODE), cards.first { it.id == "power" }.items.map { it.id })

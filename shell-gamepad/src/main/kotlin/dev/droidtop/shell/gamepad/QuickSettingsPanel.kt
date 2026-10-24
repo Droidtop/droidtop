@@ -616,10 +616,6 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
                 line(4f, 9f, 18f, 9f); line(14f, 5f, 18f, 9f); line(14f, 13f, 18f, 9f)
                 line(20f, 16f, 6f, 16f); line(10f, 12f, 6f, 16f); line(10f, 20f, 6f, 16f)
             }
-            QuickGlyph.UPDATE -> {
-                arc(12f, 12f, 8f, 120f, 260f)
-                line(12f, 6f, 12f, 14f); line(9f, 11f, 12f, 14f); line(15f, 11f, 12f, 14f)
-            }
             QuickGlyph.ANDROID -> {
                 ring(12f, 12f, 3.2f)
                 listOf(0f, 60f, 120f, 180f, 240f, 300f).forEach { deg ->

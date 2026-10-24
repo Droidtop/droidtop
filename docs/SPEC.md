@@ -3468,7 +3468,11 @@ the `ContainerRuntime` interface that already exists (§3):
     Connections card shows the same items.
   - **Power and mode** (was System): the quick-settings tile grid over the rest of the catalog's quick System group with
     its status header: Battery, **Power menu**, Sleep, Restart, Power off, Switch mode, Screenshot, Stop the app in
-    front, updates and the Android settings index. Android gives an ordinary app
+    front and the Android settings index. **No tiles for places** (menu review M5, approved by the owner 2026-10-23,
+    Droidtop/tracker#621): the left menu owns places, the Quick Menu owns toggles, state and what runs, so the Social
+    and Updates tiles are gone (Social and Updates are left-menu rows; the Downloads tab stays, it is live job status).
+    The companion has no left menu, so its System card ends with its own **Updates** row, and its Home's "N updates
+    available" line opens Updates (it did nothing, Droidtop/tracker#577). Android gives an ordinary app
     no write to airplane mode and no call that opens the power menu, so Airplane mode shows the
     real state and opens the system screen, and Power menu is a tile marked "Needs privilege"
     that says so when pressed (a privilege helper plugin is the route that could do it); nothing

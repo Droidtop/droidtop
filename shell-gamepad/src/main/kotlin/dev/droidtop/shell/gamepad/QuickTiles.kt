@@ -31,7 +31,7 @@ import dev.droidtop.library.settings.UiMode
  */
 enum class QuickGlyph {
     NETWORK, VOLUME, BRIGHTNESS, MOON, ROTATE, TIMER, BLUETOOTH, VPN,
-    DISPLAY, GAMEPAD, SWAP, UPDATE, ANDROID, EXIT, SETTINGS, BATTERY, GENERIC,
+    DISPLAY, GAMEPAD, SWAP, ANDROID, EXIT, SETTINGS, BATTERY, GENERIC,
     // The rail's own marks and the rows added with the branching panel.
     APPS, BELL, GAUGE, DOWNLOAD, POWER, AIRPLANE,
     // The companion's tabs (docs/SPEC.md "The companion's tabs"), drawn by the same rail.
@@ -275,7 +275,6 @@ object QuickTiles {
         -> QuickGlyph.POWER
         GamingSettingsCatalog.ID_AUDIO_OUTPUT -> QuickGlyph.VOLUME
         GamingSettingsCatalog.ID_ORIENTATION -> QuickGlyph.ROTATE
-        GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
         GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
         GamingSettingsCatalog.ID_SYSTEM_SWITCH_MODE -> QuickGlyph.SWAP
@@ -290,7 +289,6 @@ object QuickTiles {
         -> QuickGlyph.SECOND_SCREEN
         GamingSettingsCatalog.ID_SYSTEM_LOCATION -> QuickGlyph.LOCATION
         GamingSettingsCatalog.ID_SYSTEM_FLASHLIGHT -> QuickGlyph.FLASHLIGHT
-        GamingSettingsCatalog.ID_SYSTEM_SOCIAL -> QuickGlyph.PEOPLE
         GamingSettingsCatalog.ID_PERFORMANCE_MODE -> QuickGlyph.GAUGE
         GamingSettingsCatalog.ID_DOWNLOADS -> QuickGlyph.DOWNLOAD
         GamingSettingsCatalog.ID_CONTROLLER -> QuickGlyph.GAMEPAD

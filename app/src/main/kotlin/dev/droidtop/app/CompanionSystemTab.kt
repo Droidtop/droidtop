@@ -56,6 +56,13 @@ internal fun CompanionSystemTab() {
                 performanceMode = GamingSettingsCatalog.performanceModeItem(),
                 privacy = GamingSettingsCatalog.privacyDashboardItem(),
                 accessibility = dev.droidtop.runtime.systemstatus.AccessibilityControls.items(context.applicationContext),
+                updates = dev.droidtop.library.settings.NestedScreenItem(
+                    id = "companion_updates",
+                    title = "Updates",
+                    subtitle = "droidtop, plugins and games with a newer version",
+                    registryId = dev.droidtop.library.settings.Place.ID_UPDATES,
+                    icon = dev.droidtop.library.settings.CatalogIcon.SYSTEM_UPDATES,
+                ),
             )
         }
     }

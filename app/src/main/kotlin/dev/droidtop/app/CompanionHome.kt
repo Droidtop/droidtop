@@ -382,6 +382,8 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
                 }
             }
             if (updates.isNotEmpty()) {
+                // A tap opens Updates, in the mode in use (PlaceLinks): the line did nothing (Droidtop/tracker#577).
+                val context = androidx.compose.ui.platform.LocalContext.current
                 Text(
                     (if (updates.size == 1) "Update available: " else "${updates.size} updates available: ") +
                         updates.take(MAX_UPDATE_TITLES).joinToString(", ") { it.title } +
@@ -390,6 +392,11 @@ internal fun CompanionActivitySection(layout: CompanionHomeLayout) {
                     color = MaterialTheme.colorScheme.tertiary,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .clickable { context.startActivity(PlaceLinks.intent(context, dev.droidtop.library.settings.Place.UPDATES)) }
+                        .padding(vertical = 8.dp),
                 )
             }
         }

@@ -81,8 +81,10 @@ internal fun companionSystemCards(
     performanceMode: CatalogItem?,
     privacy: CatalogItem?,
     accessibility: List<CatalogItem> = emptyList(),
+    // The companion has no left menu, so Updates is a row of its System card (Droidtop/tracker#577, #621).
+    updates: CatalogItem? = null,
 ): List<SystemCard> = listOf(
-    SystemCard("system", "System", section(QuickSection.SYSTEM), folded = false),
+    SystemCard("system", "System", section(QuickSection.SYSTEM) + listOfNotNull(updates), folded = false),
     SystemCard("display", "Display", section(QuickSection.DISPLAY), folded = true),
     SystemCard("sound", "Sound", section(QuickSection.AUDIO), folded = true),
     // Network detail and Bluetooth devices, drawn by the card itself (slice C19).
