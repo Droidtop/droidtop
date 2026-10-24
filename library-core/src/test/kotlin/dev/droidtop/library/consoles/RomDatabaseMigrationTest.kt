@@ -99,7 +99,7 @@ class RomDatabaseMigrationTest {
         // not depend on WAL support in the test JVM; no destructive
         // fallback is registered, on purpose (see the class comment).
         val room = Room.databaseBuilder(context, RomDatabase::class.java, TEST_DB)
-            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
+            .addMigrations(MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
             .setJournalMode(RoomDatabase.JournalMode.TRUNCATE)
             .allowMainThreadQueries()
             .build()
@@ -131,6 +131,15 @@ class RomDatabaseMigrationTest {
             assertTrue("game_metadata must still carry its $column column", column in notNullByColumn)
             assertEquals("$column must stay a nullable column", 0, notNullByColumn[column])
         }
+
+        // v12 (Droidtop/tracker#318): the row's game has a uid, its path the uid's first locator on this device, and
+        // the identity tables are otherwise empty: nothing about the row is claimed, nothing is re-keyed.
+        val uid = runBlocking { room.identityDao().uidAt(dev.droidtop.library.identity.GameIdentities.THIS_DEVICE, GAME_ID) }
+        assertTrue("the migrated row's path must locate a uid", uid != null && uid.matches(Regex("[0-9a-f]{32}")))
+        assertEquals(listOf(GAME_ID), runBlocking { room.identityDao().locatorsOf(uid!!) }.map { it.locator })
+        assertEquals(emptyList<Any>(), runBlocking { room.identityDao().claimsOf(uid!!) })
+        val games = room.openHelper.readableDatabase.query("SELECT COUNT(*) FROM games WHERE uid = ?", arrayOf<Any>(uid!!)).use { it.moveToFirst(); it.getInt(0) }
+        assertEquals(1, games)
 
         room.close()
     }

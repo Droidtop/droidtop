@@ -111,7 +111,8 @@ object LibraryCore {
             // The index database, in RAM (docs/SPEC.md 7g, step 3) --
             // derived entirely from `records`, so this never needs to
             // hold anything the record files don't already have.
-            index = RoomLibraryIndexStore(LibraryIndexDatabase.get(app), records),
+            // Each saved game also gets its identity (Droidtop/tracker#318): a uid by its path, with its store id.
+            index = dev.droidtop.library.identity.IdentityRegisteringIndexStore(RoomLibraryIndexStore(LibraryIndexDatabase.get(app), records), app),
             // A launch by id reads the game's record before anything else.
             records = records,
             // No slow round starts while the device is in battery saver

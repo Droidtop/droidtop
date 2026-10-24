@@ -13975,6 +13975,24 @@ after it reuse them. Both folder walks do (`EngineGameProvider.rescanProgressive
 
 ## 7h. Scraper honesty, and what counts as a game (directed 2026-09-02)
 
+**One identity model (approved 2026-10-24, Droidtop/tracker#318, "Proposal: matching, scraping and metadata"; the
+owner: "I guess I'll approve them").** Which real game a library entry is no longer rests on its path. Every game has a
+stable local **uid**, minted the first time droidtop sees it and never changed on this device, and a set of **claims**
+about which game it is, each with a strength: strong ones (a store's id, a ROM's content hash, RetroAchievements' hash,
+an id the person picked, an alias their pick taught), medium ones (IGDB, SteamGridDB, Lutris, ScreenScraper, a plugin's
+thread) and weak ones (the parsed title, which only ever suggests). A path, or a store row, is a **locator**: where the
+game lives on one device. Claims are append-only: a replaced one names what replaced it, so an old key still resolves.
+A game's sync key is computed from its best claim (store, then hash, then manual, then alias, then IGDB and
+SteamGridDB, else its uid) and never stored, so a better claim re-keys nothing that points at the uid. A new locator that
+presents a strong claim another game holds is that game moved or copied (a renamed ROM keeps its history and saves);
+a weak or medium claim never joins two games, and two games whose ids contradict (steam:440 and steam:620) are never
+one, whatever their titles say: store rows sharing a title stay apart on that (7m, `StoreIdentity`), unless the person
+named them one game. **Built so far (slice 1, additive):** the `games`, `game_claims` and `game_locators` tables
+(RomDatabase v12; the migration gives every existing metadata row a uid with its path as the first locator and claims
+nothing it cannot see), registration of every game a library scan saves with its store id, and a ROM's MD5 claimed
+whenever the scrape computes one. Nothing reads a uid yet: metadata, saves, history, favourites and collections stay
+keyed as before and move to the uid one at a time in later steps, as the proposal's rollout lists them.
+
 **PC games get PC-native sources (directed 2026-09-24).** PC and engine games are scraped from the
 sources that actually cover them, tied into the same pipeline as the ROM scrapers (one mechanism):
 SteamGridDB (grids, heroes, logos, icons; it needs the user's own free API key, entered once and
