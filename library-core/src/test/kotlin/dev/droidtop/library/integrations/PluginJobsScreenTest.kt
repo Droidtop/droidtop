@@ -68,9 +68,11 @@ class PluginJobsScreenTest {
         assertEquals("12 of 40", PluginJobsScreen.amountLine(dev.droidtop.pluginhost.JobNumbers(itemsDone = 12, itemsTotal = 40)))
         assertNull(PluginJobsScreen.amountLine(dev.droidtop.pluginhost.JobNumbers()))
         assertNull(PluginJobsScreen.amountLine(null))
-        // The numbers come before the job's own line, which stays for what they cannot say.
+        // The figures are the detail, asked for; the row's line says only where it stands (Droidtop/tracker#643).
         val running = job("a", 40, status = "Checking files").copy(numbers = bytes)
-        assertEquals("40%\n120 MB of 300 MB, 4 MB/s\nChecking files", PluginJobsScreen.progressLine(running, null))
+        assertEquals("Downloading", PluginJobsScreen.progressLine(running, null))
+        assertEquals("About 3 min left", PluginJobsScreen.progressLine(running, "About 3 min left"))
+        assertEquals("40%, 120 MB of 300 MB, 4 MB/s", PluginJobsScreen.detailLine(running, nowMs = 0L))
     }
 
     @Test
@@ -88,8 +90,10 @@ class PluginJobsScreenTest {
     }
 
     @Test
-    fun `the value says how far, how long is left and the size line`() {
-        assertEquals("42% · About 3 min left\nDownloading… 12 MB of 300 MB", PluginJobsScreen.progressLine(job("a", 42), "About 3 min left"))
+    fun `the value says how long is left, never a percent, and a job's own line under it`() {
+        assertEquals("About 3 min left\nDownloading… 12 MB of 300 MB", PluginJobsScreen.progressLine(job("a", 42), "About 3 min left"))
+        // Before there is a time to say, a job that sends no numbers says its own line.
+        assertEquals("Downloading… 12 MB of 300 MB", PluginJobsScreen.progressLine(job("a", 42), null))
         assertEquals("Paused\nDownloading… 12 MB of 300 MB", PluginJobsScreen.progressLine(job("a", 42, paused = true), null))
         assertEquals("Waiting for Wi-Fi", PluginJobsScreen.progressLine(job("a", status = "Waiting for Wi-Fi"), null))
         val held = job("h", 42, paused = true, status = "Waiting for Wi-Fi").copy(hold = "Waiting for Wi-Fi")
@@ -107,29 +111,5 @@ class PluginJobsScreenTest {
         assertEquals("Theme pack", done.title)
         // A finished job with no error is done; only an error makes it a failure.
         assertEquals("GOG · Done", done.subtitle)
-    }
-
-    @Test
-    fun `time left comes from the rate seen, and only once the job has moved`() {
-        assertNull(JobEta.remainingMs(startMs = 0L, startPercent = 10, nowMs = 60_000L, percent = 10))
-        assertNull(JobEta.remainingMs(startMs = 0L, startPercent = 10, nowMs = 2_000L, percent = 20))
-        // 10 percent a minute, 80 percent to go: eight minutes.
-        assertEquals(480_000L, JobEta.remainingMs(startMs = 0L, startPercent = 10, nowMs = 60_000L, percent = 20))
-    }
-
-    @Test
-    fun `time left is said in the coarsest honest words`() {
-        assertEquals("Under a minute left", JobEta.words(30_000L))
-        assertEquals("About 5 min left", JobEta.words(300_000L))
-        assertEquals("About 2 h left", JobEta.words(100 * 60_000L))
-    }
-
-    @Test
-    fun `the estimate starts again after a pause`() {
-        val id = "eta"
-        assertNull(JobEta.line(job(id, 10), nowMs = 0L))
-        assertEquals("About 8 min left", JobEta.line(job(id, 20), nowMs = 60_000L))
-        assertNull(JobEta.line(job(id, 50, paused = true), nowMs = 61_000L))
-        assertNull(JobEta.line(job(id, 55), nowMs = 62_000L))
     }
 }

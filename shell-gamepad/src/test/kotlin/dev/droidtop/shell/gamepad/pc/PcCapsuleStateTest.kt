@@ -98,7 +98,8 @@ class PcCapsuleStateTest {
         assertEquals("Downloading", running.verb)
         assertEquals(StoreStage.DOWNLOADING, running.store)
         assertEquals(0.42f, running.progress)
-        assertTrue(running.detail, running.detail.startsWith("42%"))
+        // The bar says how far; the line never a percent that changes with each report (Droidtop/tracker#643).
+        assertEquals("Downloading", running.detail)
 
         val paused = playStateOf(null, store(installed = false), job(42, paused = true))
         assertEquals("Resume", paused.verb)

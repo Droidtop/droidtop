@@ -16,7 +16,6 @@ import dev.droidtop.pluginhost.JobState
 import dev.droidtop.pluginhost.Outcome
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.ReportItem
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The one shared "what plugin jobs are running" screen (docs/SPEC.md 12a
@@ -31,8 +30,8 @@ import java.util.concurrent.ConcurrentHashMap
  * Laid out as Steam's downloads page (docs/SPEC.md 7j "Places", Droidtop/
  * tracker#363 slice 9): the jobs fall into Current, Waiting (held by the
  * download rules), Paused and Finished, each headed with its count; a job is
- * ONE row with its name, a progress bar, how far it has got from its numbers
- * ([amountLine]) and roughly how long is left ([JobEta]). A opens the job's
+ * ONE row with its name, a progress bar and roughly how long is left
+ * ([JobPace]); its figures ([detailLine]) are on its page. A opens the job's
  * own page: Pause or Resume and Cancel while it runs; once it has finished,
  * what it did, line by line ([JobReport]), with Open, Retry and Clear
  * (docs/SPEC.md "Jobs and their results", Droidtop/tracker#577). The screen is
@@ -74,7 +73,7 @@ object PluginJobsScreen {
 
     /** The screen's sections for [snapshot]: Current, Waiting, Paused, Finished, each only when it has a job. */
     internal fun groupsFor(snapshot: List<PluginJobsCenter.Entry>, nowMs: Long): List<CatalogGroup> {
-        JobEta.forget(snapshot.mapTo(HashSet()) { it.jobId })
+        JobPace.forget(snapshot.mapTo(HashSet()) { it.jobId })
         if (snapshot.isEmpty()) {
             return listOf(
                 CatalogGroup(
@@ -162,14 +161,14 @@ object PluginJobsScreen {
      * How far a job has got, in its own numbers: "120 MB of 300 MB, 4.2 MB/s" for a transfer, "12 of 40" for work
      * counted in things; null when the job reports only a percent. Pure.
      */
-    internal fun amountLine(numbers: JobNumbers?): String? {
+    internal fun amountLine(numbers: JobNumbers?, speedBps: Long? = numbers?.downloadBps): String? {
         numbers ?: return null
         val bytes = when {
             numbers.bytesDone >= 0 && numbers.bytesTotal > 0 -> "${ValueFormat.size(numbers.bytesDone)} of ${ValueFormat.size(numbers.bytesTotal)}"
             numbers.bytesDone >= 0 -> ValueFormat.size(numbers.bytesDone)
             else -> null
         }
-        val speed = numbers.downloadBps.takeIf { it > 0 }?.let { "${ValueFormat.size(it)}/s" }
+        val speed = speedBps?.takeIf { it > 0 }?.let { "${ValueFormat.size(it)}/s" }
         val items = if (numbers.itemsDone >= 0 && numbers.itemsTotal > 0) "${numbers.itemsDone} of ${numbers.itemsTotal}" else null
         return listOfNotNull(bytes, speed, items).joinToString(", ").ifEmpty { null }
     }
@@ -198,27 +197,39 @@ object PluginJobsScreen {
     }
 
     /**
-     * What a running job's row says in its value column: how far it has got ("42%", "Paused", or
-     * the status line while its size is unknown) and roughly how long is left, then its status line
-     * (a download's "120 MB of 300 MB"). Pure.
+     * What a running job's row says in its value column: where it stands ("Paused", "Waiting for the connection") or,
+     * while it moves, roughly how long is left ([timeLeft], from [JobPace]), never a number that changes with every
+     * report (owner, 2026-10-24, Droidtop/tracker#643: "The current 'flickery numbers for download progress', for
+     * instance, is bad"). The bar beside it shows how far; the percent, amounts and speed are [detailLine], on demand.
+     * A job that sends only a percent and a line keeps its line under it. Pure.
      */
     internal fun progressLine(entry: PluginJobsCenter.Entry, timeLeft: String?): String {
+        val moving = entry.percent >= 0 || amountLine(entry.numbers, speedBps = null) != null
+        // A job's own line, said only by a job that sends no numbers: with numbers, its figures are the detail.
+        val own = entry.statusLine.takeIf { entry.numbers == null && it.isNotBlank() }
         val first = when {
             entry.hold != null -> entry.hold!!
             entry.paused -> "Paused"
             entry.state == JobState.WAITING_FOR_NETWORK -> "Waiting for the connection"
             entry.state == JobState.WAITING_TO_RETRY -> "Waiting to try again"
-            entry.percent >= 0 -> listOfNotNull("${entry.percent}%", timeLeft).joinToString(" · ")
+            moving && timeLeft != null -> timeLeft
+            moving && own != null -> return own
+            moving -> return if ((entry.numbers?.bytesDone ?: -1L) >= 0) "Downloading" else "Working"
             else -> entry.statusLine
         }
-        // The job's own numbers say how far it has got better than its line does; the line stays for what they cannot say.
-        amountLine(entry.numbers)?.takeIf { !entry.paused }?.let { amount ->
-            val status = entry.statusLine.takeIf { it.isNotBlank() && !it.equals(first, ignoreCase = true) }
-            return listOfNotNull(first, amount, status).joinToString("\n")
-        }
         // The status line is said once: a paused job whose status is "Paused" read "Paused Paused" (tracker#85).
-        val second = entry.statusLine.takeIf { it.isNotBlank() && !it.equals(first, ignoreCase = true) }
+        val second = own?.takeIf { !it.equals(first, ignoreCase = true) }
         return if ((entry.percent >= 0 || entry.paused) && second != null) "$first\n$second" else first
+    }
+
+    /**
+     * How far a running job has got in figures, for where the person asked (its page; a focused row): "42%, 120 MB of
+     * 300 MB, 4 MB/s", the speed smoothed ([JobPace]). Null when the job gives no figures. Pure but for the pace.
+     */
+    internal fun detailLine(entry: PluginJobsCenter.Entry, nowMs: Long): String? {
+        val percent = entry.percent.takeIf { it in 0..100 }?.let { "$it%" }
+        val amount = amountLine(entry.numbers, speedBps = JobPace.speed(entry, nowMs) ?: entry.numbers?.downloadBps)
+        return listOfNotNull(percent, amount).joinToString(", ").ifEmpty { null }
     }
 
     /**
@@ -227,7 +238,7 @@ object PluginJobsScreen {
      * say less than the Downloads place; a failed job says why.
      */
     fun oneLine(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): String =
-        if (entry.done) outcome(entry).lineSequence().first() else progressLine(entry, JobEta.line(entry, nowMs)).replace("\n", " · ")
+        if (entry.done) outcome(entry).lineSequence().first() else progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
 
     /**
      * One job as one row, wherever a list of jobs is drawn (this screen, a store's page): a running
@@ -246,7 +257,7 @@ object PluginJobsScreen {
                 valueLabel = { if (entry.state == JobState.FAILED) "Failed" else "Done" },
             )
         }
-        val line = progressLine(entry, JobEta.line(entry, nowMs))
+        val line = progressLine(entry, JobPace.line(entry, nowMs))
         return NestedScreenItem(
             id = "plugin_job_${entry.jobId}",
             title = entry.title,
@@ -291,8 +302,9 @@ object PluginJobsScreen {
                 ActionItem(
                     id = "plugin_job_${jobId}_progress",
                     title = "Progress",
-                    subtitle = entry.statusLine,
-                    value = progressLine(entry, JobEta.line(entry, System.currentTimeMillis())),
+                    // The page is where the person asked: the figures are here, as well as the calm line.
+                    subtitle = listOfNotNull(detailLine(entry, System.currentTimeMillis()), entry.statusLine.takeIf { it.isNotBlank() }).joinToString("\n"),
+                    value = progressLine(entry, JobPace.line(entry, System.currentTimeMillis())),
                     progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
                     run = {},
                 ),
@@ -410,57 +422,5 @@ object PluginJobsScreen {
             subtitle = line.detail,
             run = { ctx -> target?.let { JobOpen.open(ctx, it) } },
         )
-    }
-}
-
-/**
- * Roughly how long a running job has left (docs/SPEC.md 7j "Places"), from how fast it has moved
- * since droidtop first saw it moving: honest about what it measured, so nothing is said until the
- * job has moved [MIN_MOVED_PERCENT] over at least [MIN_ELAPSED_MS], and a pause, a step backwards
- * or the end starts the measure again. In memory, for the screens that show jobs; nothing polls.
- */
-internal object JobEta {
-    private const val MIN_MOVED_PERCENT = 1
-    private const val MIN_ELAPSED_MS = 5_000L
-
-    private data class Sample(val atMs: Long, val percent: Int)
-
-    private val since = ConcurrentHashMap<String, Sample>()
-
-    /** "About 3 min left" for [entry] at [nowMs], or null while there is nothing honest to say. */
-    fun line(entry: PluginJobsCenter.Entry, nowMs: Long): String? {
-        if (entry.done || entry.paused || entry.percent !in 0..99) {
-            since.remove(entry.jobId)
-            return null
-        }
-        val start = since[entry.jobId]
-        if (start == null || entry.percent < start.percent) {
-            since[entry.jobId] = Sample(nowMs, entry.percent)
-            return null
-        }
-        return remainingMs(start.atMs, start.percent, nowMs, entry.percent)?.let(::words)
-    }
-
-    /** Forgets the jobs no longer listed. */
-    fun forget(keep: Set<String>) {
-        since.keys.retainAll(keep)
-    }
-
-    /** The time left at the rate seen from ([startMs], [startPercent]) to ([nowMs], [percent]); null until it has moved enough. Pure. */
-    fun remainingMs(startMs: Long, startPercent: Int, nowMs: Long, percent: Int): Long? {
-        val moved = percent - startPercent
-        val elapsed = nowMs - startMs
-        if (moved < MIN_MOVED_PERCENT || elapsed < MIN_ELAPSED_MS) return null
-        return elapsed * (100 - percent) / moved
-    }
-
-    /** The time left in the coarsest words that are honest. Pure. */
-    fun words(ms: Long): String {
-        val minutes = ms / 60_000L
-        return when {
-            minutes < 1 -> "Under a minute left"
-            minutes < 60 -> "About $minutes min left"
-            else -> "About ${(minutes + 30) / 60} h left"
-        }
     }
 }
