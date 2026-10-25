@@ -1,7 +1,10 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import android.util.Log
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.util.UUID
@@ -22,7 +25,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 
-private val Context.pluginJobsStore by preferencesDataStore(name = "plugin_jobs")
+// A damaged jobs file starts the list empty: an unreadable record of past jobs must never stop droidtop from starting.
+private val Context.pluginJobsStore by preferencesDataStore(
+    name = "plugin_jobs",
+    corruptionHandler = ReplaceFileCorruptionHandler {
+        Log.w("PluginJobsCenter", "The saved jobs file could not be read; starting with no saved jobs", it)
+        emptyPreferences()
+    },
+)
 
 /**
  * The one shared "a plugin job is running, here is its progress" registry
