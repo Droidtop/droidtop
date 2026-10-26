@@ -3031,9 +3031,9 @@ private fun GamesSection(
                         // every time), found by id in the current carousel so a
                         // rescan that reorders the cards cannot move it
                         // (Droidtop/tracker#642).
-                        val restoredSystemIndex = remember {
-                            restoredFocusIndex(orderedGroups.map { it.key }, nav.focusHere)
-                        }
+                        // nav.focusHere reads from a mutableStateMapOf; no remember needed.
+                        // The remember block was capturing the initial focus and never updating.
+                        val restoredSystemIndex = restoredFocusIndex(orderedGroups.map { it.key }, nav.focusHere)
                         var focusedSystemIndex by remember { mutableStateOf(restoredSystemIndex) }
                         // ES-DE's system-to-system FADE (SystemView.cpp:
                         // 447-458): the element layer fades to black over
