@@ -141,6 +141,11 @@ object InWindowKeyboard {
             if (newFocus != null && newFocus !== oldFocus && newFocus.onCheckIsTextEditor()) {
                 dismissed = false
                 picked = KeyboardTargets.raisesOnOwnFocus()
+                // #523: If the keyboard is served elsewhere (companion), hide Android's keyboard immediately
+                val displayId = decor.display?.displayId
+                if (displayId != null && KeyboardTargets.servesField(displayId)) {
+                    KeyboardTargets.hideAndroidKeyboard(decor)
+                }
             }
         }
 
@@ -154,6 +159,11 @@ object InWindowKeyboard {
                 code == android.view.KeyEvent.KEYCODE_ENTER || event.isPrintingKey
             ) {
                 picked = true
+                // #523: If the keyboard is served elsewhere (companion), hide Android's keyboard immediately
+                val displayId = decor.display?.displayId
+                if (displayId != null && KeyboardTargets.servesField(displayId)) {
+                    KeyboardTargets.hideAndroidKeyboard(decor)
+                }
             }
         }
 
