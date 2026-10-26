@@ -14,15 +14,19 @@ import dev.droidtop.library.controller.FaceRole
  * whichever face button the person chose for them, and a keyboard's Enter
  * is [A] and Escape is [B]. What each one means in droidtop:
  *
- * - [A] accept, [B] back one level, [X] the focused thing's toggle
- *   (favourite), [Y] the focused thing's detail or info;
- * - [UP]/[DOWN]/[LEFT]/[RIGHT] move;
+ * - [A] accept / open the focused item; on a game, opens its page with Play focused
+ * - [B] back one level; focus returns to where it was
+ * - [X] Play when a game is focused; otherwise the focused thing's toggle
+ * - [Y] Search on lists and Home; on a game page, toggles Favourite; otherwise the focused thing's detail
+ * - [UP]/[DOWN]/[LEFT]/[RIGHT] move; lists do not wrap
  * - [L]/[R] previous/next tab of the nearest tab strip, else of the top
  *   bar (a keyboard's Page Up/Page Down and Shift+Tab/Tab);
- * - [R2] the Quick Menu (a held Select is the same press, for pads whose
- *   triggers send no key), [START] the left menu, [SELECT] the options of the
- *   list or screen you are on, [L2] the focused thing's own menu (a held Start is the
- *   same press, as a held Select is R2's);
+ * - [R2] the Quick Menu (opens and closes); [START] the left menu
+ * - [SELECT] the options of the list or screen you are on (bottom sheet)
+ * - [L2] the focused thing's own menu (anchored menu)
+ * - Hold Select 250ms: chord strip appears (B Quit, X Keyboard, R1 Screenshot, Stick Brightness)
+ * - Hold Select 400ms+: Quick Menu opens on This game
+ * - Hold Select <250ms: passes Select to the game
  * - [BACK] the system back key. It belongs to the back dispatcher
  *   (`BackHandler`), never to a key handler, so a long press of it still
  *   reaches the activity.

@@ -105,9 +105,25 @@ internal class PadGateCore(
         var cancel: (() -> Unit)? = null
     }
 
+    /** A button whose hold has multiple stages: tap, chord strip at 250ms, full action at 400ms+. */
+    private class MultiStageHold(
+        val key: Int,
+        val chordStripMs: Long = 250L,
+        val fullActionMs: Long = 400L,
+    ) {
+        var down = false
+        var chordStripFired = false
+        var fullActionFired = false
+        var chordStripCancel: (() -> Unit)? = null
+        var fullActionCancel: (() -> Unit)? = null
+    }
+
     private val holds = listOf(
-        Hold(KeyEvent.KEYCODE_BUTTON_SELECT, KeyEvent.KEYCODE_BUTTON_R2),
         Hold(KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_BUTTON_L2),
+    )
+
+    private val multiStageHolds = listOf(
+        MultiStageHold(KeyEvent.KEYCODE_BUTTON_SELECT, 250L, 400L),
     )
 
     /**
@@ -130,6 +146,7 @@ internal class PadGateCore(
         if (!down) lastUp[keyCode] = now
         if (deviceId > 0 && !fallback && keyCode in TRANSLATED_KEYS) realKeys += pair(deviceId, keyCode)
         holds.firstOrNull { it.key == keyCode }?.let { return hold(it, down, repeatCount, now) }
+        multiStageHolds.firstOrNull { it.key == keyCode }?.let { return multiStageHold(it, down, repeatCount, now) }
         return true
     }
 
@@ -165,6 +182,15 @@ internal class PadGateCore(
             hold.cancel?.invoke()
             hold.cancel = null
             hold.down = false
+        }
+        for (hold in multiStageHolds) {
+            hold.chordStripCancel?.invoke()
+            hold.chordStripCancel = null
+            hold.fullActionCancel?.invoke()
+            hold.fullActionCancel = null
+            hold.down = false
+            hold.chordStripFired = false
+            hold.fullActionFired = false
         }
     }
 
@@ -231,6 +257,45 @@ internal class PadGateCore(
     private fun press(keyCode: Int, at: Long) {
         emit(PadSyntheticKey(keyCode, down = true, repeatCount = 0, downTime = at, eventTime = at, deviceId = 0))
         emit(PadSyntheticKey(keyCode, down = false, repeatCount = 0, downTime = at, eventTime = at, deviceId = 0))
+    }
+
+    private fun multiStageHold(hold: MultiStageHold, down: Boolean, repeatCount: Int, now: Long): Boolean {
+        if (down && repeatCount == 0) {
+            hold.down = true
+            hold.chordStripFired = false
+            hold.fullActionFired = false
+            hold.chordStripCancel?.invoke()
+            hold.fullActionCancel?.invoke()
+            hold.chordStripCancel = scheduler.after(hold.chordStripMs) {
+                hold.chordStripCancel = null
+                hold.chordStripFired = true
+                // Emit a synthetic event to show the chord strip
+                emit(PadSyntheticKey(KeyEvent.KEYCODE_BUTTON_SELECT, down = true, repeatCount = 0, downTime = now, eventTime = now, deviceId = 0))
+            }
+            hold.fullActionCancel = scheduler.after(hold.fullActionMs) {
+                hold.fullActionCancel = null
+                hold.fullActionFired = true
+                press(KeyEvent.KEYCODE_BUTTON_R2, scheduler.now())
+            }
+            return false
+        }
+        // A release (or a repeat) of a press that began before this window
+        // was listening is not ours to reinterpret.
+        if (!hold.down) return true
+        if (down) return false
+        hold.down = false
+        hold.chordStripCancel?.invoke()
+        hold.chordStripCancel = null
+        hold.fullActionCancel?.invoke()
+        hold.fullActionCancel = null
+        if (!hold.chordStripFired && !hold.fullActionFired) {
+            // Tap - pass through to the game
+            press(hold.key, now)
+        } else if (hold.chordStripFired && !hold.fullActionFired) {
+            // Released after chord strip but before full action - hide chord strip
+            emit(PadSyntheticKey(KeyEvent.KEYCODE_BUTTON_SELECT, down = false, repeatCount = 0, downTime = now, eventTime = now, deviceId = 0))
+        }
+        return false
     }
 
     private fun pair(deviceId: Int, keyCode: Int): Long = (deviceId.toLong() shl 32) or (keyCode.toLong() and 0xffffffffL)

@@ -69,6 +69,17 @@ val ShellMenuHints: List<HintBinding> = listOf(
 )
 
 /**
+ * Chord strip hints shown when Select is held (250ms+).
+ * These are the Steam-style shortcuts: B Quit, X Keyboard, R1 Screenshot, Stick Brightness.
+ */
+val ChordStripHints: List<HintBinding> = listOf(
+    HintBinding(GamepadAction.B, "Quit"),
+    HintBinding(GamepadAction.X, "Keyboard"),
+    HintBinding(GamepadAction.R, "Screenshot"),
+    HintBinding(GamepadAction.UP, "Brightness"),
+)
+
+/**
  * Opens the shell's two menus, for a window of its own (the PC game page is
  * a Dialog, so the shell's root handler never sees its presses) that wants
  * Start and R2 to keep their meaning. Null outside the shell.

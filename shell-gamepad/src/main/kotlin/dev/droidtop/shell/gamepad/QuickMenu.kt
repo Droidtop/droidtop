@@ -208,6 +208,7 @@ internal fun QuickMenu(
         // again closes the sheet it opened. Start is the left
         // menu's button, so it swaps to that menu rather than
         // closing this one (Droidtop/tracker#258).
+        var chordStripVisible by remember { mutableStateOf(false) }
         val keys = Modifier.onPad(preview = true) { press ->
             when (press.action) {
                 GamepadAction.R2 -> {
@@ -225,6 +226,14 @@ internal fun QuickMenu(
                     section = next
                     true
                 }
+                GamepadAction.SELECT -> {
+                    // Chord strip visibility is driven by PadGate's synthetic events
+                    // The synthetic SELECT down at 250ms shows it, up before 400ms hides it
+                    if (press.repeatCount == 0) {
+                        chordStripVisible = press.action == GamepadAction.SELECT && press.down
+                    }
+                    true
+                }
                 else -> false
             }
         }
@@ -233,6 +242,10 @@ internal fun QuickMenu(
         }
         val pane: @Composable (Modifier) -> Unit = { paneModifier ->
             Column(modifier = paneModifier.padding(16.dp)) {
+                // Chord strip shown when Select is held (250ms+)
+                if (chordStripVisible) {
+                    ChordStrip()
+                }
                 // L1/R1 step the rail; the glyphs beside the section's
                 // name say so instead of a "Switch tab" hint-bar pill
                 // (owner, 2026-09-25).
@@ -1099,5 +1112,56 @@ private fun StopPill(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         QuickGlyphIcon(QuickGlyph.POWER, tint = MenuTokens.Danger, modifier = Modifier.size(18.dp))
         Text(label, style = TypeRole.button, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MenuTokens.Danger)
+    }
+}
+
+/**
+ * The chord strip shown when Select is held for 250ms+ in a game.
+ * Shows the Steam-style shortcuts: B Quit, X Keyboard, R1 Screenshot, Stick Brightness.
+ */
+@Composable
+private fun ChordStrip() {
+    val window = currentShellWindow()
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(MenuTokens.Surface, MenuTokens.RowShape),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ChordItem("B", "Quit", QuickGlyph.POWER, MenuTokens.Danger)
+        ChordItem("X", "Keyboard", QuickGlyph.KEYBOARD, MenuTokens.Accent)
+        ChordItem("R1", "Screenshot", QuickGlyph.CAMERA, MenuTokens.Accent)
+        ChordItem("Stick", "Brightness", QuickGlyph.BRIGHTNESS, MenuTokens.Accent)
+    }
+}
+
+@Composable
+private fun ChordItem(
+    button: String,
+    label: String,
+    glyph: QuickGlyph,
+    color: androidx.compose.ui.graphics.Color,
+) {
+    Row(
+        modifier = Modifier.padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(28.dp)
+                .background(color.copy(alpha = 0.2f), MenuTokens.RowShape),
+        ) {
+            Text(
+                button,
+                style = TypeRole.button,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                color = color,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MenuTokens.OnSurface)
     }
 }

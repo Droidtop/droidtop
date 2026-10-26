@@ -1005,7 +1005,6 @@ fun CatalogNavigator(
                 modifier = modifier,
             )
         }
-        val edge = LocalShellWindow.current.edgePadding
         CompositionLocalProvider(LocalValueColumnWidth provides valueColumnWidth) {
             when {
                 !categoryMode -> pane(Modifier.fillMaxSize(), edge)
@@ -1019,6 +1018,7 @@ fun CatalogNavigator(
         }
     }
 }
+
 
 /** The pane: an optional title, then the rows, grouped under small section labels. */
 @Composable

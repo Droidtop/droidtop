@@ -760,6 +760,32 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
             QuickGlyph.MORE -> {
                 dot(5f, 12f, 2f); dot(12f, 12f, 2f); dot(19f, 12f, 2f)
             }
+            QuickGlyph.KEYBOARD -> {
+                drawRoundRect(
+                    tint,
+                    topLeft = p(2.5f, 6f),
+                    size = Size(19f * u, 12f * u),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f * u, 2f * u),
+                    style = stroke,
+                )
+                listOf(6f, 10f, 14f, 18f).forEach { x -> dot(x, 10f, 1.1f) }
+                line(8f, 14.5f, 16f, 14.5f)
+            }
+            QuickGlyph.CAMERA -> {
+                drawRoundRect(tint, p(3f, 7f), Size(18f * u, 13f * u), androidx.compose.ui.geometry.CornerRadius(2.5f * u), style = stroke)
+                line(8.5f, 7f, 10f, 4.5f); line(10f, 4.5f, 14f, 4.5f); line(14f, 4.5f, 15.5f, 7f)
+                ring(12f, 13.5f, 3.8f)
+            }
+            QuickGlyph.BRIGHTNESS -> {
+                ring(12f, 12f, 4.5f)
+                val rays = listOf(0f, 45f, 90f, 135f, 180f, 225f, 270f, 315f)
+                rays.forEach { deg ->
+                    val rad = Math.toRadians(deg.toDouble())
+                    val dx = Math.cos(rad).toFloat()
+                    val dy = Math.sin(rad).toFloat()
+                    line(12f + dx * 7.5f, 12f + dy * 7.5f, 12f + dx * 10f, 12f + dy * 10f)
+                }
+            }
         }
     }
 }

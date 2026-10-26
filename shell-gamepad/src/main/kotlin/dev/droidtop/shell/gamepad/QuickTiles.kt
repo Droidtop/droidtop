@@ -38,6 +38,8 @@ enum class QuickGlyph {
     HOME, KEYBOARD, PEOPLE, MORE,
     // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
     CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
+    // Chord strip glyphs (Steam-style shortcuts)
+    KEYBOARD, CAMERA, BRIGHTNESS,
 }
 
 /**
