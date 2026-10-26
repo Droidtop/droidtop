@@ -1060,6 +1060,10 @@ private fun CatalogPane(
     val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id, explanation = !underRows) }
         ?: hint?.takeIf { active }
     val reserveTip = hint != null || statusById.isNotEmpty() || rows.any { (!underRows && it.item.subtitle != null) || it.item.confirmText != null }
+    // Plugin pages (and all catalog pages) must respect the shared spacing scale:
+    // screen safe margin is 32dp (DESIGN-LANGUAGE.md), so cap start padding at that.
+    // This fixes "ridiculously large" margins on 1920x1080 plugin pages (#649).
+    val effectiveStartPadding = minOf(startPadding, 32.dp)
     Column(modifier) {
         if (title != null) MenuHeader(title, iconFile = titleIcon)
         LazyColumn(
@@ -1072,7 +1076,7 @@ private fun CatalogPane(
                 .fillMaxWidth()
                 .fadingEdges(state),
             contentPadding = PaddingValues(
-                start = startPadding,
+                start = effectiveStartPadding,
                 end = LocalShellWindow.current.edgePadding,
                 // Without a title the first row starts at the window's top edge, under the
                 // floating clock and battery (console, build 1386: the pill sat on "Use droidtop
