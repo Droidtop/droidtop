@@ -59,7 +59,7 @@ object SourceScreens {
                 NestedScreenItem("source_pick_${source.id}_pc", "PC games", inline = searchScreen(source, SourceSystems.PC, "PC", entry.pcFolder)),
             )).takeIf { serves.serves(SourceSystems.PC) },
             yours.takeIf { it.isNotEmpty() }?.let { list -> CatalogGroup("source_entry_yours_${source.id}", "Your systems", list.map { (f, s) -> item(f, s) }) },
-            others.takeIf { it.isNotEmpty() }?.let { list -> CatalogGroup("source_entry_other_${source.id}", if (yours.isEmpty()) null else "Other systems", list.map { (f, s) -> item(f, s) }) },
+            others.takeIf { it.isNotEmpty() }?.let { list -> CatalogGroup("source_entry_other_${source.id}", if (yours.isEmpty()) "Available systems" else "Other systems", list.map { (f, s) -> item(f, s) }) },
         )
         return CatalogScreen(
             id = "source_entry_${source.id}",
@@ -68,9 +68,17 @@ object SourceScreens {
             indexGroups = { emptyList() },
             groups = {
                 groups.ifEmpty {
-                    listOf(CatalogGroup("source_entry_none_${source.id}", null, listOf(
-                        ActionItem("source_entry_none", "No system to search for", subtitle = "${source.label} lists no system droidtop knows.", run = {}),
-                    )))
+                    // If the source serves systems but none have folders yet, show the available systems
+                    val servedSystems = entry.systems.filter { it.id !in SourceSystems.PC_FAMILY && source.serves(it.id) }
+                    if (servedSystems.isNotEmpty()) {
+                        listOf(CatalogGroup("source_entry_available_${source.id}", "Available systems", servedSystems.map { system ->
+                            NestedScreenItem("source_pick_${source.id}_${system.id}", system.displayName, inline = searchScreen(source, system.id, system.displayName, File(entry.root, system.id)))
+                        }))
+                    } else {
+                        listOf(CatalogGroup("source_entry_none_${source.id}", null, listOf(
+                            ActionItem("source_entry_none", "No system to search for", subtitle = "${source.label} lists no system droidtop knows.", run = {}),
+                        )))
+                    }
                 }
             },
         )
