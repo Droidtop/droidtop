@@ -20,6 +20,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import dev.droidtop.library.integrations.GetGamesContext
 
 /**
  * The one empty state of a games place (Retro Games, PC Games, Home; docs/SPEC.md 7i, "An empty library";
@@ -32,8 +33,7 @@ internal fun EmptyLibrary(
     line: String,
     actionLabel: String,
     onAction: () -> Unit,
-    // PC Games' Get games searches for PC games; Retro Games and Home search every source.
-    pc: Boolean = false,
+    getGames: GetGamesContext = GetGamesContext.EMPTY_STATE,
     onChanged: () -> Unit = {},
 ) {
     val first = remember { FocusRequester() }
@@ -43,7 +43,7 @@ internal fun EmptyLibrary(
             Text(line, color = MenuTokens.OnSurface, style = TypeRole.body, textAlign = TextAlign.Center)
             Row(horizontalArrangement = Arrangement.spacedBy(Space.Md), verticalAlignment = Alignment.CenterVertically) {
                 ShellChip(actionLabel, modifier = Modifier.focusRequester(first), onClick = onAction)
-                GetGamesChip(pc = pc, onChanged = onChanged)
+                GetGamesChip(getGames, onChanged = onChanged)
             }
         }
     }

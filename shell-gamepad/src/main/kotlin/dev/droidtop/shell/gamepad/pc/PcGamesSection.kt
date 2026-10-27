@@ -48,6 +48,7 @@ import dev.droidtop.library.RunnerAction
 import dev.droidtop.library.RunnerState
 import dev.droidtop.library.stores.StoreInstallJob
 import dev.droidtop.pluginhost.PluginJobsCenter
+import dev.droidtop.library.integrations.GetGamesContext
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
@@ -804,7 +805,7 @@ internal fun PcGamesSection(
             line = if (state.home) "No games yet" else "No PC games yet",
             actionLabel = "Game sources",
             onAction = { onOpenSection(GamingSection.STORES) },
-            pc = !state.home,
+            getGames = if (state.home) GetGamesContext.EMPTY_STATE else GetGamesContext.PC,
         )
         return
     }

@@ -3002,6 +3002,7 @@ private fun GamesSection(
                             line = "No games yet",
                             actionLabel = "Add a folder",
                             onAction = { if (foldersScreen != null) addingFolders = true },
+                            getGames = GetGamesContext.EMPTY_STATE,
                             onChanged = onRequestRescan,
                         )
                     }
