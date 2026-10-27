@@ -3304,11 +3304,11 @@ object AppSettingsCatalogs {
         groups = { context ->
             listOf(
                 // One list: the folders and, under them, the row that adds one, so a folder just added shows
-                // where it was added (#537). Every group is titled: an untitled one is named after the screen in
-                // the category column, which listed "Game folders" twice.
+                // where it was added (#537). Group title is null: the screen title ("Game folders") is shown
+                // in the category column, so a titled group would duplicate it.
                 CatalogGroup(
                     id = "rom_folders_list",
-                    title = "Game folders",
+                    title = null,
                     items = GamesRootPrefs.gamesRootPaths(context).sorted().map { path ->
                         ActionItem(
                             id = "rom_folder_$path",

@@ -52,6 +52,7 @@ internal object FoldersCatalog {
      * The one "Add a folder" row (Game sources > Folders and Settings > Game folders): Android's folder picker, the
      * folder stored as a game folder, and the row says what happened ("Added Games"), since the folder shows up in the
      * list only after the picker has gone (Droidtop/tracker#537).
+     * Returns null on success (per FolderPickItem contract), error message on failure.
      */
     fun addFolderItem(id: String) = FolderPickItem(
         id = id,
@@ -61,7 +62,7 @@ internal object FoldersCatalog {
             val resolved = GamesRootPrefs.resolveStoragePath(uri)
             if (resolved != null) {
                 GamesRootPrefs.addGamesRoot(ctx, resolved)
-                "Added " + folderName(resolved.path)
+                null  // Success: return null per FolderPickItem contract; launcher shows confirmation
             } else {
                 "Couldn't resolve that folder to a real path on this device. Not added"
             }

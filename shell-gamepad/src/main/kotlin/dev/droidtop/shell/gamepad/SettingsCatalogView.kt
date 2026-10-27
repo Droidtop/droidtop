@@ -426,9 +426,14 @@ fun CatalogNavigator(
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
         statusById[item.id] = "Working..."
         scope.launch {
-            val error = runCatching { item.onPicked(context, uri) }
+            val result = runCatching { item.onPicked(context, uri) }
                 .getOrElse { "Couldn't share that folder: ${it.message ?: "an unknown error"}" }
-            if (error != null) statusById[item.id] = error else statusById.remove(item.id)
+            // FolderPickItem returns null on success, error message on failure
+            if (result == null) {
+                statusById[item.id] = "Added"
+            } else {
+                statusById[item.id] = result
+            }
             refresh()
         }
     }
