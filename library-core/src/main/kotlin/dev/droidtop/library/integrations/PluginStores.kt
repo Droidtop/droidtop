@@ -9,10 +9,12 @@ import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.pluginhost.AcquireDownloads
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.ProvidedPoint
+import dev.droidtop.runtime.SafeDelete
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
@@ -91,6 +93,49 @@ object PluginStores {
         }
     }
 
+    /** Where droidtop put a store's game ([PluginStoreLibrary.install]): its folder, and whether the download finished there. */
+    internal data class Install(val path: String, val installed: Boolean)
+
+    /** The installs file's records by game id; a record that is not one is dropped. Pure. */
+    internal fun installsOf(text: String?): Map<String, Install> {
+        val json = text?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return emptyMap()
+        return json.keys().asSequence().mapNotNull { id ->
+            val row = json.optJSONObject(id) ?: return@mapNotNull null
+            val path = row.optString("path").takeIf { it.startsWith("/") } ?: return@mapNotNull null
+            id to Install(path, row.optBoolean("installed"))
+        }.toMap()
+    }
+
+    internal fun installsJson(installs: Map<String, Install>): String = JSONObject().also { json ->
+        installs.forEach { (id, install) -> json.put(id, JSONObject().put("path", install.path).put("installed", install.installed)) }
+    }.toString()
+
+    /** [games] with what droidtop installed laid over them: a finished install is installed, at its folder. Pure. */
+    internal fun withInstalls(games: List<StoreGame>, installs: Map<String, Install>): List<StoreGame> = games.map { game ->
+        val install = installs[game.gameId]?.takeIf { it.installed } ?: return@map game
+        game.copy(installed = true, installPath = install.path)
+    }
+
+    private val UNSAFE = Regex("[^A-Za-z0-9 ._-]")
+    private val SPACES = Regex(" {2,}")
+
+    /**
+     * The folder a new install of [title] goes in under [root], as droidtop's own stores choose it: the title with what
+     * a card's filesystem refuses dropped ([fallback] when nothing is left), or "Name (2)" and on when a folder of that
+     * name is there and not empty. A failed install's cleanup deletes the folder it was given, so it is never handed
+     * one droidtop did not make. Disk; off the main thread.
+     */
+    internal fun freshFolder(root: File, title: String, fallback: String): File {
+        val name = title.replace(UNSAFE, "").replace(SPACES, " ").trim().trimEnd('.').ifBlank { fallback }
+        var candidate = File(root, name)
+        var n = 2
+        while (candidate.exists() && !(candidate.isDirectory && candidate.list().isNullOrEmpty())) {
+            candidate = File(root, "$name ($n)")
+            n++
+        }
+        return candidate
+    }
+
     internal fun rowsJson(games: List<StoreGame>): String = JSONArray(games.map { g ->
         JSONObject().put("id", g.gameId).put("title", g.title).put("size", g.sizeBytes).putOpt("art", g.artUrl)
             .put("externalIds", JSONObject(g.externalIds as Map<*, *>)).put("holding", g.holding.name.lowercase())
@@ -99,7 +144,8 @@ object PluginStores {
 
 /**
  * One plugin's store (docs/plugin-api.md 3 A13). Its rows are droidtop's own copy of the plugin's last `library`
- * answer, in droidtop's files; nothing here asks the plugin to draw a list. Installing is not built yet (slice 2).
+ * answer, in droidtop's files; nothing here asks the plugin to draw a list. Installing asks the plugin where the game's
+ * files are (`install`, answered as a source's acquire is) and droidtop fetches them into the store's folder.
  */
 class PluginStoreLibrary internal constructor(
     private val app: Context,
@@ -113,6 +159,20 @@ class PluginStoreLibrary internal constructor(
     override val siteUrl: String? = runCatching { JSONObject(entry.extra).optString("site") }.getOrNull()?.takeIf { it.startsWith("https://") }
 
     private fun file(context: Context) = File(File(context.applicationContext.filesDir, "plugin-stores"), "$id.json")
+
+    /** What droidtop installed from this store ([PluginStores.Install]), kept apart from the rows a sync replaces. */
+    private fun installsFile(context: Context) = File(File(context.applicationContext.filesDir, "plugin-stores"), "$id.installs.json")
+
+    private fun installs(context: Context): Map<String, PluginStores.Install> =
+        PluginStores.installsOf(runCatching { installsFile(context).readText() }.getOrNull())
+
+    private fun writeInstalls(context: Context, installs: Map<String, PluginStores.Install>) {
+        val target = installsFile(context)
+        target.parentFile?.mkdirs()
+        val tmp = File(target.parentFile, target.name + ".tmp")
+        tmp.writeText(PluginStores.installsJson(installs))
+        Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    }
 
     override fun signedIn(context: Context): Boolean = PluginWebAccount.of(context, record)?.signedIn == true
 
@@ -158,16 +218,78 @@ class PluginStoreLibrary internal constructor(
 
     override suspend fun games(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
         val text = runCatching { file(context).readText() }.getOrNull() ?: return@withContext emptyList()
-        PluginStores.gamesOf(id, JSONObject().put("games", runCatching { JSONArray(text) }.getOrDefault(JSONArray())))
+        PluginStores.withInstalls(
+            PluginStores.gamesOf(id, JSONObject().put("games", runCatching { JSONArray(text) }.getOrDefault(JSONArray()))),
+            installs(context),
+        )
     }
 
-    override suspend fun install(context: Context, gameId: String, root: File, progress: StoreProgress): String =
-        throw IllegalStateException("Installing from $label is not built yet")
+    override suspend fun installedPath(context: Context, gameId: String): String? = withContext(Dispatchers.IO) {
+        installs(context)[gameId]?.takeIf { it.installed }?.path
+    }
 
-    override suspend fun uninstall(context: Context, gameId: String): Result<Unit> =
-        Result.failure(UnsupportedOperationException("Nothing from $label is installed by droidtop yet"))
+    /**
+     * Asks the plugin where [gameId]'s files are (`install {store, id}`, a job answered with `download` or `downloads` as
+     * a source's acquire is, docs/plugin-api.md 3 A13) and fetches them with Downloads into a new folder for the game
+     * under [root]. The folder is recorded before the download, so a Cancel knows which one is unfinished. Updating an
+     * installed game is not offered yet: the plugin says nothing about versions.
+     */
+    override suspend fun install(context: Context, gameId: String, root: File, progress: StoreProgress): String {
+        val game = games(context).firstOrNull { it.gameId == gameId } ?: error("$label no longer lists this game")
+        check(!game.installed) { "${game.title} is installed; uninstall it to install it again" }
+        val folder = withContext(Dispatchers.IO) {
+            val earlier = installs(context)[gameId]?.path?.let(::File)
+            val folder = earlier?.takeIf { it.parentFile == root } ?: PluginStores.freshFolder(root, game.title, "$id-$gameId")
+            writeInstalls(context, installs(context) + (gameId to PluginStores.Install(folder.absolutePath, installed = false)))
+            folder
+        }
+        progress.report(-1f, "Asking $label for ${game.title}")
+        val answer = PluginViews.runJob(
+            context, record, PluginStores.POINT, "install", JSONObject().put("store", id).put("id", gameId), game.title,
+        ) { line -> progress.report(-1f, line) }
+        check(answer.ok) { answer.error ?: "$label did not say where ${game.title} is" }
+        val descriptors = AcquireDownloads.parse(answer.values)?.takeIf { it.isNotEmpty() }
+            ?: error("$label did not give a download for ${game.title}")
+        val fetched = AcquireDownload.run(
+            context = context,
+            record = record,
+            title = game.title,
+            hostContext = JSONObject().put("destination", folder.absolutePath),
+            // A store's game goes in the store's folder, whatever system a source would hint.
+            values = answer.values - AcquireSystemHint.KEY,
+            descriptors = descriptors,
+            onStatus = { line -> progress.report(-1f, line) },
+            onPercent = { percent -> if (percent >= 0) progress.report(percent / 100f, "Downloading ${game.title}") },
+        )
+        check(fetched.ok) { fetched.error ?: "the download of ${game.title} failed" }
+        withContext(Dispatchers.IO) {
+            writeInstalls(context, installs(context) + (gameId to PluginStores.Install(folder.absolutePath, installed = true)))
+        }
+        StoreChanges.announce(context)
+        return "Installed ${game.title}"
+    }
 
-    override fun changeStamp(context: Context): Long = file(context).lastModified()
+    override suspend fun discardPartial(context: Context, gameId: String) {
+        withContext(Dispatchers.IO) {
+            val install = installs(context)[gameId]?.takeIf { !it.installed } ?: return@withContext
+            val folder = File(install.path)
+            folder.parentFile?.let { SafeDelete.deleteWithin(it, folder) }
+            writeInstalls(context, installs(context) - gameId)
+        }
+    }
+
+    override suspend fun uninstall(context: Context, gameId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        val install = installs(context)[gameId] ?: return@withContext Result.failure(IllegalStateException("droidtop did not install this game from $label"))
+        runCatching {
+            val folder = File(install.path)
+            val parent = folder.parentFile ?: error("${install.path} is not a game folder")
+            if (folder.exists()) check(SafeDelete.deleteWithin(parent, folder)) { "Could not remove ${install.path}" }
+            writeInstalls(context, installs(context) - gameId)
+            StoreChanges.announce(context)
+        }
+    }
+
+    override fun changeStamp(context: Context): Long = maxOf(file(context).lastModified(), installsFile(context).lastModified())
 
     private companion object {
         const val SYNC_MS = 60_000L

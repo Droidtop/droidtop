@@ -11784,9 +11784,13 @@ its games join the PC library and the automatic sync like a built-in
 store's. Its account is the plugin's own site account (droidtop's web
 view, no password seen), and its rows are droidtop's copy of the
 plugin's last `library` answer. Its plugin's page has "<store>: read your
-games". Not built yet: installing, uninstalling and updating from it,
-launching through it, and its page in Stores, which lists droidtop's
-five.
+games". Install asks the plugin where the game's files are (`install`,
+answered as a source's acquire is) and droidtop fetches them with
+Downloads into a new folder for the game under the store's folder, as a
+built-in store's install goes (7g, "Where a store installs"); the
+plugin never names a path. Uninstall deletes only the folder droidtop
+made. Not built yet: updating from it, launching through it, and its
+page in Stores, which lists droidtop's five.
 
 ### One consistent way into Settings (directed 2026-09-28)
 

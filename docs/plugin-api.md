@@ -2594,7 +2594,8 @@ writes real files that droidtop's own scan finds (A2).
 
 **A13 Stores.** EP `library.stores@1` (Droidtop/tracker#220; owner,
 2026-10-01: "we need store/source and downloader integration APIs",
-downloading belonging to sources). Risk high. Built 2026-10-28, in part.
+downloading belonging to sources). Risk high. Built 2026-10-28, in part
+(rows and sign-in; installing and uninstalling).
 - **What it is:** a store droidtop shows beside its own (Steam, GOG,
   Epic, Amazon, itch). A plugin's store is a `StoreLibrary` like theirs
   (`PluginStoreLibrary`, registered in `StoreLibraries` by
@@ -2623,10 +2624,22 @@ downloading belonging to sources). Risk high. Built 2026-10-28, in part.
     Each id is taken once, and a row without an id or a title is
     dropped. droidtop keeps the answer as its own copy and lists from
     it with no call; Sync and the automatic sync ask again (60 s budget).
-- **Not built yet:** installing (an `install {store, id}` job whose
-  reply is download descriptors, placed under the store's folder as a
-  built-in store's install is), uninstall and update, `launch`, and the
-  store's page in the Stores place (it lists droidtop's five today). A
+  - `install {store, id} -> {download}` or `{downloads}`: a job (1.6)
+    answered exactly as a source's `acquire` is: one descriptor or a
+    list, with `unpack`, digests, headers, a web-session token or a
+    torrent. droidtop makes the game's folder under the store's folder
+    in the person's game folder (`<game folder>/<store label>/<title>`,
+    "Title (2)" beside a folder that is not droidtop's), fetches the
+    files there with Downloads and records the game as installed at
+    that folder. The plugin never names a path. A Cancel removes the
+    unfinished folder; Uninstall deletes the folder droidtop made and
+    nothing else, with no call to the plugin. droidtop's record of what
+    it installed survives Sync and Sign out.
+- **Not built yet:** update (the plugin says nothing about versions, so
+  an installed game is uninstalled to be installed again), `launch`,
+  and the store's page in the Stores place (it lists droidtop's five
+  today). An installed game is found by the library walk like any game
+  in a game folder. A
   plugin's store is signed in from its plugin's page (the account row)
   and read there ("<store>: read your games") or by the automatic sync;
   its games show in the library.

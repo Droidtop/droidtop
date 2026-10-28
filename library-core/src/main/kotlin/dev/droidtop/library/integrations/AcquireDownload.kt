@@ -34,6 +34,8 @@ internal object AcquireDownload {
         onStatus: (String) -> Unit,
         /** An update's placement: `destinationPath`, the `versionFolder` and the saves' arguments ([UpdatePlacement]). */
         update: Map<String, String>? = null,
+        /** The download's percent each time it changes (0 to 100; -1 while the size is not known). */
+        onPercent: (Int) -> Unit = {},
     ): PluginResult {
         if (descriptors.isEmpty()) return PluginResult.failure("${record.manifest.label} returned an invalid download descriptor")
         // The source's system hint: the game's own system folder, unless this screen is already that system's. An
@@ -92,6 +94,7 @@ internal object AcquireDownload {
                     update?.let { putAll(it) }
                 },
                 onStatus = onStatus,
+                onPercent = onPercent,
                 swarm = swarm.swarm,
                 torrent = swarm.torrent,
             )
@@ -135,6 +138,7 @@ internal object AcquireDownload {
                 update?.let { putAll(it) }
             },
             onStatus = onStatus,
+            onPercent = onPercent,
         )
     }
 }
