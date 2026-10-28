@@ -616,6 +616,8 @@ private fun CompanionTasksTab() {
     ) {
         CompanionPill("Open an app") { picking = true }
         CompanionTasks()
+        // The Linux desktop's windows, while a desktop session runs (Droidtop/tracker#425).
+        CompanionDesktopWindows()
     }
 }
 
