@@ -4446,7 +4446,12 @@ droidtop 0.2.0-dev.1931).
   `TrackpadSettings`) are libinput's options with libinput's defaults: pointer speed, tap to click, tap time, hold
   to drag (the tap-and-drag window), two-finger scroll, two-finger tap right-click, long press right-click (one finger
   held still for 600 ms, a touch screen's own gesture, on by default), three-finger tap middle-click, natural scrolling
-  on; scroll momentum and drag lock off.
+  on; scroll momentum and drag lock off. **Three fingers swiped sideways switch the desktop's workspace**
+  (Droidtop/tracker#426): at least 15 mm across and at most half as much down, told once as the fingers lift
+  (`TrackpadOutput.onSwipe`), the content following the fingers (a swipe to the left brings the next workspace). In
+  Desktop under sway it is `workspace next_on_output` / `prev_on_output` over sway's IPC (`DesktopWindows.switchWorkspace`);
+  labwc takes no command from outside, and outside Desktop there is nothing to switch, so there it does nothing. The
+  render resolution beside the scale (Full, 75%, 50%) is `DesktopScale`'s, decided 2026-10-14 on the same issue.
   **The trackpad is a pointer on the main screen (Droidtop/tracker#486 item 3).** Outside Desktop it drives the target
   screen (above), by `TrackpadRoute` chosen as each gesture starts and kept until its left button is let go: while
   droidtop's shell is what that screen shows it moves the shell's selection (focus steps, confirm, back:

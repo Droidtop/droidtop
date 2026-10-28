@@ -501,7 +501,7 @@ class SecondScreenInputView(
         val session = DesktopSessionService.state.value as? DesktopSessionState.Connected
         if (mode == SecondaryDisplayContent.Mode.DESKTOP && session != null) {
             val settings = dev.droidtop.library.settings.CompanionPrefs.settings.value.trackpad
-            return SeatTrackpadSink(
+            val seatSink = SeatTrackpadSink(
                 seat = InputSeats.of(session.hostBridge),
                 // Gain from the DESTINATION output's width, so the same
                 // hand movement crosses whatever the container renders at
@@ -510,6 +510,15 @@ class SecondScreenInputView(
                 userSpeed = trackpadSpeed(settings),
                 naturalScroll = settings.naturalScroll,
             )
+            // Three fingers swiped sideways switch the desktop's workspace, the content following the fingers: a swipe
+            // to the left brings the next one (Droidtop/tracker#426).
+            return object : TrackpadOutput by seatSink {
+                override fun onSwipe(leftward: Boolean) {
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        session.windows.switchWorkspace(next = leftward)
+                    }
+                }
+            }
         }
         return routedOutput()
     }

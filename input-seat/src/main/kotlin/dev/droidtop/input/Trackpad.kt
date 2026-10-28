@@ -122,6 +122,12 @@ data class TrackpadConfig(
     val twoFingerRightClick: Boolean = true,
     /** A three-finger tap is the middle button. */
     val threeFingerMiddleClick: Boolean = true,
+    /**
+     * Three fingers swiped sideways at least [swipeMinMm], mostly sideways, switch workspaces (Droidtop/tracker#426):
+     * the desktop's own gesture on a laptop trackpad. Not a libinput constant.
+     */
+    val threeFingerSwipe: Boolean = true,
+    val swipeMinMm: Float = 15f,
     /** libinput's drag lock, off by default: a tap-and-drag's button stays down after the finger lifts, until the next tap. */
     val dragLock: Boolean = false,
     /** A two-finger scroll coasts on after the fingers lift, slowing down; off by default. */
@@ -150,6 +156,12 @@ interface TrackpadOutput {
 
     /** [evdevButton] is BTN_LEFT/BTN_RIGHT/BTN_MIDDLE from [EvdevKeys]. */
     fun onButton(evdevButton: Int, pressed: Boolean)
+
+    /**
+     * A three-finger swipe sideways, once per swipe, when the fingers lift ([leftward]: the fingers moved left).
+     * A sink with nothing to switch ignores it.
+     */
+    fun onSwipe(leftward: Boolean) {}
 }
 
 /** One finger, in millimetres from the top-left of the trackpad area. */
@@ -187,6 +199,10 @@ class TrackpadGestureEngine(
     private var scrolling = false
     private var scrollAccumX = 0f
     private var scrollAccumY = 0f
+
+    /** How far three fingers have moved together in this gesture. */
+    private var swipeX = 0f
+    private var swipeY = 0f
 
     private var dragging = false
 
@@ -382,7 +398,12 @@ class TrackpadGestureEngine(
                 }
             }
 
-            // Three or more fingers move nothing: they exist to be tapped.
+            // Three fingers move nothing as they go; a sideways swipe is told once, when they lift.
+            3 -> {
+                swipeX += dx
+                swipeY += dy
+            }
+
             else -> Unit
         }
     }
@@ -412,6 +433,10 @@ class TrackpadGestureEngine(
             coastAtMs = nowMs
         }
 
+        if (maxFingers == 3 && config.threeFingerSwipe && isSwipe(swipeX, swipeY, config.swipeMinMm)) {
+            out.onSwipe(leftward = swipeX < 0f)
+        }
+
         if (wasTap) {
             when (maxFingers) {
                 1 -> if (config.tapToClick) {
@@ -439,6 +464,8 @@ class TrackpadGestureEngine(
     }
 
     private fun resetGesture() {
+        swipeX = 0f
+        swipeY = 0f
         maxFingers = 0
         movedBeyondTapSlop = false
         scrolling = false
@@ -677,3 +704,7 @@ class FocusNavTrackpadSink(
         scrollStepper.reset()
     }
 }
+
+/** Whether three fingers' travel ([dxMm], [dyMm]) is a sideways swipe: at least [minMm] across, at most half as much down. Pure. */
+internal fun isSwipe(dxMm: Float, dyMm: Float, minMm: Float): Boolean =
+    kotlin.math.abs(dxMm) >= minMm && kotlin.math.abs(dyMm) * 2f <= kotlin.math.abs(dxMm)
