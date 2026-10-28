@@ -699,6 +699,14 @@
     <string name="dictionary_removed">Removed the %1$s dictionary</string>
     <string name="dictionary_not_removed">The %1$s dictionary could not be removed</string>
     <string name="dictionary_added">Added %1$s: %2$d words, used from the next text field</string>
+    <string name="title_droidtop_mode">Settings shown</string>
+    <string name="title_pro_mode">Pro mode</string>
+    <string name="summary_pro_mode_on">Every Hacker\'s Keyboard option is shown</string>
+    <string name="summary_pro_mode_off">The common options only. Turn on for every Hacker\'s Keyboard option; hidden options keep their values</string>
+    <string name="title_reset_modern">Reset to modern defaults</string>
+    <string name="summary_reset_modern">Puts every option back to its default. Your macros and languages stay</string>
+    <string name="confirm_reset_modern">Reset every keyboard option to its default? Your macros and languages stay.</string>
+    <string name="action_reset">Reset</string>
     <string name="title_tools_strip">Tool strip</string>
     <string name="summary_tools_strip">A row of buttons above the keys: clipboard history, macros and incognito mode.</string>
     <string name="title_keyboard_form">Key grid shape</string>

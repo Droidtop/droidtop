@@ -19,6 +19,25 @@
         android:title="@string/english_ime_settings"
         android:key="english_ime_settings">
 
+    <!-- droidtop: pro mode and the reset (Droidtop/tracker#337). With pro mode off the screen is short; nothing is removed. -->
+    <PreferenceCategory
+            android:title="@string/title_droidtop_mode"
+            android:key="droidtop_mode">
+    <CheckBoxPreference
+            android:key="pref_pro_mode"
+            android:title="@string/title_pro_mode"
+            android:persistent="true"
+            android:defaultValue="false"
+            android:summaryOn="@string/summary_pro_mode_on"
+            android:summaryOff="@string/summary_pro_mode_off"
+            />
+    <Preference
+            android:key="pref_reset_modern"
+            android:title="@string/title_reset_modern"
+            android:summary="@string/summary_reset_modern"
+            />
+    </PreferenceCategory>
+
     <PreferenceCategory
             android:title="@string/title_keyboard_view_settings"
             android:key="graphics_settings">
@@ -73,6 +92,7 @@
             />
 
     <PreferenceScreen
+            android:key="pref_screen_view"
             android:title="@string/pref_screen_view_title"
             android:summary="@string/pref_screen_view_title_summary">
         <intent android:action="org.pocketworkstation.pckeyboard.PREFS_VIEW"/>
@@ -110,6 +130,7 @@
             />
 
     <PreferenceScreen
+            android:key="pref_screen_languages"
             android:title="@string/language_selection_title"
             android:summary="@string/language_selection_summary">
         <intent
@@ -147,6 +168,7 @@
             />
     
     <PreferenceScreen
+            android:key="pref_screen_feedback"
             android:title="@string/pref_screen_feedback_title"
             android:summary="@string/pref_screen_feedback_title_summary">
         <intent
@@ -154,6 +176,7 @@
     </PreferenceScreen>
 
     <PreferenceScreen
+            android:key="pref_screen_actions"
             android:title="@string/pref_screen_actions_title"
             android:summary="@string/pref_screen_actions_title_summary">
         <intent android:action="org.pocketworkstation.pckeyboard.PREFS_ACTIONS"/>

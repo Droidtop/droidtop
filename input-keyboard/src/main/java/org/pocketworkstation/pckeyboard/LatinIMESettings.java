@@ -68,6 +68,8 @@ public class LatinIMESettings extends PreferenceActivity
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
+        // droidtop: pro mode is decided before the screen reads it (Droidtop/tracker#337).
+        boolean pro = KeyboardProMode.isPro(getPreferenceManager().getSharedPreferences());
         addPreferencesFromResource(R.xml.prefs);
         mQuickFixes = (CheckBoxPreference) findPreference(QUICK_FIXES_KEY);
         mVoicePreference = (ListPreference) findPreference(VOICE_SETTINGS_KEY);
@@ -97,6 +99,23 @@ public class LatinIMESettings extends PreferenceActivity
                 return true;
             });
             OfflineVoice.refresh(this, () -> runOnUiThread(() -> offlineVoice.setSummary(OfflineVoiceRow.summary(this))));
+        }
+
+        // droidtop: the short screen hides what it leaves out, after every field above is held (Droidtop/tracker#337).
+        if (!pro) KeyboardProMode.applySimple(getPreferenceScreen());
+        Preference reset = findPreference(KeyboardProMode.RESET_KEY);
+        if (reset != null) {
+            reset.setOnPreferenceClickListener(p -> {
+                new android.app.AlertDialog.Builder(this)
+                        .setMessage(R.string.confirm_reset_modern)
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setPositiveButton(R.string.action_reset, (d, w) -> {
+                            KeyboardProMode.reset(this, getPreferenceManager().getSharedPreferences());
+                            recreate();
+                        })
+                        .show();
+                return true;
+            });
         }
 
         SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
@@ -176,6 +195,12 @@ public class LatinIMESettings extends PreferenceActivity
 
     public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
         (new BackupManager(this)).dataChanged();
+        // droidtop: pro mode shows or hides options, so the screen is built again (Droidtop/tracker#337).
+        if (KeyboardProMode.KEY.equals(key)) {
+            recreate();
+            return;
+        }
+        if (key == null) return;
         // If turning on voice input, show dialog
         if (key.equals(VOICE_SETTINGS_KEY) && !mVoiceOn) {
             if (!prefs.getString(VOICE_SETTINGS_KEY, mVoiceModeOff)
