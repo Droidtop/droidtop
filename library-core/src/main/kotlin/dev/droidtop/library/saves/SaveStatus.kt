@@ -65,7 +65,7 @@ object SaveSearch {
                 SaveStatus.Found(found, states, cards, truncated, note = plan.unknown.takeIf { it.isNotEmpty() }?.let(::unreadNote))
             plan.unknown.isNotEmpty() -> SaveStatus.Unknown(unreadNote(plan.unknown), looked)
             plan.places.isEmpty() && plan.blocked.isNotEmpty() ->
-                SaveStatus.Unknown("droidtop may not look inside the emulator's own folder (${plan.blocked.first()}) without all-files access or Shizuku", emptyList())
+                SaveStatus.Unknown("droidtop may not look inside the emulator's own folder (${plan.blocked.first()}) without all-files access or More controls", emptyList())
             plan.places.isEmpty() -> SaveStatus.Unknown("this rule names no place droidtop can search for this game", emptyList())
             else -> SaveStatus.NoneFound(looked, states)
         }

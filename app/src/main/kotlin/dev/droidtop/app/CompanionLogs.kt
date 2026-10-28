@@ -77,7 +77,7 @@ internal fun CompanionLogs() {
     }
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        CompanionNote(if (android == false) "droidtop's own log (Android's needs the helper app)" else "Android's log")
+        CompanionNote(if (android == false) "droidtop's own log (Android's needs More controls)" else "Android's log")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
             listOf(LogReader.Level.VERBOSE, LogReader.Level.DEBUG, LogReader.Level.INFO, LogReader.Level.WARN, LogReader.Level.ERROR).forEach { level ->
                 CompanionPill(level.label, selected = filter.minLevel == level) { filter = filter.copy(minLevel = level) }

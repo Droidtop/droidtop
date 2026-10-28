@@ -864,7 +864,7 @@ object GamingSettingsCatalog {
                             id = ID_SYSTEM_SLEEP,
                             title = "Sleep",
                             value = "Power button",
-                            run = { _, _ -> "Press the power button to sleep. With the helper app droidtop can do it from here" },
+                            run = { _, _ -> "Press the power button to sleep. With More controls set up, droidtop can do it from here" },
                         ),
                     )
                 }
@@ -1060,7 +1060,7 @@ object GamingSettingsCatalog {
         return ToggleItem(
             id = id,
             title = title,
-            subtitle = "Switches $title through the helper app",
+            subtitle = "Switches $title",
             current = controls.radioOn(context, radio) == true,
             onToggle = { ctx, on ->
                 // Never a switch that silently does nothing (tracker#581): when Android did not end up in the state
@@ -1228,7 +1228,7 @@ object GamingSettingsCatalog {
                 ToggleItem(
                     id = "companion_pip",
                     title = "Move picture-in-picture video to the companion",
-                    subtitle = "A video that goes small on the main screen plays on the companion instead. Needs the helper app",
+                    subtitle = "A video that goes small on the main screen plays on the companion instead. Needs More controls",
                     current = settings.pipToCompanion,
                     onToggle = { c, on -> CompanionPrefs.setPipToCompanion(c, on) },
                 ),

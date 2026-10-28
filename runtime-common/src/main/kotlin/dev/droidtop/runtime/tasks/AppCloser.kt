@@ -43,7 +43,7 @@ class AppCloser(
             }
             is ForceStopResult.Failed -> CloseOutcome.Failed("Couldn't kill it: ${result.message}")
             ForceStopResult.NoProvider -> CloseOutcome.Failed(
-                "Kill needs the helper app to force-stop it" + (ops.unavailableReason()?.let { ": $it" } ?: "") + ". Quit ends it the way Android allows",
+                "Kill needs More controls to force-stop it" + (ops.unavailableReason()?.let { ": $it" } ?: "") + ". Quit ends it the way Android allows",
             )
         }
     }

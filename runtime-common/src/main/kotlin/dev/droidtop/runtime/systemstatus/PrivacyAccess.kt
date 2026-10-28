@@ -94,7 +94,7 @@ object PrivacyAccess {
             Grant("Usage access", usage, "Knows which app and game is in front, and sorts apps by data use"),
             Grant("Accessibility service", accessibility, "Types into other apps on a second screen, takes screenshots, and plays the touches of the companion's pointer"),
             Grant("Bluetooth", bluetooth, "Lists your Bluetooth devices on the companion"),
-            Grant("Helper app (Shizuku)", provider, "Closes apps for good, switches radios, and reads what other apps used"),
+            Grant("More controls", provider, "Closes apps for good, switches radios, and reads what other apps used"),
         )
     }
 }

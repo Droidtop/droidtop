@@ -3751,7 +3751,7 @@ a close path of its own. Every call works off the main thread.
   force-stop it").** Kill (the Quick Menu's Kill pill, the companion's Kill row) is `Library.killRunning`: a
   helper's force-stop straight away (`TaskManager.kill`, `AppCloser.kill`), never Quit's gentler steps first
   (Enginehost's own end, the move to the background); without a helper that can force-stop it says "Kill needs
-  the helper app to force-stop it ... Quit ends it the way Android allows" and stops nothing. droidtop's own
+  More controls to force-stop it ... Quit ends it the way Android allows" and stops nothing. droidtop's own
   Windows screen ends its guest at once either way. Its second press asks Kill's own question ("It is stopped at
   once, without saving"). Before this Kill and Quit were one call.
   Quit is `Library.quitRunning`, run so that it finishes even when the
@@ -4264,7 +4264,13 @@ droidtop 0.2.0-dev.1931).
      Add opens `CompanionWidgetPickActivity` (Android's picker needs an Activity result, which the
      second-screen hosts cannot take) on the companion's own screen, and `CompanionWidgetPrefs.ids` is
      observed, so Standard's second screen can add widgets too (it showed no Widgets section, rig, build 1702).
-  Home ends with "More controls need the helper app. Set up" while no `priv.shell` provider runs (not in Kid
+  **The person never meets the machinery's name (owner, 2026-10-17: "what helper app? and why are we telling the
+  user this?", Droidtop/tracker#582).** What elevated access unlocks is called **More controls** everywhere a feature
+  says it needs it ("Needs More controls"); "the helper app", "privileged helper" and Shizuku appear in no feature's
+  text. Shizuku is named only where the person sets it up or fixes it: the Set up page below, Settings' Elevated
+  access row and its fix-it lines, since those are steps taken in Shizuku's own app. A failure says what did not
+  happen ("The change did not go through. Try again"), not which part failed.
+  Home ends with "More controls need a one-time setup. Set up" while no `priv.shell` provider runs (not in Kid
   or Kiosk). Set up opens a plain page: what the helper adds, that everything else works without it, that it
   is fiddly (wireless debugging and a pairing code in Shizuku's own app) and that skipping it loses nothing
   important, with one button for the next step (Get Shizuku, Open Shizuku, Allow droidtop) and Don't show again.

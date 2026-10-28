@@ -307,7 +307,7 @@ object ControllerLayouts {
         val property = console?.toggle?.property ?: return
         val inProcess = LayoutSignals.readInProcess(property)
         toggleValue = inProcess ?: privilegedToggleValue
-        toggleVia = if (inProcess != null) "app" else "privileged helper"
+        toggleVia = if (inProcess != null) "app" else "More controls"
         // SELinux can hide the property from the app: ask the privileged helper, off the main thread.
         if (inProcess == null) scheduleHeavy(app, force = false)
     }
@@ -352,7 +352,7 @@ object ControllerLayouts {
             }
             if (toggleValue == null && privilegedToggleValue != null) {
                 toggleValue = privilegedToggleValue
-                toggleVia = "privileged helper"
+                toggleVia = "More controls"
             }
             recompute()
         }
@@ -420,7 +420,7 @@ object ControllerLayouts {
         val property = console?.toggle?.property
         val toggle = when {
             property == null -> "no toggle"
-            facts.toggleValue == null -> "$property unreadable (app and privileged helper)"
+            facts.toggleValue == null -> "$property unreadable (app and More controls)"
             else -> "$property=${facts.toggleValue} via $toggleVia"
         }
         val padText = pad?.let { "'${it.name}' %04x:%04x".format(it.vendorId, it.productId) } ?: "none"

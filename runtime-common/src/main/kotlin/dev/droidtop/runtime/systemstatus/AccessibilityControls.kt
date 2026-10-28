@@ -60,7 +60,7 @@ object AccessibilityControls {
         RiskyActions.allows(RiskyClass.ACCESSIBILITY_SETTINGS) && runCatching { TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
 
     private fun put(namespace: String, key: String, value: String): String? {
-        val out = TaskManager.shell.exec(listOf("settings", "put", namespace, key, value)) ?: return "The helper app did not answer"
+        val out = TaskManager.shell.exec(listOf("settings", "put", namespace, key, value)) ?: return "The change did not go through. Try again"
         return if (out.exit == 0) null else out.stderr.trim().ifEmpty { "Android refused" }
     }
 

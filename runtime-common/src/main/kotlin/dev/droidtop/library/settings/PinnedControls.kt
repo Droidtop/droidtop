@@ -114,7 +114,7 @@ object PinnedControls {
         }
 
     /**
-     * Whether Home ends with "More controls need the helper app. Set up": only without a provider, only where the
+     * Whether Home ends with "More controls need a one-time setup. Set up": only without a provider, only where the
      * mode shows the provider line (not Kid or Kiosk), and not once the person dismissed it for good.
      */
     fun showsProviderLine(hasProvider: Boolean, mode: UiMode, dismissed: Boolean): Boolean =
