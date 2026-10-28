@@ -91,7 +91,8 @@ class ControllerLayoutTest {
             Binding.ControllerAction(listOf("CHANGE_PRESET", "2", "0", "0"), "controller_action CHANGE_PRESET 2 0 0, , "),
             Binding.parse("controller_action CHANGE_PRESET 2 0 0, , "),
         )
-        assertEquals(Binding.Other("mode_shift joystick 3"), Binding.parse("mode_shift joystick 3"))
+        assertEquals(Binding.ModeShift("joystick", 3, "mode_shift joystick 3"), Binding.parse("mode_shift joystick 3"))
+        assertEquals(Binding.Other("mode_shift joystick"), Binding.parse("mode_shift joystick"))
         assertEquals(Binding.Other(""), Binding.parse(""))
         assertNull(Binding.parse("key_press W").label)
     }
