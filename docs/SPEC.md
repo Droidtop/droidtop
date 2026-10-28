@@ -17130,8 +17130,11 @@ structure, top to bottom, drawn only from theme tokens:
   toward the ground by a gradient so what is laid over it stays legible on
   any art, with the game's logo (`logoUri`) or, without one, its name, and
   nothing else stacked on the art (the source and engine are rows, not a
-  line on the hero). Only portrait art: that art at its own 2:3 shape on the
-  right of a plate, never stretched across the band, and the name keeps to
+  line on the hero). The hero art is the landscape slots' one order
+  (`heroArt`), so never a screenshot. Only portrait art, or hero art
+  narrower than 320 px (`HERO_MIN_WIDTH_PX`, checked on the decoded image,
+  Droidtop/tracker#254): that art at its own shape (portrait art 2:3) on the
+  right of a plate, never stretched or blown up across the band, and the name keeps to
   the width left of it, wrapping to three lines, never running under the art
   (Droidtop/tracker#666). No art: the plate and the name. Its height is a share of the window's (46 percent landscape,
   Steam's hero ends at about 46; 30 percent portrait).
@@ -17157,7 +17160,8 @@ structure, top to bottom, drawn only from theme tokens:
   arrives) at the right edge, all in one row (`factsStrip`): Last played,
   Play time, Version (the installed version against the latest known:
   "0.9.5, v0.9.6 is available", the one wording of `GameUpdates.line`), Size
-  and Runs with, only those that exist. It scrolls sideways rather than
+  and Runs with with the one-line reason it won under it (`ResolvedRunner.reason`,
+  the Runner row's subtitle), only those that exist. It scrolls sideways rather than
   clipping at a large text size. Play time is time only, and only once some
   was recorded; how many times the game was played is Overview's "Times
   played", said once (Droidtop/tracker#662). Under it the one line saying why the

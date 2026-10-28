@@ -475,6 +475,7 @@ internal fun PcGamePage(
             folderSizeBytes = folderSize,
             installedVersion = installedVersions(entry, siblings, setVersion).firstOrNull(),
             runsWith = runner?.label,
+            runsWithReason = runner?.reason,
         )
     }
 
@@ -958,16 +959,22 @@ private const val PAGE_PLATE_SHADOW_ALPHA = 0.5f
 private fun PageHero(entry: LibraryEntry, height: Dp) {
     val window = LocalShellWindow.current
     val title = GameNaming.displayName(entry.title)
-    val hero = entry.heroUri
-    // Only portrait art: it takes its own cover shape at the right and the name keeps to the width left of
-    // it, wrapping, rather than running under the art with only the gradient between (Droidtop/tracker#666).
+    // The landscape slots' one order: never a screenshot (heroArt, docs/SPEC.md 7i).
+    val hero = entry.heroArt().landscape
+    // Hero art too small to fill the band without being blown up is drawn whole on the right instead (#254).
+    var heroNarrow by remember(hero) { mutableStateOf(false) }
+    // Only portrait art, or hero art too narrow for the band: it takes its own shape at the right and the name keeps
+    // to the width left of it, wrapping, rather than running under the art with only the gradient between
+    // (Droidtop/tracker#666).
     val coverArt = entry.artworkUri.takeIf { hero == null }
+    val sideHero = hero.takeIf { heroNarrow }
     Box(modifier = Modifier.fillMaxWidth().height(height).background(MenuTokens.Card)) {
-        if (hero != null) {
+        if (hero != null && !heroNarrow) {
             AsyncImage(
                 model = hero,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                onSuccess = { state -> if (isNarrowHeroArt(state.painter.intrinsicSize.width)) heroNarrow = true },
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -1017,6 +1024,14 @@ private fun PageHero(entry: LibraryEntry, height: Dp) {
                         .padding(vertical = Space.Sm)
                         .aspectRatio(COVER_ASPECT, matchHeightConstraintsFirst = true),
                 )
+            } else if (sideHero != null) {
+                AsyncImage(
+                    model = sideHero,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterEnd,
+                    modifier = Modifier.fillMaxHeight().padding(vertical = Space.Sm),
+                )
             }
         }
     }
@@ -1038,7 +1053,7 @@ private fun PageActionBand(
     play: PcPlayState,
     favourite: Boolean,
     selectedButton: Int?,
-    strip: List<Pair<String, String>>,
+    strip: List<StripFact>,
     portrait: Boolean,
     // Where Play is, for the launch to grow out of (PageFlood.kt).
     onPlayPlaced: (androidx.compose.ui.layout.LayoutCoordinates) -> Unit,
@@ -1160,15 +1175,16 @@ private const val GEAR_TURN_DEGREES = 90f
  * sideways rather than clipping at a large text size.
  */
 @Composable
-private fun PageFactsStrip(facts: List<Pair<String, String>>, modifier: Modifier = Modifier) {
+private fun PageFactsStrip(facts: List<StripFact>, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(Space.Xl),
     ) {
-        facts.forEach { (label, value) ->
+        facts.forEach { (label, value, note) ->
             Column(verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
                 Text(label.labelCase(), color = MenuTokens.OnSurfaceMuted, style = TypeRole.eyebrow, maxLines = 1)
                 Text(value, color = MenuTokens.OnSurface, style = TypeRole.value, maxLines = 1)
+                if (note != null) Text(note, color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting, maxLines = 1)
             }
         }
     }
@@ -1757,11 +1773,15 @@ internal fun versionFact(installed: String?, latest: String?): String? = when {
     else -> null
 }
 
+/** One fact of the page's facts strip: a small label, its value, and an optional quiet line under them. */
+internal data class StripFact(val label: String, val value: String, val note: String? = null)
+
 /**
  * The page's quiet facts strip, label then value, only the facts that
  * exist: when it was last played, play time, the version installed against
  * the latest known, size on this device (or to download), and what runs
- * it. Pure; sizes read through the one formatter ([dev.droidtop.library.format.ValueFormat]).
+ * it with the one-line reason it won ([dev.droidtop.library.ResolvedRunner.reason]).
+ * Pure; sizes read through the one formatter ([dev.droidtop.library.format.ValueFormat]).
  */
 internal fun factsStrip(
     entry: LibraryEntry,
@@ -1769,14 +1789,21 @@ internal fun factsStrip(
     folderSizeBytes: Long?,
     installedVersion: String?,
     runsWith: String?,
-): List<Pair<String, String>> = listOfNotNull(
-    "Last played" to (entry.lastPlayedEpochMs?.let { dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
+    runsWithReason: String? = null,
+): List<StripFact> = listOfNotNull(
+    StripFact("Last played", entry.lastPlayedEpochMs?.let { dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
     // Play time is time; how many times is Overview's "Times played", said once (Droidtop/tracker#662).
-    entry.playtimeSeconds.takeIf { it > 0 }?.let { "Play time" to dev.droidtop.library.format.ValueFormat.duration(it) },
-    versionFact(installedVersion, entry.availableUpdate)?.let { "Version" to it },
-    (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { "Size" to dev.droidtop.library.format.ValueFormat.size(it) },
-    runsWith?.takeIf { it.isNotBlank() }?.let { "Runs with" to it },
+    entry.playtimeSeconds.takeIf { it > 0 }?.let { StripFact("Play time", dev.droidtop.library.format.ValueFormat.duration(it)) },
+    versionFact(installedVersion, entry.availableUpdate)?.let { StripFact("Version", it) },
+    (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { StripFact("Size", dev.droidtop.library.format.ValueFormat.size(it)) },
+    runsWith?.takeIf { it.isNotBlank() }?.let { StripFact("Runs with", it, runsWithReason?.takeIf { r -> r.isNotBlank() }) },
 )
+
+/** The narrowest hero art the page's band crops to fill, in pixels; narrower art is drawn whole (#254). */
+internal const val HERO_MIN_WIDTH_PX = 320
+
+/** Whether hero art this many pixels wide would be blown up to fill the band. Pure. */
+internal fun isNarrowHeroArt(widthPx: Float): Boolean = widthPx > 0f && widthPx < HERO_MIN_WIDTH_PX
 
 /** The one quiet line under the home's hero card: "Played yesterday · 2 h 5 min". */
 internal fun heroCaption(entry: LibraryEntry, now: Long): String {
