@@ -13052,12 +13052,16 @@ action Gaming settings does — the same item, by id, so the in-shell
 renderer's real in-place rescan serves both rather than one screen getting
 a second, weaker mechanism.
 
-**The Game folders page is one list (Droidtop/tracker#537).** Group "Game folders" holds the folders, each named by
-its last segment with the path as its hint, and the "Add a folder" row under them (the one `FoldersCatalog
-.addFolderItem`, shared with Game sources > Folders); after the picker the row says "Added <name>" and the folder
-appears in the list above it. Then "Add a folder by path" and "Library" (rescan, rebuild). Every group is titled, and
-the category column joins untitled groups, so no name repeats. Drawn in place of an empty library's Games tab, the
-footer says A Select and B Back, not the tab's Options.
+**One Game folders screen (Droidtop/tracker#589, replacing #537's page).** Settings > Library > Game folders and Game
+sources > Folders were two screens over the same `GamesRootPrefs` list, each with its own Add and rescan, and on both a
+folder row removed the folder on A, with nothing on the row saying so. Now there is one, `FoldersCatalog.screen()`,
+registered as `rom_folders` and opened by every way in (Settings, Game sources, Downloads and Updates' Sources, an
+empty library, the Launcher's grid). Each folder is a row named by its last segment, its games and last scan in the
+value column ("170 games · scanned 5 min ago", or "Not available"); A opens the folder's own page: what was found,
+Rescan PC game folders, and **Remove this folder** as a named row behind a question ("Stop looking in <path>?"; its
+games leave the library, adding it back restores them, nothing on the device is deleted). Under the folders: Add a
+folder (the picker, then "Added <name>"), Rescan library, Rescan PC game folders and the Wine shortcuts, then "Add a
+folder by path". Drawn in place of an empty library's Games tab, the footer says A Select and B Back.
 
 ### Launch resolution: keep the default, expose it
 
