@@ -18,7 +18,6 @@ package org.pocketworkstation.pckeyboard;
 
 import org.pocketworkstation.pckeyboard.LatinIMEUtil.RingCharBuffer;
 
-import com.google.android.voiceime.VoiceRecognitionTrigger;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -287,7 +286,6 @@ public class LatinIME extends InputMethodService implements
     private PluginManager mPluginManager;
     private NotificationReceiver mNotificationReceiver;
 
-    private VoiceRecognitionTrigger mVoiceRecognitionTrigger;
 
     public abstract static class WordAlternatives {
         protected CharSequence mChosenWord;
@@ -403,7 +401,6 @@ public class LatinIME extends InputMethodService implements
         mVolDownAction = prefs.getString(PREF_VOL_DOWN, res.getString(R.string.default_vol_down));
         sKeyboardSettings.initPrefs(prefs, res);
 
-        mVoiceRecognitionTrigger = new VoiceRecognitionTrigger(this);
         
         updateKeyboardOptions();
 
@@ -818,10 +815,7 @@ public class LatinIME extends InputMethodService implements
         mEnableVoiceButton = shouldShowVoiceButton(attribute);
         final boolean enableVoiceButton = mEnableVoiceButton && mEnableVoice;
 
-        if (mVoiceRecognitionTrigger != null) {
-            mVoiceRecognitionTrigger.onStartInputView();
-        }
-        
+
         mInputTypeNoAutoCorrect = false;
         mPredictionOnForMode = false;
         mCompletionOn = false;
@@ -2110,10 +2104,8 @@ public class LatinIME extends InputMethodService implements
             toggleLanguage(false, false);
             break;
         case LatinKeyboardView.KEYCODE_VOICE:
-            if (mVoiceRecognitionTrigger.isInstalled()) {
-                mVoiceRecognitionTrigger.startVoiceRecognition();
-            }
-            //startListening(false /* was a button press, was not a swipe */);
+            // droidtop (Droidtop/tracker#343): dictation from the first voice provider that can.
+            VoiceInput.start(this);
             break;
         case 9 /* Tab */:
             if (processMultiKey(primaryCode)) {
