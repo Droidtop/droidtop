@@ -101,8 +101,6 @@ internal fun TouchHintBar(
     hints: List<Pair<GamepadAction, String>>,
     modifier: Modifier = Modifier,
     background: Color = MenuTokens.HintBar,
-    // False for a small pill group placed in a corner rather than a bar.
-    fill: Boolean = true,
 ) {
     if (hints.isEmpty()) return
     val window = LocalShellWindow.current
@@ -115,7 +113,7 @@ internal fun TouchHintBar(
     val spoken = HintFit.spoken(hints) { GamepadKeyMap.labelFor(it) }
     BoxWithConstraints(
         modifier
-            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+            .fillMaxWidth()
             .semantics {
                 contentDescription = spoken
                 customActions = listOf(CustomAccessibilityAction("Read controls") { view.announceForAccessibility(spoken); true })
@@ -145,7 +143,7 @@ internal fun TouchHintBar(
             }
         }
         val plate = Modifier
-            .then(if (fill) Modifier.fillMaxWidth() else Modifier)
+            .fillMaxWidth()
             .background(background)
             // A plate gets the frame's hairline on its top edge; over a
             // theme's own canvas (transparent) there is no plate and none.

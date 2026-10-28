@@ -12,6 +12,7 @@ import android.widget.ImageView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -44,6 +45,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -3395,6 +3397,10 @@ private fun EsDeThemedHelpSystem(
     // Compose change counter), and the setting lives on the library one.
     val controllerFamily =
         dev.droidtop.library.theme.ThemePrefs.controllerFamily(LocalContext.current)
+    // Each entry is a touch route to its button, as the shell's own bar is: the row ends on Start and R2
+    // (Droidtop/tracker#510), so a touch on the theme's row reaches the two menus too. Never a focus target
+    // (canFocus off ahead of clickable, docs/SPEC.md 7j).
+    val press = dev.droidtop.shell.gamepad.rememberGamepadTouch()
 
     Row(
         modifier = Modifier
@@ -3425,6 +3431,9 @@ private fun EsDeThemedHelpSystem(
             // illegible circle on every real device screenshot.
             val fontFamily = themeFontFamily(element)
             Row(
+                modifier = Modifier
+                    .focusProperties { canFocus = false }
+                    .clickable { press(action) },
                 horizontalArrangement = Arrangement.spacedBy(iconTextSpacing.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

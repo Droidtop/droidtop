@@ -61,7 +61,7 @@ fun rememberHintList(bindings: List<HintBinding>): List<Pair<GamepadAction, Stri
  * (docs/SPEC.md 7j, "Gaming controls", Droidtop/tracker#273): Start is the
  * left menu (navigation), R2 the Quick Menu (quick management). One list for
  * every row that names them: the shell's footer, a layer that keeps them
- * reachable, the themed Retro Games screen's corner pair ([ShellMenuPills]).
+ * reachable, the end of a theme's own help row on Retro Games (Droidtop/tracker#510).
  */
 val ShellMenuHints: List<HintBinding> = listOf(
     HintBinding(GamepadAction.START, "Menu"),
@@ -76,21 +76,6 @@ val ShellMenuHints: List<HintBinding> = listOf(
 class ShellMenus(val openLeft: () -> Unit, val openQuick: () -> Unit)
 
 val LocalShellMenus = compositionLocalOf<ShellMenus?> { null }
-
-/**
- * Just the two menu pills, tappable, in a small plate: for a screen whose
- * help row is not the shell's (a theme draws the legend itself, and a
- * legend is not tappable), so Start and R2 still have a touch route there.
- */
-@Composable
-fun ShellMenuPills(modifier: Modifier = Modifier) {
-    TouchHintBar(
-        hints = rememberHintList(ShellMenuHints),
-        modifier = modifier,
-        background = Color.Transparent,
-        fill = false,
-    )
-}
 
 /**
  * A hint row built from [HintBinding]s: [TouchHintBar] over exactly the

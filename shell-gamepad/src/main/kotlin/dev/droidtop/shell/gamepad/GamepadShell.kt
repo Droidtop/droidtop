@@ -134,7 +134,6 @@ import dev.droidtop.shell.gamepad.input.FocusedHints
 import dev.droidtop.shell.gamepad.input.LocalFocusedHints
 import dev.droidtop.shell.gamepad.input.LocalShellMenus
 import dev.droidtop.shell.gamepad.input.ShellMenuHints
-import dev.droidtop.shell.gamepad.input.ShellMenuPills
 import dev.droidtop.shell.gamepad.input.ShellMenus
 import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.menuStep
@@ -1552,18 +1551,6 @@ private fun GamepadShellBody(
             val homeBand = section == GamingSection.HOME && nav.place is ShellPlace.Section
             if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
                 FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
-            }
-            // A theme that draws its own help legend (a pad is attached, so
-            // the legend is the theme's) names nothing of the two menus and
-            // is not tappable: the Start and R2 pills sit in the corner
-            // beside it (docs/SPEC.md 7j, "Gaming controls").
-            if (helpRowOwner == HelpRowOwner.THEME && !screensaverOn) {
-                ShellMenuPills(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = shellWindow.edgePadding, bottom = 4.dp)
-                        .background(MenuTokens.FloatingPlate, RoundedCornerShape(12.dp)),
-                )
             }
             // Over the themed canvas, at the place the theme itself laid
             // out for a help row, rather than under a canvas shortened to
@@ -3182,9 +3169,8 @@ private fun GamesSection(
                         // 2026-09-24, screenshots 01/06). No shoulder either: L1/R1
                         // never switch sections (docs/SPEC.md 7j, "Gaming controls"),
                         // and nothing here is a tab strip they could step.
-                        val systemListHints = listOf(
-                            GamepadAction.A to "Select",
-                        )
+                        // Start and R2 end the theme's row, as real ES-DE's own row ends on START MENU (#510).
+                        val systemListHints = listOf(GamepadAction.A to "Select") + rememberHintList(ShellMenuHints)
                         val systemView = theme?.views?.get("system")
                         // Same rule as the gamelist's own claim above: a
                         // themed canvas lays the help row out itself,
@@ -3411,7 +3397,7 @@ private fun GamesSection(
                             HintBinding(GamepadAction.Y, "Info") { gameUnderCursor },
                             HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
                             HintBinding(GamepadAction.B, "Back"),
-                        )
+                        ) + ShellMenuHints
                     ),
                     systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
                         name = selectedGroupLabel,
