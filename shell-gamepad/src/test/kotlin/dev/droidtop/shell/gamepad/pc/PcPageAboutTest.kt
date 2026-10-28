@@ -221,24 +221,33 @@ class PcPageAboutTest {
             playtimeSeconds = 3600,
             availableUpdate = "0.9.6",
         )
-        val strip = factsStrip(played, now, folderSizeBytes = 2048, installedVersion = "0.9.5", runsWith = "Wine")
+        val strip = factsStrip(
+            played, now, folderSizeBytes = 2048, installedVersion = "0.9.5", runsWith = "Wine", runsWithReason = "Your choice for this game",
+        )
         assertEquals(
             listOf(
-                "Last played" to "2 days ago",
-                "Play time" to "1 h",
-                "Version" to "0.9.5, v0.9.6 is available",
-                "Size" to "2 KB",
-                "Runs with" to "Wine",
+                StripFact("Last played", "2 days ago"),
+                StripFact("Play time", "1 h"),
+                StripFact("Version", "0.9.5, v0.9.6 is available"),
+                StripFact("Size", "2 KB"),
+                StripFact("Runs with", "Wine", "Your choice for this game"),
             ),
             strip,
         )
 
         val bare = factsStrip(entry(), now, folderSizeBytes = null, installedVersion = null, runsWith = null)
-        assertEquals(listOf("Last played" to "Never"), bare)
+        assertEquals(listOf(StripFact("Last played", "Never")), bare)
 
         // Counted but not timed: the count is Overview's "Times played", not a play time.
         val counted = factsStrip(entry().copy(playCount = 14), now, folderSizeBytes = null, installedVersion = null, runsWith = null)
-        assertEquals(listOf("Last played" to "Never"), counted)
+        assertEquals(listOf(StripFact("Last played", "Never")), counted)
+    }
+
+    @Test
+    fun heroArtNarrowerThan320PixelsIsNeverBlownUp() {
+        assertTrue(isNarrowHeroArt(319f))
+        assertFalse(isNarrowHeroArt(320f))
+        assertFalse(isNarrowHeroArt(0f))
     }
 
     @Test
