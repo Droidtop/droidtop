@@ -45,6 +45,7 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val LOCK_HOME_SCREEN: String = "pref_lock_home_screen"
         const val BLUR_PREVIEW: String = "pref_blur_preview"
         const val BLUR_PREVIEW_WARNING: String = "pref_blur_preview_warning"
+        const val WRAP_PAGES: String = "pref_wrap_pages"
         const val DOCK_ICONS_OVERRIDE_SWITCH: String = "pref_dock_icons_override_switch"
         const val DOCK_ICONS: String = "pref_dock_icons"
         const val DOUBLE_TAP_ACTION: String = "pref_gesture_double_tap_action"
