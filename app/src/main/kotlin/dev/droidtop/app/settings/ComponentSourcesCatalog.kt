@@ -108,7 +108,7 @@ object ComponentSourcesCatalog {
             // What is on the device (Droidtop/tracker#233): each build's size, and Remove for one nothing uses.
             val onDevice = installed.map { c ->
                 // A build added by link or file says where from (its WineBuilds id is the store key without the kind).
-                val size = android.text.format.Formatter.formatShortFileSize(context, c.bytes) +
+                val size = dev.droidtop.library.format.ValueFormat.size(c.bytes) +
                     (added[c.entry.substringAfter('-')]?.let { ". Added from $it" } ?: "")
                 if (c.removable) {
                     AsyncActionItem(
@@ -142,7 +142,7 @@ object ComponentSourcesCatalog {
                                 title = "${u.kind} ${u.name}",
                                 subtitle = listOfNotNull(
                                     u.reason,
-                                    u.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
+                                    u.bytes.takeIf { it > 0 }?.let { dev.droidtop.library.format.ValueFormat.size(it) },
                                 ).joinToString(". "),
                                 value = "Not on this device",
                             )
