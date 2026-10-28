@@ -73,7 +73,9 @@ public class InputLanguageSelection extends PreferenceActivity {
         "fa", "fi", "fr", "fr_CA", "he", "hr", "hu", "hu_QY", "hy", "in",
         "it", "iw", "ja", "ka", "ko", "lo", "lt", "lv", "nb", "nl", "pl",
         "pt", "pt_PT", "rm", "ro", "ru", "ru_PH", "si", "sk", "sk_QY", "sl",
-        "sr", "sv", "ta", "th", "tl", "tr", "uk", "vi", "zh_CN", "zh_TW"
+        "sr", "sv", "ta", "th", "tl", "tr", "uk", "vi", "zh_CN", "zh_TW",
+        // droidtop: 4-row layouts made from HeliBoard's (Droidtop/tracker#342, input-keyboard/layouts-src)
+        "be", "mk", "mn"
     };
 
     private static final String[] KBD_5_ROW = {
@@ -90,7 +92,9 @@ public class InputLanguageSelection extends PreferenceActivity {
         "ar", "bg", "bg_ST", "cs", "cs_QY", "da", "de", "de_NE", "el",
         "en", "en_CX", "en_DV", "es", "es_LA", "es_US", "fa", "fr", "fr_CA",
         "he", "hr", "hu", "hu_QY", "iw", "nb", "ru", "ru_PH", "sk", "sk_QY",
-        "sl", "sr", "sv", "tr", "uk"
+        "sl", "sr", "sv", "tr", "uk",
+        // droidtop: made from HeliBoard's layouts (Droidtop/tracker#342)
+        "be", "mk", "mn"
     };
 
     private static String getLocaleName(Locale l) {

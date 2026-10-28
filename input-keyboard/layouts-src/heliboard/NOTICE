@@ -1,0 +1,4 @@
+These layouts are copied unchanged from HeliBoard (https://github.com/Helium314/HeliBoard,
+app/src/main/assets/layouts/main/, revision 44ddb1ae06203857c490da75f9fa281a4e8b89cd), licensed GPL-3.0.
+heliboard-to-kbd.py turns each into the keyboard's res/xml-<locale>/kbd_qwerty.xml:
+  macedonian.txt -> xml-mk, belarusian.txt -> xml-be, mongolian.txt -> xml-mn
