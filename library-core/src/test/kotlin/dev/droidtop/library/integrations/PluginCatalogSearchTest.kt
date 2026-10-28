@@ -32,4 +32,11 @@ class PluginCatalogSearchTest {
         assertTrue(PluginCatalogScreen.matchesQuery(plugin, "droidtop", "retro torrents"))
         assertFalse(PluginCatalogScreen.matchesQuery(plugin, "droidtop", "retro emulator"))
     }
+
+    @Test
+    fun `the Plugins page's search matches installed plugins the same way, skipping fields they lack`() {
+        assertTrue(PluginCatalogScreen.matchesWords("nyaa", listOf("Nyaa", "dev.plugin.nyaa", null, "droidtop")))
+        assertTrue(PluginCatalogScreen.matchesWords("  ", listOf(null)))
+        assertFalse(PluginCatalogScreen.matchesWords("steam", listOf("Nyaa", "dev.plugin.nyaa", null, "droidtop")))
+    }
 }
