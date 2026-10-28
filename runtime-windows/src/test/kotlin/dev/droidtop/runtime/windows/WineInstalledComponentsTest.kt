@@ -1,6 +1,8 @@
 package dev.droidtop.runtime.windows
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,5 +36,18 @@ class WineInstalledComponentsTest {
         assertTrue(free.removable)
         assertFalse(free.copy(inUse = true).removable)
         assertFalse(free.copy(bundled = true).removable)
+    }
+
+    @Test
+    fun `an ARM device is offered every build`() {
+        assertNull(WineOptionPlan.notHereReason(x86Host = false, wine = "proton-9.0-arm64ec"))
+        assertNull(WineOptionPlan.notHereReason(x86Host = false, wine = "proton-9.0-x86_64"))
+    }
+
+    @Test
+    fun `an x86_64 device says why an ARM or pre-10 build is not offered`() {
+        assertEquals("An ARM (arm64ec) build; this device's CPU is x86_64", WineOptionPlan.notHereReason(true, "proton-10.0-4-arm64ec"))
+        assertEquals("Made for Box64 on ARM; an x86_64 device runs Wine builds from 10 on", WineOptionPlan.notHereReason(true, "proton-9.0-x86_64"))
+        assertNull(WineOptionPlan.notHereReason(true, "proton-10.0-4-x86_64-1"))
     }
 }

@@ -7345,6 +7345,13 @@ source (now `:runtime-windows`, §9):
     "Built in" and never removable. An installed build is not updated in place:
     each prefix keeps the build it was made with (the save-safe default, plan of
     2026-10-14 on the issue).
+    **Not on this device**: what the enabled sources offer that this CPU cannot
+    run is listed beneath, each with why (SPEC 7i's state, never hidden): on an
+    x86_64 device the ARM (arm64ec) Wine builds and the x86_64 ones before Wine
+    10 (`WineOptionPlan.notHereReason`), and the ARM GPU drivers, with the
+    catalog's size where it gives one. An ARM device runs every bionic build (an
+    x86_64 one under Box64), so it lists none. The choice rows still offer only
+    what runs; Linux (glibc) builds stay as their sources' "Not available" row.
   - **Any Wine build (owner, 2026-10-08: "I just wanted to make sure we
     could use arbitrary wine versions, for compatibility reasons").** Beside
     the catalog's, a person adds a build by link or by file ("Add a Wine

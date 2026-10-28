@@ -36,6 +36,7 @@ object ComponentSourcesCatalog {
             val fetchedAt = withContext(Dispatchers.IO) { ComponentCatalog.fetchedAt(context) }
             val added = withContext(Dispatchers.IO) { WineBuilds.added(context) }
             val installed = WineInstalledComponents.list(context)
+            val notHere = WineInstalledComponents.notOnThisDevice(context)
             val add = buildList<CatalogItem> {
                 add(
                     TextInputItem(
@@ -130,6 +131,24 @@ object ComponentSourcesCatalog {
             listOfNotNull(
                 CatalogGroup(id = "wine_build_add", title = "Add a Wine build", items = add),
                 onDevice.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "wine_components_installed", title = "On this device", items = it) },
+                // What the enabled sources offer that this CPU cannot run, with why, rather than hidden (SPEC 7i).
+                notHere.takeIf { it.isNotEmpty() }?.let { list ->
+                    CatalogGroup(
+                        id = "wine_components_not_here",
+                        title = "Not on this device",
+                        items = list.map { u ->
+                            ActionItem(
+                                id = "wine_component_not_here_${u.kind}_${u.name}",
+                                title = "${u.kind} ${u.name}",
+                                subtitle = listOfNotNull(
+                                    u.reason,
+                                    u.bytes.takeIf { it > 0 }?.let { android.text.format.Formatter.formatShortFileSize(context, it) },
+                                ).joinToString(". "),
+                                value = "Not on this device",
+                            )
+                        },
+                    )
+                },
                 CatalogGroup(id = "component_sources", title = "Sources", items = sources + refresh),
             )
         },
