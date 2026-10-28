@@ -75,7 +75,7 @@ fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
                 if (request.tier == PermissionTier.CRITICAL) {
                     Text(
                         "This gives the plugin system-level access. Only allow it if you trust the plugin.",
-                        color = MenuTokens.Danger,
+                        color = MenuTokens.NoticeDanger,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

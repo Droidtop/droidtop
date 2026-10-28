@@ -1576,7 +1576,7 @@ private fun GamesStep(
                     supporting = report?.let { GamesRootReport.describe(it) }
                         ?: GamesRootReport.describe(scanProgress[path]),
                     trailing = {
-                        PadButton("Remove", { onRemoveRoot(path) }, color = MenuTokens.Danger)
+                        PadButton("Remove", { onRemoveRoot(path) }, color = MenuTokens.NoticeDanger)
                     },
                 )
                 // ES-DE's three concrete repairs when a folder yields
@@ -1641,7 +1641,7 @@ private fun GamesStep(
                     .onFocusChanged { pathFieldFocused = it.isFocused },
             )
             if (pathError != null) {
-                Text(pathError, color = MenuTokens.Danger, style = TypeRole.supporting)
+                Text(pathError, color = MenuTokens.NoticeDanger, style = TypeRole.supporting)
             }
             if (pathEntry.isNotBlank()) PadButton("Add this path", onAddPath)
         }

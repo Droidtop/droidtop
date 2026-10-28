@@ -509,7 +509,7 @@ private fun ReadoutRow(label: String, value: String, fill: Int?, detail: String?
             Spacer(Modifier.weight(1f))
             Text(
                 value,
-                color = if (alarm) MenuTokens.Danger else MenuTokens.Value,
+                color = if (alarm) MenuTokens.NoticeDanger else MenuTokens.Value,
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
@@ -527,7 +527,7 @@ private fun ReadoutRow(label: String, value: String, fill: Int?, detail: String?
                         .fillMaxWidth(fill.coerceIn(0, 100) / 100f)
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(if (alarm) MenuTokens.Danger else MenuTokens.Accent),
+                        .background(if (alarm) MenuTokens.NoticeDanger else MenuTokens.Accent),
                 )
             }
         }
@@ -1096,14 +1096,14 @@ private fun StopPill(label: String, selected: Boolean, onClick: () -> Unit) {
                 selected,
                 Corners.Pill,
                 rest = Color.Transparent,
-                restOutline = MenuTokens.Danger.copy(alpha = 0.55f),
-                selectedFill = MenuTokens.Danger.copy(alpha = 0.18f),
+                restOutline = MenuTokens.NoticeDanger.copy(alpha = 0.55f),
+                selectedFill = MenuTokens.NoticeDanger.copy(alpha = 0.18f),
             )
             .focusProperties { canFocus = false }
             .clickable(onClick = onClick)
             .padding(start = 12.dp, end = 14.dp),
     ) {
-        QuickGlyphIcon(QuickGlyph.POWER, tint = MenuTokens.Danger, modifier = Modifier.size(18.dp))
-        Text(label, style = TypeRole.button, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MenuTokens.Danger)
+        QuickGlyphIcon(QuickGlyph.POWER, tint = MenuTokens.NoticeDanger, modifier = Modifier.size(18.dp))
+        Text(label, style = TypeRole.button, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MenuTokens.NoticeDanger)
     }
 }

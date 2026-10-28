@@ -2021,7 +2021,7 @@ private fun EntryDetailScreen(
         // fail for reasons droidtop cannot see coming (the template names a
         // component that app no longer exports). Shown, not swallowed.
         integrationError?.let {
-            Text(it, color = MenuTokens.Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+            Text(it, color = MenuTokens.NoticeDanger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
         }
     }
     pluginActionScreen?.let { screen ->

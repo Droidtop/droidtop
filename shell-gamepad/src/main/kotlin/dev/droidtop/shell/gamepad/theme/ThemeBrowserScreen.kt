@@ -357,7 +357,7 @@ private fun ThemeBrowserRow(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(entry.name, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
                 if (entry.deprecated) {
-                    Text("DEPRECATED", color = MenuTokens.Danger, style = MaterialTheme.typography.labelSmall)
+                    Text("DEPRECATED", color = MenuTokens.NoticeDanger, style = MaterialTheme.typography.labelSmall)
                 }
             }
             if (entry.author.isNotBlank()) {
