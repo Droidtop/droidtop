@@ -70,6 +70,7 @@ object UpdatesPage {
         id = AppSettingsCatalogs.SCREEN_UPDATES,
         title = "Updates",
         subtitle = "What has a newer version",
+        needsNetwork = true,
         // Off the main thread as a whole: the rows read preferences, caches and the package manager.
         groups = { context -> withContext(Dispatchers.IO) { listOf(CatalogGroup(id = "updates", title = null, items = rows(context))) } },
     )
