@@ -7,10 +7,13 @@ import dev.droidtop.library.GamesRoots
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.PcSource
 import dev.droidtop.library.settings.ActionItem
+import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.FolderPickItem
 import dev.droidtop.library.settings.GamingSettingsCatalog
+import dev.droidtop.library.settings.NestedScreenItem
+import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.TextBlockItem
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -37,16 +40,26 @@ internal data class FolderCounts(val roots: List<RootCount>, val shortcuts: Int)
  * of a card can take minutes, docs/SPEC.md 7g).
  */
 internal object FoldersCatalog {
-    const val SCREEN_ID = "game_sources_folders_screen"
+    /**
+     * The one game folders screen (Droidtop/tracker#589): Settings > Library > Game folders, Game sources > Folders,
+     * the empty libraries' Add a folder and the Launcher's games grid all open this id. It was two screens over the
+     * same `GamesRootPrefs` list, each with its own add and rescan rows.
+     */
+    const val SCREEN_ID = "rom_folders"
 
     fun screen() = CatalogScreen(
         id = SCREEN_ID,
-        title = "Folders",
-        subtitle = "Your game folders, what droidtop found in each, and a rescan of them",
+        title = "Game folders",
+        subtitle = "Where droidtop looks for games. Console games go in a folder named for their system (snes, psx) " +
+            "inside one of these; PC and engine games can be anywhere under them",
         groups = { context -> groups(context) },
-        // The search index must not read the library to list a few rows.
-        indexGroups = { emptyList() },
+        // The search index must not read the library: it gets the rows that never change.
+        indexGroups = { listOf(actionsGroup(shortcuts = null), byPathGroup()) },
     )
+
+    // The typed path, between the field and the Add action.
+    @Volatile
+    private var pendingPath = ""
 
     /**
      * The one "Add a folder" row (Game sources > Folders and Settings > Game folders): Android's folder picker, the
@@ -111,8 +124,37 @@ internal object FoldersCatalog {
         return "${gamesWord(root.games)} · $scanned"
     }
 
-    /** A root row's hint: where it is, and what selecting it does. */
-    fun rootLine(root: RootCount): String = "${root.path}. Select to stop looking here"
+    /**
+     * One folder's own page: what was found there and when, a rescan, and Remove as a named row behind a question.
+     * A folder row used to remove the folder on A, with nothing on the row saying so (Droidtop/tracker#589), so two
+     * presses could drop a 2,000-game folder.
+     */
+    private fun folderScreen(root: RootCount, now: Long) = CatalogScreen(
+        id = "folders_root_screen_${root.path}",
+        title = folderName(root.path),
+        subtitle = root.path,
+        groups = {
+            listOf(
+                CatalogGroup(
+                    id = "folders_root_facts_${root.path}",
+                    title = null,
+                    items = listOf(
+                        TextBlockItem(id = "folders_root_found_${root.path}", text = rootValue(root, now).replaceFirstChar { it.uppercase() }),
+                        GamingSettingsCatalog.rescanPcFoldersItem(),
+                        ActionItem(
+                            id = "folders_root_remove_${root.path}",
+                            title = "Remove this folder",
+                            subtitle = "droidtop stops looking here. Its games leave the library, and adding it back restores them. " +
+                                "Nothing on the device is deleted",
+                            confirmTitle = "Stop looking in ${root.path}?",
+                            run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, root.path) },
+                        ),
+                    ),
+                ),
+            )
+        },
+        indexGroups = { emptyList() },
+    )
 
     /** "5 min ago", in the coarsest honest unit, as the store rows say "Synced 5 min ago". */
     fun agoWords(now: Long, then: Long): String = syncedAgo(now, then).removePrefix("Synced ")
@@ -125,34 +167,76 @@ internal object FoldersCatalog {
                 id = "folders_roots",
                 title = null,
                 items = counts.roots.map { root ->
-                    ActionItem(
+                    NestedScreenItem(
                         id = "folders_root_${root.path}",
                         title = folderName(root.path),
-                        subtitle = rootLine(root),
-                        value = rootValue(root, now),
-                        confirmTitle = "Stop looking in ${root.path}? Its games leave the library; adding it back restores them",
-                        run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, root.path) },
+                        subtitle = root.path,
+                        inline = folderScreen(root, now),
+                        valueLabel = { rootValue(root, now) },
+                        icon = dev.droidtop.library.settings.CatalogIcon.GAME_FOLDERS,
                     )
                 }.ifEmpty {
                     listOf(ActionItem(id = "folders_none", title = "No game folders yet", subtitle = "Add the folder your games are in", run = {}))
                 } + TextBlockItem(id = "folders_note", text = "New games appear after Rescan or a store sync."),
             ),
-            CatalogGroup(
-                id = "folders_actions",
-                title = null,
-                items = listOf(
-                    GamingSettingsCatalog.rescanPcFoldersItem(),
-                    addFolderItem("folders_add"),
-                    ActionItem(
-                        // The Gaming shell opens PC Games on the Wine shortcuts (PcSource.LIBRARY_ITEM_PREFIX).
-                        id = "${PcSource.LIBRARY_ITEM_PREFIX}${PcSource.WineShortcut.id}",
-                        title = PcSource.WineShortcut.label(),
-                        subtitle = "Shortcuts made by hand in a Wine prefix. PC Games lists them",
-                        value = gamesWord(counts.shortcuts),
-                        run = {},
-                    ),
-                ),
-            ),
+            actionsGroup(counts.shortcuts),
+            byPathGroup(),
         )
     }
+
+    /**
+     * Add a folder, the two rescans (the whole library, and the PC walk alone), and the Wine shortcuts. [shortcuts]
+     * is null for the search index, which must not read the library, so the shortcuts row is left out there.
+     */
+    private fun actionsGroup(shortcuts: Int?) = CatalogGroup(
+        id = "folders_actions",
+        title = null,
+        items = listOfNotNull(
+            addFolderItem("folders_add"),
+            GamingSettingsCatalog.rescanLibraryItem(),
+            GamingSettingsCatalog.rescanPcFoldersItem(),
+            shortcuts?.let { count ->
+                ActionItem(
+                    // The Gaming shell opens PC Games on the Wine shortcuts (PcSource.LIBRARY_ITEM_PREFIX).
+                    id = "${PcSource.LIBRARY_ITEM_PREFIX}${PcSource.WineShortcut.id}",
+                    title = PcSource.WineShortcut.label(),
+                    subtitle = "Shortcuts made by hand in a Wine prefix. PC Games lists them",
+                    value = gamesWord(count),
+                    run = {},
+                )
+            },
+        ),
+    )
+
+    /** A folder the picker cannot offer, typed: an emulator's host share, a rooted device's own mount, a USB drive. */
+    private fun byPathGroup() = CatalogGroup(
+        id = "folders_add_by_path",
+        title = "Add a folder by path",
+        items = listOf(
+            TextInputItem(
+                id = "folders_path",
+                title = "Folder path",
+                subtitle = "The picker only offers what Android calls a storage volume. An emulator's host share " +
+                    "(BlueStacks' /mnt/windows/BstSharedFolder), a mount a rooted device adds itself, or a USB drive " +
+                    "under /mnt is none of those, and is typed here instead",
+                value = pendingPath,
+                onChange = { _, value -> pendingPath = value },
+            ),
+            AsyncActionItem(
+                id = "folders_path_add",
+                title = "Add this folder",
+                subtitle = "Checked for real before it is stored: it must exist, be a folder, and be readable",
+                run = { ctx, _ ->
+                    val typed = pendingPath
+                    val error = withContext(Dispatchers.IO) { GamesRootPrefs.addGamesRootByPath(ctx, typed) }
+                    if (error == null) {
+                        pendingPath = ""
+                        "Added " + typed.trim()
+                    } else {
+                        error
+                    }
+                },
+            ),
+        ),
+    )
 }
