@@ -67,4 +67,16 @@ class PadMouseTest {
         assertTrue(PadMouse.initial(null, runnerNeedsMouse = true).on)
         assertFalse(PadMouse.initial(PadMouse.encode(PadMouse.Settings(on = false)), runnerNeedsMouse = true).on)
     }
+
+    @Test
+    fun `a pointer genre starts mouse mode on, and a word inside another does not count`() {
+        assertTrue(PadMouse.genreNeedsMouse("Adventure, Point-and-click"))
+        assertTrue(PadMouse.genreNeedsMouse("Adventure / Point and Click"))
+        assertTrue(PadMouse.genreNeedsMouse("Real Time Strategy (RTS)"))
+        assertTrue(PadMouse.genreNeedsMouse("Visual Novel"))
+        assertTrue(PadMouse.genreNeedsMouse("Card & Board Game"))
+        assertFalse(PadMouse.genreNeedsMouse("Sports"))
+        assertFalse(PadMouse.genreNeedsMouse("Platform, Action"))
+        assertFalse(PadMouse.genreNeedsMouse(null))
+    }
 }

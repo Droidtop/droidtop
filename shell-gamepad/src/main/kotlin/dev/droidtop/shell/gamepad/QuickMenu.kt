@@ -952,7 +952,7 @@ private fun GameTab(
                 add(
                     GameQuickTile(
                         title = "Mouse mode",
-                        subtitle = if (on) "On. Both stick clicks held also turn it off" else "Off",
+                        subtitle = if (on) "On. Both stick clicks held also turn it off" else "Off. Both stick clicks held also turn it on",
                         action = {
                             ownScreen?.setPadMouse(!on)
                             padMouse = !on
