@@ -130,6 +130,9 @@ class WineGameActivity : Activity() {
         Thread(runnable, "droidtop-wine-start")
     }
 
+    /** droidtop's token set for the failure screen; null until read, and then the screen keeps black and white. */
+    @Volatile private var chrome: dev.droidtop.library.theme.RoleTokens.Set? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -137,6 +140,9 @@ class WineGameActivity : Activity() {
         // view and renderer code, and both inits are no-ops once done.
         GameNativePrefManager.init(this)
         WinlatorPrefManager.init(this)
+        // The failure screen's colours, droidtop's own for its Light or dark (docs/SPEC.md 7k, Droidtop/tracker#561):
+        // read once here, off the main thread, since they come from a preference.
+        startupExecutor.execute { chrome = runCatching { dev.droidtop.library.theme.RoleTokens.current(applicationContext) }.getOrNull() }
         // Not optional, and not cosmetic: WinHandler.start() asks the
         // controller manager to scan for devices, and the manager holds
         // the InputManager it scans with only after this call. Without it
@@ -451,8 +457,10 @@ class WineGameActivity : Activity() {
                     "Check that Windows games is set up in Settings, then try again." + "\n" + "\n" +
                     "Press B to return to droidtop."
                 gravity = Gravity.CENTER
-                setBackgroundColor(Color.BLACK)
-                setTextColor(Color.WHITE)
+                // droidtop's own screen, not the game's frame: it follows Light or dark (Droidtop/tracker#561).
+                val tokens = chrome
+                setBackgroundColor(tokens?.color("ground") ?: Color.BLACK)
+                setTextColor(tokens?.color("onSurface") ?: Color.WHITE)
                 setPadding(FAILURE_PADDING_PX, FAILURE_PADDING_PX, FAILURE_PADDING_PX, FAILURE_PADDING_PX)
             },
         )
