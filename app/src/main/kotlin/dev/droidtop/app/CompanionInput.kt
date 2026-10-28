@@ -60,17 +60,15 @@ internal fun trackpadConfig(settings: TrackpadSettings): TrackpadConfig = Trackp
 internal fun trackpadSpeed(settings: TrackpadSettings): Float = settings.speed.coerceIn(-10, 10) / 10f
 
 /**
- * The chord keys above the keyboard: what a handheld's touch keyboard makes awkward, each played by the vendored
+ * The chord keys above the keyboard: the shortcuts a touch keyboard makes awkward, each played by the vendored
  * keyboard's own [org.pocketworkstation.pckeyboard.MacroPlayer] into the one keyboard destination, so they go where
  * typed keys go: the container's input seat in Desktop (the compositor gets Alt+Tab and Super, Android never sees them
  * as shortcuts), else the focused app.
  */
 internal object CompanionChords {
+    // Only combinations: Esc, Tab and Super are keys of the keyboard's own extras row, so they are not here twice (#525).
     val ALL: List<Macro> = listOf(
-        Macro("Esc", listOf(MacroStep.Chord(KeyEvent.KEYCODE_ESCAPE))),
-        Macro("Tab", listOf(MacroStep.Chord(KeyEvent.KEYCODE_TAB))),
         Macro("Alt+Tab", listOf(MacroStep.Chord(KeyEvent.KEYCODE_TAB, alt = true))),
-        Macro("Super", listOf(MacroStep.Chord(KeyEvent.KEYCODE_META_LEFT))),
         Macro("Ctrl+C", listOf(MacroStep.Chord(KeyEvent.KEYCODE_C, ctrl = true))),
         Macro("Ctrl+V", listOf(MacroStep.Chord(KeyEvent.KEYCODE_V, ctrl = true))),
         Macro("Ctrl+Z", listOf(MacroStep.Chord(KeyEvent.KEYCODE_Z, ctrl = true))),

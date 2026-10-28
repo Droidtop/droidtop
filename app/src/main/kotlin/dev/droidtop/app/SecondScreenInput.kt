@@ -202,6 +202,8 @@ class SecondScreenInputView(
     init {
         orientation = VERTICAL
         setBackgroundColor(dev.droidtop.shell.gamepad.MenuTokens.Ground.toArgb())
+        // Text keeps a 16dp gutter from the screen's edge; the keys and the trackpad run edge to edge (#525).
+        val gutter = (GUTTER_DP * resources.displayMetrics.density).toInt()
 
         val header = LinearLayout(context).apply {
             orientation = HORIZONTAL
@@ -216,6 +218,7 @@ class SecondScreenInputView(
         tabs.contentDescription = "Show tabs"
         tabs.setOnClickListener { CompanionInputHandle.showTabs.value = !CompanionInputHandle.showTabs.value }
         header.addView(tabs, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
+        header.setPadding(gutter, 0, gutter, 0)
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         // The chord keys, played into the same destination as the keyboard ([CompanionChords]).
@@ -241,8 +244,15 @@ class SecondScreenInputView(
                 LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT),
             )
         }
+        // The row scrolls sideways, and its edges fade where there is more, so a chord past the edge is seen to be there.
         addView(
-            android.widget.HorizontalScrollView(context).apply { addView(chords) },
+            android.widget.HorizontalScrollView(context).apply {
+                addView(chords)
+                setPadding(gutter, 0, gutter, 0)
+                clipToPadding = false
+                isHorizontalFadingEdgeEnabled = true
+                setFadingEdgeLength(gutter * 2)
+            },
             LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT),
         )
 
@@ -267,6 +277,7 @@ class SecondScreenInputView(
         status.gravity = Gravity.CENTER
         // Fixed heights: a fact that changes (the target, a controller, the input method) never moves the keys.
         status.setLines(2)
+        status.setPadding(gutter, 0, gutter, 0)
         addView(status, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         imePicker.text = "Use droidtop keyboard"
@@ -286,6 +297,7 @@ class SecondScreenInputView(
         controllers.textSize = 13f
         controllers.gravity = Gravity.CENTER
         controllers.setSingleLine()
+        controllers.setPadding(gutter, 0, gutter, 0)
         addView(controllers, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         addView(trackpad, LayoutParams(LayoutParams.MATCH_PARENT, 0, TRACKPAD_WEIGHT))
@@ -338,7 +350,7 @@ class SecondScreenInputView(
                 controllers.visibility = if (pads.isEmpty()) View.INVISIBLE else View.VISIBLE
                 syncTarget()
                 syncPointerHelp()
-                status.text = statusText()
+                showStatus()
             }
         }
     }
@@ -379,7 +391,7 @@ class SecondScreenInputView(
         // went away leaves no sink pointing at a dead bridge.
         val settings = dev.droidtop.library.settings.CompanionPrefs.settings.value.trackpad
         trackpad.engine = TrackpadGestureEngine(trackpadOutput(), trackpadConfig(settings))
-        status.text = statusText()
+        showStatus()
         refreshFacts()
         syncImePicker()
         syncImeSuppression()
@@ -413,7 +425,7 @@ class SecondScreenInputView(
         super.onWindowFocusChanged(hasWindowFocus)
         syncImePicker()
         syncPointerHelp()
-        status.text = statusText()
+        showStatus()
         if (hasWindowFocus) refreshFacts()
     }
 
@@ -486,7 +498,7 @@ class SecondScreenInputView(
                 lastRoute = route
                 post {
                     syncPointerHelp()
-                    status.text = statusText()
+                    showStatus()
                 }
             }
             when (route) {
@@ -550,7 +562,7 @@ class SecondScreenInputView(
             RoutedKeyboardSink(
                 displayId = { targetId() },
                 elevated = { elevated },
-                onNoRoute = { status.text = statusText() },
+                onNoRoute = { showStatus() },
             )
         }
 
@@ -589,12 +601,27 @@ class SecondScreenInputView(
         }
         val keys = when {
             KeyboardTargets.companion.value != null -> "Typing"
-            !SecondScreenKeyboard.imeRunning && !AccessibilityKeyboard.connected && !elevated -> "Keyboard off"
+            keysOff() -> null
             !SecondScreenKeyboard.androidTargetAvailable() && !AccessibilityKeyboard.hasEditor() && !elevated -> "No text field"
             else -> null
         }
         return listOfNotNull(keys, padLine()).joinToString(" · ")
     }
+
+    /**
+     * The fact lines, and the keys' own look: with nothing able to take what they type the keys are dimmed and the
+     * "Use droidtop keyboard" button under them says what to do, rather than a "Keyboard off" line under a keyboard that
+     * looks ready (Droidtop/tracker#525).
+     */
+    private fun showStatus() {
+        status.text = statusText()
+        keys?.alpha = if (keysOff()) KEYS_OFF_ALPHA else 1f
+    }
+
+    /** Whether the keys have nowhere to type: no request, no input method, no accessibility service, no helper. */
+    private fun keysOff(): Boolean =
+        mode != SecondaryDisplayContent.Mode.DESKTOP && KeyboardTargets.companion.value == null &&
+            !SecondScreenKeyboard.imeRunning && !AccessibilityKeyboard.connected && !elevated
 
     /** What the trackpad is doing outside Desktop, in a few words. */
     private fun padLine(): String = when (currentRoute()) {
@@ -609,6 +636,12 @@ class SecondScreenInputView(
         /** The keyboard's and the trackpad's shares of the height left under the header and the fact lines. */
         const val KEYBOARD_WEIGHT = 3f
         const val TRACKPAD_WEIGHT = 2f
+
+        /** The text's distance from the screen's edge. */
+        const val GUTTER_DP = 16
+
+        /** The keys' opacity while nothing can take what they type. */
+        const val KEYS_OFF_ALPHA = 0.38f
     }
 }
 

@@ -73,8 +73,18 @@ class CompanionInputTest {
             keys,
         )
         keys.clear()
-        player.play(CompanionChords.ALL.single { it.name == "Super" })
-        assertEquals(listOf(KeyEvent.KEYCODE_META_LEFT to true, KeyEvent.KEYCODE_META_LEFT to false), keys)
+        player.play(CompanionChords.ALL.single { it.name == "Ctrl+C" })
+        assertEquals(
+            listOf(
+                KeyEvent.KEYCODE_CTRL_LEFT to true,
+                KeyEvent.KEYCODE_C to true,
+                KeyEvent.KEYCODE_C to false,
+                KeyEvent.KEYCODE_CTRL_LEFT to false,
+            ),
+            keys,
+        )
+        // The keyboard's extras row has Esc, Tab and Super: the chord row holds only combinations.
+        assertTrue(CompanionChords.ALL.none { it.name in setOf("Esc", "Tab", "Super") })
         // Every chord leaves nothing held.
         for (macro in CompanionChords.ALL) {
             keys.clear()
