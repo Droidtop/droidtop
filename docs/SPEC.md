@@ -7247,6 +7247,18 @@ two-finger scroll and right-click as everywhere else (`GamePointerTrackpadSink`)
 service. No second touch path is added on the main screen, which keeps the Windows screen's own trackpad (the owner's
 clarification above).
 
+**Controller layouts: Steam's format** (decided 2026-10-23, Droidtop/tracker#618; owner: "we want all profiles we use
+to be compatible with steam. If a steam user who doesn't use droidtop wants to use it, they should be able to", and on
+the controls review: "Yep. Go for it"). A controller layout is stored as Steam's controller configuration file, a
+KeyValues text file rooted at `controller_mappings` (groups with a mode, inputs, activators and bindings; presets that
+put groups on sources; action sets and layers; localization). The `:input-mapping` module reads and writes it
+(`KeyValues`, `ControllerLayout`, `Binding`): the node tree is the layout, so repeated keys keep their order and a key
+droidtop does not know is written back unchanged; `parse(write(x)) == x` is tested. Comments are not kept. Nothing
+droidtop-only goes into the file: what Steam has no word for will live in a `<layout>.droidtop.json` sidecar. The
+module holds no Android types, so the same sources can move to the shared library when Enginehost uses it (C9). The
+mapping engine that plays a layout to a game, and the defaults, follow on it; until then Controller mouse mode above
+is the pad's only pointer.
+
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with
 the Gaming Quick Menu open on its Game section (Resume, Restart, Stop with two
