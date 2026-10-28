@@ -126,6 +126,24 @@ object DownloadSites {
         return runCatching { PluginVault.forContext(context).put(VAULT_ID, site.domain, session.toJson()) }.isSuccess
     }
 
+    /**
+     * The `Cookie` header of every signed-in site, by domain, leaving out the sites [except] covers (a view already
+     * carrying that site's session, such as its own sign-in). What droidtop's web view puts in while it is open (slice 2).
+     */
+    fun cookies(context: Context, except: List<String> = emptyList()): Map<String, String> =
+        all(context).filter { !WebSessions.covers(it.domain, except) }.mapNotNull { site ->
+            stored(context, site)?.cookies?.get(site.domain)?.takeIf { it.isNotBlank() }?.let { site.domain to it }
+        }.toMap()
+
+    /** The cookies a site renewed while droidtop's view was open, sealed again; nothing for a site not signed in. */
+    fun renew(context: Context, domain: String, header: String) {
+        if (header.isBlank()) return
+        val site = all(context).firstOrNull { it.domain == domain } ?: return
+        val kept = stored(context, site) ?: return
+        if (kept.cookies[domain] == header) return
+        runCatching { PluginVault.forContext(context).put(VAULT_ID, domain, kept.copy(cookies = kept.cookies + (domain to header)).toJson()) }
+    }
+
     /** Sign out: [site]'s cookies are forgotten, and no other site's. */
     fun signOut(context: Context, site: Site): Boolean = PluginVault.forContext(context).delete(VAULT_ID, site.domain)
 }

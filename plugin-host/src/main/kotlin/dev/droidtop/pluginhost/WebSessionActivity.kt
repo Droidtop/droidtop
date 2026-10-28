@@ -80,6 +80,12 @@ class WebSessionActivity : Activity() {
         cookies.setAcceptCookie(true)
         asked.domains.forEach { purge(cookies, it) }
         asked.session?.cookies?.forEach { (domain, header) -> inject(cookies, domain, header) }
+        // droidtop's own signed-in download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648), for their
+        // domains only and only while this view is open.
+        siteCookies[id]?.forEach { (domain, header) ->
+            purge(cookies, domain)
+            inject(cookies, domain, header)
+        }
         cookies.flush()
 
         val root = LinearLayout(this).apply {
@@ -299,6 +305,17 @@ class WebSessionActivity : Activity() {
             )
         }
         asked?.domains?.forEach { purge(cookies, it) }
+        // The download sites go back to droidtop's vault, as the site left them, and out of the store.
+        val renewed = id?.let { siteCookies.remove(it) }?.keys?.mapNotNull { domain ->
+            val left = cookies.getCookie("https://$domain")
+            purge(cookies, domain)
+            left?.let { domain to it }
+        }.orEmpty()
+        // Sealing touches the Keystore: not on the main thread.
+        if (renewed.isNotEmpty()) {
+            val app = applicationContext
+            Thread { renewed.forEach { (domain, header) -> DownloadSites.renew(app, domain, header) } }.start()
+        }
         cookies.flush()
         id?.let { requests.remove(it) }
         // An Open view answers with everything it took; a single capture is the first of them.
@@ -337,6 +354,9 @@ class WebSessionActivity : Activity() {
         private val closers = ConcurrentHashMap<String, (WebSessionResult) -> Unit>()
         private val requests = ConcurrentHashMap<String, WebSessionRequest>()
 
+        /** The signed-in download sites' cookies a view puts in, by view: read before it starts, off the main thread. */
+        private val siteCookies = ConcurrentHashMap<String, Map<String, String>>()
+
         /**
          * Shows the web view for [request] and returns at once; [onClosed] gets the answer when the view closes, on the
          * main thread. False when the view could not be started, and then [onClosed] is never called.
@@ -345,6 +365,8 @@ class WebSessionActivity : Activity() {
             val id = UUID.randomUUID().toString()
             closers[id] = onClosed
             requests[id] = request
+            runCatching { DownloadSites.cookies(context, except = request.domains) }.getOrNull()
+                ?.takeIf { it.isNotEmpty() }?.let { siteCookies[id] = it }
             val intent = Intent(context, WebSessionActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(EXTRA_ID, id)
@@ -352,6 +374,7 @@ class WebSessionActivity : Activity() {
             if (runCatching { context.startActivity(intent) }.isSuccess) return true
             closers.remove(id)
             requests.remove(id)
+            siteCookies.remove(id)
             return false
         }
 
