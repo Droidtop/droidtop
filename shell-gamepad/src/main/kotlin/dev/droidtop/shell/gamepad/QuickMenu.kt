@@ -907,9 +907,12 @@ private fun GameTab(
     val ownScreen = dev.droidtop.library.OwnGameScreens.current?.takeIf { it.entryId == entry.id }
     var padMouse by remember(entry.id) { mutableStateOf(ownScreen?.padMouse) }
     var controls by remember(entry.id) { mutableStateOf(ownScreen?.controls) }
+    // Report a problem for a game in droidtop's own screen (docs/SPEC.md 7e2; owner, Droidtop/tracker#601): what the
+    // row says while the report is made and after.
+    var reportLine by remember(entry.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
-    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, controls) {
+    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, controls, reportLine) {
         fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = ActionRow(
             title = title,
             detail = when {
@@ -950,6 +953,18 @@ private fun GameTab(
                             scope.launch {
                                 if (dev.droidtop.library.consoles.GameEmulatorChoice.save(library, entry, next)) emulatorChoice = next
                             }
+                        },
+                    ),
+                )
+            }
+            if (ownScreen?.canReport == true) {
+                add(
+                    ActionRow(
+                        title = "Report a problem",
+                        detail = reportLine ?: "Saves what the game printed and its logs, then you choose where to send them",
+                        onSelect = {
+                            reportLine = "Saving the report..."
+                            ownScreen.reportProblem { said -> scope.launch { reportLine = said } }
                         },
                     ),
                 )
