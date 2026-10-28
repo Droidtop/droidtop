@@ -182,7 +182,7 @@ object TaskManager {
             RunningSnapshot(RunningListing.fromLedger(LaunchLedger.entries(), hidden, label, stopped), Fidelity.LAUNCHED_ONLY, note)
         }
         if (!shell.capabilities().listTasks) {
-            return fromLedger("Without Shizuku droidtop can list only the apps it opened itself, and cannot tell when one of them closed by itself.")
+            return fromLedger("Without More controls droidtop can list only the apps it opened itself, and cannot tell when one of them closed by itself.")
         }
         val out = try {
             shell.exec(ActivityDump.COMMAND)
@@ -193,7 +193,7 @@ object TaskManager {
         if (out != null && out.exit == 0 && out.stdout.contains("Display #")) {
             return RunningSnapshot(RunningListing.fromDump(ActivityDump.parse(out.stdout), hidden, label), Fidelity.EXACT)
         }
-        return fromLedger("The privileged helper could not give droidtop the system's task list, so only the apps droidtop opened are listed.")
+        return fromLedger("Android did not give droidtop its task list, so only the apps droidtop opened are listed.")
     }
 
     /**

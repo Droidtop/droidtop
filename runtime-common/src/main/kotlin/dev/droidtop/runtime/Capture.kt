@@ -49,7 +49,7 @@ object Capture {
         if (providerShell && displayId != android.view.Display.DEFAULT_DISPLAY) {
             "Turn on droidtop's accessibility service to take screenshots of this screen"
         } else {
-            "Needs the helper app or droidtop's accessibility service"
+            "Needs More controls or droidtop's accessibility service"
         }
 
     /** A saved screenshot: where it is, for Share, and the line to show. */

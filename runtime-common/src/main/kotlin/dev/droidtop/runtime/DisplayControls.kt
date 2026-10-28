@@ -76,9 +76,9 @@ object DisplayControls {
      * Sets [displayId]'s refresh rate through the helper app; the plain reason when it cannot. Blocks: off the main thread.
      */
     fun setRefreshRate(displayId: Int, widthPx: Int, heightPx: Int, rateHz: Float): String? {
-        if (!TaskManager.shell.capabilities().shellCommand) return "Needs the helper app"
+        if (!TaskManager.shell.capabilities().shellCommand) return "Needs More controls"
         if (!RiskyActions.allows(RiskyClass.DISPLAY_SETTINGS)) return "Turn on Risky actions, then \"${RiskyClass.DISPLAY_SETTINGS.title}\""
-        val out = TaskManager.shell.exec(refreshCommand(displayId, widthPx, heightPx, rateHz)) ?: return "The helper app did not answer"
+        val out = TaskManager.shell.exec(refreshCommand(displayId, widthPx, heightPx, rateHz)) ?: return "The change did not go through. Try again"
         return if (out.exit == 0) null else out.stderr.trim().ifEmpty { "Android refused" }
     }
 }

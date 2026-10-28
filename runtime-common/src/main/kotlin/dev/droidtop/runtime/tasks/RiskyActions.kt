@@ -26,14 +26,14 @@ enum class RiskyClass(val id: String, val title: String, val summary: String) {
     DISPLAY_SETTINGS(
         "display_settings",
         "Change display settings",
-        "Let droidtop set a screen's refresh rate for every app, through the helper app",
+        "Let droidtop set a screen's refresh rate for every app",
     ),
 
     /** The helper app changing Android's accessibility settings for every app: font and display size, TalkBack. */
     ACCESSIBILITY_SETTINGS(
         "accessibility_settings",
         "Change accessibility settings",
-        "Let droidtop set font size, display size, magnification, contrast, inversion and TalkBack for every app, through the helper app",
+        "Let droidtop set font size, display size, magnification, contrast, inversion and TalkBack for every app",
     ),
 
     /** Root-level commands through a provider that holds root (Sui, or a root provider plugin). */
@@ -162,7 +162,7 @@ object RiskyNotices {
             RiskyClass.OTHER_APP_FILES -> Triple(
                 "Emulator setup is off for safety",
                 "It changes emulator config files.",
-                "Turning it on lets droidtop rewrite emulator settings files and put BIOS files in an emulator's folder, through the helper app. Each change asks first.",
+                "Turning it on lets droidtop rewrite emulator settings files and put BIOS files in an emulator's folder. Each change asks first.",
             )
             RiskyClass.ROOT_COMMANDS -> Triple(
                 "Core checks are off for safety",
@@ -172,12 +172,12 @@ object RiskyNotices {
             RiskyClass.DISPLAY_SETTINGS -> Triple(
                 "Display controls are off for safety",
                 "They change screen refresh and scaling.",
-                "Turning it on lets droidtop set a screen's refresh rate for every app, through the helper app.",
+                "Turning it on lets droidtop set a screen's refresh rate for every app.",
             )
             RiskyClass.ACCESSIBILITY_SETTINGS -> Triple(
                 "Quick actions are off for safety",
                 "Some change system settings.",
-                "Turning it on lets droidtop set font size, display size, magnification, contrast, inversion and TalkBack for every app, through the helper app.",
+                "Turning it on lets droidtop set font size, display size, magnification, contrast, inversion and TalkBack for every app.",
             )
             RiskyClass.GRANT_ACCESS -> Triple(
                 "Granting access is off for safety",

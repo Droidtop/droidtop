@@ -425,7 +425,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
             MenuRow(
                 title = "Overlay",
                 value = if (canDraw) overlayLevel.label else "Needs display over apps",
-                subtitle = if (overlayLevel != OverlayLevel.OFF && !hasShell) "FPS, CPU and GPU need the Shizuku plugin" else null,
+                subtitle = if (overlayLevel != OverlayLevel.OFF && !hasShell) "FPS, CPU and GPU need More controls" else null,
                 adjustable = canDraw,
                 selected = focusIndex == 0,
                 onClick = {
