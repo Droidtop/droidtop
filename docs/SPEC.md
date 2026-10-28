@@ -7330,6 +7330,21 @@ source (now `:runtime-windows`, §9):
     source and "downloads when used"; what a prefix already names is fetched
     even after its source is turned off. The earlier "More driver builds"
     screen is gone: those builds are ordinary choices of the Driver build row.
+  - **Components on this device** (Droidtop/tracker#233; the issue: "a list of
+    Wine, Proton (GE and others), DXVK, VKD3D, Box64/FEX builds that can be
+    downloaded, updated and removed"). "Wine builds and sources" lists every
+    build the runtime's contents store holds ("On this device",
+    `WineInstalledComponents`), each with its size on disk and, for one added
+    by link or file, where from (this replaces the separate "Installed" rows
+    of added builds). A build nothing uses offers Remove, which asks first and
+    deletes only inside the store's folder for its kind (`SafeDelete.clearWithin`),
+    never a prefix. "Uses" errs one way: a build counts as in use when its name
+    appears in any prefix's settings or any game's own choices (setup's
+    included, `WineOptions.componentValuesInUse`), so Remove never takes a build
+    a game needs; such a row says it stays. The runtime's bundled Wine builds are
+    "Built in" and never removable. An installed build is not updated in place:
+    each prefix keeps the build it was made with (the save-safe default, plan of
+    2026-10-14 on the issue).
   - **Any Wine build (owner, 2026-10-08: "I just wanted to make sure we
     could use arbitrary wine versions, for compatibility reasons").** Beside
     the catalog's, a person adds a build by link or by file ("Add a Wine

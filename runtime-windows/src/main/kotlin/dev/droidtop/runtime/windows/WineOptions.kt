@@ -163,6 +163,23 @@ object WineOptions {
         )
     }
 
+    /**
+     * Every component value a prefix or a game's choices name: each prefix's Wine build, emulator builds, driver build and
+     * DXVK and VKD3D versions, and every value a game (or setup) chose over the shared prefix. What
+     * [WineInstalledComponents] checks a build against before it may be removed. Disk.
+     */
+    internal fun componentValuesInUse(context: Context): Set<String> = buildSet {
+        for (container in runCatching { ContainerManager(context).containers }.getOrDefault(emptyList())) {
+            val settings = read(ContainerUtils.toContainerData(container))
+            val values: List<String?> = listOf(
+                container.wineVersion, settings.wine, settings.box64, settings.fexcore, settings.driver,
+                settings.driverVersion, settings.dxvk, settings.vkd3d,
+            )
+            for (value in values) if (!value.isNullOrBlank()) add(value)
+        }
+        for (choices in WineGameOptionsPrefs.all(context)) for (value in choices.values) if (value.isNotBlank()) add(value)
+    }
+
     /** The Wine builds of every prefix but [shared], each with how many prefixes run it. */
     private fun otherBuilds(context: Context, shared: Container): Map<String, Int> =
         runCatching { ContainerManager(context).containers }.getOrDefault(emptyList())

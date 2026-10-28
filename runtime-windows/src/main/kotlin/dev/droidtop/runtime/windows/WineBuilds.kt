@@ -112,6 +112,12 @@ object WineBuilds {
         return json.keys().asSequence().associateWith { json.getString(it) }
     }
 
+    /** Drops [id] from [added] once its build is removed from the device. Disk. */
+    internal fun forget(context: Context, id: String) {
+        val json = runCatching { JSONObject(prefs(context).getString(KEY_ADDED, "{}")!!) }.getOrDefault(JSONObject())
+        if (json.remove(id) != null) prefs(context).edit().putString(KEY_ADDED, json.toString()).apply()
+    }
+
     /**
      * Why bytes starting with [head] cannot be a Wine build, or null when they can: a .wcp package is a tar.xz or a
      * tar.zst archive. Pure.

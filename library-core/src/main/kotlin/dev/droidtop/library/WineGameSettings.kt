@@ -116,6 +116,13 @@ object WineGameOptionsPrefs {
             ?.let { runCatching { json.decodeFromString(serializer, it) }.getOrNull() }
             .orEmpty()
 
+    /** Every game's choices, and the choices kept for setup, unordered: what a component is checked against before it is removed. Disk. */
+    fun all(context: Context): List<Map<String, String>> =
+        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).all
+            .filterKeys { it.startsWith(KEY_PREFIX) }
+            .values
+            .mapNotNull { value -> (value as? String)?.let { runCatching { json.decodeFromString(serializer, it) }.getOrNull() } }
+
     /** Stores [choices]; an empty map removes the game's entry. */
     fun set(context: Context, entryId: String, choices: Map<String, String>) {
         val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()

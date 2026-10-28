@@ -9,6 +9,7 @@ import dev.droidtop.library.settings.DocumentPickItem
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.runtime.windows.WineBuilds
+import dev.droidtop.runtime.windows.WineInstalledComponents
 import dev.droidtop.runtime.windows.utils.ComponentCatalog
 import java.text.DateFormat
 import java.util.Date
@@ -34,6 +35,7 @@ object ComponentSourcesCatalog {
             val data = withContext(Dispatchers.IO) { ComponentCatalog.load(context) }
             val fetchedAt = withContext(Dispatchers.IO) { ComponentCatalog.fetchedAt(context) }
             val added = withContext(Dispatchers.IO) { WineBuilds.added(context) }
+            val installed = WineInstalledComponents.list(context)
             val add = buildList<CatalogItem> {
                 add(
                     TextInputItem(
@@ -67,9 +69,6 @@ object ComponentSourcesCatalog {
                         onPicked = { ctx, uri -> WineBuilds.addFromFile(ctx, uri) },
                     ),
                 )
-                added.forEach { (id, origin) ->
-                    add(ActionItem(id = "wine_build_added_$id", title = id, subtitle = "Added from $origin", value = "Installed"))
-                }
             }
             val sources = data.sources.map { source ->
                 if (source.engine == ComponentCatalog.ENGINE_BIONIC) {
@@ -105,8 +104,32 @@ object ComponentSourcesCatalog {
                     )
                 },
             )
-            listOf(
+            // What is on the device (Droidtop/tracker#233): each build's size, and Remove for one nothing uses.
+            val onDevice = installed.map { c ->
+                // A build added by link or file says where from (its WineBuilds id is the store key without the kind).
+                val size = android.text.format.Formatter.formatShortFileSize(context, c.bytes) +
+                    (added[c.entry.substringAfter('-')]?.let { ". Added from $it" } ?: "")
+                if (c.removable) {
+                    AsyncActionItem(
+                        id = "wine_component_${c.entry}",
+                        title = "${c.kind} ${c.name}",
+                        subtitle = "$size. No prefix or game uses it",
+                        value = "Remove",
+                        confirmTitle = "Remove ${c.kind} ${c.name}? A game that picks it later downloads it again if a source offers it",
+                        run = { ctx, _ -> WineInstalledComponents.remove(ctx, c.entry) },
+                    )
+                } else {
+                    ActionItem(
+                        id = "wine_component_${c.entry}",
+                        title = "${c.kind} ${c.name}",
+                        subtitle = if (c.bundled) "$size. Comes with droidtop" else "$size. A prefix or a game's own choices use it, so it stays",
+                        value = if (c.bundled) "Built in" else "In use",
+                    )
+                }
+            }
+            listOfNotNull(
                 CatalogGroup(id = "wine_build_add", title = "Add a Wine build", items = add),
+                onDevice.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "wine_components_installed", title = "On this device", items = it) },
                 CatalogGroup(id = "component_sources", title = "Sources", items = sources + refresh),
             )
         },
