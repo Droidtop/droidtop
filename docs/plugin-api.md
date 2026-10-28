@@ -3569,6 +3569,7 @@ item, shown as `provide:<point>`, because providing is what gives the
 plugin power there. These points are:
 
 - `library.sources` (writes into game folders);
+- `library.stores` (adds the games an account holds to your library, A13);
 - `apps.catalog` (offers Android apps that droidtop installs);
 - `saves.sync`;
 - `launch.provider` (decides what runs your game);
