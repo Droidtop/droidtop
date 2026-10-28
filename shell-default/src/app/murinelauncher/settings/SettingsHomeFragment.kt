@@ -39,6 +39,7 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
         const val GRID_SIZE_WIDTH: String = "pref_grid_size_width"
         const val GRID_SIZE_HEIGHT: String = "pref_grid_size_height"
         const val LOCK_HOME_SCREEN: String = "pref_lock_home_screen"
+        const val WRAP_PAGES: String = "pref_wrap_pages"
         const val DOCK_ICONS_OVERRIDE_SWITCH: String = "pref_dock_icons_override_switch"
         const val DOCK_ICONS: String = "pref_dock_icons"
         // droidtop patch: superseded by DOUBLE_TAP_ACTION/SWIPE_DOWN_ACTION
