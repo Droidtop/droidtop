@@ -13339,8 +13339,11 @@ answered as a source's acquire is) and droidtop fetches them with
 Downloads into a new folder for the game under the store's folder, as a
 built-in store's install goes (7g, "Where a store installs"); the
 plugin never names a path. Uninstall deletes only the folder droidtop
-made. Not built yet: updating from it, launching through it, and its
-page in Stores, which lists droidtop's five.
+made. The Stores place lists it after droidtop's five, by its label,
+with the same row and page as theirs, while its plugin runs. Its games
+launch as a built-in store's game with no launch answer of its own does:
+droidtop finds the executable, or the engine, in the installed folder.
+Not built yet: updating from it.
 
 ### One consistent way into Settings (directed 2026-09-28)
 
