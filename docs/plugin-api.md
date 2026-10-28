@@ -2790,14 +2790,19 @@ downloading belonging to sources). Risk high. Built 2026-10-28, in part
     unfinished folder; Uninstall deletes the folder droidtop made and
     nothing else, with no call to the plugin. droidtop's record of what
     it installed survives Sync and Sign out.
+- **In the Stores place:** a running plugin's store is listed after
+  droidtop's five, by its label, with the same row and page as theirs:
+  sign in (the plugin's site account in droidtop's web view), sign out,
+  Sync, its counts and its installs. It is also signed in from its
+  plugin's page (the account row) and read there ("<store>: read your
+  games"). It leaves the place when its plugin stops.
+- **Launching** is droidtop's: the store gives no launch answer
+  (`StoreLibrary.launch` is null), so droidtop finds the executable in
+  the installed folder, or the engine that runs it, as it does for a
+  built-in store's game without one. There is no `launch` op. A store
+  whose games need the plugin to start them is B1's (launch providers).
 - **Not built yet:** update (the plugin says nothing about versions, so
-  an installed game is uninstalled to be installed again), `launch`,
-  and the store's page in the Stores place (it lists droidtop's five
-  today). An installed game is found by the library walk like any game
-  in a game folder. A
-  plugin's store is signed in from its plugin's page (the account row)
-  and read there ("<store>: read your games") or by the automatic sync;
-  its games show in the library.
+  an installed game is uninstalled to be installed again).
 - **Permission:** `provide:library.stores` (high), `web.session`,
   `net.domains`.
 
