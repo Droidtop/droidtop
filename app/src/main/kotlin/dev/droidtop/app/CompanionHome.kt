@@ -50,6 +50,10 @@ import dev.droidtop.library.consoles.resolvePlayer
 import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.displayName
 import dev.droidtop.library.settings.CompanionHomeLayout
+import dev.droidtop.library.settings.CompanionPrefs
+import dev.droidtop.library.settings.GameControls
+import dev.droidtop.library.settings.GameRow
+import dev.droidtop.library.settings.UiModeRefresh
 import dev.droidtop.library.settings.CompanionHomePrefs
 import dev.droidtop.library.settings.CompanionHomeSection
 import dev.droidtop.library.settings.UiModePrefs
@@ -243,6 +247,16 @@ internal fun NowRunningCard(entry: LibraryEntry, sinceEpochMs: Long) {
             delay(30_000)
         }
     }
+    // Outside the tabs (no Game tab to open) the card asks Quit's question itself.
+    val question by CompanionConfirm.open.collectAsState()
+    val asking = question
+    if (nav == null && asking != null) {
+        CompanionAsk(asking.text, "Keep playing", asking.action, onSafe = { CompanionConfirm.cancel() }, onAction = {
+            CompanionConfirm.cancel()
+            asking.run()
+        })
+        return
+    }
     NowCardFrame(entry) {
         Eyebrow("Now playing · $played")
         Text(entry.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -250,7 +264,26 @@ internal fun NowRunningCard(entry: LibraryEntry, sinceEpochMs: Long) {
         PillRow {
             // Resume is a relaunch of the entry, the Quick Menu's own resume (the one launch path).
             CompanionPill("Resume", selected = true) { CompanionState.onLaunchEntry?.invoke(entry) }
-            CompanionPill("Quit") { CompanionState.quit(context, entry) }
+            // Quit asks as the Game tab's does, by the one rule (GameControls.asks): the question is the Game tab's,
+            // so asking opens that tab on it (Droidtop/tracker#588: this pill used to quit at once, even in Kid).
+            val uiMode by UiModeRefresh.mode.collectAsState()
+            val settings by CompanionPrefs.settings.collectAsState()
+            val runner = runnerOf(entry)
+            CompanionPill(GameControls.label(GameRow.QUIT, runner)) {
+                val quit = { CompanionState.quit(context, entry) }
+                if (GameControls.asks(GameRow.QUIT, uiMode, settings.ask)) {
+                    CompanionConfirm.ask(
+                        CompanionConfirm.Question(
+                            GameControls.question(GameRow.QUIT, runner, entry.title),
+                            GameControls.label(GameRow.QUIT, runner),
+                            quit,
+                        ),
+                    )
+                    nav?.openTab(CompanionTab.GAME)
+                } else {
+                    quit()
+                }
+            }
             if (nav != null) CompanionPill("Controls") { nav.openTab(CompanionTab.SYSTEM) }
         }
         // What Quit came to, under the button that was pressed (Droidtop/tracker#412).
