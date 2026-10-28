@@ -2570,6 +2570,16 @@ object AppSettingsCatalogs {
                 ).joinToString(" - "),
             )
         }
+        // Everyday calls are counted per day, not listed (docs/plugin-api.md 4.6, Droidtop/tracker#61).
+        val days = PluginAudit.countsForContext(context).days(pluginId).take(COUNT_DAYS_SHOWN)
+        val dayRows = days.map { (day, counts) ->
+            ActionItem(
+                id = "plugin_${pluginId}_counts_$day",
+                title = day + " - " + counts.sumOf { it.second } + " calls",
+                subtitle = counts.joinToString(", ") { (key, n) -> (PluginPermissions.labelFor(key) ?: key) + " " + n },
+                run = {},
+            )
+        }
         return listOfNotNull(
             CatalogGroup(id = "plugin_activity_note", title = null, items = listOf(ActionItem(id = "plugin_activity_note_row", title = note))),
             CatalogGroup(
@@ -2577,6 +2587,7 @@ object AppSettingsCatalogs {
                 title = "Newest first",
                 items = rows.ifEmpty { listOf(ActionItem(id = "plugin_activity_empty", title = "Nothing logged yet")) },
             ),
+            dayRows.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_activity_counts", title = "Everyday calls, counted by day", items = it) },
         )
     }
 
@@ -2899,6 +2910,7 @@ object AppSettingsCatalogs {
 
     /** The most activity lines one plugin's Activity screen shows; the log keeps up to 2,000. */
     private const val ACTIVITY_SHOWN = 200
+    private const val COUNT_DAYS_SHOWN = 7
 
     /** The tick boxes of one approval list, kept between redraws until the user answers. Keyed by plugin, and by plugin plus "#new" for an update's list. */
     private val pendingTicks = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()

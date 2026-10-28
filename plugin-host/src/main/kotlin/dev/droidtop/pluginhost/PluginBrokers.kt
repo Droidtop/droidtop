@@ -126,6 +126,7 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
     private val appContext = context.applicationContext
     private val grantStore = PluginGrants.forContext(appContext)
     private val auditLog = PluginAudit.forContext(appContext)
+    private val callCounts = PluginAudit.countsForContext(appContext)
 
     init {
         auditLog.purgeExpired()
@@ -151,6 +152,10 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun audit(pluginId: String, entry: AuditEntry) {
         auditLog.append(pluginId, entry)
+    }
+
+    override fun countCall(pluginId: String, key: String) {
+        callCounts.count(pluginId, key)
     }
 
     override fun notNow(pluginId: String, permission: String): Boolean = PluginRefusals.isNotNow(pluginId, permission)

@@ -3648,15 +3648,20 @@ tick.
   contents), `via` chain, result code and timestamp. Network calls
   (`net.http`, `net.download`, with the host), shared-file calls and
   picked-file calls are logged whatever their tier (built 2026-10-08).
-  Other normal-permission calls are to be counted per day, not logged one
-  by one (not built).
+  Other normal-permission calls, and ops that need no permission, are
+  counted per day, not logged one by one (built 2026-10-28,
+  Droidtop/tracker#61): a count per day and per permission, or per
+  `api op` when there is none, kept 30 days beside the ring and deleted
+  with it (`PluginCallCounts`). Counts gather in memory and are written
+  at most every 30 s, when the day changes, and before they are read.
 - **Storage.** In droidtop's private storage, per plugin: a ring of 2,000
   entries or 30 days. It is kept 7 days after uninstall.
 - **Where it shows.** Activity per plugin ("Used your GitHub token 3 times
   today, last 14:02"), and "last used" on each permission row. Built
   2026-10-08: Accounts and sources → Plugins → <plugin> → Activity lists
   the last 200 entries, newest first, under one line that says what the
-  list covers for that plugin's tier.
+  list covers for that plugin's tier. Below them, "Everyday calls, counted by day" shows
+  the last 7 days' counts, busiest first.
 - **Export.** It is included in Share diagnostics only with the user's
   say-so, and scrubbed (H5).
 - **What the audit cannot see.** Anything a full-trust plugin does

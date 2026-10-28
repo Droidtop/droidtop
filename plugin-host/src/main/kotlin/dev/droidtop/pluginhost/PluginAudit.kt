@@ -42,8 +42,8 @@ data class AuditEntry(
  * The per-plugin activity ring (docs/plugin-api.md 4.6): the last 2,000
  * entries or 30 days, whichever is fewer, one JSON line each, in droidtop's
  * private storage. Only calls that need a dangerous or critical permission
- * are written (the broker decides); normal-permission calls are not
- * recorded yet. After an uninstall the ring is kept 7 days, marked removed,
+ * are written (the broker decides); the rest are counted per day
+ * ([PluginCallCounts]). After an uninstall the ring is kept 7 days, marked removed,
  * so "what did it do" can still be answered ([markRemoved], [purgeExpired]).
  */
 class PluginAudit(private val dir: File, private val maxEntries: Int = MAX_ENTRIES) {
@@ -99,6 +99,7 @@ class PluginAudit(private val dir: File, private val maxEntries: Int = MAX_ENTRI
                 if (nowMs - removedAt > REMOVED_RETENTION_MS) {
                     val id = marker.name.removeSuffix(".removed")
                     File(dir, "$id.jsonl").delete()
+                    PluginCallCounts(dir).delete(id)
                     marker.delete()
                 }
             }
@@ -114,5 +115,9 @@ class PluginAudit(private val dir: File, private val maxEntries: Int = MAX_ENTRI
         fun forPluginsRoot(pluginsRoot: File): PluginAudit = PluginAudit(File(pluginsRoot.parentFile ?: pluginsRoot, "plugin-audit"))
 
         fun forContext(context: Context): PluginAudit = forPluginsRoot(PluginStore.root(context))
+
+        /** The per-day counts of everyday calls, kept beside the rings (Droidtop/tracker#61). */
+        fun countsForContext(context: Context): PluginCallCounts =
+            PluginCallCounts(File(PluginStore.root(context).let { it.parentFile ?: it }, "plugin-audit"))
     }
 }

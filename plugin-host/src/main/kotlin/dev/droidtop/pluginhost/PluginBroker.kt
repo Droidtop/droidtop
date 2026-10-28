@@ -45,6 +45,9 @@ interface BrokerEnvironment {
     fun noteRefused(pluginId: String, permission: String) = Unit
     fun audit(pluginId: String, entry: AuditEntry)
 
+    /** Counts one everyday call (one the activity ring does not list) of [pluginId] under [key], per day (docs/plugin-api.md 4.6). */
+    fun countCall(pluginId: String, key: String) = Unit
+
     /** True while a user-initiated host to plugin call is in flight for [pluginId]: only then may a call in `ask` state show the sheet. */
     fun userInitiated(pluginId: String): Boolean
 
@@ -896,6 +899,9 @@ class BrokerCore(val pluginId: String, private val env: BrokerEnvironment) {
             val audited = if (permission != null) tier != null && (tier != PermissionTier.NORMAL || hostOp.alwaysAudit) else hostOp.alwaysAudit
             if (audited) {
                 env.audit(pluginId, AuditEntry(env.nowMs(), permission ?: request.api, request.api, request.op, runCatching { hostOp.target(request.args) }.getOrDefault(""), emptyList(), result))
+            } else {
+                // Everyday calls are counted per day, not listed (docs/plugin-api.md 4.6, Droidtop/tracker#61).
+                env.countCall(pluginId, permission ?: "${request.api} ${request.op}")
             }
         }
     }
