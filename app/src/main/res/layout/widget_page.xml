@@ -70,6 +70,15 @@
         android:focusable="true"
         android:visibility="gone" />
 
+    <!-- The row's progress when it is a job (the Downloads widget): a thin bar under its line, hidden otherwise. -->
+    <ProgressBar
+        android:id="@+id/widget_row1_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:max="100"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/widget_row2"
         android:layout_width="match_parent"
@@ -81,6 +90,15 @@
         android:maxLines="1"
         android:clickable="true"
         android:focusable="true"
+        android:visibility="gone" />
+
+    <!-- The row's progress when it is a job (the Downloads widget): a thin bar under its line, hidden otherwise. -->
+    <ProgressBar
+        android:id="@+id/widget_row2_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:max="100"
         android:visibility="gone" />
 
     <TextView
@@ -96,6 +114,15 @@
         android:focusable="true"
         android:visibility="gone" />
 
+    <!-- The row's progress when it is a job (the Downloads widget): a thin bar under its line, hidden otherwise. -->
+    <ProgressBar
+        android:id="@+id/widget_row3_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:max="100"
+        android:visibility="gone" />
+
     <TextView
         android:id="@+id/widget_row4"
         android:layout_width="match_parent"
@@ -107,6 +134,15 @@
         android:maxLines="1"
         android:clickable="true"
         android:focusable="true"
+        android:visibility="gone" />
+
+    <!-- The row's progress when it is a job (the Downloads widget): a thin bar under its line, hidden otherwise. -->
+    <ProgressBar
+        android:id="@+id/widget_row4_bar"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:max="100"
         android:visibility="gone" />
 
     <View

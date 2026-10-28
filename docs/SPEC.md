@@ -18415,8 +18415,11 @@ not read; text explains on demand, and is never the primary way to see state.**
   (`leftMenuAttention`). Home's band ring glides. The jobs notification carries a bar of the running jobs together,
   moved in 5 percent steps (`JobsSummary.runningPercent`): Android draws its status bar's icon itself, so the bar in
   the notification is the filling it allows.
-- **Still to come (Droidtop/tracker#643):** Enginehost's side, a follow-up of its own; the Downloads widget still
-  says a percent in text.
+- **The Downloads widget** says each download's line as every job row does (`PluginJobsScreen.oneLine`: time left,
+  Paused, Waiting for the connection) with a thin bar under it for its progress (`DroidtopWidgets.Row.progress`; an
+  indeterminate bar while the amount is not known). It never says a percent in text. A widget is a launcher's view, so
+  the bar steps when the widget is drawn again (at most every 2 s, on a 5 percent change), not with the glide.
+- **Still to come (Droidtop/tracker#643):** Enginehost's side, a follow-up of its own.
 
 ### A version is a FOLDER (decided 2026-09-17; a Godot single-file build amended 2026-10-10)
 

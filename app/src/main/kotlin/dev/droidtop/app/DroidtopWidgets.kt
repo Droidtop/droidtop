@@ -48,6 +48,7 @@ internal object DroidtopWidgets {
 
     /** The four rows [rows] fills, in order. */
     private val ROW_IDS = intArrayOf(R.id.widget_row1, R.id.widget_row2, R.id.widget_row3, R.id.widget_row4)
+    private val BAR_IDS = intArrayOf(R.id.widget_row1_bar, R.id.widget_row2_bar, R.id.widget_row3_bar, R.id.widget_row4_bar)
     const val MAX_ROWS = 4
 
     /** The colours a widget is drawn in: the role tokens in use now. Reads a preference, so off the main thread. */
@@ -57,8 +58,11 @@ internal object DroidtopWidgets {
         Look(it.light, it.color("surface"), it.color("onSurface"), it.color("onSurfaceMuted"))
     }
 
-    /** One row of a [rows] widget: its text and what a tap does (null: nothing). */
-    class Row(val text: String, val tap: PendingIntent?)
+    /**
+     * One row of a [rows] widget: its text and what a tap does (null: nothing). [progress] is a job's 0 to 100, drawn as
+     * a thin bar under the line, or -1 for a job whose amount is not known yet (an indeterminate bar); null is no bar.
+     */
+    class Row(val text: String, val tap: PendingIntent?, val progress: Int? = null)
 
     /**
      * A title and up to [MAX_ROWS] rows, or [empty] when there are none: an honest empty state, never placeholder
@@ -87,6 +91,9 @@ internal object DroidtopWidgets {
         for ((index, id) in ROW_IDS.withIndex()) {
             val row = rows.getOrNull(index)
             views.setViewVisibility(id, if (row == null) View.GONE else View.VISIBLE)
+            val progress = row?.progress
+            views.setViewVisibility(BAR_IDS[index], if (progress == null) View.GONE else View.VISIBLE)
+            if (progress != null) views.setProgressBar(BAR_IDS[index], 100, progress.coerceIn(0, 100), progress < 0)
             if (row == null) continue
             views.setTextViewText(id, row.text)
             views.setTextColor(id, look.ink)

@@ -15,7 +15,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The Downloads widget (docs/SPEC.md, "Widgets on any launcher"; Droidtop/tracker#563): the downloads running or
- * paused, each with its progress, then how many games have an update. A download row opens Downloads, the updates row
+ * paused, each with its line and a bar for its progress, then how many games have an update. A download row opens Downloads, the updates row
  * opens Updates. Drawn again when the jobs change, at most every [THROTTLE_MS], while one is placed ([watch]).
  */
 class DownloadsWidgetProvider : AppWidgetProvider() {
@@ -56,13 +56,14 @@ class DownloadsWidgetProvider : AppWidgetProvider() {
 
         private suspend fun render(context: Context, widgetId: Int): RemoteViews {
             val open = DroidtopWidgets.activity(context, widgetId, "downloads", CatalogScreenLink.intent(context, DOWNLOADS_SCREEN))
+            // A job's line is the one every job row says (time left, Paused, Waiting for the connection), and its progress
+            // is the bar under it, never a percent in the text (Droidtop/tracker#643: no flickering numbers).
             val rows = downloads(PluginJobsCenter.entries().value).map { job ->
-                val state = when {
-                    job.paused -> job.hold ?: "Paused"
-                    job.percent < 0 -> "Starting"
-                    else -> "${job.percent}%"
-                }
-                DroidtopWidgets.Row("${job.title} · $state", open)
+                DroidtopWidgets.Row(
+                    "${job.title} · ${dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job)}",
+                    open,
+                    progress = if (job.paused) job.percent.coerceAtLeast(0) else job.percent,
+                )
             }
             val updates = dev.droidtop.library.GameUpdates.waiting(DroidtopWidgets.libraryGames(context)).size
             val updateRow = updates.takeIf { it > 0 }?.let { n ->
