@@ -72,7 +72,17 @@ class LocalSimilarityRecommendations(
 ) : RecommendationProvider {
     override suspend fun recommend(context: Context, scope: RecommendationScope, limit: Int): List<Recommendation> =
         try {
-            withContext(Dispatchers.Default) { rank(library(), scope, limit, now()) }
+            val entries = library()
+            // The games the person does not own (Droidtop/tracker#52): read as last built, and rebuilt in the background
+            // from the most played games when a week old. Nothing here waits for IGDB.
+            val pool = withContext(Dispatchers.IO) {
+                val nowMs = now()
+                val played = entries.filter { it.isPlayed() && !it.hidden }
+                    .sortedByDescending { it.signal(nowMs).weight }
+                RecommendationPool.refreshIfStale(context, played, nowMs)
+                RecommendationPool.read(context).second
+            }
+            withContext(Dispatchers.Default) { rank(entries, scope, limit, now(), pool) }
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (_: Exception) {
@@ -83,6 +93,13 @@ class LocalSimilarityRecommendations(
         /** Extra score for a well-rated game (rating is 0..1); small next to similarity, which must be above zero for a game to be recommended at all. */
         private const val RATING_BONUS = 0.25
         private const val DAY_MS = 86_400_000L
+
+        /** What a game IGDB lists as similar to a played one starts with: it resembles that game by IGDB's own measure. */
+        private const val SIMILAR_BASE = 0.2
+
+        /** IGDB's ratings pulled toward 70 out of 100 until 25 ratings back them ([weightedRating]). */
+        private const val POOL_PRIOR_MEAN = 0.7
+        private const val POOL_PRIOR_COUNT = 25.0
 
         private fun LibraryEntry.isPlayed(): Boolean = playCount > 0 || playtimeSeconds > 0 || lastPlayedEpochMs != null
 
@@ -100,7 +117,13 @@ class LocalSimilarityRecommendations(
          * unplayed, visible candidate is scored by lookup. Best first, at
          * most [limit]; a candidate that resembles nothing played is left out.
          */
-        fun rank(entries: List<LibraryEntry>, scope: RecommendationScope, limit: Int, nowMs: Long): List<Recommendation> {
+        fun rank(
+            entries: List<LibraryEntry>,
+            scope: RecommendationScope,
+            limit: Int,
+            nowMs: Long,
+            pool: List<RecommendationPool.Candidate> = emptyList(),
+        ): List<Recommendation> {
             if (limit <= 0) return emptyList()
             val visible = entries.filter { !it.hidden && !it.broken }
             val basis = when (scope) {
@@ -110,7 +133,25 @@ class LocalSimilarityRecommendations(
             if (basis.isEmpty()) return emptyList()
             val index = SimilarityIndex(basis.map { it.signal(nowMs) })
             val basisIds = basis.mapTo(HashSet()) { it.id }
-            return visible.asSequence()
+            val owned = visible.mapTo(HashSet()) { dev.droidtop.library.scraper.PcMatching.normalize(it.title) }
+            // Games the person does not own, which IGDB found similar to one they play: overall, or for the game named.
+            // A platform's view has none yet: IGDB names platforms its own way, not by droidtop's systems.
+            val fromPool = pool.asSequence()
+                .filter { scope !is RecommendationScope.Platform }
+                .filter { scope !is RecommendationScope.BecauseOf || it.likeTitle.equals(scope.ownedTitle, ignoreCase = true) }
+                .filter { dev.droidtop.library.scraper.PcMatching.normalize(it.title) !in owned }
+                .map { candidate ->
+                    val rated = candidate.rating?.let { weightedRating(it, candidate.ratingCount, POOL_PRIOR_MEAN, POOL_PRIOR_COUNT) } ?: 0.0
+                    Recommendation(
+                        title = candidate.title,
+                        platform = null,
+                        reason = if (scope is RecommendationScope.BecauseOf) "Because you played ${scope.ownedTitle}" else "Like ${candidate.likeTitle}",
+                        artUrl = candidate.artUrl,
+                        description = candidate.description,
+                        score = SIMILAR_BASE + index.score(candidate.genre, candidate.developer) + RATING_BONUS * rated,
+                    )
+                }
+            return (visible.asSequence()
                 .filter { it.id !in basisIds && !it.isPlayed() }
                 .filter { scope !is RecommendationScope.Platform || it.systemId == scope.systemId }
                 .mapNotNull { candidate ->
@@ -124,7 +165,7 @@ class LocalSimilarityRecommendations(
                         description = candidate.description,
                         score = similarity + RATING_BONUS * (candidate.rating?.toDouble() ?: 0.0).coerceIn(0.0, 1.0),
                     )
-                }
+                } + fromPool)
                 .sortedWith(compareByDescending<Recommendation> { it.score }.thenBy { it.title.lowercase() })
                 .take(limit)
                 .toList()

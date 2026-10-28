@@ -123,4 +123,29 @@ class LocalSimilarityRecommendationsTest {
         val library = listOf(game("Played", "Platformer", playSeconds = 3600)) + (1..5).map { game("G$it", "Platformer") }
         assertEquals(2, LocalSimilarityRecommendations.rank(library, RecommendationScope.Overall, 2, 0L).size)
     }
+
+    private fun candidate(title: String, like: String, genre: String? = null, rating: Double? = null, count: Int = 0) =
+        RecommendationPool.Candidate(title, title.hashCode().toLong().let { if (it <= 0) -it + 1 else it }, like, null, null, genre, null, rating, count)
+
+    @Test
+    fun `games IGDB found similar join the picks, never one the library has, and well-rated ones rank higher`() {
+        val library = listOf(game("Played Platformer", "Platformer", playSeconds = 36_000), game("Owned Already", "Racing"))
+        val pool = listOf(
+            candidate("Little Known", "Played Platformer", rating = 0.95, count = 2),
+            candidate("Much Loved", "Played Platformer", rating = 0.9, count = 900),
+            candidate("Owned Already", "Played Platformer", rating = 0.99, count = 5000),
+        )
+        val picks = LocalSimilarityRecommendations.rank(library, RecommendationScope.Overall, 10, 0L, pool)
+        assertEquals(listOf("Much Loved", "Little Known"), picks.map { it.title })
+        assertEquals("Like Played Platformer", picks.first().reason)
+        assertEquals(null, picks.first().platform)
+    }
+
+    @Test
+    fun `a pool game is offered for the game it was found for, and not in a platform's view`() {
+        val library = listOf(game("A", "Platformer", playSeconds = 3600), game("B", "Racing", playSeconds = 3600))
+        val pool = listOf(candidate("Like A", "A"), candidate("Like B", "B"))
+        assertEquals(listOf("Like A"), LocalSimilarityRecommendations.rank(library, RecommendationScope.BecauseOf("a"), 10, 0L, pool).map { it.title })
+        assertTrue(LocalSimilarityRecommendations.rank(library, RecommendationScope.Platform("nes"), 10, 0L, pool).isEmpty())
+    }
 }

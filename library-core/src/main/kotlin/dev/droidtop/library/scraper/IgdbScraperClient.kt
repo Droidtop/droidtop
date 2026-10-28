@@ -40,6 +40,18 @@ data class IgdbGameMetadata(
     val gogId: String? = null,
 )
 
+/** One game IGDB lists as similar to another ([IgdbScraperClient.similar]): [totalRating] is IGDB's 0..100, null when unrated. */
+data class IgdbSimilar(
+    val id: Long,
+    val name: String,
+    val coverUrl: String?,
+    val description: String?,
+    val genre: String?,
+    val developer: String?,
+    val totalRating: Double?,
+    val ratingCount: Int,
+)
+
 /**
  * Real IGDB (igdb.com) metadata/cover-art client for PC and engine
  * games, sitting beside the keyless [LutrisScraperClient] as the
@@ -179,6 +191,53 @@ object IgdbScraperClient {
             ScrapeLookup.NoMatch -> ScrapeLookup.NoMatch
             is ScrapeLookup.Refused -> found
         }
+    }
+
+    /**
+     * The games IGDB lists as similar to each of [ids] (its `similar_games`), with what droidtop ranks them by: genre,
+     * developer, the critic-and-user `total_rating` (0..100) and how many ratings it rests on (Droidtop/tracker#52).
+     * One query for up to [MAX_SIMILAR_IDS] games; the answer maps each asked id to its similar games.
+     */
+    fun similar(clientId: String, clientSecret: String, ids: List<Long>): ScrapeLookup<Map<Long, List<IgdbSimilar>>> {
+        val asked = ids.distinct().take(MAX_SIMILAR_IDS)
+        if (asked.isEmpty()) return ScrapeLookup.NoMatch
+        val body = "fields id,$SIMILAR_FIELDS; where id = (${asked.joinToString(",")}); limit ${asked.size};"
+        return when (val rows = post(clientId, clientSecret, "games", body, "similar games")) {
+            is ScrapeLookup.Found -> parseSimilar(rows.value).takeIf { it.isNotEmpty() }?.let { ScrapeLookup.Found(it) } ?: ScrapeLookup.NoMatch
+            ScrapeLookup.NoMatch -> ScrapeLookup.NoMatch
+            is ScrapeLookup.Refused -> rows
+        }
+    }
+
+    const val MAX_SIMILAR_IDS = 10
+
+    private const val SIMILAR_FIELDS = "similar_games.name,similar_games.cover.url,similar_games.summary," +
+        "similar_games.genres.name,similar_games.total_rating,similar_games.total_rating_count," +
+        "similar_games.involved_companies.company.name,similar_games.involved_companies.developer"
+
+    /** A `similar_games` answer, by the asked game's id. Pure; visible for the JVM tests. */
+    internal fun parseSimilar(rows: JSONArray): Map<Long, List<IgdbSimilar>> = buildMap {
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            val id = row.optLong("id", 0L).takeIf { it > 0 } ?: continue
+            val similar = row.optJSONArray("similar_games") ?: continue
+            put(id, (0 until similar.length()).mapNotNull { j -> similar.optJSONObject(j)?.let(::similarOf) })
+        }
+    }
+
+    private fun similarOf(game: JSONObject): IgdbSimilar? {
+        val id = game.optLong("id", 0L).takeIf { it > 0 } ?: return null
+        val base = parse(game) ?: return null
+        return IgdbSimilar(
+            id = id,
+            name = base.name,
+            coverUrl = base.coverUrl,
+            description = base.description,
+            genre = base.genre,
+            developer = base.developer,
+            totalRating = game.optDouble("total_rating", -1.0).takeIf { it >= 0 },
+            ratingCount = game.optInt("total_rating_count", 0).coerceAtLeast(0),
+        )
     }
 
     // Every field droidtop shows, in one query. Only the field names IGDB
