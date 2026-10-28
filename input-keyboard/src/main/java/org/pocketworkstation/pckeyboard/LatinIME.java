@@ -165,6 +165,8 @@ public class LatinIME extends InputMethodService implements
     /* package */KeyboardSwitcher mKeyboardSwitcher;
     // droidtop: the pad on the keyboard (Droidtop/tracker#338).
     private final PadKeys mPadKeys = new PadKeys(this);
+    // droidtop: the dictionaries the keyboard last loaded (Droidtop/tracker#339).
+    private int mDictionaryGeneration;
 
     private UserDictionary mUserDictionary;
     private UserBigramDictionary mUserBigramDictionary;
@@ -615,6 +617,10 @@ public class LatinIME extends InputMethodService implements
 
         int[] dictionaries = getDictionary(orig);
         mSuggest = new Suggest(this, dictionaries);
+        // droidtop: a dictionary the person added for this language, loaded off the main thread (Droidtop/tracker#339).
+        final Suggest created = mSuggest;
+        mDictionaryGeneration = KeyboardDictionaries.getGeneration();
+        KeyboardDictionaries.loadInto(this, created, locale, () -> mSuggest == created, this::updateCorrectionMode);
         updateAutoTextEnabled(saveLocale);
         if (mUserDictionary != null)
             mUserDictionary.close();
@@ -778,6 +784,10 @@ public class LatinIME extends InputMethodService implements
         // policy, docs/SPEC.md 4c), so droidtop is told and can draw the
         // same keyboard on the editor's own screen itself.
         SecondScreenKeyboard.onShowRequested(attribute.packageName);
+        // droidtop: a dictionary added or removed since the last field is loaded now (Droidtop/tracker#339).
+        if (mDictionaryGeneration != KeyboardDictionaries.getGeneration() && mLanguageSwitcher != null) {
+            initSuggest(mLanguageSwitcher.getInputLanguage());
+        }
         sKeyboardSettings.editorPackageName = attribute.packageName;
         sKeyboardSettings.editorFieldName = attribute.fieldName;
         sKeyboardSettings.editorFieldId = attribute.fieldId;

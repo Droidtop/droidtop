@@ -258,6 +258,12 @@
             android:title="@string/title_suggested_punctuation"
             android:defaultValue="@string/suggested_punctuations"
             />
+    <!-- droidtop: the keyboard's own dictionaries, converted from wordlists (Droidtop/tracker#339). -->
+    <Preference
+            android:key="pref_dictionaries"
+            android:title="@string/title_dictionaries"
+            android:summary="@string/summary_dictionaries"
+            />
     </PreferenceCategory>
 
     <PreferenceCategory

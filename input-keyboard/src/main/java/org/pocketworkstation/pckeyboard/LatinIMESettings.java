@@ -80,6 +80,15 @@ public class LatinIMESettings extends PreferenceActivity
         mKeyboardModePortraitPreference = (ListPreference) findPreference("pref_keyboard_mode_portrait");
         mKeyboardModeLandscapePreference = (ListPreference) findPreference("pref_keyboard_mode_landscape");
         
+        // droidtop: the keyboard's own dictionaries (Droidtop/tracker#339).
+        Preference dictionaries = findPreference(DictionaryRow.KEY);
+        if (dictionaries != null) {
+            dictionaries.setOnPreferenceClickListener(p -> {
+                DictionaryRow.open(this, p);
+                return true;
+            });
+        }
+
         SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
         prefs.registerOnSharedPreferenceChangeListener(this);
 
@@ -136,6 +145,14 @@ public class LatinIMESettings extends PreferenceActivity
         }
 
         mLabelVersion.setSummary(version);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == DictionaryRow.PICK_REQUEST && resultCode == RESULT_OK && data != null) {
+            DictionaryRow.picked(this, findPreference(DictionaryRow.KEY), data.getData());
+        }
     }
 
     @Override
