@@ -115,7 +115,12 @@ internal object HostWebApis {
                 env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
                 // The site may have renewed the session while the person was there.
                 result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it.copy(account = stored(env, record)?.account)) }
-                result.downloads
+                // The person followed the page to a host droidtop serves (a masked link, #650): its resolvers take it, and
+                // when none can, the view opens that host's page as it would have.
+                result.handoff?.let { link ->
+                    dev.droidtop.pluginhost.hosts.HostLinks.resolve(link)
+                        ?: show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, link, domains, stored(env, record), null, maxDownloads = max)).downloads
+                } ?: result.downloads
             }
             if (downloads.isEmpty()) return@HostOp JSONObject().put("captured", false)
             val described = downloads.take(max).map { download ->

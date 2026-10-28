@@ -56,6 +56,9 @@ class WebSessionActivity : Activity() {
 
     /** What an Open view has taken so far, in order, each address once. */
     private val captured = mutableListOf<WebSessionDownload>()
+
+    /** The host link the person followed out of an Open view, for droidtop's resolvers ([WebSessionResult.handoff]). */
+    private var handoff: String? = null
     private var takenLine: TextView? = null
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -181,6 +184,19 @@ class WebSessionActivity : Activity() {
                     // Only web pages: an intent:, market: or other app link never leaves droidtop from here. A store's
                     // pages, where people pay, load only over https.
                     val scheme = request.url.scheme?.lowercase()
+                    // A page that leads to a file host droidtop has an API for (a masked link the person just unmasked,
+                    // Droidtop/tracker#650) closes there: the host's resolvers serve the link, through the person's
+                    // account or a debrid one, where its own page would build the file where no download can reach it.
+                    val target = request.url.toString()
+                    if (asked.mode == WebSessionRequest.Mode.OPEN && request.isForMainFrame && scheme == "https" &&
+                        captured.isEmpty() && dev.droidtop.pluginhost.hosts.HostLinks.served(target)
+                    ) {
+                        Log.i(LOG_TAG, "${NetScope.hostOf(target)}: handed to droidtop's host resolvers")
+                        handoff = target
+                        // Not from inside the view's own callback: closing destroys it.
+                        view.post { finishWith(completed = true, download = null) }
+                        return true
+                    }
                     return if (browse) scheme != "https" else scheme != "http" && scheme != "https"
                 }
 
@@ -287,7 +303,7 @@ class WebSessionActivity : Activity() {
         id?.let { requests.remove(it) }
         // An Open view answers with everything it took; a single capture is the first of them.
         val taken = (captured + listOfNotNull(download)).distinctBy { it.url }
-        id?.let { closers.remove(it)?.invoke(WebSessionResult(completed, session, taken.firstOrNull(), taken)) }
+        id?.let { closers.remove(it)?.invoke(WebSessionResult(completed, session, taken.firstOrNull(), taken, handoff)) }
         webView?.apply {
             stopLoading()
             destroy()

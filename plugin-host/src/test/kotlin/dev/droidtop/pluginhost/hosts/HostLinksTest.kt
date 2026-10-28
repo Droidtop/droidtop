@@ -152,4 +152,13 @@ class HostLinksTest {
         val pd = PixelDrain(Canned("GET https://pixeldrain.com/api/list/big" to (200 to many)))
         assertNull(HostLinks.resolve("https://pixeldrain.com/l/big", debrid = { null }, resolvers = listOf(pd)))
     }
+
+    @Test
+    fun aPageThatLeadsToAServedHostHandsItOverAndAnyOtherPageDoesNot() {
+        // Droidtop/tracker#650: a masked forum link, unmasked in the view, ends on the host's link.
+        val pd = listOf(PixelDrain(Canned()))
+        assertTrue(HostLinks.served("https://pixeldrain.com/u/abc123", pd))
+        assertFalse(HostLinks.served("https://f95zone.to/masked/pixeldrain.com/1/2/", pd))
+        assertFalse(HostLinks.served("https://example.com/file", pd))
+    }
 }

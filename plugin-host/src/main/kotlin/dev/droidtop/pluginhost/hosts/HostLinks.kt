@@ -20,6 +20,12 @@ object HostLinks {
     val resolvers: List<HostResolver> by lazy { listOf(PixelDrain(), Mega()) }
 
     /**
+     * Whether [link] is on a host droidtop has an API for, so a page that leads to it hands it here instead of loading
+     * the host's page (Droidtop/tracker#650: a masked forum link the person unmasks in the view). Local, no request.
+     */
+    fun served(link: String, resolvers: List<HostResolver> = this.resolvers): Boolean = resolvers.any { it.matches(link) }
+
+    /**
      * [link]'s files, or null when no way serves it. [debrid] and [resolvers] are replaceable for the tests. [refused] is
      * told the host's sentence each time its API refuses the link (a limit, a missing file, a refused key): when the link
      * then comes back null, the web view opens it and the caller can say why.

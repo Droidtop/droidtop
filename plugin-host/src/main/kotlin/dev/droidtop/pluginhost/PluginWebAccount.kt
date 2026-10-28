@@ -151,6 +151,10 @@ object PluginWebAccount {
         result.session?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {
             vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, it.copy(account = stored?.account).toJson())
         }
+        // The page led to a host droidtop serves (a masked link the person unmasked, Droidtop/tracker#650): that link
+        // goes through the resolvers above, and opens its own page only if none serves it (the view does not hand off
+        // the page it was opened on, so this ends there).
+        result.handoff?.let { return openForDownloads(context, record, it, max) }
         // A host whose API refused the link (Mega's limit on anonymous downloads) says so in the job's line.
         return result.downloads.take(max).map { download -> refusal?.let { download.copy(via = "from the web page ($it)") } ?: download }
     }

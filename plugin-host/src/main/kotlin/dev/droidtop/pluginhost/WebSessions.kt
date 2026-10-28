@@ -139,6 +139,11 @@ data class WebSessionResult(
     val download: WebSessionDownload?,
     /** Every download the page started, in order, when the request took more than one ([WebSessionRequest.maxDownloads]). */
     val downloads: List<WebSessionDownload> = listOfNotNull(download),
+    /**
+     * A link on a host droidtop serves ([dev.droidtop.pluginhost.hosts.HostLinks.served]) that the person followed in an
+     * Open view before anything was taken: the view closed there, and the caller asks the host's resolvers for it.
+     */
+    val handoff: String? = null,
 )
 
 /** A download a page started in the web view, as the web view reported it. */
