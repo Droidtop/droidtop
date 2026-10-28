@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -35,6 +34,10 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.app.ui.QrCode
+import dev.droidtop.library.settings.Notice
+import dev.droidtop.library.settings.NoticePlacement
+import dev.droidtop.library.settings.NoticeTone
+import dev.droidtop.ui.shared.NoticeCard
 import dev.droidtop.library.credentials.handoff.RemoteInputState
 import dev.droidtop.library.credentials.handoff.consoleLine
 
@@ -52,6 +55,9 @@ import dev.droidtop.library.credentials.handoff.consoleLine
 class RemoteInputActivity : AppCompatActivity() {
     private var folder by mutableStateOf("")
 
+    /** Why the last file picked to send was not offered, shown on the screen beside Send to the phone until the next pick. */
+    private var offerFailure by mutableStateOf<String?>(null)
+
     private val pickFolder = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
         if (tree != null) {
             // Kept across restarts, read and write, so the folder is still the one chosen next time.
@@ -68,12 +74,13 @@ class RemoteInputActivity : AppCompatActivity() {
 
     private val pickFile = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri != null) {
+            offerFailure = null
             // The file stays where it is and is read when the phone downloads it, so the permission must outlive this screen.
             runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             // Reading its name and size is provider work: not on the main thread.
             Thread({
                 val offered = RemoteInputs.offer(applicationContext, uri)
-                if (!offered) runOnUiThread { Toast.makeText(this, "That file cannot be sent. Wait for the QR code, or pick another file", Toast.LENGTH_LONG).show() }
+                if (!offered) runOnUiThread { offerFailure = "Wait for the QR code, or pick another file" }
             }, "droidtop-remote-offer").apply { isDaemon = true; start() }
         }
     }
@@ -87,6 +94,7 @@ class RemoteInputActivity : AppCompatActivity() {
                 Scaffold { padding ->
                     RemoteInputScreen(
                         folder = folder,
+                        offerFailure = offerFailure,
                         onPickFolder = { pickFolder.launch(null) },
                         onDefaultFolder = {
                             ReceiveFolder.choose(this, null)
@@ -119,6 +127,7 @@ class RemoteInputActivity : AppCompatActivity() {
 @Composable
 private fun RemoteInputScreen(
     folder: String,
+    offerFailure: String?,
     onPickFolder: () -> Unit,
     onDefaultFolder: () -> Unit,
     onOffer: () -> Unit,
@@ -170,6 +179,8 @@ private fun RemoteInputScreen(
                 Button(onClick = onPickFolder) { Text("Choose folder") }
                 TextButton(onClick = onDefaultFolder) { Text("Use Download/droidtop") }
             }
+            // The failure stays on the screen it belongs to (docs/SPEC.md 7k, "Notices"), not a toast.
+            offerFailure?.let { NoticeCard(Notice(NoticeTone.Caution, "That file cannot be sent", body = it), NoticePlacement.Row) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = onOffer) { Text("Send to the phone") }
                 if ((state as? RemoteInputState.Paired)?.offered != null) TextButton(onClick = { RemoteInputs.withdrawOffer() }) { Text("Stop offering") }
