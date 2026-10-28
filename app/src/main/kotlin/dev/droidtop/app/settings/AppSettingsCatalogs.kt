@@ -1336,6 +1336,19 @@ object AppSettingsCatalogs {
         forDeepLink = { pluginId -> pluginPermissionsScreen(pluginId) },
     )
 
+    /** The catalogs' plugins that answer the Plugins page's search and are not installed (Droidtop/tracker#513). */
+    private fun catalogSearchGroup(context: Context): CatalogGroup? {
+        val query = pluginSearch.takeIf { it.isNotBlank() } ?: return null
+        val rows = PluginCatalogScreen.searchRows(context, query)
+        return CatalogGroup(
+            id = "plugins_search_catalogs",
+            title = "In catalogs",
+            items = rows.ifEmpty {
+                listOf(ActionItem(id = "plugins_search_catalogs_none", title = "No catalog plugin matches \"$query\"", subtitle = "Searched as each catalog was last fetched", run = {}))
+            },
+        )
+    }
+
     private suspend fun pluginsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val installed = PluginStore.installed(context)
         // Read once here, off the main thread; valueLabel below is a
@@ -1377,6 +1390,18 @@ object AppSettingsCatalogs {
                 id = "plugins_installed",
                 title = if (installed.isEmpty()) null else "Installed",
                 items = buildList {
+                    // One search over the installed plugins and every catalog (Droidtop/tracker#513).
+                    if (installed.isNotEmpty() || listings.isNotEmpty()) {
+                        add(
+                            TextInputItem(
+                                id = "plugins_search",
+                                title = "Search",
+                                value = pluginSearch,
+                                search = true,
+                                onChange = { _, value -> pluginSearch = value.trim() },
+                            ),
+                        )
+                    }
                     if (installed.isEmpty()) {
                         add(
                             ActionItem(
@@ -1434,14 +1459,23 @@ object AppSettingsCatalogs {
                         )
                     }
                     val kind = pluginKind.takeIf { it in kinds } ?: ALL_KINDS
-                    val shown = cards.filter { (record, state, _) -> pluginFilter.keeps(state) && (kind == ALL_KINDS || kindOf(record) == kind) }
+                    val query = pluginSearch
+                    val shown = cards.filter { (record, state, _) ->
+                        pluginFilter.keeps(state) && (kind == ALL_KINDS || kindOf(record) == kind) && PluginCatalogScreen.matchesInstalled(record, query)
+                    }
                     if (shown.isEmpty()) {
-                        add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}", run = {}))
+                        add(
+                            ActionItem(
+                                id = "plugins_filter_none",
+                                title = if (query.isBlank()) "No plugin ${pluginFilter.none}" else "No installed plugin matches \"$query\"",
+                                run = {},
+                            ),
+                        )
                     }
                     shown.forEach { (_, _, card) -> add(card) }
                 },
             ),
-        ) + listOfNotNull(appInterfacesGroup(context, installed)) + providedByGroups(resolution, providerChoices) + listOf(
+        ) + listOfNotNull(catalogSearchGroup(context)) + listOfNotNull(appInterfacesGroup(context, installed)) + providedByGroups(resolution, providerChoices) + listOf(
             CatalogGroup(
                 id = "plugins_more",
                 title = null,
@@ -1607,6 +1641,9 @@ object AppSettingsCatalogs {
     }
 
     @Volatile private var pluginFilter = PluginListFilter.ALL
+
+    /** What the Plugins page's search holds (Droidtop/tracker#513): it narrows the installed cards and lists catalog matches. */
+    @Volatile private var pluginSearch = ""
 
     /** The kind the installed list is narrowed to (docs/plugin-api.md 1.2, "Categories"), or [ALL_KINDS]. */
     @Volatile private var pluginKind = ALL_KINDS
