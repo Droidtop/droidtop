@@ -149,7 +149,7 @@ object DroidtopWideSettings {
                 CatalogGroup(
                     id = "global_accessibility",
                     title = "Accessibility",
-                    category = "Accessibility",
+                    category = "Appearance",
                     items = listOf(
                         ChoiceItem(
                             id = AccessibilityPrefs.KEY_COLOR_VISION,

@@ -18079,18 +18079,21 @@ Settings tab, the left menu's places, Console systems and Containers.
   in (Global settings) contribute groups to several categories. **Reorganised into short categories, one home per
   setting (owner, 2026-10-23, Droidtop/tracker#610: "Settings would be very wise to reconfigure, yes. But don't worry
   about the single depth. Settings requires the complexity it deserves").** The Gaming Settings column is, in order:
-  **Modes** (Home screen, the modes, and Desktop's and Standard's own pages, which were "Other shells"),
-  **Kids and guests** (UI mode, the passkey, Kid's highest volume, Play time; out of the old Shell group),
+  **Modes** (Home screen, the modes, and Desktop's and Standard's own pages, which were "Other shells", then
+  Kids and guests as its section: UI mode, the passkey, Kid's highest volume, Play time),
   **Library** (Console systems, Emulators, Game folders, Windows games,
   Scraper as rows that open their screens; Downloads
   too in a mode with no left menu, see below),
   **Accounts and sources** (its screen drawn directly, a hub of one),
-  **Appearance** (theme rows, Light and dark), **Accessibility** (its own category, out of Appearance),
+  **Appearance** (theme rows, Light and dark, and Accessibility as its section),
   **Controls and keyboard** (the controller and every keyboard row, which were split over Controls and Displays),
   **Displays** (orientation, the display roles and the screens' names), **Companion screen** (the companion's own
   page drawn directly, a hub of one; it was about 28 rows under Displays), **Shell behaviour** (Default section,
   Quick Menu order, hints, animations, sounds, screensaver, while a game runs) and **System** (Android settings,
-  Risky actions, Data, About). Global settings is `merged`: its groups are
+  Risky actions, Data, About): nine, since Droidtop/tracker#621 M8 (owner, 2026-10-23: "let's do all nine of those
+  proposals") folded Kids and guests into Modes and Accessibility into Appearance. Accounts and sources stays a
+  category of its own, as its screen holds the scrapers, plugins and integrations besides the stores that Game
+  sources also lists. Global settings is `merged`: its groups are
   sections of those categories, not a column entry of its own, and every
   other surface still opens it as a screen. Eight Library entries and the
   Global settings entry left the column; no setting moved out of reach.

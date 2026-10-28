@@ -49,7 +49,9 @@ object GamingSettingsCatalog {
     val CATEGORY_ORDER = listOf(
         // Reorganised 2026-10-23 into short categories, one home per setting (Droidtop/tracker#610, the owner:
         // "Settings would be very wise to reconfigure, yes").
-        "Modes", "Kids and guests", "Library", "Accounts and sources", "Appearance", "Accessibility",
+        // Nine since Droidtop/tracker#621 M8 (owner, 2026-10-23: "let's do all nine of those proposals"): Kids and
+        // guests is a section of Modes, as who the device is handed to is a mode, and Accessibility one of Appearance.
+        "Modes", "Library", "Accounts and sources", "Appearance",
         "Controls and keyboard", "Displays", "Companion screen", "Shell behaviour", "System",
     )
     const val GROUP_KIDS = "gaming_kids"
@@ -226,7 +228,7 @@ object GamingSettingsCatalog {
             id = GROUP_KIDS,
             title = "Kids and guests",
             icon = CatalogIcon.GAMING,
-            category = "Kids and guests",
+            category = "Modes",
             items = buildList {
                 add(
                     ChoiceItem(
