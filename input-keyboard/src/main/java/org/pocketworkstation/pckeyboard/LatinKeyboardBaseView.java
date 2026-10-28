@@ -436,6 +436,11 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             mQueue.remove(tracker);
         }
 
+        /** droidtop: forgets every pointer without releasing it (a glide took the touch, Droidtop/tracker#341). */
+        public void clear() {
+            mQueue.clear();
+        }
+
         public boolean isInSlidingKeyInput() {
             for (final PointerTracker tracker : mQueue) {
                 if (tracker.isInSlidingKeyInput())
@@ -679,6 +684,8 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         mKeyboardChanged = true;
         invalidateAllKeys();
         computeProximityThreshold(keyboard);
+        // droidtop: glide typing works out its paths for this keyboard's letter keys (Droidtop/tracker#341).
+        if (mGlide != null) mGlide.prepare(keyboard);
         mMiniKeyboardCacheMain.clear();
         mMiniKeyboardCacheShift.clear();
         mMiniKeyboardCacheCaps.clear();
@@ -869,6 +876,8 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             onBufferDraw(canvas);
         }
         if (mBuffer != null) canvas.drawBitmap(mBuffer, 0, 0, null);
+        // droidtop: a glide's trail over the keys (Droidtop/tracker#341).
+        if (mGlide != null) mGlide.drawTrail(canvas, getPaddingLeft(), getPaddingTop(), mGlideTrailPaint);
         // droidtop: the pad's focus ring (Droidtop/tracker#338), over the keys, only while a pad drives.
         if (mPadFocus != null) {
             Key k = mPadFocus;
@@ -883,6 +892,73 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
     // droidtop: the key the pad's focus ring is on, or null (Droidtop/tracker#338, PadKeys).
     private Key mPadFocus;
     private final Paint mPadRingPaint = padRingPaint(getResources().getDisplayMetrics().density);
+
+    // droidtop: glide typing (Droidtop/tracker#341). Null while it is off; the IME sets it.
+    private GlideTyping mGlide;
+    private final Paint mGlideTrailPaint = GlideTyping.trailPaint(6 * getResources().getDisplayMetrics().density);
+
+    public void setGlide(GlideTyping glide) {
+        if (mGlide == glide) return;
+        if (mGlide != null) mGlide.cancel();
+        mGlide = glide;
+        if (glide != null && mKeyboard != null) glide.prepare(mKeyboard);
+        invalidate();
+    }
+
+    /** Whether the touch at keyboard coordinates (x, y) is on a letter key, where a glide may start. */
+    private boolean letterAt(int x, int y) {
+        if (mKeys == null) return false;
+        for (Key k : mKeys) {
+            if (k.isInside(x, y)) return k.codes != null && k.codes.length > 0 && Character.isLetter(k.codes[0]);
+        }
+        return false;
+    }
+
+    /**
+     * A single finger's touch, offered to glide typing first. True when the glide takes it: from the move that makes
+     * the touch a glide, the ordinary key press is cancelled and the keys see nothing more of this touch.
+     */
+    private boolean offerToGlide(MotionEvent me, int action) {
+        if (mGlide == null || mMiniKeyboardVisible) return false;
+        if (me.getPointerCount() > 1) {
+            boolean was = mGlide.getGliding();
+            mGlide.cancel();
+            if (was) invalidate();
+            return was;
+        }
+        final int gx = (int) me.getX() - getPaddingLeft();
+        final int gy = (int) me.getY() - getPaddingTop();
+        switch (action) {
+        case MotionEvent.ACTION_DOWN:
+            mGlide.down(gx, gy, letterAt(gx, gy));
+            return false;
+        case MotionEvent.ACTION_MOVE: {
+            final boolean wasGliding = mGlide.getGliding();
+            if (!mGlide.move(gx, gy)) return false;
+            if (!wasGliding) {
+                // The touch is a glide now: the key it started on is not pressed.
+                for (PointerTracker t : mPointerTrackers) t.onCancelEvent(gx, gy, me.getEventTime());
+                mPointerQueue.clear();
+                dismissKeyPreview();
+                mHandler.cancelKeyTimers();
+            }
+            invalidate();
+            return true;
+        }
+        case MotionEvent.ACTION_UP:
+            if (mGlide.up(gx, gy)) {
+                invalidate();
+                return true;
+            }
+            return false;
+        case MotionEvent.ACTION_CANCEL:
+            mGlide.cancel();
+            invalidate();
+            return false;
+        default:
+            return mGlide.getGliding();
+        }
+    }
 
     private static Paint padRingPaint(float density) {
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -1647,6 +1723,9 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
         if (!mHasDistinctMultitouch && pointerCount > 1 && oldPointerCount > 1) {
             return true;
         }
+
+        // droidtop: glide typing sees a single finger first, before the swipe gestures (Droidtop/tracker#341).
+        if (offerToGlide(me, action)) return true;
 
         // Track the last few movements to look for spurious swipes.
         mSwipeTracker.addMovement(me);

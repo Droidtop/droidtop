@@ -382,6 +382,14 @@
             android:summary="@string/summary_space_drag"
             />
 
+    <CheckBoxPreference
+            android:key="pref_glide"
+            android:title="@string/title_glide"
+            android:persistent="true"
+            android:defaultValue="true"
+            android:summary="@string/summary_glide"
+            />
+
     <EditTextPreference
             android:key="pref_macros"
             android:title="@string/title_macros"

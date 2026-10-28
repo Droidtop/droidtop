@@ -167,6 +167,14 @@ public class LatinIME extends InputMethodService implements
     private final PadKeys mPadKeys = new PadKeys(this);
     // droidtop: the dictionaries the keyboard last loaded (Droidtop/tracker#339).
     private int mDictionaryGeneration;
+    // droidtop: glide typing (Droidtop/tracker#341): the guesser for the shown keyboard, and the word a glide last
+    // typed with the others it offered, so picking one of those replaces it.
+    private final GlideTyping mGlide = new GlideTyping(words -> {
+        onGlideWords(words);
+        return kotlin.Unit.INSTANCE;
+    });
+    private String mGlideWord;
+    static final String PREF_GLIDE = "pref_glide";
 
     private UserDictionary mUserDictionary;
     private UserBigramDictionary mUserBigramDictionary;
@@ -621,6 +629,9 @@ public class LatinIME extends InputMethodService implements
         final Suggest created = mSuggest;
         mDictionaryGeneration = KeyboardDictionaries.getGeneration();
         KeyboardDictionaries.loadInto(this, created, locale, () -> mSuggest == created, this::updateCorrectionMode);
+        // droidtop: glide guesses from the same language's words (Droidtop/tracker#341), read when a keyboard shows.
+        final String glideLocale = locale;
+        mGlide.setWords(() -> KeyboardDictionaries.INSTANCE.glideWords(this, glideLocale));
         updateAutoTextEnabled(saveLocale);
         if (mUserDictionary != null)
             mUserDictionary.close();
@@ -803,6 +814,9 @@ public class LatinIME extends InputMethodService implements
         if (inputView == null) {
             return;
         }
+        // droidtop: glide typing while its setting is on (Droidtop/tracker#341); a new field starts with no glided word.
+        mGlideWord = null;
+        inputView.setGlide(PreferenceManager.getDefaultSharedPreferences(this).getBoolean(PREF_GLIDE, true) ? mGlide : null);
 
         if (mRefreshKeyboardRequired) {
             mRefreshKeyboardRequired = false;
@@ -2050,6 +2064,8 @@ public class LatinIME extends InputMethodService implements
     // Implementation of KeyboardViewListener
 
     public void onKey(int primaryCode, int[] keyCodes, int x, int y) {
+        // droidtop: a key typed after a glide keeps the glided word (Droidtop/tracker#341).
+        mGlideWord = null;
         // droidtop patch (Droidtop/tracker#342): an open emoji search takes the keys.
         if (KeyboardCapture.offerKey(primaryCode)) {
             return;
@@ -2720,6 +2736,8 @@ public class LatinIME extends InputMethodService implements
     }
 
     public void pickSuggestionManually(int index, CharSequence suggestion) {
+        // droidtop: one of a glide's other words replaces the word it typed (Droidtop/tracker#341).
+        if (replaceGlideWord(suggestion)) return;
         List<CharSequence> suggestions = mCandidateView.getSuggestions();
 
         final boolean correcting = TextEntryState.isCorrecting();
@@ -2800,6 +2818,59 @@ public class LatinIME extends InputMethodService implements
     }
 
     private void rememberReplacedWord(CharSequence suggestion) {
+    }
+
+    /**
+     * droidtop: a glide's words (Droidtop/tracker#341), best first. The best is typed, after a space when it follows a
+     * word, with the shift state's capitals; the strip offers the rest, and picking one replaces it.
+     */
+    private void onGlideWords(java.util.List<String> words) {
+        if (words.isEmpty()) return;
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
+        ic.beginBatchEdit();
+        commitTyped(ic, true);
+        CharSequence before = ic.getTextBeforeCursor(1, 0);
+        if (before != null && before.length() > 0 && Character.isLetterOrDigit(before.charAt(0))) {
+            ic.commitText(" ", 1);
+        }
+        String word = glideCase(words.get(0));
+        ic.commitText(word, 1);
+        ic.endBatchEdit();
+        mGlideWord = word;
+        java.util.List<CharSequence> offered = new java.util.ArrayList<CharSequence>();
+        for (String w : words) offered.add(glideCase(w));
+        setSuggestions(offered, false, true, true);
+        updateShiftKeyState(getCurrentInputEditorInfo());
+    }
+
+    /** A glided word in the shift state's case: all capitals when locked, a capital first letter when shifted. */
+    private String glideCase(String word) {
+        int shift = getShiftState();
+        if (shift == Keyboard.SHIFT_LOCKED || shift == Keyboard.SHIFT_CAPS_LOCKED) return word.toUpperCase();
+        if (shift == Keyboard.SHIFT_ON || shift == Keyboard.SHIFT_CAPS) {
+            return word.isEmpty() ? word : word.substring(0, 1).toUpperCase() + word.substring(1);
+        }
+        return word;
+    }
+
+    /** When [suggestion] is picked right after a glide, it replaces the glided word; false otherwise. */
+    private boolean replaceGlideWord(CharSequence suggestion) {
+        String glided = mGlideWord;
+        if (glided == null) return false;
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return false;
+        CharSequence before = ic.getTextBeforeCursor(glided.length(), 0);
+        if (before == null || !glided.contentEquals(before)) {
+            mGlideWord = null;
+            return false;
+        }
+        ic.beginBatchEdit();
+        ic.deleteSurroundingText(glided.length(), 0);
+        ic.commitText(suggestion, 1);
+        ic.endBatchEdit();
+        mGlideWord = suggestion.toString();
+        return true;
     }
 
     /**
