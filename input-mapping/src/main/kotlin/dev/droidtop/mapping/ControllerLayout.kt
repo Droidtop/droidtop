@@ -129,6 +129,9 @@ sealed class Binding {
     data class XinputButton(val button: String, override val raw: String) : Binding()
     data class GameAction(val set: String, val action: String, override val raw: String) : Binding()
     data class ControllerAction(val words: List<String>, override val raw: String) : Binding()
+
+    /** Held, puts group [groupId] on [source] instead of its preset's group (Steam's mode shift). */
+    data class ModeShift(val source: String, val groupId: Int, override val raw: String) : Binding()
     data class Other(override val raw: String) : Binding()
 
     companion object {
@@ -143,6 +146,7 @@ sealed class Binding {
                 verb == "xinput_button" && args.size == 1 -> XinputButton(args[0], raw)
                 verb == "game_action" && args.size == 2 -> GameAction(args[0], args[1], raw)
                 verb == "controller_action" && args.isNotEmpty() -> ControllerAction(args, raw)
+                verb == "mode_shift" && args.size == 2 && args[1].toIntOrNull() != null -> ModeShift(args[0], args[1].toInt(), raw)
                 else -> Other(raw)
             }
         }

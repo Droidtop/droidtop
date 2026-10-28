@@ -7255,9 +7255,16 @@ put groups on sources; action sets and layers; localization). The `:input-mappin
 (`KeyValues`, `ControllerLayout`, `Binding`): the node tree is the layout, so repeated keys keep their order and a key
 droidtop does not know is written back unchanged; `parse(write(x)) == x` is tested. Comments are not kept. Nothing
 droidtop-only goes into the file: what Steam has no word for will live in a `<layout>.droidtop.json` sidecar. The
-module holds no Android types, so the same sources can move to the shared library when Enginehost uses it (C9). The
-mapping engine that plays a layout to a game, and the defaults, follow on it; until then Controller mouse mode above
-is the pad's only pointer.
+module holds no Android types, so the same sources can move to the shared library when Enginehost uses it (C9).
+`MappingEngine` plays a layout: the host names each pad input as Steam does (`button_diamond`/`button_a`,
+`switch`/`left_bumper`, `joystick`/`click`), and gets keys, mouse buttons, wheel, pad buttons and game actions back.
+The active preset says which group is on which source; `controller_action CHANGE_PRESET n` switches preset (Steam
+counts from 1) after letting go of everything held; a held `mode_shift <source> <group>` puts that group on the
+source. Full_Press is held while the button is, Start_Press and Release_Press tap; a Long_Press (400 ms unless its
+`long_press_time` says otherwise) is held from that time to release, and makes the same input's Full_Press wait and tap
+on a quicker release. A stick in `dpad` mode presses up to two directions past half deflection. Pure; time is passed
+in. Double press, chords, turbo, the analog modes and layers come next, then the Wine sink and the defaults; until
+then Controller mouse mode above is the pad's only pointer.
 
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with

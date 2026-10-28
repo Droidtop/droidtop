@@ -1,0 +1,191 @@
+package dev.droidtop.mapping
+
+import kotlin.math.abs
+
+/**
+ * Plays a [ControllerLayout] (Droidtop/tracker#618 C3; docs/SPEC.md 5b "Controller layouts"): a pad's presses and
+ * sticks in, what the game receives out. Pure and single-threaded; time is passed in, so every rule is tested
+ * without a clock.
+ *
+ * A physical input is named as Steam names it, a source and an input of it: (`button_diamond`, `button_a`),
+ * (`dpad`, `dpad_north`), (`switch`, `left_bumper`), (`joystick`, `click`), (`left_trigger`, `click`). The host
+ * translates its pad's events into those names; a stick's deflection goes to [stick].
+ *
+ * What it does:
+ * - the active preset ([presetId]) says which group is on which source; a `controller_action CHANGE_PRESET <id>`
+ *   binding switches preset (Steam's ids are 1-based: preset id + 1), releasing what the old one held;
+ * - a `mode_shift <source> <group>` binding, held, puts that group on the source instead, as Steam's mode shift;
+ * - activators: `Full_Press` is held while the input is; `Start_Press` taps on press and `Release_Press` on release;
+ *   `Long_Press` is held from [Activator.long_press_time][DEFAULT_LONG_PRESS_MS] after the press until release. An
+ *   input with a Long_Press makes its Full_Press wait: released sooner, the Full_Press is a tap;
+ * - a stick in `dpad` mode presses `dpad_north` and the others past [STICK_DPAD_THRESHOLD], 8-way.
+ * Not yet: double press, chords, turbo, the analog modes (joystick mouse and camera, which come with the Wine sink),
+ * and action layers.
+ */
+class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null) {
+
+    /** What the game receives. Keys and buttons are Steam's names (`W`, `SPACE`, `LEFT`, `A`); the sink maps them. */
+    sealed class Output {
+        data class KeyDown(val key: String) : Output()
+        data class KeyUp(val key: String) : Output()
+        data class MouseDown(val button: String) : Output()
+        data class MouseUp(val button: String) : Output()
+        data class Wheel(val direction: String) : Output()
+        data class PadDown(val button: String) : Output()
+        data class PadUp(val button: String) : Output()
+        data class ActionDown(val set: String, val action: String) : Output()
+        data class ActionUp(val set: String, val action: String) : Output()
+        data class PresetChanged(val presetId: Int) : Output()
+    }
+
+    data class Physical(val source: String, val input: String)
+
+    var presetId: Int = presetId ?: layout.presets.firstOrNull()?.id ?: 0
+        private set
+
+    /** Held mode shifts: the source and the group the holder put on it. */
+    private val shifts = LinkedHashMap<Physical, Pair<String, Int>>()
+
+    /** Each held physical input: what it pressed, and how it began. */
+    private class Held(val since: Long, val activators: List<ControllerLayout.Activator>) {
+        val down = ArrayList<Binding>()
+        var longFired = false
+    }
+
+    private val held = LinkedHashMap<Physical, Held>()
+
+    /** The 8-way directions a stick in dpad mode holds now, by source. */
+    private val stickDirs = HashMap<String, Set<String>>()
+
+    fun press(source: String, input: String, now: Long): List<Output> {
+        val physical = Physical(source, input)
+        if (physical in held) return emptyList()
+        val activators = groupOn(source)?.input(input)?.activators.orEmpty()
+        val h = Held(now, activators)
+        held[physical] = h
+        val out = ArrayList<Output>()
+        val hasLong = activators.any { it.type.equals(LONG, true) }
+        for (a in activators) {
+            when {
+                a.type.equals(FULL, true) && !hasLong -> a.bindings.forEach { begin(physical, h, it, out) }
+                a.type.equals(START, true) -> a.bindings.forEach { tap(it, out) }
+            }
+        }
+        return out
+    }
+
+    fun release(source: String, input: String, now: Long): List<Output> {
+        val physical = Physical(source, input)
+        if (physical !in held) return emptyList()
+        val out = ArrayList<Output>()
+        // A long press held past its time counts even when no tick came in between.
+        tick(now, out)
+        val h = held.remove(physical) ?: return out
+        if (h.activators.any { it.type.equals(LONG, true) } && !h.longFired) {
+            h.activators.filter { it.type.equals(FULL, true) }.forEach { a -> a.bindings.forEach { tap(it, out) } }
+        }
+        for (b in h.down.asReversed()) end(physical, b, out)
+        h.activators.filter { it.type.equals(RELEASE, true) }.forEach { a -> a.bindings.forEach { tap(it, out) } }
+        return out
+    }
+
+    /** Fires what time alone fires (a long press reaching its time). Call it each frame, or before the next event. */
+    fun tick(now: Long): List<Output> = ArrayList<Output>().also { tick(now, it) }
+
+    private fun tick(now: Long, out: MutableList<Output>) {
+        for ((physical, h) in held.entries.toList()) {
+            if (h.longFired) continue
+            val long = h.activators.firstOrNull { it.type.equals(LONG, true) } ?: continue
+            val time = long.settings["long_press_time"]?.toLongOrNull() ?: DEFAULT_LONG_PRESS_MS
+            if (now - h.since >= time) {
+                h.longFired = true
+                long.bindings.forEach { begin(physical, h, it, out) }
+            }
+        }
+    }
+
+    /**
+     * A stick at ([x], [y]), -1 to 1 with up negative as Android reports it. In `dpad` mode it presses and releases
+     * the group's dpad inputs; in other modes it does nothing yet.
+     */
+    fun stick(source: String, x: Float, y: Float, now: Long): List<Output> {
+        val group = groupOn(source)
+        val wanted = if (group?.mode.equals("dpad", true)) directions(x, y) else emptySet()
+        val before = stickDirs[source].orEmpty()
+        stickDirs[source] = wanted
+        val out = ArrayList<Output>()
+        for (d in before - wanted) out += release(source, d, now)
+        for (d in wanted - before) out += press(source, d, now)
+        return out
+    }
+
+    /** The group on [source] now: a held mode shift's, else the active preset's. */
+    fun groupOn(source: String): ControllerLayout.Group? {
+        shifts.values.lastOrNull { it.first.equals(source, true) }?.let { return layout.group(it.second) }
+        val preset = layout.presets.firstOrNull { it.id == presetId } ?: return null
+        val binding = preset.sources.firstOrNull { it.source.equals(source, true) && it.active && !it.modeShift } ?: return null
+        return layout.group(binding.groupId)
+    }
+
+    private fun begin(physical: Physical, h: Held, binding: Binding, out: MutableList<Output>) {
+        when (binding) {
+            is Binding.KeyPress -> out += Output.KeyDown(binding.key)
+            is Binding.MouseButton -> out += Output.MouseDown(binding.button)
+            is Binding.XinputButton -> out += Output.PadDown(binding.button)
+            is Binding.GameAction -> out += Output.ActionDown(binding.set, binding.action)
+            is Binding.MouseWheel -> out += Output.Wheel(binding.direction)
+            is Binding.ModeShift -> shifts[physical] = binding.source to binding.groupId
+            is Binding.ControllerAction -> changePreset(binding, out)
+            is Binding.Other -> Unit
+        }
+        h.down += binding
+    }
+
+    private fun end(physical: Physical, binding: Binding, out: MutableList<Output>) {
+        when (binding) {
+            is Binding.KeyPress -> out += Output.KeyUp(binding.key)
+            is Binding.MouseButton -> out += Output.MouseUp(binding.button)
+            is Binding.XinputButton -> out += Output.PadUp(binding.button)
+            is Binding.GameAction -> out += Output.ActionUp(binding.set, binding.action)
+            is Binding.ModeShift -> shifts.remove(physical)
+            else -> Unit
+        }
+    }
+
+    private fun tap(binding: Binding, out: MutableList<Output>) {
+        val scratch = Held(0, emptyList())
+        val tapper = Physical("", "")
+        begin(tapper, scratch, binding, out)
+        for (b in scratch.down.asReversed()) end(tapper, b, out)
+    }
+
+    /** `controller_action CHANGE_PRESET <n>`: everything held is let go under the old preset first. */
+    private fun changePreset(binding: Binding.ControllerAction, out: MutableList<Output>) {
+        if (!binding.words[0].equals("CHANGE_PRESET", true)) return
+        val target = binding.words.getOrNull(1)?.toIntOrNull()?.minus(1) ?: return
+        if (target == presetId || layout.presets.none { it.id == target }) return
+        for ((physical, h) in held.entries.toList()) {
+            for (b in h.down.asReversed()) end(physical, b, out)
+            h.down.clear()
+        }
+        presetId = target
+        out += Output.PresetChanged(target)
+    }
+
+    companion object {
+        const val DEFAULT_LONG_PRESS_MS = 400L
+        const val STICK_DPAD_THRESHOLD = 0.5f
+        private const val FULL = "Full_Press"
+        private const val LONG = "Long_Press"
+        private const val START = "Start_Press"
+        private const val RELEASE = "Release_Press"
+
+        /** The dpad inputs a stick at ([x], [y]) holds: one or two, 8-way, past the threshold on each axis. Pure. */
+        fun directions(x: Float, y: Float): Set<String> {
+            val out = HashSet<String>()
+            if (abs(x) >= STICK_DPAD_THRESHOLD) out += if (x > 0) "dpad_east" else "dpad_west"
+            if (abs(y) >= STICK_DPAD_THRESHOLD) out += if (y > 0) "dpad_south" else "dpad_north"
+            return out
+        }
+    }
+}
