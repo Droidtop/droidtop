@@ -165,7 +165,7 @@ private fun NetworkGlyph(status: SystemStatusSnapshot) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val stroke = remember(density) { Stroke(width = with(density) { 1.6.dp.toPx() }, cap = StrokeCap.Round) }
     val normal = MenuTokens.OnSurfaceMuted
-    val attention = MenuTokens.Danger
+    val attention = MenuTokens.NoticeDanger
     val kind = status.network
     val level = status.wifiLevel
     val lit = when {
@@ -225,7 +225,7 @@ private fun BatteryGlyph(percent: Int?, charging: Boolean) {
     val stroke = remember(density) { Stroke(width = with(density) { 1.4.dp.toPx() }) }
     val tint = when {
         charging -> MenuTokens.Affirmative
-        percent != null && percent <= LOW_BATTERY_PERCENT -> MenuTokens.Danger
+        percent != null && percent <= LOW_BATTERY_PERCENT -> MenuTokens.NoticeDanger
         else -> MenuTokens.OnSurfaceMuted
     }
     Canvas(Modifier.size(width = 24.dp, height = 12.dp)) {

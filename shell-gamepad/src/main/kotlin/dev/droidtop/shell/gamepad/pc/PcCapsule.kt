@@ -422,10 +422,10 @@ internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: PluginJo
         CapsuleStatus.DOWNLOADING -> Triple("Downloading", MenuTokens.Selected, MenuTokens.OnSelected)
         CapsuleStatus.WAITING -> Triple("Waiting", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.PAUSED -> Triple("Paused", MenuTokens.Scrim, MenuTokens.OnSurface)
-        CapsuleStatus.FAILED -> Triple("Failed", MenuTokens.Scrim, MenuTokens.Danger)
+        CapsuleStatus.FAILED -> Triple("Failed", MenuTokens.Scrim, MenuTokens.NoticeDanger)
         CapsuleStatus.NOT_INSTALLED -> Triple("Not installed", MenuTokens.Scrim, MenuTokens.OnSurface)
         CapsuleStatus.WISHLIST -> Triple("Wishlist", MenuTokens.Scrim, MenuTokens.OnSurface)
-        CapsuleStatus.MISSING -> Triple("Missing", MenuTokens.Scrim, MenuTokens.Danger)
+        CapsuleStatus.MISSING -> Triple("Missing", MenuTokens.Scrim, MenuTokens.NoticeDanger)
         CapsuleStatus.INSTALLED -> Triple("✓", MenuTokens.Scrim, MenuTokens.Affirmative)
     }
     CapsuleChip(text, ink, fill, Modifier.align(Alignment.TopStart))

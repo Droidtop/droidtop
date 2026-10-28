@@ -459,7 +459,13 @@ object MenuTokens {
     val Value: Color get() = GamingTheme.palette.value
     val Placeholder: Color get() = GamingTheme.palette.placeholder
     val Accent: Color get() = GamingTheme.palette.accent
-    val Danger: Color get() = GamingTheme.palette.danger
+    /**
+     * The one danger colour: the notice palette's danger ink (docs/SPEC.md 7k, "Notices"; Droidtop/tracker#485), the
+     * same ink a danger notice, the status glyph's error mark and the danger dialog use, kept to contrast on this
+     * palette's ground. It replaced the theme's own `danger` role here, so a failed capsule and a danger notice can no
+     * longer be two reds.
+     */
+    val NoticeDanger: Color get() = GamingTheme.palette.notice.ink(dev.droidtop.library.settings.NoticeTone.Danger)
     /** "This is on / included" -- the one affirmative in the menus. */
     val Affirmative: Color get() = GamingTheme.palette.affirmative
 
@@ -503,8 +509,6 @@ object MenuTokens {
     private const val LIGHT_PANEL_VEIL_ALPHA = 0.32f
     /** The favourite mark. */
     val Favourite: Color get() = GamingTheme.palette.favourite
-    /** The plate behind a [Danger] message that sits over the page. */
-    val DangerPlate: Color get() = GamingTheme.palette.dangerPlate
     /** The one primary action on a detail (Play), and its states. */
     val Launch: Color get() = GamingTheme.palette.launch
     val LaunchFocused: Color get() = GamingTheme.palette.launchFocused

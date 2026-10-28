@@ -580,7 +580,7 @@ internal fun MenuRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     title,
-                    color = if (danger) MenuTokens.Danger else MenuTokens.OnSurface,
+                    color = if (danger) MenuTokens.NoticeDanger else MenuTokens.OnSurface,
                     fontWeight = FontWeight.Medium,
                     style = MaterialTheme.typography.bodyLarge,
                     maxLines = if (progress != null || chip != null) 1 else 2,
@@ -834,7 +834,7 @@ internal fun shellJobColors(): dev.droidtop.ui.shared.JobProgressColors {
         track = MenuTokens.Scrim,
         fill = MenuTokens.Accent,
         done = MenuTokens.Affirmative,
-        failed = MenuTokens.Danger,
+        failed = MenuTokens.NoticeDanger,
     )
 }
 
@@ -1072,7 +1072,7 @@ internal fun DialogChoices(groups: List<List<DialogChoice>>, selected: Int, onCh
                         choice.label,
                         color = when {
                             inverted -> MenuTokens.OnSelected
-                            choice.danger -> MenuTokens.Danger
+                            choice.danger -> MenuTokens.NoticeDanger
                             else -> MenuTokens.OnSurface
                         },
                         style = TypeRole.body,

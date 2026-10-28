@@ -431,13 +431,13 @@ private fun QuickTileView(
     // The selection is drawn only while a pad drives (docs/SPEC.md 6e).
     val ring = focused && dev.droidtop.shell.gamepad.input.PadModality.showsFocus
     val background = when {
-        confirmArmed -> MenuTokens.Danger.copy(alpha = 0.22f)
+        confirmArmed -> MenuTokens.NoticeDanger.copy(alpha = 0.22f)
         lit -> MenuTokens.Accent.copy(alpha = 0.24f)
         ring -> MenuTokens.SurfaceSelected
         else -> MenuTokens.Surface
     }
     val tint = when {
-        confirmArmed -> MenuTokens.Danger
+        confirmArmed -> MenuTokens.NoticeDanger
         lit -> MenuTokens.Accent
         else -> MenuTokens.Value
     }
@@ -463,7 +463,7 @@ private fun QuickTileView(
         Spacer(Modifier.weight(1f))
         Text(
             if (confirmArmed) "${tile.label}: ${PressWords.again}" else tile.label,
-            color = if (confirmArmed) MenuTokens.Danger else MenuTokens.OnSurface,
+            color = if (confirmArmed) MenuTokens.NoticeDanger else MenuTokens.OnSurface,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Medium,
             maxLines = if (focused) 1 else 2,
