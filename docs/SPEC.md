@@ -3561,6 +3561,14 @@ the `ContainerRuntime` interface that already exists (§3):
     "Downloads and installs") hosted in the sheet by `CatalogNavigator`, without its own heading
     (`PluginJobsScreen.screen(headed = false)`: the rail header already names it). Its empty state is
     one short row, "Nothing running", with the longer sentence as its HintTip.
+  - **Profile** (owner, 2026-10-28, Droidtop/tracker#586: "a, but autofill from all the profiles we have and let users
+    pick/override"): droidtop's own name and picture for the person (`ProfileStore`, `:library-core`). Name is "From
+    your accounts" by default, the first name droidtop knows (a social provider's own name, Steam's persona among them,
+    then a store that keeps an account name: itch, Epic), or any one of them picked, or the person's own typed name.
+    No account gives droidtop a picture (avatars are not read from any service), so the picture is an image the
+    person picks from their files, copied into droidtop's storage (8 MB at most), and removable. Home's top band
+    shows the picture, or the name's first letter, and the name on its left; a tap opens the Quick Menu. Only Full
+    has it: Kiosk, Kid and Guest leave the owner's profile out.
   - **Plugins** (whenever a plugin is installed or plugins can be managed from here; Decky-style since
     2026-10-07, Droidtop/tracker#316, 12a "Plugin UI, Decky-style"; the one home of plugin menus since
     2026-10-24, Droidtop/tracker#644): every installed plugin, one row each with its icon, its name and one

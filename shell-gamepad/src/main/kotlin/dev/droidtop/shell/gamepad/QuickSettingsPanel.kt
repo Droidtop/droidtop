@@ -690,6 +690,12 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
                 dot(12f, 14.5f, 1.1f)
                 line(12f, 2f, 12f, 4.5f); line(5.5f, 3.5f, 7f, 5f); line(18.5f, 3.5f, 17f, 5f)
             }
+            QuickGlyph.PROFILE -> {
+                // A person in a circle: the head and the shoulders' curve.
+                ring(12f, 12f, 9f)
+                ring(12f, 9.5f, 3f)
+                arc(12f, 20f, 6f, 200f, 140f)
+            }
             QuickGlyph.PLUGIN -> {
                 // A puzzle piece, as the left menu's Plugins row: a square with a knob on its top and one on its right.
                 line(4f, 8f, 9.5f, 8f); line(14.5f, 8f, 18f, 8f)
