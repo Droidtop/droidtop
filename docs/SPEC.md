@@ -15309,7 +15309,11 @@ structure, top to bottom, drawn only from theme tokens:
   toward the ground by a gradient so what is laid over it stays legible on
   any art, with the game's logo (`logoUri`) or, without one, its name, and
   nothing else stacked on the art (the source and engine are rows, not a
-  line on the hero). Only portrait art: that art at its own shape on the
+  line on the hero). The hero art is the landscape slots' one order
+  (`heroArt`), so never a screenshot; hero art narrower than 320 px
+  (`HERO_MIN_WIDTH_PX`, checked on the decoded image) is drawn whole on the
+  right as portrait art is, never blown up to fill the band. Only portrait
+  art: that art at its own shape on the
   right of a plate, never stretched across the band. No art: the plate and
   the name. Its height is a share of the window's (46 percent landscape,
   Steam's hero ends at about 46; 30 percent portrait).
@@ -15335,7 +15339,8 @@ structure, top to bottom, drawn only from theme tokens:
   arrives) at the right edge, all in one row (`factsStrip`): Last played,
   Play time, Version (the installed version against the latest known:
   "0.9.5, v0.9.6 is available", the one wording of `GameUpdates.line`), Size
-  and Runs with, only those that exist. It scrolls sideways rather than
+  and Runs with with the one-line reason it won under it (`ResolvedRunner.reason`,
+  the Runner row's subtitle), only those that exist. It scrolls sideways rather than
   clipping at a large text size. Last played and Play time are said by the
   same two functions (`lastPlayedPhrase`, `playtimeLine`) in the strip and in
   the Details tab, so the two never disagree. Under it the one line saying why the
