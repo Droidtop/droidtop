@@ -145,12 +145,19 @@ object PluginWebAccount {
         val vault = PluginVault.forContext(context)
         // Without the permission the page still opens, signed out: the person may still start a public download.
         val stored = if (grant == GrantState.GRANTED) WebSessions.Stored.parse(vault.getHost(record.manifest.id, WebSessions.VAULT_KEY)) else null
-        val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (stored != null) domains else emptyList(), stored, null, maxDownloads = max.coerceIn(1, 16), signInUrl = signInUrl(record))
+        // droidtop's sign-in for a declared download site the plugin keeps none of its own for (Droidtop/tracker#648).
+        val shared = if (grant == GrantState.GRANTED) runCatching { DownloadSites.sharedWith(context, record.manifest.id, domains) }.getOrDefault(emptyMap()) else emptyMap()
+        val borrowed = shared.keys.filter { stored?.cookies?.get(it).isNullOrBlank() }
+        val inUse = DownloadSites.borrow(stored, shared)
+        val request = WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, if (inUse != null) domains else emptyList(), inUse, null, maxDownloads = max.coerceIn(1, 16), signInUrl = signInUrl(record))
         val result = WebSessionActivity.show(context, request)
         SiteChecks.keep(vault, record.manifest.id, result.session)
-        result.session?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {
-            vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, it.copy(account = stored?.account).toJson())
-        }
+        // A shared site's renewed cookies go back to droidtop, never into the plugin's vault.
+        result.session?.cookies?.filterKeys { it in borrowed }?.forEach { (domain, header) -> DownloadSites.renew(context, domain, header) }
+        result.session?.let { it.copy(cookies = it.cookies.filterKeys { domain -> domain !in borrowed }) }
+            ?.takeIf { stored != null && it.cookies.isNotEmpty() }?.let {
+                vault.putHost(record.manifest.id, WebSessions.VAULT_KEY, it.copy(account = stored?.account).toJson())
+            }
         // The page led to a host droidtop serves (a masked link the person unmasked, Droidtop/tracker#650): that link
         // goes through the resolvers above, and opens its own page only if none serves it (the view does not hand off
         // the page it was opened on, so this ends there).

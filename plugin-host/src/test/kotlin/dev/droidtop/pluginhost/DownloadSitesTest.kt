@@ -59,4 +59,14 @@ class DownloadSitesTest {
         val target = OpenTarget.SiteSignIn("gofile.io")
         assertEquals(target, OpenTarget.decode(OpenTarget.encode(target)))
     }
+
+    @Test fun `a plugin borrows a shared site only where it keeps no sign-in of its own`() {
+        val own = WebSessions.Stored("UA", mapOf("f95zone.to" to "xf_user=1", "gofile.io" to "mine=1"))
+        val shared = mapOf("gofile.io" to "accountToken=abc", "mega.nz" to "sid=2")
+        val inUse = DownloadSites.borrow(own, shared)!!
+        assertEquals(mapOf("f95zone.to" to "xf_user=1", "gofile.io" to "mine=1", "mega.nz" to "sid=2"), inUse.cookies)
+        assertEquals("UA", inUse.userAgent)
+        assertEquals(mapOf("mega.nz" to "sid=2"), DownloadSites.borrow(null, mapOf("mega.nz" to "sid=2"))!!.cookies)
+        assertEquals(null, DownloadSites.borrow(null, emptyMap()))
+    }
 }

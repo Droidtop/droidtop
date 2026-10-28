@@ -120,6 +120,15 @@ interface BrokerEnvironment {
     /** The per-plugin secret store behind `vault` (docs/plugin-api.md 3 G1); null where there is none (the call is UNSUPPORTED). */
     fun vault(): PluginVault? = null
 
+    /**
+     * droidtop's own sign-ins for the download sites among [declared] that it shares with [pluginId], by domain
+     * (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648): none where there is no list.
+     */
+    fun sharedSites(pluginId: String, declared: List<String>): Map<String, String> = emptyMap()
+
+    /** Seals again what a shared download site renewed while a plugin's view was open; never into the plugin's vault. */
+    fun renewSharedSites(cookies: Map<String, String>) = Unit
+
     /** Whether droidtop holds [need] now (or this Android version has no such permission). */
     fun holdsAndroid(need: AndroidNeed): Boolean = true
 

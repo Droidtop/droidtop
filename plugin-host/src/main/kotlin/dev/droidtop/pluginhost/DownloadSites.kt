@@ -190,4 +190,38 @@ object DownloadSites {
     }
 
     private const val KEY_EXPIRED = "expired"
+
+    /**
+     * The signed-in download sites among [declared] (a plugin's `web.session` sites) whose sign-in droidtop shares with
+     * [pluginId] (Droidtop/tracker#648 slice 5): every one, unless the person turned sharing off for that plugin. Disk.
+     */
+    fun sharedWith(context: Context, pluginId: String, declared: List<String>): Map<String, String> {
+        if (!sharing(context, pluginId)) return emptyMap()
+        return cookies(context).filterKeys { WebSessions.covers(it, declared) }
+    }
+
+    /** Whether the plugin's declared [declared] sites include a download site on the list (its Permissions row shows). */
+    fun declaresAny(context: Context, declared: List<String>): List<Site> = all(context).filter { WebSessions.covers(it.domain, declared) }
+
+    /** Sharing is on for a plugin until the person turns it off in its Permissions ("no forced approvals"). */
+    fun sharing(context: Context, pluginId: String): Boolean =
+        !expiredPrefs(context).getStringSet(KEY_NOT_SHARED, emptySet()).orEmpty().contains(pluginId)
+
+    fun setSharing(context: Context, pluginId: String, on: Boolean) {
+        val prefs = expiredPrefs(context)
+        val now = prefs.getStringSet(KEY_NOT_SHARED, emptySet()).orEmpty().toMutableSet()
+        if (if (on) now.remove(pluginId) else now.add(pluginId)) prefs.edit().putStringSet(KEY_NOT_SHARED, now).apply()
+    }
+
+    private const val KEY_NOT_SHARED = "not_shared"
+
+    /**
+     * [own] (a plugin's own kept session) with [shared] (droidtop's sign-ins for its declared download sites) added for
+     * each site the plugin keeps no cookies of its own for. Pure.
+     */
+    fun borrow(own: WebSessions.Stored?, shared: Map<String, String>): WebSessions.Stored? {
+        val missing = shared.filterKeys { domain -> own?.cookies?.get(domain).isNullOrBlank() }
+        if (missing.isEmpty()) return own
+        return (own ?: WebSessions.Stored(null, emptyMap())).let { it.copy(cookies = it.cookies + missing) }
+    }
 }

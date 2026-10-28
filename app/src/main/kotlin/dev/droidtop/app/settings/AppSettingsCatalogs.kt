@@ -3002,8 +3002,22 @@ object AppSettingsCatalogs {
                 else -> null
             }
         }
+        // A plugin that signs in to a download site droidtop also keeps a sign-in for borrows droidtop's, unless the
+        // person turns that off here (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648 slice 5).
+        val sharedSites = dev.droidtop.pluginhost.DownloadSites.declaresAny(context, dev.droidtop.pluginhost.WebSessions.declaredDomains(record.manifest.v2.permissions))
+        val sharingItem = sharedSites.takeIf { it.isNotEmpty() }?.let { sites ->
+            ToggleItem(
+                id = "plugin_permissions_download_sites",
+                title = "Use your download-site sign-ins",
+                subtitle = "For ${sites.joinToString { it.name }}: when ${record.manifest.label} has no sign-in of its own there, " +
+                    "it uses the one under Accounts and sources > Download sites. It never sees your password",
+                current = dev.droidtop.pluginhost.DownloadSites.sharing(context, pluginId),
+                onToggle = { ctx, on -> dev.droidtop.pluginhost.DownloadSites.setSharing(ctx, pluginId, on) },
+            )
+        }
         return listOfNotNull(
             accessRow?.let { CatalogGroup(id = "plugin_permissions_access", title = "Access", items = listOf(it)) },
+            sharingItem?.let { CatalogGroup(id = "plugin_permissions_download_sites_group", title = "Download sites", items = listOf(it)) },
             (modeItems + targetItems).takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_modes", "Where it appears", it) },
             facetItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_facets", "What it shows", it) },
             backgroundItems.takeIf { it.isNotEmpty() }?.let { CatalogGroup("plugin_permissions_background", "Background tasks", it) },

@@ -24,6 +24,24 @@ internal object HostWebApis {
     private fun stored(env: BrokerEnvironment, record: PluginRecord): WebSessions.Stored? =
         WebSessions.Stored.parse(vault(env).getHost(record.manifest.id, WebSessions.VAULT_KEY))
 
+    /**
+     * The session a plugin's calls use: its own, plus droidtop's sign-in for each declared download site it keeps none
+     * of its own for (Droidtop/tracker#648 slice 5). Only [stored] is ever saved back to the plugin's vault.
+     */
+    private fun inUse(env: BrokerEnvironment, record: PluginRecord): WebSessions.Stored? =
+        DownloadSites.borrow(stored(env, record), env.sharedSites(record.manifest.id, WebSessions.declaredDomains(record.manifest.v2.permissions)))
+
+    /** [session] as a view left it, split: the plugin's own sites are its to keep; a shared site goes back to droidtop. */
+    private fun keepAfterView(env: BrokerEnvironment, record: PluginRecord, session: WebSessions.Stored?) {
+        session ?: return
+        val shared = env.sharedSites(record.manifest.id, WebSessions.declaredDomains(record.manifest.v2.permissions))
+        val own = stored(env, record)
+        val borrowed = shared.keys.filter { own?.cookies?.get(it).isNullOrBlank() }
+        env.renewSharedSites(session.cookies.filterKeys { it in borrowed })
+        val left = session.cookies.filterKeys { it !in borrowed }
+        if (left.isNotEmpty()) save(env, record, session.copy(cookies = left, account = own?.account))
+    }
+
     private fun save(env: BrokerEnvironment, record: PluginRecord, session: WebSessions.Stored?) {
         if (session == null || session.cookies.isEmpty()) {
             vault(env).deleteHost(record.manifest.id, WebSessions.VAULT_KEY)
@@ -61,7 +79,7 @@ internal object HostWebApis {
             JSONObject().put("signedIn", result.completed && result.session?.cookies?.isNotEmpty() == true)
         },
         HostOp("web.session", "get_status", permission = WebSessions.PERMISSION) { env, record, _ ->
-            val session = stored(env, record)
+            val session = inUse(env, record)
             JSONObject().put("signedIn", session?.cookies?.isNotEmpty() == true).put("account", session?.account ?: JSONObject.NULL)
         },
         // The name of the account the session is signed in to, as the plugin read it from the site: droidtop shows it
@@ -83,7 +101,7 @@ internal object HostWebApis {
         ) { env, record, args ->
             val domains = domains(record)
             val url = sessionUrl(args, domains)
-            val session = stored(env, record)
+            val session = inUse(env, record)
             val added = buildMap {
                 session?.cookieFor(url, domains)?.let { put("Cookie", it) }
                 session?.userAgent?.let { put("User-Agent", it) }
@@ -110,16 +128,17 @@ internal object HostWebApis {
             // A link a host account, a debrid account or the host's own API serves comes from there, without the page (#638);
             // the plugin gets the files as it would a captured download, and never the account or its key.
             val downloads = dev.droidtop.pluginhost.hosts.HostLinks.resolve(url) ?: run {
-                val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, stored(env, record), null, maxDownloads = max))
+                val result = show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, url, domains, inUse(env, record), null, maxDownloads = max))
                 // A browser check passed in the view clears droidtop's requests to that site too (Droidtop/tracker#600).
                 env.vault()?.let { SiteChecks.keep(it, record.manifest.id, result.session) }
-                // The site may have renewed the session while the person was there.
-                result.session?.takeIf { it.cookies.isNotEmpty() }?.let { save(env, record, it.copy(account = stored(env, record)?.account)) }
+                // The site may have renewed the session while the person was there: the plugin's own sites are kept for
+                // it, a shared download site's go back to droidtop.
+                result.session?.takeIf { it.cookies.isNotEmpty() }?.let { keepAfterView(env, record, it) }
                 // The person followed the page to a host droidtop serves (a masked link, #650): its resolvers take it, and
                 // when none can, the view opens that host's page as it would have.
                 result.handoff?.let { link ->
                     dev.droidtop.pluginhost.hosts.HostLinks.resolve(link)
-                        ?: show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, link, domains, stored(env, record), null, maxDownloads = max)).downloads
+                        ?: show(env, record, WebSessionRequest(record.manifest.label, WebSessionRequest.Mode.OPEN, link, domains, inUse(env, record), null, maxDownloads = max)).downloads
                 } ?: result.downloads
             }
             if (downloads.isEmpty()) return@HostOp JSONObject().put("captured", false)

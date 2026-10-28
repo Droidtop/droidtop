@@ -265,6 +265,13 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun vault(): PluginVault = pluginVault
 
+    override fun sharedSites(pluginId: String, declared: List<String>): Map<String, String> =
+        runCatching { DownloadSites.sharedWith(appContext, pluginId, declared) }.getOrDefault(emptyMap())
+
+    override fun renewSharedSites(cookies: Map<String, String>) {
+        cookies.forEach { (domain, header) -> DownloadSites.renew(appContext, domain, header) }
+    }
+
     override fun gamesRoots(): List<String> = dev.droidtop.library.settings.LibraryPaths.roots()
 
     override fun libraryFilesChanged(pluginId: String, change: dev.droidtop.library.settings.PathChange): Boolean =
