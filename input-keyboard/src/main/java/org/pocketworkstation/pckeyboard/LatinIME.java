@@ -163,6 +163,8 @@ public class LatinIME extends InputMethodService implements
     private AlertDialog mOptionsDialog;
 
     /* package */KeyboardSwitcher mKeyboardSwitcher;
+    // droidtop: the pad on the keyboard (Droidtop/tracker#338).
+    private final PadKeys mPadKeys = new PadKeys(this);
 
     private UserDictionary mUserDictionary;
     private UserBigramDictionary mUserBigramDictionary;
@@ -1045,6 +1047,7 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
+        mPadKeys.clear();
         SecondScreenKeyboard.onShowEnded();
         if (mToolsDeck != null) {
             mToolsDeck.clearInlineSuggestions();
@@ -1295,6 +1298,8 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
+        // droidtop: a pad drives the keyboard while it shows (Droidtop/tracker#338).
+        if (mPadKeys.onKeyDown(keyCode, event)) return true;
         switch (keyCode) {
         case KeyEvent.KEYCODE_BACK:
             if (event.getRepeatCount() == 0
@@ -1320,6 +1325,7 @@ public class LatinIME extends InputMethodService implements
 
     @Override
     public boolean onKeyUp(int keyCode, KeyEvent event) {
+        if (mPadKeys.onKeyUp(keyCode, event)) return true;
         switch (keyCode) {
         case KeyEvent.KEYCODE_DPAD_DOWN:
         case KeyEvent.KEYCODE_DPAD_UP:
