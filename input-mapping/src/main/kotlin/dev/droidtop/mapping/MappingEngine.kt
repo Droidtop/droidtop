@@ -1,6 +1,7 @@
 package dev.droidtop.mapping
 
 import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * Plays a [ControllerLayout] (Droidtop/tracker#618 C3; docs/SPEC.md 5b "Controller layouts"): a pad's presses and
@@ -18,9 +19,13 @@ import kotlin.math.abs
  * - activators: `Full_Press` is held while the input is; `Start_Press` taps on press and `Release_Press` on release;
  *   `Long_Press` is held from [Activator.long_press_time][DEFAULT_LONG_PRESS_MS] after the press until release. An
  *   input with a Long_Press makes its Full_Press wait: released sooner, the Full_Press is a tap;
- * - a stick in `dpad` mode presses `dpad_north` and the others past [STICK_DPAD_THRESHOLD], 8-way.
- * Not yet: double press, chords, turbo, the analog modes (joystick mouse and camera, which come with the Wine sink),
- * and action layers.
+ * - a stick in `dpad` mode presses `dpad_north` and the others past [STICK_DPAD_THRESHOLD], 8-way;
+ * - a stick in `joystick_mouse` mode moves the pointer at each [tick], by today's controller mouse curve (a push under
+ *   [MOUSE_DEADZONE] is rest, then the square of the push up to [MOUSE_FULL_WIDTHS_PER_S] screen widths a second),
+ *   scaled by the group's `sensitivity` (percent, 100 by default);
+ * - a stick in `joystick_move` mode is passed through as the pad's stick, its group's `output_joystick` choosing which
+ *   (0 left, 1 right; by default the stick it came from).
+ * Not yet: double press, chords, turbo, joystick camera, scroll wheel, radial and touch menus, and action layers.
  */
 class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null) {
 
@@ -36,6 +41,12 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
         data class ActionDown(val set: String, val action: String) : Output()
         data class ActionUp(val set: String, val action: String) : Output()
         data class PresetChanged(val presetId: Int) : Output()
+
+        /** The pointer moved by this much, in screen widths (the sink knows the screen). */
+        data class MouseMove(val dx: Float, val dy: Float) : Output()
+
+        /** The pad's [stick] ("LEFT" or "RIGHT") is now at ([x], [y]). */
+        data class StickMove(val stick: String, val x: Float, val y: Float) : Output()
     }
 
     data class Physical(val source: String, val input: String)
@@ -56,6 +67,10 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
 
     /** The 8-way directions a stick in dpad mode holds now, by source. */
     private val stickDirs = HashMap<String, Set<String>>()
+
+    /** Each stick's last deflection, by source, for the pointer it moves between ticks. */
+    private val deflection = HashMap<String, Pair<Float, Float>>()
+    private var lastTick: Long? = null
 
     fun press(source: String, input: String, now: Long): List<Output> {
         val physical = Physical(source, input)
@@ -93,6 +108,18 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
     fun tick(now: Long): List<Output> = ArrayList<Output>().also { tick(now, it) }
 
     private fun tick(now: Long, out: MutableList<Output>) {
+        val since = lastTick
+        lastTick = now
+        if (since != null && now > since) {
+            val seconds = (now - since) / 1000f
+            for ((source, xy) in deflection) {
+                val group = groupOn(source) ?: continue
+                if (!group.mode.equals("joystick_mouse", true)) continue
+                val gain = (group.settings["sensitivity"]?.toFloatOrNull() ?: 100f) / 100f
+                val (vx, vy) = mouseVelocity(xy.first, xy.second)
+                if (vx != 0f || vy != 0f) out += Output.MouseMove(vx * gain * seconds, vy * gain * seconds)
+            }
+        }
         for ((physical, h) in held.entries.toList()) {
             if (h.longFired) continue
             val long = h.activators.firstOrNull { it.type.equals(LONG, true) } ?: continue
@@ -109,11 +136,19 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
      * the group's dpad inputs; in other modes it does nothing yet.
      */
     fun stick(source: String, x: Float, y: Float, now: Long): List<Output> {
+        val out = ArrayList<Output>()
+        // The pointer has moved by the old deflection until now.
+        tick(now, out)
+        deflection[source] = x to y
         val group = groupOn(source)
+        if (group?.mode.equals("joystick_move", true)) {
+            val output = group?.settings?.get("output_joystick")?.trim()?.toIntOrNull()
+            val right = if (output != null) output == 1 else source.equals("right_joystick", true)
+            out += Output.StickMove(if (right) "RIGHT" else "LEFT", x, y)
+        }
         val wanted = if (group?.mode.equals("dpad", true)) directions(x, y) else emptySet()
         val before = stickDirs[source].orEmpty()
         stickDirs[source] = wanted
-        val out = ArrayList<Output>()
         for (d in before - wanted) out += release(source, d, now)
         for (d in wanted - before) out += press(source, d, now)
         return out
@@ -175,10 +210,24 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
     companion object {
         const val DEFAULT_LONG_PRESS_MS = 400L
         const val STICK_DPAD_THRESHOLD = 0.5f
+        const val MOUSE_DEADZONE = 0.15f
+        const val MOUSE_FULL_WIDTHS_PER_S = 1.5f
         private const val FULL = "Full_Press"
         private const val LONG = "Long_Press"
         private const val START = "Start_Press"
         private const val RELEASE = "Release_Press"
+
+        /**
+         * Pointer velocity in screen widths a second for a stick at ([x], [y]): the controller mouse curve
+         * (docs/SPEC.md 5b, "Controller mouse mode"), so a layout's mouse feels as mouse mode does. Pure.
+         */
+        fun mouseVelocity(x: Float, y: Float): Pair<Float, Float> {
+            val magnitude = sqrt(x * x + y * y).coerceAtMost(1f)
+            if (magnitude <= MOUSE_DEADZONE) return 0f to 0f
+            val scaled = (magnitude - MOUSE_DEADZONE) / (1f - MOUSE_DEADZONE)
+            val speed = scaled * scaled * MOUSE_FULL_WIDTHS_PER_S
+            return speed * x / magnitude to speed * y / magnitude
+        }
 
         /** The dpad inputs a stick at ([x], [y]) holds: one or two, 8-way, past the threshold on each axis. Pure. */
         fun directions(x: Float, y: Float): Set<String> {

@@ -7176,9 +7176,12 @@ The active preset says which group is on which source; `controller_action CHANGE
 counts from 1) after letting go of everything held; a held `mode_shift <source> <group>` puts that group on the
 source. Full_Press is held while the button is, Start_Press and Release_Press tap; a Long_Press (400 ms unless its
 `long_press_time` says otherwise) is held from that time to release, and makes the same input's Full_Press wait and tap
-on a quicker release. A stick in `dpad` mode presses up to two directions past half deflection. Pure; time is passed
-in. Double press, chords, turbo, the analog modes and layers come next, then the Wine sink and the defaults; until
-then Controller mouse mode above is the pad's only pointer.
+on a quicker release. A stick in `dpad` mode presses up to two directions past half deflection; in `joystick_mouse`
+mode it moves the pointer at each tick by Controller mouse mode's curve (above) times the group's `sensitivity`
+percent, in screen widths the sink scales; in `joystick_move` mode it is passed through as the pad's stick
+(`output_joystick` 0 left, 1 right, else the stick it came from). Pure; time is passed in. Double press, chords,
+turbo, joystick camera, scroll wheel, menus and layers come next, then the Wine sink and the defaults; until then
+Controller mouse mode above is the pad's only pointer.
 
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with

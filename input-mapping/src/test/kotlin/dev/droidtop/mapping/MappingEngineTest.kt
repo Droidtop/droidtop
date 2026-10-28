@@ -91,7 +91,28 @@ class MappingEngineTest {
         assertTrue(e.release("dpad", "dpad_north", 10).isEmpty())
     }
 
+    @Test
+    fun `a stick in joystick mouse mode moves the pointer between ticks, scaled by its sensitivity`() {
+        val e = engine()
+        assertEquals(emptyList<Output>(), e.stick("right_joystick", 1f, 0f, 0))
+        // A full push: 1.5 screen widths a second, doubled by sensitivity 200, for half a second.
+        assertEquals(listOf(Output.MouseMove(1.5f, 0f)), e.tick(500))
+        val last = e.stick("right_joystick", 0f, 0f, 600).single() as Output.MouseMove
+        assertEquals(0.3f, last.dx, 0.0001f)
+        assertEquals(emptyList<Output>(), e.tick(1000))
+        assertEquals(0f to 0f, MappingEngine.mouseVelocity(0.1f, 0f))
+    }
+
+    @Test
+    fun `a stick in joystick move mode is passed through as the pad's stick`() {
+        val e = MappingEngine(ControllerLayout.parse(LAYOUT), presetId = 1)
+        assertEquals(listOf(Output.StickMove("RIGHT", 0.5f, -0.25f)), e.stick("right_joystick", 0.5f, -0.25f, 0))
+    }
+
     companion object {
+        private fun settingsGroup(id: Int, mode: String, settings: String) =
+            "\"group\" { \"id\" \"$id\" \"mode\" \"$mode\" \"settings\" { $settings } }"
+
         private fun press(type: String, vararg bindings: String, settings: String = ""): String =
             "\"$type\" { \"bindings\" { " + bindings.joinToString(" ") { "\"binding\" \"$it\"" } + " } " +
                 (if (settings.isEmpty()) "" else "\"settings\" { $settings } ") + "}"
@@ -126,9 +147,12 @@ class MappingEngineTest {
             input("button_a", press("Full_Press", "key_press RETURN")),
             input("button_y", press("Full_Press", "controller_action CHANGE_PRESET 1 0 0")),
         )}
+              ${settingsGroup(5, "joystick_mouse", "\"sensitivity\" \"200\"")}
+              ${settingsGroup(6, "joystick_move", "")}
               "preset" { "id" "0" "name" "Default" "group_source_bindings" {
-                "0" "button_diamond active" "1" "joystick active" "2" "switch active" "3" "joystick active modeshift" } }
-              "preset" { "id" "1" "name" "Menu" "group_source_bindings" { "4" "button_diamond active" } }
+                "0" "button_diamond active" "1" "joystick active" "2" "switch active" "3" "joystick active modeshift"
+                "5" "right_joystick active" } }
+              "preset" { "id" "1" "name" "Menu" "group_source_bindings" { "4" "button_diamond active" "6" "right_joystick active" } }
             }
         """.trimIndent()
     }
