@@ -161,18 +161,18 @@ class GameGroupingTest {
         // game found twice under two spellings of one name.
         val merged = games.filter { it.allVersions.sumOf { version -> version.copies.size } > 1 }
         assertEquals(
-            listOf("Anomalous_Coffee_Machine_2", "Goodbye Eternity", "love_of_magic_book3"),
+            listOf("Anomalous Coffee Machine 2", "Goodbye Eternity", "love of magic book3"),
             merged.map { it.name }.sorted(),
         )
         // ...and each of those really is two VERSIONS of one game.
-        assertEquals(listOf("1.2", "1.0.00"), games.single { it.name == "Anomalous_Coffee_Machine_2" }.versions.map { it.version })
-        assertEquals(listOf("1.1.9f", "0.5.11c"), games.single { it.name == "love_of_magic_book3" }.versions.map { it.version })
+        assertEquals(listOf("1.2", "1.0.00"), games.single { it.name == "Anomalous Coffee Machine 2" }.versions.map { it.version })
+        assertEquals(listOf("1.1.9f", "0.5.11c"), games.single { it.name == "love of magic book3" }.versions.map { it.version })
 
         // The three Love of Magic books are three games, not one, although
         // their names are 0.95 alike -- the reason similarity never merges.
         // Same for Lust Academy and Lust Theory (0.61) and for ARTEMIS and
         // RTS (0.60).
-        for (name in listOf("love_of_magic_book1", "love_of_magic_book2", "love_of_magic_book3", "Lust Academy", "Lust Theory", "ARTEMIS", "RTS")) {
+        for (name in listOf("love of magic book1", "love of magic book2", "love of magic book3", "Lust Academy", "Lust Theory", "ARTEMIS", "RTS")) {
             assertEquals(name, 1, games.count { it.name == name })
         }
     }
