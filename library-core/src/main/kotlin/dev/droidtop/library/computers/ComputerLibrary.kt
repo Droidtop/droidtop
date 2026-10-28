@@ -228,7 +228,7 @@ object ComputerLibrary {
 
     /** Whether version [a] is newer than [b], as droidtop compares versions (a leading `v` aside). */
     fun newerThan(a: String, b: String): Boolean =
-        dev.droidtop.runtime.util.Versions.compareLoose(a.trim().removePrefix("v").removePrefix("V"), b.trim().removePrefix("v").removePrefix("V")) > 0
+        dev.droidtop.shared.version.Versions.compareLoose(a.trim().removePrefix("v").removePrefix("V"), b.trim().removePrefix("v").removePrefix("V")) > 0
 
     /** A version of a game another device had, and when this device first heard of it. */
     data class VersionElsewhere(val device: String, val version: String, val atMs: Long, val current: Boolean, val deviceId: String = "")

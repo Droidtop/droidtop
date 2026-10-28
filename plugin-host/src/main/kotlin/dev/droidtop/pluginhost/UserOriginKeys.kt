@@ -1,12 +1,11 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.PublishedKeys
+import dev.droidtop.shared.trust.Sha256
 
 import android.content.Context
 import java.io.File
 import java.security.PublicKey
-import java.util.Base64
 import org.json.JSONObject
 
 /**
@@ -69,7 +68,7 @@ sealed interface AddKeyOutcome {
  */
 object UserOriginKeys {
     private const val STORE_NAME = "plugin-user-keys.json"
-    private const val MAX_ORIGIN_ID_LEN = 64
+    const val MAX_ORIGIN_ID_LEN = 64
     private const val MAX_PREVIOUS = 16
     private val HEX64 = Regex("[0-9a-f]{64}")
 
@@ -187,18 +186,8 @@ object UserOriginKeys {
      * already forces to lowercase -- an origin with a dot or an
      * uppercase letter could never name an installable plugin.
      */
-    fun originProblem(origin: String): String? {
-        val id = origin.trim()
-        if (id.isEmpty()) return "origin id can't be blank"
-        if (id == PluginOriginKeys.OFFICIAL_ORIGIN) {
-            return "the origin id \"${PluginOriginKeys.OFFICIAL_ORIGIN}\" is official -- a third-party origin can't claim it"
-        }
-        if (!id.matches(Regex("[a-z0-9-]+"))) {
-            return "origin id must be lowercase letters, digits and hyphens (it prefixes every plugin id, \"<origin>.<name>\")"
-        }
-        if (id.length > MAX_ORIGIN_ID_LEN) return "origin id must be at most $MAX_ORIGIN_ID_LEN characters"
-        return null
-    }
+    fun originProblem(origin: String): String? =
+        PublishedKeys.originProblem(origin, setOf(PluginOriginKeys.OFFICIAL_ORIGIN), MAX_ORIGIN_ID_LEN)
 
     /**
      * The anchor key to store for [origin] from what a source publishes or a
@@ -214,17 +203,7 @@ object UserOriginKeys {
      * base64, so the store only ever holds one form of a key and comparisons
      * can be exact. Null when nothing usable is there.
      */
-    fun anchorKey(origin: String, text: String): String? {
-        val certificate = ChainSignature.parseCertificate(text)
-        val key = if (certificate != null) {
-            val names = ChainSignature.uris(certificate).filter { it.startsWith(ChainSignature.ORIGIN_URN) }
-            if (names.isNotEmpty() && ChainSignature.ORIGIN_URN + origin !in names) return null
-            certificate.publicKey.takeIf(ChainSignature::acceptableKey)
-        } else {
-            PluginOriginKeys.parseSpki(text)
-        } ?: return null
-        return Base64.getEncoder().encodeToString(key.encoded)
-    }
+    fun anchorKey(origin: String, text: String): String? = PublishedKeys.anchorKey(origin, text)
 
     private const val UNUSABLE = "that isn't a certificate or public key droidtop can use (P-256 or RSA of 2048 bits or more, and naming this origin if it names any)"
 

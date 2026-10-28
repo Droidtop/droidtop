@@ -6,7 +6,7 @@ import dev.droidtop.app.apps.ApkInstaller
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginResult
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

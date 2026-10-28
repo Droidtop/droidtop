@@ -1,6 +1,6 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.runtime.util.ChainSignature
+import dev.droidtop.shared.trust.ChainSignature
 import dev.droidtop.runtime.util.DroidtopSigningRoot
 import dev.droidtop.runtime.util.RevocationList
 import java.io.File

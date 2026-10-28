@@ -1,8 +1,8 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.runtime.util.ChainSignature
+import dev.droidtop.shared.trust.ChainSignature
 import dev.droidtop.runtime.util.DroidtopSigningRoot
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.Sha256
 import dev.droidtop.testpki.TestPki
 import java.io.File
 import java.security.KeyPair

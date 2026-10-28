@@ -109,7 +109,7 @@ data class GameLinks(
     val latestKnown: String?
         get() = sources.sortedBy { it.source }
             .mapNotNull { it.answer?.takeUnless { a -> a.gone }?.version?.takeIf { v -> v.isNotBlank() } }
-            .reduceOrNull { best, next -> if (dev.droidtop.runtime.util.Versions.compareLoose(GameUpdates.normalize(next), GameUpdates.normalize(best)) > 0) next else best }
+            .reduceOrNull { best, next -> if (dev.droidtop.shared.version.Versions.compareLoose(GameUpdates.normalize(next), GameUpdates.normalize(best)) > 0) next else best }
 
     /**
      * The link whose record gives [latestKnown], the one an update row shows the downloads of (Droidtop/tracker#639);

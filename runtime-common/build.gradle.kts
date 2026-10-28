@@ -20,6 +20,10 @@ android {
         // compile (vendor/notices, Droidtop/notices, pinned as a submodule; docs/SPEC.md 7k "Notices").
         getByName("main") {
             java.srcDir("../vendor/notices/src/main/kotlin")
+            // The version and trust code droidtop and Enginehost share (vendor/droidtop-shared, Droidtop/droidtop-shared,
+            // pinned as a submodule; docs/SPEC.md 12a "Shared trust code"): compiled in the same way as the notices.
+            java.srcDir("../vendor/droidtop-shared/version/src/main/kotlin")
+            java.srcDir("../vendor/droidtop-shared/trust/src/main/kotlin")
         }
         getByName("test") {
             resources.srcDirs("src/main/assets")

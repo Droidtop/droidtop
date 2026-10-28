@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.util
 
+import dev.droidtop.shared.trust.ChainSignature
+
 /**
  * A catalog index's signature (docs/SPEC.md 9 "What droidtop-components may
  * re-host, and the catalog's signature", and 12a "Added catalogs"): a detached

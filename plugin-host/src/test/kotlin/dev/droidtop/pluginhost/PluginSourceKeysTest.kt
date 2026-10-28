@@ -109,7 +109,7 @@ class PluginSourceKeysTest {
             keyJson("acme", "not a real spki key").toByteArray()
         }
         assertTrue(fetched is PluginSourceKeys.FetchResult.Failed)
-        assertTrue((fetched as PluginSourceKeys.FetchResult.Failed).reason.contains("can use"))
+        assertTrue((fetched as PluginSourceKeys.FetchResult.Failed).reason.contains("can be used"))
     }
 
     @Test
@@ -125,7 +125,7 @@ class PluginSourceKeysTest {
     fun `a published certificate gives the anchor key`() {
         val pair = freshKeyPair()
         val cert = dev.droidtop.testpki.TestPki.cert("acme", pair.public).eku(dev.droidtop.testpki.TestPki.PLUGIN)
-            .uri(dev.droidtop.runtime.util.ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
+            .uri(dev.droidtop.shared.trust.ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
         val text = JSONObject().put("origin", "acme").put("certificate", dev.droidtop.testpki.TestPki.pem(cert)).toString()
         assertEquals(Base64.getEncoder().encodeToString(pair.public.encoded), PluginSourceKeys.parsePublishedKey(text)?.keyBase64)
         val fetched = PluginSourceKeys.fetchKey("https://example.com/plugins") { text.toByteArray() }

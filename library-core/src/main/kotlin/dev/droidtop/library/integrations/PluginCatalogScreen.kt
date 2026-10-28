@@ -21,7 +21,7 @@ import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.Sha256
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

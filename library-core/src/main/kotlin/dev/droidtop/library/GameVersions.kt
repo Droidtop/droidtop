@@ -1,6 +1,6 @@
 package dev.droidtop.library
 
-import dev.droidtop.runtime.util.Versions
+import dev.droidtop.shared.version.Versions
 
 /**
  * One game, its versions and its segments -- the model behind "a game is

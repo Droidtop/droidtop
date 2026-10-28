@@ -22618,6 +22618,30 @@ the secondary path for sources that publish no key.
   (the last two only when they apply). The official origin has no entry
   there and never can.
 
+**Shared trust code (owner, 2026-10-23, Droidtop/tracker#188; built under
+Droidtop/tracker#191 and #192).** The verifier, the bundle reader, the version
+ordering and the parsing of a source's published key are not droidtop's own code:
+droidtop and Enginehost each vendor the same small library,
+`Droidtop/droidtop-shared`, and neither depends on the other. droidtop pins it as
+the submodule `vendor/droidtop-shared` and compiles its `version` and `trust`
+sources into `:runtime-common` the way it compiles `vendor/notices`
+(`runtime-common/build.gradle.kts`), so no composite build or Kotlin plugin
+version is shared. The package is `dev.droidtop.shared.*`: `ChainSignature` and
+`Sha256` (the format and the hash), `BundleTar` (the tar.xz reader that
+PluginBundleInstaller streams entries through), `PublishedKeys` and `KeyRotation`
+(finding and reading the key a source publishes), and `Versions`. The library
+pins no key: droidtop's signing root, the revocation lists, the catalog signature
+and the stores of keys people confirmed stay in `:runtime-common` and
+`:plugin-host`, and hand the verifier an anchor. Its tests run in that repository
+(`./gradlew test` there); droidtop keeps only the tests of what it wraps
+(`SignatureWrappersTest`, `BundleSignatureTest`, `PluginSourceKeysTest`,
+`UserOriginKeysTest`, `PluginBundleInstallerTest`). Two behaviours are stricter
+than droidtop's old code and are intended: a bundle that names the same path
+twice, or holds a link or other special file, is refused (a later entry could
+otherwise replace one the signature covered), and the xz stream of a bundle is
+held to 512 MiB of decoder memory. Bundle paths may use any character but a
+control character, and may never be empty, `.`, `..` or absolute.
+
 **Signatures: certificate chains to droidtop's signing root (owner, 2026-10-15,
 Droidtop/tracker#550; replaces "Per-plugin keys and the plugin master" of
 2026-10-08).** The master seeds behind the old P-256 plugin master were

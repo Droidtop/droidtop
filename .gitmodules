@@ -50,3 +50,6 @@
 	path = vendor/javasteam
 	url = https://github.com/Droidtop/javasteam
 	branch = droidtop
+[submodule "vendor/droidtop-shared"]
+	path = vendor/droidtop-shared
+	url = https://github.com/Droidtop/droidtop-shared

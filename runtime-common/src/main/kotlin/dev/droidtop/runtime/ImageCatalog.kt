@@ -1,7 +1,7 @@
 package dev.droidtop.runtime
 
 import android.content.Context
-import dev.droidtop.runtime.util.Versions
+import dev.droidtop.shared.version.Versions
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 

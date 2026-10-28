@@ -1,5 +1,8 @@
 package dev.droidtop.runtime.util
 
+import dev.droidtop.shared.trust.ChainSignature
+import dev.droidtop.shared.trust.Sha256
+
 import java.security.PublicKey
 
 /**

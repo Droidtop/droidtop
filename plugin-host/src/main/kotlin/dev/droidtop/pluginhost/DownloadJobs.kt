@@ -7,7 +7,7 @@ import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
 import dev.droidtop.runtime.util.ArchiveExtractor
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.Sha256
 import java.util.concurrent.ConcurrentHashMap
 import dev.droidtop.net.DownloadCategory
 import dev.droidtop.net.DownloadPools

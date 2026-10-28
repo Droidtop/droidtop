@@ -18,8 +18,8 @@ import dev.droidtop.pluginhost.UserOriginKey
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.runtime.util.CatalogSignature
 import dev.droidtop.runtime.util.RevocationList
-import dev.droidtop.runtime.util.Sha256
-import dev.droidtop.runtime.util.Versions
+import dev.droidtop.shared.trust.Sha256
+import dev.droidtop.shared.version.Versions
 import java.io.File
 import kotlin.math.sign
 import kotlinx.coroutines.Dispatchers

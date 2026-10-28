@@ -1,8 +1,8 @@
 package dev.droidtop.library.integrations
 
 import dev.droidtop.pluginhost.UserOriginKey
-import dev.droidtop.runtime.util.ChainSignature
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.ChainSignature
+import dev.droidtop.shared.trust.Sha256
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.spec.ECGenParameterSpec

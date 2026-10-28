@@ -1,6 +1,6 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.Sha256
 import java.io.File
 import java.security.KeyFactory
 import java.security.PublicKey

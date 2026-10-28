@@ -235,7 +235,7 @@ class UserOriginKeysTest {
     fun `a publisher's certificate stores its own key, and must name the origin if it names any`() {
         val pair = freshKeyPair()
         val named = dev.droidtop.testpki.TestPki.cert("acme", pair.public).eku(dev.droidtop.testpki.TestPki.PLUGIN)
-            .uri(dev.droidtop.runtime.util.ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
+            .uri(dev.droidtop.shared.trust.ChainSignature.ORIGIN_URN + "acme").selfSigned(pair.private).build()
         assertEquals(spkiBase64(pair), UserOriginKeys.anchorKey("acme", dev.droidtop.testpki.TestPki.pem(named)))
         assertNull(UserOriginKeys.anchorKey("other", dev.droidtop.testpki.TestPki.pem(named)))
         val unnamed = dev.droidtop.testpki.TestPki.cert("plain", pair.public).selfSigned(pair.private).build()

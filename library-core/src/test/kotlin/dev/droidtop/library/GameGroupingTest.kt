@@ -72,11 +72,11 @@ class GameGroupingTest {
 
     @Test
     fun `a version list is ordered by what the numbers mean, not by how they read`() {
-        assertTrue(dev.droidtop.runtime.util.Versions.compareLoose("0.10", "0.9") > 0)
-        assertTrue(dev.droidtop.runtime.util.Versions.compareLoose("1.2", "1.1.9") > 0)
-        assertTrue(dev.droidtop.runtime.util.Versions.compareLoose("0.8.3b", "0.8.3") > 0)
-        assertTrue(dev.droidtop.runtime.util.Versions.compareLoose("1.0", "") > 0)
-        assertEquals(0, dev.droidtop.runtime.util.Versions.compareLoose("1.2", "1.2"))
+        assertTrue(dev.droidtop.shared.version.Versions.compareLoose("0.10", "0.9") > 0)
+        assertTrue(dev.droidtop.shared.version.Versions.compareLoose("1.2", "1.1.9") > 0)
+        assertTrue(dev.droidtop.shared.version.Versions.compareLoose("0.8.3b", "0.8.3") > 0)
+        assertTrue(dev.droidtop.shared.version.Versions.compareLoose("1.0", "") > 0)
+        assertEquals(0, dev.droidtop.shared.version.Versions.compareLoose("1.2", "1.2"))
     }
 
     @Test

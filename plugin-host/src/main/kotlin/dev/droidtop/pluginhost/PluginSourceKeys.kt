@@ -1,8 +1,8 @@
 package dev.droidtop.pluginhost
 
 import dev.droidtop.net.Http
+import dev.droidtop.shared.trust.PublishedKeys
 
-import java.net.URI
 
 /**
  * Fetches a plugin source's PUBLISHED origin key (docs/SPEC.md 12a "The
@@ -37,30 +37,7 @@ object PluginSourceKeys {
      * itself the attack, so it is refused rather than upgraded, except
      * the github.com case, where the derived raw URL is always https.
      */
-    fun keyUrlsFor(sourceUrl: String): List<String> {
-        val trimmed = sourceUrl.trim().trimEnd('/')
-        if (trimmed.isEmpty()) return emptyList()
-        val isHttps = trimmed.startsWith("https://", ignoreCase = true)
-        val isHttp = trimmed.startsWith("http://", ignoreCase = true)
-        if (!isHttps && !isHttp) return emptyList()
-        val body = trimmed.substringAfter("://")
-        if (isHttps && body.endsWith(".json", ignoreCase = true)) return listOf(trimmed)
-
-        val host = runCatching { URI("https://$body").host?.lowercase() }.getOrNull() ?: return emptyList()
-        if (host == "github.com" || host == "www.github.com") {
-            val segments = runCatching { URI("https://$body").path.orEmpty().trim('/').split('/') }.getOrDefault(emptyList())
-            if (segments.size < 2) return emptyList()
-            val owner = segments[0]
-            val repo = segments[1].removeSuffix(".git")
-            // A /tree/<branch> (or /blob/<branch>) URL names the branch
-            // to read the key file from; the bare repo URL reads the
-            // default branch via raw.githubusercontent.com's HEAD.
-            val branch = if (segments.size >= 4 && (segments[2] == "tree" || segments[2] == "blob")) segments[3] else "HEAD"
-            return listOf("https://raw.githubusercontent.com/$owner/$repo/$branch/$KEY_FILE_NAME")
-        }
-        if (isHttp) return emptyList()
-        return listOf("https://$body/$KEY_FILE_NAME")
-    }
+    fun keyUrlsFor(sourceUrl: String): List<String> = PublishedKeys.keyUrlsFor(sourceUrl, KEY_FILE_NAME)
 
     /**
      * Parses a published key file / catalog index: a JSON object with
@@ -72,13 +49,7 @@ object PluginSourceKeys {
      * certificate's own key; what cannot be read is passed through for
      * [fetchKey] to refuse.
      */
-    fun parsePublishedKey(text: String): PublishedKey? {
-        val json = runCatching { org.json.JSONObject(text) }.getOrNull() ?: return null
-        val origin = json.optString("origin").trim().takeIf { it.isNotBlank() } ?: return null
-        // "publicKey" is accepted as a spelling of "key"; either names the same SPKI.
-        val given = listOf("certificate", "key", "publicKey").firstNotNullOfOrNull { json.optString(it).trim().takeIf(String::isNotBlank) } ?: return null
-        return PublishedKey(origin, UserOriginKeys.anchorKey(origin, given) ?: given)
-    }
+    fun parsePublishedKey(text: String): PublishedKey? = PublishedKeys.parse(text)?.let { PublishedKey(it.origin, it.keyBase64) }
 
     /**
      * Fetches and validates the source's key; [httpGet] is injectable
@@ -94,39 +65,10 @@ object PluginSourceKeys {
         token: String? = null,
         httpGet: (String) -> ByteArray? = { fetchBytes(it, token) },
     ): FetchResult {
-        val candidates = keyUrlsFor(sourceUrl)
-        if (candidates.isEmpty()) {
-            return FetchResult.Failed(
-                "That doesn't look like a plugin source address. Use a GitHub repo (https://github.com/<owner>/<repo>), " +
-                    "a catalog index ending in .json, or a plain https address -- plaintext http is refused.",
-            )
+        return when (val selected = PublishedKeys.select(sourceUrl, listOf(KEY_FILE_NAME), setOf(PluginOriginKeys.OFFICIAL_ORIGIN), UserOriginKeys.MAX_ORIGIN_ID_LEN, httpGet)) {
+            is PublishedKeys.Selection.Fetched -> FetchResult.Fetched(PublishedKey(selected.key.origin, selected.key.keyBase64))
+            is PublishedKeys.Selection.Failed -> FetchResult.Failed(selected.reason)
         }
-        var lastProblem = "no candidate to fetch"
-        for (url in candidates) {
-            val bytes = runCatching { httpGet(url) }.getOrNull()
-            if (bytes == null) {
-                lastProblem = "couldn't fetch $url"
-                continue
-            }
-            val published = parsePublishedKey(bytes.toString(Charsets.UTF_8))
-            if (published == null) {
-                lastProblem = "$url has no \"origin\" and \"certificate\" fields"
-                continue
-            }
-            if (PluginOriginKeys.parseSpki(published.keyBase64) == null) {
-                lastProblem = "the certificate $url publishes is not one droidtop can use for that origin"
-                continue
-            }
-            UserOriginKeys.originProblem(published.origin)?.let {
-                return FetchResult.Failed("Origin \"${published.origin}\" can't be trusted: $it.")
-            }
-            return FetchResult.Fetched(published)
-        }
-        return FetchResult.Failed(
-            "Couldn't fetch a usable key from $sourceUrl ($lastProblem). " +
-                "A plugin source publishes $KEY_FILE_NAME with \"origin\" and \"certificate\" at its root; " +
-                "a catalog index carries the same fields.",
-        )
     }
 
     /** The one real network leg: `Http.request` with the user's GitHub token (the GitHub opener, which sends it to GitHub hosts only), capped at 64 KiB (a key file is well under 1 KiB). */

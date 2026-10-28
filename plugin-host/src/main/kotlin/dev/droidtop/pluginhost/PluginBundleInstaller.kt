@@ -1,12 +1,10 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.BundleTar
+import dev.droidtop.shared.trust.Sha256
 
 import java.io.File
 import java.security.MessageDigest
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
-import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import org.json.JSONObject
 
 /** Why an install was refused -- shown verbatim on the approval screen, never swallowed into a generic "couldn't install". */
@@ -89,62 +87,37 @@ object PluginBundleInstaller {
         val small = linkedMapOf<String, ByteArray>()
         val staged = linkedMapOf<String, Staged>()
         try {
-            TarArchiveInputStream(XZCompressorInputStream(bundleFile.inputStream().buffered())).use { tar ->
-                var entry: TarArchiveEntry? = tar.nextTarEntry
-                var count = 0
-                val buffer = ByteArray(64 * 1024)
-                while (entry != null) {
-                    if (!entry.isDirectory) {
-                        if (entry.size > MAX_ENTRY_BYTES) {
-                            return PluginInstallResult.Refused(PluginInstallError("${entry.name} is larger than the ${MAX_ENTRY_BYTES / (1024 * 1024)} MiB per-file cap"))
-                        }
-                        // normalize() + the leading-".." check refuse a
-                        // path that would extract outside the plugin's
-                        // own directory (zip-slip shape), independent of
-                        // the manifest's own payload list matching later.
-                        val name = File(entry.name).path
-                        if (File(name).normalize().path.startsWith("..")) {
-                            return PluginInstallResult.Refused(PluginInstallError("bundle entry escapes its own directory: ${entry.name}"))
-                        }
-                        if (name in TRUST_FILES) {
-                            if (entry.size > MAX_MANIFEST_BYTES) {
-                                return PluginInstallResult.Refused(PluginInstallError("$name exceeds the ${MAX_MANIFEST_BYTES / 1024} KiB cap"))
-                            }
-                            small[name] = tar.readBytes()
-                        } else {
-                            // Staged under a counter, never under the bundle's own name: the name is only a key.
-                            val target = File(staging, "f" + count++)
-                            val digest = MessageDigest.getInstance("SHA-256")
-                            target.outputStream().buffered().use { out ->
-                                var left = MAX_ENTRY_BYTES
-                                while (true) {
-                                    val read = tar.read(buffer)
-                                    if (read < 0) break
-                                    left -= read
-                                    if (left < 0) return PluginInstallResult.Refused(PluginInstallError("$name is larger than the ${MAX_ENTRY_BYTES / (1024 * 1024)} MiB per-file cap"))
-                                    digest.update(buffer, 0, read)
-                                    out.write(buffer, 0, read)
-                                }
-                            }
-                            staged.remove(name)?.file?.delete()
-                            staged[name] = Staged(target, digest.digest().toHexString())
+            var count = 0
+            val buffer = ByteArray(64 * 1024)
+            // BundleTar (vendor/droidtop-shared, :trust) refuses a path that could leave the plugin's own directory, a link or
+            // special file, a path that appears twice, an entry over the per-file cap and an xz stream that asks for too much
+            // memory, before an entry reaches this code.
+            BundleTar.read(bundleFile, BundleTar.Limits(maxEntryBytes = MAX_ENTRY_BYTES, pathChars = BundleTar.PERMISSIVE_PATH_CHARS)) { entry ->
+                val name = entry.path
+                if (name in TRUST_FILES) {
+                    small[name] = entry.readBytes(MAX_MANIFEST_BYTES.toLong())
+                } else {
+                    // Staged under a counter, never under the bundle's own name: the name is only a key.
+                    val target = File(staging, "f" + count++)
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    target.outputStream().buffered().use { out ->
+                        while (true) {
+                            val read = entry.input.read(buffer)
+                            if (read < 0) break
+                            digest.update(buffer, 0, read)
+                            out.write(buffer, 0, read)
                         }
                     }
-                    entry = tar.nextTarEntry
+                    staged[name] = Staged(target, digest.digest().toHexString())
                 }
             }
-        } catch (e: OutOfMemoryError) {
-            // The xz dictionary a bundle asks for is the one thing left that sizes memory: a refusal on its row, never a crash.
-            return PluginInstallResult.Refused(PluginInstallError("couldn't read the bundle: it needs more memory than droidtop can spare"))
         } catch (e: Exception) {
+            // BundleTarException included, which also covers the xz dictionary a bundle asks for (the one thing that sizes memory): a refusal on its row, never a crash.
             return PluginInstallResult.Refused(PluginInstallError("couldn't read the bundle: ${e.message}"))
         }
 
         val manifestBytes = small["manifest.json"]
             ?: return PluginInstallResult.Refused(PluginInstallError("bundle has no manifest.json"))
-        if (manifestBytes.size > MAX_MANIFEST_BYTES) {
-            return PluginInstallResult.Refused(PluginInstallError("manifest.json exceeds the ${MAX_MANIFEST_BYTES / 1024} KiB cap"))
-        }
         // Only the certificate format installs; the old one verifies only what is already installed (SPEC 12a "Migration from raw keys").
         val jws = small[BundleSignature.FILE_NAME]?.toString(Charsets.US_ASCII)
             ?: return PluginInstallResult.Refused(

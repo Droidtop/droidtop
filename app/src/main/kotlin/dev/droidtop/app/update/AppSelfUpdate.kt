@@ -6,7 +6,7 @@ import androidx.core.content.pm.PackageInfoCompat
 import org.json.JSONObject
 import java.io.File
 import dev.droidtop.net.Http
-import dev.droidtop.runtime.util.Sha256
+import dev.droidtop.shared.trust.Sha256
 import dev.droidtop.app.apps.ApkInstaller
 
 /**
