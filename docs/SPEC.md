@@ -5205,6 +5205,11 @@ droidtop 0.2.0-dev.1931).
   Clear all (`ProtectedApps`, Droidtop/tracker#252). Clear all always asks first ("Close 4 apps?", with Keep
   them first and the two answers well apart), and leaves alone what is protected and whatever is open on the
   companion's own screen (`TaskPolicy.clearAllTargets(..., keepDisplays)`).
+  **The Linux desktop's windows (Droidtop/tracker#425).** While a desktop session runs, a "Linux desktop" card under
+  the running apps lists the container's windows (`CompanionDesktopWindows`): the title, where it is (In front,
+  Open, Minimized) and its app id, and Raise or Restore, Minimize and Close, the taskbar's own actions
+  (`DesktopWindows`, the bridge's close request). The bridge says the list changed as a shared tick
+  (`HostBridge.toplevelChanges`) every reader re-reads on, replacing the single listener only the taskbar could hold.
   **Open an app (the app picker, Droidtop/tracker#488 item 3).** The pill at the top of Apps replaces the tab with
   `CompanionAppPicker` until Back: a search field typed with droidtop's own keyboard (`DraftField` and
   `DroidtopKeyboard`, the Social composer's pieces; no input method and no window focus, so a game on the other
