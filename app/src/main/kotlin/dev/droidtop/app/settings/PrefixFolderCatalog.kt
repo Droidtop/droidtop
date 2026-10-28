@@ -50,20 +50,19 @@ object PrefixFolderCatalog {
             id = "wine_prefix_folder_here",
             title = "Read only",
             subtitle = folder.path + if (folder == root) ". drive_c is C:" else "",
-            run = {},
         )
         val rows = if (listing.entries.isEmpty()) {
-            listOf<CatalogItem>(ActionItem(id = "wine_prefix_folder_empty", title = "Nothing in this folder", run = {}))
+            listOf<CatalogItem>(ActionItem(id = "wine_prefix_folder_empty", title = "Nothing in this folder"))
         } else {
             listing.entries.map { entry ->
                 val id = "wine_prefix_entry:" + entry.name
                 when {
-                    entry.link -> ActionItem(id = id, title = entry.name, subtitle = "Link to ${entry.target ?: "somewhere"}; not opened here", value = "Link", run = {})
+                    entry.link -> ActionItem(id = id, title = entry.name, subtitle = "Link to ${entry.target ?: "somewhere"}; not opened here", value = "Link")
                     entry.directory -> NestedScreenItem(id = id, title = entry.name, inline = screenOf(root, File(folder, entry.name)))
-                    else -> ActionItem(id = id, title = entry.name, value = dev.droidtop.library.format.ValueFormat.size(entry.size), run = {})
+                    else -> ActionItem(id = id, title = entry.name, value = dev.droidtop.library.format.ValueFormat.size(entry.size))
                 }
             } + if (listing.more > 0) {
-                listOf(ActionItem(id = "wine_prefix_folder_more", title = "${listing.more} more not shown", run = {}))
+                listOf(ActionItem(id = "wine_prefix_folder_more", title = "${listing.more} more not shown"))
             } else {
                 emptyList()
             }
@@ -72,5 +71,5 @@ object PrefixFolderCatalog {
     }
 
     private fun emptyNotice(text: String): List<CatalogGroup> =
-        listOf(CatalogGroup(id = "wine_prefix_folder_none", title = null, items = listOf(ActionItem(id = "wine_prefix_folder_none_row", title = text, run = {}))))
+        listOf(CatalogGroup(id = "wine_prefix_folder_none", title = null, items = listOf(ActionItem(id = "wine_prefix_folder_none_row", title = text))))
 }

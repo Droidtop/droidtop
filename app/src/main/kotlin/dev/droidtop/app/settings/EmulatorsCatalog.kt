@@ -206,7 +206,6 @@ object EmulatorsCatalog {
                             ActionItem(
                                 id = "emulators_none_installed",
                                 title = "No emulators found",
-                                run = {},
                             ),
                         )
                     } else {
@@ -269,7 +268,6 @@ object EmulatorsCatalog {
                         id = "emulators_no_systems",
                         title = "No game folders yet",
                         subtitle = "Add a games folder under Console systems, then each system appears here.",
-                        run = {},
                     ),
                 )
             } else {
@@ -320,7 +318,6 @@ object EmulatorsCatalog {
                                         "A single game can use another emulator from its Edit metadata screen."
                                 },
                                 value = resolved?.player?.name ?: "None",
-                                run = {},
                             ),
                             // The switched-off risky actions this screen would offer, as one caution notice each (G1-G6).
                             *listOfNotNull(
@@ -466,7 +463,6 @@ object EmulatorsCatalog {
                         title = "No known emulators",
                         subtitle = "droidtop's platform database has none for ${system.displayName}. " +
                             "Add a custom player below.",
-                        run = {},
                     ),
                 )
             },
@@ -567,7 +563,6 @@ object EmulatorsCatalog {
                 missing.isEmpty() -> "All there"
                 else -> "${missing.size} missing"
             },
-            run = {},
         )
         if (!writable) return listOf(status)
         // droidtop's own copies of the missing files, in a games folder's bios folder: the one place droidtop keeps them.
@@ -805,7 +800,7 @@ object EmulatorsCatalog {
                         CatalogGroup(
                             id = "emulator_custom_gone",
                             title = null,
-                            items = listOf(ActionItem(id = "emulator_custom_gone_row", title = "This custom player was removed", run = {})),
+                            items = listOf(ActionItem(id = "emulator_custom_gone_row", title = "This custom player was removed")),
                         ),
                     )
                 }
@@ -862,7 +857,6 @@ object EmulatorsCatalog {
                                     else -> "The command reads right. The launch test shows whether the app takes it"
                                 },
                                 value = if (faults.isEmpty()) "OK" else "Fix it",
-                                run = {},
                             ),
                             NestedScreenItem(
                                 id = "emulator_custom_test",
@@ -928,7 +922,6 @@ object EmulatorsCatalog {
                                     id = "emulator_test_no_games_${system.id}",
                                     title = "No games found",
                                     subtitle = "droidtop found no ${system.displayName} games in your games folders to test with.",
-                                    run = {},
                                 ),
                             )
                         } else {

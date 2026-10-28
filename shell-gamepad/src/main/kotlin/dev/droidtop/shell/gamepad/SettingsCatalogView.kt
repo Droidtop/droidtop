@@ -113,6 +113,7 @@ import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.library.settings.SliderItem
 import dev.droidtop.library.settings.SubScreenItem
 import dev.droidtop.library.settings.TextBlockItem
+import dev.droidtop.library.settings.isInert
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.library.settings.confirmText
@@ -347,7 +348,6 @@ fun CatalogNavigator(
                         id = SEARCH_ROW_ID,
                         title = "Search settings",
                         icon = CatalogIcon.SEARCH,
-                        run = {},
                     ),
                     headerAbove = null,
                 ),
@@ -586,6 +586,8 @@ fun CatalogNavigator(
                 NoticePress.NONE -> {}
             }
             is ActionItem -> {
+                // A fact or a state: A promises nothing on it, and does nothing (Droidtop/tracker#587).
+                if (item.inert) return
                 if (item.confirmTitle != null && confirmArmedId != item.id) {
                     confirmArmedId = item.id
                     return
@@ -925,7 +927,7 @@ fun CatalogNavigator(
     val rowHints = remember(selectedRowItem) {
         selectedRowItem?.let { item ->
             listOfNotNull(
-                HintBinding(GamepadAction.A, "Select").takeIf { item !is TextBlockItem },
+                HintBinding(GamepadAction.A, "Select").takeIf { !item.isInert },
                 // A row that steps in place says so: "◄ ► Change" (Droidtop/tracker#519). Left's label is empty so
                 // the pair reads as one hint, keycaps then the word.
                 HintBinding(GamepadAction.LEFT, "").takeIf { item.stepsInPlace() },
@@ -1365,7 +1367,7 @@ private fun loadingGroups(title: String) = listOf(
     CatalogGroup(
         id = "pane_loading",
         title = null,
-        items = listOf(ActionItem(id = "pane_loading_row", title = if (title.isBlank()) "Loading" else "Loading $title", progress = -1f, run = {})),
+        items = listOf(ActionItem(id = "pane_loading_row", title = if (title.isBlank()) "Loading" else "Loading $title", progress = -1f)),
     ),
 )
 

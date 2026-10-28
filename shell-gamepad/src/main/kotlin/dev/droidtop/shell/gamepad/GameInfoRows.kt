@@ -132,11 +132,11 @@ internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long): 
     subtitle = SaveLines.value(report.status, nowMs),
     groups = {
         val facts = SaveLines.details(report, nowMs).mapIndexed { index, (name, value) ->
-            ActionItem(id = "saves_fact_$index", title = name, subtitle = value, run = {})
+            ActionItem(id = "saves_fact_$index", title = name, subtitle = value)
         }
         val turnedOff = report.status is SaveStatus.TurnedOff
         listOfNotNull(
-            CatalogGroup("saves_about", null, listOf(ActionItem(id = "saves_summary", title = SaveLines.value(report.status, nowMs), subtitle = SaveLines.subtitle(report, nowMs), run = {}))),
+            CatalogGroup("saves_about", null, listOf(ActionItem(id = "saves_summary", title = SaveLines.value(report.status, nowMs), subtitle = SaveLines.subtitle(report, nowMs)))),
             CatalogGroup("saves_facts", "Where droidtop looked", facts).takeIf { facts.isNotEmpty() },
             CatalogGroup(
                 "saves_fix",
@@ -247,7 +247,6 @@ internal fun storeAchievementItem(achievement: dev.droidtop.library.stores.Store
             progress != null && max != null -> "${progress.toInt()} of ${max.toInt()}"
             else -> null
         },
-        run = {},
     )
 }
 
@@ -413,7 +412,6 @@ private fun achievementItem(achievement: RaAchievement): ActionItem {
             earned != null -> earned.take(10)
             else -> null
         },
-        run = {},
     )
 }
 

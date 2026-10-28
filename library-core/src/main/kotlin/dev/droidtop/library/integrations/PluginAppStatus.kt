@@ -97,7 +97,7 @@ object PluginAppStatus {
                         CatalogGroup(
                             id = "plugin_app_status_${m.id}_error",
                             title = null,
-                            items = listOf(ActionItem(id = "plugin_app_status_${m.id}_error_row", title = result.error ?: "Couldn't read this plugin's app status", run = {})),
+                            items = listOf(ActionItem(id = "plugin_app_status_${m.id}_error_row", title = result.error ?: "Couldn't read this plugin's app status")),
                         ),
                     )
                 }
@@ -119,11 +119,10 @@ object PluginAppStatus {
                                     title = app?.first ?: pkg ?: "The app ${m.label} manages",
                                     subtitle = status,
                                     value = if (installed) "Installed" else "Not installed",
-                                    run = {},
                                 ),
                             )
                             if (installed && version != null) {
-                                add(ActionItem(id = "plugin_app_status_${m.id}_version", title = "Version", value = version, run = {}))
+                                add(ActionItem(id = "plugin_app_status_${m.id}_version", title = "Version", value = version))
                             }
                             // Undocumented values never reach the page as "Key: value" (Droidtop/tracker#544 item 5).
                             // A Developer menu row (docs/SPEC.md 7, "Developer menu").
@@ -138,7 +137,7 @@ object PluginAppStatus {
                                             title = "Technical details",
                                             groups = {
                                                 listOf(CatalogGroup(id = "plugin_app_status_${m.id}_technical_rows", title = null, items = technical.mapIndexed { i, line ->
-                                                    ActionItem(id = "plugin_app_status_${m.id}_technical_$i", title = line, run = {})
+                                                    ActionItem(id = "plugin_app_status_${m.id}_technical_$i", title = line)
                                                 }))
                                             },
                                         ),

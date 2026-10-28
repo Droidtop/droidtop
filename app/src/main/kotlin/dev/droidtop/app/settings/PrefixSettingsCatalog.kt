@@ -33,7 +33,7 @@ object PrefixSettingsCatalog {
                     CatalogGroup(
                         id = "wine_prefix_none",
                         title = null,
-                        items = listOf(ActionItem(id = "wine_prefix_not_set_up", title = "No Windows environment yet", value = "Set up Windows games first", run = {})),
+                        items = listOf(ActionItem(id = "wine_prefix_not_set_up", title = "No Windows environment yet", value = "Set up Windows games first")),
                     ),
                 )
             } else {
@@ -78,6 +78,6 @@ object PrefixSettingsCatalog {
             current = row.current,
             onChange = { ctx, value -> PrefixSettings.set(ctx, entryId, row.id, value.toString()) },
         )
-        is PrefixSetting.Info -> ActionItem(id = row.id, title = row.title, value = row.value, run = {})
+        is PrefixSetting.Info -> ActionItem(id = row.id, title = row.title, value = row.value)
     }
 }

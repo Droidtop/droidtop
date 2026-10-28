@@ -73,7 +73,6 @@ object WineOptionsCatalog {
                             title = "Runs in its own prefix",
                             subtitle = "This game chose its own Wine build, so it has a Windows prefix of its own; changes here apply to it alone",
                             value = state.prefixName,
-                            run = {},
                         )
                     } else {
                         ActionItem(
@@ -90,7 +89,6 @@ object WineOptionsCatalog {
                                 1 -> "Shared, 1 setting changed for this game"
                                 else -> "Shared, ${state.ownChoices} settings changed for this game"
                             },
-                            run = {},
                         )
                     },
                 )
@@ -117,7 +115,6 @@ object WineOptionsCatalog {
                         subtitle = "A game that chose its own Wine build runs in a prefix of its own and starts on that build, not the one above. " +
                             "Change it under that game's Wine and graphics",
                         value = state.otherBuilds.entries.joinToString(", ") { (build, games) -> if (games > 1) "$build x$games" else build },
-                        run = {},
                     ),
                 )
             }
@@ -176,7 +173,6 @@ object WineOptionsCatalog {
                     subtitle = "Wine, DXVK, VKD3D, FEXCore, Box64 and drivers from droidtop's component catalog " +
                         "(github.com/Droidtop/droidtop-components): re-hosted unmodified, or linked where their makers publish them, " +
                         "each download checked against its SHA-256; software Vulkan and the x86_64 libraries built by droidtop's CI",
-                    run = {},
                 ),
             )
         }
@@ -209,7 +205,7 @@ object WineOptionsCatalog {
             )
         }
         if (row.choices.isEmpty()) {
-            return ActionItem(id = row.id, title = row.title, subtitle = summary, value = label, run = {})
+            return ActionItem(id = row.id, title = row.title, subtitle = summary, value = label)
         }
         return ChoiceItem(
             id = row.id,

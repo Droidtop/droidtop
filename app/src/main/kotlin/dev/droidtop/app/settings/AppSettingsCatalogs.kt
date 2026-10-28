@@ -408,7 +408,6 @@ object AppSettingsCatalogs {
                             id = "console_systems_no_folders",
                             title = "No console system folders found",
                             subtitle = "Name a folder after its system (snes, psx, ...) inside a Game folder, or choose one below",
-                            run = {},
                         ),
                     )
                 } else {
@@ -517,7 +516,6 @@ object AppSettingsCatalogs {
                                             title = "${kind.storeName} library",
                                             subtitle = "PC games from ${kind.storeName} are found one by one ($gameText). " +
                                                 "They appear under PC on the Games screen.",
-                                            run = {},
                                         ),
                                     ),
                                 ),
@@ -537,7 +535,6 @@ object AppSettingsCatalogs {
                                             title = "Engine games folder",
                                             subtitle = "Engine games (Ren'Py, RPG Maker, etc.) are found one by one ($gameText). " +
                                                 "They appear under PC on the Games screen and launch via Enginehost.",
-                                            run = {},
                                         ),
                                     ),
                                 ),
@@ -693,7 +690,6 @@ object AppSettingsCatalogs {
                                     status.md5Ok == true -> "Present, verified"
                                     else -> "Present (no known hash to verify against)"
                                 },
-                                run = {},
                             )
                         },
                     ),
@@ -840,7 +836,6 @@ object AppSettingsCatalogs {
                                     id = "enginehost_missing",
                                     title = "Enginehost isn't installed",
                                     subtitle = "Engine games fall back to Wine or a Linux container until it is",
-                                    run = {},
                                 ),
                             )
                             return@buildList
@@ -878,7 +873,6 @@ object AppSettingsCatalogs {
                                 id = "enginehost_no_bundles",
                                 title = "No runtime bundles installed yet",
                                 subtitle = "Launching an engine game offers the matching bundle, and installs it without asking when droidtop is sure which one it needs",
-                                run = {},
                             ),
                         )
                     } else {
@@ -904,15 +898,15 @@ object AppSettingsCatalogs {
                                                 id = "enginehost_bundle_details",
                                                 title = "Details",
                                                 items = listOfNotNull(
-                                                    ActionItem(id = "bundle_id", title = "Bundle", value = bundle.bundleId, run = {}),
+                                                    ActionItem(id = "bundle_id", title = "Bundle", value = bundle.bundleId),
                                                     bundle.runtimeVersion?.let {
-                                                        ActionItem(id = "bundle_runtime", title = "Engine version", value = it, run = {})
+                                                        ActionItem(id = "bundle_runtime", title = "Engine version", value = it)
                                                     },
                                                     bundle.pluginVersion?.let {
-                                                        ActionItem(id = "bundle_plugin", title = "Plugin version", value = it, run = {})
+                                                        ActionItem(id = "bundle_plugin", title = "Plugin version", value = it)
                                                     },
                                                     bundle.origin?.let {
-                                                        ActionItem(id = "bundle_origin", title = "Source", subtitle = it, run = {})
+                                                        ActionItem(id = "bundle_origin", title = "Source", subtitle = it)
                                                     },
                                                 ),
                                             ),
@@ -1006,7 +1000,6 @@ object AppSettingsCatalogs {
                                 id = "windows_unavailable",
                                 title = "Windows support isn't loaded",
                                 subtitle = "This build cannot run Windows games, so there is nothing to set up",
-                                run = {},
                             ),
                         )
                         return@buildList
@@ -1045,7 +1038,6 @@ object AppSettingsCatalogs {
                             id = "windows_no_roots",
                             title = "No game folders added yet",
                             subtitle = "Add one under Game folders first — a Windows environment that cannot see your games is not much use",
-                            run = {},
                         ),
                     )
                 } else {
@@ -1061,7 +1053,6 @@ object AppSettingsCatalogs {
                             } else {
                                 "Will be mapped when you set up the environment"
                             },
-                            run = {},
                         )
                     }
                 },
@@ -1273,7 +1264,6 @@ object AppSettingsCatalogs {
                                     title = "No integrations yet",
                                     subtitle = "Add an integration file below, or copy one into $folderLabel " +
                                         "over USB or a file manager — example.json.txt there shows the format",
-                                    run = {},
                                 ),
                             )
                         }
@@ -1292,7 +1282,6 @@ object AppSettingsCatalogs {
                                             .takeIf { it.isNotEmpty() }
                                             ?.let { append("  |  uses ").append(it.joinToString(" ")) }
                                     },
-                                    run = {},
                                 ),
                             )
                         }
@@ -1383,7 +1372,6 @@ object AppSettingsCatalogs {
                                 id = "plugins_none",
                                 title = "No plugins installed",
                                 subtitle = "Get one above; each waits for your approval before it runs",
-                                run = {},
                             ),
                         )
                         return@buildList
@@ -1436,7 +1424,7 @@ object AppSettingsCatalogs {
                     val kind = pluginKind.takeIf { it in kinds } ?: ALL_KINDS
                     val shown = cards.filter { (record, state, _) -> pluginFilter.keeps(state) && (kind == ALL_KINDS || kindOf(record) == kind) }
                     if (shown.isEmpty()) {
-                        add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}", run = {}))
+                        add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}"))
                     }
                     shown.forEach { (_, _, card) -> add(card) }
                 },
@@ -1491,7 +1479,7 @@ object AppSettingsCatalogs {
         val refusal = (verdict as? dev.droidtop.pluginhost.AppInterfaceTrust.Verdict.Refused)?.reason ?: app.problem
         val id = "plugins_app_${app.packageName}"
         if (refusal != null) {
-            return ActionItem(id = id, title = app.appLabel, subtitle = "Can't be added: $refusal", run = {})
+            return ActionItem(id = id, title = app.appLabel, subtitle = "Can't be added: $refusal")
         }
         val runsIn = "Runs in its own app, outside droidtop; it reaches droidtop only through droidtop's checks"
         fun add(ctx: Context): String {
@@ -1715,7 +1703,6 @@ object AppSettingsCatalogs {
                                 ActionItem(
                                     id = "plugin_detail_gone_row",
                                     title = "This plugin is no longer installed",
-                                    run = {},
                                 ),
                             ),
                         ),
@@ -1777,7 +1764,6 @@ object AppSettingsCatalogs {
                         id = "plugin_${m.id}_app",
                         title = "Runs in its own app, outside droidtop",
                         subtitle = "${m.app?.packageName}: it reaches droidtop only through droidtop's checks. $trustLine",
-                        run = {},
                     ),
                 )
             }
@@ -1825,7 +1811,6 @@ object AppSettingsCatalogs {
                             id = "plugin_${m.id}_status",
                             title = statusLine,
                             subtitle = trustLine,
-                            run = {},
                         ),
                     )
                 }
@@ -1838,10 +1823,10 @@ object AppSettingsCatalogs {
                 val caution = PluginTiers.caution(record, grantSnapshot)
                 when {
                     refusal != null && PluginTiers.declaresFullTrust(m) -> add(NoticeItem("plugin_${m.id}_access", needsFullAccessNotice(record, refusal)))
-                    refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = "Needs an update", subtitle = refusal, run = {}))
+                    refusal != null -> add(ActionItem(id = "plugin_${m.id}_access", title = "Needs an update", subtitle = refusal))
                     accessBadge != null -> add(NoticeItem("plugin_${m.id}_access", hasFullAccessNotice(record, grantSnapshot)))
                     // A granted permission that lets its own code reach past droidtop's checks (gpu.render, docs/plugin-api.md 5.3).
-                    caution != null -> add(ActionItem(id = "plugin_${m.id}_access", title = CAUTION_TITLE, subtitle = caution, run = {}))
+                    caution != null -> add(ActionItem(id = "plugin_${m.id}_access", title = CAUTION_TITLE, subtitle = caution))
                 }
             }
             // A stopped plugin always has something to press: the newer version when the catalog has one (the row under
@@ -1889,7 +1874,7 @@ object AppSettingsCatalogs {
                                     CatalogGroup(
                                         id = "plugin_${m.id}_detail_group",
                                         title = null,
-                                        items = listOf(ActionItem(id = "plugin_${m.id}_detail_text", title = "${m.label} reported", subtitle = detail, run = {})),
+                                        items = listOf(ActionItem(id = "plugin_${m.id}_detail_text", title = "${m.label} reported", subtitle = detail)),
                                     ),
                                 )
                             },
@@ -1903,7 +1888,6 @@ object AppSettingsCatalogs {
                         id = "plugin_${m.id}_waiting",
                         title = "Needs " + missing.joinToString { it.api },
                         subtitle = "Waiting for a running plugin",
-                        run = {},
                     ),
                 )
             }
@@ -1913,7 +1897,6 @@ object AppSettingsCatalogs {
                         id = "plugin_${m.id}_new_access",
                         title = "Wants new access",
                         subtitle = "An update asks for more; nothing new is on until you choose",
-                        run = {},
                     ),
                 )
             }
@@ -1924,7 +1907,6 @@ object AppSettingsCatalogs {
                         id = "plugin_${m.id}_root",
                         title = if (record.rootApproved) "Uses root" else "Can use root",
                         subtitle = if (record.rootApproved) "Approved" else "Not granted: approve with root above to allow it",
-                        run = {},
                     ),
                 )
             }
@@ -2042,7 +2024,6 @@ object AppSettingsCatalogs {
             ActionItem(
                 id = "plugin_${m.id}_provides",
                 title = pluginSummary(m, enabledPoints),
-                run = {},
             ),
         )
 
@@ -2138,7 +2119,6 @@ object AppSettingsCatalogs {
                         id = "plugin_${m.id}_version",
                         title = "Version ${m.version}",
                         subtitle = if (listings.isEmpty()) "Catalog not fetched yet: open Add > Catalogs to check" else "No newer version on its channel in your catalogs",
-                        run = {},
                     )
                 },
             )
@@ -2167,8 +2147,8 @@ object AppSettingsCatalogs {
         // so a plugin never writes its maker or its site into its description.
         val about = m.presentation
         val aboutGroup = listOfNotNull(
-            about.publisher?.let { ActionItem(id = "plugin_${m.id}_publisher", title = "Made by", value = it, run = {}) },
-            about.category?.let { ActionItem(id = "plugin_${m.id}_category", title = "Kind", value = categoryLabel(it), run = {}) },
+            about.publisher?.let { ActionItem(id = "plugin_${m.id}_publisher", title = "Made by", value = it) },
+            about.category?.let { ActionItem(id = "plugin_${m.id}_category", title = "Kind", value = categoryLabel(it)) },
             about.homepage?.let { url ->
                 ActionItem(
                     id = "plugin_${m.id}_homepage",
@@ -2183,9 +2163,9 @@ object AppSettingsCatalogs {
         )
 
         val advancedGroup = listOf(
-            ActionItem(id = "plugin_${m.id}_id", title = "Plugin id", subtitle = m.id, run = {}),
-            ActionItem(id = "plugin_${m.id}_origin", title = "Origin", subtitle = m.origin, run = {}),
-            ActionItem(id = "plugin_${m.id}_digest", title = "Archive digest", subtitle = record.archiveDigest, run = {}),
+            ActionItem(id = "plugin_${m.id}_id", title = "Plugin id", subtitle = m.id),
+            ActionItem(id = "plugin_${m.id}_origin", title = "Origin", subtitle = m.origin),
+            ActionItem(id = "plugin_${m.id}_digest", title = "Archive digest", subtitle = record.archiveDigest),
             // docs/plugin-api.md 5.3: loads the plugin as a call would and shows what its process reached when it tried.
             AsyncActionItem(
                 id = "plugin_${m.id}_containment",
@@ -2588,15 +2568,14 @@ object AppSettingsCatalogs {
                     if (e.result == "ok") null else "refused or failed: ${e.result}",
                     e.via.takeIf { it.isNotEmpty() }?.let { "via ${it.joinToString(" > ")}" },
                 ).joinToString(" - "),
-                run = {},
             )
         }
         return listOfNotNull(
-            CatalogGroup(id = "plugin_activity_note", title = null, items = listOf(ActionItem(id = "plugin_activity_note_row", title = note, run = {}))),
+            CatalogGroup(id = "plugin_activity_note", title = null, items = listOf(ActionItem(id = "plugin_activity_note_row", title = note))),
             CatalogGroup(
                 id = "plugin_activity_entries",
                 title = "Newest first",
-                items = rows.ifEmpty { listOf(ActionItem(id = "plugin_activity_empty", title = "Nothing logged yet", run = {})) },
+                items = rows.ifEmpty { listOf(ActionItem(id = "plugin_activity_empty", title = "Nothing logged yet")) },
             ),
         )
     }
@@ -2654,7 +2633,7 @@ object AppSettingsCatalogs {
                 CatalogGroup(
                     id = "plugin_permissions_gone",
                     title = null,
-                    items = listOf(ActionItem(id = "plugin_permissions_gone_row", title = "This plugin is no longer installed", run = {})),
+                    items = listOf(ActionItem(id = "plugin_permissions_gone_row", title = "This plugin is no longer installed")),
                 ),
             )
         val snap = PluginGrants.forContext(context).read(pluginId)
@@ -2761,9 +2740,9 @@ object AppSettingsCatalogs {
             val refusal = PluginTiers.refusal(record, snap)
             val badge = PluginTiers.badge(record, snap)
             when {
-                refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = if (PluginTiers.declaresFullTrust(record.manifest)) "Needs full access to work" else "Needs an update", subtitle = refusal, run = {})
-                record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions existed: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity", run = {})
-                badge != null -> ActionItem(id = "plugin_permissions_access_row", title = badge, subtitle = accessLine(record, snap), run = {})
+                refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = if (PluginTiers.declaresFullTrust(record.manifest)) "Needs full access to work" else "Needs an update", subtitle = refusal)
+                record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions existed: it can do anything droidtop can, and only what it asks droidtop to do is listed under Activity")
+                badge != null -> ActionItem(id = "plugin_permissions_access_row", title = badge, subtitle = accessLine(record, snap))
                 // A permission's caution (gpu.render) is on its own line below, where the person can take it back.
                 else -> null
             }
@@ -2780,7 +2759,7 @@ object AppSettingsCatalogs {
                 CatalogGroup(
                     id = "plugin_permissions_none",
                     title = null,
-                    items = listOf(ActionItem(id = "plugin_permissions_none_row", title = "This plugin asks for no permissions", run = {})),
+                    items = listOf(ActionItem(id = "plugin_permissions_none_row", title = "This plugin asks for no permissions")),
                 )
             } else {
                 null
@@ -2851,7 +2830,7 @@ object AppSettingsCatalogs {
         val full = PluginConsent.of(m, PluginStore.installed(context)) { pluginTrustBadge(it, userKeys, catalogNames) }
         val view = if (only == null) full else full.only(only)
         fun info(key: String, title: String, subtitle: String? = null, value: String? = null) =
-            ActionItem(id = "plugin_${m.id}_$scope$key", title = title, subtitle = subtitle, value = value, run = {})
+            ActionItem(id = "plugin_${m.id}_$scope$key", title = title, subtitle = subtitle, value = value)
         fun line(key: String, l: dev.droidtop.pluginhost.ConsentLine, lead: String? = null, trail: String? = null, value: String? = null): CatalogItem {
             val grantKey = l.id
             if (ticks == null || grantKey == null) {
@@ -2959,7 +2938,7 @@ object AppSettingsCatalogs {
             id = "plugin_keys_apps",
             title = "Apps you trust",
             items = if (apps.isEmpty()) {
-                listOf(ActionItem(id = "plugin_keys_apps_none", title = "No app keys added by you", subtitle = "An app's plugin signed by its maker's official key needs none", run = {}))
+                listOf(ActionItem(id = "plugin_keys_apps_none", title = "No app keys added by you", subtitle = "An app's plugin signed by its maker's official key needs none"))
             } else {
                 apps.entries.sortedBy { it.key }.flatMap { (packageName, cert) ->
                     listOf(
@@ -2967,7 +2946,6 @@ object AppSettingsCatalogs {
                             id = "plugin_key_app_$packageName",
                             title = packageName,
                             subtitle = "An app's plugin, trusted by you: NOT official. Key ${PluginDangers.groupsOfFour(cert)}",
-                            run = {},
                         ),
                         AsyncActionItem(
                             id = "plugin_key_app_${packageName}_remove",
@@ -3008,7 +2986,6 @@ object AppSettingsCatalogs {
                                 title = PluginOriginKeys.OFFICIAL_ORIGIN,
                                 subtitle = "Official: certified inside droidtop itself. Signing root " +
                                     (rootFingerprint?.take(16)?.chunked(4)?.joinToString(" ") ?: "not pinned in this build"),
-                                run = {},
                             ),
                         )
                         if (userKeys.isEmpty()) {
@@ -3017,7 +2994,6 @@ object AppSettingsCatalogs {
                                     id = "plugin_keys_none",
                                     title = "No keys added by you",
                                     subtitle = "Only the official origin is trusted. Add a plugin source below and droidtop fetches its key, or paste one by hand",
-                                    run = {},
                                 ),
                             )
                         }
@@ -3033,7 +3009,6 @@ object AppSettingsCatalogs {
                                         entry.source?.let { append(". Added from $it") }
 
                                     },
-                                    run = {},
                                 ),
                             )
                             add(
@@ -3153,7 +3128,6 @@ object AppSettingsCatalogs {
                             "tell the two apart. Nothing has been changed yet. Replacing the stored key keeps its plugins " +
                             "approved: each runs again once it updates to a version signed by the new key."
                     },
-                    run = {},
                 ),
                 AsyncActionItem(
                     id = "plugin_keys_proposal_trust",
@@ -3599,7 +3573,6 @@ object AppSettingsCatalogs {
                                     id = "platform_deleted",
                                     title = "${existing.displayName} was deleted",
                                     subtitle = "Go back to the platform list",
-                                    run = {},
                                 ),
                             ),
                         ),

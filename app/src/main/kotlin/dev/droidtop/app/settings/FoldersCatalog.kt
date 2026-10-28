@@ -176,7 +176,7 @@ internal object FoldersCatalog {
                         icon = dev.droidtop.library.settings.CatalogIcon.GAME_FOLDERS,
                     )
                 }.ifEmpty {
-                    listOf(ActionItem(id = "folders_none", title = "No game folders yet", subtitle = "Add the folder your games are in", run = {}))
+                    listOf(ActionItem(id = "folders_none", title = "No game folders yet", subtitle = "Add the folder your games are in"))
                 } + TextBlockItem(id = "folders_note", text = "New games appear after Rescan or a store sync."),
             ),
             actionsGroup(counts.shortcuts),
@@ -202,7 +202,6 @@ internal object FoldersCatalog {
                     title = PcSource.WineShortcut.label(),
                     subtitle = "Shortcuts made by hand in a Wine prefix. PC Games lists them",
                     value = gamesWord(count),
-                    run = {},
                 )
             },
         ),

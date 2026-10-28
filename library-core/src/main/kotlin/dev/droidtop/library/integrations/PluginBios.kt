@@ -135,17 +135,17 @@ object PluginBios {
         val have = EmulatorSetup.listFolder(folder).orEmpty()
         val missing = EmulatorSetup.missingBios(setup, bios, have)
         if (missing.isEmpty()) {
-            return listOf(CatalogGroup("bios_none", null, listOf(ActionItem("bios_none_row", "Every file droidtop knows of is already in $folder", run = {}))))
+            return listOf(CatalogGroup("bios_none", null, listOf(ActionItem("bios_none_row", "Every file droidtop knows of is already in $folder"))))
         }
         return providers.map { record ->
             val label = record.manifest.label
             val reply = PluginViews.call(context, record, POINT, "list", JSONObject().put("system", systemId))
             val items: List<CatalogItem> = if (!reply.ok) {
-                listOf(ActionItem("bios_failed_${record.manifest.id}", "$label: ${reply.message ?: "it did not answer"}", run = {}))
+                listOf(ActionItem("bios_failed_${record.manifest.id}", "$label: ${reply.message ?: "it did not answer"}"))
             } else {
                 val found = offers(missing, parseList(reply.data))
                 if (found.isEmpty()) {
-                    listOf(ActionItem("bios_empty_${record.manifest.id}", "$label has none of the missing files", run = {}))
+                    listOf(ActionItem("bios_empty_${record.manifest.id}", "$label has none of the missing files"))
                 } else {
                     found.map { offer ->
                         val target = EmulatorSetup.biosTarget(setup, offer.entry)

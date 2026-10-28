@@ -69,7 +69,7 @@ object SourceScreens {
             groups = {
                 groups.ifEmpty {
                     listOf(CatalogGroup("source_entry_none_${source.id}", null, listOf(
-                        ActionItem("source_entry_none", "No system to search for", subtitle = "${source.label} lists no system droidtop knows.", run = {}),
+                        ActionItem("source_entry_none", "No system to search for", subtitle = "${source.label} lists no system droidtop knows."),
                     )))
                 }
             },
@@ -124,14 +124,14 @@ object SourceScreens {
             onFailure = { error -> listOf(CatalogGroup("source_error_${source.id}", null, buildList {
                 // A plain sentence first; what the source actually reported (a platform exception text, a
                 // stack line) is for its developer and sits one step behind "Technical details".
-                add(ActionItem("source_failure_${source.id}", "Couldn't search ${source.label}", subtitle = "It did not answer. Try again in a moment.", run = {}))
+                add(ActionItem("source_failure_${source.id}", "Couldn't search ${source.label}", subtitle = "It did not answer. Try again in a moment."))
                 val technical = error.message?.trim().orEmpty().ifBlank { error::class.java.simpleName }
                 // A Developer menu row (docs/SPEC.md 7, "Developer menu").
                 if (dev.droidtop.library.settings.DeveloperMenu.on(context)) add(
                     NestedScreenItem(
                         "source_failure_detail_${source.id}", "Technical details", subtitle = "What the source reported, for its developer",
                         inline = CatalogScreen("source_failure_detail_screen_${source.id}", "Technical details", groups = {
-                            listOf(CatalogGroup("detail", null, listOf(ActionItem("source_failure_text_${source.id}", technical, run = {}))))
+                            listOf(CatalogGroup("detail", null, listOf(ActionItem("source_failure_text_${source.id}", technical))))
                         }),
                     ),
                 )
@@ -148,7 +148,6 @@ object SourceScreens {
                 "destination_missing",
                 if (systemName.isNullOrBlank()) "No games folder to download into yet" else "No games folder for $systemName yet",
                 subtitle = "Add one under Settings, Game folders, then open this result again.",
-                run = {},
             ))))
         },
     )
@@ -158,7 +157,7 @@ object SourceScreens {
             var picked = result.options.firstOrNull()?.index ?: 0
             CatalogScreen("source_detail_${source.id}_${result.id}", result.title, groups = { context ->
                 listOf(CatalogGroup("detail", null, buildList {
-                    add(ActionItem("facts", listOfNotNull(result.platform, result.sizeLabel).joinToString(" · ").ifBlank { result.title }, run = {}))
+                    add(ActionItem("facts", listOfNotNull(result.platform, result.sizeLabel).joinToString(" · ").ifBlank { result.title }))
                     if (result.options.size > 1) add(dev.droidtop.library.settings.ChoiceItem(id = "option", title = "Download option", options = result.options.map { dev.droidtop.library.settings.ChoiceOption(it.index.toString(), it.label) }, current = picked.toString(), onSelect = { _, value -> picked = value.toIntOrNull() ?: picked }))
                     add(AsyncActionItem("download", "Download", run = { ctx, status -> AcquireContentSources.runDownloadAndAwait(ctx, source, destination, result, status, picked) }))
                 }))

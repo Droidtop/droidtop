@@ -97,22 +97,20 @@ object GameProperties {
         }
         val launch = WindowsLaunchResolver.forEntry(context, entryId, gameRoot)
         val show = if (launch == null) {
-            listOf(ActionItem("properties_command_none", "Program", "droidtop can't tell which program is the game here; choose one under Program", run = {}))
+            listOf(ActionItem("properties_command_none", "Program", "droidtop can't tell which program is the game here; choose one under Program"))
         } else {
             listOf(
-                ActionItem("properties_command_program", "Program", launch.executable.path.removePrefix(gameRoot.path).trimStart('/').ifEmpty { launch.executable.name }, run = {}),
+                ActionItem("properties_command_program", "Program", launch.executable.path.removePrefix(gameRoot.path).trimStart('/').ifEmpty { launch.executable.name }),
                 ActionItem(
                     "properties_command_args",
                     "Arguments",
                     launch.arguments.joinToString(" ") { if (it.any(Char::isWhitespace) || it.isEmpty()) "\"$it\"" else it }.ifEmpty { "None" },
-                    run = {},
                 ),
-                ActionItem("properties_command_dir", "Starts in", launch.workingDir.path, run = {}),
+                ActionItem("properties_command_dir", "Starts in", launch.workingDir.path),
                 ActionItem(
                     "properties_command_env",
                     "Environment",
                     GameLaunchOptions.launchEnvironment(environment).ifEmpty { "None of its own; the prefix's variables apply" },
-                    run = {},
                 ),
             )
         }

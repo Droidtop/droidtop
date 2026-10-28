@@ -1834,7 +1834,7 @@ internal fun needsAttentionScreen(items: List<AttentionItem>): dev.droidtop.libr
                                         valueLabel = { item.verb },
                                     )
                                 } else {
-                                    dev.droidtop.library.settings.ActionItem(id = item.id, title = item.title, subtitle = item.body, run = {})
+                                    dev.droidtop.library.settings.ActionItem(id = item.id, title = item.title, subtitle = item.body)
                                 }
                             }
                             AttentionTarget.Artwork -> dev.droidtop.library.settings.ActionItem(

@@ -147,7 +147,6 @@ object GitHubAccountCatalog {
                                     else -> "Not signed in"
                                 },
                                 subtitle = if (stored && credential == null) "Sign in again" else null,
-                                run = {},
                             ),
                         )
                         add(
@@ -252,7 +251,7 @@ object GitHubAccountCatalog {
                     id = "repos_list",
                     title = "Repositories you trust",
                     items = if (repos.isEmpty()) {
-                        listOf(ActionItem(id = "repos_none", title = "None yet", run = {}))
+                        listOf(ActionItem(id = "repos_none", title = "None yet"))
                     } else {
                         repos.map { entry ->
                             NestedScreenItem(
@@ -340,7 +339,7 @@ object GitHubAccountCatalog {
                 )
             }
             if (isEmpty()) {
-                add(ActionItem(id = "repos_found_none", title = "Nothing found yet", subtitle = "Repositories you can access with the topic ${PluginRepoDetection.TOPIC}, or a plugin name and a published key, show up here", run = {}))
+                add(ActionItem(id = "repos_found_none", title = "Nothing found yet", subtitle = "Repositories you can access with the topic ${PluginRepoDetection.TOPIC}, or a plugin name and a published key, show up here"))
             }
             add(
                 AsyncActionItem(
@@ -399,7 +398,7 @@ object GitHubAccountCatalog {
             is PluginRepos.TrustDecision.Propose -> confirmItems(repo, decision.published, adopt = false, sources = proposal.sources)
             is PluginRepos.TrustDecision.Adopt -> confirmItems(repo, decision.published, adopt = true, sources = proposal.sources)
             is PluginRepos.TrustDecision.AlreadyTrusted -> listOf(
-                ActionItem(id = "repos_proposal_info", title = "$repo is already trusted", subtitle = "Same key, fingerprint ${fingerprintOf(decision.published.keyBase64)}", run = {}),
+                ActionItem(id = "repos_proposal_info", title = "$repo is already trusted", subtitle = "Same key, fingerprint ${fingerprintOf(decision.published.keyBase64)}"),
             )
             is PluginRepos.TrustDecision.KeyChanged -> listOf(
                 ActionItem(
@@ -408,7 +407,6 @@ object GitHubAccountCatalog {
                     subtitle = "You trusted ${decision.trustedFingerprint}; it now publishes ${decision.publishedFingerprint}. That can mean the owner rotated it, " +
                         "or that the repository was taken over. droidtop does not replace it from here. If you are sure, remove the repository " +
                         "and add it again; plugins signed with the old key stop running when you remove it.",
-                    run = {},
                 ),
             )
             is PluginRepos.TrustDecision.OriginChanged -> listOf(
@@ -416,7 +414,6 @@ object GitHubAccountCatalog {
                     id = "repos_proposal_info",
                     title = "REFUSED: $repo now names a different origin",
                     subtitle = "You trusted it as \"${decision.trustedOrigin}\"; it now publishes \"${decision.publishedOrigin}\". Remove the repository and add it again if that is expected.",
-                    run = {},
                 ),
             )
             is PluginRepos.TrustDecision.OriginTaken -> listOf(
@@ -424,7 +421,6 @@ object GitHubAccountCatalog {
                     id = "repos_proposal_info",
                     title = "REFUSED: origin \"${decision.origin}\" belongs to ${decision.byRepo}",
                     subtitle = "One origin can be trusted for one repository. Remove that repository first if this one replaces it.",
-                    run = {},
                 ),
             )
         }
@@ -443,7 +439,6 @@ object GitHubAccountCatalog {
                 "installed and are updated automatically from $repo, and they show \"Verified by: $repo\". Each plugin still runs only after you " +
                 "approve it, and anything an update newly asks for asks you first. droidtop has not vetted this repository and cannot tell whose key it " +
                 "is; compare the fingerprint with one the author published if you can.",
-            run = {},
         ),
         AsyncActionItem(
             id = "repos_proposal_trust",
@@ -491,7 +486,6 @@ object GitHubAccountCatalog {
                                 id = "repo_last",
                                 title = last ?: "Not checked yet",
                                 subtitle = "Plugins signed with this key show \"Verified by: $repo\"",
-                                run = {},
                             ),
                             AsyncActionItem(
                                 id = "repo_check_now",
@@ -517,7 +511,7 @@ object GitHubAccountCatalog {
                                     PluginRepoUpdates.installFromRepo(ctx, entry, assetName)
                                 },
                             )
-                        } ?: listOf(ActionItem(id = "repo_no_release", title = "Nothing listed yet", subtitle = "Check for updates to see what its latest release carries", run = {})),
+                        } ?: listOf(ActionItem(id = "repo_no_release", title = "Nothing listed yet", subtitle = "Check for updates to see what its latest release carries")),
                     ),
                     CatalogGroup(
                         id = "repo_remove",

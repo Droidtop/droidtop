@@ -32,7 +32,7 @@ object RunInPrefixCatalog {
     fun screen(): CatalogScreen = CatalogScreen(
         id = ManageScreens.RUN_IN_PREFIX,
         title = TITLE,
-        groups = { _ -> listOf(CatalogGroup("run_in_prefix_none", null, listOf(ActionItem(id = "run_in_prefix_from_game", title = "Open this from a game's options", run = {})))) },
+        groups = { _ -> listOf(CatalogGroup("run_in_prefix_none", null, listOf(ActionItem(id = "run_in_prefix_from_game", title = "Open this from a game's options")))) },
         indexGroups = { _ -> emptyList() },
         forDeepLink = { argument ->
             val target = LinuxToolsScreen.parse(argument)

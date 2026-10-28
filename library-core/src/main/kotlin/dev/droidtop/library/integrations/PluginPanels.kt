@@ -171,7 +171,7 @@ object PluginPanels {
                         id = "plugin_panels_list",
                         title = null,
                         items = rows.ifEmpty {
-                            listOf(ActionItem(id = "plugin_panels_none", title = "No plugins yet", subtitle = "Plugins you add show here, each with its own panel", run = {}))
+                            listOf(ActionItem(id = "plugin_panels_none", title = "No plugins yet", subtitle = "Plugins you add show here, each with its own panel"))
                         },
                     ),
                     if (!showManage) {
@@ -274,7 +274,7 @@ object PluginPanels {
         val states = PluginTiles.refresh(context, panel.tiles.filterNot(needsApp))
         val items = panel.tiles.map { tile ->
             if (needsApp(tile)) {
-                return@map ActionItem(id = "plugin_tile_${tile.key}", title = tile.fallbackLabel, subtitle = PluginManagedApp.reason(missing!!), run = {})
+                return@map ActionItem(id = "plugin_tile_${tile.key}", title = tile.fallbackLabel, subtitle = PluginManagedApp.reason(missing!!))
             }
             val state = states[tile.key]
             val title = state?.label ?: tile.fallbackLabel
@@ -291,7 +291,7 @@ object PluginPanels {
                 )
             } else {
                 // A status tile only reports: no action, so no A hint (docs/plugin-api.md 1.6, "Pad and hint row").
-                ActionItem(id = "plugin_tile_${tile.key}", title = title, value = state?.let(::tileValue), run = {})
+                ActionItem(id = "plugin_tile_${tile.key}", title = title, value = state?.let(::tileValue))
             }
         }
         return listOf(CatalogGroup(id = "plugin_panel_${panel.pluginId}_tiles", title = null, items = items))
