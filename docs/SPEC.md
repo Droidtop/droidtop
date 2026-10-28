@@ -8028,7 +8028,8 @@ are drawn only while the last input was a pad or keyboard press
 (`PadModality`, set by the gate): a finger touching the screen hides them,
 and the next pad or keyboard press shows them again where the last tap
 left the selection. It starts as "a pad is attached", so a console opens
-with its selection visible and a phone without one does not. The first
+with its selection visible and a phone without one does not. This is a
+design choice, not an owner decision (Droidtop/tracker#176); its reason: the first
 tester on a touch-only phone read a ring on one onboarding answer beside
 the tick on another as "the default", and the ring on an unpicked theme
 as the pick; a ring on something nobody is pressing is not information on
@@ -17877,13 +17878,15 @@ A change to either re-reads the palette at once (a preferences listener held by 
 ### Text in rows and tiles (directed 2026-09-30, tracker#154)
 
 The owner could not read some settings items: rows were one line with
-one-line titles, values and summaries cut by an ellipsis. The first
-tester added: Settings are unusable in portrait, descriptions never use
-room that is there, columns sit at percentages of the width so arrows
-do not line up, the largest Text size cut everything off, and scrolling
-text is disliked. The owner's decision (2026-09-30), verbatim: "make sure
-settings entries are a consistent height, always. It makes scrolling more
-even." The rule, in the shared components (`MenuRow`, `SettingsCatalogView`):
+one-line titles, values and summaries cut by an ellipsis. The owner's
+decision (2026-09-30), verbatim, is the one rule here that is theirs: "make
+sure settings entries are a consistent height, always. It makes scrolling
+more even." The rest of this section is **design choices** answering the
+first tester's feedback (portrait Settings unusable, descriptions not using
+the room there is, columns at percentages of the width so arrows do not line
+up, the largest Text size cutting everything off, scrolling text disliked);
+the tester's words are not decisions (Droidtop/tracker#176). The rule, in the
+shared components (`MenuRow`, `SettingsCatalogView`):
 
 - **Every settings row is the same height, always.** `MenuRow(uniformHeight
   = true)` is exactly `uniformRowHeight(summaryLines)` tall: two lines of
