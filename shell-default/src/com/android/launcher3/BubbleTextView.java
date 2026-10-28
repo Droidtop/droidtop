@@ -226,6 +226,8 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
     protected boolean mIsIconVisible = true;
     @ViewDebug.ExportedProperty(category = "launcher")
     private int mTextColor;
+    // The person's label colour on Home (LauncherPrefs.LABEL_COLOR, Droidtop/tracker#564); null keeps the theme's.
+    @Nullable private Integer mLabelColorOverride;
     @ViewDebug.ExportedProperty(category = "launcher")
     private ColorStateList mTextColorStateList;
     @ViewDebug.ExportedProperty(category = "launcher")
@@ -304,6 +306,11 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
         mCenterVertically = a.getBoolean(R.styleable.BubbleTextView_centerVertically, false);
 
         mDisplay = a.getInteger(R.styleable.BubbleTextView_iconDisplay, DISPLAY_WORKSPACE);
+        if (mDisplay == DISPLAY_WORKSPACE) {
+            mLabelColorOverride = LauncherPrefs.get(context).get(LauncherPrefs.LABEL_COLOR).getArgb();
+            // The style's colour was set by TextView's constructor before this was known.
+            if (mLabelColorOverride != null) setTextColor(getTextColors());
+        }
         final int defaultIconSize;
         if (mDisplay == DISPLAY_WORKSPACE) {
             setTextSize(TypedValue.COMPLEX_UNIT_PX, mDeviceProfile.iconTextSizePx);
@@ -1113,6 +1120,7 @@ public class BubbleTextView extends TextView implements ItemInfoUpdateReceiver,
 
     @Override
     public void setTextColor(ColorStateList colors) {
+        if (mLabelColorOverride != null) colors = ColorStateList.valueOf(mLabelColorOverride);
         if (shouldDrawAppContrastTile()) {
             mTextColor = PillColorProvider.getInstance(
                     getContext()).getAppTitleTextPaint().getColor();

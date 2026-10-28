@@ -315,17 +315,18 @@ public class InvariantDeviceProfile {
                     ICON_SIZE.getSharedPrefKey().equals(key) ||
                     ICON_LABEL_SIZE.getSharedPrefKey().equals(key) ||
                     LABEL_VISIBILITY.getSharedPrefKey().equals(key) ||
+                    LauncherPrefs.LABEL_COLOR.getSharedPrefKey().equals(key) ||
                     QSB_SHOW_SEARCH_BAR.getSharedPrefKey().equals(key)) {
                 onConfigChanged(context);
             }
         };
         prefs.addListener(prefListener, FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE,
                 GRID_WIDTH, GRID_HEIGHT, DRAWER_GRID_WIDTH_OVERRIDE, ICON_SIZE, ICON_LABEL_SIZE,
-                LABEL_VISIBILITY, DRAWER_PADDING, DOCK_ICONS);
+                LABEL_VISIBILITY, LauncherPrefs.LABEL_COLOR, DRAWER_PADDING, DOCK_ICONS);
         lifeCycle.addCloseable(() -> prefs.removeListener(prefListener,
                 FIXED_LANDSCAPE_MODE, ENABLE_TWOLINE_ALLAPPS_TOGGLE, GRID_WIDTH, GRID_HEIGHT,
                 DRAWER_GRID_WIDTH_OVERRIDE, ICON_SIZE, ICON_LABEL_SIZE, LABEL_VISIBILITY,
-                DRAWER_PADDING, DOCK_ICONS));
+                LauncherPrefs.LABEL_COLOR, DRAWER_PADDING, DOCK_ICONS));
 
         SimpleBroadcastReceiver localeReceiver = new SimpleBroadcastReceiver(context,
                 MAIN_EXECUTOR, i -> onConfigChanged(context));
