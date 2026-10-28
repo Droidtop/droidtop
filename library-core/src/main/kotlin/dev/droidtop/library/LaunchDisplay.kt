@@ -149,8 +149,16 @@ object LaunchDisplay {
     val running: kotlinx.coroutines.flow.StateFlow<RunningSession?> = runningFlow
 
     /** Package resolved for the parked launch; used to notice Android's force-stop state. */
-    @Volatile
-    var runningPackageName: String? = null
+    var runningPackageName: String?
+        get() = runningPackageFlow.value
+        set(value) {
+            runningPackageFlow.value = value
+        }
+
+    private val runningPackageFlow = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+
+    /** [runningPackageName], observable: [GameMemory] learns the running game's package from it. */
+    val runningPackage: kotlinx.coroutines.flow.StateFlow<String?> = runningPackageFlow
 
     /**
      * Installed by the shell owning launch UI: presents [askOptions] and

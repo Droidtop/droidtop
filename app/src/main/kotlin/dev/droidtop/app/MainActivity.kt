@@ -292,6 +292,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // off, and this Activity does not run then (LibraryCore).
         library = LibraryCore.library(applicationContext)
         dev.droidtop.library.GameWakeLock.install(applicationContext)
+        dev.droidtop.library.GameMemory.install(applicationContext)
         dev.droidtop.library.SessionMonitor.install(applicationContext)
         androidx.core.content.ContextCompat.registerReceiver(
             this, screenOffReceiver, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF),

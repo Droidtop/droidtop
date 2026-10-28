@@ -3506,6 +3506,12 @@ the `ContainerRuntime` interface that already exists (§3):
     end, asking first like Restart; Kill stays the header's force-stop. Whether its Quit, Restart and
     its Kill pill need the second A is `GameControls.needsSecondPress` (Droidtop/tracker#414, slice C8): the same
     decision the companion's Game tab asks by, so turning Ask before stopping off makes both act at once.
+    **Each game remembers its own** (Droidtop/tracker#423, `GameMemory`): the performance overlay's level, the
+    companion's brightness and Android's performance mode that the person changed while that game ran are kept for it,
+    put back when it starts again, and the values from before it are restored when it ends, so one game's settings do
+    not follow the person into the next. Only what changed is kept, so a game never adjusted follows the global
+    values; the mode is kept with the package it was set for (one emulator runs many games) and set back to what the
+    package had when the game ends, where droidtop knows it.
   - **Running apps**: the task manager's list with Close and Clear all (`AppsTab`, #245, #252).
   - **Notifications**: unchanged (`NotificationsTab`, grant row when access is missing, #180).
   - **Social** (moved off the left menu 2026-10-24, Droidtop/tracker#644 slice 3; owner: "Game sources go into the
