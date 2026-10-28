@@ -192,8 +192,9 @@ object GamingSettingsCatalog {
             items = listOf(
                 NestedScreenItem(
                     id = ID_GLOBAL_SETTINGS,
-                    title = "Global settings",
-                    subtitle = "Home screen and modes",
+                    // The droidtop-wide page (Droidtop/tracker#571 row 11), named as :app's DroidtopWideSettings names it.
+                    title = "droidtop",
+                    subtitle = "Home screen, which screen it opens, updates and everything that isn't one UI's",
                     registryId = "global_settings",
                     icon = CatalogIcon.GLOBAL,
                 ),

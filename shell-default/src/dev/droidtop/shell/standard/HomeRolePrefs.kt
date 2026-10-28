@@ -30,11 +30,11 @@ object HomeRolePrefs {
     private const val STANDARD_ACTIVITY = dev.droidtop.library.settings.Modes.LAUNCHER_ACTIVITY
     private const val ALTERNATIVE_ACTIVITY = "dev.droidtop.shell.standard.AlternativeLauncherActivity"
 
-    enum class HomeImplementation { STANDARD, ALTERNATIVE, NONE }
+    enum class HomeImplementation { DROIDTOP, ALTERNATIVE, NONE }
 
     fun setActiveHomeImplementation(context: Context, implementation: HomeImplementation) {
         val pm = context.packageManager
-        val standardEnabled = implementation == HomeImplementation.STANDARD
+        val standardEnabled = implementation == HomeImplementation.DROIDTOP
         val alternativeEnabled = implementation == HomeImplementation.ALTERNATIVE
         pm.setComponentEnabledSetting(
             ComponentName(context.packageName, STANDARD_ACTIVITY),
@@ -56,7 +56,7 @@ object HomeRolePrefs {
         val pm = context.packageManager
         return when {
             isEnabled(pm, context.packageName, ALTERNATIVE_ACTIVITY) -> HomeImplementation.ALTERNATIVE
-            isEnabled(pm, context.packageName, STANDARD_ACTIVITY) -> HomeImplementation.STANDARD
+            isEnabled(pm, context.packageName, STANDARD_ACTIVITY) -> HomeImplementation.DROIDTOP
             else -> HomeImplementation.NONE
         }
     }

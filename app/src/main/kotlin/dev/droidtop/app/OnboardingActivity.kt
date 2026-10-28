@@ -384,7 +384,9 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
             ?: oldMode?.takeIf { it != Mode.LAUNCHER }
             ?: if (oldDesktop && !oldGaming) Mode.DESKTOP else Mode.GAMING
         alsoOther.value = saved.optBoolean("also", oldGaming && oldDesktop)
-        homeChoice.value = HomeImplementation.entries.firstOrNull { it.name == saved.optString("home") }
+        // "STANDARD" is DROIDTOP's name from before Droidtop/tracker#571 row 11, in a run saved by an older build.
+        val savedHome = saved.optString("home").let { if (it == "STANDARD") HomeImplementation.DROIDTOP.name else it }
+        homeChoice.value = HomeImplementation.entries.firstOrNull { it.name == savedHome }
             ?: HomeImplementation.NONE
         homeShowsHomeScreen.value = saved.optBoolean("homeShowsHomeScreen", oldMode == Mode.LAUNCHER)
         homeAlternative.value = saved.optString("homeAlternative").ifEmpty { null }?.let(ComponentName::unflattenFromString)
@@ -945,7 +947,7 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
                 // droidtop's one icon on the home screen it just set up, so
                 // the way into Gaming or Desktop is in sight rather than in
                 // a drawer or behind a gesture (SPEC 2c).
-                if (home == HomeImplementation.STANDARD) HomeRolePrefs.placeDroidtopIcon(context)
+                if (home == HomeImplementation.DROIDTOP) HomeRolePrefs.placeDroidtopIcon(context)
                 if (default == Mode.LAUNCHER) {
                     // The home screen is not a MainActivity shell. Sent
                     // there with "standard", MainActivity skipped it as
@@ -1328,14 +1330,14 @@ private fun HomeStep(
         SelectableRow(
             title = "droidtop",
             supporting = "Home opens $mode. Android asks you to confirm.",
-            selected = choice == HomeImplementation.STANDARD && !showsHomeScreen,
-            onClick = { onSelect(HomeImplementation.STANDARD, false, null) },
+            selected = choice == HomeImplementation.DROIDTOP && !showsHomeScreen,
+            onClick = { onSelect(HomeImplementation.DROIDTOP, false, null) },
         )
         SelectableRow(
             title = "droidtop's home screen",
             supporting = "Its own app drawer and widgets",
-            selected = choice == HomeImplementation.STANDARD && showsHomeScreen,
-            onClick = { onSelect(HomeImplementation.STANDARD, true, null) },
+            selected = choice == HomeImplementation.DROIDTOP && showsHomeScreen,
+            onClick = { onSelect(HomeImplementation.DROIDTOP, true, null) },
         )
         launchers?.forEach { launcher ->
             SelectableRow(
@@ -2166,7 +2168,7 @@ private fun DoneStep(
     // Each line names the Settings section it lives in.
     val skipped = buildList {
         if (homeChoice != HomeImplementation.NONE && !homeHeld) {
-            add("Home button (Home still opens another app): Global settings")
+            add("Home button (Home still opens another app): droidtop > Home screen")
         }
         if (gamingConfigured && !storageGranted) add("File access for your game folders: Game folders")
         if (desktopOffered && !desktopConfigured) add("Desktop (no Linux system chosen yet): Desktop")

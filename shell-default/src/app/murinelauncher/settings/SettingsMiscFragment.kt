@@ -1,11 +1,8 @@
 package app.murinelauncher.settings
 
 import android.app.AlertDialog
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.provider.Settings
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.preference.Preference
 import app.murinelauncher.backup.BackupHelper
@@ -24,8 +21,6 @@ import kotlin.system.exitProcess
 public final class SettingsMiscFragment: AbstractSettingsFragment() {
 
     companion object {
-        const val PREF_DEFAULT_LAUNCHER: String = "pref_default_launcher"
-        const val PREF_DROIDTOP_HOME_SCREEN: String = "pref_droidtop_home_screen"
         const val BACKUP_EXPORT: String = "pref_backup_export"
         const val BACKUP_IMPORT: String = "pref_backup_import"
         const val LAUNCHER_IMPORT: String = "pref_launcher_import"
@@ -80,38 +75,6 @@ public final class SettingsMiscFragment: AbstractSettingsFragment() {
     override fun initPreference(preference: Preference, info: DisplayController.Info): Boolean {
         val context = requireContext()
         when (preference.key) {
-            PREF_DEFAULT_LAUNCHER -> {
-                val pm = context.packageManager
-                val homeIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
-                val resolveInfo = pm.resolveActivity(homeIntent, PackageManager.MATCH_DEFAULT_ONLY)
-                preference.summary = if (resolveInfo == null || resolveInfo.activityInfo.packageName == "android") "???" else
-                    resolveInfo.loadLabel(pm).toString()
-                preference.setOnPreferenceClickListener {
-                    context.startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
-                    true
-                }
-                return true
-            }
-            PREF_DROIDTOP_HOME_SCREEN -> {
-                preference.summary = when (dev.droidtop.shell.standard.HomeRolePrefs.activeHomeImplementation(context)) {
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.STANDARD -> "droidtop"
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.ALTERNATIVE -> "A launcher you already have, through droidtop"
-                    dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation.NONE -> "Unchanged"
-                }
-                preference.setOnPreferenceClickListener {
-                    // Re-entry into onboarding's own Home step -- same
-                    // explicit-component-name pattern as
-                    // PREF_CONSOLE_SYSTEMS/PREF_GAME_FOLDERS.
-                    val intent = Intent(Intent.ACTION_MAIN).apply {
-                        component = ComponentName(context.packageName, "dev.droidtop.app.OnboardingActivity")
-                        putExtra("dev.droidtop.app.EXTRA_START_STEP", "HOME")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                    true
-                }
-                return true
-            }
             BACKUP_EXPORT -> {
                 preference.setOnPreferenceClickListener {
                     val date = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())

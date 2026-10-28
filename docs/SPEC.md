@@ -642,10 +642,10 @@ candidate. Onboarding's Home step asks Android for the role itself
 (`RoleManager.createRequestRoleIntent(ROLE_HOME)` on 10+, started for a
 result because the request asks who is calling; Android's Default home
 app screen below 10), as its hand-off work with the skip beside it; the
-Alternative choice asks the same way. Global settings' "Use droidtop as
-home screen" is On only when droidtop's launcher is enabled AND is what
-Home opens, says which app Home opens, and turning it on opens Android's
-Default home app screen. The mode switcher always lists "Android", and
+Alternative choice asks the same way. The droidtop page's "droidtop is
+your home screen" is On only when droidtop's launcher is enabled AND is what
+Home opens, says by name which app Home opens when it is another, and turning
+it on opens Android's Default home app screen. The mode switcher always lists "Android", and
 when droidtop's launcher is not Home (or droidtop holds no home at all) it
 opens whatever Home opens; it used to vanish then (dq-onboard-02). Below
 Android 10 there is no role to request: when no Home app has been chosen
@@ -775,9 +775,22 @@ droidtop (Open with, an exported launch). A physical Home press goes where Home 
 `ModeBoundaryTest` lists every place in droidtop's sources that starts a mode's screen, with its count and its
 reason; a new one fails until it is reviewed and listed.
 
+**The home screen is a setting of droidtop as a whole (decided 2026-10-16, Droidtop/tracker#571 row 11).** The
+owner: "Nope. We need to configure droidtop as a whole. Remember, all three UIs are the same droidtop, we want users
+in our ecosystem", and on the proposal, "That's fine, I suppose". What was "Global settings" is the **droidtop**
+page ("Home screen, which screen it opens, updates and everything that isn't one UI's"; `DroidtopWideSettings`,
+linked by that name from Gaming's Settings, Desktop's settings and Standard's root), and its first group, Home
+screen, holds the two rows together: **droidtop is your home screen** (On/Off, the one row for Android's Home role)
+and **Home opens** (what was Default mode, offering only the UIs that are on). Standard's Miscellaneous had two
+more rows for the same thing, "Default launcher" (Android's Home settings, "???" when nothing resolved) and
+"droidtop home screen" (onboarding's Home step again); they are one **Home screen** row that opens the droidtop
+page. In code droidtop as Home is `HomeImplementation.DROIDTOP` (it was `STANDARD`, as if it belonged to one UI);
+an onboarding run saved by an older build reads its old name. Onboarding's Home step stays the first-run way in and
+sets the same two rows.
+
 **Home goes to the default mode (decided 2026-09-25).** A Home press goes
 where `ModeGate.homeTarget` says: the default mode the person chose (in
-onboarding, or Global settings > Default mode), when it is on; else the
+onboarding, or the droidtop page's Home opens), when it is on; else the
 mode they last used; else the Android home screen. The Launcher3 fork and
 the Alternative forwarder both ask it, on a cold start and on every Home
 press. It used to follow the last-used mode alone, so a person who
@@ -785,7 +798,7 @@ answered "Opens into Android" and then opened Gaming once had every later
 Home press land back in Gaming (rig, dq-coordinator-24). An explicit
 "Android" from the mode switcher (`BackButtonMenu.openHome`, which names
 the mode in its intent) shows the home screen and is never forwarded.
-Default mode offers Android whenever droidtop holds the home screen, so
+Home opens offers Android whenever droidtop holds the home screen, so
 onboarding's answer reads back there instead of "Whichever was used last";
 "Whichever was used last" keeps the old behaviour for whoever picks it.
 

@@ -64,8 +64,10 @@ object DroidtopWideSettings {
 
     fun globalScreen() = CatalogScreen(
         id = SCREEN_GLOBAL,
-        title = "Global settings",
-        subtitle = "Home screen and modes",
+        // One page for droidtop as a whole, whichever of its UIs is open (Droidtop/tracker#571 row 11; owner,
+        // 2026-10-16: "We need to configure droidtop as a whole. Remember, all three UIs are the same droidtop").
+        title = DROIDTOP_PAGE_TITLE,
+        subtitle = DROIDTOP_PAGE_SUBTITLE,
         // The Gaming settings page draws these groups as sections of its own categories (each group
         // names one) instead of a level of its own; every other surface still opens this screen.
         merged = true,
@@ -87,20 +89,22 @@ object DroidtopWideSettings {
                         // screen, the only place that choice is made.
                         ToggleItem(
                             id = "pref_global_home_role",
-                            title = "Use droidtop as home screen",
+                            title = "droidtop is your home screen",
                             subtitle = homeRoleSubtitle(context),
                             current = HomeRolePrefs.activeHomeImplementation(context) ==
-                                HomeRolePrefs.HomeImplementation.STANDARD && HomeRolePrefs.isDroidtopHome(context),
+                                HomeRolePrefs.HomeImplementation.DROIDTOP && HomeRolePrefs.isDroidtopHome(context),
                             onToggle = { ctx, on ->
                                 HomeRolePrefs.setActiveHomeImplementation(
                                     ctx,
-                                    if (on) HomeRolePrefs.HomeImplementation.STANDARD else HomeRolePrefs.HomeImplementation.NONE,
+                                    if (on) HomeRolePrefs.HomeImplementation.DROIDTOP else HomeRolePrefs.HomeImplementation.NONE,
                                 )
                                 if (on && !HomeRolePrefs.isDroidtopHome(ctx)) {
                                     SettingsLaunch.start(ctx, HomeRolePrefs.homeSettingsIntent())
                                 }
                             },
                         ),
+                        // Which of droidtop's UIs Home opens, beside the row that makes droidtop Home.
+                        defaultModeItem(context),
                     ) + listOfNotNull(usersItem(context)),
                 ),
                 CatalogGroup(
@@ -108,7 +112,6 @@ object DroidtopWideSettings {
                     title = "Modes",
                     category = "Modes",
                     items = listOf(
-                        defaultModeItem(context),
                         modeToggle(context, Mode.DESKTOP),
                         modeToggle(context, Mode.GAMING),
                         dev.droidtop.library.settings.NestedScreenItem(
@@ -289,8 +292,8 @@ object DroidtopWideSettings {
                         // mode" (rig, dq-onboard-01).
                         ActionItem(
                             id = "pref_desktop_global_settings",
-                            title = "Global settings",
-                            subtitle = "Modes, your home screen and setup",
+                            title = DROIDTOP_PAGE_TITLE,
+                            subtitle = DROIDTOP_PAGE_SUBTITLE,
                             run = { ctx -> dev.droidtop.shell.standard.BackButtonMenu.openGlobalSettings(ctx) },
                         ),
                     ),
@@ -469,8 +472,8 @@ object DroidtopWideSettings {
         }
         return ChoiceItem(
             id = "pref_global_default_mode",
-            title = "Default mode",
-            subtitle = "Where droidtop opens, and where the Home button takes you",
+            title = "Home opens",
+            subtitle = "Which of droidtop's screens droidtop opens on, and the Home button takes you to",
             options = options,
             current = Modes.defaultMode(context)?.takeIf { id -> options.any { it.value == id } } ?: "",
             onSelect = { ctx, value -> Modes.setDefaultMode(ctx, Mode.byId(value.ifEmpty { null })) },
@@ -575,12 +578,31 @@ object DroidtopWideSettings {
         )
     }
 
-    private fun homeRoleSubtitle(context: Context): String = when {
-        HomeRolePrefs.isDroidtopHome(context) -> "droidtop's own launcher is what the Home button opens"
-        HomeRolePrefs.activeHomeImplementation(context) == HomeRolePrefs.HomeImplementation.STANDARD ->
-            "Another app is the Home app. Turn this on to choose droidtop in Android's Default home app screen"
-        else -> "Turn this on to choose droidtop's own launcher in Android's Default home app screen"
+    private fun homeRoleSubtitle(context: Context): String {
+        if (HomeRolePrefs.isDroidtopHome(context)) return "The Home button opens droidtop"
+        // Who holds Home now, by name: the Standard settings row it replaces said "???" when nothing resolved.
+        val other = currentHomeLabel(context)
+        return if (other != null) {
+            "$other is your home screen. Turn this on to choose droidtop in Android's Default home app screen"
+        } else {
+            "Turn this on to choose droidtop in Android's Default home app screen"
+        }
     }
+
+    /** The app Android resolves Home to now, by its label; null when it asks each time or nothing resolves. */
+    private fun currentHomeLabel(context: Context): String? {
+        val pm = context.packageManager
+        val info = pm.resolveActivity(
+            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY,
+        ) ?: return null
+        if (info.activityInfo.packageName == "android" || info.activityInfo.packageName == context.packageName) return null
+        return info.loadLabel(pm).toString().takeIf { it.isNotBlank() }
+    }
+
+    /** The droidtop-wide page's name and line, the same in every UI that links to it (Droidtop/tracker#571 rows 9, 11). */
+    const val DROIDTOP_PAGE_TITLE = "droidtop"
+    const val DROIDTOP_PAGE_SUBTITLE = "Home screen, which screen it opens, updates and everything that isn't one UI's"
 
     private fun modeToggle(context: Context, mode: Mode) = ToggleItem(
         id = if (mode == Mode.DESKTOP) "pref_global_enable_desktop" else "pref_global_enable_gaming",
