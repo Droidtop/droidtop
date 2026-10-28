@@ -26172,20 +26172,30 @@ The empty search field of `LibrarySearchDialog` shows the top five as
 "Recommended for you" (PC library only today, computed only while the
 dialog is open); picking one puts its title in the field.
 
-**The catalog pool is still the remaining input.** The owner's fuller
-signal set — IGDB `total_rating`/`total_rating_count`/`similar_games`,
-ScreenScraper ratings, a RetroAchievements popularity proxy — needs a
-catalog of games the user does NOT own, fetched and cached by droidtop.
-That is a second candidate pool in `rank` (the Bayesian rating and the
-same `SimilarityIndex` apply to it unchanged), and it is what gives
-"where to get it" something to look up (`GetMoreComposer.composeEmpty`), a
-recommendation from the library itself being owned already. Nothing is
-fabricated in the meantime: no title enters a list that is not in the
-library. The remaining work is tracked on Droidtop/tracker,
-"Recommendations: droidtop's own games-you-might-like feature": the
-catalog fetch and cache, RetroAchievements popularity, the on-device
-index's background rebuild, store adapters for lookup, and the
-"Top rated on <system>" presentation.
+**The catalog pool: IGDB's similar games (built 2026-10-28, Droidtop/tracker#52).**
+`RecommendationPool` is the second candidate pool: games the person does
+not own, which IGDB lists as similar (`similar_games`) to the games they
+play most. With the person's own IGDB credentials (the PC source's; none
+means no pool, and the library's unplayed games are all that is offered,
+as before), the 20 most played games (by `playWeight`) are each looked up
+by an exact-name IGDB search, then their similar games are fetched ten
+games a query (`IgdbScraperClient.similar`) with genre, developer and
+IGDB's `total_rating` and `total_rating_count`. Each game is kept once,
+under the played game it was found for, a game the library already has by
+normalized name never is, and the 300 most rated are kept in droidtop's
+files (`recommendation-pool.json`). `recommend()` reads that file and,
+when it is a week old, rebuilds it in the background; nothing on screen
+waits for IGDB, and a refusal (a key, a limit) keeps the pool as it was.
+A pool game scores 0.2 (IGDB found it similar) plus the same
+`SimilarityIndex` score as a library game plus `RATING_BONUS` times its
+`weightedRating` (pulled toward 70 out of 100 until 25 ratings back it),
+and its `reason` is "Like <the played game>". It is offered overall and
+for `BecauseOf` the game it was found for; `Platform` has none yet, since
+IGDB names platforms its own way. Its `platform` is null, so "where to get
+it" (`GetMoreComposer.composeEmpty`) asks every source by title alone. Not
+built yet: ScreenScraper ratings and RetroAchievements popularity as more
+signals, store adapters for lookup, a "Top rated on <system>" view, and
+Recommendations in the console gamelist and launcher search.
 
 **Layering — how the three pieces compose (owner directive, verbatim
 below each rule).** A separate `GetMoreComposer` object
