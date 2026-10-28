@@ -666,9 +666,16 @@ object DownloadJobs {
         }
     }
 
-    private fun headersOf(part: Map<String, String>): Map<String, String> = buildMap {
-        part[ARG_HEADERS]?.let { raw -> JSONObject(raw).let { o -> o.keys().forEach { put(it, o.getString(it)) } } }
-        part[ARG_NAME]?.let { secretHeaders[it] }?.let { putAll(it) }
+    private fun headersOf(context: Context, part: Map<String, String>): Map<String, String> {
+        val given = buildMap {
+            part[ARG_HEADERS]?.let { raw -> JSONObject(raw).let { o -> o.keys().forEach { put(it, o.getString(it)) } } }
+            part[ARG_NAME]?.let { secretHeaders[it] }?.let { putAll(it) }
+        }
+        // A file on a download site the person signed in to under Accounts and sources sends that site's cookies
+        // (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648): read now, from droidtop's vault, so they are never
+        // in the job's persisted arguments and a restarted job still has them.
+        val url = part[ARG_URL] ?: return given
+        return DownloadSites.withCookie(given, url, runCatching { DownloadSites.cookies(context) }.getOrDefault(emptyMap()))
     }
 
     /** The checkpoint once every byte is in the file: a restart then goes on to the post step and never downloads again. */
@@ -713,7 +720,7 @@ object DownloadJobs {
         val name = requireNotNull(args[ARG_NAME]) { "the download has no file name" }
         val postName = args[ARG_POST] ?: POST_KEEP
         val post = posts[postName] ?: throw IllegalStateException("this version of droidtop cannot finish that download")
-        val headers = headersOf(args)
+        val headers = headersOf(context, args)
         val url = requireNotNull(args[ARG_URL]) { "the download has no address" }
         val file = fileFor(context, name)
         placedBeforeTheProcessEnded(file, postName, args, checkpoint) { LibraryPaths.report(context, PathChange.added(it)) }?.let { return it }
@@ -824,7 +831,7 @@ object DownloadJobs {
                 if (!file.isFile) {
                     require(url.isNotEmpty()) { "the torrent is missing" }
                     report(-1, "Fetching the torrent…", null)
-                    fetchWithEngine(context, url, headersOf(args), file, TORRENT_MAX_BYTES, numbers, { _, _, _ -> }, sitesGuard(args[ARG_ALLOW_SITES]))
+                    fetchWithEngine(context, url, headersOf(context, args), file, TORRENT_MAX_BYTES, numbers, { _, _, _ -> }, sitesGuard(args[ARG_ALLOW_SITES]))
                 }
                 val bytes = withContext(Dispatchers.IO) { file.readBytes() }
                 if (!looksLikeTorrent(bytes)) {
@@ -867,7 +874,7 @@ object DownloadJobs {
             // The job's bytes are the sum of its files: the whole ones before this one, and this one so far.
             val before = withContext(Dispatchers.IO) { files.take(index).sumOf { it.length() } }
             val numbers = TransferNumbers(job, before, index, parts.size)
-            transfer(context, part, url, headersOf(part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, numbers) { percent, line, _ ->
+            transfer(context, part, url, headersOf(context, part), files[index], part[ARG_MAX_BYTES]?.toLongOrNull() ?: 0L, numbers) { percent, line, _ ->
                 report(if (percent < 0) -1 else (index * 100 + percent) / parts.size, prefix + line, null)
             }
             verifyDigest(files[index], part)

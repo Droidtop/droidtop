@@ -135,6 +135,16 @@ object DownloadSites {
             stored(context, site)?.cookies?.get(site.domain)?.takeIf { it.isNotBlank() }?.let { site.domain to it }
         }.toMap()
 
+    /**
+     * [headers] for a download of [url], with the `Cookie` of the signed-in site it is on ([cookies], domain to header)
+     * when the caller sent none: a captured download already carries the page's, and an https address only. Pure.
+     */
+    fun withCookie(headers: Map<String, String>, url: String, cookies: Map<String, String>): Map<String, String> {
+        if (headers.keys.any { it.equals("Cookie", ignoreCase = true) }) return headers
+        val domain = WebSessions.domainFor(url, cookies.keys.toList()) ?: return headers
+        return headers + ("Cookie" to cookies.getValue(domain))
+    }
+
     /** The cookies a site renewed while droidtop's view was open, sealed again; nothing for a site not signed in. */
     fun renew(context: Context, domain: String, header: String) {
         if (header.isBlank()) return

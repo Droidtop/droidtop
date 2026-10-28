@@ -45,4 +45,13 @@ class DownloadSitesTest {
         file.writeText("""[{"name":"x","domain":"x.example","signIn":"http://x.example/"},{"domain":"y.example","signIn":"https://y.example/"}]""")
         assertEquals(listOf(DownloadSites.Site("y.example", "y.example", "https://y.example/", shipped = false)), DownloadSites.readAdded(file))
     }
+
+    @Test fun `a download on a signed-in site sends its cookies, unless the caller sent its own`() {
+        val signedIn = mapOf("gofile.io" to "accountToken=abc")
+        assertEquals(mapOf("Cookie" to "accountToken=abc"), DownloadSites.withCookie(emptyMap(), "https://store1.gofile.io/download/x", signedIn))
+        assertEquals(mapOf("cookie" to "page=1"), DownloadSites.withCookie(mapOf("cookie" to "page=1"), "https://gofile.io/d/x", signedIn))
+        assertEquals(emptyMap<String, String>(), DownloadSites.withCookie(emptyMap(), "https://example.com/file.zip", signedIn))
+        // Only over https: a session is never sent in the clear.
+        assertEquals(emptyMap<String, String>(), DownloadSites.withCookie(emptyMap(), "http://gofile.io/d/x", signedIn))
+    }
 }
