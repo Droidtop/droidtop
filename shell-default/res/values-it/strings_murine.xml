@@ -7,8 +7,6 @@
     <string name="pref_group_qsb_transparency">Trasparenza</string>
     <string name="pref_group_qsb_transparency_desc">Imposta gli effetti di trasparenza per la barra di ricerca rapida</string>
 
-    <string name="pref_category_general_title">Generale</string>
-    <string name="pref_category_general_desc">Preferenze globali</string>
     <string name="pref_category_icons_title">Icone</string>
     <string name="pref_category_icons_desc">Dimensione e aspetto delle icone</string>
     <string name="pref_category_home_title">Schermata home</string>
@@ -20,7 +18,6 @@
     <string name="pref_category_misc_title">Varie</string>
     <string name="pref_category_misc_desc">Altre opzioni</string>
 
-    <string name="pref_subcategory_day_night">Tema interfaccia</string>
     <string name="pref_subcategory_layout">Disposizione</string>
     <string name="pref_subcategory_appearance">Aspetto</string>
     <string name="pref_subcategory_gestures">Gesti</string>
