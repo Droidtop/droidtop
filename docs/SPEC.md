@@ -8612,6 +8612,11 @@ line.
    activity and, when droidtop does not hold Home, asks Android for the role (§2c, "Holding the
    role"): Android's own screen appears over the next step, and the summary says whether it took.
    droidtop never picks a launcher for anyone; the default is to change nothing.
+2a. **Your screens** (`SCREENS`; only when two screens are connected when the run starts, Droidtop/tracker#598).
+   Body: "Which screen should droidtop's menus be on? The other one gets the companion." Two answers, relative as the
+   setting is: **The second screen** (the default) and **The built-in screen**. Next writes the answer through
+   `MainScreen.set`, the write Settings > Displays > Main screen and the Quick Menu's Swap screens use; a note says
+   where to change it later. Detection can only guess which panel is which (4c), so the person says once, here.
 3. **Your games** (`GAMES`; Gaming only). One page with two states. Without file access, body:
    "droidtop reads only the folders you choose. Allow file access, turn on "Allow access to manage all
    files", then come back." (API 26-29: "droidtop reads only the folders you choose. Allow file access

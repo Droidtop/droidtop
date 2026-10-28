@@ -462,7 +462,7 @@ internal class OnboardingRun : androidx.lifecycle.ViewModel() {
  * up" and "what to open into" are one step that doubles as the welcome.
  */
 internal enum class OnboardingStep {
-    MODE, HOME, GAMES, APPEARANCE, DESKTOP_SETUP, KEYBOARD, CONTROLLER, DONE;
+    MODE, HOME, SCREENS, GAMES, APPEARANCE, DESKTOP_SETUP, KEYBOARD, CONTROLLER, DONE;
 
     companion object {
         /**
@@ -497,11 +497,15 @@ internal fun plannedSteps(
     opensInto: Mode,
     alsoOther: Boolean,
     controllerAsks: Boolean = true,
+    // Two screens connected when the run started: then which one the menus go on is asked (Droidtop/tracker#598).
+    twoScreens: Boolean = false,
 ): List<OnboardingStep> = buildList {
     val gaming = opensInto == Mode.GAMING || alsoOther
     val desktop = opensInto == Mode.DESKTOP || alsoOther
     add(OnboardingStep.MODE)
     add(OnboardingStep.HOME)
+    // Detection can only guess which panel is which (SPEC 4c), so a person with two says, before any mode's own pages.
+    if (twoScreens) add(OnboardingStep.SCREENS)
     // Each mode's own steps together, in the order its pages are needed.
     if (gaming) {
         add(OnboardingStep.GAMES)
@@ -679,7 +683,11 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
 
     // ONE plan per run, built from the first step's answer and from
     // whether a controller was attached when the run started.
-    val plan = plannedSteps(opensInto, alsoOther, run.controllerAsks)
+    // Read once per run, like the controller: a screen plugged in later is Settings > Displays' business.
+    val twoScreens = remember {
+        (context.getSystemService(android.hardware.display.DisplayManager::class.java)?.displays?.size ?: 1) > 1
+    }
+    val plan = plannedSteps(opensInto, alsoOther, run.controllerAsks, twoScreens)
     val padReady = ControllerLayouts.ready
     val padKnown = ControllerLayouts.layout.known
     LaunchedEffect(padReady, padKnown) { if (padReady) run.settleController(padKnown) }
@@ -805,6 +813,12 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
             onOpensInto = { opensInto = it },
             onAlsoOther = { alsoOther = it },
             onContinue = { advanceFrom(OnboardingStep.MODE) },
+        )
+
+        OnboardingStep.SCREENS -> ScreensStep(
+            progress, back,
+            isReEntry = isReEntry,
+            onContinue = { advanceFrom(OnboardingStep.SCREENS) },
         )
 
         OnboardingStep.HOME -> HomeStep(
@@ -1681,6 +1695,52 @@ internal fun suggestedGameFolders(): List<String> {
  * listed on the last screen with where to find it again (Quick Menu,
  * "Controller buttons").
  */
+/**
+ * SCREENS (Droidtop/tracker#598): with two screens connected, which one droidtop's menus are on. Detection can only
+ * guess which physical panel is which (docs/SPEC.md 4c), so the person says, once, at the start. Relative, as the
+ * setting is: "the second screen" stays right whichever id Android gives it after a replug. Next writes the answer
+ * through [MainScreen.set], the same write Settings > Displays > Main screen and the Quick Menu's Swap screens use.
+ */
+@Composable
+private fun ScreensStep(
+    progress: StepProgress?,
+    onBack: (() -> Unit)?,
+    isReEntry: Boolean,
+    onContinue: () -> Unit,
+) {
+    val context = LocalContext.current
+    val stored by produceState<dev.droidtop.runtime.MainScreenChoice?>(null) {
+        value = withContext(Dispatchers.IO) { dev.droidtop.runtime.MainScreen.choice(context) }
+    }
+    var picked by remember { mutableStateOf<dev.droidtop.runtime.MainScreenChoice?>(null) }
+    val choice = picked ?: stored ?: dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT
+    OnboardingScaffold(
+        title = "Your screens",
+        body = "Which screen should droidtop's menus be on? The other one gets the companion.",
+        progress = progress,
+        onBack = onBack,
+        primary = StepAction(if (isReEntry) "Done" else "Next") {
+            if (picked != null && picked != stored) dev.droidtop.runtime.MainScreen.set(context, choice)
+            onContinue()
+        },
+        focusContentFirst = true,
+    ) {
+        SelectableRow(
+            title = "The second screen",
+            supporting = "The bigger, docked or plugged-in one",
+            selected = choice == dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT,
+            onClick = { picked = dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT },
+        )
+        SelectableRow(
+            title = "The built-in screen",
+            supporting = "The handheld's own",
+            selected = choice == dev.droidtop.runtime.MainScreenChoice.BUILT_IN,
+            onClick = { picked = dev.droidtop.runtime.MainScreenChoice.BUILT_IN },
+        )
+        StepNote("Settings > Displays changes it later, and the Quick Menu can swap them.")
+    }
+}
+
 @Composable
 private fun ControllerStep(
     progress: StepProgress?,

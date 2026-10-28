@@ -23,6 +23,13 @@ class OnboardingPlanTest {
     }
 
     @Test
+    fun `two screens add the screens question after Home, and one screen does not`() {
+        val two = plannedSteps(Mode.GAMING, alsoOther = false, controllerAsks = false, twoScreens = true)
+        assertEquals(two.indexOf(OnboardingStep.HOME) + 1, two.indexOf(OnboardingStep.SCREENS))
+        assertTrue(OnboardingStep.SCREENS !in plannedSteps(Mode.GAMING, alsoOther = false, controllerAsks = false))
+    }
+
+    @Test
     fun `desktop brings its own two steps and nothing of gaming`() {
         val steps = plannedSteps(Mode.DESKTOP, alsoOther = false, controllerAsks = false)
         assertTrue(OnboardingStep.GAMES !in steps)
