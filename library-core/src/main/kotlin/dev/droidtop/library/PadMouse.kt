@@ -123,6 +123,22 @@ object PadMouse {
     /** What a game starts with: its own remembered settings, else off unless its runner says it needs a mouse. */
     fun initial(stored: String?, runnerNeedsMouse: Boolean): Settings =
         if (stored != null) decode(stored) else Settings(on = runnerNeedsMouse)
+
+    /**
+     * The words in a game's genre that mean it is played with a pointer (Droidtop/tracker#618 C2): point-and-click
+     * and hidden-object games, visual novels, strategy (real-time and turn-based), card and board games. A genre is
+     * the scraped one, often several joined ("Adventure, Point-and-click"), in any source's wording.
+     */
+    private val POINTER_GENRES = listOf(
+        "point-and-click", "point and click", "point & click", "hidden object", "visual novel",
+        "strategy", "rts", "card & board", "card game", "board game",
+    )
+
+    /** Whether a game of [genre] needs a mouse, so mouse mode starts on until the person says otherwise. Pure. */
+    fun genreNeedsMouse(genre: String?): Boolean {
+        val g = genre?.lowercase() ?: return false
+        return POINTER_GENRES.any { word -> Regex("(^|[^a-z])" + Regex.escape(word) + "($|[^a-z])").containsMatchIn(g) }
+    }
 }
 
 /** Mouse mode remembered per game (Droidtop/tracker#565). Reads and writes preferences: call off the main thread. */
@@ -131,6 +147,17 @@ object PadMousePrefs {
 
     fun stored(context: Context, entryId: String): String? =
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getString(KEY_PREFIX + entryId, null)
+
+    /** True the first time a game asks, then never again: its first start shows how mouse mode is reached. */
+    fun firstHint(context: Context, entryId: String): Boolean {
+        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+        val key = HINT_PREFIX + entryId
+        if (prefs.getBoolean(key, false)) return false
+        prefs.edit().putBoolean(key, true).apply()
+        return true
+    }
+
+    private const val HINT_PREFIX = "droidtop_mouse_hint_"
 
     fun set(context: Context, entryId: String, settings: PadMouse.Settings) {
         context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()

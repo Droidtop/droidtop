@@ -8175,8 +8175,15 @@ pointer (a Unity configuration window, say) works without touching the screen:
 - the other buttons and the other stick still reach the game; the stick that moves the pointer does not;
 - both stick clicks held 0.6 s turn it on or off at any time, and the running game's L2 sheet has a Mouse mode row;
   a "Mouse mode" badge in the top corner shows while it is on, and TalkBack hears the change;
-- remembered per game (`PadMousePrefs`); off by default, unless the game's runner says it needs a mouse (none says so
-  yet; `PadMouse.initial`).
+- remembered per game (`PadMousePrefs`); a game with no choice yet starts with it on when its genre is played with a
+  pointer, otherwise off (Droidtop/tracker#618 C2, the controls review: "`PadMouse.initial` never turns on by default",
+  so a game that needs a pointer on a pad-only device looked dead; owner, 2026-10-23, on the review: "Yep. Go for it").
+  The pointer genres (`PadMouse.genreNeedsMouse`) are point-and-click, hidden object, visual novel, strategy (RTS,
+  turn-based), card and board games, matched as whole words in the scraped genre, which the library's launch carries
+  (`LaunchContext.genre`). Until the mapping engine (C1, C3) replaces this mode, it is the one default;
+- a game's first start shows how to reach it for eight seconds in the badge's place, on ("Mouse mode: hold both stick
+  clicks to turn it off") or off ("Hold both stick clicks for mouse mode"), once per game (`PadMousePrefs.firstHint`),
+  and the L2 sheet's row names the combination either way.
 It is the pointer path the screen's touch trackpad already uses (`XServer.injectPointerMoveDelta`, button presses,
 the wheel as scroll-button presses), not a second one: the screen offers it as `OwnGameScreens.Screen.pointer`
 (`XServerPointer`), and both `PadMouseDriver` (in `WineGameActivity`, ahead of the XInput bridge; `PadMouse`, pure and

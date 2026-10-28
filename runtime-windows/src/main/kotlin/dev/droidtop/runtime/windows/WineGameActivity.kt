@@ -268,9 +268,17 @@ class WineGameActivity : Activity() {
         val mouseMode = PadMouseDriver(pointer, PadMouse.Settings()) { settings -> padMouseChanged(settings) }
         padMouse = mouseMode
         entryId?.let { id ->
+            // A game whose genre is played with a pointer starts with it on (Droidtop/tracker#618 C2); the library's
+            // launch carries the genre.
+            val genre = dev.droidtop.library.LaunchDisplay.runningGame?.takeIf { it.gameId == id }?.genre
             startupExecutor.execute {
-                val initial = PadMouse.initial(PadMousePrefs.stored(applicationContext, id), runnerNeedsMouse = false)
-                runOnUiThread { mouseMode.settings = initial; showPadMouse(initial.on, announce = false) }
+                val initial = PadMouse.initial(PadMousePrefs.stored(applicationContext, id), PadMouse.genreNeedsMouse(genre))
+                val hint = PadMousePrefs.firstHint(applicationContext, id)
+                runOnUiThread {
+                    mouseMode.settings = initial
+                    showPadMouse(initial.on, announce = false)
+                    if (hint) showPadMouseHint(initial.on)
+                }
             }
         }
 
@@ -646,8 +654,22 @@ class WineGameActivity : Activity() {
     }
 
     private fun showPadMouse(on: Boolean, announce: Boolean) {
+        padMouseBadge.removeCallbacks(endPadMouseHint)
+        padMouseBadge.text = "Mouse mode"
         padMouseBadge.visibility = if (on) View.VISIBLE else View.GONE
         if (announce) padMouseBadge.announceForAccessibility(if (on) "Mouse mode on" else "Mouse mode off")
+    }
+
+    private val endPadMouseHint = Runnable { showPadMouse(padMouse?.settings?.on == true, announce = false) }
+
+    /**
+     * A game's first start says how mouse mode is reached (Droidtop/tracker#618 C2), on or off, so a game that wants
+     * a pointer never looks dead to someone who has not heard of the combination. Gone after [PAD_MOUSE_HINT_MS].
+     */
+    private fun showPadMouseHint(on: Boolean) {
+        padMouseBadge.text = if (on) "Mouse mode: hold both stick clicks to turn it off" else "Hold both stick clicks for mouse mode"
+        padMouseBadge.visibility = View.VISIBLE
+        padMouseBadge.postDelayed(endPadMouseHint, PAD_MOUSE_HINT_MS)
     }
 
     /** Turned on or off (the combination, the Quick Menu): shown at once, and kept for this game. */
@@ -715,6 +737,7 @@ class WineGameActivity : Activity() {
         private const val EXTRA_ENTRY_ID = "dev.droidtop.wine.ENTRY_ID"
         private const val EXTRA_TOOL = "dev.droidtop.wine.TOOL"
         private const val FAILURE_PADDING_PX = 48
+        private const val PAD_MOUSE_HINT_MS = 8_000L
 
         /**
          * The intent a launch dispatches. Deliberately carries ids and

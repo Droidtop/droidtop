@@ -189,7 +189,7 @@ internal fun RunningGameSheet(
         }
         padMouse?.let { on ->
             add(
-                ActionRow("Mouse mode", if (on) "On. Both stick clicks held also turn it off" else "Off") {
+                ActionRow("Mouse mode", if (on) "On. Both stick clicks held also turn it off" else "Off. Both stick clicks held also turn it on") {
                     ownScreen?.setPadMouse(!on)
                     padMouse = !on
                 },

@@ -2114,7 +2114,7 @@ class Library(
             // every provider signature carrying the entry through.
             // LaunchDisplay.start captures it synchronously even when the
             // chooser dialog defers the actual dispatch.
-            LaunchDisplay.launchContext = LaunchContext(entry.id, entry.systemId)
+            LaunchDisplay.launchContext = LaunchContext(entry.id, entry.systemId, entry.genre)
             val launchStartedMs = System.currentTimeMillis()
             try {
                 providers.first { entry.kind in it.kinds }.launch(entry)

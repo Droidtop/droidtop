@@ -43,9 +43,10 @@ data class LaunchDisplayOption(val displayId: Int?, val label: String, val remem
  * Which game a launch is for, so [LaunchDisplay] can look up and record
  * remembered screens. Published by [Library.launch] around the provider
  * call — the ONE launch path — rather than threaded through every
- * provider's signature.
+ * provider's signature. [genre] is the entry's, for a game screen that picks a default from what kind of game it is
+ * (controller mouse mode, docs/SPEC.md 5b).
  */
-data class LaunchContext(val gameId: String, val systemId: String?)
+data class LaunchContext(val gameId: String, val systemId: String?, val genre: String? = null)
 
 /**
  * The game a launch would replace: the one droidtop last started, still believed running, in the same package as
