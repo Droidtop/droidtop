@@ -5,8 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -726,19 +724,14 @@ private suspend fun minimizeWindow(context: Context, windows: DesktopWindows?, t
 }
 
 /**
- * The container's windows as the bridge reports them, kept current by the bridge's one change listener
- * (it has room for just one, so the taskbar and the windows sheet share this list). Empty with no bridge.
+ * The container's windows as the bridge reports them, re-read at each of the bridge's change ticks (the taskbar and
+ * the windows sheet share this list). Empty with no bridge.
  */
 @Composable
 private fun rememberToplevels(hostBridge: HostBridge?): List<Toplevel> {
     var toplevels by remember(hostBridge) { mutableStateOf(hostBridge?.toplevels() ?: emptyList()) }
-    DisposableEffect(hostBridge) {
-        val mainHandler = Handler(Looper.getMainLooper())
-        hostBridge?.toplevelsChangedListener = {
-            // Fires from a native worker thread (see HostBridge.kt).
-            mainHandler.post { toplevels = hostBridge.toplevels() }
-        }
-        onDispose { hostBridge?.toplevelsChangedListener = null }
+    LaunchedEffect(hostBridge) {
+        hostBridge?.toplevelChanges?.collect { toplevels = hostBridge.toplevels() }
     }
     return toplevels
 }

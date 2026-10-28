@@ -3,6 +3,9 @@ package dev.droidtop.hostbridge
 import android.view.Surface
 import androidx.annotation.Keep
 import dev.droidtop.runtime.DisplayOutput
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 
 /**
  * One opened window in the primary container, over
@@ -172,9 +175,13 @@ class HostBridge : HostBridgeInput {
     // advertised the protocol -- callers don't need to special-case that,
     // an empty taskbar row list is already the right rendering for it.
 
-    /** Called from a native worker thread whenever the window list changes -- callers post to the main thread themselves, same convention as [containerClipboardListener]. */
-    @Volatile
-    var toplevelsChangedListener: (() -> Unit)? = null
+    private val toplevelChangesFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
+    /**
+     * A tick whenever the window list changes, for any number of readers (the taskbar and the companion's Apps tab,
+     * Droidtop/tracker#425): each re-reads [toplevels]. Emitted from a native worker thread.
+     */
+    val toplevelChanges: SharedFlow<Unit> = toplevelChangesFlow
 
     /** The window list as of right now. Safe to call from any thread. */
     fun toplevels(): List<Toplevel> = nativeGetToplevels().toList()
@@ -196,7 +203,7 @@ class HostBridge : HostBridgeInput {
     @Keep
     @Suppress("unused")
     private fun onToplevelsChanged() {
-        toplevelsChangedListener?.invoke()
+        toplevelChangesFlow.tryEmit(Unit)
     }
 
     // ---- Clipboard, driven by ClipboardBridge ----
