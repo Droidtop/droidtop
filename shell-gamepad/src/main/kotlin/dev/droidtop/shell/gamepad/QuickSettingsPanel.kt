@@ -35,6 +35,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -88,8 +89,10 @@ internal fun QuickSettingsPanel(
     sheetWidthDp: Int,
     openPlace: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
+    onSearch: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val search by rememberUpdatedState(onSearch)
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(0) }
     var focusIndex by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(0) }
@@ -104,7 +107,8 @@ internal fun QuickSettingsPanel(
     // battery broadcast and a connectivity query.
     val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
         value = withContext(Dispatchers.IO) {
-            quickSectionGroups(GamingSettingsCatalog.groups(context), section, dev.droidtop.library.settings.UiModePrefs.get(context))
+            val groups = quickSectionGroups(GamingSettingsCatalog.groups(context), section, dev.droidtop.library.settings.UiModePrefs.get(context))
+            if (section == QuickSection.SYSTEM && search != null) QuickTiles.withSearch(groups) { search?.invoke() } else groups
         }
     }
     val panel = remember(groups) { QuickTiles.panel(groups) }

@@ -133,6 +133,8 @@ internal fun QuickMenu(
     onDismiss: () -> Unit,
     // The section to open on, when it is shown (a link to Updates opens Downloads, Droidtop/tracker#749); null is the usual one.
     startSection: QuickSection? = null,
+    // Opens the one search from Power and mode's Search tile; null where there is none (Kiosk and Kid, Desktop's tray).
+    onSearch: (() -> Unit)? = null,
 ) {
     val window = currentShellWindow()
     // The shared side-panel frame (SidePanel.kt): a right-edge panel, or a bottom sheet on a screen held upright.
@@ -276,7 +278,7 @@ internal fun QuickMenu(
                                     QuickSection.APPS -> AppsTab(close)
                                     QuickSection.NOTIFICATIONS -> NotificationsTab(close)
                                     QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
-                                        QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
+                                        QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close, onSearch)
                                     QuickSection.PERFORMANCE -> PerformanceSection(close)
                                     else -> Unit
                                 }

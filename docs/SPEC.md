@@ -4177,11 +4177,12 @@ the `ContainerRuntime` interface that already exists (§3):
       handed the L2 press the chord took); nothing is drawn by the overlay.
   - HOME + Start is the left menu's launcher content (`LeftMenuStandalone`): the shell's own `LeftMenu` with the
     destinations the UI mode allows (read from storage before it draws, so Kiosk and Kid never show the places), Resume
-    first and the cursor on it while a game runs, then Search (`LauncherSearchActivity`, droidtop's one search). A
+    first and the cursor on it while a game runs; no Search row (Droidtop/tracker#621 M4: over a game the Quick
+    Menu's Power and mode Search tile opens `LauncherSearchActivity`, droidtop's one search, Kiosk and Kid aside). A
     destination leaves the screen for droidtop: a place through `PlaceLinks` (Gaming on it when Gaming is the mode in
     use, else the screen host), any other section in Gaming. Available in every mode: Gaming's own sections (Home, the
     libraries, Apps, Settings) are offered only while Gaming is the mode in use (`Place.opensInGaming`), so a row never
-    switches the person into a mode they are not using; in Mobile and Desktop it lists Search and the places. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
+    switches the person into a mode they are not using; in Mobile and Desktop it lists the places. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
   - **The touch route: Android's accessibility button (decided 2026-10-30, Droidtop/tracker#839;** the owner: "we
     can't ASSUME gamepad presence", then "We should probably add an accessibility button that lets the user pick what
     menu to open"). droidtop's one accessibility service asks for the button (`flagRequestAccessibilityButton`), so
@@ -4223,9 +4224,14 @@ the `ContainerRuntime` interface that already exists (§3):
     Network, Wi-Fi, Bluetooth, **Airplane mode**, VPN and Location (`QuickTiles.CONNECTION_IDS`). The companion's
     Connections card shows the same items.
   - **Power and mode** (was System): the quick-settings tile grid over the rest of the catalog's quick System group with
-    its status header: Battery, **Power menu**, Sleep, Restart, Power off, Switch mode, Screenshot, **Type from another
-    device** (7h, "Type from another device"), Stop the app in
-    front, updates and the Android settings index. Android gives an ordinary app
+    its status header: **Search** first, then Battery, **Power menu**, Sleep, Restart, Power off, Switch mode, Screenshot,
+    **Type from another device** (7h, "Type from another device"), Stop the app in
+    front and the Android settings index. Search (`QuickTiles.withSearch`, Droidtop/tracker#621 M4) opens the one
+    search (12a); it is drawn only where the host hands the Quick Menu a search (Gaming's R2, and HOME + R2 over a
+    game, `QuickMenuStandalone(onSearch)`), so the companion's System card and Desktop's tray, which have no search,
+    never draw it, and Kiosk and Kid leave it out. There is no Social or Updates tile (M5, owner 2026-10-23:
+    "yeah, let's do all nine of those proposals"): Social is a section of this rail, and Updates a page of Downloads and
+    Updates, which the Downloads section hosts. Android gives an ordinary app
     no write to airplane mode and no call that opens the power menu, so Airplane mode shows the
     real state and opens the system screen, and Power menu is a tile marked "Needs privilege"
     that says so when pressed (a privilege helper plugin is the route that could do it); nothing
@@ -15161,8 +15167,7 @@ follows:
   notifications are every provider's, see "Social" after "Places",
   Droidtop/tracker#327). Steam is the first social provider: its friends and
   conversations appear in the **Social place** (the Gaming Quick Menu's Social section), the
-  companion's Social tab and the Quick Menu's Social tile beside every other
-  provider's. What Steam carries:
+  companion's Social tab beside every other provider's. What Steam carries:
   the friends list and personas arrive by JavaSteam's callbacks; messages use
   the new Steam chat service (`FriendMessages` and `FriendMessagesClient`,
   `ServiceMethodNotification`): `GetActiveMessageSessions` once after each
@@ -18269,10 +18274,10 @@ view strip, the game page's tabs, the Quick Menu's rail). The D-pad never reache
 a header or status cluster. The hint row and the left menu are touch routes to
 their corresponding actions.
 
-The left menu's order is a Search row (not in Kiosk and Kid), Home, PC Games, Retro Games,
-Apps, the places, then Settings. Search opens the one search (12a "One search"), is
-not a destination, and carries no "you are here" mark; while a game runs, Resume leads
-and Search follows it. Home (the PC section's shelves, §7i "Home art") is the first row;
+The left menu's order is Home, PC Games, Retro Games, Apps, the places, then Settings;
+while a game runs, Resume leads. Search is not a row (Droidtop/tracker#621 M4): it is
+not a destination, and Y and the Quick Menu's Power and mode Search
+tile open the one search (12a "One search"). Home (the PC section's shelves, §7i "Home art") is the first row;
 the current-destination mark follows which of Home and PC Games is showing.
 
 The left menu is Steam's main menu, measured (Droidtop/tracker#273 slice 4;
@@ -25783,7 +25788,7 @@ search is now `UnifiedSearch` (`library-core`) and `LibrarySearchDialog`
 
 **One search: where it opens (decided 2026-10-14, Droidtop/tracker#485 F7c; owner: "We also want per-console search items").** One runner (`UnifiedSearch`, drawn by `LibrarySearchDialog`), three kinds of entry (`SearchEntry`):
 
-- **Everything**: **Y on Home**: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The left menu has one **Search** row, the one in its order above (under Resume, not in Kiosk and Kid), which opens the same runner through `LauncherSearchScreen` with the matching settings too; there is no second Search row under Home (two branches each added one; the merge of 2026-10-15 kept that one).
+- **Everything**: **Y on Home**: the device's games across every library and the launcher's game apps (each row named by its kind badge), the system names themselves ("snes" finds SNES, "play" finds PlayStation; A opens Retro Games), and every source with no system scope. The Quick Menu's Power and mode **Search** tile (not in Kiosk and Kid) opens the same runner through `LauncherSearchScreen` with the matching settings too; the left menu has no Search row (Droidtop/tracker#621 M4).
 - **One system**: **Search SNES** in a system's gamelist Select menu (the row is named for the system, "Search SNES: zelda" once text is typed): that system's games and the sources that serve it, and a download goes to that system's folder (`SourceDestinations`, with the list's own system). The running console game's L2 sheet in Gaming has the same row for its system ("Search SNES", after Guides; it opens the one search over that system's games and the sources that serve it, the sheet closing first). Home's system tiles get it with Your library's systems (#485 F7b), which are not built yet.
 - **One page**: a page's own field (the plugin Store, Installed) filters that page's list in memory.
 

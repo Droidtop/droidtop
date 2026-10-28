@@ -140,23 +140,20 @@ class LeftMenuTest {
     }
 
     @Test
-    fun `Search sits between Resume and the destinations, and the cursor still opens where the user is`() {
-        assertEquals(1, leftMenuRowsAbove(running = false, searchable = true))
-        assertEquals(2, leftMenuRowsAbove(running = true, searchable = true))
-        assertEquals(0, leftMenuRowsAbove(running = false, searchable = false))
+    fun `only Resume sits above the destinations, and the cursor still opens where the user is`() {
+        assertEquals(0, leftMenuRowsAbove(running = false))
+        assertEquals(1, leftMenuRowsAbove(running = true))
         all.forEachIndexed { index, entry ->
-            assertEquals(index + 2, leftMenuStartIndex(all, entry.section, rowsAbove = leftMenuRowsAbove(true, true)))
+            assertEquals(index + 1, leftMenuStartIndex(all, entry.section, rowsAbove = leftMenuRowsAbove(true)))
         }
     }
 
     @Test
     fun `a row index says what the row is`() {
-        assertTrue(leftMenuRowAt(0, running = true, searchable = true) is LeftMenuRow.Resume)
-        assertTrue(leftMenuRowAt(1, running = true, searchable = true) is LeftMenuRow.Search)
-        assertEquals(0, (leftMenuRowAt(2, running = true, searchable = true) as LeftMenuRow.Destination).index)
-        assertTrue(leftMenuRowAt(0, running = false, searchable = true) is LeftMenuRow.Search)
-        assertEquals(0, (leftMenuRowAt(0, running = false, searchable = false) as LeftMenuRow.Destination).index)
-        assertEquals(2, (leftMenuRowAt(4, running = true, searchable = true) as LeftMenuRow.Destination).index)
+        assertTrue(leftMenuRowAt(0, running = true) is LeftMenuRow.Resume)
+        assertEquals(0, (leftMenuRowAt(1, running = true) as LeftMenuRow.Destination).index)
+        assertEquals(0, (leftMenuRowAt(0, running = false) as LeftMenuRow.Destination).index)
+        assertEquals(3, (leftMenuRowAt(4, running = true) as LeftMenuRow.Destination).index)
     }
 
     @Test

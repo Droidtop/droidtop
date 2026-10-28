@@ -362,4 +362,14 @@ class QuickTilesTest {
         val claimed = QuickTiles.AUDIO_IDS + QuickTiles.DISPLAY_IDS + QuickTiles.CONNECTION_IDS
         assertTrue(system.none { it in claimed })
     }
+
+    @Test
+    fun `the Search tile leads Power and mode, draws its own glyph and is a press`() {
+        val groups = listOf(CatalogGroup(id = "quick_system", title = null, items = listOf(toggle("a", true))))
+        val items = QuickTiles.withSearch(groups) {}.single().items
+        assertEquals(listOf(QuickTiles.ID_SEARCH, "a"), items.map { it.id })
+        val tile = QuickTiles.tile(items.first())
+        assertEquals(QuickGlyph.SEARCH, tile.glyph)
+        assertFalse((tile.item as ActionItem).inert)
+    }
 }

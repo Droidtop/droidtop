@@ -126,6 +126,8 @@ internal object InGameOverlays {
                     // Start swaps to the left menu, as it does in Gaming.
                     onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                     onDismiss = { close() },
+                    // Power and mode's Search tile, the left menu's Search row until Droidtop/tracker#621 M4.
+                    onSearch = { open(Intent(app, LauncherSearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                 )
                 OverlayRequest.Kind.CONTEXT_MENU -> if (!gameInFront) {
                     front?.let { packageName ->
@@ -174,7 +176,6 @@ internal object InGameOverlays {
                     onResume = { close() },
                     onOpenSection = { section, placeScreenId -> open(sectionIntent(section, placeScreenId)) },
                     onOpenQuickMenu = { swap(request.copy(kind = OverlayRequest.Kind.QUICK_MENU)) },
-                    onSearch = { open(Intent(app, LauncherSearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                     onDismiss = { close() },
                 )
             }

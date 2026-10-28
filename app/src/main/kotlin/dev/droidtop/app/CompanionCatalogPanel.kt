@@ -105,7 +105,6 @@ private val DRAWN_CARDS = setOf("display", "sound", "connections", "power", "pri
 internal fun CompanionCatalogItems(
     items: List<CatalogItem>,
     onChanged: () -> Unit,
-    onOpenSocial: (() -> Unit)? = null,
     asks: (CatalogItem) -> Boolean = { it.confirmText != null },
 ) {
     var nested by remember { mutableStateOf<CatalogScreen?>(null) }
@@ -120,9 +119,7 @@ internal fun CompanionCatalogItems(
                 is SliderItem -> CatalogSliderRow(item, onChanged)
                 is ToggleItem -> CatalogToggleRow(item, onChanged)
                 is ChoiceItem -> CatalogChoiceRow(item, onChanged)
-                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile, progress = item.progress, look = item.progressLook, statusMark = item.statusMark) {
-                    if (item.registryId == "social" && onOpenSocial != null) onOpenSocial() else nested = item.resolve()
-                }
+                is NestedScreenItem -> CatalogRow(item.title, item.subtitle, null, iconFile = item.iconFile, progress = item.progress, look = item.progressLook, statusMark = item.statusMark) { nested = item.resolve() }
                 is ActionItem, is AsyncActionItem -> CatalogActionRow(item, onChanged, asks(item))
                 is NoticeItem -> CompanionNotice(item, onChanged, onOpen = { nested = it })
                 // A page's header and bar (docs/SPEC.md 7k, "Page anatomy"): the shared pieces, touch only.

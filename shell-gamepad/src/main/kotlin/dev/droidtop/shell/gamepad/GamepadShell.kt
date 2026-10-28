@@ -769,6 +769,16 @@ internal fun GamepadShellBody(
                 Log.i("droidtop.ReturnToGame", "Quick Menu closed")
                 overlays.quickMenuOpen = false
             },
+            // Power and mode's Search tile, the left menu's Search row until Droidtop/tracker#621 M4. Kiosk and Kid
+            // keep the library and leave out what manages the device, downloads and settings with it.
+            onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
+                {
+                    overlays.quickMenuOpen = false
+                    overlays.globalSearchOpen = true
+                }
+            } else {
+                null
+            },
         )
     }
     if (overlays.leftMenuOpen) {
@@ -788,15 +798,6 @@ internal fun GamepadShellBody(
             onOpenQuickMenu = {
                 overlays.leftMenuOpen = false
                 overlays.quickMenuOpen = true
-            },
-            // Kiosk and Kid keep the library and leave out what manages the device, downloads and settings with it.
-            onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
-                {
-                    overlays.leftMenuOpen = false
-                    overlays.globalSearchOpen = true
-                }
-            } else {
-                null
             },
             onDismiss = { overlays.leftMenuOpen = false },
         )

@@ -96,8 +96,6 @@ object GamingSettingsCatalog {
     const val ID_SYSTEM_ROTATE = "pref_gaming_system_rotate"
     const val ID_SYSTEM_TIMEOUT = "pref_gaming_system_timeout"
     const val ID_SYSTEM_ANDROID_LINKS = "pref_gaming_system_android_links"
-    const val ID_SYSTEM_UPDATES = "pref_gaming_system_updates"
-    const val ID_SYSTEM_SOCIAL = "pref_gaming_system_social"
     const val ID_SYSTEM_AIRPLANE = "pref_gaming_system_airplane"
     const val ID_SYSTEM_POWER_MENU = "pref_gaming_system_power_menu"
     const val ID_SYSTEM_SLEEP = "pref_gaming_system_sleep"
@@ -949,30 +947,8 @@ object GamingSettingsCatalog {
                         run = { ctx -> SettingsLaunch.start(ctx, controls.audioOutputIntent()) },
                     ),
                 )
-                // The Social place's way in from the Quick Menu: the unread count over every provider is the
-                // tile's value, so a message shows without opening anything. Not drawn when nothing provides friends.
-                if (SocialBadge.available) {
-                    add(
-                        NestedScreenItem(
-                            id = ID_SYSTEM_SOCIAL,
-                            title = "Social",
-                            registryId = "social",
-                            valueLabel = { SocialBadge.unread.takeIf { it > 0 }?.let { "$it new" } },
-                            icon = CatalogIcon.GLOBAL,
-                        ),
-                    )
-                }
-                // The Updates place's way in from the Quick Menu: pressing it closes the menu and opens
-                // that place (docs/SPEC.md 7j "Updates"). Not in Settings: one Updates destination.
-                add(
-                    NestedScreenItem(
-                        id = ID_SYSTEM_UPDATES,
-                        title = "Updates",
-                        subtitle = "Droidtop, plugins and games with a newer version",
-                        registryId = "updates",
-                        icon = CatalogIcon.SYSTEM_UPDATES,
-                    ),
-                )
+                // No Social or Updates tile (Droidtop/tracker#621 M5): Social is a section of the Quick Menu's own
+                // rail, and Updates a page of Downloads and Updates, which the Downloads section hosts.
             },
         ),
         CatalogGroup(
