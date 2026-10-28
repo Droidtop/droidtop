@@ -3,6 +3,19 @@ package dev.droidtop.shell.gamepad.pc
 import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import dev.droidtop.shell.gamepad.Corners
+import dev.droidtop.shell.gamepad.ShellChip
+import dev.droidtop.shell.gamepad.ShoulderGlyph
+import dev.droidtop.shell.gamepad.Space
+import dev.droidtop.shell.gamepad.input.HintBinding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -221,7 +234,7 @@ internal fun recordRows(record: UpdateSources.Record, tab: RecordTab, picked: St
         record.updatedEpochMs?.let { RecordRow("Updated", formatDate(it)) },
         record.tags.takeIf { it.isNotEmpty() }?.let { RecordRow("Tags", subtitle = it.joinToString(", ")) },
         record.url?.let { url -> RecordRow(OPEN_SOURCE_ROW, linkHost(url), action = RecordAction.Open(url)) },
-        RecordRow("Change link", "#${record.externalId}", action = RecordAction.Relink),
+        changeLinkRow(),
     )
 }
 
@@ -272,7 +285,7 @@ internal fun SourceRecordPage(
             val signIn = signInRow(source.label, r, signedOut).takeIf { tab == RecordTab.DOWNLOADS && !needsCheck }
             check + listOfNotNull(signIn) + recordRows(r, tab, picked) { ms -> dateFormat.format(Date(ms)) }
         }
-            ?: if (answer != null) check + RecordRow("Change link", "#$externalId", action = RecordAction.Relink) else emptyList()
+            ?: if (answer != null) check + changeLinkRow() else emptyList()
     }
 
     fun pickSystem(step: Int) {
@@ -329,6 +342,7 @@ internal fun SourceRecordPage(
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(760.dp)),
             focusLabel = source.label,
+            hints = RECORD_HINTS,
             onPad = { pad ->
                 when (pad.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> {
@@ -351,36 +365,55 @@ internal fun SourceRecordPage(
                 true
             },
         ) {
-            Text(
-                record?.title ?: source.label,
-                style = MaterialTheme.typography.titleLarge,
-                color = MenuTokens.OnSurface,
-                fontWeight = FontWeight.SemiBold,
-            )
-            // Which version is which, in words: the one on offer stands out, the one here is secondary (Droidtop/tracker#639).
-            record?.version?.takeIf { it.isNotBlank() }?.let { available ->
-                Text(
-                    GameUpdates.availableLabel(available),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MenuTokens.OnSurface,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    GameUpdates.installedLabel(installedVersion),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MenuTokens.OnSurfaceMuted,
-                )
+            // The game it is about, by its cover, beside the page's title and which version is which (Droidtop/tracker#591).
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Md), verticalAlignment = Alignment.CenterVertically) {
+                newest.artworkUri?.let { art ->
+                    AsyncImage(
+                        model = art,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.size(width = 72.dp, height = 96.dp).clip(Corners.Crisp),
+                    )
+                }
+                Column {
+                    Text(
+                        record?.title ?: source.label,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MenuTokens.OnSurface,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    // Which version is which, in words: the one on offer stands out, the one here is secondary (Droidtop/tracker#639).
+                    record?.version?.takeIf { it.isNotBlank() }?.let { available ->
+                        Text(
+                            GameUpdates.availableLabel(available),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MenuTokens.OnSurface,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            GameUpdates.installedLabel(installedVersion),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MenuTokens.OnSurfaceMuted,
+                        )
+                    }
+                }
             }
-            Text(
-                RecordTab.entries.joinToString("   ") { if (it == tab) "[ ${it.label} ]" else it.label },
-                style = MaterialTheme.typography.titleSmall,
-                color = MenuTokens.OnSurface,
-            )
+            // The tabs as the shell's tab pills between the shoulder glyphs, the PC game page's strip: L1/R1 step them
+            // and a tap picks one. They were words in brackets on one line, which touch could not reach.
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.Sm), verticalAlignment = Alignment.CenterVertically) {
+                ShoulderGlyph("L1")
+                RecordTab.entries.forEach { entry ->
+                    ShellChip(entry.label, tab = true, on = entry == tab, selected = false) {
+                        if (entry != tab) switchTab(entry.ordinal - tab.ordinal)
+                    }
+                }
+                ShoulderGlyph("R1")
+            }
             when {
                 answer == null -> MenuRow(title = "Asking ${source.label}...")
                 record == null -> {
                     MenuRow(
-                        title = if (answer?.unsupported == true) "${source.label} has no update page" else "${source.label} has no page for #$externalId",
+                        title = if (answer?.unsupported == true) "${source.label} has no update page" else "${source.label} has no page for this game",
                         subtitle = answer?.failure,
                     )
                     rows.forEachIndexed { index, row ->
@@ -420,3 +453,13 @@ internal fun SourceRecordPage(
         }
     }
 }
+
+/** Change link: it opens the link sheet. The record's thread number is the site's, not something the person reads. */
+private fun changeLinkRow(): RecordRow =
+    RecordRow("Change link", subtitle = "Link this game to a different page", action = RecordAction.Relink)
+
+private val RECORD_HINTS = listOf(
+    HintBinding(GamepadAction.A, "Select"),
+    HintBinding(GamepadAction.L, "Switch tab"),
+    HintBinding(GamepadAction.B, "Back"),
+)
