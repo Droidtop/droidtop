@@ -343,11 +343,29 @@ internal fun PcGamePage(
         value = withContext(Dispatchers.IO) { dev.droidtop.library.originLabel(entry, 1, roots = pcRootsOf(context)).full }
     }
     val sizeLine = (folderSize ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { dev.droidtop.library.format.ValueFormat.size(it) }
-    val rows = remember(entry, play, runner, siblings, scrapeStatus, updateStatus, links, updateSources, setVersion, fileVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers) {
+    // Whether it plays with no network (Droidtop/tracker#422): the art the game draws from the internet is looked up in
+    // the image cache once, off the main thread, as the page opens; the rest is the entry's own facts.
+    val artNotSaved by produceState(0, entry.id, entry.artworkUri, entry.heroUri, entry.logoUri) {
+        val remote = dev.droidtop.library.OfflineReadiness.remoteArt(entry)
+        value = if (remote.isEmpty()) {
+            0
+        } else {
+            withContext(Dispatchers.IO) {
+                val cache = coil3.SingletonImageLoader.get(context).diskCache
+                remote.count { url -> cache?.openSnapshot(url)?.use { true } != true }
+            }
+        }
+    }
+    val offlineRow = remember(entry, artNotSaved) {
+        val (value, subtitle) = dev.droidtop.library.OfflineReadiness.line(dev.droidtop.library.OfflineReadiness.need(entry), artNotSaved)
+        PageFact(OFFLINE_ROW, value, subtitle = subtitle, tab = PageTab.DETAILS)
+    }
+    val rows = remember(entry, play, runner, siblings, scrapeStatus, updateStatus, links, updateSources, setVersion, fileVersion, moreOpen, cloudRow, sizeLine, originText, elsewhere, pairedComputers, offlineRow) {
         pageRows(
             entry, play, runner, siblings,
             origin = originText,
             size = sizeLine,
+            offline = offlineRow,
             cloudSaves = cloudRow,
             setVersion = setVersion,
             fileVersion = fileVersion,
@@ -1444,6 +1462,8 @@ private fun pageRows(
     // its cloud saves' row, the version the person set, and whether More is open.
     origin: String? = null,
     size: String? = null,
+    // Whether it plays with no network ([dev.droidtop.library.OfflineReadiness]).
+    offline: PageFact? = null,
     cloudSaves: PageFact? = null,
     setVersion: String? = null,
     // The version the game's own files declare ([dev.droidtop.library.GameFileVersions]), used when nothing else names one.
@@ -1559,6 +1579,7 @@ private fun pageRows(
     // How the account holds it, only when that is not simply owned (docs/SPEC.md 7g, "Ownership is a fact").
     ownershipSentence(entry)?.let { (value, sentence) -> add(PageFact("Ownership", value, subtitle = sentence, tab = PageTab.DETAILS)) }
     size?.let { add(PageFact("Size", it, tab = PageTab.DETAILS)) }
+    offline?.let(::add)
     cloudSaves?.let(::add)
     // The technical facts, folded away until asked for (docs/SPEC.md 7i).
     val more = buildList {
@@ -1672,10 +1693,13 @@ private val MORE_ROWS = setOf("Store id", "Installed build", "Install location",
 
 /**
  * Details in order of use (docs/SPEC.md 7i, "The game page"): where it came
- * from, how it is held, its size, its cloud saves, its DLC, then the rest,
+ * from, how it is held, its size, whether it plays offline, its cloud saves, its DLC, then the rest,
  * then More and what More opens.
  */
-private val DETAILS_ORDER = listOf("Source", "Ownership", "Size", "Cloud saves", "DLC")
+private val DETAILS_ORDER = listOf("Source", "Ownership", "Size", OFFLINE_ROW, "Cloud saves", "DLC")
+
+/** The Details row saying whether the game plays with no network (Droidtop/tracker#422). */
+internal const val OFFLINE_ROW = "Offline"
 
 private fun detailsRank(title: String): Int = when (title) {
     in DETAILS_ORDER -> DETAILS_ORDER.indexOf(title)
