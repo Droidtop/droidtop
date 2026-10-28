@@ -32,7 +32,8 @@ import dev.droidtop.library.LaunchDisplayOption
  * the choice for THIS GAME so the question never comes back for it —
  * ask-per-launch is the honest default, a remembered per-game answer is
  * the steady state, and clearing lives in the game's metadata editor as
- * a first-class action.
+ * a first-class action. Then an "Every game" pair (Droidtop/tracker#590): on a console with a dock the answer is the
+ * same for every game, so one press sets Settings > Displays > Games launch on and the question stops for all of them.
  */
 @Composable
 internal fun LaunchDisplayChooserDialog(
@@ -40,26 +41,30 @@ internal fun LaunchDisplayChooserDialog(
     /** Whether the launch has a game identity to remember a choice for — no identity, no "Always" rows. */
     canRemember: Boolean,
     onPick: (option: LaunchDisplayOption, remember: Boolean) -> Unit,
+    /** The "Every game" rows: the shell stores [option] as every game's screen, then launches on it. */
+    onPickEveryGame: (option: LaunchDisplayOption) -> Unit,
     onCancel: () -> Unit,
 ) {
     val rows = remember(options, canRemember) {
-        options.map { ChooserRow(it, remember = false, label = it.label) } +
-            if (canRemember) {
-                options.filter { it.rememberable }.map { ChooserRow(it, remember = true, label = "Always: " + it.label) }
-            } else {
-                emptyList()
-            }
+        val rememberable = options.filter { it.rememberable }
+        options.map { ChooserRow(it, Scope.ONCE, label = it.label) } +
+            (if (canRemember) rememberable.map { ChooserRow(it, Scope.GAME, label = "Always: " + it.label) } else emptyList()) +
+            rememberable.map { ChooserRow(it, Scope.EVERY_GAME, label = "Every game: " + it.label) }
     }
     // Steam's dialog order: the screens, then the remembered choices, then Cancel last on its own.
     val groups = remember(rows) {
-        listOf(
-            rows.filterNot { it.remember }.map { DialogChoice(it.label) },
-            rows.filter { it.remember }.map { DialogChoice(it.label) },
-            listOf(DialogChoice("Cancel")),
-        )
+        Scope.entries.map { scope -> rows.filter { it.scope == scope }.map { DialogChoice(it.label) } }.filter { it.isNotEmpty() } +
+            listOf(listOf(DialogChoice("Cancel")))
     }
     val count = rows.size + 1
-    val choose: (Int) -> Unit = { index -> rows.getOrNull(index)?.let { onPick(it.option, it.remember) } ?: onCancel() }
+    val choose: (Int) -> Unit = { index ->
+        val row = rows.getOrNull(index)
+        when (row?.scope) {
+            null -> onCancel()
+            Scope.EVERY_GAME -> onPickEveryGame(row.option)
+            else -> onPick(row.option, row.scope == Scope.GAME)
+        }
+    }
     var selected by remember { mutableStateOf(0) }
 
     val window = LocalShellWindow.current
@@ -81,9 +86,12 @@ internal fun LaunchDisplayChooserDialog(
                 true
             },
         ) {
-            if (canRemember) {
-                Text("\"Always\" remembers for this game", color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting)
-            }
+            Text(
+                (if (canRemember) "\"Always\" remembers for this game. " else "") +
+                    "\"Every game\" changes Settings > Displays > Games launch on",
+                color = MenuTokens.OnSurfaceMuted,
+                style = TypeRole.supporting,
+            )
             DialogChoices(groups, selected) { index ->
                 selected = index
                 choose(index)
@@ -92,4 +100,7 @@ internal fun LaunchDisplayChooserDialog(
     }
 }
 
-private data class ChooserRow(val option: LaunchDisplayOption, val remember: Boolean, val label: String)
+/** How far a pick reaches: this launch, this game ("Always"), or every game. */
+private enum class Scope { ONCE, GAME, EVERY_GAME }
+
+private data class ChooserRow(val option: LaunchDisplayOption, val scope: Scope, val label: String)
