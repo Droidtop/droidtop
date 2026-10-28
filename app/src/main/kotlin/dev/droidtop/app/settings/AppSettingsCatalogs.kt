@@ -2568,7 +2568,7 @@ object AppSettingsCatalogs {
                         id = "plugins_external_launch_apps",
                         title = null,
                         items = rows.ifEmpty {
-                            listOf(ActionItem(id = "plugins_external_launch_none", title = "No app has asked yet", run = {}))
+                            listOf(ActionItem(id = "plugins_external_launch_none", title = "No app has asked yet"))
                         },
                     ),
                 )
@@ -2629,7 +2629,6 @@ object AppSettingsCatalogs {
                 id = "plugin_${pluginId}_counts_$day",
                 title = day + " - " + counts.sumOf { it.second } + " calls",
                 subtitle = counts.joinToString(", ") { (key, n) -> (PluginPermissions.labelFor(key) ?: key) + " " + n },
-                run = {},
             )
         }
         return listOfNotNull(
