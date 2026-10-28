@@ -4612,8 +4612,10 @@ arrays under the manifest's own keys (`V2Declarations`).
     no built-in search and no other plugin, only the game's own store id first.
     Its match fills the game, a tie leaves it for the person's pick, and a pass
     the person started over everything replaces what the game had (not their
-    edits). Not built: a plugin as the console scrape's source, and "Rescrape
-    with..." on a game.
+    edits). "Rescrape with..." on a PC or engine game's menu lists the same
+    sources, built-in and plugin, and redoes that one game from the one picked
+    as a pass over everything; the chosen source is left as it is. Not built:
+    a plugin as the console scrape's source.
   - **Quick Menu tiles (C2, C3).** `PluginTiles` reads `ui.status_tile` and
     `ui.quick_tile` entries whose `surfaces` include `gaming.quick_menu`
     (or list none) from manifests when the sheet opens; the Plugins tab

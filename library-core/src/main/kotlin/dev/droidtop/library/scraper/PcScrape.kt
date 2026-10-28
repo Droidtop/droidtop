@@ -66,8 +66,13 @@ object PcScraperSourcePrefs {
 
     private fun prefs(context: Context) = PrefsFile(context, "com.android.launcher3.prefs")
 
-    fun get(context: Context): PcScraperSource {
-        val raw = prefs(context).getString(KEY_SOURCE, null)
+    fun get(context: Context): PcScraperSource = builtin(prefs(context).getString(KEY_SOURCE, null))
+
+    /** What is chosen, as stored: a built-in source's key or [PLUGIN_PREFIX] and a plugin's id. */
+    fun key(context: Context): String = prefs(context).getString(KEY_SOURCE, null) ?: PcScraperSource.LUTRIS.key
+
+    /** The built-in source [raw] names, Lutris for anything else. Pure. */
+    fun builtin(raw: String?): PcScraperSource {
         // Lutris is the default because it is the one that works with
         // nothing configured; a default that needs credentials would
         // make a fresh install's first scrape fail for a reason the user
@@ -83,8 +88,11 @@ object PcScraperSourcePrefs {
     const val PLUGIN_PREFIX = "plugin:"
 
     /** The metadata plugin chosen as the PC source, by its id, or null when a built-in source is chosen. */
-    fun plugin(context: Context): String? =
-        prefs(context).getString(KEY_SOURCE, null)?.takeIf { it.startsWith(PLUGIN_PREFIX) }?.removePrefix(PLUGIN_PREFIX)?.takeIf { it.isNotBlank() }
+    fun plugin(context: Context): String? = pluginOf(prefs(context).getString(KEY_SOURCE, null))
+
+    /** The plugin id the stored choice [raw] names, or null for a built-in source. Pure. */
+    fun pluginOf(raw: String?): String? =
+        raw?.takeIf { it.startsWith(PLUGIN_PREFIX) }?.removePrefix(PLUGIN_PREFIX)?.takeIf { it.isNotBlank() }
 
     /** Chooses the metadata plugin [pluginId] as the one source every PC pass asks. */
     fun setPlugin(context: Context, pluginId: String) {
@@ -403,7 +411,7 @@ object PcScraper {
     private const val METADATA_READ_CHUNK = 500
 
     /** The live source for the current selection, or null when it is not usable (see [ScraperReadiness.pcSourceProblem]). */
-    fun source(context: Context): PcMetadataSource? = when (PcScraperSourcePrefs.get(context)) {
+    fun source(context: Context, key: String = PcScraperSourcePrefs.key(context)): PcMetadataSource? = when (PcScraperSourcePrefs.builtin(key)) {
         PcScraperSource.LUTRIS -> LutrisSource
         PcScraperSource.IGDB -> PcFlavour.igdbCredentials(context)?.let { (id, secret) -> IgdbSource(id, secret) }
         PcScraperSource.STEAMGRIDDB -> SteamGridDbPrefs.apiKey(context).ifBlank { null }?.let { SteamGridDbSource(it) }
@@ -530,13 +538,17 @@ object PcScraper {
         filter: ScrapeFilter? = null,
         // The automatic pass (PcAutoScrape) only fills gaps (Droidtop/tracker#318 §7.2).
         auto: Boolean = false,
+        // "Rescrape with…" (Droidtop/tracker#67): the source this pass asks instead of the chosen one, as
+        // [PcScraperSourcePrefs.key] stores a choice. The setting is left as it is.
+        using: String? = null,
     ): String = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
-        ScraperReadiness.pcSourceProblem(context)?.let { return@withContext it }
+        val key = using ?: PcScraperSourcePrefs.key(context)
+        ScraperReadiness.pcSourceProblem(context, key)?.let { return@withContext it }
         // A metadata plugin chosen as the source is the one source the pass asks (Droidtop/tracker#67): no built-in
         // search, as with any other choice.
-        val chosen = chosenPlugin(context)
-        val source = if (chosen != null) PluginChosenSource(chosen.label) else source(context) ?: return@withContext "No PC scraper source is configured."
+        val chosen = chosenPlugin(context, key)
+        val source = if (chosen != null) PluginChosenSource(chosen.label) else source(context, key) ?: return@withContext "No PC scraper source is configured."
         val wantMetadata = ScrapeOptionsPrefs.scrapeMetadata(context)
         val wantArtwork = ScrapeOptionsPrefs.scrapeArtwork(context)
         if (!wantMetadata && !wantArtwork) {
@@ -776,9 +788,19 @@ object PcScraper {
     /** What the metadata plugins did for one game: [matched] when one found it, [tie] when only ties came back. */
     private data class PluginFill(val tie: Boolean, val matched: Boolean)
 
+    /** One source "Rescrape with…" offers: the [scrape] `using` value, its name, and why it cannot run now (null when it can). */
+    data class SourceChoice(val key: String, val label: String, val problem: String?)
+
+    /** Every source one game can be scraped with (Droidtop/tracker#67): the built-in ones, then the running metadata plugins. */
+    fun sourceChoices(context: Context): List<SourceChoice> =
+        PcScraperSource.entries.map { SourceChoice(it.key, it.label, ScraperReadiness.pcSourceProblem(context, it.key)) } +
+            dev.droidtop.library.integrations.PluginMetadataSources.sources(context).map {
+                SourceChoice(PcScraperSourcePrefs.PLUGIN_PREFIX + it.record.manifest.id, "${it.label} (plugin)", null)
+            }
+
     /** The metadata plugin chosen as the PC source, when it is installed and running (Droidtop/tracker#67). */
-    internal fun chosenPlugin(context: Context): dev.droidtop.library.integrations.PluginMetadataSources.Source? {
-        val id = PcScraperSourcePrefs.plugin(context) ?: return null
+    internal fun chosenPlugin(context: Context, key: String = PcScraperSourcePrefs.key(context)): dev.droidtop.library.integrations.PluginMetadataSources.Source? {
+        val id = PcScraperSourcePrefs.pluginOf(key) ?: return null
         return dev.droidtop.library.integrations.PluginMetadataSources.sources(context).firstOrNull { it.record.manifest.id == id }
     }
 

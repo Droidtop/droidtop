@@ -157,6 +157,8 @@ internal fun PcGameMenu(
     var status by remember(entry) { mutableStateOf<String?>(null) }
     var viewingMedia by remember(entry) { mutableStateOf(false) }
     var pickingMatch by remember(entry) { mutableStateOf(false) }
+    // "Rescrape with…" (Droidtop/tracker#67): one game, from a source the person picks.
+    var pickingSource by remember(entry) { mutableStateOf(false) }
     var editingCollections by remember(entry) { mutableStateOf(false) }
     var pickingReplacement by remember(entry) { mutableStateOf(false) }
     var pickingSameGame by remember(entry) { mutableStateOf(false) }
@@ -348,6 +350,23 @@ internal fun PcGameMenu(
                     }
                 },
                 onDismiss = { pickingOnce = false },
+            )
+        }
+        return
+    }
+    if (pickingSource) {
+        FullScreenOverlay(onDismiss = { pickingSource = false }) {
+            ScrapeSourcePicker(
+                choices = remember { PcScraper.sourceChoices(context) },
+                current = remember { dev.droidtop.library.scraper.PcScraperSourcePrefs.key(context) },
+                onPick = { key ->
+                    pickingSource = false
+                    status = "Scraping ${entry.title}…"
+                    scope.launch {
+                        status = PcScraper.scrape(context, listOf(entry), filter = dev.droidtop.library.scraper.ScrapeFilter.ALL, using = key)
+                    }
+                },
+                onDismiss = { pickingSource = false },
             )
         }
         return
@@ -779,6 +798,7 @@ internal fun PcGameMenu(
             scope.launch { status = PcScraper.scrape(context, listOf(entry), filter = dev.droidtop.library.scraper.ScrapeFilter.ALL) }
         },
         onChooseMatch = { pickingMatch = true },
+        onRescrapeWith = { pickingSource = true },
         onViewMedia = { viewingMedia = true },
         onCollections = { editingCollections = true },
         favorite = favorite,
@@ -1381,6 +1401,7 @@ private fun rememberPcActions(
     runner: ResolvedRunner?,
     media: Int,
     onScrape: () -> Unit,
+    onRescrapeWith: () -> Unit,
     onChooseMatch: () -> Unit,
     onViewMedia: () -> Unit,
     onCollections: () -> Unit,
@@ -1426,6 +1447,7 @@ private fun rememberPcActions(
         // added where their state lives.
         info = listOfNotNull(
             PcActionRow("Scrape", "Looks this game up in the PC sources", onScrape),
+            PcActionRow("Rescrape with…", "Looks it up again in a source you pick, this game only", onRescrapeWith),
             PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
             if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
         ) + titleRows.take(1),

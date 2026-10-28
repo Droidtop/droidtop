@@ -150,6 +150,30 @@ internal fun EnginePicker(
     }
 }
 
+/**
+ * "Rescrape with…" (Droidtop/tracker#67): every source one game can be looked up in, built-in and plugin, for this
+ * game only; the chosen source in Scraper settings stays as it is. A source that cannot run says why, dimmed.
+ */
+@Composable
+internal fun ScrapeSourcePicker(
+    choices: List<dev.droidtop.library.scraper.PcScraper.SourceChoice>,
+    current: String,
+    onPick: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    PickerPage(title = "Rescrape with", onDismiss = onDismiss) {
+        items(choices, key = { it.key }) { choice ->
+            RunnerRow(
+                title = choice.label,
+                detail = choice.problem ?: "Looks this game up again here and replaces what it has, except your edits",
+                enabled = choice.problem == null,
+                selected = choice.key == current,
+                onSelect = { onPick(choice.key) },
+            )
+        }
+    }
+}
+
 /** The full-screen page both pickers are: a title, a list, B to leave. */
 @Composable
 private fun PickerPage(

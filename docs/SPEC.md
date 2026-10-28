@@ -14076,6 +14076,12 @@ the same care as the art.
     from any source, never the person's edits (`PcPluginFields.fill(replace)`); any other pass fills gaps. A
     chosen plugin that is uninstalled or turned off stops the pass with a sentence saying so
     (`ScraperReadiness.pcSourceProblem`).
+  - **"Rescrape with…" (2026-10-28, Droidtop/tracker#67; owner: "On any game, 'Rescrape with…' lists every
+    source, built-in and plugin, and redoes just that game with the one you pick, replacing what it had (except
+    your edits)").** A PC or engine game's menu has it under Scrape. It opens a list of every source the choice
+    above offers (`PcScraper.sourceChoices`); one that cannot run now is shown dimmed with the reason. Picking one
+    scrapes that game alone from it, as a pass over everything (`PcScraper.scrape(using)`), so it replaces what
+    the game had except the person's edits. The chosen source in Scraper settings stays as it is.
 - **Calibrating name matching from recorded answers (decided 2026-10-24, Droidtop/tracker#318 §3.3).** The score
   and tiers that will replace `PcMatching`'s exact-only bar (`identity/MatchScore`) are graded offline against a set
   of games with the right answers (`identity/MatchCalibration`, one JSON line per game). The set is built from real
