@@ -1977,6 +1977,35 @@ object AppSettingsCatalogs {
         // state of each one, and a second list saying "Asks first" beside "7 allowed, 0 ask" contradicts it.
         val consentGroups = pluginConsentGroups(context, record, userKeys, catalogNames, ticks = approvalTicks)
             .filterNot { record.trust == PluginTrustState.APPROVED && it.id.endsWith("_consent_asks") }
+        // The lists are their own page, one row under the header (Droidtop/tracker#512): the page leads with who the
+        // plugin is and what to do, not with eight rows of permissions. Approval's ticks are the plugin's one tick buffer,
+        // so what is ticked there is what Approve on the bar allows.
+        val consentGroup: CatalogGroup? = consentGroups.takeIf { it.isNotEmpty() }?.let { groups ->
+            val pending = approvalTicks != null
+            CatalogGroup(
+                id = "plugin_${m.id}_consent_group",
+                title = null,
+                items = listOf(
+                    NestedScreenItem(
+                        id = "plugin_${m.id}_consent",
+                        title = if (pending) "What you're allowing" else "What it adds and can do",
+                        subtitle = groups.mapNotNull { it.title }.joinToString(", "),
+                        inline = CatalogScreen(
+                            id = "plugin_consent_${m.id}",
+                            title = if (pending) "What you're allowing" else "What it adds and can do",
+                            subtitle = if (pending) "Untick what you don't want it to have, then Approve" else m.label,
+                            groups = { ctx ->
+                                withContext(Dispatchers.IO) {
+                                    pluginConsentGroups(ctx, record, userKeys, catalogNames, ticks = approvalTicks)
+                                        .filterNot { record.trust == PluginTrustState.APPROVED && it.id.endsWith("_consent_asks") }
+                                }
+                            },
+                        ),
+                        valueLabel = { groups.sumOf { it.items.size }.let { n -> if (n == 1) "1 item" else "$n items" } },
+                    ),
+                ),
+            )
+        }
 
         // Grants exist once the plugin is approved (docs/plugin-api.md 4.4): one screen per plugin, no second place.
         val permissionsGroup: CatalogGroup? = if (record.trust != PluginTrustState.APPROVED) {
@@ -2244,7 +2273,8 @@ object AppSettingsCatalogs {
             ),
             runtimeGroupItem.takeIf { runtimeNeed != null },
             useGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_use_group", title = null, items = it) },
-        ).filterNot { it.items.isEmpty() && it.id == "plugin_${m.id}_status_group" } + newAccessGroups + consentGroups + listOfNotNull(
+        ).filterNot { it.items.isEmpty() && it.id == "plugin_${m.id}_status_group" } + newAccessGroups + listOfNotNull(
+            consentGroup,
             permissionsGroup,
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
             runtimeGroupItem.takeIf { runtimeNeed == null },

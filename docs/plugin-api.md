@@ -3613,9 +3613,12 @@ Each (plugin, permission) pair is in one of three states:
 
 When they are asked:
 
-- **At approval ("Approval is a list").** One screen, and every line
-  below with a tick box can be unticked before approving, high-risk ones
-  included:
+- **At approval ("Approval is a list").** One screen, "What you're
+  allowing", reached from the row under the plugin page's header (the
+  page itself leads with the header and Approve on its bar,
+  Droidtop/tracker#512); what is ticked there is what Approve allows.
+  Every line below with a tick box can be unticked before approving,
+  high-risk ones included:
   - "Adds": each extension point, with the mode it shows in (Gaming / Android / Desktop) beside it and nothing beside a point that has no particular place,
     with one plain sentence on what it lets the plugin do (high-risk ones
     marked "high risk");

@@ -24142,7 +24142,11 @@ without its runtime said "Running". Decisions:
   the Permissions screen is the one place that shows each permission's real
   state, and its tier group for the middle tier is titled "Sensitive"
   instead of "Asks first" because an allowed permission is not one that
-  asks.
+  asks. The lists themselves (Adds, Can, Asks for, Offers, Uses) are
+  one page of their own, reached from one row under the header ("What
+  you're allowing" before approval, "What it adds and can do" after), so
+  the plugin page leads with the header and its one action
+  (Droidtop/tracker#512).
 
 **v2 direction:** an `advanced: Boolean` flag on the existing catalog row
 model (additive to `AppSettingsCatalogs.kt`, not a new screen type), with
