@@ -23862,6 +23862,14 @@ listed only when it has a row that can be pressed and saying its first rows ("Sc
 - **Controls and saves:** Controls, Saves, Sync cloud saves.
 - **Manage:** Run a program in a Wine prefix, Prefix tools, and Linux tools for a game with a Linux build.
 
+**The one sheet of choices (Droidtop/tracker#610, "a shared ActionSheet and row model").** A thing's short menu in
+Gaming is `ActionSheet` over `ActionRow` (a title, a line under it, the danger look, what A does): the app menu
+(`AppOptionsMenu`), a collection tile's menu and the imported-collections prompt are built on it, and their own row
+types and panels are gone. Up and Down move, A chooses, B, Select or L2 closes, and the sheet holds the pad. A row
+that has a choice of its own opens a page or a task, never a second sheet. The game menu's categories, the Quick
+Menu and the other shells' menus move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left
+(`raw-dialog`, off until its last site is moved).
+
 **Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's
 translation updater under Wine while Enginehost plays the game: "We can set the game type. We can probably also do a
 "run once". And maybe in a "management" menu we can run it attached to a wineprefix".

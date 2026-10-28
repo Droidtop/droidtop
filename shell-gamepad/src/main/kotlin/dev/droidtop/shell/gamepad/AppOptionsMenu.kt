@@ -1,22 +1,12 @@
 package dev.droidtop.shell.gamepad
 
-import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.settings.CatalogScreen
-import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.HintBinding
 
 /**
  * Select on an app: the focused app's own menu (docs/SPEC.md 7j, "Filters,
@@ -46,8 +36,6 @@ internal fun AppOptionsMenu(
     onUninstall: (() -> Unit)? = null,
     detailsLabel: String = "App details",
 ) {
-    class Option(val title: String, val subtitle: String?, val onClick: () -> Unit)
-
     // What plugins offer on this app (C4, Droidtop/tracker#67): the same page as Standard's long-press menu.
     var pluginScreen by remember(entry) { mutableStateOf<CatalogScreen?>(null) }
     val hasPluginActions = rememberHasPluginActions(entry)
@@ -57,76 +45,42 @@ internal fun AppOptionsMenu(
     }
 
     val options = remember(entry, isGame, hidden, detailsLabel, hasPluginActions) {
-        buildList<Option> {
-            onPrimary?.let { add(Option(if (entry.appFacts != null) "Open" else "Play", null, it)) }
-            add(Option(detailsLabel, null, onDetails))
+        buildList<ActionRow> {
+            onPrimary?.let { add(ActionRow(if (entry.appFacts != null) "Open" else "Play", onSelect = it)) }
+            add(ActionRow(detailsLabel, onSelect = onDetails))
             if (hasPluginActions) {
                 add(
-                    Option(PLUGIN_ACTIONS_LABEL, "What your plugins can do with this app") {
+                    ActionRow(PLUGIN_ACTIONS_LABEL, "What your plugins can do with this app") {
                         pluginScreen = pluginActionsScreen(entry, dev.droidtop.pluginhost.PluginModes.Surfaces.GAMING_APP_MENU) { reply -> pluginScreen = reply }
                     },
                 )
             }
-            add(Option(if (entry.favorite) "Remove from favourites" else "Add to favourites", null, onToggleFavorite))
+            add(ActionRow(if (entry.favorite) "Remove from favourites" else "Add to favourites", onSelect = onToggleFavorite))
             // Only an installed app has a category to mark; the other kinds of this tab have none.
             if (entry.appFacts != null && onMarkGame != null) {
                 add(
                     if (isGame) {
-                        Option("Not a game", "Takes it out of Games in the Category filter", onMarkGame)
+                        ActionRow("Not a game", "Takes it out of Games in the Category filter", onSelect = onMarkGame)
                     } else {
-                        Option("Mark as game", "Puts it under Games in the Category filter", onMarkGame)
+                        ActionRow("Mark as game", "Puts it under Games in the Category filter", onSelect = onMarkGame)
                     },
                 )
             }
             if (entry.appFacts != null && onToggleHidden != null) {
                 add(
                     if (hidden) {
-                        Option("Show in droidtop", null, onToggleHidden)
+                        ActionRow("Show in droidtop", onSelect = onToggleHidden)
                     } else {
-                        Option("Hide from droidtop", "Filter, then Hidden, brings it back", onToggleHidden)
+                        ActionRow("Hide from droidtop", "Filter, then Hidden, brings it back", onSelect = onToggleHidden)
                     },
                 )
             }
             // Android refuses to uninstall a system app, so the row is only for the ones it will take.
-            if (entry.appFacts?.system == false && onUninstall != null) add(Option("Uninstall", null, onUninstall))
-            add(Option("Close", null, onDismiss))
+            if (entry.appFacts?.system == false && onUninstall != null) add(ActionRow("Uninstall", onSelect = onUninstall))
+            add(ActionRow("Close", onSelect = onDismiss))
         }
     }
-    var focusIndex by remember { mutableIntStateOf(0) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        GatePadInThisDialog()
-        MenuPanel(
-            modifier = Modifier.width(LocalShellWindow.current.panelWidth(480.dp)),
-            focusLabel = "App options",
-            hints = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Close")),
-            onPad = { press ->
-                when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, options.size, press)
-                    GamepadAction.A -> options.getOrNull(focusIndex)?.onClick?.invoke()
-                    // L2 opened it, so L2 closes it too (proposal 6.E, Droidtop/tracker#644 slice 4).
-                    GamepadAction.B, GamepadAction.SELECT, GamepadAction.L2 -> onDismiss()
-                    else -> Unit
-                }
-                true
-            },
-        ) {
-            Text(
-                entry.title,
-                style = MaterialTheme.typography.titleLarge,
-                color = MenuTokens.OnSurface,
-                maxLines = 1,
-            )
-            options.forEachIndexed { index, option ->
-                MenuRow(
-                    title = option.title,
-                    subtitle = option.subtitle,
-                    selected = index == focusIndex,
-                    onClick = option.onClick,
-                )
-            }
-        }
-    }
+    ActionSheet(title = entry.title, rows = options, onDismiss = onDismiss)
 }
 
 /** Android's own uninstall prompt for [packageName]; it asks its own confirmation and refuses a system app. */
