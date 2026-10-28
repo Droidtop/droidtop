@@ -12407,7 +12407,12 @@ reimplemented it as my own f95seeker code." So:
 - **One page for a linked record, drawn by droidtop** (`SourceRecordPage`).
   The source hands over data (`library.updates` `record`, docs/plugin-api.md
   3 A6), never a screen, and droidtop draws F95Checker's four tabs, which own
-  L1/R1 as the game page's do:
+  L1/R1 as the game page's do. The page opens with the game's cover beside the
+  title and its Available and Installed versions; the tabs are the shell's tab
+  pills between the L1 and R1 glyphs, tappable, and the footer names A, L1/R1 and
+  B (Droidtop/tracker#591: they were words in brackets with no hint row). Change
+  link reads "Link this game to a different page"; the site's thread number is
+  never shown as a value.
   - **Overview**: the cover, the version, the status and the description.
   - **Changelog**: the source's changelog text, as given.
   - **Downloads**: every link, grouped under the source's own section headings
