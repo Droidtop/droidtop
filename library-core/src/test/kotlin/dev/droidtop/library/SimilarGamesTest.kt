@@ -18,13 +18,14 @@ class SimilarGamesTest {
     ) + LibraryEntry(id = "steam:1", title = "Star Harbour", kind = LibraryEntryKind.WINE_PROFILE)
 
     private val groups = LibraryGrouping.group(library)
-    private fun named(name: String) = groups.first { it.game.name == name }
+    // By an entry the group holds: a folder's card is named in words, so a name alone can be a store row's too.
+    private fun holding(id: String) = groups.first { id in it.entriesByPath }
 
     @Test
     fun `a game whose name drifted is offered, and nothing unlike it is`() {
-        val candidates = SimilarGames.candidates(named("StarHarbor"), groups)
+        val candidates = SimilarGames.candidates(holding("/games/renpy/StarHarbor-0.3-pc"), groups)
 
-        assertEquals(listOf("Star_Harbour"), candidates.map { it.group.game.name })
+        assertEquals(listOf("Star Harbour"), candidates.map { it.group.game.name })
         assertTrue(candidates.single().score >= GameNaming.NAME_SIMILARITY_THRESHOLD)
     }
 
@@ -32,13 +33,13 @@ class SimilarGamesTest {
     fun `a store row and a game that is only missing are not offered`() {
         // The store row's name is the store's; the missing game is the
         // missing-game fold's question (docs/SPEC.md 7g).
-        val names = SimilarGames.candidates(named("Star_Harbour"), groups).map { it.group.game.name }
+        val names = SimilarGames.candidates(holding("/games/renpy/Star_Harbour-0.4-pc"), groups).map { it.group.game.name }
 
-        assertEquals(listOf("StarHarbor"), names)
+        assertEquals(listOf("Star Harbor"), names)
     }
 
     @Test
     fun `a store row is never the game asked about`() {
-        assertTrue(SimilarGames.candidates(named("Star Harbour"), groups).isEmpty())
+        assertTrue(SimilarGames.candidates(holding("steam:1"), groups).isEmpty())
     }
 }

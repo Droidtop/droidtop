@@ -247,7 +247,7 @@ class LibraryTest {
         val groups = LibraryGrouping.group(listOf(older, newer))
         assertEquals(2, groups.size)
 
-        assertTrue(library.mergeGames(groups.first { it.game.name == "StarHarbor" }, groups.first { it.game.name == "Star_Harbour" }))
+        assertTrue(library.mergeGames(groups.first { older.id in it.entriesByPath }, groups.first { newer.id in it.entriesByPath }))
 
         // One game, named for the game it was asked from, with both folders
         // still in it; the newer version is what its card draws, so the
@@ -255,7 +255,7 @@ class LibraryTest {
         library.rescanNow(LibraryEntryKind.entries.toSet())
         val scanned = library.backgroundScanState(LibraryEntryKind.entries.toSet()).value ?: emptyList()
         val merged = LibraryGrouping.group(scanned).single()
-        assertEquals("StarHarbor", merged.game.name)
+        assertEquals("Star Harbor", merged.game.name)
         assertEquals(setOf(older.id, newer.id), merged.entriesByPath.keys)
         assertEquals(newer.id, merged.displayEntry.id)
         assertEquals(2, playHistory.getAll(listOf(newer.id))[newer.id]?.playCount)
@@ -274,7 +274,7 @@ class LibraryTest {
         val groups = LibraryGrouping.group(listOf(folder, store))
 
         assertFalse(library.mergeGames(groups[0], groups[0]))
-        assertFalse(library.mergeGames(groups.first { it.game.name == "StarHarbor" }, groups.first { it.game.name == "Star Harbor" }))
+        assertFalse(library.mergeGames(groups.first { folder.id in it.entriesByPath }, groups.first { store.id in it.entriesByPath }))
     }
 
     private val renpyGame = LibraryEntry(id = "/games/renpy/Known", title = "Known", kind = LibraryEntryKind.RENPY)

@@ -84,6 +84,10 @@ class GameTitleParserTest {
         Row("SomeDayWThingGirl", "Some Day W Thing Girl"),
         Row("AWonderfulDay", "A Wonderful Day"),
         Row("NekoParadise", "Neko Paradise"),
+        // A number meeting a capitalised word is a break; a number's own letter stays with it (rig, build 2361).
+        Row("30YearOldVirgin-0.12-pc", "30 Year Old Virgin", version = "0.12", platform = "pc"),
+        Row("3DCustomGirl", "3D Custom Girl"),
+        Row("AHouseInTheRift", "A House In The Rift"),
         // A short name that is a game's whole title keeps it: the version is cut, not the name.
         Row("REC_v0.4.3.5", "REC", version = "0.4.3.5"),
         Row("RTS_0.032_WIN2", "RTS", version = "0.032"),

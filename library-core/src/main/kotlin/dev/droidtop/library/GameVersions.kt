@@ -261,7 +261,9 @@ object GameGrouping {
         val games = LinkedHashMap<String, Builder>()
         for (folder in found.sortedWith(compareBy({ it.namePath }, { it.path }))) {
             val derived = GameNaming.derive(folder.namePath)
-            val name = folder.name?.takeIf { it.isNotBlank() } ?: derived.name
+            // The card's name is the folder's title as the parser reads it (`AHouseInTheRift` is `A House In The
+            // Rift`), not the bare derived name; the key below ignores spaces, so grouping is unchanged.
+            val name = folder.name?.takeIf { it.isNotBlank() } ?: GameTitleParser.words(derived.name).ifEmpty { derived.name }
             // An unidentified folder is nobody's version: two `game` folders
             // are two unknowns, not one game.
             val key = if (derived.unidentified && folder.name.isNullOrBlank()) {
@@ -269,7 +271,13 @@ object GameGrouping {
             } else {
                 GameNaming.nameKey(name).ifEmpty { folder.path.lowercase() }
             }
-            games.getOrPut(key) { Builder(name) }.merge(derived, folder)
+            val builder = games.getOrPut(key) { Builder(name) }
+            // A name the person gave is the card's, whichever folder came first.
+            if (!folder.name.isNullOrBlank() && !builder.named) {
+                builder.name = name
+                builder.named = true
+            }
+            builder.merge(derived, folder)
         }
         return games.values.map { it.build() }.sortedBy { it.name.lowercase() }
     }
@@ -280,7 +288,9 @@ object GameGrouping {
      * inside it and update it in place, or add it -- so re-scanning a
      * library updates what it already knows instead of duplicating it.
      */
-    private class Builder(val name: String) {
+    private class Builder(var name: String) {
+        var named = false
+
         private val direct = VersionsBuilder()
         private val segments = LinkedHashMap<String, SegmentBuilder>()
 

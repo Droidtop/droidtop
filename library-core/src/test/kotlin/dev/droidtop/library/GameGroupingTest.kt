@@ -285,4 +285,19 @@ class GameGroupingTest {
         assertEquals(listOf("0.4", "0.3"), merged.versions.map { it.version })
         assertEquals("/games/b/Star_Harbour_Remaster-0.4-pc", merged.defaultVersion?.playable?.path)
     }
+
+    @Test
+    fun `a card names its game in words, as the folder's own title does`() {
+        // Rig, build 2361 (Droidtop/tracker#282): the folder's title was split but the card's name was not.
+        val games = GameGrouping.group(
+            listOf(
+                GameGrouping.Found("/games/AHouseInTheRift-0.8.09r1-pc"),
+                GameGrouping.Found("/games/AHouseInTheRift-0.7-pc"),
+                GameGrouping.Found("/games/PrincessEvangileFull"),
+            ),
+        )
+
+        assertEquals(listOf("A House In The Rift", "Princess Evangile Full"), games.map { it.name })
+        assertEquals(2, games.first().versions.size)
+    }
 }

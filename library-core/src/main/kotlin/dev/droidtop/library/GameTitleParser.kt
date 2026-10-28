@@ -175,7 +175,7 @@ object GameTitleParser {
      * fix reached only folders that changed on disk (rig, build 1715: a run-together name stayed unsplit after
      * the run-together rule landed, Droidtop/tracker#282).
      */
-    const val RULES_VERSION = 3L
+    const val RULES_VERSION = 4L
 
     private val BRACKET = Regex("""[\[({]([^\[\]{}()]*)[\])}]""")
     private val SHORT_NUMBER = Regex("""\d{1,3}""")
@@ -325,7 +325,7 @@ object GameTitleParser {
         for (token in derived.tags) classify(token)
         for (token in derived.mods) classify(token)
 
-        val title = splitRunTogether(tidy(GameNaming.displayName(derived.name))).ifEmpty { raw }
+        val title = words(derived.name).ifEmpty { raw }
         val subtitle = SUBTITLE.find(title)?.groupValues?.get(2)?.trim()?.ifEmpty { null }
         val main = SUBTITLE.find(title)?.groupValues?.get(1)?.trim() ?: title
         val numbered = SERIES_NUMBER.find(main)
@@ -366,12 +366,21 @@ object GameTitleParser {
         )
     }
 
-    private val RUN_TOGETHER = Regex("""(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])""")
+    private val RUN_TOGETHER = Regex("""(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|(?<=[0-9])(?=[A-Z][a-z])""")
+
+    /**
+     * A name [GameNaming.derive] gave, as the words a person reads: separators made spaces and a run-together
+     * name split ([splitRunTogether]). What [parse] titles a folder, and what a card names a game
+     * ([GameGrouping.group]), so the two never differ (Droidtop/tracker#282).
+     */
+    fun words(name: String): String = splitRunTogether(tidy(GameNaming.displayName(name)))
 
     /**
      * A title written as one run of words, `PrincessEvangileFull`, read as the words it is
      * made of: a space where a lower-case letter meets a capital, and before the last
-     * capital of a capital run that starts a word (`BeingADik` is `Being A Dik`). Only a
+     * capital of a capital run that starts a word (`BeingADik` is `Being A Dik`), and where a
+     * number meets a capitalised word (`30YearOldVirgin` is `30 Year Old Virgin`; `3DGirl` is
+     * `3D Girl`, a number's own letter staying with it). Only a
      * name with no space in it: a spaced title is as its author wrote it, and a name
      * with no lower-case letter (`GTA`, `LUSTACADEMY`) has no word breaks to read
      * (Droidtop/tracker#282).

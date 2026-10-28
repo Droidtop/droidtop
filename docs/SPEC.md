@@ -18836,8 +18836,14 @@ every rescan; clearing it returns to the parsed one.
 space in it is read as the words it is made of: a space where a lower-case
 letter meets a capital and before the last capital of a capital run that
 starts a word (`PrincessEvangileFull` is `Princess Evangile Full`,
-`BeingADik` is `Being A Dik`); a name with no lower-case letter (`GTA`) or
-with a space is left as written. A dotted version written straight onto the
+`BeingADik` is `Being A Dik`), and where a number meets a capitalised word
+(`30YearOldVirgin` is `30 Year Old Virgin`; `3DCustomGirl` is
+`3D Custom Girl`, a number's own letter staying with it); a name with no
+lower-case letter (`GTA`) or with a space is left as written. A game's card
+is named by the same reading: the name versions are grouped under is the
+parsed title of the folder, unless the person named the game, so the card
+never shows the bare folder name its folders' titles were split from
+(rig, build 2361). A dotted version written straight onto the
 title with a capital V (`SomeGameV0.80`) is the version, not part of the
 title. So is a version written straight after punctuation or a letter of
 another script, which no English word goes on through
