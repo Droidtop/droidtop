@@ -17384,10 +17384,14 @@ own games, in droidtop's own treatment:
 - **Art that does not load is no art** (console, build 1386: three empty
   frames on Recently added). A card whose art fails to load (`AsyncImage`
   `onError`) draws the plate with the name, the same as a card with no art.
-- **Continue playing is the first shelf** and the first card of the first
-  shelf is always the **hero card** (`isHeroCard`; on a library nothing has
-  been played from, whichever shelf leads), so Home and Overview both open on
-  one large piece of art (`PcCapsule(hero = true)`): Steam's featured card,
+- **Continue playing is the first shelf** and the card under the cursor on
+  the first shelf is the **hero card** (`isHeroCard`, `heroItem`; on a library
+  nothing has been played from, whichever shelf leads): with the cursor
+  elsewhere, the card it last left there, else the first, so Home and
+  Overview both open on one large piece of art (`PcCapsule(hero = true)`).
+  Moving along the shelf widens the new card and narrows the old one over the
+  focus duration (`Motion.focus`, a snap with motion off), the height fixed,
+  as the Deck's recent row does (Droidtop/tracker#253): Steam's featured card,
   3.2 capsules wide at the capsules' own height (`heroWidth`,
   `HERO_CAPSULES_WIDE`, so landscape hero art loses a thin band top and
   bottom) so the row keeps one baseline, under it the name in bold and under

@@ -355,6 +355,16 @@ class PcShelvesTest {
     }
 
     @Test
+    fun `the hero card is the one the cursor is on, else the one it left, else the first`() {
+        assertEquals(3, heroItem(cursorOnShelf = true, cursorItem = 3, remembered = 1))
+        assertEquals(1, heroItem(cursorOnShelf = false, cursorItem = 5, remembered = 1))
+        assertEquals(0, heroItem(cursorOnShelf = false, cursorItem = 5, remembered = null))
+        assertTrue(isHeroCard(0, 3, heroItem = 3))
+        assertEquals(false, isHeroCard(0, 0, heroItem = 3))
+        assertEquals(false, isHeroCard(1, 3, heroItem = 3))
+    }
+
+    @Test
     fun `the cursor stays on its game when the shelves move under it`() {
         fun shelf(id: String, vararg games: String) = PcShelf(id, id, games.map { game(it) }, games.size)
         val before = listOf(shelf("kind:A", "/a1", "/a2"), shelf("kind:B", "/b1", "/b2", "/b3"))

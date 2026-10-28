@@ -354,12 +354,23 @@ internal fun LibraryEntry.heroArt(): HeroArt =
     HeroArt(heroUri?.takeIf { !EsDeArtwork.isScreenshot(it) }, artworkUri?.takeIf { !EsDeArtwork.isScreenshot(it) })
 
 /**
- * Whether a card is the hero card: the first card of the first shelf, drawn
- * landscape (docs/SPEC.md 7i, "Home art"). Usually Continue playing's; on a
- * library nothing has been played from yet, whatever shelf leads, so the
- * page always opens on one large piece of art. Pure.
+ * Which card of the first shelf is the hero card (docs/SPEC.md 7i, "Home
+ * art"): the one under the cursor while the cursor is on that shelf, else the
+ * one it was last on there ([remembered]), else the first, so the page opens
+ * on the game most likely wanted and the card that widens is the one being
+ * looked at (Droidtop/tracker#253). Pure.
  */
-internal fun isHeroCard(shelfIndex: Int, itemIndex: Int): Boolean = shelfIndex == 0 && itemIndex == 0
+internal fun heroItem(cursorOnShelf: Boolean, cursorItem: Int, remembered: Int?): Int =
+    if (cursorOnShelf) cursorItem else remembered ?: 0
+
+/**
+ * Whether a card is the hero card, drawn landscape: card [heroItem] of the
+ * first shelf. Usually Continue playing's; on a library nothing has been
+ * played from yet, whatever shelf leads, so the page always shows one large
+ * piece of art. Pure.
+ */
+internal fun isHeroCard(shelfIndex: Int, itemIndex: Int, heroItem: Int = 0): Boolean =
+    shelfIndex == 0 && itemIndex == heroItem
 
 /**
  * Where the cursor goes when the shelves are worked out again (a scan still

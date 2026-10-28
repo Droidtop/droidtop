@@ -4,6 +4,7 @@ import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.R
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -1812,6 +1813,7 @@ private fun PcShelvesHome(
                             .focusRing(onThisShelf && state.headingFocused, dev.droidtop.shell.gamepad.Corners.Crisp)
                             .padRow { onOpenShelf(shelf) },
                     )
+                    val heroAt = heroItem(onThisShelf, state.itemIndex, state.shelfItems[shelf.id])
                     LazyRow(
                         state = rowState(shelf.id),
                         contentPadding = PaddingValues(horizontal = window.edgePadding),
@@ -1819,13 +1821,16 @@ private fun PcShelvesHome(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         itemsIndexed(shelf.entries, key = { _, entry -> entry.id }) { itemIndex, entry ->
-                            // The game most likely wanted leads the first shelf as a
-                            // landscape hero card (docs/SPEC.md 7i, "Home art").
-                            val hero = isHeroCard(shelfIndex, itemIndex)
+                            // The card under the cursor on the first shelf widens into a
+                            // landscape hero card (docs/SPEC.md 7i, "Home art"); the width
+                            // moves, the height stays the capsules', so the row keeps one baseline.
+                            val hero = isHeroCard(shelfIndex, itemIndex, heroAt)
+                            val cardWidth by animateDpAsState(if (hero) heroCardWidth else width, Motion.focus(), label = "hero width")
                             PcCapsule(
                                 entry = entry,
                                 selected = onThisShelf && !state.headingFocused && state.itemIndex == itemIndex,
-                                width = if (hero) heroCardWidth else width,
+                                width = cardWidth,
+                                aspect = CAPSULE_ASPECT * (cardWidth / width),
                                 onTap = { onTapCapsule(shelfIndex, itemIndex, entry) },
                                 onLongPress = { onLongPressCapsule(entry) },
                                 download = entry.downloadKey()?.let { downloads[it] },
