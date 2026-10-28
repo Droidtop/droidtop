@@ -900,9 +900,10 @@ private fun GameTab(
     // has a pointer: null there is nothing to offer.
     val ownScreen = dev.droidtop.library.OwnGameScreens.current?.takeIf { it.entryId == entry.id }
     var padMouse by remember(entry.id) { mutableStateOf(ownScreen?.padMouse) }
+    var keyboardMouse by remember(entry.id) { mutableStateOf(ownScreen?.keyboardMouse) }
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
-    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse) {
+    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, keyboardMouse) {
         fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = GameQuickTile(
             title = title,
             subtitle = when {
@@ -956,6 +957,18 @@ private fun GameTab(
                         action = {
                             ownScreen?.setPadMouse(!on)
                             padMouse = !on
+                        },
+                    ),
+                )
+            }
+            keyboardMouse?.let { on ->
+                add(
+                    GameQuickTile(
+                        title = "Controls",
+                        subtitle = if (on) "Keyboard and mouse: left stick WASD, right stick the mouse" else "Gamepad",
+                        action = {
+                            ownScreen?.setKeyboardMouse(!on)
+                            keyboardMouse = !on
                         },
                     ),
                 )

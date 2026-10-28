@@ -95,6 +95,7 @@ dependencies {
     implementation(project(":runtime-common"))
     // PcGameProvider's LibraryProvider and the store rows of PcLibrary.
     implementation(project(":library-core"))
+    implementation(project(":input-mapping"))
 
     implementation(libs.androidx.core.ktx)
     implementation(platform(libs.androidx.compose.bom))
