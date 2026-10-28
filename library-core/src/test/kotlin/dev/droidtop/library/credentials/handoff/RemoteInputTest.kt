@@ -1152,18 +1152,21 @@ class RemoteInputTest {
 
     @Test
     fun `the server answers over a real socket on the address it was given, and stops listening when stopped`() {
+        var server: HandoffServer? = null
         val input = RemoteInput(
             clock = { now },
             router = router,
-            listen = { endpoint -> HandoffServer(endpoint, "127.0.0.1") },
+            listen = { endpoint -> HandoffServer(endpoint, "127.0.0.1").also { server = it } },
             host = "127.0.0.1",
             state = MutableStateFlow(RemoteInputState.Idle),
         )
         input.start()
+        val listening = server!!.bound!!
         val url = input.url()!!
         val port = url.substringAfterLast(':').substringBefore('/').toInt()
         try {
             assertTrue(port in 49152..65535)
+            assertEquals(port, listening.localPort)
             Socket(InetAddress.getByName("127.0.0.1"), port).use { socket ->
                 socket.soTimeout = 5_000
                 socket.getOutputStream().write("GET ${url.substringAfter("$port")} HTTP/1.1\r\nHost: x\r\n\r\n".toByteArray())
@@ -1182,8 +1185,10 @@ class RemoteInputTest {
             input.close()
         }
         assertNotNull(input.state.value as? RemoteInputState.Closed)
-        val refused = runCatching { Socket(InetAddress.getByName("127.0.0.1"), port).use { } }.isFailure
-        assertTrue("the port must not accept connections after close", refused)
+        // The server itself has let the port go. Connecting to the port asked the whole machine instead: another
+        // test process running beside this one could take the freed port and answer (CI, Droidtop/tracker#645).
+        assertTrue("the server must close its socket when closed", listening.isClosed)
+        assertNull("the server must not keep a socket after close", server!!.bound)
     }
 
     @Test

@@ -71,6 +71,9 @@ class HandoffServer(private val endpoint: HandoffEndpoint, private val bindHost:
     @Volatile private var socket: ServerSocket? = null
     @Volatile private var thread: Thread? = null
 
+    /** The socket it listens on while started, for a test to ask this server (not the whole machine) whether it let the port go. */
+    internal val bound: ServerSocket? get() = socket
+
     @Synchronized
     override fun start(): Int {
         socket?.let { return it.localPort }
