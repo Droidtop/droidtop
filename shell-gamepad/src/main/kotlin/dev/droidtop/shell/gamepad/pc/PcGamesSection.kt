@@ -858,7 +858,7 @@ internal fun PcGamesSection(
             )
         } else listOf(
             HintBinding(GamepadAction.X, "Play now") { playsNow && !onDest && !state.stripFocused },
-            HintBinding(GamepadAction.Y, "Sort By"),
+            HintBinding(GamepadAction.Y, "Search"),
             HintBinding(GamepadAction.L2, "Options") {
                 focusedEntry != null || focusedTile != null ||
                     (state.stripFocused && (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.builtIn == false)
@@ -1058,7 +1058,9 @@ internal fun PcGamesSection(
                         }
                         // X is Play now on a game (Droidtop/tracker#641); Filter is in the list options. Y is Search on Home.
                         GamepadAction.X -> if (playsNow && !onDest && !onHomeStrip && !state.stripFocused) focusedEntry?.let(launch) else return@onPad false
-                        GamepadAction.Y -> if (state.home) state.searchOpen = true else state.sortOpen = true
+                        // Y is Search on Home and on every list (proposal 6.A, Droidtop/tracker#644 slice 4); Sort By
+                        // is in the list options with Filter.
+                        GamepadAction.Y -> state.searchOpen = true
                         // L2 is the focused thing's menu, as R2 is the global
                         // one; a long press opens the same menu. Select is the
                         // list's options, whatever is focused (owner, 2026-10-23,
@@ -1380,6 +1382,11 @@ internal fun PcGamesSection(
                 "Filter" to {
                     state.optionsOpen = false
                     state.filterOpen = true
+                },
+                // Y is Search (Droidtop/tracker#644 slice 4), so Sort By is here beside Filter.
+                "Sort by" to {
+                    state.optionsOpen = false
+                    state.sortOpen = true
                 },
                 ("Favourites tab: " + if (stripTabs.favourites) "Shown" else "Hidden") to {
                     setStripTabs(stripTabs.copy(favourites = !stripTabs.favourites))

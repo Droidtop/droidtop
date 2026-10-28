@@ -16567,6 +16567,12 @@ mechanism per job).
 
 ### Filters, sort and the hint bar (owner, 2026-10-01, Droidtop/tracker#257, #260)
 
+**Gaming's button map changes this (Droidtop/tracker#644 slice 4, proposal 6.A and 6.B, which the owner approved;
+X became Play on a game in #641):** in Gaming, **Y is Search** on every list as on Home, and Filter and Sort by are
+reached from **Select**: PC Games' List options lead with Filter and Sort by, and on Apps Select opens the Filter
+sheet, whose footer has Sort by. X on Apps does nothing. Standard's games screen (`LauncherGamesScreen`) keeps X
+Filter and Y Sort By below until its own lane takes up the map.
+
 One vocabulary on every library and app list: **X Filter, Y Sort By,
 L2 Options** (the focused thing's own menu; a long press opens the same one), **Select List options** (the
 list's own, whatever is focused) (owner, 2026-10-23, Droidtop/tracker#621: L2 because "it matches with R2 (global menu and local menu)"), **Start** the left menu,
@@ -16685,7 +16691,7 @@ filters, not the sort; picking a built-in view keeps the sort the person
 chose, picking a saved view brings its own. **L1/R1** step the strip (the
 page owns the shoulders, never wrapping; with a pill showing and no view lit
 the first press lands on All); the chips take no D-pad focus. The footer is
-the shell's one footer: A Open, X Filter, Y Sort By, L2 Options. The
+the shell's one footer: A Open, Y Search, Select Filter, L2 Options (X Filter and Y Sort By until 2026-10-28). The
 list below the strip is still sectioned by kind (a section per kind, a
 dense icon grid for installed apps). "Marked as a game" is a short toast now
 that the line it used to ride on is gone. Facets, in order: **Category** (Games, Emulators,

@@ -3546,15 +3546,16 @@ private val EMPTY_FOLDERS_HINTS = listOf(
 )
 
 /**
- * What an app tile promises while it has the focus: A opens, X and Y open
- * the Filter and Sort By sheets (the list around the tile answers them),
- * Select the app's own options. The one footer draws these
- * ([declaresHints]).
+ * What an app tile promises while it has the focus: A opens, Y searches and
+ * Select opens the list's Filter sheet (with Sort by in it), as every list
+ * does (proposal 6.A, Droidtop/tracker#644 slice 4), and L2 is the app's own
+ * options. The list around the tile answers Y and Select. The one footer
+ * draws these ([declaresHints]).
  */
 private val APP_TILE_HINTS = listOf(
     HintBinding(GamepadAction.A, "Open"),
-    HintBinding(GamepadAction.X, "Filter"),
-    HintBinding(GamepadAction.Y, "Sort By"),
+    HintBinding(GamepadAction.Y, "Search"),
+    HintBinding(GamepadAction.SELECT, "Filter"),
     HintBinding(GamepadAction.L2, "Options"),
 )
 
@@ -3700,12 +3701,12 @@ private fun AppsSection(
             .fillMaxSize()
             .onPad { press ->
                 when (press.action) {
-                    GamepadAction.X -> {
+                    GamepadAction.SELECT -> {
                         filterOpen = true
                         true
                     }
                     GamepadAction.Y -> {
-                        sortOpen = true
+                        searchOpen = true
                         true
                     }
                     else -> false
@@ -3727,8 +3728,8 @@ private fun AppsSection(
             val emptyHints = remember(activeView) {
                 listOf(
                     HintBinding(GamepadAction.A, if (activeView > 0) "Show all apps" else "Clear filters") { activeView > 0 || !query.isEmpty },
-                    HintBinding(GamepadAction.X, "Filter"),
-                    HintBinding(GamepadAction.Y, "Sort By"),
+                    HintBinding(GamepadAction.Y, "Search"),
+                    HintBinding(GamepadAction.SELECT, "Filter"),
                 )
             }
             Box(
@@ -3835,7 +3836,13 @@ private fun AppsSection(
                 usageTick++
             },
             facetActions = if (usageGranted) emptyMap() else mapOf(LibraryFacet.RECENTLY_USED to listOf(usageAction)),
-            footerActions = if (usageGranted) emptyList() else listOf(usageAction),
+            // Sort by lives here now that Y is Search (Droidtop/tracker#644 slice 4).
+            footerActions = listOf(
+                SheetAction("Sort by", null) {
+                    filterOpen = false
+                    sortOpen = true
+                },
+            ) + if (usageGranted) emptyList() else listOf(usageAction),
         )
     }
     if (sortOpen) {
