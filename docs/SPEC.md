@@ -11776,6 +11776,18 @@ one page per store in **Stores** (`stores`, reached from the Gaming left
 menu, "Places" under 7j), and Accounts and sources links to it with one row
 instead of five sign-in rows.
 
+**A plugin's store (2026-10-28, Droidtop/tracker#220, docs/plugin-api.md 3
+A13).** A plugin that provides `library.stores` adds a store beside
+droidtop's own: a `StoreLibrary` (`PluginStoreLibrary`) registered at
+start, after a change to the plugins and before each automatic sync, so
+its games join the PC library and the automatic sync like a built-in
+store's. Its account is the plugin's own site account (droidtop's web
+view, no password seen), and its rows are droidtop's copy of the
+plugin's last `library` answer. Its plugin's page has "<store>: read your
+games". Not built yet: installing, uninstalling and updating from it,
+launching through it, and its page in Stores, which lists droidtop's
+five.
+
 ### One consistent way into Settings (directed 2026-09-28)
 
 **Audit.** Before this pass droidtop already had one real, working route

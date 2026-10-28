@@ -2088,6 +2088,28 @@ object AppSettingsCatalogs {
             if (record.runnable()) {
                 dev.droidtop.pluginhost.PluginWebAccount.of(context, record)?.let { account -> add(pluginAccountRow(record, account)) }
             }
+            // A store the plugin provides (docs/plugin-api.md 3 A13): signed in with the account row above, read here.
+            if (record.runnable()) {
+                record.manifest.v2.provides.filter { it.point == dev.droidtop.library.integrations.PluginStores.POINT }.mapNotNull { it.id }
+                    .mapNotNull { dev.droidtop.library.stores.StoreLibraries.byId(it) }
+                    .filterIsInstance<dev.droidtop.library.integrations.PluginStoreLibrary>()
+                    .forEach { store ->
+                        add(
+                            AsyncActionItem(
+                                id = "plugin_${m.id}_store_${store.id}_sync",
+                                title = "${store.label}: read your games",
+                                subtitle = "Adds the games your ${store.label} account holds to your library. Sign in with the account row first",
+                                run = { ctx, _ ->
+                                    if (!withContext(Dispatchers.IO) { store.signedIn(ctx) }) {
+                                        "Sign in to ${store.label} first"
+                                    } else {
+                                        store.sync(ctx).fold({ "$it games from ${store.label}" }, { it.message ?: "${store.label} did not answer" })
+                                    }
+                                },
+                            ),
+                        )
+                    }
+            }
             if (record.runnable() && PluginCapability.APP_STATUS in m.capabilities) {
                 add(
                     NestedScreenItem(
@@ -2686,6 +2708,9 @@ object AppSettingsCatalogs {
     private fun pluginsChanged(context: Context) {
         PluginStatusWidgetProvider.requestUpdate(context)
         PluginBackground.changed(context)
+        // A store a plugin provides comes and goes with it (docs/plugin-api.md 3 A13).
+        val app = context.applicationContext
+        Thread { runCatching { dev.droidtop.library.integrations.PluginStores.refresh(app) } }.start()
     }
 
     private fun pluginPermissionGroups(context: Context, pluginId: String): List<CatalogGroup> {

@@ -2592,6 +2592,47 @@ writes real files that droidtop's own scan finds (A2).
 
 ### B. Launch and runtime
 
+**A13 Stores.** EP `library.stores@1` (Droidtop/tracker#220; owner,
+2026-10-01: "we need store/source and downloader integration APIs",
+downloading belonging to sources). Risk high. Built 2026-10-28, in part.
+- **What it is:** a store droidtop shows beside its own (Steam, GOG,
+  Epic, Amazon, itch). A plugin's store is a `StoreLibrary` like theirs
+  (`PluginStoreLibrary`, registered in `StoreLibraries` by
+  `PluginStores`), so its games join the PC library, the automatic sync
+  and every place that reads the stores. This answers A10's open
+  question for stores: the rows are a store's rows, not entries a plugin
+  adds to the library.
+- **Manifest:** a `provides` entry
+  `{"point": "library.stores", "version": 1, "id": "<store>", "label": "<name>", "site": "https://..."}`.
+  `id` is the store half of every library id (`humble:123`): 2 to 24
+  lower-case letters and digits, starting with a letter, and not a store
+  droidtop already has. If two plugins name the same id, the first one
+  read has it.
+- **The account is the plugin's site account** (G3 `web.session`, with a
+  declared `signIn` page). The store's Sign in opens it in droidtop's
+  web view, and droidtop draws who is signed in. The plugin never sees a
+  password, and Sign out clears that session and droidtop's copy of the
+  rows.
+- **Ops:**
+  - `library {store} -> {games: [{id, title, size?, art?, externalIds?, holding?}]}`:
+    the account's games. `id` is the store's own id (at most 128
+    characters, one line). `art` is taken only over https.
+    `externalIds` names the same game in other stores (`{"steam":
+    "261570"}`), the strongest evidence that two rows are one game.
+    `holding` is `owned` (the default), `family`, `free` or `wishlist`.
+    Each id is taken once, and a row without an id or a title is
+    dropped. droidtop keeps the answer as its own copy and lists from
+    it with no call; Sync and the automatic sync ask again (60 s budget).
+- **Not built yet:** installing (an `install {store, id}` job whose
+  reply is download descriptors, placed under the store's folder as a
+  built-in store's install is), uninstall and update, `launch`, and the
+  store's page in the Stores place (it lists droidtop's five today). A
+  plugin's store is signed in from its plugin's page (the account row)
+  and read there ("<store>: read your games") or by the automatic sync;
+  its games show in the library.
+- **Permission:** `provide:library.stores` (high), `web.session`,
+  `net.domains`.
+
 **B1 Launch providers.** EP `launch.provider@1`. Risk high.
 - **For:** a runner, emulator frontend or engine host whose launch needs
   code rather than a players-database `am start` template. Examples: a
