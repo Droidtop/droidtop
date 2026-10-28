@@ -147,7 +147,6 @@ internal object StorageCatalog {
                     id = "storage_no_folder",
                     title = "No game folder yet",
                     subtitle = "Store games install into a game folder. Add one under Game sources > Folders",
-                    run = {},
                 ),
             )
         } else {
@@ -157,7 +156,6 @@ internal object StorageCatalog {
                     title = volume.name,
                     subtitle = volume.path,
                     value = freeSpaceLine(volume, size),
-                    run = {},
                 )
             }
         }
@@ -169,7 +167,7 @@ internal object StorageCatalog {
         val retro = roms.filter { !it.missing && !it.hidden }.groupingBy { it.systemId.orEmpty() }.eachCount()
             .entries.sortedBy { (id, _) -> (systems[id] ?: id).lowercase() }
             .map { (id, count) ->
-                ActionItem(id = "storage_retro_$id", title = systems[id] ?: id.ifEmpty { "Other" }, value = gamesWord(count), run = {})
+                ActionItem(id = "storage_retro_$id", title = systems[id] ?: id.ifEmpty { "Other" }, value = gamesWord(count))
             }
 
         // PC: each store's installs, then the folders of their own, sizes as they are measured.
@@ -189,7 +187,6 @@ internal object StorageCatalog {
                 title = row.title,
                 subtitle = friendlyLocation(row.path),
                 value = measured[row.path]?.let { FolderSizes.words(it, size) } ?: "Measuring…",
-                run = {},
             )
         }
         // Hidden games, store installs and folders alike, are one row.
@@ -204,7 +201,6 @@ internal object StorageCatalog {
                 title = hiddenRowTitle(count),
                 subtitle = "Shown when PC Games' Filter selects Hidden",
                 value = FolderSizes.words(FolderSizes.Size(bytes, partial), size),
-                run = {},
             )
         }
         val pc = storeGroups + listOfNotNull(
@@ -215,7 +211,7 @@ internal object StorageCatalog {
             CatalogGroup("storage_space", "Room left", space),
             CatalogGroup("storage_retro", "Retro", retro).takeIf { retro.isNotEmpty() },
         ) + pc.ifEmpty {
-            listOf(CatalogGroup("storage_none", "PC", listOf(ActionItem("storage_nothing", "No PC games installed yet", run = {}))))
+            listOf(CatalogGroup("storage_none", "PC", listOf(ActionItem("storage_nothing", "No PC games installed yet"))))
         }
     }
 

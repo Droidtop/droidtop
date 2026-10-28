@@ -71,7 +71,7 @@ object ComputersCatalog {
                     title = null,
                     items = buildList {
                         if (!AgentNative.available) {
-                            add(ActionItem(id = "computers_missing", title = "This build of droidtop has no computer sync library", run = {}))
+                            add(ActionItem(id = "computers_missing", title = "This build of droidtop has no computer sync library"))
                         }
                         add(
                             ActionItem(
@@ -248,7 +248,7 @@ object ComputersCatalog {
         groups = { context ->
             withContext(Dispatchers.IO) {
                 val device = Computers.devices(context).firstOrNull { it.id == id && it.handheld }
-                    ?: return@withContext listOf(CatalogGroup(id = "handheld_gone", title = null, items = listOf(ActionItem(id = "handheld_gone_row", title = "This handheld is no longer paired", run = {}))))
+                    ?: return@withContext listOf(CatalogGroup(id = "handheld_gone", title = null, items = listOf(ActionItem(id = "handheld_gone_row", title = "This handheld is no longer paired"))))
                 listOf(
                     CatalogGroup(
                         id = "handheld_state",
@@ -259,7 +259,6 @@ object ComputersCatalog {
                                 title = "Paired " + DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(device.pairedAtMs)),
                                 subtitle = "Plugins you allow to see your paired devices can keep things in step with it. Its key " +
                                     (device.fingerprint?.take(16)?.chunked(4)?.joinToString(" ") ?: "was pinned before fingerprints were shown"),
-                                run = {},
                             ),
                         ),
                     ),
@@ -294,7 +293,7 @@ object ComputersCatalog {
 
     private suspend fun computerGroups(context: Context, id: String): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val computer = Computers.list(context).firstOrNull { it.id == id }
-            ?: return@withContext listOf(CatalogGroup(id = "computer_gone", title = null, items = listOf(ActionItem(id = "computer_gone_row", title = "This computer is no longer paired", run = {}))))
+            ?: return@withContext listOf(CatalogGroup(id = "computer_gone", title = null, items = listOf(ActionItem(id = "computer_gone_row", title = "This computer is no longer paired"))))
         val games = ComputerLibrary.gamesOn(context, computer)
         val apps = ComputerLibrary.appsOn(context, computer)
         val last = if (computer.lastSyncMs > 0) DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(computer.lastSyncMs)) else null
@@ -308,7 +307,6 @@ object ComputersCatalog {
                         title = "Last sync",
                         subtitle = computer.lastLine ?: "Saves sync when a game starts and ends; the library when you sync it here",
                         value = last ?: "never",
-                        run = {},
                     ),
                     AsyncActionItem(
                         id = "computer_sync_library",
@@ -332,7 +330,6 @@ object ComputersCatalog {
                             else -> null
                         },
                         subtitle = awayLine(context, computer),
-                        run = {},
                     ),
                     NestedScreenItem(
                         id = "computer_games",
@@ -406,7 +403,6 @@ object ComputersCatalog {
                             title = game.title,
                             subtitle = listOfNotNull(game.launcher, game.platform?.takeIf { it != "pc" && it != ComputerLibrary.APP_PLATFORM }).joinToString(" · ").ifBlank { null },
                             value = game.sizeBytes.takeIf { it > 0 }?.let { "${it / (1024 * 1024)} MB" },
-                            run = {},
                         )
                     },
                 ),

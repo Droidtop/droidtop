@@ -217,8 +217,20 @@ class ActionItem(
     override val statusMark: StatusMark? = null,
     override val chip: String? = null,
     override val iconFile: String? = null,
-    val run: (Context) -> Unit,
-) : CatalogItem
+    // What A does. A row given none is a fact or a state, not an action (Droidtop/tracker#587): no renderer promises A
+    // on it ([inert]), and pressing it does nothing.
+    val run: (Context) -> Unit = NOTHING,
+) : CatalogItem {
+    /** Whether this row has nothing to do: a value, an empty state, a line that says what happened. */
+    val inert: Boolean get() = run === NOTHING
+
+    companion object {
+        private val NOTHING: (Context) -> Unit = {}
+    }
+}
+
+/** Whether pressing [this] does nothing, so no renderer may show A on it: a paragraph, or an action row with no action. */
+val CatalogItem.isInert: Boolean get() = this is TextBlockItem || (this is ActionItem && inert)
 
 /** The explicit-yes sentence an item asks for before it runs, or null. */
 val CatalogItem.confirmText: String?

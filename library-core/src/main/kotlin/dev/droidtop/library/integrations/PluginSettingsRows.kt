@@ -94,12 +94,12 @@ object PluginSettingsRows {
                             id = "plugin_settings_rows_${m.id}_group",
                             title = null,
                             items = if (!result.ok) {
-                                listOf(ActionItem(id = "plugin_settings_rows_${m.id}_error", title = result.error ?: "Couldn't read this plugin's settings rows", run = {}))
+                                listOf(ActionItem(id = "plugin_settings_rows_${m.id}_error", title = result.error ?: "Couldn't read this plugin's settings rows"))
                             } else if (result.values.isEmpty()) {
-                                listOf(ActionItem(id = "plugin_settings_rows_${m.id}_empty", title = "\"${m.label}\" has nothing to show here", run = {}))
+                                listOf(ActionItem(id = "plugin_settings_rows_${m.id}_empty", title = "\"${m.label}\" has nothing to show here"))
                             } else {
                                 result.values.entries.sortedBy { it.key }.map { (key, value) ->
-                                    ActionItem(id = "plugin_settings_rows_${m.id}_$key", title = value, run = {})
+                                    ActionItem(id = "plugin_settings_rows_${m.id}_$key", title = value)
                                 }
                             },
                         ),

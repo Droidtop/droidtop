@@ -197,7 +197,7 @@ internal object SocialCatalog {
                     CatalogGroup(
                         id = "social_messages_apps_list",
                         title = null,
-                        items = items.ifEmpty { listOf(ActionItem(id = "social_apps_empty", title = "No apps yet", run = {})) },
+                        items = items.ifEmpty { listOf(ActionItem(id = "social_apps_empty", title = "No apps yet")) },
                     ),
                 )
             }
@@ -248,14 +248,14 @@ internal object SocialCatalog {
                                         ),
                                     )
                                 }
-                                failure?.let { add(ActionItem(id = "chat_failed", title = "Not sent", value = it, run = {})) }
+                                failure?.let { add(ActionItem(id = "chat_failed", title = "Not sent", value = it)) }
                             },
                         ),
                         CatalogGroup(
                             id = "chat_messages_$friendId",
                             title = null,
                             items = if (messages.isEmpty()) {
-                                listOf(ActionItem(id = "chat_empty", title = "No messages yet", run = {}))
+                                listOf(ActionItem(id = "chat_empty", title = "No messages yet"))
                             } else {
                                 messages.asReversed().map { message -> messageRow(context, message, friendName) }
                             },
@@ -277,7 +277,6 @@ internal object SocialCatalog {
         id = "chat_msg_${message.key}",
         title = message.text,
         value = (if (message.mine) "You" else friendName) + " · " + SocialTime.text(context, message.timeMs),
-        run = {},
     )
 }
 

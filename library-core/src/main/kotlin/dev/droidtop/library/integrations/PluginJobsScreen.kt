@@ -122,7 +122,7 @@ object PluginJobsScreen {
                     id = "plugin_jobs_list",
                     title = null,
                     // A short title: the navigator's detail strip repeats any title longer than a row shows.
-                    items = listOf(ActionItem(id = "plugin_jobs_none", title = "Nothing running", subtitle = "No jobs running or recently finished", run = {})),
+                    items = listOf(ActionItem(id = "plugin_jobs_none", title = "Nothing running", subtitle = "No jobs running or recently finished")),
                 ),
             )
         }
@@ -353,7 +353,7 @@ object PluginJobsScreen {
     private fun jobControls(jobId: String, entry: PluginJobsCenter.Entry?): List<CatalogItem> {
         if (entry == null) {
             val said = if (PluginJobsCenter.wasCleared(jobId)) "This job was cleared" else "This job is no longer tracked"
-            return listOf(ActionItem(id = "plugin_job_${jobId}_gone", title = said, run = {}))
+            return listOf(ActionItem(id = "plugin_job_${jobId}_gone", title = said))
         }
         if (entry.done) return finishedControls(jobId, entry)
         return buildList {
@@ -366,7 +366,6 @@ object PluginJobsScreen {
                     value = progressLine(entry, JobPace.line(entry, System.currentTimeMillis())),
                     progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
                     progressLook = lookOf(entry),
-                    run = {},
                 ),
             )
             // A native job with no checkpoint yet pauses to a fresh start, so it may always be paused.
@@ -435,7 +434,6 @@ object PluginJobsScreen {
                 id = "plugin_job_${jobId}_outcome",
                 title = if (entry.state == JobState.FAILED) "Failed" else "Finished",
                 subtitle = listOfNotNull(outcome(entry), reportCounts(entry.report)).joinToString("\n"),
-                run = {},
             ),
         )
         entry.open?.takeIf { JobOpen.available }?.let { target ->
@@ -469,7 +467,7 @@ object PluginJobsScreen {
             val lines = report.items.filter { it.outcome == outcome }
             if (lines.isEmpty()) return@flatMap emptyList()
             listOf<CatalogItem>(
-                ActionItem(id = "plugin_job_${jobId}_head_${outcome.name}", title = "${outcomeHeading(outcome)} (${lines.size})", run = {}),
+                ActionItem(id = "plugin_job_${jobId}_head_${outcome.name}", title = "${outcomeHeading(outcome)} (${lines.size})"),
             ) + lines.mapIndexed { index, line -> reportRow(jobId, outcome, index, line) }
         }
     }

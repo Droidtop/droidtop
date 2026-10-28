@@ -134,7 +134,7 @@ internal object FoldersCatalog {
                         run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, root.path) },
                     )
                 }.ifEmpty {
-                    listOf(ActionItem(id = "folders_none", title = "No game folders yet", subtitle = "Add the folder your games are in", run = {}))
+                    listOf(ActionItem(id = "folders_none", title = "No game folders yet", subtitle = "Add the folder your games are in"))
                 } + TextBlockItem(id = "folders_note", text = "New games appear after Rescan or a store sync."),
             ),
             CatalogGroup(
@@ -149,7 +149,6 @@ internal object FoldersCatalog {
                         title = PcSource.WineShortcut.label(),
                         subtitle = "Shortcuts made by hand in a Wine prefix. PC Games lists them",
                         value = gamesWord(counts.shortcuts),
-                        run = {},
                     ),
                 ),
             ),

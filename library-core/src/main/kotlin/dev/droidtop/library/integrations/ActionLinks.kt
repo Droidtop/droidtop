@@ -644,7 +644,7 @@ object ActionLinks {
         groups = { _ ->
             val current = plan
             if (current == null) {
-                listOf(CatalogGroup("links_actions_none", null, listOf(ActionItem("links_actions_none_row", "No link is waiting", run = {}))))
+                listOf(CatalogGroup("links_actions_none", null, listOf(ActionItem("links_actions_none_row", "No link is waiting"))))
             } else {
                 groups(current)
             }
@@ -678,7 +678,7 @@ object ActionLinks {
             val items = buildList<CatalogItem> {
                 review.lines.forEachIndexed { i, line -> add(TextBlockItem("links_actions_${step.number}_line_$i", text = line)) }
                 if (step.dependsOn.isNotEmpty()) {
-                    add(ActionItem("links_actions_${step.number}_needs", "Needs step ${step.dependsOn.sorted().joinToString(", ")}", run = {}))
+                    add(ActionItem("links_actions_${step.number}_needs", "Needs step ${step.dependsOn.sorted().joinToString(", ")}"))
                 }
                 review.notice?.let { notice ->
                     val paragraphs = notice.trim().split(Regex("\\n+")).map { it.trim() }.filter { it.isNotEmpty() }
@@ -706,13 +706,13 @@ object ActionLinks {
                     review.problem != null -> {
                         // The reason is its own text block: the rig showed no reason under the "Cannot run" row (Droidtop/tracker#480).
                         add(TextBlockItem("links_actions_${step.number}_problem_reason", text = review.problem))
-                        add(ActionItem("links_actions_${step.number}_problem", "Cannot run", run = {}))
+                        add(ActionItem("links_actions_${step.number}_problem", "Cannot run"))
                     }
-                    review.done -> add(ActionItem("links_actions_${step.number}_done", "Already done on this device", run = {}))
+                    review.done -> add(ActionItem("links_actions_${step.number}_done", "Already done on this device"))
                     step.number in refused && step.number !in denied ->
                     {
                         add(TextBlockItem("links_actions_${step.number}_refused_reason", text = "It needs a step you denied"))
-                        add(ActionItem("links_actions_${step.number}_refused", "Refused", run = {}))
+                        add(ActionItem("links_actions_${step.number}_refused", "Refused"))
                     }
                     else -> add(
                         ToggleItem(

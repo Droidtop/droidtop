@@ -75,7 +75,7 @@ object AppCatalogScreen {
         groups = { _ ->
             val waiting = pending
             if (waiting == null) {
-                listOf(CatalogGroup("apps_review_none", null, listOf(ActionItem("apps_review_none_row", "Nothing is waiting to be added", run = {}))))
+                listOf(CatalogGroup("apps_review_none", null, listOf(ActionItem("apps_review_none_row", "Nothing is waiting to be added"))))
             } else {
                 listOf(reviewGroup(waiting.first, waiting.second))
             }
@@ -104,7 +104,7 @@ object AppCatalogScreen {
                         )
                     } else {
                         listOf(
-                            ActionItem("apps_none_row", "No app catalog is added", subtitle = "Apps come from catalog plugins, such as one that reads F-Droid repositories", run = {}),
+                            ActionItem("apps_none_row", "No app catalog is added", subtitle = "Apps come from catalog plugins, such as one that reads F-Droid repositories"),
                             NestedScreenItem(
                                 "apps_none_plugins",
                                 "Plugins",
@@ -143,10 +143,10 @@ object AppCatalogScreen {
             if (query.isNotBlank()) {
                 AppCatalogs.search(context, record, query).fold(
                     onSuccess = { rows ->
-                        if (rows.isEmpty()) add(ActionItem("apps_search_none_$id", "Nothing matches \"$query\"", run = {}))
+                        if (rows.isEmpty()) add(ActionItem("apps_search_none_$id", "Nothing matches \"$query\""))
                         rows.forEach { add(appRow(record, it)) }
                     },
-                    onFailure = { add(ActionItem("apps_search_failed_$id", "${record.manifest.label}: ${SourceFailures.plain(it.message)}", run = {})) },
+                    onFailure = { add(ActionItem("apps_search_failed_$id", "${record.manifest.label}: ${SourceFailures.plain(it.message)}")) },
                 )
             }
         }
@@ -185,9 +185,9 @@ object AppCatalogScreen {
                 "apps_sources_list_$id",
                 "Your sources",
                 buildList<CatalogItem> {
-                    if (sources == null) add(ActionItem("apps_sources_failed", "${record.manifest.label}: ${listed.exceptionOrNull()?.message}", run = {}))
+                    if (sources == null) add(ActionItem("apps_sources_failed", "${record.manifest.label}: ${listed.exceptionOrNull()?.message}"))
                     if (sources != null && sources.sources.isEmpty()) {
-                        add(ActionItem("apps_sources_empty", "None added", subtitle = "Add one below: from the list, by its address or its QR code", run = {}))
+                        add(ActionItem("apps_sources_empty", "None added", subtitle = "Add one below: from the list, by its address or its QR code"))
                     }
                     sources?.sources?.forEach { source ->
                         add(
@@ -300,7 +300,7 @@ object AppCatalogScreen {
                 ),
             )
             review.description?.let { add(TextBlockItem(id = "apps_review_description", title = "", text = it)) }
-            add(ActionItem("apps_review_address", review.address, subtitle = "Where it is read from", run = {}))
+            add(ActionItem("apps_review_address", review.address, subtitle = "Where it is read from"))
             add(
                 ActionItem(
                     "apps_review_key",
@@ -311,11 +311,10 @@ object AppCatalogScreen {
                         else -> "The link named no fingerprint. Compare this one with the source's own page before you accept"
                     },
                     value = review.fingerprint?.let(::grouped) ?: "None",
-                    run = {},
                 ),
             )
-            review.apps?.let { add(ActionItem("apps_review_apps", "Apps", value = it.toString(), run = {})) }
-            review.note?.let { add(ActionItem("apps_review_note", "Note", subtitle = it, run = {})) }
+            review.apps?.let { add(ActionItem("apps_review_apps", "Apps", value = it.toString())) }
+            review.note?.let { add(ActionItem("apps_review_note", "Note", subtitle = it)) }
             if (review.existing) {
                 add(ActionItem("apps_review_existing", "Already added", subtitle = "Nothing to do", run = { pending = null }))
             } else {
@@ -350,9 +349,9 @@ object AppCatalogScreen {
                     "apps_source_${fresh.id.hashCode()}",
                     null,
                     buildList<CatalogItem> {
-                        add(ActionItem("apps_source_address", fresh.address, subtitle = "Address", run = {}))
-                        fresh.fingerprint?.let { add(ActionItem("apps_source_key", "Signing key", value = grouped(it), run = {})) }
-                        fresh.note?.let { add(ActionItem("apps_source_note", "Note", subtitle = it, run = {})) }
+                        add(ActionItem("apps_source_address", fresh.address, subtitle = "Address"))
+                        fresh.fingerprint?.let { add(ActionItem("apps_source_key", "Signing key", value = grouped(it))) }
+                        fresh.note?.let { add(ActionItem("apps_source_note", "Note", subtitle = it)) }
                         // The source's own settings, as the plugin describes them (AppCatalogs.SourceOption).
                         fresh.options.forEach { option -> add(optionItem(record, fresh, option)) }
                         add(
@@ -440,7 +439,7 @@ object AppCatalogScreen {
 
     private suspend fun appGroups(context: Context, record: PluginRecord, appId: String): List<CatalogGroup> {
         val page = AppCatalogs.app(context, record, appId).getOrElse { error ->
-            return listOf(CatalogGroup("apps_app_failed", null, listOf(ActionItem("apps_app_failed_row", "${record.manifest.label}: ${error.message}", run = {}))))
+            return listOf(CatalogGroup("apps_app_failed", null, listOf(ActionItem("apps_app_failed_row", "${record.manifest.label}: ${error.message}"))))
         }
         val installed = AppPackages.installedFacts(context, appId)
         val newest = page.versions.maxByOrNull { it.versionCode }
@@ -450,7 +449,7 @@ object AppCatalogScreen {
             null,
             buildList<CatalogItem> {
                 add(TextBlockItem("apps_app_summary", title = page.name, text = page.summary ?: page.id))
-                add(ActionItem("apps_app_installed", "Installed", value = installed?.let { it.versionName ?: it.versionCode.toString() } ?: "No", run = {}))
+                add(ActionItem("apps_app_installed", "Installed", value = installed?.let { it.versionName ?: it.versionCode.toString() } ?: "No"))
                 page.description?.let { add(TextBlockItem("apps_app_description", title = "", text = it)) }
             },
             chips = listOfNotNull(page.license?.let { CatalogChip(it) }, page.source?.let { CatalogChip(it) }),
@@ -459,7 +458,7 @@ object AppCatalogScreen {
             groups += CatalogGroup(
                 "apps_app_antifeatures",
                 "Anti-features",
-                features.map { f -> ActionItem("apps_app_af_${f.key}", f.label, subtitle = f.reason, run = {}) },
+                features.map { f -> ActionItem("apps_app_af_${f.key}", f.label, subtitle = f.reason) },
             )
         }
         groups += CatalogGroup(
@@ -471,7 +470,7 @@ object AppCatalogScreen {
             "apps_app_facts",
             "Details",
             buildList<CatalogItem> {
-                add(ActionItem("apps_app_package", "Package", value = page.id, run = {}))
+                add(ActionItem("apps_app_package", "Package", value = page.id))
                 val signers = newest?.signers.orEmpty()
                 add(
                     ActionItem(
@@ -484,12 +483,11 @@ object AppCatalogScreen {
                             else -> "droidtop checks the download is signed by this key"
                         },
                         value = signers.firstOrNull()?.let(::grouped) ?: "Not named",
-                        run = {},
                     ),
                 )
-                page.author?.let { add(ActionItem("apps_app_author", "Author", value = it, run = {})) }
-                page.website?.let { add(ActionItem("apps_app_web", "Website", subtitle = it, run = {})) }
-                page.sourceCode?.let { add(ActionItem("apps_app_code", "Source code", subtitle = it, run = {})) }
+                page.author?.let { add(ActionItem("apps_app_author", "Author", value = it)) }
+                page.website?.let { add(ActionItem("apps_app_web", "Website", subtitle = it)) }
+                page.sourceCode?.let { add(ActionItem("apps_app_code", "Source code", subtitle = it)) }
             },
         )
         return groups
@@ -505,8 +503,8 @@ object AppCatalogScreen {
         ).joinToString(" - ").ifEmpty { null }
         val installedCode = installed?.versionCode
         return when {
-            installedCode != null && installedCode == version.versionCode -> ActionItem(id, version.version, subtitle = subtitle, value = "Installed", run = {})
-            installedCode != null && installedCode > version.versionCode -> ActionItem(id, version.version, subtitle = subtitle, value = "Older than installed", run = {})
+            installedCode != null && installedCode == version.versionCode -> ActionItem(id, version.version, subtitle = subtitle, value = "Installed")
+            installedCode != null && installedCode > version.versionCode -> ActionItem(id, version.version, subtitle = subtitle, value = "Older than installed")
             else -> {
                 val action = if (installedCode == null) "Install" else "Update to"
                 AsyncActionItem(

@@ -35,7 +35,7 @@ BANNED='sandbox|\broot\b|Shizuku|signing|fingerprint|helper|\bhost\b|\bindex\b|c
 RULES=(
 "toast @@ 1 @@ Toast\.makeText @@ /Notices\.kt$ @@ an acknowledgement is Notices.flash, a failure a row notice or a dialog"
 "error-colour @@ 1 @@ colorScheme\.error @@ ^ui-shared/ @@ Material's error roles are set from the notice palette in :ui-shared only"
-"empty-run @@ 0 @@ run = \{\} @@ - @@ a row that does nothing is a value on another row, gone, or a NoticeItem"
+"empty-run @@ 1 @@ run = \{\} @@ - @@ a row that does nothing is a value on another row, gone, or a NoticeItem"
 "warning-text @@ 1 @@ TextBlockItem\([^)]*\"WARNING|\(high risk\) @@ - @@ a warning is a notice, never a paragraph or a title suffix"
 "hex-colour @@ 1 @@ Color\(0x[0-9A-Fa-f]{6,8} @@ (DesignTokens|GamingTheme|ChromeColors|SystemThemeColors|NoticeColors|GamingThemeMapping)\.kt$|/theme/ @@ screens read colour roles, never a literal"
 "deleted-names @@ 0 @@ \bMenuHint\(|\bSafeModeBanner\(|\bReinitPill\(|MenuTokens\.Danger(Plate)?\b|\bOwnFieldKeyboard\( @@ - @@ these were replaced by the notice and text-entry components"

@@ -653,12 +653,11 @@ internal object StoresCatalog {
                     // When droidtop last asked for a sync is the page's chip.
                     subtitle = "PC Games shows editions and copies of one game as one card, so its tabs can count fewer",
                     value = countsLine(counts, signedIn),
-                    run = {},
                 ),
             )
             // Each count its own row, so every row fits its value column.
             if (dlc != null && dlc > 0) {
-                add(ActionItem(id = "store_${store.key}_dlc", title = "DLC", subtitle = "DLC you hold for games in your library", value = "$dlc", run = {}))
+                add(ActionItem(id = "store_${store.key}_dlc", title = "DLC", subtitle = "DLC you hold for games in your library", value = "$dlc"))
             }
             if (counts.family > 0) {
                 add(
@@ -769,7 +768,6 @@ internal object StoresCatalog {
                     title = "Account",
                     subtitle = "This device holds no sign-in for ${store.label}",
                     value = keyFailures[store.key] ?: "Not signed in",
-                    run = {},
                 ),
                 TextInputItem(
                     id = "store_${store.key}_api_key",

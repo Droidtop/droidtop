@@ -232,14 +232,13 @@ object PluginCatalogScreen {
                     ),
                 )
                 addAll(noticeItems("plugins_catalogs_proposal_notice", proposal.info.name, false, proposal.disclaimer.text, gate))
-                add(ActionItem(id = "plugins_catalogs_proposal_address", title = proposal.indexUrl.removePrefix("https://"), subtitle = "Where droidtop reads it from", run = {}))
+                add(ActionItem(id = "plugins_catalogs_proposal_address", title = proposal.indexUrl.removePrefix("https://"), subtitle = "Where droidtop reads it from"))
                 add(
                     ActionItem(
                         id = "plugins_catalogs_proposal_signed",
                         title = "Signed by the catalog",
                         subtitle = if (proposal.signed) null else "droidtop can only check that it came from this address",
                         value = if (proposal.signed) "Yes" else "No",
-                        run = {},
                     ),
                 )
                 proposal.info.keyBase64?.let { master ->
@@ -249,7 +248,6 @@ object PluginCatalogScreen {
                             title = "Catalog key",
                             subtitle = "Vouches for this catalog's plugins; droidtop refuses a later copy under another key",
                             value = UserOriginKeys.fingerprint(master) ?: "unreadable",
-                            run = {},
                         ),
                     )
                 }
@@ -327,7 +325,6 @@ object PluginCatalogScreen {
             title = title,
             subtitle = "Third-party, not official, and droidtop has not checked it",
             value = fingerprint,
-            run = {},
         )
     }
 
@@ -352,7 +349,7 @@ object PluginCatalogScreen {
                 CatalogGroup(
                     id = "plugins_catalog_gone",
                     title = null,
-                    items = listOf(ActionItem(id = "plugins_catalog_gone_row", title = "This catalog was removed", run = {})),
+                    items = listOf(ActionItem(id = "plugins_catalog_gone_row", title = "This catalog was removed")),
                 ),
             )
         val load = PluginCatalog.currentIndex(context, source)
@@ -454,7 +451,7 @@ object PluginCatalogScreen {
                 ),
             )
             load.note?.let { note ->
-                add(ActionItem(id = "plugins_catalog_note", title = "Catalog status", subtitle = note, run = {}))
+                add(ActionItem(id = "plugins_catalog_note", title = "Catalog status", subtitle = note))
             }
             if (index == null) {
                 add(
@@ -468,7 +465,6 @@ object PluginCatalogScreen {
                         } else {
                             "Nothing is published at this catalog's address now."
                         },
-                        run = {},
                     ),
                 )
             }
@@ -489,7 +485,7 @@ object PluginCatalogScreen {
                 id = "plugins_catalog_list",
                 title = if (query.isBlank()) "Plugins" else "Plugins matching \"$query\"",
                 items = if (rows.isEmpty() && query.isNotBlank()) {
-                    listOf(ActionItem(id = "plugins_catalog_search_none", title = "Nothing matches \"$query\"", run = {}))
+                    listOf(ActionItem(id = "plugins_catalog_search_none", title = "Nothing matches \"$query\""))
                 } else {
                     rows
                 },
@@ -573,7 +569,6 @@ object PluginCatalogScreen {
                                 (if (source.indexSigned) "Index signed" else "Index not signed"),
                         )
                     },
-                    run = {},
                 ),
             )
             index?.disclaimer?.let { addAll(noticeItems("plugins_catalog_about_disclaimer", source.name, false, it.text, null)) }
@@ -623,8 +618,8 @@ object PluginCatalogScreen {
                         title = null,
                         items = listOfNotNull(
                             (plugin.description ?: plugin.summary)?.let { TextBlockItem(id = "${id}_description", text = it) },
-                            ActionItem(id = "${id}_maker", title = "Made by", value = plugin.publisher ?: origin.origin, run = {}),
-                            ActionItem(id = "${id}_from", title = "Listed in", value = if (source.official) "droidtop's catalog" else source.name, chip = chipFor(source), run = {}),
+                            ActionItem(id = "${id}_maker", title = "Made by", value = plugin.publisher ?: origin.origin),
+                            ActionItem(id = "${id}_from", title = "Listed in", value = if (source.official) "droidtop's catalog" else source.name, chip = chipFor(source)),
                             if (conflict) {
                                 NoticeItem(
                                     id = "${id}_conflict",
@@ -675,7 +670,7 @@ object PluginCatalogScreen {
                 value = "Update to ${latest!!.version}",
                 run = { ctx, onStatus -> PluginCatalog.install(ctx, plugin, latest!!, onStatus) },
             )
-            installed != null -> ActionItem(id = id, title = "Installed", value = "Installed ${installed.manifest.version}", run = {})
+            installed != null -> ActionItem(id = id, title = "Installed", value = "Installed ${installed.manifest.version}")
             offered && latest != null -> AsyncActionItem(
                 id = id,
                 title = "Install",
@@ -692,9 +687,8 @@ object PluginCatalogScreen {
                     is PluginCatalog.OriginState.Unusable -> "Not available (${state.reason})"
                     PluginCatalog.OriginState.Offered -> ""
                 },
-                run = {},
             )
-            else -> ActionItem(id = id, title = "Not offered", value = "No stable release yet", run = {})
+            else -> ActionItem(id = id, title = "Not offered", value = "No stable release yet")
         }
     }
 }

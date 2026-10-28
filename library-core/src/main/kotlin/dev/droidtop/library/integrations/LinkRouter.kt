@@ -221,7 +221,7 @@ object LinkRouter {
         title = "Link",
         groups = { context ->
             lastResult?.groups?.invoke(context)
-                ?: listOf(CatalogGroup("links_result_none", null, listOf(ActionItem("links_result_none_row", "Nothing to show", run = {}))))
+                ?: listOf(CatalogGroup("links_result_none", null, listOf(ActionItem("links_result_none_row", "Nothing to show"))))
         },
         indexGroups = { emptyList() },
     )
@@ -233,11 +233,11 @@ object LinkRouter {
         groups = { _ ->
             val pending = pendingChoice
             if (pending == null) {
-                listOf(CatalogGroup("links_choose_none", null, listOf(ActionItem("links_choose_none_row", "No link is waiting", run = {}))))
+                listOf(CatalogGroup("links_choose_none", null, listOf(ActionItem("links_choose_none_row", "No link is waiting"))))
             } else {
                 val (link, found) = pending
                 val items = buildList<CatalogItem> {
-                    add(ActionItem("links_choose_link", link.take(120), subtitle = "More than one handler opens this kind of link", run = {}))
+                    add(ActionItem("links_choose_link", link.take(120), subtitle = "More than one handler opens this kind of link"))
                     add(
                         ToggleItem(
                             id = "links_choose_remember",
@@ -305,7 +305,7 @@ object LinkRouter {
             "links_handlers_list",
             "Registered",
             buildList<CatalogItem> {
-                if (all.isEmpty()) add(ActionItem("links_handlers_none", "None yet", subtitle = "Plugins register the links they open; you can add an app below", run = {}))
+                if (all.isEmpty()) add(ActionItem("links_handlers_none", "None yet", subtitle = "Plugins register the links they open; you can add an app below"))
                 all.forEachIndexed { i, handler ->
                     val mine = handler.kind == KIND_ANDROID
                     add(
@@ -338,8 +338,8 @@ object LinkRouter {
                         onChange = { _, value -> draftPattern = value.trim() },
                     ),
                 )
-                if (draftPattern.isNotBlank() && pattern == null) add(ActionItem("links_handlers_bad", "That is not a scheme or a site", run = {}))
-                if (pattern != null && apps.isEmpty()) add(ActionItem("links_handlers_noapp", "No installed app opens these links", run = {}))
+                if (draftPattern.isNotBlank() && pattern == null) add(ActionItem("links_handlers_bad", "That is not a scheme or a site"))
+                if (pattern != null && apps.isEmpty()) add(ActionItem("links_handlers_noapp", "No installed app opens these links"))
                 if (pattern != null) apps.forEach { (component, label) ->
                     add(
                         ActionItem(

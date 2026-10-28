@@ -170,13 +170,12 @@ object ContainersCatalog {
                                 id = "containers_none",
                                 title = "No containers yet",
                                 subtitle = "The desktop makes its own when it first starts; create others with the row above",
-                                run = {},
                             ),
                         )
                     }
             },
             onFailure = { error ->
-                listOf(ActionItem(id = "containers_error", title = "Couldn't list the containers", subtitle = FailureText.of("Containers", error), run = {}))
+                listOf(ActionItem(id = "containers_error", title = "Couldn't list the containers", subtitle = FailureText.of("Containers", error)))
             },
         )
         return listOf(
@@ -200,7 +199,7 @@ object ContainersCatalog {
                 CatalogGroup(
                     id = "gone",
                     title = null,
-                    items = listOf(ActionItem(id = "container_gone", title = "This container was deleted", subtitle = "Go back to Containers", run = {})),
+                    items = listOf(ActionItem(id = "container_gone", title = "This container was deleted", subtitle = "Go back to Containers")),
                 ),
             )
         val container = info.container
@@ -309,7 +308,7 @@ object ContainersCatalog {
      */
     private fun backupItems(runtime: ContainerRuntime, info: ContainerInfo, running: Boolean): List<CatalogItem> {
         runtime.dataBackupUnavailableReason?.let {
-            return listOf(ActionItem(id = "container_backup_unavailable", title = "Backup: not available here", subtitle = it, run = {}))
+            return listOf(ActionItem(id = "container_backup_unavailable", title = "Backup: not available here", subtitle = it))
         }
         if (running) {
             return listOf(
@@ -317,7 +316,6 @@ object ContainersCatalog {
                     id = "container_backup_stop_first",
                     title = "Back up or restore its data",
                     subtitle = "Stop it first: a running container's files are changing",
-                    run = {},
                 ),
             )
         }
@@ -385,7 +383,6 @@ object ContainersCatalog {
                 id = "container_recreate",
                 title = "Recreate from the image",
                 subtitle = "This container has no recorded image reference to recreate from (it was made before droidtop recorded them)",
-                run = {},
             )
         }
         return AsyncActionItem(
@@ -406,7 +403,6 @@ object ContainersCatalog {
         id = "container_storage",
         title = "Storage used",
         value = bytes?.let { dev.droidtop.library.format.ValueFormat.size(it) } ?: "Unknown",
-        run = {},
     )
 
     // ---- sockets (docs/SPEC.md 3d) ----
@@ -430,7 +426,7 @@ object ContainersCatalog {
             )
             val audioReason = runtime.audioSharingUnavailableReason
             if (audioReason != null) {
-                add(ActionItem(id = "container_socket_audio", title = "Audio: not available here", subtitle = audioReason, run = {}))
+                add(ActionItem(id = "container_socket_audio", title = "Audio: not available here", subtitle = audioReason))
             } else {
                 add(
                     ToggleItem(
@@ -647,7 +643,7 @@ object ContainersCatalog {
         return apps.fold(
             onSuccess = { list ->
                 if (list.isEmpty()) {
-                    listOf(ActionItem(id = "container_exports_none", title = "No apps installed in it yet", subtitle = "An app installed here can then be shown on the desktop", run = {}))
+                    listOf(ActionItem(id = "container_exports_none", title = "No apps installed in it yet", subtitle = "An app installed here can then be shown on the desktop"))
                 } else {
                     list.map { app ->
                         ToggleItem(
@@ -673,7 +669,6 @@ object ContainersCatalog {
                         id = "container_exports_unreadable",
                         title = "Couldn't read its apps",
                         subtitle = if (runtime.siblingsNeedStart && !info.running) "Start it, then come back" else userFacingErrorMessage(error),
-                        run = {},
                     ),
                 )
             },
@@ -745,7 +740,7 @@ object ContainersCatalog {
                 ),
             )
             if (mounts.isEmpty()) {
-                add(ActionItem(id = "container_mounts_none", title = "No extra folders shared", subtitle = "Add one above", run = {}))
+                add(ActionItem(id = "container_mounts_none", title = "No extra folders shared", subtitle = "Add one above"))
             }
             mounts.forEach { mount ->
                 add(
@@ -778,7 +773,6 @@ object ContainersCatalog {
                 id = "container_terminal",
                 title = "Terminal",
                 subtitle = "A terminal opens as a window on the desktop, which is not running. Open Desktop first, then choose Terminal again",
-                run = {},
             )
         }
         val container = info.container
@@ -812,7 +806,6 @@ object ContainersCatalog {
                 } else {
                     "Running: stop it to delete"
                 },
-                run = {},
             )
         }
         return AsyncActionItem(
@@ -1002,7 +995,7 @@ object ContainersCatalog {
 
     private suspend fun deviceItems(context: Context, runtime: ContainerRuntime, info: ContainerInfo): List<CatalogItem> {
         runtime.deviceSharingUnavailableReason?.let { reason ->
-            return listOf(ActionItem(id = "container_devices", title = "Not available here", subtitle = reason, run = {}))
+            return listOf(ActionItem(id = "container_devices", title = "Not available here", subtitle = reason))
         }
         val container = info.container
         val shared = runCatching { runtime.sharedDevices(container).toSet() }.getOrDefault(emptySet())
@@ -1020,7 +1013,6 @@ object ContainersCatalog {
                     id = "container_devices",
                     title = "No USB device is connected",
                     subtitle = "Plug one in, then open this page again",
-                    run = {},
                 ),
             )
         }
@@ -1117,7 +1109,7 @@ object ContainersCatalog {
                             )
                         },
                         onFailure = { error ->
-                            add(ActionItem(id = "create_version", title = "Couldn't list the versions", subtitle = FailureText.of("Containers", error), run = {}))
+                            add(ActionItem(id = "create_version", title = "Couldn't list the versions", subtitle = FailureText.of("Containers", error)))
                         },
                     )
                     add(

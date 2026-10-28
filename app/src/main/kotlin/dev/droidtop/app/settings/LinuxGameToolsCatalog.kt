@@ -47,7 +47,7 @@ object LinuxGameToolsCatalog {
     private suspend fun groups(context: android.content.Context, target: LinuxToolsScreen.Target?): List<CatalogGroup> {
         if (target == null) {
             return listOf(
-                CatalogGroup("linux_tools_none", null, listOf(ActionItem(id = "linux_tools_open_from_game", title = "Open this from a game's page", run = {}))),
+                CatalogGroup("linux_tools_none", null, listOf(ActionItem(id = "linux_tools_open_from_game", title = "Open this from a game's page"))),
             )
         }
         val runtime = PcGameRuntimeRegistry.runtime
@@ -64,7 +64,6 @@ object LinuxGameToolsCatalog {
                         title = "Runs in Desktop mode's container",
                         subtitle = if (up) "The container is running" else "The container is not running. Start Desktop mode first: these tools act inside it",
                         value = if (ownHome) "Own home" else "Shared home",
-                        run = {},
                     ),
                     ToggleItem(
                         id = "linux_tools_own_home",

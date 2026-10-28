@@ -57,7 +57,6 @@ object SourceRecordScreen {
                             id = "update_record_no_page",
                             title = "No source page for this update",
                             subtitle = "The source that named the newer version has no page droidtop can show. Its own game page has its sources",
-                            run = {},
                         ),
                     ),
                 ),
@@ -78,7 +77,6 @@ object SourceRecordScreen {
                     id = "update_record_available",
                     title = GameUpdates.availableLabel(record?.version ?: facet.entry.availableUpdate ?: "a newer version"),
                     subtitle = GameUpdates.installedLabel(facet.installed),
-                    run = {},
                 ),
             ),
         )
@@ -93,7 +91,6 @@ object SourceRecordScreen {
                             id = "update_record_missing_row",
                             title = if (answer.unsupported) "${facet.source.label} has no update page" else "${facet.source.label} has no page for #${facet.externalId}",
                             subtitle = answer.failure,
-                            run = {},
                         ),
                     ),
                 ),
@@ -184,7 +181,7 @@ object SourceRecordScreen {
                 },
             )
             RecordAction.Relink, RecordAction.PickSystem -> null
-            null -> ActionItem(id = id, title = row.title, subtitle = row.subtitle, value = row.value, run = {})
+            null -> ActionItem(id = id, title = row.title, subtitle = row.subtitle, value = row.value)
         }
 }
 

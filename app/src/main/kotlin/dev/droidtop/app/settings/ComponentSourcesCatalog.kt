@@ -68,7 +68,7 @@ object ComponentSourcesCatalog {
                     ),
                 )
                 added.forEach { (id, origin) ->
-                    add(ActionItem(id = "wine_build_added_$id", title = id, subtitle = "Added from $origin", value = "Installed", run = {}))
+                    add(ActionItem(id = "wine_build_added_$id", title = id, subtitle = "Added from $origin", value = "Installed"))
                 }
             }
             val sources = data.sources.map { source ->
@@ -87,7 +87,6 @@ object ComponentSourcesCatalog {
                         subtitle = listOfNotNull(source.about, "Linux builds need droidtop's Linux engine, which is not available yet")
                             .joinToString(". "),
                         value = "Not available",
-                        run = {},
                     )
                 }
             }

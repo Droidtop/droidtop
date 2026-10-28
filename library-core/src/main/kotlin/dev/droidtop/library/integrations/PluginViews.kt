@@ -398,7 +398,7 @@ private class PluginPage(
             if (shownNotice != null) {
                 add(noticeItem(screenId, "pv_${screenId}_reply_notice", shownNotice))
             } else {
-                notice?.takeIf { it.isNotBlank() }?.let { add(ActionItem(id = "pv_${screenId}_notice", title = it, run = {})) }
+                notice?.takeIf { it.isNotBlank() }?.let { add(ActionItem(id = "pv_${screenId}_notice", title = it)) }
             }
             error?.let {
                 if (denied) {
@@ -424,7 +424,7 @@ private class PluginPage(
                     addAll(extraWhenFailed())
                 }
             }
-            view?.subtitle?.let { add(ActionItem(id = "pv_${screenId}_about", title = it, run = {})) }
+            view?.subtitle?.let { add(ActionItem(id = "pv_${screenId}_about", title = it)) }
             // The empty-state contract (docs/plugin-api.md 1.6, #179; #521 item 6): never a blank page, and droidtop's own
             // notice, not a plugin's row: "Nothing here yet" from the plugin, its one sentence if it gave one, and Refresh.
             if (error == null && view?.sections?.all { it.nodes.isEmpty() } != false) {
@@ -484,7 +484,7 @@ private class PluginPage(
      */
     private fun turnedOffItem(screenId: String, node: ViewNode, permission: String): CatalogItem {
         missingApp?.takeIf { permission == PluginManagedApp.NEEDS }?.let { app ->
-            return ActionItem(id = "pv_${screenId}_${node.id}_no_app", title = node.title, subtitle = PluginManagedApp.reason(app), run = {})
+            return ActionItem(id = "pv_${screenId}_${node.id}_no_app", title = node.title, subtitle = PluginManagedApp.reason(app))
         }
         val what = PluginPermissions.labelFor(permission) ?: permission
         return NestedScreenItem(
@@ -501,7 +501,7 @@ private class PluginPage(
             is ViewNode.Notice -> noticeItem(screenId, itemId, node)
             // A status facet's state is the host's glyph (Droidtop/tracker#644): busy turns a ring, warning asks for the
             // person, error is the danger octagon; ok, on and off are quiet.
-            is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, statusMark = PluginViews.markOf(node.state), run = {})
+            is ViewNode.Info -> ActionItem(id = itemId, title = node.title, subtitle = node.subtitle, value = node.value, statusMark = PluginViews.markOf(node.state))
             // A plugin's progress is the host's job bar (Droidtop/tracker#643, #644), not a percent in text: the bar glides,
             // and one with no percent is the checking shimmer.
             is ViewNode.Progress -> ActionItem(
@@ -509,7 +509,6 @@ private class PluginPage(
                 title = node.title,
                 subtitle = node.subtitle,
                 progress = if (node.percent >= 0) node.percent.coerceAtMost(100) / 100f else -1f,
-                run = {},
             )
             is ViewNode.Row -> actionItem(screenId, itemId, node.title, node.shownSubtitle(), node.shownValue(), null, node.action)
             is ViewNode.Button -> actionItem(screenId, itemId, node.title, node.subtitle, node.value, node.confirm, node.action)
@@ -625,7 +624,7 @@ private class PluginPage(
         confirm: String?,
         action: ViewAction?,
     ): CatalogItem = if (action == null) {
-        ActionItem(id = itemId, title = title, subtitle = subtitle, value = value, run = {})
+        ActionItem(id = itemId, title = title, subtitle = subtitle, value = value)
     } else when (action.kind) {
         ViewAction.Kind.VIEW -> NestedScreenItem(
             id = itemId,
