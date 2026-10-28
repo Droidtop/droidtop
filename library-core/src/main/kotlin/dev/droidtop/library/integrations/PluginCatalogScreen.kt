@@ -77,12 +77,40 @@ object PluginCatalogScreen {
      * Whether [plugin], listed under [origin], answers a search: every word of [query] is somewhere in its name, id,
      * description or origin, in any case. Pure, over the index already in memory: a search never asks the network.
      */
-    internal fun matchesQuery(plugin: PluginCatalogPlugin, origin: String, query: String): Boolean {
+    internal fun matchesQuery(plugin: PluginCatalogPlugin, origin: String, query: String): Boolean =
+        matchesWords(query, listOf(plugin.label, plugin.id, plugin.description, origin))
+
+    /** Whether every word of [query] is somewhere in [fields], in any case; a blank query matches everything. Pure. */
+    internal fun matchesWords(query: String, fields: List<String?>): Boolean {
         val words = query.trim().lowercase().split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (words.isEmpty()) return true
-        val haystack = listOfNotNull(plugin.label, plugin.id, plugin.description, origin).joinToString(" ").lowercase()
+        val haystack = fields.filterNotNull().joinToString(" ").lowercase()
         return words.all { it in haystack }
     }
+
+    /**
+     * The Plugins page's search over the catalogs (Droidtop/tracker#513): every plugin a catalog lists, as last fetched
+     * (never a network call), that answers [query] and is not installed, each the same row its catalog shows. The
+     * installed ones are the page's own cards. Disk; call off the main thread.
+     */
+    fun searchRows(context: Context, query: String): List<CatalogItem> {
+        if (query.isBlank()) return emptyList()
+        val installed = PluginStore.installed(context).associateBy { it.manifest.id }
+        val userKeys = UserOriginKeys.load(UserOriginKeys.storeFile(context))
+        val seen = mutableSetOf<String>()
+        return PluginCatalog.listings(context).flatMap { listing ->
+            listing.index.origins.flatMap { origin ->
+                val state = PluginCatalog.originState(listing.source, origin, userKeys)
+                origin.plugins
+                    .filter { it.id !in installed && matchesQuery(it, origin.origin, query) && seen.add(it.id) }
+                    .map { rowFor(listing.source, origin, state, it, null, null) }
+            }
+        }
+    }
+
+    /** Whether the installed plugin [record] answers [query], the same way a catalog's plugins do. Pure. */
+    fun matchesInstalled(record: PluginRecord, query: String): Boolean =
+        record.manifest.let { matchesWords(query, listOf(it.label, it.id, it.description, it.origin)) }
 
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,

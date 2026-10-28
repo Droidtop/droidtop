@@ -19524,6 +19524,13 @@ menu still list every `listed` place.
   in Gaming one line even with Info text under rows off, the full text in
   Info) (Droidtop/tracker#513, #514, built 2026-10-16). The companion draws a
   row's picture too.
+  One Search sits at the top of the installed list (Droidtop/tracker#513,
+  built 2026-10-28). Every word typed must be somewhere in a plugin's name,
+  id, description or origin. It narrows the installed cards (with the Show
+  and Kind choices), and an "In catalogs" group below lists every catalog
+  plugin that matches and is not installed, as its catalog's own row. The
+  catalogs are searched as last fetched, never over the network
+  (`PluginCatalogScreen.searchRows`).
 
 **Places in every mode (decided 2026-10-08, Droidtop/tracker#346).** The
 places were Gaming sections only: Mobile reached Stores, Social, Downloads
