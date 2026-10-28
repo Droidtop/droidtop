@@ -34,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -201,6 +202,41 @@ internal fun HomeTopBand(
             .focusProperties { canFocus = false }
             .background(Brush.verticalGradient(0f to MenuTokens.Ground.copy(alpha = 0.6f), 1f to Color.Transparent)),
     ) {
+        // The person (Droidtop/tracker#586): their picture or initial and their name, from Quick Menu > Profile; a tap
+        // opens the Quick Menu. Nothing while droidtop knows neither.
+        val context = androidx.compose.ui.platform.LocalContext.current
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { dev.droidtop.library.profile.ProfileStore.refresh(context) }
+        }
+        val profile by dev.droidtop.library.profile.ProfileStore.current.collectAsState()
+        if (profile.name != null || profile.picture != null) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(horizontal = window.edgePadding)
+                    .heightIn(min = 48.dp)
+                    .semantics { contentDescription = profile.name ?: "Profile" }
+                    .padRow(onClick = onQuickMenu),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Space.Sm),
+            ) {
+                val picture = profile.picture
+                if (picture != null) {
+                    coil3.compose.AsyncImage(
+                        // The file's time in the key, so a new picture under the same name is read again.
+                        model = coil3.request.ImageRequest.Builder(context).data(picture).memoryCacheKey("profile:${picture.lastModified()}").build(),
+                        contentDescription = null,
+                        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                        modifier = Modifier.size(32.dp).clip(CircleShape),
+                    )
+                } else {
+                    Box(Modifier.size(32.dp).background(MenuTokens.Selected, CircleShape), contentAlignment = Alignment.Center) {
+                        Text(profile.name.orEmpty().take(1).uppercase(), color = MenuTokens.OnSelected, style = TypeRole.rowTitle)
+                    }
+                }
+                profile.name?.let { Text(it, color = MenuTokens.OnSurface, style = TypeRole.rowTitle, maxLines = 1) }
+            }
+        }
         Row(
             // The same inset from the top edge as the status pill floating over every other page, so the pill keeps
             // its rounded top in portrait (Droidtop/tracker#675).

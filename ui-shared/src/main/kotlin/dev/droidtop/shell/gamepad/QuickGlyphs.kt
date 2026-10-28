@@ -22,6 +22,7 @@ enum class QuickGlyph {
     HOME, KEYBOARD, PEOPLE, MORE,
     // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
     CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
+    PROFILE,
 }
 
 
@@ -214,6 +215,12 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
                 drawRoundRect(tint, p(9.5f, 11f), Size(5f * u, 10f * u), androidx.compose.ui.geometry.CornerRadius(1f * u), style = stroke)
                 dot(12f, 14.5f, 1.1f)
                 line(12f, 2f, 12f, 4.5f); line(5.5f, 3.5f, 7f, 5f); line(18.5f, 3.5f, 17f, 5f)
+            }
+            QuickGlyph.PROFILE -> {
+                // A person in a circle: the head and the shoulders' curve.
+                ring(12f, 12f, 9f)
+                ring(12f, 9.5f, 3f)
+                arc(12f, 20f, 6f, 200f, 140f)
             }
             QuickGlyph.PLUGIN -> {
                 // A puzzle piece, as the left menu's Plugins row: a square with a knob on its top and one on its right.

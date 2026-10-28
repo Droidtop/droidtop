@@ -24,12 +24,12 @@ class ControlAccessTest {
             ControlPanel.entries.toSet(),
             ControlRow.entries.toSet(),
         ),
-        UiMode.KIOSK to Triple(restrictedCompanion, ControlPanel.entries.toSet(), restrictedRows),
-        UiMode.KID to Triple(restrictedCompanion, ControlPanel.entries.toSet(), restrictedRows + ControlRow.PLAY_TIME),
+        UiMode.KIOSK to Triple(restrictedCompanion, ControlPanel.entries.toSet() - ControlPanel.PROFILE, restrictedRows),
+        UiMode.KID to Triple(restrictedCompanion, ControlPanel.entries.toSet() - ControlPanel.PROFILE, restrictedRows + ControlRow.PLAY_TIME),
         UiMode.GUEST to Triple(
             restrictedCompanion,
             ControlPanel.entries.toSet() -
-                setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS),
+                setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS, ControlPanel.PROFILE),
             restrictedRows,
         ),
     )

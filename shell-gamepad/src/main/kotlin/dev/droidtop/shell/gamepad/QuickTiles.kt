@@ -51,6 +51,8 @@ enum class QuickSection(val glyph: QuickGlyph, val panel: ControlPanel) {
     DISPLAY(QuickGlyph.DISPLAY, ControlPanel.DISPLAY),
     DOWNLOADS(QuickGlyph.DOWNLOAD, ControlPanel.DOWNLOADS),
     PLUGINS(QuickGlyph.PLUGIN, ControlPanel.PLUGINS),
+    // The person's own name and picture (Droidtop/tracker#586).
+    PROFILE(QuickGlyph.PROFILE, ControlPanel.PROFILE),
     ;
 
     /** The section's name, kept with the order the person sets ([QuickMenuOrder]), so the two cannot differ. */

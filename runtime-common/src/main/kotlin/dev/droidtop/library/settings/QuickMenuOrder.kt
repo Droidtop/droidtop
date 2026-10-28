@@ -28,6 +28,8 @@ object QuickMenuOrder {
         ControlPanel.DISPLAY to "Display",
         ControlPanel.DOWNLOADS to "Downloads",
         ControlPanel.PLUGINS to "Plugins",
+        // The person's own name and picture (owner, 2026-10-28, Droidtop/tracker#586).
+        ControlPanel.PROFILE to "Profile",
     )
 
     private val names = DEFAULT.toMap()

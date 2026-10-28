@@ -20,6 +20,9 @@ enum class ControlSurface { COMPANION, QUICK_MENU }
  */
 enum class ControlPanel {
     HOME, GAME, SYSTEM, APPS, PERFORMANCE, INPUT, SOCIAL, PLUGINS, NOTIFICATIONS, AUDIO, DISPLAY, DOWNLOADS, CONNECTIONS,
+
+    /** The person's own name and picture (Droidtop/tracker#586): the owner's, so the restricted modes leave it out. */
+    PROFILE,
 }
 
 /**
@@ -91,13 +94,13 @@ object ControlAccess {
     /**
      * Kiosk and Kid: a handheld handed to somebody else. The companion keeps Home (volume and
      * brightness only), Game (Resume and Quit, both asking) and Performance as figures only. The Quick
-     * Menu keeps its sections as before. The items that control the restriction itself (the Companion
+     * Menu keeps its sections as before, but Profile, which is the owner's. The items that control the restriction itself (the Companion
      * group, the volume cap, the passkey, the UI mode) are hidden on every surface, so the person it
      * restricts cannot undo it from inside.
      */
     private val RESTRICTED = ControlRules(
         companionPanels = setOf(ControlPanel.HOME, ControlPanel.GAME, ControlPanel.PERFORMANCE),
-        quickMenuPanels = ControlPanel.entries.toSet(),
+        quickMenuPanels = ControlPanel.entries.toSet() - ControlPanel.PROFILE,
         readOnlyPanels = setOf(ControlPanel.PERFORMANCE),
         rows = setOf(ControlRow.PINS, ControlRow.GAME_RESUME, ControlRow.GAME_QUIT, ControlRow.STATS),
         pinIds = setOf(GamingSettingsCatalog.ID_SYSTEM_VOLUME, GamingSettingsCatalog.ID_SYSTEM_BRIGHTNESS),
@@ -127,7 +130,7 @@ object ControlAccess {
      */
     private val GUEST = RESTRICTED.copy(
         quickMenuPanels = ControlPanel.entries.toSet() -
-            setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS),
+            setOf(ControlPanel.NOTIFICATIONS, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.DOWNLOADS, ControlPanel.PROFILE),
     )
 
     fun rules(mode: UiMode): ControlRules = when (mode) {

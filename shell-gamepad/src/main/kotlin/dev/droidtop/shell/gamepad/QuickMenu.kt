@@ -263,11 +263,16 @@ internal fun QuickMenu(
                             // 1280dp, 54dp + 16dp at 1920dp (owner: "The plugin pages have margins that are ridiculously
                             // large", Droidtop/tracker#649). They now see the pane as their window, so the gutter is the
                             // scale's floor, 16dp, and it is the only one.
-                            QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS ->
+                            QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS, QuickSection.PROFILE ->
                                 CompositionLocalProvider(LocalShellWindow provides window.pane(paneWidthDp)) {
                                     when (section) {
                                         QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
                                         QuickSection.DOWNLOADS -> DownloadsSection(close)
+                                        // The person's own name and picture (Droidtop/tracker#586), a page of the sheet.
+                                        QuickSection.PROFILE -> CatalogNavigator(
+                                            root = remember { dev.droidtop.library.profile.ProfileStore.screen() },
+                                            onExit = close,
+                                        )
                                         else -> PluginsTab(runningEntry, placeAvailable, close)
                                     }
                                 }
