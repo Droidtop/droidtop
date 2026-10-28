@@ -4,6 +4,9 @@ import android.content.Context
 import com.winlator.contents.ContentProfile
 import com.winlator.contents.ContentsManager
 import dev.droidtop.runtime.SafeDelete
+import dev.droidtop.runtime.windows.utils.ManifestComponentHelper
+import dev.droidtop.runtime.windows.utils.ManifestContentTypes
+import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import java.io.IOException
 import java.nio.file.FileVisitResult
 import java.nio.file.Files
@@ -87,6 +90,28 @@ object WineInstalledComponents {
             WineBuilds.forget(context, WineBuilds.id(profile))
         }
         if (reason == null) "Removed ${component.name}" else "Couldn't remove ${component.name}: $reason"
+    }
+
+    /** A catalog build this device cannot run, with why ("Not on this device", SPEC 7i). [bytes] is the catalog's, 0 when unknown. */
+    data class Unavailable(val kind: String, val name: String, val bytes: Long, val reason: String)
+
+    /**
+     * The enabled sources' builds this CPU cannot run, which the choice rows leave out: on an x86_64 device the ARM
+     * (arm64ec) Wine builds and the x86_64 ones before Wine 10 ([WineOptionPlan.notHereReason]), and the ARM GPU drivers.
+     * Empty on an ARM device, which runs every bionic build (x86_64 ones under Box64). Disk (the catalog file).
+     */
+    suspend fun notOnThisDevice(context: Context): List<Unavailable> = withContext(Dispatchers.IO) {
+        val x86 = X86_64GuestLibs.isX86_64Host()
+        if (!x86) return@withContext emptyList()
+        val manifest = ManifestComponentHelper.loadComponentAvailability(context).manifest
+        fun bionic(type: String) = ManifestComponentHelper.filterManifestByVariant(manifest.items[type].orEmpty(), "bionic")
+        val wines = (bionic(ManifestContentTypes.PROTON) + bionic(ManifestContentTypes.WINE)).distinctBy { it.id }.mapNotNull { entry ->
+            WineOptionPlan.notHereReason(x86, entry.id)?.let { Unavailable("Wine", entry.name.ifBlank { entry.id }, entry.size, it) }
+        }
+        val drivers = bionic(ManifestContentTypes.DRIVER).map { entry ->
+            Unavailable("Driver", entry.name.ifBlank { entry.id }, entry.size, "An ARM GPU driver; an x86_64 device never loads one")
+        }
+        (wines + drivers).sortedWith(compareBy({ it.kind }, { it.name.lowercase() }))
     }
 
     private fun bundledNames(context: Context): List<String> =

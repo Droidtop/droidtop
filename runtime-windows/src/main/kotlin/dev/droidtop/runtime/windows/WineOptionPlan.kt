@@ -92,6 +92,16 @@ object WineOptionPlan {
     fun runsOnX86Host(wine: String): Boolean =
         !isArm64ec(wine) && (wineMajor(wine)?.let { it >= 10 } ?: true)
 
+    /**
+     * Why a catalog Wine build [wine] is not offered on this CPU, or null when it is (Droidtop/tracker#233: shown as
+     * "Not on this device" with this reason, never just hidden). Pure.
+     */
+    fun notHereReason(x86Host: Boolean, wine: String): String? = when {
+        !x86Host || runsOnX86Host(wine) -> null
+        isArm64ec(wine) -> "An ARM (arm64ec) build; this device's CPU is x86_64"
+        else -> "Made for Box64 on ARM; an x86_64 device runs Wine builds from 10 on"
+    }
+
     /** The 32-bit emulators to choose from; empty when the Wine build and CPU leave no choice. */
     fun emulators(x86Host: Boolean, wine: String): List<String> =
         if (!x86Host && isArm64ec(wine)) listOf(FEXCORE, BOX64) else emptyList()
