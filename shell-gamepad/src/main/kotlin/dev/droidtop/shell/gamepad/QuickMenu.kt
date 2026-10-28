@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.PressWords
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -468,7 +469,7 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                 )
             }
             if (s == null) {
-                Text("Reading the device...", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.reading_device), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             } else {
                 val device = s.deviceCpuPercent
                 val clock = s.cpuMhz?.let { "Fastest core $it MHz" }

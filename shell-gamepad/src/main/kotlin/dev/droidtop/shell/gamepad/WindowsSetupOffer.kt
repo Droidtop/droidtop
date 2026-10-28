@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import androidx.compose.foundation.clickable
@@ -62,7 +63,7 @@ internal fun WindowsSetupOfferDialog(
                 true
             },
         ) {
-            Text("Windows games need a one-time download", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.windows_setup_title), color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
             Text(
                 "A confirms · B postpones",
                 color = MenuTokens.OnSurfaceMuted,

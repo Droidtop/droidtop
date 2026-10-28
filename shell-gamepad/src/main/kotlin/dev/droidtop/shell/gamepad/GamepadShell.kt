@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import android.util.Log
 import dev.droidtop.library.userFacingErrorMessage
@@ -1855,7 +1856,7 @@ private fun EntryDetailScreen(
             Text(entry.kind.itemName(), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.titleMedium)
         }
         if (entry.playtimeSeconds > 0) {
-            Text("Played ${entry.playtimeSeconds / 60} min", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.played_for, dev.droidtop.library.format.ValueFormat.duration(entry.playtimeSeconds)), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         }
         gameInfo.forEach { row ->
             Text(

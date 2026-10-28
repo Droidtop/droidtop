@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -79,7 +80,7 @@ internal fun GameEmulatorPicker(
             },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Emulator for this game", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.emulator_for_game), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
         Text(entry.title, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
         LazyColumn(
             modifier = Modifier.weight(1f),

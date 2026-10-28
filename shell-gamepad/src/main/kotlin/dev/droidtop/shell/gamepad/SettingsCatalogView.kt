@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.runtime.FailureText
 import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -1491,7 +1492,7 @@ internal fun PlaceCatalogView(
     val screen = remember(screenId) { SettingsScreenRegistry.get(screenId) }
     if (screen == null) {
         BackHandler(onBack = onBack)
-        Text("This page is not available in this build.", color = MenuTokens.OnSurfaceMuted)
+        Text(stringResource(R.string.page_not_in_build), color = MenuTokens.OnSurfaceMuted)
         return
     }
     CatalogNavigator(root = screen, onExit = onBack, nativeActions = nativeActions)
@@ -1936,11 +1937,11 @@ internal fun TextEditDialog(
                     TextButton(
                         onClick = { clipboard.getText()?.text?.trim()?.takeIf { it.isNotEmpty() }?.let { value = it } },
                         modifier = Modifier.keepsFieldFocusOnTouch(),
-                    ) { Text("Paste", color = MenuTokens.Accent) }
+                    ) { Text(stringResource(R.string.paste), color = MenuTokens.Accent) }
                 }
                 Spacer(Modifier.weight(1f))
                 TextButton(onClick = onDismiss, modifier = Modifier.keepsFieldFocusOnTouch()) {
-                    Text("Cancel", color = MenuTokens.OnSurfaceMuted)
+                    Text(stringResource(R.string.cancel), color = MenuTokens.OnSurfaceMuted)
                 }
                 TextButton(onClick = { onCommit(value) }, modifier = Modifier.keepsFieldFocusOnTouch()) {
                     Text(if (search) "Search" else "Save", color = MenuTokens.Accent)

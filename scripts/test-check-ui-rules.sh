@@ -27,6 +27,7 @@ fixture hint-tip shell-gamepad/src/main/kotlin/A.kt 'HintTip("Why") { Text("Row"
 fixture permission-titles plugin-host/src/main/kotlin/A.kt 'PluginPermission("x", PermissionTier.DANGEROUS, "Run adb commands")'
 fixture raw-dialog shell-gamepad/src/main/kotlin/A.kt 'Dialog(onDismissRequest = onDismiss) { Text("Pick") }'
 fixture copy-budget app/src/main/kotlin/A.kt 'ActionItem(id = "x", title = "A title that runs well past the forty character budget")'
+fixture literal-text shell-gamepad/src/main/kotlin/A.kt 'Text("Loading")'
 
 status=0
 for dir in "$tmp"/*/; do

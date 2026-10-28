@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -314,12 +315,12 @@ private fun LocalSide(card: MatchQueue.Card, entries: Map<String, LibraryEntry>,
     val parsed = GameTitleParser.parseName(name)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(name, style = MaterialTheme.typography.titleSmall, color = MenuTokens.OnSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        Text("Read as ${parsed.title}", style = MaterialTheme.typography.bodySmall, color = MenuTokens.OnSurfaceMuted)
+        Text(stringResource(R.string.matches_read_as, parsed.title), style = MaterialTheme.typography.bodySmall, color = MenuTokens.OnSurfaceMuted)
         parsed.version.takeIf { it.isNotBlank() }?.let {
-            Text("Version $it", style = MaterialTheme.typography.bodySmall, color = MenuTokens.OnSurfaceMuted)
+            Text(stringResource(R.string.matches_version, it), style = MaterialTheme.typography.bodySmall, color = MenuTokens.OnSurfaceMuted)
         }
         card.items.first().source.takeIf { it.isNotBlank() }?.let {
-            Text("Searched $it for \"${card.searched}\"", style = MaterialTheme.typography.bodySmall, color = MenuTokens.OnSurfaceMuted)
+            Text(stringResource(R.string.matches_searched, it, card.searched), style = MaterialTheme.typography.bodySmall, color = MenuTokens.OnSurfaceMuted)
         }
         if (card.items.size > 1) {
             Text("x${card.items.size}: a pick applies to all", style = MaterialTheme.typography.labelMedium, color = MenuTokens.Accent)

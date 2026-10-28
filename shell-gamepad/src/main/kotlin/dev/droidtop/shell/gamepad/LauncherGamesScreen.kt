@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.activity.compose.BackHandler
@@ -245,7 +246,7 @@ private fun GamesGrid(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(Space.Lg),
                     ) {
-                        Text("No games match these filters", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                        Text(stringResource(R.string.no_games_match_filters), color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                         ShellChip(
                             "Clear filters",
                             primary = true,
@@ -262,7 +263,7 @@ private fun GamesGrid(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(Space.Lg),
                     ) {
-                        Text("No games yet.", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                        Text(stringResource(R.string.no_games_yet), color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                         if (onOpenFolders != null) {
                             ShellChip(
                                 "Add a games folder",

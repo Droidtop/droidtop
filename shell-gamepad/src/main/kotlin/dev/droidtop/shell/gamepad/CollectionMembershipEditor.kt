@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -81,11 +82,11 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                 }
             },
     ) {
-        Text("Collections", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.collections_title), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
         Text(entry.title, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
 
         if (!loaded) {
-            Text("Loading...", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.loading), color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -119,7 +120,7 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                             OutlinedTextField(
                                 value = newName,
                                 onValueChange = { newName = it },
-                                label = { Text("Collection name") },
+                                label = { Text(stringResource(R.string.collection_name)) },
                                 singleLine = true,
                                 colors = TextFieldDefaults.colors(
                                     focusedTextColor = MenuTokens.OnSurface,

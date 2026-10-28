@@ -17355,7 +17355,12 @@ trees keep their own resources. Lint cannot be the gate for this rule: its `Hard
 reads XML layouts only and never sees a Compose `Text("...")`, which is where droidtop's chrome
 writes its strings, and the app's lint block runs `checkOnly` NewApi/InlinedApi (the API-level
 gate, §10b). The gate is a check over the Kotlin sources of the modules droidtop writes, with
-the vendored trees excluded by path, as the API gate's baseline excludes them.
+the vendored trees excluded by path, as the API gate's baseline excludes them. Built as
+`check-ui-rules.sh`'s `literal-text` rule (Droidtop/tracker#177, owner 2026-10-14: "do it"): a Compose `Text` given a
+capitalised literal fails `--check`. It is on, with the modules not yet cleared on its allowlist; a module leaves the
+allowlist in the commit that moves its words into resources. `:shell-gamepad` is the first cleared
+(`shell-gamepad/src/main/res/values/strings.xml`); catalog titles and lines (`title = "..."`) are the next step, with
+the rule widened to them module by module.
 
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
 screen reader through one focus order: every focusable is reachable by D-pad and by linear
