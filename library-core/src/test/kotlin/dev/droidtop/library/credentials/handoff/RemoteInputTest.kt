@@ -1182,8 +1182,17 @@ class RemoteInputTest {
             input.close()
         }
         assertNotNull(input.state.value as? RemoteInputState.Closed)
-        val refused = runCatching { Socket(InetAddress.getByName("127.0.0.1"), port).use { } }.isFailure
-        assertTrue("the port must not accept connections after close", refused)
+        // Nothing answers as the session any more. Refused is the usual outcome, but the port is in Linux's ephemeral
+        // range, and another test JVM of the parallel build can be listening on it a moment later; a connection there
+        // must still not be served the session's page.
+        val answer = runCatching {
+            Socket(InetAddress.getByName("127.0.0.1"), port).use { socket ->
+                socket.soTimeout = 2_000
+                socket.getOutputStream().write("GET ${url.substringAfter("$port")} HTTP/1.1\r\nHost: x\r\n\r\n".toByteArray())
+                socket.getInputStream().readBytes().toString(Charsets.UTF_8)
+            }
+        }.getOrNull()
+        assertFalse("the closed session must not answer on its port", answer?.startsWith("HTTP/1.1 200") == true)
     }
 
     @Test
