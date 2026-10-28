@@ -2123,7 +2123,14 @@ error: ptrace(TRACEME): Operation not permitted"), while the identical
 x86_64 proot runs as the shell user there (dq-desktop-05: SELinux disabled,
 no Yama, the app untraced and without seccomp). That is BlueStacks' kernel,
 and proot has no way around it; the proot check reports it and Desktop mode
-is unavailable there. Container work is verified on the stock-Android
+is unavailable there without root. The BlueStacks rig on Android 13 x86_64
+refuses it the same way (Droidtop/tracker#555). The root backend
+(droidspaces, namespaces and cgroups) traces nothing, and
+`ContainerRuntimeFactory` picks it whenever Shizuku or Sui runs as root, so
+such a device runs Desktop with root only: onboarding's check and the
+session's failure say so ("Desktop can't run here without root ... With
+Shizuku started as root, it can.", `desktopCheckMessage`) instead of a bare
+"can't run on this device". Container work is verified on the stock-Android
 emulator (API 34), which, like the user's Android 13 console, also applies
 the exec restrictions on app-private files.
 

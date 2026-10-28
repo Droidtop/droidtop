@@ -1009,6 +1009,24 @@ private fun launcherLabel(context: Context, component: ComponentName): String? {
  * Desktop one; in both, two actions moved forward and neither said which
  * one moved on without answering.
  */
+/**
+ * What onboarding's Desktop check says, in plain words. Pure.
+ *
+ * A device whose kernel refuses an app `ptrace(PTRACE_TRACEME)` cannot run proot at all (docs/SPEC.md 3, "Not every
+ * Android lets an app trace its children"; the BlueStacks rigs, dq-desktop-04 and Droidtop/tracker#555), but the root
+ * backend needs no tracing, so that case names the way that works here: Shizuku started as root. Any other failure
+ * keeps the short sentence; the backend's own text goes to the log.
+ */
+internal fun desktopCheckMessage(succeeded: Boolean, rooted: Boolean, error: String): String = when {
+    succeeded && rooted -> "Desktop can run here (rooted, full speed)."
+    succeeded -> "Desktop can run here (not rooted, a little slower)."
+    rooted -> "Desktop can't start yet. Try again later in Settings."
+    error.contains("ptrace", ignoreCase = true) ->
+        "Desktop can't run here without root: this device doesn't let apps run Linux programs the unrooted way. " +
+            "With Shizuku started as root, it can."
+    else -> "Desktop can't run on this device."
+}
+
 internal fun onboardingForwardLabel(reEntry: Boolean, answered: Boolean): String = when {
     reEntry -> "Done"
     answered -> "Next"
@@ -1427,16 +1445,7 @@ private fun DesktopSetupStep(
             android.util.Log.w("Onboarding", "Desktop check failed: ${result.stderr.ifBlank { result.stdout }.trim()}")
         }
         onCapabilityKnown(result.succeeded)
-        checkMessage = when {
-            result.succeeded && runtime is DroidSpacesRuntime ->
-                "Desktop can run here (rooted, full speed)."
-            result.succeeded ->
-                "Desktop can run here (not rooted, a little slower)."
-            runtime is DroidSpacesRuntime ->
-                "Desktop can't start yet. Try again later in Settings."
-            else ->
-                "Desktop can't run on this device."
-        }
+        checkMessage = desktopCheckMessage(result.succeeded, rooted = runtime is DroidSpacesRuntime, error = result.stderr)
     }
 
     val capable = checkResult == true

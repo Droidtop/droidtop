@@ -155,7 +155,15 @@ class DesktopSessionService : Service() {
 
         val check = runtime.checkSystemRequirements()
         if (!check.succeeded) {
-            fail("This device can't run ${runtime.javaClass.simpleName}: ${check.stderr.ifBlank { check.stdout }.trim()}")
+            val detail = check.stderr.ifBlank { check.stdout }.trim()
+            // A kernel that refuses ptrace has one way that works, said as onboarding says it (Droidtop/tracker#555).
+            fail(
+                if (runtime !is dev.droidtop.runtime.linux.root.DroidSpacesRuntime && detail.contains("ptrace", ignoreCase = true)) {
+                    "${desktopCheckMessage(false, rooted = false, error = detail)} ($detail)"
+                } else {
+                    "This device can't run ${runtime.javaClass.simpleName}: $detail"
+                },
+            )
             return
         }
         android.util.Log.i(TAG, "${runtime.javaClass.simpleName} system check passed")
