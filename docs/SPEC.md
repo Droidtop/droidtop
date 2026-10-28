@@ -11794,10 +11794,15 @@ sleeps on idle, by the system's own timer; the screensaver keeps its own timer a
   handheld keeps the lock while the shell shows on the first. A game that ended unseen ends the session in
   `SessionMonitor`, which releases the lock like any other end; the lock has no check of its own. Droidtop's own Windows
   game screen no longer sets `FLAG_KEEP_SCREEN_ON`: it ignored the setting, and this is the one mechanism.
-- **Return to the game.** With a game running, a HOME press (the warm HOME Launcher forwards with the
-  reinit extra) and a wake with the shell in front (`MainActivity` sees `ACTION_SCREEN_OFF`, and its next
-  resume while a game runs is a wake) open the Quick Menu on its Game section, Resume first and focused:
-  one A resumes. This is the path Back in a Windows game already uses (`openQuickMenu`, the Resume
+- **Return to the game.** With a game running, coming back to the Gaming shell from it (HOME, Recents, or a
+  wake with the shell in front) opens the Quick Menu on its Game section, Resume first and focused: one A
+  resumes. It is decided when the shell resumes (`ShellReturn.returnsToGame`): the shell stopped while a game
+  ran, the game still runs, and no other droidtop screen came up since (a sign-in page, Type from another
+  device; its own Windows game screen counts as the game). HOME cannot decide it: when the shell's task is
+  already there, Android brings it to the front and only resumes it, with no new intent and no run of the
+  home activity (rig, BlueStacks, 2026-10-28, Droidtop/tracker#86). A screen going off stops the shell too,
+  so a wake is the same return. A cold HOME, with no shell yet, still carries the reinit extra the deep link
+  reads. This is the path Back in a Windows game already uses (`openQuickMenu`, the Resume
   action); there is no second mechanism. A wake with the game in front never reaches the shell, because
   Android wakes into the top window.
 - **Power rows.** The Quick Menu's System section carries Sleep, Power menu, Power off and Restart. With

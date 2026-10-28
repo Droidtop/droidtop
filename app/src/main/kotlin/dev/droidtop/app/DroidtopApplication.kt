@@ -227,6 +227,10 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
                 // Every droidtop text field on a screen Android draws no keyboard on gets droidtop's (SPEC 4c).
                 dev.droidtop.shell.gamepad.InWindowKeyboard.attach(activity)
                 if (!activity.isParkedSurface()) AudioHandOff.reopen("${activity.javaClass.simpleName} resumed")
+                // Another of droidtop's screens over the shell is not a game: coming back from it is not a return (ShellReturn).
+                if (!activity.isParkedSurface() && activity !is MainActivity && activity !is dev.droidtop.runtime.windows.WineGameActivity) {
+                    ShellReturn.otherScreenResumed()
+                }
             }
             override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
             override fun onActivityStarted(activity: Activity) = activity.note("started")
