@@ -292,6 +292,11 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
         pageEndTransition();
     }
 
+    /** Whether a swipe past the last page goes to the first, and past the first to the last. Off here. */
+    protected boolean wrapsPages() {
+        return false;
+    }
+
     private int validateNewPage(int newPage) {
         newPage = ensureWithinScrollBounds(newPage);
         // Ensure that it is clamped by the actual set of children in all cases
@@ -1434,6 +1439,19 @@ public abstract class PagedView<T extends View & PageIndicator> extends ViewGrou
                                 ? mCurrentPage : mCurrentPage + getPanelCount();
                         runOnPageScrollsInitialized(
                                 () -> snapToPageWithVelocity(finalPage, velocity));
+                    } else if (!returnToOriginalPage && wrapsPages()
+                            && ((isSignificantMove && !isFling) || isFling)) {
+                        // Past the first or the last page with wrapping on (Droidtop/tracker#564, Nova's
+                        // infinite scroll): the other end, the move's direction deciding which.
+                        boolean towardStart = isFling ? !isVelocityLeft : !isDeltaLeft;
+                        int wrapped = towardStart && mCurrentPage == 0 ? getChildCount() - 1
+                                : !towardStart && mCurrentPage >= getChildCount() - getPanelCount() ? 0
+                                : -1;
+                        if (wrapped >= 0) {
+                            runOnPageScrollsInitialized(() -> snapToPageWithVelocity(wrapped, velocity));
+                        } else {
+                            runOnPageScrollsInitialized(this::snapToDestination);
+                        }
                     } else {
                         runOnPageScrollsInitialized(this::snapToDestination);
                     }

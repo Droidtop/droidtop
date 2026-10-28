@@ -349,6 +349,8 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
             backedUpItem(TASKBAR_PINNING_DESKTOP_MODE_KEY, true, EncryptionType.DEVICE_PROTECTED)
         @JvmField
         val LOCK_HOME_SCREEN = backedUpItem(SettingsHomeFragment.LOCK_HOME_SCREEN, false)
+        @JvmField
+        val WRAP_PAGES = backedUpItem(SettingsHomeFragment.WRAP_PAGES, false)
         // droidtop patch: one action per gesture slot instead of one
         // hardcoded action toggled on/off (docs/SPEC.md, Launcher mode
         // survey, "Assignable gesture actions"). Defaults match the old
