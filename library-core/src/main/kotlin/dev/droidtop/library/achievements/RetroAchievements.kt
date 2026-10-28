@@ -32,6 +32,12 @@ sealed interface RaResult {
      * [stale] when the progress shown is older than its time to live because the service could not be reached.
      */
     data class Known(val game: RaGame, val matchedBy: String, val progress: RaProgress?, val stale: Boolean) : RaResult
+
+    /**
+     * RetroAchievements has a game of this title, and no file of the game matches its list: shown only once the person
+     * confirms it ([RaChoices]; Droidtop/tracker#318 decision 7a). Nothing of the person's progress is asked for until then.
+     */
+    data class Proposed(val game: RaGame) : RaResult
 }
 
 /**
@@ -62,8 +68,13 @@ object RetroAchievements {
                 is ScrapeLookup.Refused -> return RaResult.Failed(refusal(list))
                 ScrapeLookup.NoMatch -> emptyList()
             }
-            val identified = identify(directory, entry, console, games)
+            val found = identify(directory, entry, console, games)
                 ?: return RaResult.NotFound("RetroAchievements lists no achievements for this game")
+            val identified = byTitle(found, RaChoices.answer(context, entry.id, found.first.id)) ?: return when {
+                RaChoices.answer(context, entry.id, found.first.id) == RaChoices.Answer.NOT_THIS ->
+                    RaResult.NotFound("You said this is not ${found.first.title} on RetroAchievements")
+                else -> RaResult.Proposed(found.first)
+            }
             val outcome = progress(directory, user, key, identified.first, now)
             when (outcome) {
                 is Progress.Fresh -> RaResult.Known(identified.first, identified.second, outcome.value, stale = false)
@@ -106,6 +117,16 @@ object RetroAchievements {
     }
 
     // ----- which game ------------------------------------------------------
+
+    /**
+     * What a title match may show (decision 7a): a hash match as it is; a title match only once the person confirmed
+     * it, then named so. Null when it waits for an answer or the person said it is not that game. Pure.
+     */
+    internal fun byTitle(found: Pair<RaGame, String>, answer: RaChoices.Answer?): Pair<RaGame, String>? = when {
+        found.second != "name" -> found
+        answer == RaChoices.Answer.CONFIRMED -> found.first to "name, confirmed by you"
+        else -> null
+    }
 
     private fun identify(directory: File, entry: LibraryEntry, console: RaConsole, games: List<RaGame>): Pair<RaGame, String>? {
         if (games.isEmpty()) return null

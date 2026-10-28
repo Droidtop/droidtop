@@ -14642,7 +14642,13 @@ has no row. Before this, a person with no key had no sign the feature existed. I
 and hashes (`API_GetGameList` with hashes, one request per console, kept a week), then, only when no hash matches
 or the file cannot be hashed, by a title that normalises to exactly one RetroAchievements title (`RaMatching`: case,
 punctuation, brackets, "the" and "&" ignored; two games with the same normalised title match nothing). The line says
-which of the two recognised it, so a name match is never presented as a hash match. The person's progress comes from
+which of the two recognised it, so a name match is never presented as a hash match. **A title match is asked, never
+shown by itself (2026-10-28, Droidtop/tracker#318 decision 7a: "Becomes a Tier C review card, never automatic").** The
+row reads "Is it <title>?". Its page offers **Yes, show its achievements** and **Not this game**, and nothing of the
+person's progress is asked for until then. The answer is kept per game on the device (`RaChoices`), and a confirmed
+one also becomes the game's `ra` claim (#318 §2). Confirmed, the line says "Recognised by name, confirmed by you";
+refused, the row says the person said it is not that game, and it is not asked again for that title. A hash match
+needs no answer. The person's progress comes from
 `API_GetGameInfoAndUserProgress` for that game, cached ten minutes; offline, the last progress loaded is shown and
 says so, and being offline alone draws nothing. The chip opens the achievements as a page of rows in the settings
 catalog's own form (`achievementsScreen`): those earned (with the date, "Hardcore" where earned in hardcore), those

@@ -27,6 +27,15 @@ class AchievementRowsTest {
         assertEquals("Not loaded", achievementRowsFor(RaResult.Failed("Refused")).single().value)
     }
 
+    @Test
+    fun aGameRecognisedOnlyByItsTitleIsAskedNotShown() {
+        val game = dev.droidtop.library.achievements.RaGame(42, "Super Metroid", 3, 74, 610, emptyList())
+        val row = achievementRowsFor(RaResult.Proposed(game), "/roms/snes/sm.sfc").single()
+        assertEquals("Is it Super Metroid?", row.value)
+        assertNotNull("the answers open in place of the row", row.screen)
+        assertEquals("Confirm achievements", row.chip)
+    }
+
     private val list = StoreAchievements(
         listOf(
             StoreAchievement("A", "First steps", "Finish the tutorial", earnedAtMs = 1_700_000_000_000L),

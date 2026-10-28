@@ -173,7 +173,7 @@ private fun offline(message: String) = message.startsWith("No connection")
 
 internal suspend fun achievementRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
     // A console game: RetroAchievements. A store's game: the store's own (Steam, Droidtop/tracker#230), in the same row.
-    val retro = achievementRowsFor(RetroAchievements.lookup(context, entry))
+    val retro = achievementRowsFor(RetroAchievements.lookup(context, entry), entry.id)
     if (retro.isNotEmpty()) return retro
     val key = entry.pcInfo?.storeId
     val store = key?.let { dev.droidtop.library.stores.StoreLibraries.forKey(it) }
@@ -251,9 +251,20 @@ internal fun storeAchievementItem(achievement: dev.droidtop.library.stores.Store
     )
 }
 
-/** The rows for what RetroAchievements said about a game. Pure, for the tests. */
-internal fun achievementRowsFor(result: RaResult): List<GameInfoRow> =
+/** The rows for what RetroAchievements said about a game ([entryId] answers a proposal). Pure, for the tests. */
+internal fun achievementRowsFor(result: RaResult, entryId: String = ""): List<GameInfoRow> =
     when (result) {
+        // A title match is asked, never shown by itself (Droidtop/tracker#318 decision 7a): wrong achievements and wrong
+        // progress are worse than none.
+        is RaResult.Proposed -> listOf(
+            GameInfoRow(
+                "Achievements",
+                "Is it ${result.game.title}?",
+                "RetroAchievements has a game of this name, but no file of yours is on its list. Confirm it to see its achievements",
+                screen = raProposalScreen(entryId, result.game),
+                chip = "Confirm achievements",
+            ),
+        )
         RaResult.Unsupported -> emptyList()
         // A console RetroAchievements covers, and no key yet: the feature says it is there (Droidtop/tracker#143).
         RaResult.NotSignedIn -> listOf(
@@ -286,6 +297,45 @@ internal fun achievementRowsFor(result: RaResult): List<GameInfoRow> =
             }
         }
     }
+
+/** The two answers to a RetroAchievements game proposed by title ([RaResult.Proposed]). */
+internal fun raProposalScreen(entryId: String, game: dev.droidtop.library.achievements.RaGame): CatalogScreen = CatalogScreen(
+    id = "ra_proposal_${game.id}",
+    title = game.title,
+    subtitle = "${game.numAchievements} achievements, ${game.points} points",
+    groups = {
+        listOf(
+            CatalogGroup(
+                "ra_proposal",
+                "Is this game ${game.title} on RetroAchievements?",
+                listOf(
+                    AsyncActionItem(
+                        id = "ra_confirm",
+                        title = "Yes, show its achievements",
+                        subtitle = "Your progress in it shows on this game from now on",
+                        run = { ctx, _ ->
+                            dev.droidtop.library.achievements.RaChoices.confirm(ctx, entryId, game.id)
+                            // What the person confirmed is who the game is (#318 §2): a claim later devices can use.
+                            dev.droidtop.library.identity.LibraryIdentities.claim(
+                                ctx, entryId, null, listOf(dev.droidtop.library.identity.Claim(dev.droidtop.library.identity.ClaimNamespaces.RA, game.id.toString())), "manual",
+                            )
+                            "Achievements for ${game.title} show on this game"
+                        },
+                    ),
+                    AsyncActionItem(
+                        id = "ra_not_this",
+                        title = "Not this game",
+                        subtitle = "droidtop does not ask about it again",
+                        run = { ctx, _ ->
+                            dev.droidtop.library.achievements.RaChoices.notThis(ctx, entryId, game.id)
+                            "droidtop will not show ${game.title}'s achievements on this game"
+                        },
+                    ),
+                ),
+            ),
+        )
+    },
+)
 
 internal fun playTimeRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
     val title = entry.gameName ?: GameNaming.displayName(entry.title)
