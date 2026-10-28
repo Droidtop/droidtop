@@ -15,6 +15,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import dev.droidtop.library.OwnGameScreens
 import dev.droidtop.library.PadMouse
+import dev.droidtop.mapping.ControllerLayout
 import dev.droidtop.library.PadMousePrefs
 import dev.droidtop.library.diagnostics.RunRecords
 import dev.droidtop.runtime.windows.data.TouchGestureConfig
@@ -116,6 +117,12 @@ class WineGameActivity : Activity() {
         override val pointer: OwnGameScreens.Pointer? get() = this@WineGameActivity.gamePointer
         override fun setPadMouse(on: Boolean) {
             runOnUiThread { this@WineGameActivity.padMouse?.let { it.set(it.settings.copy(on = on)) } }
+        }
+        override val keyboardMouse: Boolean? get() = this@WineGameActivity.layoutDriver?.on
+        override fun setKeyboardMouse(on: Boolean) {
+            runOnUiThread { this@WineGameActivity.layoutDriver?.on = on }
+            val id = this@WineGameActivity.entryId ?: return
+            startupExecutor.execute { WineControlsPrefs.setKeyboardMouse(applicationContext, id, on) }
         }
         override fun stop() {
             // The guest's teardown is queued now (off the main thread), so a relaunch that follows
@@ -252,6 +259,19 @@ class WineGameActivity : Activity() {
             startupExecutor.execute {
                 val initial = PadMouse.initial(PadMousePrefs.stored(applicationContext, id), runnerNeedsMouse = false)
                 runOnUiThread { mouseMode.settings = initial; showPadMouse(initial.on, announce = false) }
+            }
+        }
+
+        // The keyboard-and-mouse layout (Droidtop/tracker#618): read and parsed off the main thread, on when this game
+        // was left with it on.
+        startupExecutor.execute {
+            val layout = runCatching {
+                resources.openRawResource(R.raw.controls_keyboard_mouse).bufferedReader().use { ControllerLayout.parse(it.readText()) }
+            }.getOrNull() ?: return@execute
+            val on = entryId?.let { WineControlsPrefs.keyboardMouse(applicationContext, it) } ?: false
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                layoutDriver = LayoutDriver(xServer, pointer, layout).also { it.on = on }
             }
         }
 
@@ -497,6 +517,8 @@ class WineGameActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP) it.hide()
             return true
         }
+        // A keyboard-and-mouse layout, when on, plays the pad buttons it binds; mouse mode then sees none of them.
+        if (layoutDriver?.onKey(event) == true) return true
         // Mouse mode takes its clicks and scroll hold first, and always watches for its on/off combination.
         if (padMouse?.onKey(event) == true) return true
         if (winHandler?.onKeyEvent(event) == true) return true
@@ -522,6 +544,7 @@ class WineGameActivity : Activity() {
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (layoutDriver?.onMotion(event) == true) return true
         if (padMouse?.onMotion(event) == true) return true
         if (winHandler?.onGenericMotionEvent(event) == true) return true
         if (touchMouse?.onExternalMouseEvent(event) == true) return true
@@ -531,6 +554,9 @@ class WineGameActivity : Activity() {
     // ---- controller mouse mode ----------------------------------------
 
     private var padMouse: PadMouseDriver? = null
+
+    /** The keyboard-and-mouse layout's driver, once its layout is read; off unless the game was left with it on. */
+    private var layoutDriver: LayoutDriver? = null
 
     /** The visible sign that the pad is a mouse: a small badge in the top corner while it is on. */
     private val padMouseBadge by lazy {
@@ -579,6 +605,7 @@ class WineGameActivity : Activity() {
     override fun onDestroy() {
         // The game is over for good (not a rotation): its cloud saves go up.
         OwnGameScreens.unregister(ownScreen)
+        layoutDriver?.close()
         if (isFinishing) entryId?.let { dev.droidtop.library.stores.StoreSaves.afterExit(applicationContext, it) }
         session?.stop()
         session = null

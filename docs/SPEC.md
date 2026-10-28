@@ -7268,7 +7268,14 @@ mode it moves the pointer at each tick by Controller mouse mode's curve (above) 
 percent, in screen widths the sink scales; in `joystick_move` mode it is passed through as the pad's stick
 (`output_joystick` 0 left, 1 right, else the stick it came from). Pure; time is passed in. Chords, turbo, joystick
 camera, scroll wheel, menus and layers come next, then the Wine sink and the defaults; until then
-Controller mouse mode above is the pad's only pointer.
+Controller mouse mode above is the pad's only pointer. **The Wine sink** (`LayoutDriver`): a Windows
+game's Quick Menu Game section has a Controls row, Gamepad or "Keyboard and mouse", kept per game
+(`WineControlsPrefs`, off by default); with it on, the pad plays droidtop's bundled "Keyboard (WASD) and Mouse"
+layout (`res/raw/controls_keyboard_mouse.vdf`, Steam's format, our own, CC BY 4.0 as the owner chose for layouts:
+left stick WASD and its click Shift, right stick the mouse, R2 left click, L2 right click, A Space, B Ctrl, X R, Y E,
+L1 Q, R1 F, the d-pad 1 to 4, Start Escape, Select Tab). Its keys reach the X server by Steam's key names
+(`WineKeyNames`), its mouse through the game's one pointer, as mouse mode does; a pad button the layout leaves
+unbound still reaches the game as the pad. The engine ticks each frame while it is on.
 
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with
