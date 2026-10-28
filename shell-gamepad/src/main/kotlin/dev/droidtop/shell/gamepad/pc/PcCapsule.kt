@@ -215,6 +215,8 @@ internal fun PcCapsule(
     download: PluginJobsCenter.Entry? = null,
     parts: Int = 1,
     hero: Boolean = false,
+    // The art's shape; a hero card widening or narrowing passes its width over the capsules' height on the way.
+    aspect: Float = if (hero) HERO_ASPECT else CAPSULE_ASPECT,
     badge: KindBadge? = null,
     // The name under the art (PC Games' "Show names under images", docs/SPEC.md 7i, Droidtop/tracker#578). A card
     // with no art carries its name on its plate whatever this says; a hero card has its own name under it.
@@ -244,7 +246,7 @@ internal fun PcCapsule(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(if (hero) HERO_ASPECT else CAPSULE_ASPECT)
+            .aspectRatio(aspect)
             // The capsule under the cursor says where it is, so its page can grow out of it
             // (PageFlood.kt); only that one, so a scroll costs the others nothing.
             .then(
