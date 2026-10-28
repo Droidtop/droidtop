@@ -1177,6 +1177,12 @@ object AppSettingsCatalogs {
                     guidedKeyRow(context, ScraperKeyService.PIXELDRAIN, "PixelDrain"),
                 ),
             ),
+            // droidtop's own sign-ins for download sites (docs/SPEC.md 12a "Download sites", Droidtop/tracker#648).
+            CatalogGroup(
+                id = "accounts_download_sites",
+                title = "Download sites",
+                items = downloadSiteRows(context) + addDownloadSiteRow(),
+            ),
             CatalogGroup(
                 id = "accounts_plugins",
                 title = "Plugins and integrations",
@@ -1200,6 +1206,115 @@ object AppSettingsCatalogs {
             ),
         )
     }
+
+    /** What Add site's address field holds until Add is pressed. */
+    @Volatile private var pendingSiteAddress = ""
+
+    /**
+     * One row per download site (docs/SPEC.md 12a "Download sites"), as a plugin's account row behaves: a shipped site
+     * signed out signs in at once; signed in, or an added site, opens its page with Sign out, and Remove for an added one.
+     * Disk: call off the main thread.
+     */
+    private fun downloadSiteRows(context: Context): List<CatalogItem> = dev.droidtop.pluginhost.DownloadSites.all(context).map { site ->
+        val sites = dev.droidtop.pluginhost.DownloadSites
+        val id = "accounts_download_site_" + site.domain.replace(Regex("[^a-z0-9]"), "_")
+        val state = if (sites.signedIn(context, site)) "Signed in" else "Not signed in"
+        val subtitle = "Your sign-in stays in droidtop, and plugins never see it"
+        if (site.shipped && state == "Not signed in") {
+            return@map AsyncActionItem(id = id, title = site.name, subtitle = subtitle, value = state, run = { ctx, _ -> signInToSite(ctx, site) })
+        }
+        NestedScreenItem(
+            id = id,
+            title = site.name,
+            subtitle = subtitle,
+            valueLabel = { state },
+            inline = CatalogScreen(
+                id = "${id}_screen",
+                title = site.name,
+                subtitle = site.domain,
+                groups = { ctx ->
+                    val signedIn = withContext(Dispatchers.IO) { sites.signedIn(ctx, site) }
+                    listOf(
+                        CatalogGroup(
+                            id = "${id}_actions",
+                            title = null,
+                            items = buildList {
+                                if (!signedIn) {
+                                    add(AsyncActionItem(id = "${id}_sign_in", title = "Sign in", value = "Not signed in", run = { c, _ -> signInToSite(c, site) }))
+                                } else {
+                                    add(
+                                        AsyncActionItem(
+                                            id = "${id}_sign_out",
+                                            title = "Sign out",
+                                            value = "Signed in",
+                                            confirmTitle = "Sign out of ${site.name}?",
+                                            run = { c, _ -> if (withContext(Dispatchers.IO) { sites.signOut(c, site) }) "Signed out of ${site.name}" else "Already signed out" },
+                                        ),
+                                    )
+                                }
+                                if (!site.shipped) {
+                                    add(
+                                        AsyncActionItem(
+                                            id = "${id}_remove",
+                                            title = "Remove",
+                                            subtitle = "Takes ${site.name} off the list and signs out of it",
+                                            confirmTitle = "Remove ${site.name}?",
+                                            run = { c, _ -> withContext(Dispatchers.IO) { sites.remove(c, site) }; "Removed ${site.name}" },
+                                        ),
+                                    )
+                                }
+                            },
+                        ),
+                    )
+                },
+            ),
+        )
+    }
+
+    /** Signs in to a download site in droidtop's web view; waits for the view to close, so never on the main thread. */
+    private suspend fun signInToSite(ctx: Context, site: dev.droidtop.pluginhost.DownloadSites.Site): String =
+        if (withContext(Dispatchers.IO) { dev.droidtop.pluginhost.DownloadSites.signIn(ctx, site) }) "Signed in to ${site.name}" else "Not signed in to ${site.name}"
+
+    /** The list's last row: Add site asks for the site's https address (its sign-in page) and adds it. */
+    private fun addDownloadSiteRow(): CatalogItem = NestedScreenItem(
+        id = "accounts_download_sites_add",
+        title = "Add site",
+        subtitle = "Another download site to sign in to once, by its address",
+        inline = CatalogScreen(
+            id = "accounts_download_sites_add_screen",
+            title = "Add site",
+            groups = {
+                listOf(
+                    CatalogGroup(
+                        id = "accounts_download_sites_add_group",
+                        title = null,
+                        items = listOf(
+                            TextInputItem(
+                                id = "accounts_download_sites_add_address",
+                                title = "Site address",
+                                subtitle = "Its https address, best its sign-in page, such as https://example.com/login",
+                                value = pendingSiteAddress,
+                                onChange = { _, v -> pendingSiteAddress = v.trim() },
+                            ),
+                            AsyncActionItem(
+                                id = "accounts_download_sites_add_run",
+                                title = "Add",
+                                run = { ctx, _ ->
+                                    when (val added = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.DownloadSites.add(ctx, pendingSiteAddress) }) {
+                                        is dev.droidtop.pluginhost.DownloadSites.Added.Site -> {
+                                            pendingSiteAddress = ""
+                                            "Added ${added.site.name}. Open it under Download sites to sign in"
+                                        }
+                                        is dev.droidtop.pluginhost.DownloadSites.Added.Refused -> added.reason
+                                    }
+                                },
+                            ),
+                        ),
+                    ),
+                )
+            },
+        ),
+    )
 
     /**
      * An optional source that needs the person's own credential: one row,
