@@ -1,7 +1,6 @@
 package dev.droidtop.library.scraper
 
-import java.net.HttpURLConnection
-import java.net.URL
+import dev.droidtop.net.Http
 import java.text.DateFormat
 import java.util.Date
 import org.json.JSONObject
@@ -31,24 +30,14 @@ object SteamNewsClient {
 
     /** Network: never on the main thread. */
     fun latest(appId: Long): ScrapeLookup<SteamNewsItem> {
-        val url = URL(
-            "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/" +
-                "?appid=$appId&count=$COUNT&maxlength=$EXCERPT_CHARS&feeds=steam_community_announcements&format=json",
-        )
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
-        }
-        return try {
-            when (val status = connection.responseCode) {
-                200 -> parse(JSONObject(connection.inputStream.bufferedReader().use { it.readText().take(MAX_CHARS) }))
-                // Steam answers an app it does not know with 403 or 404.
-                403, 404 -> ScrapeLookup.NoMatch
-                else -> ScrapeRefusals.refused("Steam news", connection, status, emptyList(), "app $appId")
-            }
-        } finally {
-            connection.disconnect()
+        val url = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/" +
+            "?appid=$appId&count=$COUNT&maxlength=$EXCERPT_CHARS&feeds=steam_community_announcements&format=json"
+        val response = Http.request(url, maxBytes = MAX_BYTES)
+        return when (response.status) {
+            200 -> parse(JSONObject(response.text()))
+            // Steam answers an app it does not know with 403 or 404.
+            403, 404 -> ScrapeLookup.NoMatch
+            else -> ScrapeRefusals.refused("Steam news", response, emptyList(), "app $appId")
         }
     }
 
@@ -82,8 +71,7 @@ object SteamNewsClient {
 
     private const val COUNT = 10
     private const val EXCERPT_CHARS = 280
-    private const val TIMEOUT_MS = 15_000
-    private const val MAX_CHARS = 256 * 1024
+    private const val MAX_BYTES = 256L * 1024
 }
 
 /** "Patch notes, 3 Oct 2026" or "News, 3 Oct 2026"; the kind alone when Steam gave no date. */

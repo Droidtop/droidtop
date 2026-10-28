@@ -1,9 +1,8 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import dev.droidtop.library.LibraryEntry
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * ProtonDB's own summary for one Steam app, as its public endpoint
@@ -31,20 +30,12 @@ object ProtonDbClient {
     fun pageUrl(appId: Long): String = "https://www.protondb.com/app/$appId"
 
     fun summary(appId: Long): ScrapeLookup<ProtonDbSummary> {
-        val connection = (URL("https://www.protondb.com/api/v1/reports/summaries/$appId.json").openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
-        }
-        return try {
-            when (val status = connection.responseCode) {
-                200 -> parse(JSONObject(connection.inputStream.bufferedReader().use { it.readText().take(MAX_CHARS) }))
-                // ProtonDB answers an app nobody has reported with 404.
-                404 -> ScrapeLookup.NoMatch
-                else -> ScrapeRefusals.refused("ProtonDB", connection, status, emptyList(), "app $appId")
-            }
-        } finally {
-            connection.disconnect()
+        val response = Http.request("https://www.protondb.com/api/v1/reports/summaries/$appId.json", maxBytes = MAX_BYTES)
+        return when (response.status) {
+            200 -> parse(JSONObject(response.text()))
+            // ProtonDB answers an app nobody has reported with 404.
+            404 -> ScrapeLookup.NoMatch
+            else -> ScrapeRefusals.refused("ProtonDB", response, emptyList(), "app $appId")
         }
     }
 
@@ -82,8 +73,7 @@ object ProtonDbClient {
 
     private fun normalized(name: String): String = name.lowercase().filter { it.isLetterOrDigit() }
 
-    private const val TIMEOUT_MS = 15_000
-    private const val MAX_CHARS = 64 * 1024
+    private const val MAX_BYTES = 64L * 1024
 }
 
 /**

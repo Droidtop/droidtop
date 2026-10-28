@@ -1,7 +1,6 @@
 package dev.droidtop.library.scraper
 
-import java.net.HttpURLConnection
-import java.net.URL
+import dev.droidtop.net.Http
 import java.net.URLEncoder
 
 /**
@@ -90,13 +89,7 @@ object LibretroThumbnails {
         val encodedName = URLEncoder.encode(thumbnailName(gameName), "UTF-8").replace("+", "%20")
         val url = "https://thumbnails.libretro.com/$encodedSystem/$repo/$encodedName.png"
         return runCatching {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.requestMethod = "HEAD"
-            connection.connectTimeout = 8000
-            connection.readTimeout = 8000
-            val ok = connection.responseCode == 200
-            connection.disconnect()
-            if (ok) url else null
+            if (Http.request(url, method = "HEAD", timeouts = Http.Media.timeouts).status == 200) url else null
         }.getOrNull()
     }
 }

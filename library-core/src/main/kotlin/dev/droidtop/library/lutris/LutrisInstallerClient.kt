@@ -1,10 +1,9 @@
 package dev.droidtop.library.lutris
 
+import dev.droidtop.net.Http
 import dev.droidtop.library.scraper.ScrapeLookup
 import dev.droidtop.library.scraper.ScrapeRefusals
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * One published Lutris installer for a game, as lutris.net's own API
@@ -40,37 +39,17 @@ object LutrisInstallerClient {
 
     fun forGame(gameSlug: String): ScrapeLookup<List<LutrisInstaller>> {
         if (!SLUG.matches(gameSlug)) throw LutrisScriptRefused("\"$gameSlug\" is not a Lutris game id")
-        val connection = (URL("https://lutris.net/api/installers/$gameSlug").openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
+        val response = try {
+            Http.request("https://lutris.net/api/installers/$gameSlug", maxBytes = MAX_BYTES.toLong())
+        } catch (_: Http.TooLarge) {
+            throw LutrisScriptRefused("lutris.net sent more than droidtop reads for one game")
         }
-        return try {
-            val status = connection.responseCode
-            when (status) {
-                200 -> parse(JSONObject(readBounded(connection)))
-                // Lutris answers an unknown game with its 404 page: no installers.
-                404 -> ScrapeLookup.NoMatch
-                else -> ScrapeRefusals.refused("Lutris", connection, status, emptyList(), gameSlug)
-            }
-        } finally {
-            connection.disconnect()
+        return when (response.status) {
+            200 -> parse(JSONObject(response.text()))
+            // Lutris answers an unknown game with its 404 page: no installers.
+            404 -> ScrapeLookup.NoMatch
+            else -> ScrapeRefusals.refused("Lutris", response, emptyList(), gameSlug)
         }
-    }
-
-    private fun readBounded(connection: HttpURLConnection): String {
-        val bytes = connection.inputStream.use { input ->
-            val out = java.io.ByteArrayOutputStream()
-            val buffer = ByteArray(16 * 1024)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                out.write(buffer, 0, read)
-                if (out.size() > MAX_BYTES) throw LutrisScriptRefused("lutris.net sent more than droidtop reads for one game")
-            }
-            out.toByteArray()
-        }
-        return String(bytes, Charsets.UTF_8)
     }
 
     /** Pure, for the JVM tests. Rows without a script object are skipped. */
@@ -91,5 +70,4 @@ object LutrisInstallerClient {
         return if (parsed.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(parsed.sortedByDescending { it.importable })
     }
 
-    private const val TIMEOUT_MS = 15_000
 }

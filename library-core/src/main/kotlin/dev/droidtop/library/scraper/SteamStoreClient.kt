@@ -1,8 +1,7 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.TimeZone
@@ -38,10 +37,9 @@ object SteamStoreClient {
     private val pacing = RequestPacing(minimumIntervalMs = 1_500L)
 
     fun appDetails(appId: Int): ScrapeLookup<PcMatch> {
-        val connection = open("https://store.steampowered.com/api/appdetails?appids=$appId&l=english")
-        val status = connection.responseCode
-        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, emptyList(), "app $appId")
-        return parse(appId, JSONObject(connection.inputStream.bufferedReader().readText()))
+        val response = get("https://store.steampowered.com/api/appdetails?appids=$appId&l=english")
+        if (response.status != 200) return ScrapeRefusals.refused(SOURCE, response, emptyList(), "app $appId")
+        return parse(appId, JSONObject(response.text()))
     }
 
     /**
@@ -52,10 +50,9 @@ object SteamStoreClient {
      */
     fun search(term: String): ScrapeLookup<List<PcMatch>> {
         val query = java.net.URLEncoder.encode(term, "UTF-8").replace("+", "%20")
-        val connection = open("https://store.steampowered.com/api/storesearch/?term=$query&l=english&cc=US")
-        val status = connection.responseCode
-        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, emptyList(), "search \"$term\"")
-        return parseSearch(JSONObject(connection.inputStream.bufferedReader().readText()))
+        val response = get("https://store.steampowered.com/api/storesearch/?term=$query&l=english&cc=US")
+        if (response.status != 200) return ScrapeRefusals.refused(SOURCE, response, emptyList(), "search \"$term\"")
+        return parseSearch(JSONObject(response.text()))
     }
 
     /** Pure, for the JVM tests. Bundles and anything without an app id are left out; nothing found is a real miss. */
@@ -71,17 +68,13 @@ object SteamStoreClient {
         return if (matches.isEmpty()) ScrapeLookup.NoMatch else ScrapeLookup.Found(matches)
     }
 
-    private fun open(address: String): HttpURLConnection {
+    private fun get(address: String): Http.Response {
         synchronized(pacing) {
             val wait = pacing.delayBeforeRequest(System.currentTimeMillis())
             if (wait > 0) Thread.sleep(wait)
             pacing.requestStarted(System.currentTimeMillis())
         }
-        return (URL(address).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 10_000
-            readTimeout = 20_000
-        }
+        return Http.request(address, maxBytes = 4L * 1024 * 1024)
     }
 
     /** Pure, so the JVM tests exercise it against captured response shapes. */

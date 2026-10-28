@@ -1,9 +1,8 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import android.content.Context
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 
 /**
@@ -26,6 +25,9 @@ import java.net.URLEncoder
  * parsed tolerantly, unknown keys ignored.
  */
 object LibretroMetadata {
+    /** A metadat DAT is a few megabytes at most; this is the most of one droidtop reads. */
+    private const val DAT_MAX_BYTES = 32L * 1024 * 1024
+
 
     data class Fields(
         val genre: String?,
@@ -90,15 +92,11 @@ object LibretroMetadata {
         val encoded = URLEncoder.encode(systemName, "UTF-8").replace("+", "%20")
         val url = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat/$category/$encoded.dat"
         return runCatching<ScrapeLookup<String>> {
-            val connection = URL(url).openConnection() as HttpURLConnection
-            connection.connectTimeout = 10000
-            connection.readTimeout = 20000
-            val status = connection.responseCode
-            if (status != 200) {
-                ScrapeRefusals.refused("libretro-database", connection, status, emptyList(), "$category/$systemName")
-                    .also { connection.disconnect() }
+            val response = Http.request(url, maxBytes = DAT_MAX_BYTES)
+            if (response.status != 200) {
+                ScrapeRefusals.refused("libretro-database", response, emptyList(), "$category/$systemName")
             } else {
-                val text = connection.inputStream.bufferedReader().use { it.readText() }
+                val text = response.text()
                 cache.parentFile?.mkdirs()
                 cache.writeText(text)
                 ScrapeLookup.Found(text)

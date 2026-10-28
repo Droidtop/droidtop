@@ -1,8 +1,7 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 
 /**
@@ -65,6 +64,7 @@ data class LutrisGameDetails(val description: String?, val genre: String?)
  */
 object LutrisScraperClient {
     private const val MAX_RESULTS = 10
+    private const val MAX_BYTES = 2L * 1024 * 1024
 
     /**
      * Every result Lutris returns for [gameTitle], newest-first as the
@@ -82,15 +82,9 @@ object LutrisScraperClient {
      */
     fun search(gameTitle: String): ScrapeLookup<List<LutrisGameResult>> {
         val query = URLEncoder.encode(gameTitle, "UTF-8")
-        val url = URL("https://lutris.net/api/games?search=$query")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 10_000
-            readTimeout = 20_000
-        }
-        val status = connection.responseCode
-        if (status != 200) return ScrapeRefusals.refused("Lutris", connection, status, emptyList(), gameTitle)
-        return parse(JSONObject(connection.inputStream.bufferedReader().readText()))
+        val response = Http.request("https://lutris.net/api/games?search=$query", maxBytes = MAX_BYTES)
+        if (response.status != 200) return ScrapeRefusals.refused("Lutris", response, emptyList(), gameTitle)
+        return parse(JSONObject(response.text()))
     }
 
     /**
@@ -100,16 +94,10 @@ object LutrisScraperClient {
      */
     fun details(slug: String): ScrapeLookup<LutrisGameDetails> {
         val path = URLEncoder.encode(slug, "UTF-8").replace("+", "%20")
-        val url = URL("https://lutris.net/api/games/$path")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 10_000
-            readTimeout = 20_000
-        }
-        val status = connection.responseCode
-        if (status == 404) return ScrapeLookup.NoMatch
-        if (status != 200) return ScrapeRefusals.refused("Lutris", connection, status, emptyList(), slug)
-        return parseDetails(JSONObject(connection.inputStream.bufferedReader().readText()))
+        val response = Http.request("https://lutris.net/api/games/$path", maxBytes = MAX_BYTES)
+        if (response.status == 404) return ScrapeLookup.NoMatch
+        if (response.status != 200) return ScrapeRefusals.refused("Lutris", response, emptyList(), slug)
+        return parseDetails(JSONObject(response.text()))
     }
 
     /** Pure, for the JVM tests. */

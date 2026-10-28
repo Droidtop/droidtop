@@ -1,5 +1,6 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import java.net.HttpURLConnection
 
 /**
@@ -86,8 +87,14 @@ object ScrapeRefusals {
         status: Int,
         secrets: List<String>,
         subject: String,
-    ): ScrapeLookup.Refused {
-        val reason = summarizeErrorBody(readBoundedErrorBody(connection), secrets)
+    ): ScrapeLookup.Refused = refused(source, status, readBoundedErrorBody(connection), secrets, subject)
+
+    /** The same refusal for an answer [Http.request] returned. */
+    fun refused(source: String, response: Http.Response, secrets: List<String>, subject: String): ScrapeLookup.Refused =
+        refused(source, response.status, response.text().take(ERROR_BODY_MAX_CHARS), secrets, subject)
+
+    private fun refused(source: String, status: Int, body: String, secrets: List<String>, subject: String): ScrapeLookup.Refused {
+        val reason = summarizeErrorBody(body, secrets)
         android.util.Log.w(
             "droidtop.Scraper",
             "$source refused $subject: HTTP $status" +
