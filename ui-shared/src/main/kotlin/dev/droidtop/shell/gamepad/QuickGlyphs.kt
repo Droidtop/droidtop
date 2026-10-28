@@ -23,6 +23,7 @@ enum class QuickGlyph {
     // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
     CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
     PROFILE,
+    SEARCH,
 }
 
 
@@ -221,6 +222,11 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
                 ring(12f, 12f, 9f)
                 ring(12f, 9.5f, 3f)
                 arc(12f, 20f, 6f, 200f, 140f)
+            }
+            QuickGlyph.SEARCH -> {
+                // A magnifier: the lens and its handle.
+                ring(10.5f, 10.5f, 6.5f)
+                line(15.3f, 15.3f, 20f, 20f)
             }
             QuickGlyph.PLUGIN -> {
                 // A puzzle piece, as the left menu's Plugins row: a square with a knob on its top and one on its right.

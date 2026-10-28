@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -343,8 +344,13 @@ fun QuickMenuStandalone(
     onDismiss: () -> Unit,
     // The tab it opens on (OverlayQuickMenuRigTest opens each one); null for the menu's own choice.
     startSection: QuickSection? = null,
+    // Power and mode's Search tile (Droidtop/tracker#621 M4), where the host has the one search (over a game); null
+    // for none (Desktop's tray). Kiosk and Kid never get it, as in Gaming.
+    onSearch: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val uiMode by dev.droidtop.library.settings.UiModeRefresh.mode.collectAsState()
+    val searchable = onSearch != null && dev.droidtop.shell.gamepad.menuSectionsFor(uiMode).any { it.managesDevice }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         QuickMenu(
             runningEntry = null,
@@ -359,6 +365,7 @@ fun QuickMenuStandalone(
             },
             onDismiss = onDismiss,
             startSection = startSection,
+            onSearch = onSearch?.takeIf { searchable },
         )
     }
 }
@@ -384,7 +391,7 @@ fun MenuPickerStandalone(
             rows = listOf(
                 dev.droidtop.shell.gamepad.ActionRow("Quick Menu", "What R2 opens: running apps, notifications, settings", onSelect = onQuickMenu),
                 dev.droidtop.shell.gamepad.ActionRow(contextTitle, "What L2 opens for what is on screen", onSelect = onContextMenu),
-                dev.droidtop.shell.gamepad.ActionRow("Start menu", "What Start opens: droidtop's places and search", onSelect = onStartMenu),
+                dev.droidtop.shell.gamepad.ActionRow("Start menu", "What Start opens: droidtop's places", onSelect = onStartMenu),
                 dev.droidtop.shell.gamepad.ActionRow("Switch mode", "Gaming, Mobile or Desktop", onSelect = onSwitchMode),
             ),
             onDismiss = onDismiss,
@@ -398,7 +405,7 @@ private val HOSTED_SHEET_WIDTH = 520.dp
 /**
  * The left menu's launcher content over a game (HOME + Start, docs/SPEC.md "In-game overlays: HOME chords",
  * Droidtop/tracker#740): the shell's own [dev.droidtop.shell.gamepad.LeftMenu], with the destinations the UI mode
- * allows, Resume first while a game runs and the cursor on it, then Search. A destination is opened by the host
+ * allows, Resume first while a game runs and the cursor on it. A destination is opened by the host
  * ([onOpenSection], a Gaming section's name, and its place's screen id when it is a place), which leaves the game
  * for droidtop; R2 swaps to the Quick Menu, as it does in Gaming.
  */
@@ -411,7 +418,6 @@ fun LeftMenuStandalone(
     onResume: () -> Unit,
     onOpenSection: (section: String, placeScreenId: String?) -> Unit,
     onOpenQuickMenu: () -> Unit,
-    onSearch: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     // Read from storage before anything is drawn: over a game the shell may never have loaded the live mode, and Kiosk
@@ -431,8 +437,6 @@ fun LeftMenuStandalone(
             onResume = onResume,
             onSelect = { entry -> onOpenSection(entry.section.name, entry.section.placeScreenId) },
             onOpenQuickMenu = onOpenQuickMenu,
-            // Kiosk and Kid have no Search here either (the same rule as the shell's left menu).
-            onSearch = if (all.any { it.managesDevice }) onSearch else null,
             onDismiss = onDismiss,
         )
     }
