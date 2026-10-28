@@ -87,7 +87,21 @@ class PluginWidgetProvider : AppWidgetProvider() {
                 views.setImageViewBitmap(R.id.widget_image, it)
                 views.setViewVisibility(R.id.widget_image, View.VISIBLE)
             }
-            content.action?.let { views.setOnClickPendingIntent(R.id.widget_root, PluginWidgetActionReceiver.intent(context, id, key, it)) }
+            val whole = content.action?.let { PluginWidgetActionReceiver.intent(context, id, key, it) }
+                // Nothing of the plugin's own to press (a status tile, a snapshot with no action): the tap opens
+                // droidtop's Plugins place, where the plugin is, instead of falling to the launcher, which reopened
+                // the source chooser (RP5, build 2011, Droidtop/tracker#563).
+                ?: if (rows.none { it.tap != null }) {
+                    DroidtopWidgets.activity(
+                        context,
+                        id,
+                        "plugin-widget-place-$id",
+                        dev.droidtop.library.settings.CatalogScreenLink.intent(context, dev.droidtop.app.settings.AppSettingsCatalogs.SCREEN_PLUGINS),
+                    )
+                } else {
+                    null
+                }
+            whole?.let { views.setOnClickPendingIntent(R.id.widget_root, it) }
             return views
         }
 
