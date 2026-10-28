@@ -572,6 +572,13 @@ it plus the integrations only that surface can offer.
 
 `GameLaunchActivity` is not exported (`android:exported="false"`, 2026-09-28): every internal caller uses an explicit component intent or the library's direct `launchInBackground`, so no external package needs direct access. The index-backed lookup (c35c36f4) makes the surface safe to narrow.
 
+**Other apps that start games (Droidtop/tracker#124).** Owner, 2026-09-28: "Maybe we flag that behind a permissions system too? But that's for later, disabling for now is the right call". The issue asks for the entry re-exposed behind a per-caller Allow / Ask / Block, remembered, on the plugin API's permission model "rather than a second mechanism". Built so:
+- `ExternalGameLaunchActivity` takes the same action (`dev.droidtop.app.action.LAUNCH_GAME`, the entry's id in `dev.droidtop.app.extra.ENTRY_ID`), exported; `GameLaunchActivity` stays unexported for droidtop's own pins.
+- **droidtop must know who asks.** A caller is named only by what Android vouches for: `getCallingPackage` (the app used `startActivityForResult`) or, on Android 14 and later, `getLaunchedFromPackage` (the app shared its identity with `ActivityOptions.setShareIdentityEnabled(true)`). A caller it cannot name is refused with a sentence saying so; the referrer is never used, since an app sets it to anything.
+- Each app holds one permission, `launch.games`, in a `PluginGrants` store of its own (`files/app-grants`, so an app is never mistaken for a plugin with the same id): Allowed, Ask first or Blocked, the same three states as a plugin's permission (plugin-api 4.3). An app with no answer is asked on the plugin API's first-use sheet, "<app> wants to start games from your library", with Allow / Not now / Never, tiered as dangerous; Not now lasts this run of droidtop (`PluginRefusals`, under `app:<package>`) and leaves the app listed as Ask first. A blocked or put-off app is refused with a flash naming where to change it.
+- The answers are under Accounts and sources > Plugins > Apps that start games, beside the plugins' own grants (plugin-api 4.4), each app with the same three chips; an app appears there once it has asked.
+- The launch itself is `GameLaunchActivity.dispatch`, the one path every surface uses.
+
 The slow rebuild pass is core, not Gaming's: every surface that shows the
 library reads the same index (the Launcher's Games grid, Gaming's rows,
 Desktop's objects), and it runs only while one of them is observing the

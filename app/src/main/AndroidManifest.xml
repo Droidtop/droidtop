@@ -202,6 +202,25 @@
         </activity>
 
         <!--
+          Another app asking droidtop to start a game (Droidtop/tracker#124): the same
+          action, exported, behind a per-app Allow, Ask first or Blocked answer on the
+          plugin API's grant model (ExternalGameLaunch). The internal entry above stays
+          unexported; another app cannot resolve it. Translucent, so the first-use sheet
+          it may open is started from a visible activity; its own task, out of Recents.
+        -->
+        <activity
+            android:name="dev.droidtop.app.ExternalGameLaunchActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="dev.droidtop.app.action.LAUNCH_GAME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!--
           "Continue playing" home-screen widget (docs/SPEC.md Launcher mode,
           "full computer" direction): the library's own recently-played
           games, placeable like any Nova/Apex widget from the Standard

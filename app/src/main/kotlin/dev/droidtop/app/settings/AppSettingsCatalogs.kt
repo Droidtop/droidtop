@@ -1441,6 +1441,13 @@ object AppSettingsCatalogs {
                         subtitle = "Which plugin or app opens which kind of link, and sending a kind of link to an app",
                         registryId = dev.droidtop.library.integrations.LinkRouter.HANDLERS_ID,
                     ),
+                    // Other apps that asked to start a game (Droidtop/tracker#124): their answers live with the plugins' grants.
+                    NestedScreenItem(
+                        id = "plugins_external_launch",
+                        title = "Apps that start games",
+                        subtitle = "Other apps that asked droidtop to start a game from your library",
+                        inline = externalLaunchScreen(),
+                    ),
                     // One place for where plugins come from (#513): catalogs, repositories and keys, side by side.
                     NestedScreenItem(
                         id = "plugins_sources",
@@ -2525,6 +2532,51 @@ object AppSettingsCatalogs {
      * Accounts and sources > Plugins > one plugin > Permissions (docs/plugin-api.md 4.4): every declared permission with its state and when
      * the audit log last saw it used. A change is written at once and takes effect on the plugin's next call.
      */
+    /**
+     * Accounts and sources > Plugins > Apps that start games (Droidtop/tracker#124, docs/SPEC.md 7 "Other apps that start
+     * games"): every app that asked, with its answer as the same three chips a plugin's permission has. An app is listed
+     * once it asked; nothing here can add one.
+     */
+    private fun externalLaunchScreen() = CatalogScreen(
+        id = "plugins_external_launch_screen",
+        title = "Apps that start games",
+        subtitle = "An app asks the first time; a change applies to its next request",
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                val callers = dev.droidtop.app.ExternalGameLaunch.callers(context)
+                val rows: List<CatalogItem> = callers.map { pkg ->
+                    val state = dev.droidtop.app.ExternalGameLaunch.stateOf(context, pkg) ?: GrantState.ASK
+                    dev.droidtop.library.settings.ChoiceItem(
+                        id = "plugins_external_launch_$pkg",
+                        title = dev.droidtop.app.ExternalGameLaunch.label(context, pkg),
+                        subtitle = pkg,
+                        options = listOf(
+                            dev.droidtop.library.settings.ChoiceOption(GrantState.GRANTED.name, "Allowed"),
+                            dev.droidtop.library.settings.ChoiceOption(GrantState.ASK.name, "Ask first", dev.droidtop.library.settings.NoticeTone.Caution),
+                            dev.droidtop.library.settings.ChoiceOption(GrantState.DENIED.name, "Blocked", dev.droidtop.library.settings.NoticeTone.Danger),
+                        ),
+                        current = state.name,
+                        onSelect = { ctx, value ->
+                            GrantState.fromId(value)?.let { chosen ->
+                                noticeScope.launch { withContext(Dispatchers.IO) { dev.droidtop.app.ExternalGameLaunch.set(ctx, pkg, chosen) } }
+                            }
+                        },
+                    )
+                }
+                listOf(
+                    CatalogGroup(
+                        id = "plugins_external_launch_apps",
+                        title = null,
+                        items = rows.ifEmpty {
+                            listOf(ActionItem(id = "plugins_external_launch_none", title = "No app has asked yet", run = {}))
+                        },
+                    ),
+                )
+            }
+        },
+        live = PluginGrants.changes,
+    )
+
     private fun pluginPermissionsScreen(pluginId: String) = CatalogScreen(
         id = "plugin_permissions_$pluginId",
         title = "Permissions",

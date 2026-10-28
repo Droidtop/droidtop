@@ -59,7 +59,8 @@ class GameLaunchActivity : Activity() {
             dispatch(context, entry.id)
         }
 
-        private fun dispatch(context: Context, entryId: String) {
+        /** The same by id: a pinned icon, and another app droidtop has allowed ([ExternalGameLaunchActivity]). */
+        fun dispatch(context: Context, entryId: String) {
             val app = context.applicationContext
             LibraryCore.library(app).launchInBackground(entryId) { result ->
                 when (result) {
