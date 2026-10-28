@@ -97,11 +97,13 @@ class HomeTrampolineActivity : Activity() {
                 if (doubleTap) putExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT_FORCE, true)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            android.util.Log.i("droidtop.ReturnToGame", "HOME on display $here: to $target (double tap $doubleTap)")
             startActivity(redirect)
             finish()
             return
         }
 
+        android.util.Log.i("droidtop.ReturnToGame", "HOME on display $here: to Standard")
         lastHomePressMs = SystemClock.elapsedRealtime()
         forwardToStandard()
     }

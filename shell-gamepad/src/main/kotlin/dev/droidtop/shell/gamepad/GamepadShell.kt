@@ -499,6 +499,7 @@ private fun GamepadShellBody(
     LaunchedEffect(deepLinkToken) {
         quickMenuOpen = openQuickMenu
         leftMenuOpen = false
+        Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu")
     }
     // The face-button layout of the pad in use (SPEC 7b, "Console and controller detection"),
     // followed live because a handheld's own toggle can flip it while this shell stays in front.
@@ -831,7 +832,10 @@ private fun GamepadShellBody(
                 } != null
             },
             placeAvailable = { screenId -> placeForScreen(screenId, uiMode) != null },
-            onDismiss = { quickMenuOpen = false },
+            onDismiss = {
+                Log.i("droidtop.ReturnToGame", "Quick Menu closed")
+                quickMenuOpen = false
+            },
         )
     }
     if (leftMenuOpen) {

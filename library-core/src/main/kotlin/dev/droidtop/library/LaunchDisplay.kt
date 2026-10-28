@@ -275,6 +275,8 @@ object LaunchDisplay {
      * already stopped treating as parked.
      */
     fun clearRunning(stopWatching: Boolean = true) {
+        // Who ended the session, for a return to the game that found none (Droidtop/tracker#86).
+        runningFlow.value?.let { Log.i("droidtop.ReturnToGame", "session for ${it.context.gameId} cleared", Throwable("cleared here")) }
         if (stopWatching) LaunchWatchdog.cancel()
         parkedDisplayId = null
         runningGame = null

@@ -222,10 +222,16 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Back from a game screen of droidtop's own asks for the menu; so does a HOME press while a game runs
         // (the warm HOME forwarded by Launcher carries the reinit extra): the person is coming back from the
         // game, and the menu's Game section has Resume first (docs/SPEC.md 7f, "Sleep and return to game").
+        val homePress = intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false)
+        val running = dev.droidtop.library.LaunchDisplay.runningGame
         gamingQuickMenu = intent.getBooleanExtra(dev.droidtop.library.OwnGameScreens.EXTRA_QUICK_MENU, false) ||
-            (intent.getBooleanExtra(BackButtonMenu.EXTRA_DISPLAY_REINIT, false) &&
-                dev.droidtop.library.LaunchDisplay.runningGame != null)
+            (homePress && running != null)
         gamingDeepLinkToken++
+        // One line per arrival, so a HOME that did not bring the menu says which half was missing (Droidtop/tracker#86).
+        android.util.Log.i(
+            "droidtop.ReturnToGame",
+            "arrival: homePress=$homePress running=${running?.gameId} quickMenu=$gamingQuickMenu token=$gamingDeepLinkToken",
+        )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
