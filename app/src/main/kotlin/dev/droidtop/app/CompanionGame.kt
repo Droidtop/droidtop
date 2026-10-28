@@ -275,7 +275,7 @@ private fun GameButton(label: String, primary: Boolean = false, onClick: () -> U
 
 /** The question, starting on the safe answer: Keep playing first and focused, the action well apart. */
 @Composable
-private fun CompanionQuestion(question: CompanionConfirm.Question) {
+internal fun CompanionQuestion(question: CompanionConfirm.Question) {
     val colors = MaterialTheme.colorScheme
     val safe = remember { FocusRequester() }
     LaunchedEffect(question) { runCatching { safe.requestFocus() } }
