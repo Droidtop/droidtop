@@ -1,7 +1,6 @@
 package org.pocketworkstation.pckeyboard
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.util.Size
@@ -33,17 +32,18 @@ import androidx.autofill.inline.v1.InlineSuggestionUi
 object InlineAutofill {
     private var generation = 0
 
-    /** The request: chips in the keyboard's dark colours, up to six of them. */
+    /** The request: chips in the keyboard's colours, light or dark ([KeyboardAppearance]), up to six of them. */
     @JvmStatic
     fun request(context: Context): InlineSuggestionsRequest {
+        val colors = KeyboardAppearance.palette(context)
         val chip = Icon.createWithResource(context, androidx.autofill.R.drawable.autofill_inline_suggestion_chip_background)
-            .setTint(Color.rgb(60, 64, 67))
+            .setTint(colors.chip)
         val style = InlineSuggestionUi.newStyleBuilder()
             .setSingleIconChipStyle(ViewStyle.Builder().setBackground(chip).setPadding(0, 0, 0, 0).build())
             .setChipStyle(ViewStyle.Builder().setBackground(chip).build())
             .setStartIconStyle(ImageViewStyle.Builder().setLayoutMargin(0, 0, 0, 0).build())
-            .setTitleStyle(TextViewStyle.Builder().setTextColor(Color.WHITE).setTextSize(12f).build())
-            .setSubtitleStyle(TextViewStyle.Builder().setTextColor(Color.rgb(170, 172, 176)).setTextSize(10f).build())
+            .setTitleStyle(TextViewStyle.Builder().setTextColor(colors.text).setTextSize(12f).build())
+            .setSubtitleStyle(TextViewStyle.Builder().setTextColor(colors.muted).setTextSize(10f).build())
             .setEndIconStyle(ImageViewStyle.Builder().setLayoutMargin(0, 0, 0, 0).build())
             .build()
         val stylesBuilder = UiVersions.newStylesBuilder()

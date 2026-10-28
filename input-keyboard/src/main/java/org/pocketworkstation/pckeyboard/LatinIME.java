@@ -783,6 +783,8 @@ public class LatinIME extends InputMethodService implements
         sKeyboardSettings.editorImeOptions = attribute.imeOptions;
 
         //Log.i("PCKeyboard", "onStartInputView " + attribute + ", inputType= " + Integer.toHexString(attribute.inputType) + ", restarting=" + restarting);
+        // droidtop patch: "Follow light or dark" follows a change made while the keyboard was away (Droidtop/tracker#562).
+        mKeyboardSwitcher.refreshAppearance();
         LatinKeyboardView inputView = mKeyboardSwitcher.getInputView();
         // In landscape mode, this method gets called without the input view
         // being created.

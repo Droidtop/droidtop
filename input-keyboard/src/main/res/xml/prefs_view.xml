@@ -61,7 +61,7 @@
             android:title="@string/title_top_row_scale" />
         
         <org.pocketworkstation.pckeyboard.AutoSummaryListPreference
-            android:defaultValue="0"
+            android:defaultValue="8"
             android:entries="@array/keyboard_layout_modes"
             android:entryValues="@array/keyboard_layout_modes_values"
             android:key="pref_keyboard_layout"

@@ -27,7 +27,9 @@ internal class EmojiBrowser(
     private val onSearch: () -> Unit,
     private val onBack: () -> Unit,
 ) : LinearLayout(context) {
-    private val adapter = EmojiAdapter(context)
+    // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
+    private val colors = KeyboardAppearance.palette(context)
+    private val adapter = EmojiAdapter(context, colors.text)
     private val grid = GridView(context)
     private val groupRow = LinearLayout(context)
     private var catalog: EmojiCatalog? = null
@@ -35,7 +37,7 @@ internal class EmojiBrowser(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(PANEL)
+        setBackgroundColor(colors.panel)
         val header = LinearLayout(context).apply {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(4), 0, dp(4), 0)
@@ -75,7 +77,7 @@ internal class EmojiBrowser(
         text = label
         setAllCaps(false)
         textSize = 13f
-        setTextColor(Color.WHITE)
+        setTextColor(colors.text)
         setBackgroundColor(Color.TRANSPARENT)
         minHeight = 0
         minimumHeight = 0
@@ -98,7 +100,7 @@ internal class EmojiBrowser(
         adapter.show(if (items.isEmpty() && id == RECENT) listOf("Nothing used yet") else items, loading = items.isEmpty())
     }
 
-    private class EmojiAdapter(private val context: Context) : BaseAdapter() {
+    private class EmojiAdapter(private val context: Context, private val textColor: Int) : BaseAdapter() {
         var items: List<String> = emptyList()
             private set
         private var note = false
@@ -123,7 +125,7 @@ internal class EmojiBrowser(
             val density = context.resources.displayMetrics.density
             val view = (convertView as? TextView) ?: TextView(context).apply {
                 gravity = Gravity.CENTER
-                setTextColor(Color.WHITE)
+                setTextColor(textColor)
                 layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, (44 * density).toInt())
             }
             view.textSize = if (note) 13f else 26f
@@ -134,7 +136,6 @@ internal class EmojiBrowser(
 
     companion object {
         private const val RECENT = "recent"
-        private val PANEL = Color.rgb(41, 42, 45)
 
         /** The button text for a group id of the emoji data. */
         fun groupLabel(id: String): String = when (id) {
@@ -162,6 +163,7 @@ internal class EmojiSearchBar(
     private val onPick: (String) -> Unit,
     private val onDone: () -> Unit,
 ) : LinearLayout(context), KeyboardCapture.Target {
+    private val colors = KeyboardAppearance.palette(context)
     private val query = StringBuilder()
     private val label = TextView(context)
     private val results = LinearLayout(context)
@@ -169,11 +171,11 @@ internal class EmojiSearchBar(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(Color.rgb(41, 42, 45))
+        setBackgroundColor(colors.panel)
         val top = LinearLayout(context).apply { gravity = Gravity.CENTER_VERTICAL }
         label.apply {
             textSize = 15f
-            setTextColor(Color.WHITE)
+            setTextColor(colors.text)
             setPadding(dp(12), dp(6), dp(8), dp(6))
         }
         top.addView(label, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
@@ -182,7 +184,7 @@ internal class EmojiSearchBar(
                 text = "Done"
                 setAllCaps(false)
                 textSize = 13f
-                setTextColor(Color.WHITE)
+                setTextColor(colors.text)
                 setBackgroundColor(Color.TRANSPARENT)
                 isFocusable = false
                 setOnClickListener { onDone() }
@@ -245,7 +247,7 @@ internal class EmojiSearchBar(
                 TextView(context).apply {
                     text = entry.emoji
                     textSize = 26f
-                    setTextColor(Color.WHITE)
+                    setTextColor(colors.text)
                     setPadding(dp(8), dp(2), dp(8), dp(2))
                     setOnClickListener { onPick(entry.emoji) }
                 },

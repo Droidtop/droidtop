@@ -32,6 +32,8 @@ class ToolsDeck private constructor(
     private val beforeInsert: Runnable?,
     private val relayout: Runnable?,
 ) : LinearLayout(context) {
+    // Light beside a light keyboard, dark beside every other theme (KeyboardAppearance, Droidtop/tracker#562).
+    private val colors = KeyboardAppearance.palette(context)
     private val stack = FrameLayout(context)
     private var overlay: View? = null
     private var overlayId: String? = null
@@ -46,7 +48,7 @@ class ToolsDeck private constructor(
 
     init {
         orientation = VERTICAL
-        setBackgroundColor(BACKGROUND)
+        setBackgroundColor(colors.background)
         isFocusable = false
         addView(buildStrip(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         inlineScroll.apply {
@@ -59,7 +61,7 @@ class ToolsDeck private constructor(
         addView(inlineHost, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
         notice.apply {
             textSize = 12f
-            setTextColor(MUTED)
+            setTextColor(colors.muted)
             setPadding(dp(12), 0, dp(12), dp(2))
             visibility = GONE
         }
@@ -96,7 +98,7 @@ class ToolsDeck private constructor(
         text = label
         setAllCaps(false)
         textSize = 13f
-        setTextColor(TEXT)
+        setTextColor(colors.text)
         setBackgroundColor(Color.TRANSPARENT)
         minHeight = 0
         minimumHeight = 0
@@ -238,19 +240,19 @@ class ToolsDeck private constructor(
 
     private fun updateIncognito(on: Boolean = ToolsPrefs.incognito(context)) {
         incognitoButton.text = if (on) "Incognito: on" else "Incognito"
-        incognitoButton.setBackgroundColor(if (on) ACCENT else Color.TRANSPARENT)
+        incognitoButton.setBackgroundColor(if (on) colors.accent else Color.TRANSPARENT)
     }
 
     private fun label(text: String, size: Float = 14f): TextView = TextView(context).apply {
         this.text = text
         textSize = size
-        setTextColor(TEXT)
+        setTextColor(colors.text)
     }
 
     private fun panelFrame(title: String, status: TextView, vararg actions: Button): LinearLayout {
         val root = LinearLayout(context).apply {
             orientation = VERTICAL
-            setBackgroundColor(PANEL)
+            setBackgroundColor(colors.panel)
             minimumHeight = dp(200)
         }
         val header = LinearLayout(context).apply {
@@ -263,7 +265,7 @@ class ToolsDeck private constructor(
         header.addView(tool("Back") { hidePanel() })
         root.addView(header)
         status.setPadding(dp(12), 0, dp(12), dp(4))
-        status.setTextColor(MUTED)
+        status.setTextColor(colors.muted)
         status.textSize = 12f
         root.addView(status)
         return root
@@ -360,11 +362,6 @@ class ToolsDeck private constructor(
 
     companion object {
         private const val NOTICE_MS = 3000L
-        private val BACKGROUND = Color.rgb(32, 33, 36)
-        private val PANEL = Color.rgb(41, 42, 45)
-        private val TEXT = Color.WHITE
-        private val MUTED = Color.rgb(170, 172, 176)
-        private val ACCENT = Color.rgb(26, 115, 232)
 
         /**
          * [keyboard] wrapped with the tool strip, or [keyboard] itself when the strip is switched off. [typeText]

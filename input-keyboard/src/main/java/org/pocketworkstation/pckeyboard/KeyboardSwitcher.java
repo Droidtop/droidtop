@@ -59,7 +59,8 @@ public class KeyboardSwitcher implements
     // Symbols keyboard layout with the settings key
     public static final int KEYBOARDMODE_SYMBOLS_WITH_SETTINGS_KEY = R.id.mode_symbols_with_settings_key;
 
-    public static final String DEFAULT_LAYOUT_ID = "0";
+    // "Follow light or dark" (KeyboardAppearance.FOLLOW) for anyone who never chose a theme (Droidtop/tracker#562).
+    public static final String DEFAULT_LAYOUT_ID = "8";
     public static final String PREF_KEYBOARD_LAYOUT = "pref_keyboard_layout";
     private static final int[] THEMES = new int[] {
         R.layout.input_ics,
@@ -137,6 +138,8 @@ public class KeyboardSwitcher implements
     private LanguageSwitcher mLanguageSwitcher;
 
     private int mLayoutId;
+    // The theme the person stored; mLayoutId is the one drawn (KeyboardAppearance.resolve).
+    private int mStoredLayoutId;
 
     private static final KeyboardSwitcher sInstance = new KeyboardSwitcher();
 
@@ -153,8 +156,10 @@ public class KeyboardSwitcher implements
 
         final SharedPreferences prefs = PreferenceManager
                 .getDefaultSharedPreferences(ims);
-        sInstance.mLayoutId = Integer.valueOf(prefs.getString(
+        sInstance.mStoredLayoutId = parseLayout(prefs.getString(
                 PREF_KEYBOARD_LAYOUT, DEFAULT_LAYOUT_ID));
+        sInstance.mLayoutId = KeyboardAppearance.resolve(sInstance.mStoredLayoutId,
+                KeyboardAppearance.isLight(ims));
 
         sInstance.updateSettingsKeyState(prefs);
         prefs.registerOnSharedPreferenceChangeListener(sInstance);
@@ -611,13 +616,32 @@ public class KeyboardSwitcher implements
         changeLatinKeyboardView(mLayoutId, true);
     }
 
+    /**
+     * Draws the theme the stored choice means now: "Follow light or dark" changes with the host's
+     * or the system's Light or dark (Droidtop/tracker#562). Called as an editor starts.
+     */
+    public void refreshAppearance() {
+        if (mInputMethodService == null) return;
+        int drawn = KeyboardAppearance.resolve(mStoredLayoutId,
+                KeyboardAppearance.isLight(mInputMethodService));
+        if (drawn != mLayoutId) changeLatinKeyboardView(drawn, true);
+    }
+
+    private static int parseLayout(String value) {
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return KeyboardAppearance.FOLLOW;
+        }
+    }
+
     private void changeLatinKeyboardView(int newLayout, boolean forceReset) {
         if (mLayoutId != newLayout || mInputView == null || forceReset) {
             if (mInputView != null) {
                 mInputView.closing();
             }
-            if (THEMES.length <= newLayout) {
-                newLayout = Integer.valueOf(DEFAULT_LAYOUT_ID);
+            if (newLayout < 0 || THEMES.length <= newLayout) {
+                newLayout = KeyboardAppearance.MATERIAL_DARK;
             }
 
             LatinIMEUtil.GCUtils.getInstance().reset();
@@ -654,8 +678,9 @@ public class KeyboardSwitcher implements
     public void onSharedPreferenceChanged(SharedPreferences sharedPreferences,
             String key) {
         if (PREF_KEYBOARD_LAYOUT.equals(key)) {
-            changeLatinKeyboardView(Integer.valueOf(sharedPreferences
-                    .getString(key, DEFAULT_LAYOUT_ID)), true);
+            mStoredLayoutId = parseLayout(sharedPreferences.getString(key, DEFAULT_LAYOUT_ID));
+            changeLatinKeyboardView(KeyboardAppearance.resolve(mStoredLayoutId,
+                    KeyboardAppearance.isLight(mInputMethodService)), true);
         } else if (LatinIMESettings.PREF_SETTINGS_KEY.equals(key)) {
             updateSettingsKeyState(sharedPreferences);
             recreateInputView();
