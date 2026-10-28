@@ -1190,7 +1190,9 @@ internal fun PcGameMenu(
                     // release of the same press can no longer step out a
                     // second time, it belongs to this press (SPEC 6e).
                     GamepadAction.B -> goBack()
-                    GamepadAction.SELECT -> onClose()
+                    // The button that opened the menu closes it: L2, or Select on the page (proposal 6.E,
+                    // Droidtop/tracker#644 slice 4).
+                    GamepadAction.SELECT, GamepadAction.L2 -> onClose()
                     else -> Unit
                 }
                 true
