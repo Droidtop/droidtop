@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -432,7 +433,7 @@ private fun ResumeRow(title: String, selected: Boolean, onClick: () -> Unit, onH
             }
             Spacer(Modifier.width(SideMenu.IconGap))
             Column(verticalArrangement = Arrangement.spacedBy(Space.Hair)) {
-                Text("Resume", color = MenuTokens.OnSurface, style = TypeRole.rowTitle, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                Text(stringResource(R.string.resume), color = MenuTokens.OnSurface, style = TypeRole.rowTitle, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 Text(title, color = MenuTokens.OnSurfaceMuted, style = TypeRole.supporting, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }

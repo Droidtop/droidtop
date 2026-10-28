@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.PressWords
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
@@ -130,7 +131,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             },
     ) {
         if (snapshot?.note != null && apps.isNotEmpty()) {
-            Text("Limited list", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.limited_list), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
         }
         // Scrolls, and MenuRow brings the selected row into view itself.
         Column(
@@ -140,7 +141,7 @@ internal fun AppsTab(onDismiss: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (snapshot == null) {
-                Text("Reading…", color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.reading), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium)
             } else if (apps.isEmpty()) {
                 // A list the system only partly gave us cannot promise nothing is running (Droidtop/tracker#367).
                 Text(

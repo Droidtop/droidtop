@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -84,7 +85,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
 
     val current = loaded ?: run {
         Column(modifier = Modifier.fillMaxSize().groundBackground().padding(LocalShellWindow.current.edgePadding)) {
-            Text("Loading...", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.loading), color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
         }
         return
     }
@@ -129,7 +130,7 @@ internal fun GameMetadataEditor(entry: LibraryEntry, library: Library, onDismiss
                 }
             },
     ) {
-        Text("Edit metadata", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.edit_metadata), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
         Text(entry.title, color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(bottom = 12.dp))
 
         val editing = remember { mutableStateOf(false) }
@@ -363,7 +364,7 @@ private fun ControllerPicker(current: String?, onPick: (String?) -> Unit, onDism
             },
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Controller", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.controller_title), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
         LazyColumn(
             modifier = Modifier.weight(1f),
             // The hint bar's own room (MenuTokens.HintBarRoom).

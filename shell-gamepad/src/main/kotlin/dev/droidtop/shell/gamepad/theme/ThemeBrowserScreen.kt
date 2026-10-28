@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.R
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
@@ -191,7 +193,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 .fillMaxSize()
                 .padding(horizontal = dev.droidtop.shell.gamepad.LocalShellWindow.current.edgePadding, vertical = 24.dp),
         ) {
-            Text("Browse themes", color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.browse_themes), color = MenuTokens.OnSurface, style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
             // A refresh of a stale list runs under the list it already has,
             // and says so above it, with a real spinner while it runs --
@@ -209,7 +211,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 }
             }
             when {
-                loading -> Text("Loading…", color = MenuTokens.OnSurfaceMuted)
+                loading -> Text(stringResource(R.string.loading), color = MenuTokens.OnSurfaceMuted)
                 entries.isEmpty() -> Column(
                     modifier = Modifier
                         .focusRequester(emptyFocus)
@@ -357,7 +359,7 @@ private fun ThemeBrowserRow(
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(entry.name, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
                 if (entry.deprecated) {
-                    Text("DEPRECATED", color = MenuTokens.NoticeDanger, style = MaterialTheme.typography.labelSmall)
+                    Text(stringResource(R.string.theme_deprecated), color = MenuTokens.NoticeDanger, style = MaterialTheme.typography.labelSmall)
                 }
             }
             if (entry.author.isNotBlank()) {

@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import androidx.compose.foundation.background
@@ -58,7 +59,7 @@ internal fun ScrapeOfferDialog(
                 true
             },
         ) {
-            Text("Fetch box art and details for your games?", color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.scrape_offer_title), color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
             Text(
                 "A confirms · B declines",
                 color = MenuTokens.OnSurfaceMuted,

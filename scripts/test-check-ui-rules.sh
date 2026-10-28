@@ -25,6 +25,7 @@ fixture text-fields app/src/main/kotlin/A.kt 'BasicTextField(value = v, onValueC
 fixture formatters app/src/main/kotlin/A.kt 'val s = String.format("%.1f GB", b / 1e9)'
 fixture hint-tip shell-gamepad/src/main/kotlin/A.kt 'HintTip("Why") { Text("Row") }'
 fixture permission-titles plugin-host/src/main/kotlin/A.kt 'PluginPermission("x", PermissionTier.DANGEROUS, "Run adb commands")'
+fixture literal-text shell-gamepad/src/main/kotlin/A.kt 'Text("Loading")'
 
 status=0
 for dir in "$tmp"/*/; do

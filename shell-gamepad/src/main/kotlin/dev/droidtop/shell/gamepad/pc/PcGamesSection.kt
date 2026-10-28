@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.R
+import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -1181,7 +1183,7 @@ internal fun PcGamesSection(
                 else -> {
                     if (grid.isEmpty() && !hasFreeRow) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No games match this view", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                            Text(stringResource(R.string.no_games_match_view), color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                         }
                     } else {
                         // Whole capsules at the tier width, 12dp apart, the
@@ -1653,7 +1655,7 @@ private fun PcShelvesHome(
     if (shelves.isEmpty() && home == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(Space.Lg)) {
-                Text("Nothing on the shelves yet", color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
+                Text(stringResource(R.string.shelves_empty), color = MenuTokens.OnSurfaceMuted, style = TypeRole.body)
                 if (mixed) HomeDestinations(selected = state.destIndex.takeIf { onDest }, onOpen = onOpenSection)
                 dev.droidtop.shell.gamepad.GetGamesChip()
             }
