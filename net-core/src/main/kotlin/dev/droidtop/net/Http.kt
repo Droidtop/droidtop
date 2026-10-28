@@ -19,33 +19,84 @@ object Http {
         val rateLimitHeaders get() = responseHeaders.filterKeys { it.startsWith("x-ratelimit-") }
     }
 
+    /** A response longer than the caller reads; nothing of it is returned. */
+    class TooLarge(val limit: Long) : IOException("HTTP response exceeded $limit bytes")
+
     const val USER_AGENT = "droidtop/${BuildConfig.VERSION_NAME}"
 
-    fun get(url: String, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = Api.timeouts, maxBytes: Long = 8L * 1024 * 1024, token: String? = null): Response {
-        val c = if (token != null) GitHubAuth.open(url, token, timeouts.connectMs, timeouts.readMs) else URL(url).openConnection() as HttpURLConnection
-        c.connectTimeout = timeouts.connectMs
-        c.readTimeout = timeouts.readMs
-        c.setRequestProperty("User-Agent", USER_AGENT)
-        headers.forEach(c::setRequestProperty)
+    /** How much of a refusal's body [request] keeps, for the caller's error line. */
+    const val ERROR_BODY_MAX_BYTES = 64L * 1024
+
+    /**
+     * One request answered with whatever status the server gave: a 2xx body read to [maxBytes] ([TooLarge] past it),
+     * any other status's body read to [ERROR_BODY_MAX_BYTES]. With a [token], [GitHubAuth.open] follows the redirects
+     * and decides per hop whether the token goes on; without one, HttpURLConnection follows them.
+     */
+    fun request(
+        url: String,
+        method: String = "GET",
+        headers: Map<String, String> = emptyMap(),
+        body: ByteArray? = null,
+        timeouts: Timeouts = Api.timeouts,
+        maxBytes: Long = 8L * 1024 * 1024,
+        token: String? = null,
+    ): Response {
+        val sent = mapOf("User-Agent" to USER_AGENT) + headers
+        val c = if (token != null) {
+            require(method == "GET" && body == null) { "a token is sent on GET requests only" }
+            // GitHubAuth.open connects before it returns, so every header goes in with the request.
+            GitHubAuth.open(url, token, timeouts.connectMs, timeouts.readMs, sent)
+        } else {
+            (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = timeouts.connectMs
+                readTimeout = timeouts.readMs
+                requestMethod = method
+                sent.forEach(::setRequestProperty)
+                if (body != null) {
+                    doOutput = true
+                    setFixedLengthStreamingMode(body.size)
+                    outputStream.use { it.write(body) }
+                }
+            }
+        }
         try {
             val status = c.responseCode
             val hs = c.headerFields.entries.mapNotNull { (name, values) ->
                 name?.takeIf { it.startsWith("X-RateLimit-", ignoreCase = true) }?.lowercase()?.let { it to values.firstOrNull() }
             }.toMap()
-            if (status !in 200..299) throw HttpException(status, hs, "HTTP $status from $url")
-            val length = c.contentLengthLong
-            if (length > maxBytes) throw IOException("HTTP response exceeded $maxBytes bytes")
-            val bytes = c.inputStream.use { input ->
-                val out = java.io.ByteArrayOutputStream()
-                val buf = ByteArray(16 * 1024)
-                while (true) { val n = input.read(buf); if (n < 0) break; if (out.size().toLong() + n > maxBytes) throw IOException("HTTP response exceeded $maxBytes bytes"); out.write(buf, 0, n) }
-                out.toByteArray()
+            if (status !in 200..299) {
+                val error = runCatching { c.errorStream?.use { readTo(it, ERROR_BODY_MAX_BYTES, truncate = true) } }.getOrNull()
+                return Response(status, error ?: ByteArray(0), hs)
             }
-            return Response(status, bytes, hs)
+            if (c.contentLengthLong > maxBytes) throw TooLarge(maxBytes)
+            return Response(status, c.inputStream.use { readTo(it, maxBytes, truncate = false) }, hs)
         } finally { c.disconnect() }
     }
 
+    /** A 2xx response, or [HttpException] carrying the status and the `X-RateLimit-*` headers. */
+    fun get(url: String, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = Api.timeouts, maxBytes: Long = 8L * 1024 * 1024, token: String? = null): Response {
+        val response = request(url, headers = headers, timeouts = timeouts, maxBytes = maxBytes, token = token)
+        if (response.status !in 200..299) throw HttpException(response.status, response.headers, "HTTP ${response.status} from $url")
+        return response
+    }
+
     fun getJson(url: String, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = Api.timeouts, maxBytes: Long = 8L * 1024 * 1024) = JSONObject(get(url, headers, timeouts, maxBytes).text())
+
+    private fun readTo(input: java.io.InputStream, limit: Long, truncate: Boolean): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(16 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            if (out.size().toLong() + n > limit) {
+                if (!truncate) throw TooLarge(limit)
+                out.write(buf, 0, (limit - out.size()).toInt())
+                break
+            }
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
 
     /**
      * Opens one request for code droidtop does not trust (a plugin's, docs/plugin-api.md 3 D2) and returns the connection

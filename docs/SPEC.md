@@ -21590,7 +21590,13 @@ the secondary path for sources that publish no key.
   check keeps it unlabelled).
   `:net-core` is the one HTTP and single-file download mechanism. It owns
   bounded responses, streamed digest-checked downloads, GitHub token storage,
-  and per-hop authorization. The ES-DE theme repository itself remains a JGit
+  and per-hop authorization. A plain request is `Http.request` (any method and
+  body, one `droidtop/<version>` User-Agent, a 2xx body read to the caller's
+  bound and refused past it, any other status returned with its body read to
+  64 KiB for the caller's error line); `Http.get` is the same request that
+  throws `HttpException` (status and `X-RateLimit-*` headers) on a non-2xx.
+  A request with a GitHub token goes through `GitHubAuth.open` with all its
+  headers, since that connects before it returns (Droidtop/tracker#189). The ES-DE theme repository itself remains a JGit
   clone; installer files continue through `DownloadJobs`, which uses it.
 - **The key file format plugin authors publish** — the whole contract,
   deliberately two fields (since 2026-10-15, Droidtop/tracker#550):
