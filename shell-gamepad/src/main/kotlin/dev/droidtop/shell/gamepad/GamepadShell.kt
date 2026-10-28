@@ -831,6 +831,16 @@ private fun GamepadShellBody(
             },
             placeAvailable = { screenId -> placeForScreen(screenId, uiMode) != null },
             onDismiss = { quickMenuOpen = false },
+            // Power and mode's Search tile, the left menu's Search row until Droidtop/tracker#621 M4. Kiosk and Kid
+            // keep the library and leave out what manages the device, downloads and settings with it.
+            onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
+                {
+                    quickMenuOpen = false
+                    globalSearchOpen = true
+                }
+            } else {
+                null
+            },
         )
     }
     if (leftMenuOpen) {
@@ -850,15 +860,6 @@ private fun GamepadShellBody(
             onOpenQuickMenu = {
                 leftMenuOpen = false
                 quickMenuOpen = true
-            },
-            // Kiosk and Kid keep the library and leave out what manages the device, downloads and settings with it.
-            onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
-                {
-                    leftMenuOpen = false
-                    globalSearchOpen = true
-                }
-            } else {
-                null
             },
             onDismiss = { leftMenuOpen = false },
         )

@@ -38,6 +38,7 @@ enum class QuickGlyph {
     HOME, KEYBOARD, PEOPLE, MORE,
     // Tiles that drew GENERIC, the placeholder ring, until each had its own (Droidtop/tracker#534).
     CAMERA, STOP, SECOND_SCREEN, LOCATION, FLASHLIGHT, PLUGIN,
+    SEARCH,
 }
 
 /**
@@ -220,6 +221,23 @@ object QuickTiles {
         return listOf(CatalogGroup(id = "quick_system", title = null, items = system + displays))
     }
 
+    /** Power and mode's Search tile: the shell's own, so the companion's System card, which has no search, never draws it. */
+    const val ID_SEARCH = "quick_search"
+
+    /**
+     * [groups] with the Search tile leading Power and mode (Droidtop/tracker#621 M4: Search is not a left-menu row;
+     * Y, Home's magnifier and this tile open it). [open] opens the one search. Pure.
+     */
+    fun withSearch(groups: List<CatalogGroup>, open: () -> Unit): List<CatalogGroup> {
+        val tile = ActionItem(
+            id = ID_SEARCH,
+            title = "Search",
+            subtitle = "Your games, apps, download sources and settings",
+            run = { open() },
+        )
+        return groups.mapIndexed { index, group -> if (index == 0) group.copy(items = listOf(tile) + group.items) else group }
+    }
+
     /** Splits the tab into its slider strip and its tile grid. */
     fun panel(groups: List<CatalogGroup>): QuickPanel {
         val items = groups.flatMap { it.items }
@@ -284,7 +302,6 @@ object QuickTiles {
         -> QuickGlyph.POWER
         GamingSettingsCatalog.ID_AUDIO_OUTPUT -> QuickGlyph.VOLUME
         GamingSettingsCatalog.ID_ORIENTATION -> QuickGlyph.ROTATE
-        GamingSettingsCatalog.ID_SYSTEM_UPDATES -> QuickGlyph.UPDATE
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
         GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
         GamingSettingsCatalog.ID_SYSTEM_SWITCH_MODE -> QuickGlyph.SWAP
@@ -299,7 +316,7 @@ object QuickTiles {
         -> QuickGlyph.SECOND_SCREEN
         GamingSettingsCatalog.ID_SYSTEM_LOCATION -> QuickGlyph.LOCATION
         GamingSettingsCatalog.ID_SYSTEM_FLASHLIGHT -> QuickGlyph.FLASHLIGHT
-        GamingSettingsCatalog.ID_SYSTEM_SOCIAL -> QuickGlyph.PEOPLE
+        ID_SEARCH -> QuickGlyph.SEARCH
         GamingSettingsCatalog.ID_PERFORMANCE_MODE -> QuickGlyph.GAUGE
         GamingSettingsCatalog.ID_DOWNLOADS -> QuickGlyph.DOWNLOAD
         GamingSettingsCatalog.ID_CONTROLLER -> QuickGlyph.GAMEPAD
