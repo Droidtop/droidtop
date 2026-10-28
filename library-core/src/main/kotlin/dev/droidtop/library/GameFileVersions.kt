@@ -8,23 +8,16 @@ import org.json.JSONObject
  * Droidtop/tracker#406), for a folder game whose name carries none: Ren'Py's
  * `define config.version = "..."` in `game/options.rpy`, and the `version`
  * an RPG Maker MV or MZ developer put in `package.json` (the editor's own
- * template has none, so a value there is the developer's). Asked for one game
- * when its page opens, never while a list is drawn: a few small file reads,
- * not for the main thread.
+ * template has none, so a value there is the developer's). Read by the engine
+ * walk for a folder whose name names no version, and kept on the entry as
+ * [LibraryEntry.filesVersion]; never while a list is drawn: a few small file
+ * reads, not for the main thread.
  */
 object GameFileVersions {
     /** Bigger than any real options.rpy or package.json; a file past it is not read. */
     private const val MAX_BYTES = 512 * 1024L
 
     private val RENPY_VERSION = Regex("""^\s*define\s+config\.version\s*=\s*[urUR]?(["'])(.+?)\1""", RegexOption.MULTILINE)
-
-    /** The version [entry]'s folder declares, or null. File reads. */
-    fun read(entry: LibraryEntry): String? {
-        val path = entry.groupingPath() ?: return null
-        val file = File(path)
-        val folder = if (file.isDirectory) file else file.parentFile ?: return null
-        return read(folder)
-    }
 
     /** The version [folder]'s files declare, or null. File reads. */
     fun read(folder: File): String? =

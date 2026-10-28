@@ -17028,13 +17028,22 @@ its sentence; a game that left the library reads "This game left your library.
 installed build, the install location and where the version came from ("set by
 you", "from the store's installer", "from the folder name", "from the game's
 files"). **The game's files (2026-10-14, Droidtop/tracker#406):** a folder game
-whose name carries no version shows the one its own files declare, read by
-`GameFileVersions` once when its page opens (never while a list is drawn):
+whose name carries no version shows the one its own files declare:
 Ren'Py's `define config.version` in `game/options.rpy`, and the `version` of an
 RPG Maker MV/MZ `package.json` (root or `www/`; the editor's template has
 none, so a value there is the developer's). It ranks last (set, store
-installer, folder name, files), so it never contradicts the folder versions
-that grouping and update checks compare. **Cloud saves**:
+installer, folder name, files). **Compared too (2026-10-28,
+Droidtop/tracker#406):** the issue asks for version checks for folder sources,
+and a version shown on the page but never compared left a folder whose name
+is silent with no update ever offered. So the engine walk reads it with
+`GameFileVersions`, where it already reads that folder, only for a folder whose
+name names no version, and keeps it on the entry (`LibraryEntry.filesVersion`;
+never read while a list is drawn, nor when the page opens). Grouping takes it
+as that folder's version (`GameGrouping.Found.filesVersion`), so update checks
+against a linked source compare it; a folder name's version still wins over
+it. The page and what a paired computer is sent read the same field through
+`SetVersions.shown`. A game walked before this keeps no such version until its
+folder is walked again (Rescan library). **Cloud saves**:
 a store copy whose store keeps cloud saves droidtop reaches (Steam) says when
 they last synced (`StoreSaves.lastSync`, kept by every sync), "Last sync
 failed" with A to retry, or offline "Not synced since <when>"; a store with

@@ -253,6 +253,29 @@ class GameGroupingTest {
     }
 
     @Test
+    fun `a folder whose name is silent is compared by the version its files declare`() {
+        val behind = GameGrouping.group(
+            listOf(GameGrouping.Found("/games/x/Star Harbor", latestKnown = "0.5", filesVersion = "0.4")),
+        ).single()
+        assertEquals("0.5", behind.availableUpdate)
+        assertEquals(listOf("0.4"), behind.allVersions.map { it.version })
+
+        val current = GameGrouping.group(
+            listOf(GameGrouping.Found("/games/x/Star Harbor", latestKnown = "v0.5", filesVersion = "0.5")),
+        ).single()
+        assertFalse(current.updateAvailable)
+    }
+
+    @Test
+    fun `a folder name's version beats what the files declare`() {
+        val game = GameGrouping.group(
+            listOf(GameGrouping.Found("/games/x/Eternum-0.9.5-pc", latestKnown = "0.9.5", filesVersion = "0.9.4")),
+        ).single()
+        assertEquals(listOf("0.9.5"), game.allVersions.map { it.version })
+        assertFalse(game.updateAvailable)
+    }
+
+    @Test
     fun `an update reads the same wherever it is shown`() {
         assertEquals("v0.9.6 is available", GameUpdates.line("0.9.6"))
         assertEquals("Final is available", GameUpdates.line("Final"))

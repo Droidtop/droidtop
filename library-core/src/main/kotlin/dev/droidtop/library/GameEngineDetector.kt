@@ -1676,6 +1676,10 @@ class EngineGameProvider(
                 engine.esDeSystemName(),
                 displayFolder.name,
             ),
+            // Read here, where the walk is already reading this folder, never while a list is drawn (tracker#406).
+            filesVersion = GameNaming.derive(GameNaming.relativeTo(root.absolutePath, displayFolder.absolutePath)).version
+                .takeIf { it.isBlank() }
+                ?.let { GameFileVersions.read(gameRoot) },
         ).withStoreInstall(installsByDir.forFolder(displayFolder))
         writeRecord(this, root, part, entry)
         return entry

@@ -45,4 +45,11 @@ class SetVersionsTest {
         assertEquals("0.5" to SetVersions.Origin.FOLDER, SetVersions.shown(folder("/sd/Games/Game v0.5"), null, "0.9"))
         assertEquals("1.0" to SetVersions.Origin.SET, SetVersions.shown(folder("/sd/Games/Some Game"), "1.0", "0.9"))
     }
+
+    @Test
+    fun `the files' version is the one the walk kept on the entry`() {
+        val game = folder("/sd/Games/Some Game").copy(filesVersion = "0.9")
+        assertEquals("0.9" to SetVersions.Origin.FILES, SetVersions.shown(game, null))
+        assertNull(SetVersions.shown(folder("/sd/Games/Some Game"), null))
+    }
 }
