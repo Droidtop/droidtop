@@ -2022,7 +2022,17 @@ background" is on, off by default, decided 2026-10-09 for
 Droidtop/tracker#389: the session's foreground service and notification
 stay, the viewport's surface is gone so no frames are captured, and the
 compositor, its programs and the audio bridge's open output keep their
-memory and battery cost, which the row says), when Desktop mode is switched off (`ModePiece.DESKTOP_SESSION`,
+memory and battery cost, which the row says; and not before the person has
+answered, the first time they leave a live desktop: the coordinator relayed
+the owner's queue for #389 on 2026-10-28 as "the offer to keep the desktop
+running when leaving Desktop (the setting exists; the offer and survival are
+left)", so leaving a live desktop before the person has ever chosen asks once,
+in the mode they land in, through the one confirm (`NoticeDialogs.confirm`,
+7k): "Keep it running" or "Stop it". The desktop runs until the answer, the
+answer is stored as the Settings switch (which counts as an answer itself),
+and Stop, a dismissal or no surface to ask on stops it as before, unless the
+person is back in Desktop by then. The rule is `DesktopSetupPrefs.leaveAction`,
+tested), when Desktop mode is switched off (`ModePiece.DESKTOP_SESSION`,
 through `ModeStartup`), when the PRIMARY is stopped in Containers, and
 from the notification's Stop. Ending it stops the PRIMARY with everything
 on the desktop, including a primary still booting (the service tracks

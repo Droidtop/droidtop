@@ -554,6 +554,33 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         }
     }
 
+    /**
+     * Asks, in the mode just switched to, whether the desktop left behind keeps running (Droidtop/tracker#389,
+     * docs/SPEC.md 3 "Stopping is a stop"). It runs until the answer; either answer is kept as the Settings
+     * switch, so this is asked once. Stop, a dismissal, or no surface to ask on stops it, as leaving always did,
+     * unless the person is back in Desktop by then.
+     */
+    private fun offerKeepRunning() {
+        if (keepRunningOffer?.isActive == true) return
+        keepRunningOffer = lifecycleScope.launch {
+            val answer = dev.droidtop.library.settings.NoticeDialogs.confirm(
+                dev.droidtop.library.settings.Notice(
+                    tone = dev.droidtop.library.settings.NoticeTone.Info,
+                    title = "Keep the desktop running?",
+                    body = "Its open windows are still there. Kept running, they are waiting when you come back, " +
+                        "at a cost in memory and battery. Settings > Desktop mode changes this later.",
+                ),
+                cancelLabel = "Stop it",
+                proceedLabel = "Keep it running",
+            )
+            val keep = answer == dev.droidtop.library.settings.ConfirmAnswer.Proceed
+            DesktopSetupPrefs.setKeepRunning(this@MainActivity, keep)
+            if (!keep && mode != Mode.DESKTOP) DesktopSessionService.stop(this@MainActivity)
+        }
+    }
+
+    private var keepRunningOffer: kotlinx.coroutines.Job? = null
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -563,9 +590,19 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         // Leaving Desktop for another shell ends the desktop session: it is
         // Desktop mode's, and a compositor nobody can see must not keep
         // running behind Gaming (rig, dq-coordinator-23 F9), unless the
-        // person chose to keep it running (Droidtop/tracker#389).
-        if (previous == Mode.DESKTOP && mode != Mode.DESKTOP && !DesktopSetupPrefs.keepRunning(this)) {
-            DesktopSessionService.stop(this)
+        // person chose to keep it running, or has not chosen yet and is
+        // asked now (Droidtop/tracker#389).
+        if (previous == Mode.DESKTOP && mode != Mode.DESKTOP) {
+            val action = DesktopSetupPrefs.leaveAction(
+                sessionLive = DesktopSessionService.state.value is DesktopSessionState.Connected,
+                keepRunning = DesktopSetupPrefs.keepRunning(this),
+                answered = DesktopSetupPrefs.keepRunningAnswered(this),
+            )
+            when (action) {
+                DesktopSetupPrefs.LeaveAction.STOP -> DesktopSessionService.stop(this)
+                DesktopSetupPrefs.LeaveAction.KEEP -> Unit
+                DesktopSetupPrefs.LeaveAction.OFFER -> offerKeepRunning()
+            }
         }
         startDesktopSessionIfDesktop()
         // Display reinit on every re-entry (a HOME press routes here via

@@ -21,6 +21,7 @@ object DesktopSetupPrefs {
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
     private const val KEY_PANEL = "droidtop_desktop_panel"
     private const val KEY_KEEP_RUNNING = "droidtop_desktop_keep_running"
+    private const val KEY_KEEP_RUNNING_ANSWERED = "droidtop_desktop_keep_running_answered"
 
     /**
      * Whether leaving Desktop for another mode keeps the desktop running in
@@ -31,8 +32,35 @@ object DesktopSetupPrefs {
     fun keepRunning(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_KEEP_RUNNING, false)
 
+    /**
+     * Sets [keepRunning] and records that the person has answered, so leaving Desktop no longer offers it
+     * ([leaveAction]). The Settings switch and the offer's two buttons are both answers.
+     */
     fun setKeepRunning(context: Context, on: Boolean) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_KEEP_RUNNING, on).apply()
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putBoolean(KEY_KEEP_RUNNING, on)
+            .putBoolean(KEY_KEEP_RUNNING_ANSWERED, true)
+            .apply()
+    }
+
+    /** Whether the person has chosen either way, in Settings or in the offer on leaving Desktop. */
+    fun keepRunningAnswered(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_KEEP_RUNNING_ANSWERED, false)
+
+    /** What leaving Desktop for another mode does to the desktop session (Droidtop/tracker#389). */
+    enum class LeaveAction { STOP, KEEP, OFFER }
+
+    /**
+     * The rule for leaving Desktop. Pure. A session that is not live has nothing to keep, so it stops as
+     * before. A person who has chosen gets their choice. A person who never chose, leaving a live desktop,
+     * is asked once: the desktop keeps running until they answer, and an answer of Stop (or no surface to
+     * ask on) stops it then, as leaving always did.
+     */
+    fun leaveAction(sessionLive: Boolean, keepRunning: Boolean, answered: Boolean): LeaveAction = when {
+        !sessionLive -> LeaveAction.STOP
+        keepRunning -> LeaveAction.KEEP
+        answered -> LeaveAction.STOP
+        else -> LeaveAction.OFFER
     }
 
     /** The panel and launcher the sway desktop starts (dev.droidtop.runtime.DesktopPanel, Droidtop/tracker#353). */
