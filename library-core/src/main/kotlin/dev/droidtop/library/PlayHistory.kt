@@ -37,6 +37,17 @@ interface PlayHistoryStore {
      * game it already tracks is onboarded.
      */
     suspend fun moveTo(fromId: String, toId: String)
+
+    /** The launch log since [sinceMs] (Droidtop/tracker#611): one [PlayStart] per start, kept [PlayStarts.KEEP_MS]. */
+    suspend fun startsSince(sinceMs: Long): List<PlayStart> = emptyList()
+}
+
+/** One start of a game: which, and when (epoch ms). */
+data class PlayStart(val gameId: String, val startedAtMs: Long)
+
+/** How long the launch log keeps a start: about three months of habits, no more. */
+object PlayStarts {
+    const val KEEP_MS = 90L * 24 * 60 * 60 * 1000
 }
 
 object NoOpPlayHistoryStore : PlayHistoryStore {

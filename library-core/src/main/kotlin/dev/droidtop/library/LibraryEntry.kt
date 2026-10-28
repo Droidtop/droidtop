@@ -2024,6 +2024,10 @@ class Library(
      * [PlayHistoryRecord]'s own doc comment): the launch was at least
      * successfully dispatched.
      */
+    /** The launch log's starts within its window (Droidtop/tracker#611): Home's time-of-day row reads it. Disk: IO only. */
+    suspend fun recentStarts(nowMs: Long = System.currentTimeMillis()): List<PlayStart> =
+        withContext(Dispatchers.IO) { playHistory.startsSince(nowMs - PlayStarts.KEEP_MS) }
+
     suspend fun launch(entry: LibraryEntry) {
         withContext(Dispatchers.IO) {
             // Which game this launch is for, published for the duration of

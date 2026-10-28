@@ -59,7 +59,20 @@ interface PlayHistoryDao {
     suspend fun recordPlay(id: String, epochMs: Long) {
         ensureRow(id, epochMs)
         bumpPlay(id, epochMs)
+        // The launch log beside the count (Droidtop/tracker#611): when in the day each game is started, kept
+        // PlayStarts.KEEP_MS, so Home can put the games of this hour first. On the device only.
+        addStart(PlayStartEntity(gameId = id, startedAt = epochMs))
+        pruneStarts(epochMs - PlayStarts.KEEP_MS)
     }
+
+    @androidx.room.Insert
+    suspend fun addStart(row: PlayStartEntity)
+
+    @Query("DELETE FROM play_starts WHERE started_at < :beforeMs")
+    suspend fun pruneStarts(beforeMs: Long)
+
+    @Query("SELECT * FROM play_starts WHERE started_at >= :sinceMs")
+    suspend fun startsSince(sinceMs: Long): List<PlayStartEntity>
 
     @androidx.room.Insert(onConflict = androidx.room.OnConflictStrategy.REPLACE)
     suspend fun put(row: PlayHistoryEntity)
@@ -87,8 +100,20 @@ interface PlayHistoryDao {
             ),
         )
         delete(fromId)
+        moveStarts(fromId, toId)
     }
+
+    @Query("UPDATE play_starts SET game_id = :toId WHERE game_id = :fromId")
+    suspend fun moveStarts(fromId: String, toId: String)
 }
+
+/** One start of a game, for the launch log (Droidtop/tracker#611): which game and when. */
+@Entity(tableName = "play_starts", indices = [androidx.room.Index("started_at")])
+data class PlayStartEntity(
+    @PrimaryKey(autoGenerate = true) val rowId: Long = 0,
+    @ColumnInfo(name = "game_id") val gameId: String,
+    @ColumnInfo(name = "started_at") val startedAt: Long,
+)
 
 /** One row per favourite non-ROM entry; absence is "not a favourite". See [FavoritesStore]. */
 @Entity(tableName = "favorites")
@@ -221,10 +246,10 @@ data class LinkedKey(
 
 @Database(
     entities = [
-        PlayHistoryEntity::class, FavoriteEntity::class, GameLinkEntity::class, SourceLinkEntity::class, SourceAnswerEntity::class,
+        PlayHistoryEntity::class, PlayStartEntity::class, FavoriteEntity::class, GameLinkEntity::class, SourceLinkEntity::class, SourceAnswerEntity::class,
         dev.droidtop.library.saves.GameIdEntity::class, dev.droidtop.library.saves.SaveRuleEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class PlayHistoryDatabase : RoomDatabase() {
@@ -311,13 +336,25 @@ abstract class PlayHistoryDatabase : RoomDatabase() {
             }
         }
 
+        // The launch log (Droidtop/tracker#611): one new table, nothing existing touched, for the same reason as
+        // MIGRATION_1_2. It starts empty; Home's time-of-day row waits until it has something to say.
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `play_starts` (`rowId` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`game_id` TEXT NOT NULL, `started_at` INTEGER NOT NULL)",
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_play_starts_started_at` ON `play_starts` (`started_at`)")
+            }
+        }
+
         fun get(context: Context): PlayHistoryDatabase =
             instance ?: synchronized(this) {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     PlayHistoryDatabase::class.java,
                     "droidtop-play-history.db",
-                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { instance = it }
+                ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { instance = it }
             }
     }
 }
@@ -391,6 +428,8 @@ class RoomPlayHistoryStore(context: Context) : PlayHistoryStore {
     }
 
     override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
+
+    override suspend fun startsSince(sinceMs: Long): List<PlayStart> = dao.startsSince(sinceMs).map { PlayStart(it.gameId, it.startedAt) }
 }
 
 /**

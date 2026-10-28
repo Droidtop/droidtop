@@ -15573,7 +15573,13 @@ own games, in droidtop's own treatment:
   the plugins' reported updates, Friends, Downloads); **Most played** (games played at least twice, most first;
   `mostPlayedShelf`); **Recommended for you** (droidtop's own recommender, `LocalSimilarityRecommendations`, the same
   one the search's empty field shows; `recommendedShelf`); the plugins' shelves (docs/plugin-api.md 3 C11); then the
-  destinations. Not there yet: store recommendations, since no store droidtop runs offers them (a store plugin's
+  destinations. **The order adapts (owner, 2026-10-28: "a", the adaptive Home proposal on Droidtop/tracker#611).**
+  **Usual at this time** (`usualNowShelf`) leads when it has something to say: the games started at least twice within
+  an hour of now, over droidtop's launch log (`play_starts`, one row per start beside the play count, kept 90 days, on
+  the device only). The other rows are ordered by how many games each has started (`HomeRowUse`, counted when a game is
+  started from a Home row), rows used alike keeping the order above (`rankHomeShelves`). The order is worked out when
+  Home opens and never while the cursor is on it. Still to build on this: Pin to top, Move and Hide on a row's heading,
+  Settings > Home > Rows, and a way to clear the launch log. Not there yet: store recommendations, since no store droidtop runs offers them (a store plugin's
   facet, docs/plugin-api.md, is the way they will come). Gaming opens
   on Home: the Default section setting's `home` is its default, and a cold
   start never restores the last place. Saved shell state is restored only

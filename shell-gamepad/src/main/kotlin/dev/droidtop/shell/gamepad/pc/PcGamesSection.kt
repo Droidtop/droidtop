@@ -506,7 +506,12 @@ internal fun PcGamesSection(
             }
         }
     }
-    LaunchedEffect(games, others, ownership, recentlyAdded) {
+    // Which Home rows started the most games, read once each time Home opens, so the order is worked out then and never
+    // shifts while the person is on it (Droidtop/tracker#611).
+    val homeUse by produceState(initialValue = emptyMap<String, Int>(), state.home) {
+        value = if (state.home) withContext(Dispatchers.IO) { HomeRowUse.load(context) } else emptyMap()
+    }
+    LaunchedEffect(games, others, ownership, recentlyAdded, homeUse) {
         val all = games ?: return@LaunchedEffect
         onHomeActivityChanged(all + others)
         val own = withContext(Dispatchers.Default) { homeShelves(all, others, options = ownership, isRecentlyAdded = recentlyAdded) }
@@ -527,12 +532,23 @@ internal fun PcGamesSection(
                 recommendedShelf(titles, home)
             }
         }
-        val ownRows = own + listOfNotNull(recommended)
+        // The games this person plays at this time of day, from the launch log (Droidtop/tracker#611). Home only.
+        val usualNow = if (!state.home) {
+            null
+        } else {
+            val starts = library.recentStarts()
+            withContext(Dispatchers.Default) {
+                val zone = java.util.TimeZone.getDefault()
+                val hourOf = { ms: Long -> java.util.Calendar.getInstance(zone).apply { timeInMillis = ms }.get(java.util.Calendar.HOUR_OF_DAY) }
+                usualNowShelf(starts, home, hourOf(System.currentTimeMillis()), hourOf)
+            }
+        }
+        val ownRows = listOfNotNull(usualNow) + own + listOfNotNull(recommended)
         val fresh = withContext(Dispatchers.IO) {
             pluginHomeShelves(dev.droidtop.library.integrations.PluginShelves.shelvesFor(context, home), home)
         }
         pluginShelfList = fresh
-        val next = ownRows + fresh
+        val next = rankHomeShelves(ownRows + fresh, homeUse)
         if (next != homeShelfList) {
             if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
             homeShelfList = next
@@ -664,7 +680,11 @@ internal fun PcGamesSection(
     // The rule is shared with every host outside Gaming (rememberPcLaunch, Droidtop/tracker#349).
     val downloads by StoreInstallJob.live.collectAsState()
     val pcLaunch = rememberPcLaunch(
-        onLaunch = { entry -> onLaunch(folded?.continuing?.get(entry.id) ?: entry) },
+        onLaunch = { entry ->
+            // A start from a Home row counts for that row's place on Home (Droidtop/tracker#611).
+            if (state.home && !state.stripFocused) currentShelf?.id?.let { HomeRowUse.noteStart(context, it) }
+            onLaunch(folded?.continuing?.get(entry.id) ?: entry)
+        },
         onOpenDownloads = { onOpenSection(GamingSection.DOWNLOADS) },
     )
     val launch: (LibraryEntry) -> Unit = pcLaunch.launch
