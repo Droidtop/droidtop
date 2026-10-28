@@ -162,7 +162,10 @@ private fun RemoteInputScreen(
             }
             is RemoteInputState.Paired -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 shown.lastSent?.let { Text(stringResource(R.string.remote_input_last_sent, it), style = MaterialTheme.typography.bodyLarge) }
-                shown.notice?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
+                // Why the last thing sent did not arrive (a file not stored or not complete, a field that took nothing): a
+                // failure that stays on this screen until the next send, drawn as one, not as a line of text among the
+                // facts (Droidtop/tracker#645, docs/SPEC.md 7k "Notices").
+                shown.notice?.let { NoticeCard(Notice(NoticeTone.Caution, "Not received", body = it.take(Notice.BODY_MAX), details = it), NoticePlacement.Row) }
                 shown.clip?.let { Text(stringResource(R.string.remote_input_clipboard_from_the_device, it), style = MaterialTheme.typography.bodyLarge) }
                 shown.receiving?.let { Text(stringResource(R.string.remote_input_receiving, it), style = MaterialTheme.typography.bodyLarge) }
                 shown.received?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
