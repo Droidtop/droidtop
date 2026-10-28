@@ -1,10 +1,12 @@
 package dev.droidtop.app
 
+import android.net.NetworkCapabilities
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** System > Connections (CompanionConnections.kt, Droidtop/tracker#414 slice C19). */
+/** The companion's Network tab (CompanionNetwork.kt, Droidtop/tracker#583; the network half of slice C19). */
 class CompanionConnectionsTest {
     @Test fun `Wi-Fi bands from the frequency`() {
         assertEquals("2.4 GHz", band(2437))
@@ -13,14 +15,25 @@ class CompanionConnectionsTest {
         assertNull(band(60_000))
     }
 
-    @Test fun `the network lines say only what is known`() {
-        val full = NetworkDetail("Wi-Fi", listOf("192.168.1.20"), vpn = true, signalLevel = 3, bandGhz = "5 GHz", linkMbps = 866, name = "Home", adbWifi = false)
+    private fun net(kind: NetKind, name: String? = null, allTraffic: Boolean = false) = NetFact(
+        kind = kind, name = name, iface = "tun0", addresses = listOf("10.8.0.2"), dns = listOf("10.8.0.1"),
+        allTraffic = allTraffic, metered = false,
+    )
+
+    @Test fun `a row reads State (name), and Details says only what is known`() {
+        assertEquals("Connected (WireGuard)", netLine(net(NetKind.VPN, "WireGuard")))
+        assertEquals("Connected", netLine(net(NetKind.VPN)))
         assertEquals(
-            listOf("Wi-Fi: Home", "IP 192.168.1.20", "Signal 3 of 4, 5 GHz, 866 Mbps", "VPN on", "ADB over Wi-Fi: off"),
-            networkLines(full),
+            listOf("Interface tun0", "Address 10.8.0.2", "DNS 10.8.0.1", "All traffic goes through it", "Not metered"),
+            detailFacts(net(NetKind.VPN, allTraffic = true)),
         )
-        // Without the helper app: no name and nothing about ADB.
-        val plain = NetworkDetail("Ethernet", emptyList(), vpn = false, signalLevel = null, bandGhz = null, linkMbps = null, name = null, adbWifi = null)
-        assertEquals(listOf("Ethernet"), networkLines(plain))
+        val wifi = net(NetKind.WIFI, "Home").copy(signalLevel = 3, bandGhz = "5 GHz", linkMbps = 866)
+        assertTrue(detailFacts(wifi).contains("Signal 3 of 4, 5 GHz, 866 Mbps"))
+    }
+
+    @Test fun `a VPN is named by its transport before the one it rides on`() {
+        val vpnOverWifi = setOf(NetworkCapabilities.TRANSPORT_VPN, NetworkCapabilities.TRANSPORT_WIFI)
+        assertEquals(NetKind.VPN, kindOf { it in vpnOverWifi })
+        assertEquals(NetKind.CELLULAR, kindOf { it == NetworkCapabilities.TRANSPORT_CELLULAR })
     }
 }

@@ -73,7 +73,7 @@ object ControlAccess {
     private val FULL = ControlRules(
         companionPanels = setOf(
             ControlPanel.HOME, ControlPanel.GAME, ControlPanel.SYSTEM, ControlPanel.APPS, ControlPanel.PERFORMANCE,
-            ControlPanel.INPUT, ControlPanel.SOCIAL, ControlPanel.PLUGINS,
+            ControlPanel.INPUT, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.CONNECTIONS,
         ),
         quickMenuPanels = ControlPanel.entries.toSet(),
         readOnlyPanels = emptySet(),

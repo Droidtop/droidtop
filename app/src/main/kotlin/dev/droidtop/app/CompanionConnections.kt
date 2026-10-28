@@ -6,9 +6,6 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.net.wifi.WifiManager
 import android.os.Build
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +32,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
 import dev.droidtop.runtime.systemstatus.VolumeControl
-import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -79,56 +75,20 @@ private fun StreamSlider(stream: VolumeControl.Stream) {
     }
 }
 
-/** One network fact line for the Connections card. */
-internal data class NetworkDetail(
-    val kind: String,
-    val ip: List<String>,
-    val vpn: Boolean,
-    val signalLevel: Int?,
-    val bandGhz: String?,
-    val linkMbps: Int?,
-    val name: String?,
-    val adbWifi: Boolean?,
-)
-
-/** "5 GHz" or "2.4 GHz" (or "6 GHz") from a Wi-Fi frequency in MHz. Pure. */
-internal fun band(frequencyMhz: Int): String? = when (frequencyMhz) {
-    in 2400..2500 -> "2.4 GHz"
-    in 4900..5900 -> "5 GHz"
-    in 5925..7125 -> "6 GHz"
-    else -> null
-}
-
-/** The lines the Connections card shows for [detail]. Pure. */
-internal fun networkLines(detail: NetworkDetail): List<String> = buildList {
-    add(listOfNotNull(detail.kind, detail.name).joinToString(": "))
-    if (detail.ip.isNotEmpty()) add("IP " + detail.ip.joinToString(", "))
-    listOfNotNull(
-        detail.signalLevel?.let { "Signal $it of 4" },
-        detail.bandGhz,
-        detail.linkMbps?.let { "$it Mbps" },
-    ).takeIf { it.isNotEmpty() }?.let { add(it.joinToString(", ")) }
-    if (detail.vpn) add("VPN on")
-    detail.adbWifi?.let { add(if (it) "ADB over Wi-Fi: on" else "ADB over Wi-Fi: off") }
-}
-
 /**
- * System > Connections (slice C19): the network in detail (address, signal, band, link speed, VPN; with the helper app
- * also the network's name, which Android otherwise keeps behind location, and whether ADB over Wi-Fi is on), and the
- * Bluetooth devices paired with the device, asking for Bluetooth access when the card is first opened (owner question
- * 1's default). Read off the main thread when the card opens.
+ * System > Connections (slice C19): the Bluetooth devices paired with the device, asking for Bluetooth access when the
+ * card is first opened (owner question 1's default), and the way to the Network tab, where each network is shown in
+ * detail (Droidtop/tracker#583). Read off the main thread when the card opens.
  */
 @Composable
 internal fun CompanionConnections() {
     val context = LocalContext.current
     val view = LocalView.current
     var version by remember { mutableIntStateOf(0) }
-    val detail by produceState<NetworkDetail?>(null, version) { value = withContext(Dispatchers.IO) { readNetwork(context.applicationContext) } }
     val devices by produceState<List<String>?>(null, version) { value = withContext(Dispatchers.IO) { bondedDevices(context.applicationContext) } }
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        detail?.let { d -> networkLines(d).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) } }
-            ?: CompanionNote("Reading…")
+        LocalCompanionNav.current?.let { nav -> CompanionPill("Network") { nav.openTab(CompanionTab.NETWORK) } }
         Text("Bluetooth devices", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
         val list = devices
         when {
@@ -159,44 +119,4 @@ private fun bondedDevices(context: Context): List<String>? {
     ) return null
     val adapter = context.getSystemService(BluetoothManager::class.java)?.adapter ?: return emptyList()
     return runCatching { adapter.bondedDevices.map { it.name ?: it.address } }.getOrDefault(emptyList())
-}
-
-@Suppress("DEPRECATION")
-private fun readNetwork(context: Context): NetworkDetail {
-    val cm = context.getSystemService(ConnectivityManager::class.java)
-    val network = cm?.activeNetwork
-    val caps = network?.let { cm.getNetworkCapabilities(it) }
-    val link = network?.let { cm.getLinkProperties(it) }
-    val wifi = caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-    val kind = when {
-        caps == null -> "Offline"
-        wifi -> "Wi-Fi"
-        caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Ethernet"
-        caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Mobile data"
-        else -> "Connected"
-    }
-    val info = if (wifi) context.applicationContext.getSystemService(WifiManager::class.java)?.connectionInfo else null
-    val shell = TaskManager.shell
-    val provider = runCatching { shell.capabilities().shellCommand }.getOrDefault(false)
-    // The network's name: Android shows it to apps only with location; the helper app reads it from `cmd wifi status`.
-    val name = if (wifi && provider) {
-        shell.exec(listOf("cmd", "wifi", "status"))?.stdout?.let { Regex("SSID: \"([^\"]+)\"").find(it)?.groupValues?.get(1) }
-    } else {
-        null
-    }
-    val adbWifi = if (provider) {
-        shell.exec(listOf("settings", "get", "global", "adb_wifi_enabled"))?.stdout?.trim()?.let { it == "1" }
-    } else {
-        null
-    }
-    return NetworkDetail(
-        kind = kind,
-        ip = link?.linkAddresses?.map { it.address.hostAddress.orEmpty() }?.filter { it.isNotBlank() && !it.startsWith("fe80") }.orEmpty(),
-        vpn = cm?.allNetworks?.any { cm.getNetworkCapabilities(it)?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true } == true,
-        signalLevel = info?.let { WifiManager.calculateSignalLevel(it.rssi, 5) },
-        bandGhz = info?.frequency?.let(::band),
-        linkMbps = info?.linkSpeed?.takeIf { it > 0 },
-        name = name,
-        adbWifi = adbWifi,
-    )
 }

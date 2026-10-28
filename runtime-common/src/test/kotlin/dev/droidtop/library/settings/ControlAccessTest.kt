@@ -19,7 +19,7 @@ class ControlAccessTest {
         UiMode.FULL to Triple(
             setOf(
                 ControlPanel.HOME, ControlPanel.GAME, ControlPanel.SYSTEM, ControlPanel.APPS, ControlPanel.PERFORMANCE,
-                ControlPanel.INPUT, ControlPanel.SOCIAL, ControlPanel.PLUGINS,
+                ControlPanel.INPUT, ControlPanel.SOCIAL, ControlPanel.PLUGINS, ControlPanel.CONNECTIONS,
             ),
             ControlPanel.entries.toSet(),
             ControlRow.entries.toSet(),

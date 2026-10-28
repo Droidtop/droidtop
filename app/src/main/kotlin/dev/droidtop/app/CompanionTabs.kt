@@ -99,8 +99,11 @@ internal data class CompanionTab(val id: String, val label: String, val glyph: Q
         val SOCIAL = of(ControlPanel.SOCIAL, "Social", QuickGlyph.PEOPLE)
         val PLUGINS = of(ControlPanel.PLUGINS, "Plugins", QuickGlyph.GENERIC)
 
+        /** Every network in context, with Manage (Droidtop/tracker#583); the Quick Menu's Connections panel. */
+        val NETWORK = of(ControlPanel.CONNECTIONS, "Network", QuickGlyph.NETWORK)
+
         /** The tabs a person can choose, in the order More lists them. Game is not one: it comes while a game runs. */
-        val CHOOSABLE = listOf(HOME, SYSTEM, APPS, PERFORMANCE, INPUT, SOCIAL)
+        val CHOOSABLE = listOf(HOME, SYSTEM, APPS, PERFORMANCE, INPUT, SOCIAL, NETWORK)
 
         fun plugin(pluginId: String, label: String) = CompanionTab(CompanionPrefs.PLUGIN_PREFIX + pluginId, label, QuickGlyph.GENERIC)
 
@@ -459,6 +462,7 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                             CompanionTab.SYSTEM.id -> CompanionSystemTab()
                             CompanionTab.INPUT.id -> SecondScreenInputSurface(mode)
                             CompanionTab.PLUGINS.id -> CompanionPluginsTab(null)
+                            CompanionTab.NETWORK.id -> CompanionNetworkTab()
                             else -> if (shown.startsWith(CompanionPrefs.PLUGIN_PREFIX)) CompanionPluginsTab(shown)
                         }
                     }

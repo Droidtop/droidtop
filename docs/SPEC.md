@@ -4563,10 +4563,25 @@ droidtop 0.2.0-dev.1931).
   stream (media, ring, notifications, alarms, calls) all set volume there, and Kid's highest volume (Settings > UI
   mode's "Kid mode's highest volume", no limit by default, hidden in Kid and Kiosk) holds there for every stream; a
   settings observer turns a volume key that goes past it back down while Kid is on. Sound also opens Android's
-  output and volume panel (Outputs). System > Connections shows the network in detail: address, signal, band, link
-  speed and VPN, and with the helper app the network's name (`cmd wifi status`; Android keeps it behind location
-  otherwise) and whether ADB over Wi-Fi is on; then the paired Bluetooth devices, asking for Bluetooth access
-  (`BLUETOOTH_CONNECT`) when the card first opens (owner question 1's default), and Android's Bluetooth settings.
+  output and volume panel (Outputs). System > Connections shows the paired Bluetooth devices, asking for Bluetooth
+  access (`BLUETOOTH_CONNECT`) when the card first opens (owner question 1's default), Android's Bluetooth settings,
+  and a Network pill that opens the Network tab.
+- **The Network tab (Droidtop/tracker#583; owner, 2026-10-17: "Might actually be wise to put that in its own network
+  tab. Move wifi, cellular, ethernet, virtual interface management, and etc there too, though they should display
+  contextually, with a manage button").** A companion tab of the Quick Menu's Connections panel
+  (`CompanionTab.NETWORK`, one of the choosable tabs, not in Kid, Kiosk or Guest; `CompanionNetworkTab`). Each network
+  that is up is one card, in the order Wi-Fi, mobile data, Ethernet, VPN, Bluetooth tethering, USB (a VPN is named by
+  its own transport, not the one it rides on): "Connected (name)", Details (interface, addresses, DNS, Wi-Fi's signal,
+  band and link speed, a VPN's all or some traffic by its default route, metered) and Manage, which opens Android's own
+  screen for it (the Wi-Fi panel, the internet panel, VPN settings, network settings). With nothing up, one Offline
+  card with Manage. A VPN's name is the app Android names as the always-on VPN, read with the helper app
+  (`settings get secure always_on_vpn_app`); Android tells other apps no more, and Details says so when there is no
+  name. **The public address** is asked of api.ipify.org only from Details' "Check public address" (owner,
+  2026-10-17: "yes, behind a button in Details"), never by itself, and the answer names who answered. Under the
+  networks every interface that is up (name and addresses, `NetworkInterface`), and with the helper app whether ADB
+  over Wi-Fi is on (it was the Connections card's line). Read off the main thread when the tab opens and on Refresh.
+  Not built yet: Manage for droidtop's own container and Wine networks (they run in proot and have no interface of
+  their own to list), and choosing what each tab contains (the owner's "also what it contains").
 - **Apps (slice C20).** Stop on each row is the one stop route (`TaskManager.close`: force-stop through the helper
   app, else Android's background kill, which Android may ignore, and then "Force stop in App info"), and asks first
   while Ask before stopping is on (always in Kid and Kiosk); the Quick Menu's System section has "Stop the app in

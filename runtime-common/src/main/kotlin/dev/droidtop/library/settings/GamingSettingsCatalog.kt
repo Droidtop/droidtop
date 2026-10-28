@@ -1130,6 +1130,7 @@ object GamingSettingsCatalog {
         ControlPanel.INPUT to "Input",
         ControlPanel.SOCIAL to "Social",
         ControlPanel.PLUGINS to "Plugins",
+        ControlPanel.CONNECTIONS to "Network",
     )
 
     /** The names of plugin panels last offered as tab choices, so a bar's summary can name them without reading manifests. */
