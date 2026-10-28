@@ -260,6 +260,11 @@ object GameGrouping {
          * its install folder is, [groupingPath]). Defaults to [path].
          */
         val namePath: String = path,
+        /**
+         * The version the folder's own files declare ([LibraryEntry.filesVersion]),
+         * the folder's version only when its name names none (Droidtop/tracker#406).
+         */
+        val filesVersion: String? = null,
     )
 
     /**
@@ -324,7 +329,7 @@ object GameGrouping {
             } else {
                 segments.getOrPut(GameNaming.nameKey(segment.label)) { SegmentBuilder(segment) }.versions
             }
-            into.merge(derived.version, copy)
+            into.merge(derived.version.ifBlank { folder.filesVersion?.trim().orEmpty() }, copy)
         }
 
         fun build(): GroupedGame {

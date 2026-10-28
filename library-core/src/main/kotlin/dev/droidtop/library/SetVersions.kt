@@ -35,12 +35,12 @@ object SetVersions {
      * The version a folder game shows and where it came from: the one the
      * person set, else the build a store's marker names, else the folder
      * name's ([GameTitleParser], the same parse the title is stripped by),
-     * else what the game's own files declare ([fromFiles], read by
-     * [GameFileVersions] when the page opens; last, so a folder name the
-     * grouping and update checks already compare by is never contradicted);
-     * null when none says one. Pure.
+     * else what the game's own files declare ([fromFiles], the walk's
+     * [LibraryEntry.filesVersion]; last, the same order grouping and update
+     * checks compare by, so the page never contradicts them); null when none
+     * says one. Pure.
      */
-    fun shown(entry: LibraryEntry, set: String?, fromFiles: String? = null): Pair<String, Origin>? {
+    fun shown(entry: LibraryEntry, set: String?, fromFiles: String? = entry.filesVersion): Pair<String, Origin>? {
         set?.takeIf { it.isNotBlank() }?.let { return it to Origin.SET }
         entry.pcInfo?.marker?.buildId?.takeIf { it.isNotBlank() }?.let { return it to Origin.STORE }
         val path = entry.groupingPath() ?: return null
