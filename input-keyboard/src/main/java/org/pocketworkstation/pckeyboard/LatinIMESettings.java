@@ -118,6 +118,24 @@ public class LatinIMESettings extends PreferenceActivity
             });
         }
 
+        Preference presets = findPreference(KeyboardProMode.PRESET_KEY);
+        if (presets != null) {
+            presets.setOnPreferenceClickListener(p -> {
+                KeyboardProMode.Preset[] all = KeyboardProMode.Preset.values();
+                CharSequence[] names = new CharSequence[all.length];
+                for (int i = 0; i < all.length; i++) names[i] = all[i].getLabel() + "\n" + all[i].getAbout();
+                new android.app.AlertDialog.Builder(this)
+                        .setTitle(R.string.title_keyboard_preset)
+                        .setItems(names, (d, which) -> {
+                            KeyboardProMode.apply(this, getPreferenceManager().getSharedPreferences(), all[which]);
+                            recreate();
+                        })
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .show();
+                return true;
+            });
+        }
+
         SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
         prefs.registerOnSharedPreferenceChangeListener(this);
 

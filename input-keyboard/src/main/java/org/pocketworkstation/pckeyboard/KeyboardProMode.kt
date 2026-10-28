@@ -24,7 +24,7 @@ object KeyboardProMode {
 
     /** What the short screen shows, by preference key; a category stays while anything in it does. */
     val SIMPLE: Set<String> = setOf(
-        KEY, RESET_KEY,
+        KEY, RESET_KEY, PRESET_KEY,
         "settings_height_portrait", "settings_height_landscape",
         "pref_keyboard_mode_portrait", "pref_keyboard_mode_landscape", "pref_screen_view",
         "pref_screen_languages",
@@ -95,6 +95,62 @@ object KeyboardProMode {
     fun reset(context: Context, prefs: SharedPreferences) {
         val editor = prefs.edit()
         resetKeys(declaredKeys(context)).forEach { editor.remove(it) }
+        editor.apply()
+    }
+
+    /**
+     * The three starting points #337 names, each a set of ordinary option values (shown and changeable afterwards;
+     * nothing else is touched). Values are what the options store: list choices and heights as strings, switches as
+     * booleans.
+     */
+    enum class Preset(val label: String, val about: String, val values: Map<String, Any>) {
+        HANDHELD(
+            "Handheld",
+            "Four rows for thumbs in both orientations, a taller keyboard held sideways, capitals and suggestions on",
+            mapOf(
+                "pref_keyboard_mode_portrait" to "0",
+                "pref_keyboard_mode_landscape" to "0",
+                "settings_height_landscape" to "45",
+                "auto_cap" to true,
+                "show_suggestions" to true,
+                "suggestions_in_landscape" to true,
+            ),
+        ),
+        TERMINAL(
+            "Terminal",
+            "The full five rows with Esc, Ctrl, Alt and the arrows in both orientations; no capitals, suggestions, corrections or glide typing",
+            mapOf(
+                "pref_keyboard_mode_portrait" to "2",
+                "pref_keyboard_mode_landscape" to "2",
+                "auto_cap" to false,
+                "show_suggestions" to false,
+                "auto_complete" to false,
+                "quick_fixes" to false,
+                "suggestions_in_landscape" to false,
+                "pref_glide" to false,
+                "connectbot_tab_hack" to true,
+            ),
+        ),
+        CLASSIC_HACKER(
+            "Classic Hacker",
+            "Hacker's Keyboard as it shipped: every option back to its default (macros and languages stay) and its Ice Cream Sandwich theme",
+            mapOf("pref_keyboard_layout" to "0"),
+        ),
+    }
+
+    const val PRESET_KEY = "pref_keyboard_preset"
+
+    /** Applies [preset]: Classic Hacker starts from every default, the others change only their own options. */
+    @JvmStatic
+    fun apply(context: Context, prefs: SharedPreferences, preset: Preset) {
+        if (preset == Preset.CLASSIC_HACKER) reset(context, prefs)
+        val editor = prefs.edit()
+        for ((key, value) in preset.values) {
+            when (value) {
+                is Boolean -> editor.putBoolean(key, value)
+                else -> editor.putString(key, value.toString())
+            }
+        }
         editor.apply()
     }
 

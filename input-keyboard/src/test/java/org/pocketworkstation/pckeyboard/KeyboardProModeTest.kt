@@ -36,4 +36,20 @@ class KeyboardProModeTest {
             KeyboardProMode.resetKeys(setOf("pref_keyboard_layout", "auto_cap", "pref_pro_mode", "pref_macros")),
         )
     }
+
+    @Test
+    fun presetsSetOnlyOrdinaryOptionsThatTheScreensDeclare() {
+        val declaredHere = setOf(
+            "pref_keyboard_mode_portrait", "pref_keyboard_mode_landscape", "settings_height_landscape", "auto_cap",
+            "show_suggestions", "suggestions_in_landscape", "auto_complete", "quick_fixes", "connectbot_tab_hack",
+            "pref_keyboard_layout", "pref_glide",
+        )
+        for (preset in KeyboardProMode.Preset.entries) {
+            assertTrue(preset.name, declaredHere.containsAll(preset.values.keys))
+            assertFalse(preset.name, preset.values.keys.any { it in KeyboardProMode.KEPT_ON_RESET })
+        }
+        assertEquals("2", KeyboardProMode.Preset.TERMINAL.values["pref_keyboard_mode_landscape"])
+        assertEquals(false, KeyboardProMode.Preset.TERMINAL.values["auto_cap"])
+        assertEquals(false, KeyboardProMode.Preset.TERMINAL.values["pref_glide"])
+    }
 }
