@@ -1614,13 +1614,19 @@ object GamingSettingsCatalog {
             ChoiceOption("SECOND", "Second display"),
         ),
         current = CatalogPrefs.prefs(context).getString(ID_DISPLAY_GAME_LAUNCH_TARGET, "ASK"),
-        onSelect = { ctx, value ->
-            CatalogPrefs.prefs(ctx).edit().putString(ID_DISPLAY_GAME_LAUNCH_TARGET, value).apply()
-            // The launch target is resolved during orchestration; without
-            // this the new choice waits for the next display event.
-            dev.droidtop.runtime.DisplayArrangement.changed()
-        },
+        onSelect = { ctx, value -> setGameLaunchTarget(ctx, value) },
     )
+
+    /**
+     * Where every game launches: "ASK", "FOLLOW_SHELL", "BUILT_IN" or "SECOND". The one write, shared by this row and
+     * the launch chooser's "Every game" rows (Droidtop/tracker#590).
+     */
+    fun setGameLaunchTarget(context: Context, value: String) {
+        CatalogPrefs.prefs(context).edit().putString(ID_DISPLAY_GAME_LAUNCH_TARGET, value).apply()
+        // The launch target is resolved during orchestration; without
+        // this the new choice waits for the next display event.
+        dev.droidtop.runtime.DisplayArrangement.changed()
+    }
 
     private fun themeItem(context: Context): ChoiceItem {
         // The VALUE stays the directory id, which is what ThemePrefs

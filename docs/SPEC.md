@@ -4716,6 +4716,10 @@ fallback:
   ask > global target.** A remembered SECOND with no second display
   attached degrades to the shell's screen — a preference never fails
   a launch.
+- **The chooser answers for every game too (2026-10-28, Droidtop/tracker#590).** Its rows are three pairs: this
+  launch, "Always: <screen>" for this game, and "Every game: <screen>", which sets Settings > Displays > Games launch on
+  (`GamingSettingsCatalog.setGameLaunchTarget`, the one write that row and the chooser share) to BUILT_IN or SECOND
+  and launches. A docked console answers once instead of once per game; its supporting line says where to change it.
 - **Where a game opens when nothing chose a screen (2026-10-15, rig on
   droidtop 0.2.0-dev.1908, Droidtop/tracker#270, #271).** A launch with
   no screen chosen (no memory, no question, no global target) opens on

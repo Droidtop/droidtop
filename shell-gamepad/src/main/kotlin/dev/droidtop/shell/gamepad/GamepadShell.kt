@@ -584,6 +584,13 @@ private fun GamepadShellBody(
                 displayChoice = null
                 request.onChosen(option, rememberChoice)
             },
+            onPickEveryGame = { option ->
+                displayChoice = null
+                // The built-in panel is the default display; any other screen offered is the second one.
+                val target = if (option.displayId == android.view.Display.DEFAULT_DISPLAY) "BUILT_IN" else "SECOND"
+                dev.droidtop.library.settings.GamingSettingsCatalog.setGameLaunchTarget(context, target)
+                request.onChosen(option, false)
+            },
             onCancel = {
                 displayChoice = null
                 dev.droidtop.runtime.AudioHandOff.mark("screen question cancelled")
