@@ -555,7 +555,7 @@ internal fun PcGamePage(
     // bar); the page draws no hint row of its own. L1/R1 are named by the
     // glyphs at the tab strip's ends.
     val verb = play.verb
-    val hints = remember(zone, button, row, tab, verb, play.pressable, current) {
+    val hints = remember(zone, button, row, tab, verb, play.pressable, play.chooseEngine, current) {
         listOf(
             HintBinding(GamepadAction.A, if (zone == PageZone.ACTIONS) pageActionLabel(button, verb) else "Select") {
                 when (zone) {
@@ -564,7 +564,8 @@ internal fun PcGamePage(
                     PageZone.CONTENT -> current.getOrNull(row)?.onActivate != null
                 }
             },
-            HintBinding(GamepadAction.X, "Favourite"),
+            HintBinding(GamepadAction.X, verb) { play.pressable || play.chooseEngine },
+            HintBinding(GamepadAction.Y, "Favourite"),
             HintBinding(GamepadAction.L2, "Game options"),
             HintBinding(GamepadAction.SELECT, "Copy options") { zone == PageZone.CONTENT && current.getOrNull(row)?.onOptions != null },
             HintBinding(GamepadAction.B, "Back"),
@@ -661,7 +662,10 @@ internal fun PcGamePage(
                                 }
                                 PageZone.CONTENT -> current.getOrNull(row)?.onActivate?.invoke()
                             }
-                            GamepadAction.X -> onToggleFavorite()
+                            // X plays from anywhere on the page, as on the library tile; Y is Favourite
+                            // (owner decision, Droidtop/tracker#644 slice 4, proposal 6.C).
+                            GamepadAction.X -> pressButton(0)
+                            GamepadAction.Y -> onToggleFavorite()
                             GamepadAction.L2 -> onOpenOptions()
                             // Select on a copy's row is that copy's Options; anywhere else the game's.
                             GamepadAction.SELECT -> current.getOrNull(row)?.takeIf { zone == PageZone.CONTENT }?.onOptions?.invoke()
