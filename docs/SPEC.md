@@ -1391,7 +1391,9 @@ widget maker and the plugin lane's part (C10 `ui.widget@1`, C2 actions from a wi
     its subtitle and buttons; a media or picture image sits under the title, `widget_plugin`). A quick tile is one
     row that presses it, and a status tile one row that shows it. Each tap with an action is a
     `PluginWidgetActionReceiver` broadcast, and the widget is then drawn again with a fresh snapshot
-    (`PluginWidgets.onActed`). A source that is gone says so, and a tap chooses again.
+    (`PluginWidgets.onActed`). A source that is gone says so, and a tap chooses again. A widget with nothing of
+    the plugin's own to press (a status tile, a snapshot with no action) opens droidtop's Plugins place when
+    tapped; left without a tap, the launcher reopened the source chooser (RP5, build 2011, Droidtop/tracker#563).
 - The library widgets are not gated by a mode: the library is never mode-gated (2c). The Desktop widget is: its
   provider is enabled only while Desktop is on (`ModeStartup`, `ModePiece.DESKTOP_SESSION`), which is how Android
   hides a widget from every launcher's picker. What a launcher does with one already placed is for the rig to see.
