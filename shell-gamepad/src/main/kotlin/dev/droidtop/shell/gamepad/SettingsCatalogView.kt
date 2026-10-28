@@ -271,7 +271,7 @@ fun CatalogNavigator(
     // without a column. Suspend builder (real screens run Room queries /
     // filesystem walks), rebuilt after every value change.
     val rootGroups by produceState<List<CatalogGroup>?>(null, root, version, refreshKey) {
-        value = mergeShortScreens(root.groups(context)) { it.groups(context) }
+        value = withOfflineNotice(root, context, mergeShortScreens(root.groups(context)) { it.groups(context) })
     }
     val categories = remember(rootGroups, root) {
         rootGroups?.let { settingsCategories(it, root.title, nativeActions.keys, root.categoryOrder) }.orEmpty()
@@ -301,7 +301,7 @@ fun CatalogNavigator(
         // running down the column does not build every screen it passes.
         if (depth == 0) delay(PANE_LOAD_SETTLE_MS)
         // A screen inside Settings (Accounts and sources) does not repeat a place the left menu has either.
-        value = screen to withoutPlaceLinks(mergeShortScreens(screen.groups(context)) { it.groups(context) }, placeScreenIds)
+        value = screen to withOfflineNotice(screen, context, withoutPlaceLinks(mergeShortScreens(screen.groups(context)) { it.groups(context) }, placeScreenIds))
     }
     // A screen still building (the stores' list, a plugin's panel, which asks the plugin when it opens)
     // shows a loading row from the first frame instead of its title on black, after a moment so a fast one
@@ -2109,4 +2109,28 @@ private fun SettingsSearchOverlay(
             }
         }
     }
+}
+
+/**
+ * [groups] headed by one "You're offline" notice when [screen] needs the network and the device has none
+ * (Droidtop/tracker#594): a page whose actions would only fail says so before one is pressed. Read on the IO
+ * dispatcher with the screen's own rows; the page is read again on its next refresh, so the notice goes once a
+ * connection is back and something on the page changes.
+ */
+internal suspend fun withOfflineNotice(screen: CatalogScreen, context: Context, groups: List<CatalogGroup>): List<CatalogGroup> {
+    if (!screen.needsNetwork) return groups
+    val offline = withContext(Dispatchers.IO) {
+        runCatching { dev.droidtop.runtime.systemstatus.SystemStatus.snapshot(context).network }.getOrNull() ==
+            dev.droidtop.runtime.systemstatus.NetworkKind.NONE
+    }
+    if (!offline) return groups
+    val notice = dev.droidtop.library.settings.NoticeItem(
+        id = "${screen.id}_offline",
+        notice = dev.droidtop.library.settings.Notice(
+            dev.droidtop.library.settings.NoticeTone.Caution,
+            "You're offline",
+            body = "This page needs a connection. What it shows may be out of date, and its actions wait until you're back online.",
+        ),
+    )
+    return listOf(CatalogGroup(id = "${screen.id}_offline_group", title = null, items = listOf(notice))) + groups
 }

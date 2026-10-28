@@ -592,6 +592,7 @@ internal object StoresCatalog {
         id = "store_page_${store.key}",
         title = store.label,
         subtitle = "Account, library and downloads",
+        needsNetwork = true,
         groups = { context -> pageGroups(context, store) },
         // The search index must not read every store's tables to list a few static rows.
         indexGroups = { emptyList() },

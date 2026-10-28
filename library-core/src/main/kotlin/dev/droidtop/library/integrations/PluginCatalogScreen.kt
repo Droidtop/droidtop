@@ -87,6 +87,7 @@ object PluginCatalogScreen {
     fun screen(): CatalogScreen = CatalogScreen(
         id = ID,
         title = "More catalogs",
+        needsNetwork = true,
         subtitle = "Other places plugins are listed. They are not part of droidtop and droidtop has not vetted them: " +
             "you read each one's notice before it is added",
         groups = { context -> catalogsGroups(context) },
@@ -335,6 +336,7 @@ object PluginCatalogScreen {
     private fun catalogScreen(sourceId: String, name: String): CatalogScreen = CatalogScreen(
         id = "plugins_catalog_screen_${slug(sourceId)}",
         title = name,
+        needsNetwork = true,
         subtitle = if (sourceId == PluginCatalogSources.OFFICIAL_ID) {
             "What droidtop's catalog lists. Nothing here runs until you approve it on the Plugins screen"
         } else {

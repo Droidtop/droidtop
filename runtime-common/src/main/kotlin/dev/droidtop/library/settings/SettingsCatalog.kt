@@ -386,6 +386,12 @@ class CatalogScreen(
     /** How the screen is laid out (docs/SPEC.md 7k, "Page anatomy"); a page built by [pageScreen] names its own. */
     val layout: CatalogLayout = CatalogLayout.LIST,
     /**
+     * Whether what this screen shows and does needs the network (Updates, a store's page, the plugin catalogs): while
+     * the device is offline the Gaming renderer heads it with one "You're offline" notice, so its actions are not
+     * pressed only to fail (Droidtop/tracker#594).
+     */
+    val needsNetwork: Boolean = false,
+    /**
      * A plugin's panel (Droidtop/tracker#515): every host draws it in the one panel frame, the plugin's icon
      * ([iconFile]) before its title, and each row's subtitle as one line under it (the whole text in Info), so the
      * Quick Menu, the companion and the Standard and Desktop windows show the same panel the same way.
