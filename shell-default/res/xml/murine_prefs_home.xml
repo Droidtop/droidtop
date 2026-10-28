@@ -32,6 +32,20 @@
         android:summary="@string/pref_lock_home_screen_summary"
         android:defaultValue="false"
         android:persistent="true" />
+    <!-- Moved from the General page, which held only this (Droidtop/tracker#571 row 38). -->
+    <SwitchPreferenceCompat
+        android:key="pref_blur_preview"
+        android:title="@string/pref_blur_preview_title"
+        android:summary="@string/pref_blur_preview_desc"
+        android:persistent="true" />
+    <app.murinelauncher.widget.WarningCardPreference
+        android:key="pref_blur_preview_warning"
+        android:visible="false"
+        app:formatHtml="true"
+        app:cardIcon="@android:drawable/ic_dialog_alert"
+        app:cardText="@string/pref_blur_unsupported_warning"
+        app:cardBackgroundColor="@color/settingslib_colorBackgroundLevel_medium"
+        app:cardContentColor="@color/settingslib_materialColorOnSurface" />
     <!--
       LAUNCHER_HOME_SCREEN_ROTATION_ENABLED(615)
       LAUNCHER_HOME_SCREEN_ROTATION_DISABLED(616)

@@ -543,7 +543,8 @@ private fun PerformanceSection(onDismiss: () -> Unit) {
                     null,
                     alarm = (s.thermalStatus ?: 0) >= 3,
                 )
-                ReadoutRow("GPU and frame rate", if (hasShell) "Use the overlay" else "Needs privilege", null, null)
+                // No "GPU and frame rate" readout: it never had a reading here; the overlay above is where they show
+                // (Droidtop/tracker#571 row 35).
             }
         }
         HintRow(

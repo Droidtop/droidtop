@@ -218,7 +218,9 @@ internal fun StartMenu(
             )
         }
         out.add(HostedRow(key = "system:containers", title = "Containers", section = "System", onSelect = { openContainers(context); dismiss() }))
-        out.add(HostedRow(key = "system:modes", title = "Modes", subtitle = "Switch to Gaming, Android or Desktop", section = "System", onSelect = { openModes(context); dismiss() }))
+        // The modes this person can switch to from here, not all three (Droidtop/tracker#571 row 37).
+        val gamingOn = dev.droidtop.library.settings.Modes.isEnabledInStorage(context, dev.droidtop.library.settings.Mode.GAMING)
+        out.add(HostedRow(key = "system:modes", title = "Modes", subtitle = if (gamingOn) "Switch to Gaming or Android" else "Switch to Android", section = "System", onSelect = { openModes(context); dismiss() }))
         out.add(HostedRow(key = "system:settings", title = "Settings", section = "System", onSelect = { openSettings(context); dismiss() }))
         // A way out from inside Desktop (Droidtop/tracker#687): a setting that applies when the desktop next starts,
         // or a desktop that stopped answering, needed a trip out of the mode or the notification's Stop.

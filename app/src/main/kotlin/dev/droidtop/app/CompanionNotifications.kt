@@ -82,8 +82,12 @@ internal fun CompanionNotificationsSection(open: Boolean, onToggle: () -> Unit) 
             if (items.any { it.clearable }) {
                 Row { CompanionPill("Clear all") { NotificationsStore.controller?.clearAll() } }
             }
-            CompanionNotificationList(items.take(MAX_ROWS))
-            if (items.size > MAX_ROWS) CompanionNote("+${items.size - MAX_ROWS} more")
+            // Past the first rows, a pill shows the rest in place (Droidtop/tracker#571 row 28: "+N more" led nowhere).
+            var all by remember { mutableStateOf(false) }
+            CompanionNotificationList(if (all) items else items.take(MAX_ROWS))
+            if (items.size > MAX_ROWS) {
+                Row { CompanionPill(if (all) "Show fewer" else "Show ${items.size - MAX_ROWS} more") { all = !all } }
+            }
         }
     }
 }
