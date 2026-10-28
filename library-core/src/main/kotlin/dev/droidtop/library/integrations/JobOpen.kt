@@ -21,6 +21,7 @@ object JobOpen {
         is OpenTarget.Folder -> "Open the folder"
         is OpenTarget.File -> "Open the file"
         is OpenTarget.Place -> "Open"
+        is OpenTarget.SiteSignIn -> "Sign in again"
     }
 
     /** Opens [target]; false when nothing could. */

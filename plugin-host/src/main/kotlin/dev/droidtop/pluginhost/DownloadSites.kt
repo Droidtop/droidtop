@@ -123,7 +123,9 @@ object DownloadSites {
             ?.takeIf { it.cookies.isNotEmpty() }
             ?: return false
         // A session too large for the vault (16 KiB) is not kept, and the row stays signed out.
-        return runCatching { PluginVault.forContext(context).put(VAULT_ID, site.domain, session.toJson()) }.isSuccess
+        val kept = runCatching { PluginVault.forContext(context).put(VAULT_ID, site.domain, session.toJson()) }.isSuccess
+        if (kept) setExpired(context, site.domain, false)
+        return kept
     }
 
     /**
@@ -155,5 +157,37 @@ object DownloadSites {
     }
 
     /** Sign out: [site]'s cookies are forgotten, and no other site's. */
-    fun signOut(context: Context, site: Site): Boolean = PluginVault.forContext(context).delete(VAULT_ID, site.domain)
+    fun signOut(context: Context, site: Site): Boolean {
+        setExpired(context, site.domain, false)
+        return PluginVault.forContext(context).delete(VAULT_ID, site.domain)
+    }
+
+    fun byDomain(context: Context, domain: String): Site? = all(context).firstOrNull { it.domain == domain }
+
+    /**
+     * The signed-in site whose own cookies [headers] carried to [url], or null: what a refusal is about only when the
+     * session droidtop sent was that site's (a captured download's page cookies are not). Disk.
+     */
+    fun sentTo(context: Context, url: String, headers: Map<String, String>): Site? {
+        val sent = headers.entries.firstOrNull { it.key.equals("Cookie", ignoreCase = true) }?.value ?: return null
+        val cookies = runCatching { cookies(context) }.getOrDefault(emptyMap())
+        val domain = WebSessions.domainFor(url, cookies.keys.toList())?.takeIf { cookies[it] == sent } ?: return null
+        return byDomain(context, domain)
+    }
+
+    private fun expiredPrefs(context: Context) = context.applicationContext.getSharedPreferences("download_sites", Context.MODE_PRIVATE)
+
+    /** The site answered a download with its own session refused: its row reads Expired until it is signed in again. */
+    fun markExpired(context: Context, site: Site) = setExpired(context, site.domain, true)
+
+    fun expired(context: Context, site: Site): Boolean =
+        expiredPrefs(context).getStringSet(KEY_EXPIRED, emptySet()).orEmpty().contains(site.domain)
+
+    private fun setExpired(context: Context, domain: String, on: Boolean) {
+        val prefs = expiredPrefs(context)
+        val now = prefs.getStringSet(KEY_EXPIRED, emptySet()).orEmpty().toMutableSet()
+        if (if (on) now.add(domain) else now.remove(domain)) prefs.edit().putStringSet(KEY_EXPIRED, now).apply()
+    }
+
+    private const val KEY_EXPIRED = "expired"
 }

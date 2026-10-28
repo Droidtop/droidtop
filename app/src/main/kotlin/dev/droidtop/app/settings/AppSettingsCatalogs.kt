@@ -1218,9 +1218,14 @@ object AppSettingsCatalogs {
     private fun downloadSiteRows(context: Context): List<CatalogItem> = dev.droidtop.pluginhost.DownloadSites.all(context).map { site ->
         val sites = dev.droidtop.pluginhost.DownloadSites
         val id = "accounts_download_site_" + site.domain.replace(Regex("[^a-z0-9]"), "_")
-        val state = if (sites.signedIn(context, site)) "Signed in" else "Not signed in"
+        // Expired: the site refused the session droidtop sent with a download (#648 slice 4); signing in again clears it.
+        val state = when {
+            !sites.signedIn(context, site) -> "Not signed in"
+            sites.expired(context, site) -> "Expired"
+            else -> "Signed in"
+        }
         val subtitle = "Your sign-in stays in droidtop, and plugins never see it"
-        if (site.shipped && state == "Not signed in") {
+        if (site.shipped && state != "Signed in") {
             return@map AsyncActionItem(id = id, title = site.name, subtitle = subtitle, value = state, run = { ctx, _ -> signInToSite(ctx, site) })
         }
         NestedScreenItem(
@@ -1234,14 +1239,23 @@ object AppSettingsCatalogs {
                 subtitle = site.domain,
                 groups = { ctx ->
                     val signedIn = withContext(Dispatchers.IO) { sites.signedIn(ctx, site) }
+                    val expired = signedIn && withContext(Dispatchers.IO) { sites.expired(ctx, site) }
                     listOf(
                         CatalogGroup(
                             id = "${id}_actions",
                             title = null,
                             items = buildList {
-                                if (!signedIn) {
-                                    add(AsyncActionItem(id = "${id}_sign_in", title = "Sign in", value = "Not signed in", run = { c, _ -> signInToSite(c, site) }))
-                                } else {
+                                if (!signedIn || expired) {
+                                    add(
+                                        AsyncActionItem(
+                                            id = "${id}_sign_in",
+                                            title = if (expired) "Sign in again" else "Sign in",
+                                            value = if (expired) "Expired" else "Not signed in",
+                                            run = { c, _ -> signInToSite(c, site) },
+                                        ),
+                                    )
+                                }
+                                if (signedIn) {
                                     add(
                                         AsyncActionItem(
                                             id = "${id}_sign_out",

@@ -1063,7 +1063,18 @@ object DownloadJobs {
                 resolve = { u, h -> RedirectGuard.resolve(u, h, allow = allow) },
             )
         } catch (e: TransferException) {
-            throw EngineFailure(e.code, e.message)
+            val failure = EngineFailure(e.code, e.message)
+            // A signed-in download site that refuses its own cookies has ended the session (docs/SPEC.md 12a "Download
+            // sites", Droidtop/tracker#648): the site reads Expired, and Open on the job signs in to it again, here.
+            val status = failure.refusedStatus
+            if (status == 401 || status == 403) {
+                DownloadSites.sentTo(context, url, headers)?.let { site ->
+                    DownloadSites.markExpired(context, site)
+                    JobHandle.current()?.open(OpenTarget.SiteSignIn(site.domain))
+                    throw EngineFailure(e.code, "Your ${site.name} sign-in has expired. Open signs in again, then Retry")
+                }
+            }
+            throw failure
         }
     }
 

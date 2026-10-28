@@ -54,4 +54,9 @@ class DownloadSitesTest {
         // Only over https: a session is never sent in the clear.
         assertEquals(emptyMap<String, String>(), DownloadSites.withCookie(emptyMap(), "http://gofile.io/d/x", signedIn))
     }
+
+    @Test fun `a site's sign-in is a job's Open that survives a restart`() {
+        val target = OpenTarget.SiteSignIn("gofile.io")
+        assertEquals(target, OpenTarget.decode(OpenTarget.encode(target)))
+    }
 }

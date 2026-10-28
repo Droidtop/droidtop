@@ -51,6 +51,9 @@ sealed interface OpenTarget {
     /** One of droidtop's places, by its id (dev.droidtop.library.settings.Place). */
     data class Place(val id: String) : OpenTarget
 
+    /** A download site's sign-in, by its domain: a job its expired session stopped (docs/SPEC.md 12a "Download sites"). */
+    data class SiteSignIn(val domain: String) : OpenTarget
+
     companion object {
         fun encode(target: OpenTarget?): String? = when (target) {
             null -> null
@@ -58,6 +61,7 @@ sealed interface OpenTarget {
             is Folder -> "folder:${target.path}"
             is File -> "file:${target.path}"
             is Place -> "place:${target.id}"
+            is SiteSignIn -> "signin:${target.domain}"
         }
 
         fun decode(raw: String?): OpenTarget? {
@@ -68,6 +72,7 @@ sealed interface OpenTarget {
                 "folder" -> Folder(value)
                 "file" -> File(value)
                 "place" -> Place(value)
+                "signin" -> SiteSignIn(value)
                 else -> null
             }
         }
