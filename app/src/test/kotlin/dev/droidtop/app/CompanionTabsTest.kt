@@ -133,4 +133,10 @@ class CompanionTabsTest {
         assertFalse(jobShownOnHome(CompanionTab.HOME.id, jobRunning = false))
         assertFalse(jobShownOnHome(CompanionTab.APPS.id, jobRunning = true))
     }
+
+    @Test fun androidsBarsGiveWayToDroidtopsStatusOutsideStandard() {
+        assertTrue(companionImmersive(dev.droidtop.display.SecondaryDisplayContent.Mode.GAMING))
+        assertTrue(companionImmersive(dev.droidtop.display.SecondaryDisplayContent.Mode.DESKTOP))
+        assertFalse(companionImmersive(dev.droidtop.display.SecondaryDisplayContent.Mode.STANDARD))
+    }
 }

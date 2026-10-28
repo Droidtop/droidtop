@@ -48,6 +48,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -72,6 +75,7 @@ import dev.droidtop.shell.gamepad.QuickGlyph
 import dev.droidtop.shell.gamepad.QuickGlyphIcon
 import dev.droidtop.shell.gamepad.RailColors
 import dev.droidtop.shell.gamepad.RailTab
+import dev.droidtop.shell.gamepad.StatusCluster
 import dev.droidtop.shell.gamepad.TabRail
 import dev.droidtop.shell.gamepad.labelExtent
 import kotlinx.coroutines.cancel
@@ -208,6 +212,8 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
     val context = LocalContext.current
     val view = LocalView.current
     val modeName = mode.name
+    val immersive = companionImmersive(mode)
+    CompanionSystemBars(immersive)
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             CompanionPrefs.load(context.applicationContext)
@@ -423,15 +429,19 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
 
         val content: @Composable ColumnScope.() -> Unit = {
             // The keyboard for a field on the other screen can be hidden from here; the Keys shortcut opens the
-            // input controller where Input is not on the bar (tracker#314).
-            if (requested != null || (keysButton && bar.tabs.none { it.id == CompanionTab.INPUT.id })) {
+            // input controller where Input is not on the bar (tracker#314). Where Android's bar is hidden, droidtop's
+            // own clock, network and battery end the row (Droidtop/tracker#524); a tap opens System, which has the
+            // controls behind them.
+            val keysPill = keysButton && bar.tabs.none { it.id == CompanionTab.INPUT.id }
+            if (immersive || requested != null || keysPill) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (requested != null) {
                         CompanionPill("Hide keyboard", selected = true) { KeyboardTargets.hideCompanion() }
-                    } else {
+                    } else if (keysPill) {
                         CompanionPill("Keys", selected = selected == CompanionTab.INPUT.id) {
                             if (selected == CompanionTab.INPUT.id) {
                                 select(before ?: CompanionTab.HOME.id)
@@ -442,6 +452,11 @@ internal fun CompanionTabs(mode: SecondaryDisplayContent.Mode, home: @Composable
                                 before = from
                             }
                         }
+                    }
+                    if (immersive) {
+                        StatusCluster(showBatteryPercent = true, onClick = {
+                            if (bar.all.any { it.id == CompanionTab.SYSTEM.id }) select(CompanionTab.SYSTEM.id)
+                        })
                     }
                 }
             }
@@ -687,6 +702,40 @@ internal fun CompanionPanels(panels: List<@Composable () -> Unit>) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Whether the companion hides Android's system bars and draws droidtop's own status readout instead: in Gaming and
+ * Desktop, the modes whose main screen is immersive too (MainActivity.applySystemBars); Standard keeps Android's bars,
+ * as its launcher does (Droidtop/tracker#524). Pure.
+ */
+internal fun companionImmersive(mode: SecondaryDisplayContent.Mode): Boolean = mode != SecondaryDisplayContent.Mode.STANDARD
+
+/**
+ * Hides or shows Android's bars on the activity window this companion is drawn in, following [immersive] as the mode
+ * changes. Every host draws [CompanionTabs], so this is the one place for all of them; a Presentation host has no
+ * activity and needs none, since it is never on the screen that carries Android's bars. Bars hidden this way come
+ * back for a moment on a swipe from the edge, as on the main screen.
+ */
+@Composable
+private fun CompanionSystemBars(immersive: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(view, immersive) {
+        val window = generateSequence(view.context) { (it as? android.content.ContextWrapper)?.baseContext }
+            .firstNotNullOfOrNull { (it as? android.app.Activity)?.window }
+        if (window != null) {
+            val controller = WindowInsetsControllerCompat(window, window.decorView)
+            if (immersive) {
+                WindowCompat.setDecorFitsSystemWindows(window, false)
+                controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        onDispose { }
     }
 }
 
