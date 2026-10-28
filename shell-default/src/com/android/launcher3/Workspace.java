@@ -1321,6 +1321,17 @@ public class Workspace<T extends View & PageIndicator> extends PagedView<T>
         return mOverlayEdgeEffect != null;
     }
 
+    /**
+     * Infinite scroll (Settings > Home screen, Droidtop/tracker#564): only with more than one page, outside edit
+     * mode and a drag, and never where a swipe left of the first page opens an overlay.
+     */
+    @Override
+    protected boolean wrapsPages() {
+        return getChildCount() > getPanelCount() && !hasOverlay()
+                && !mLauncher.isInState(EDIT_MODE) && !mLauncher.isInState(SPRING_LOADED)
+                && LauncherPrefs.get(getContext()).get(LauncherPrefs.WRAP_PAGES);
+    }
+
     @Override
     protected void snapToDestination() {
         if (mOverlayEdgeEffect != null && !mOverlayEdgeEffect.isFinished()) {

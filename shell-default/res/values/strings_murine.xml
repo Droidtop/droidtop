@@ -95,6 +95,8 @@
 
     <string name="pref_lock_home_screen_title">Lock home screen</string>
     <string name="pref_lock_home_screen_summary">Prevent moving icons and widgets</string>
+    <string name="pref_wrap_pages_title">Infinite scroll</string>
+    <string name="pref_wrap_pages_summary">Swiping past the last page goes back to the first</string>
 
     <string name="pref_double_tap_action_title">Double tap</string>
     <string name="pref_swipe_down_action_title">Swipe down</string>

@@ -32,6 +32,12 @@
         android:summary="@string/pref_lock_home_screen_summary"
         android:defaultValue="false"
         android:persistent="true" />
+    <SwitchPreferenceCompat
+        android:key="pref_wrap_pages"
+        android:title="@string/pref_wrap_pages_title"
+        android:summary="@string/pref_wrap_pages_summary"
+        android:defaultValue="false"
+        android:persistent="true" />
     <!--
       LAUNCHER_HOME_SCREEN_ROTATION_ENABLED(615)
       LAUNCHER_HOME_SCREEN_ROTATION_DISABLED(616)
