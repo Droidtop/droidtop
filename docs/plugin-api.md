@@ -4722,6 +4722,23 @@ arrays under the manifest's own keys (`V2Declarations`).
     `am instrument` from CI's `droidtop-android-test` artifact. "When a real
     droidtop screen or plugin first uses these calls, that screen gets the
     user-way rig check too."
+- **`priv.settings@1`** (2026-10-28, Droidtop/tracker#72; Shizuku plugin,
+  level `adb`), every op under the `priv.settings` permission (critical):
+  - `get {namespace, key} -> {value}`: `settings get`; `value` is null for a
+    setting that is not set.
+  - `put {namespace, key, value} -> {}`: `settings put`.
+  - `delete {namespace, key} -> {deleted}`: `settings delete`; `deleted` is
+    false when the setting was not set.
+  `namespace` is `secure` or `global`. `system` is left out: an app changes
+  it with Android's own WRITE_SETTINGS, so it is no privileged call. `key` is
+  a setting's name (`^[A-Za-z0-9_.:-]{1,128}$`); `value` is one line of at
+  most 4096 characters. The provider checks all three before it runs
+  anything, and each is one argument of the command, never shell text. A
+  provider started over adb refuses to change or delete the settings it
+  stands on (`global adb_enabled`, `adb_wifi_enabled`,
+  `development_settings_enabled`) with `PERMISSION_DENIED`, since turning
+  them off stops it mid-call; reading them is allowed. No droidtop screen
+  calls it yet; it is for plugins that tune the device.
 - **Ops for the emulator setup helper** (specified 2026-10-08,
   Droidtop/tracker#130, #248; droidtop's side is built, the Shizuku provider
   plugin is to add them). Both are `priv.shell@1` ops, permission
