@@ -16353,7 +16353,10 @@ again if a code is refused".
   when the focused field is a password (`EditorInfo.inputType` for the input method's field,
   `RemoteInputRouter.isPasswordInputType`; a text view's input type or transformation for droidtop's own; a field
   whose kind cannot be read, such as a Compose or web field with no accessibility node, counts as a password), the
-  console shows bullets, never the text, and the phone's box becomes a password box.
+  console shows bullets, never the text, and the phone's box becomes a password box. When the last thing sent did not
+  arrive (text no field took, a file the console could not store or that came in part), the console shows why as a
+  Caution notice, "Not received", in place on that screen (`NoticeCard`, as the companion's "Not sent"), never as a
+  plain line among the facts and never as a passing flash; the next send clears it.
 - **Ways in:** the **Type from another device** button on the companion's Keys screen (the Input tab, opened on the
   companion's own screen), the **Type from another device** row in the Quick Menu (a catalog item,
   `GamingSettingsCatalog.ID_TYPE_FROM_DEVICE`, in the Power and mode section), and the key setup screens (7h). All
