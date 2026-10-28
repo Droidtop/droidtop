@@ -17040,8 +17040,14 @@ chosen one.
 leads with Source (`originLabel`'s full text; "Owned on Steam and GOG" under it
 when a card holds several stores), Ownership (only when not simply owned, with
 its sentence; a game that left the library reads "This game left your library.
-<Store> may refuse to start it"), Size, Cloud saves and DLC, then the rest, then
-**More**, which folds the technical facts until selected: the store id, the
+<Store> may refuse to start it"), Size, Offline, Cloud saves and DLC, then the rest, then
+**More**, which folds the technical facts until selected. **Offline** (Droidtop/tracker#422, from the companion
+plan's travel persona) says whether the game plays with no network, before the person loses it
+(`OfflineReadiness`, read from the entry alone): "Needs the internet" for a streamed game, "Needs the network" for one
+on another computer, "Not downloaded" for a store game not on this device, "Files missing" for one the library marked
+missing, else "Ready", or "Plays offline" with "Some of its art loads from the internet" when art the game draws comes
+from a web address and is not in the image cache yet, looked up once off the main thread as the page opens. A store's
+own online-only or DRM check is not known to droidtop and is not claimed. More's facts: the store id, the
 installed build, the install location and where the version came from ("set by
 you", "from the store's installer", "from the folder name", "from the game's
 files"). **The game's files (2026-10-14, Droidtop/tracker#406):** a folder game
