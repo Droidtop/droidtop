@@ -121,7 +121,7 @@ jobs:
         # never once run in CI. Add the module here the moment it grows its
         # first test; a test nothing runs is not a test.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest --stacktrace
+        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest --stacktrace
 
       - name: Plugin conformance (python fixture)
         # docs/plugin-api.md 3 I2 (Droidtop/tracker#71): the python kind's fixture through the same
@@ -140,6 +140,7 @@ jobs:
             runtime-common/build/reports/tests/
             shell-gamepad/build/reports/tests/
             input-seat/build/reports/tests/
+            input-mapping/build/reports/tests/
             runtime-windows/build/reports/tests/
             input-keyboard/build/reports/tests/
             host-bridge/build/reports/tests/

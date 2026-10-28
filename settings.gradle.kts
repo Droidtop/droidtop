@@ -85,6 +85,7 @@ include(":runtime-linux-noroot")
 // and lapdock peripheral events on the Android side, normalizes them, and hands them to
 // :host-bridge for injection into the primary container's compositor.
 include(":input-seat")
+include(":input-mapping")
 
 // Unified library/metadata layer (Playnite-style plugin model). Designed so native Android
 // apps, Wine profiles, and Linux containers are equally first-class entries — this is the
