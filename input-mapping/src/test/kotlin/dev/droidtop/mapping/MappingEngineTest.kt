@@ -109,6 +109,35 @@ class MappingEngineTest {
         assertEquals(listOf(Output.StickMove("RIGHT", 0.5f, -0.25f)), e.stick("right_joystick", 0.5f, -0.25f, 0))
     }
 
+    @Test
+    fun `with a double press, a single tap waits out the window and then taps the full press`() {
+        val e = engine()
+        assertEquals(emptyList<Output>(), e.press("switch", "button_menu", 0))
+        assertEquals(emptyList<Output>(), e.release("switch", "button_menu", 50))
+        assertEquals(emptyList<Output>(), e.tick(250))
+        assertEquals(listOf(Output.KeyDown("ESCAPE"), Output.KeyUp("ESCAPE")), e.tick(251))
+    }
+
+    @Test
+    fun `a second press inside the window is the double press, held until released`() {
+        val e = engine()
+        e.press("switch", "button_menu", 0)
+        e.release("switch", "button_menu", 50)
+        assertEquals(listOf(Output.KeyDown("F1")), e.press("switch", "button_menu", 150))
+        assertEquals(listOf(Output.KeyUp("F1")), e.release("switch", "button_menu", 300))
+        assertEquals(emptyList<Output>(), e.tick(1000))
+    }
+
+    @Test
+    fun `a second press after the window taps the first and starts again`() {
+        val e = engine()
+        e.press("switch", "button_menu", 0)
+        e.release("switch", "button_menu", 50)
+        assertEquals(listOf(Output.KeyDown("ESCAPE"), Output.KeyUp("ESCAPE")), e.press("switch", "button_menu", 400))
+        assertEquals(emptyList<Output>(), e.release("switch", "button_menu", 450))
+        assertEquals(listOf(Output.KeyDown("ESCAPE"), Output.KeyUp("ESCAPE")), e.tick(700))
+    }
+
     companion object {
         private fun settingsGroup(id: Int, mode: String, settings: String) =
             "\"group\" { \"id\" \"$id\" \"mode\" \"$mode\" \"settings\" { $settings } }"
@@ -140,6 +169,10 @@ class MappingEngineTest {
             2, "switches",
             input("left_bumper", press("Full_Press", "mode_shift joystick 3")),
             input("right_bumper", press("Full_Press", "mouse_button LEFT")),
+            input(
+                "button_menu", press("Full_Press", "key_press ESCAPE"),
+                press("Double_Press", "key_press F1", settings = "\"double_tap_time\" \"200\""),
+            ),
         )}
               ${group(3, "dpad", input("dpad_north", press("Full_Press", "key_press UP")))}
               ${group(

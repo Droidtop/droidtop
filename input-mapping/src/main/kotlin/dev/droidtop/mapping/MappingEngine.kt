@@ -19,13 +19,16 @@ import kotlin.math.sqrt
  * - activators: `Full_Press` is held while the input is; `Start_Press` taps on press and `Release_Press` on release;
  *   `Long_Press` is held from [Activator.long_press_time][DEFAULT_LONG_PRESS_MS] after the press until release. An
  *   input with a Long_Press makes its Full_Press wait: released sooner, the Full_Press is a tap;
+ * - `Double_Press` is held from a second press that comes within its `double_tap_time` ([DEFAULT_DOUBLE_TAP_MS]) of
+ *   the first one's release, until that second release. An input with a Double_Press makes its Full_Press wait too:
+ *   when no second press comes in time, the Full_Press taps then (at the [tick] or event that passes the window);
  * - a stick in `dpad` mode presses `dpad_north` and the others past [STICK_DPAD_THRESHOLD], 8-way;
  * - a stick in `joystick_mouse` mode moves the pointer at each [tick], by today's controller mouse curve (a push under
  *   [MOUSE_DEADZONE] is rest, then the square of the push up to [MOUSE_FULL_WIDTHS_PER_S] screen widths a second),
  *   scaled by the group's `sensitivity` (percent, 100 by default);
  * - a stick in `joystick_move` mode is passed through as the pad's stick, its group's `output_joystick` choosing which
  *   (0 left, 1 right; by default the stick it came from).
- * Not yet: double press, chords, turbo, joystick camera, scroll wheel, radial and touch menus, and action layers.
+ * Not yet: chords, turbo, joystick camera, scroll wheel, radial and touch menus, and action layers.
  */
 class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null) {
 
@@ -61,7 +64,13 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
     private class Held(val since: Long, val activators: List<ControllerLayout.Activator>) {
         val down = ArrayList<Binding>()
         var longFired = false
+        var double = false
     }
+
+    /** Inputs released once with a Double_Press waiting: when, and the Full_Press that taps if no second press comes. */
+    private class Waiting(val releasedAt: Long, val window: Long, val full: List<ControllerLayout.Activator>)
+
+    private val waiting = LinkedHashMap<Physical, Waiting>()
 
     private val held = LinkedHashMap<Physical, Held>()
 
@@ -75,14 +84,23 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
     fun press(source: String, input: String, now: Long): List<Output> {
         val physical = Physical(source, input)
         if (physical in held) return emptyList()
+        val out = ArrayList<Output>()
+        // Settles any double-press window that has passed, this input's included.
+        tick(now, out)
         val activators = groupOn(source)?.input(input)?.activators.orEmpty()
         val h = Held(now, activators)
         held[physical] = h
-        val out = ArrayList<Output>()
-        val hasLong = activators.any { it.type.equals(LONG, true) }
+        val second = waiting.remove(physical)
+        if (second != null) {
+            // The second press of a double press: it is held as the Double_Press, and the first press's tap is dropped.
+            h.double = true
+            activators.filter { it.type.equals(DOUBLE, true) }.forEach { a -> a.bindings.forEach { begin(physical, h, it, out) } }
+            return out
+        }
+        val waits = activators.any { it.type.equals(LONG, true) || it.type.equals(DOUBLE, true) }
         for (a in activators) {
             when {
-                a.type.equals(FULL, true) && !hasLong -> a.bindings.forEach { begin(physical, h, it, out) }
+                a.type.equals(FULL, true) && !waits -> a.bindings.forEach { begin(physical, h, it, out) }
                 a.type.equals(START, true) -> a.bindings.forEach { tap(it, out) }
             }
         }
@@ -96,8 +114,15 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
         // A long press held past its time counts even when no tick came in between.
         tick(now, out)
         val h = held.remove(physical) ?: return out
-        if (h.activators.any { it.type.equals(LONG, true) } && !h.longFired) {
-            h.activators.filter { it.type.equals(FULL, true) }.forEach { a -> a.bindings.forEach { tap(it, out) } }
+        val full = h.activators.filter { it.type.equals(FULL, true) }
+        val double = h.activators.firstOrNull { it.type.equals(DOUBLE, true) }
+        when {
+            h.double || h.longFired -> Unit
+            double != null -> {
+                val window = double.settings["double_tap_time"]?.toLongOrNull() ?: DEFAULT_DOUBLE_TAP_MS
+                waiting[physical] = Waiting(now, window, full)
+            }
+            h.activators.any { it.type.equals(LONG, true) } -> full.forEach { a -> a.bindings.forEach { tap(it, out) } }
         }
         for (b in h.down.asReversed()) end(physical, b, out)
         h.activators.filter { it.type.equals(RELEASE, true) }.forEach { a -> a.bindings.forEach { tap(it, out) } }
@@ -120,8 +145,13 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
                 if (vx != 0f || vy != 0f) out += Output.MouseMove(vx * gain * seconds, vy * gain * seconds)
             }
         }
+        for ((physical, w) in waiting.entries.toList()) {
+            if (now - w.releasedAt <= w.window) continue
+            waiting.remove(physical)
+            w.full.forEach { a -> a.bindings.forEach { tap(it, out) } }
+        }
         for ((physical, h) in held.entries.toList()) {
-            if (h.longFired) continue
+            if (h.longFired || h.double) continue
             val long = h.activators.firstOrNull { it.type.equals(LONG, true) } ?: continue
             val time = long.settings["long_press_time"]?.toLongOrNull() ?: DEFAULT_LONG_PRESS_MS
             if (now - h.since >= time) {
@@ -209,11 +239,13 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
 
     companion object {
         const val DEFAULT_LONG_PRESS_MS = 400L
+        const val DEFAULT_DOUBLE_TAP_MS = 250L
         const val STICK_DPAD_THRESHOLD = 0.5f
         const val MOUSE_DEADZONE = 0.15f
         const val MOUSE_FULL_WIDTHS_PER_S = 1.5f
         private const val FULL = "Full_Press"
         private const val LONG = "Long_Press"
+        private const val DOUBLE = "Double_Press"
         private const val START = "Start_Press"
         private const val RELEASE = "Release_Press"
 
