@@ -20,13 +20,13 @@ class CompanionTabsTest {
     @Test fun gamingDefaultsThenMore() {
         val bar = slots(gamingDefault, UiMode.FULL, emptyList(), 0f, emptyMap())
         assertEquals(listOf("home", "system", "apps", "social"), ids(bar.tabs))
-        assertEquals(listOf("performance", "input", "network"), ids(bar.more))
+        assertEquals(listOf("performance", "input", "connections"), ids(bar.more))
     }
 
     @Test fun desktopLeadsWithInput() {
         val bar = slots(desktopDefault, UiMode.FULL, emptyList(), 0f, emptyMap())
         assertEquals(listOf("input", "home", "system", "apps"), ids(bar.tabs))
-        assertEquals(listOf("performance", "social", "network"), ids(bar.more))
+        assertEquals(listOf("performance", "social", "connections"), ids(bar.more))
     }
 
     @Test fun aGameAddsGameAfterTheChosenTabsWithoutMovingThem() {
@@ -41,7 +41,7 @@ class CompanionTabsTest {
             val running = runningTabs(gameRunning = true, wantsInput = runnerWantsInput(kind))
             val gaming = slots(gamingDefault, UiMode.FULL, running, 0f, emptyMap())
             assertEquals(listOf("home", "system", "apps", "social", "game", "input"), ids(gaming.tabs))
-            assertEquals(listOf("performance", "network"), ids(gaming.more))
+            assertEquals(listOf("performance", "connections"), ids(gaming.more))
             // Desktop already has Input chosen: it stays in its place and is not added twice.
             val desktop = slots(desktopDefault, UiMode.FULL, running, 0f, emptyMap())
             assertEquals(listOf("input", "home", "system", "apps", "game"), ids(desktop.tabs))
@@ -78,11 +78,11 @@ class CompanionTabsTest {
         // Labels grew: room for three and More, so Social goes first into More, at its head.
         val tight = slots(gamingDefault, UiMode.FULL, emptyList(), 420f, sizes, moreSize = 100f)
         assertEquals(listOf("home", "system", "apps"), ids(tight.tabs))
-        assertEquals(listOf("social", "performance", "input", "network"), ids(tight.more))
+        assertEquals(listOf("social", "performance", "input", "connections"), ids(tight.more))
         // A running game takes room too; the chosen tabs give it up from the right, Game stays.
         val playing = slots(gamingDefault, UiMode.FULL, runningTabs(true, false), 420f, sizes, moreSize = 100f)
         assertEquals(listOf("home", "system", "game"), ids(playing.tabs))
-        assertEquals(listOf("apps", "social", "performance", "input", "network"), ids(playing.more))
+        assertEquals(listOf("apps", "social", "performance", "input", "connections"), ids(playing.more))
         // Unmeasured: nothing moves.
         assertEquals(ids(roomy.tabs), ids(slots(gamingDefault, UiMode.FULL, emptyList(), 0f, sizes, 100f).tabs))
     }
