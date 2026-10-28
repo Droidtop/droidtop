@@ -476,6 +476,18 @@ fun CatalogNavigator(
         scope.launch { listState.scrollToItem(0) }
     }
 
+    // L1/R1 step the categories from anywhere on the page, never wrapping, as they step a strip elsewhere (proposal
+    // 6.H, Droidtop/tracker#644 slice 4).
+    if (categoryMode) {
+        OwnShoulders { step ->
+            val next = menuStep(categoryIndex, categories.size, step)
+            if (next != categoryIndex) {
+                EsDeNavigationSounds.play(UiSound.TAB)
+                chooseCategory(next)
+            }
+        }
+    }
+
     fun adjust(item: CatalogItem, direction: Int) {
         if (item is ToggleItem) {
             EsDeNavigationSounds.play(if (item.current) UiSound.TOGGLE_OFF else UiSound.TOGGLE_ON)
