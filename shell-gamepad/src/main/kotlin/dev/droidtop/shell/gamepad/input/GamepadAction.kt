@@ -212,10 +212,19 @@ object GamepadKeyMap {
             // next to an "R2" chip left which one was meant to the reader.
             GamepadAction.L -> "L1"
             GamepadAction.R -> "R1"
-            GamepadAction.L2 -> "L2"
-            GamepadAction.R2 -> "R2"
+            GamepadAction.L2, GamepadAction.R2 -> triggerLabel(action, ControllerLayouts.triggerless)
             GamepadAction.L3 -> "L3"
             GamepadAction.R3 -> "R3"
         }
+    }
+
+    /**
+     * L2's and R2's names: the printed ones, or on a pad with no triggers the hold that stands in for each (a held
+     * Start is L2, a held Select R2), so the hint names a press the pad can make (Droidtop/tracker#621 M9). Pure.
+     */
+    fun triggerLabel(action: GamepadAction, triggerless: Boolean): String = when (action) {
+        GamepadAction.L2 -> if (triggerless) "Hold Start" else "L2"
+        GamepadAction.R2 -> if (triggerless) "Hold Select" else "R2"
+        else -> error("$action is not a trigger")
     }
 }

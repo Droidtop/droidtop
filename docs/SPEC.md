@@ -7953,6 +7953,9 @@ leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
   sees half a hold. A tap of Start therefore opens the left menu on release, as Select's tap already acted. Start here
   is the pad's Start or Menu button (`BUTTON_START`), never the Xbox, PlayStation or Steam button (`BUTTON_MODE`),
   which Gaming does not use.
+  The hints say so only where it matters (M9, approved 2026-10-23): on a pad with no L2 and R2 at all, as keys or as
+  trigger axes (`ControllerLayouts.triggerless`), the R2 pill reads "Hold Select" and the L2 pill "Hold Start"
+  (`GamepadKeyMap.triggerLabel`); every other pad keeps "R2" and "L2". The holds work on every pad either way.
 - Desktop mode hands the pad to the container (§6b), so the activity's
   gate steps aside there. Every D-pad edge is logged under
   `droidtop.input` with what became of it, for console runs read back

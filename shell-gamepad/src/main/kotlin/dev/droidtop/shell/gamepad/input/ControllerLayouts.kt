@@ -65,6 +65,7 @@ object ControllerLayouts {
         }
     private var recaptureState by mutableStateOf(false)
     private var activeNameState by mutableStateOf<String?>(null)
+    private var triggerlessState by mutableStateOf(false)
     private var readyState by mutableStateOf(false)
     private var captureRequestedState by mutableStateOf(false)
 
@@ -79,6 +80,12 @@ object ControllerLayouts {
 
     /** The person asked to set the buttons (Quick Menu, onboarding): the shell shows the capture prompt. */
     val captureRequested: Boolean get() = captureRequestedState
+
+    /**
+     * The active pad has no L2 and R2 at all, as a key or as an axis: a held Select is its R2 and a held Start its L2
+     * (PadGate's holds), and the hints say so (Droidtop/tracker#621 M9). False with no pad, where nothing is held.
+     */
+    val triggerless: Boolean get() = triggerlessState
 
     /** Name of the pad the layout is for, for the screens that say so. */
     val activePadName: String? get() = activeNameState
@@ -254,6 +261,12 @@ object ControllerLayouts {
             AttachedController(id = id, name = device.name.trim().ifEmpty { "Controller" })
         }.distinctBy { it.name }
 
+    /** L2 and R2 as keys, or the trigger axes Android reports them on (the brake and gas axes on some pads). */
+    private fun InputDevice.hasTriggers(): Boolean =
+        hasKeys(KeyEvent.KEYCODE_BUTTON_L2, KeyEvent.KEYCODE_BUTTON_R2).any { it } ||
+            listOf(android.view.MotionEvent.AXIS_LTRIGGER, android.view.MotionEvent.AXIS_RTRIGGER, android.view.MotionEvent.AXIS_BRAKE, android.view.MotionEvent.AXIS_GAS)
+                .any { getMotionRange(it) != null }
+
     private fun InputDevice.isGamepad(): Boolean {
         if (isVirtual) return false
         return (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
@@ -405,6 +418,7 @@ object ControllerLayouts {
         layoutState = resolved
         recaptureState = LayoutResolver.needsRecapture(facts, resolved)
         activeNameState = pad?.name
+        triggerlessState = pad?.let { InputDevice.getDevice(it.id) }?.let { !it.hasTriggers() } ?: false
         logDecision(pad, reason, facts, resolved)
     }
 
