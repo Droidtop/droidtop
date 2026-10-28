@@ -237,6 +237,9 @@ internal fun LeftMenu(
                             LeftMenuRow.Search -> onSearch?.invoke()
                             is LeftMenuRow.Destination -> entries.getOrNull(row.index)?.let(onSelect)
                         }
+                        // X plays, so on the running game's card it resumes it; elsewhere it does nothing (proposal
+                        // 6.D, Droidtop/tracker#644 slice 4).
+                        GamepadAction.X -> if (leftMenuRowAt(focusIndex, running, searchable) == LeftMenuRow.Resume) onResume()
                         GamepadAction.B, GamepadAction.START -> close()
                         GamepadAction.R2 -> onOpenQuickMenu()
                         else -> return@onPad false
