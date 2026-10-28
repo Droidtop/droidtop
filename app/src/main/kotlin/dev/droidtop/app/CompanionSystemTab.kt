@@ -44,7 +44,6 @@ import kotlinx.coroutines.withContext
 @Composable
 internal fun CompanionSystemTab() {
     val context = LocalContext.current
-    val nav = LocalCompanionNav.current
     val uiMode by UiModeRefresh.mode.collectAsState()
     var version by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { version++ }
@@ -90,11 +89,7 @@ internal fun CompanionSystemTab() {
                             // A slider per stream through the one volume path, and the network and Bluetooth (C19).
                             if (card.id == "sound") CompanionStreamVolumes()
                             if (card.id == "connections") CompanionConnections()
-                            CompanionCatalogItems(
-                                card.items,
-                                onChanged = { version++ },
-                                onOpenSocial = nav?.let { n -> { n.openTab(CompanionTab.SOCIAL) } },
-                            )
+                            CompanionCatalogItems(card.items, onChanged = { version++ })
                         }
                     }
                 }

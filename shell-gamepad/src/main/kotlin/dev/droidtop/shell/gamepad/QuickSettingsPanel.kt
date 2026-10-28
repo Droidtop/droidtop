@@ -37,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -96,8 +97,10 @@ internal fun QuickSettingsPanel(
     sheetWidthDp: Int,
     openPlace: (screenId: String) -> Boolean,
     onDismiss: () -> Unit,
+    onSearch: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val search by rememberUpdatedState(onSearch)
     val scope = rememberCoroutineScope()
     var version by remember { mutableStateOf(0) }
     var focusIndex by remember { mutableStateOf(0) }
@@ -112,7 +115,8 @@ internal fun QuickSettingsPanel(
     // battery broadcast and a connectivity query.
     val groups by produceState(initialValue = emptyList<CatalogGroup>(), version) {
         value = withContext(Dispatchers.IO) {
-            quickSectionGroups(GamingSettingsCatalog.groups(context), section, dev.droidtop.library.settings.UiModePrefs.get(context))
+            val groups = quickSectionGroups(GamingSettingsCatalog.groups(context), section, dev.droidtop.library.settings.UiModePrefs.get(context))
+            if (section == QuickSection.SYSTEM && search != null) QuickTiles.withSearch(groups) { search?.invoke() } else groups
         }
     }
     val panel = remember(groups) { QuickTiles.panel(groups) }
@@ -689,6 +693,11 @@ fun QuickGlyphIcon(glyph: QuickGlyph, tint: Color, modifier: Modifier = Modifier
                 drawRoundRect(tint, p(9.5f, 11f), Size(5f * u, 10f * u), androidx.compose.ui.geometry.CornerRadius(1f * u), style = stroke)
                 dot(12f, 14.5f, 1.1f)
                 line(12f, 2f, 12f, 4.5f); line(5.5f, 3.5f, 7f, 5f); line(18.5f, 3.5f, 17f, 5f)
+            }
+            QuickGlyph.SEARCH -> {
+                // A magnifier, as Home's search target: the lens and its handle.
+                ring(10.5f, 10.5f, 6.5f)
+                line(15.3f, 15.3f, 20f, 20f)
             }
             QuickGlyph.PLUGIN -> {
                 // A puzzle piece, as the left menu's Plugins row: a square with a knob on its top and one on its right.

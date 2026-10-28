@@ -37,10 +37,8 @@ object SocialNotifications {
         SocialHub.notifier = { incoming -> show(app, incoming) }
         CoroutineScope(SupervisorJob() + Dispatchers.Default).launch {
             runCatching { app.getSystemService(NotificationManager::class.java)?.deleteNotificationChannel(OLD_STEAM_CHANNEL_ID) }
-            // The Quick Menu's Social tile reads these two numbers.
-            SocialBadge.available = SocialHub.providers().isNotEmpty()
+            // The unread count the Social badges read.
             SocialHub.changes().collect {
-                SocialBadge.available = SocialHub.providers().isNotEmpty()
                 SocialBadge.unread = SocialHub.unread()
             }
         }
