@@ -712,6 +712,8 @@
     <string name="summary_clipboard_history">Keep the text you copy so it can be pinned and pasted again. Clips marked sensitive are never kept.</string>
     <string name="title_space_drag">Space bar moves the cursor</string>
     <string name="summary_space_drag">Drag a finger along the space bar to move the cursor; with Shift held on the keyboard it selects.</string>
+    <string name="title_glide">Glide typing</string>
+    <string name="summary_glide">Draw a word across the letters without lifting your finger. Needs a dictionary for the language (Dictionaries).</string>
     <string name="title_macros">Macros</string>
     <string name="message_macros">One per line, name = steps. Steps: C-b (Ctrl+B), A-x, S-Tab, M-x, key names (Esc, Enter, Tab, Up, F5, ...), letters, and \"quoted text\" with \\n for Enter. Example: tmux new window = C-b c</string>
     <string name="notification_channel_name">Hacker\'s Keyboard</string>

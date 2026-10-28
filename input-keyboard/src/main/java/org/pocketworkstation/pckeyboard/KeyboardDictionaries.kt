@@ -28,6 +28,12 @@ object KeyboardDictionaries {
     /** The file a language's dictionary is kept in: by its language code ("en" for en_US), lower case. */
     fun fileFor(context: Context, language: String): File = File(dir(context), "main_${code(language)}.dict")
 
+    /** The words glide typing guesses from for a language (Droidtop/tracker#341), kept beside its dictionary. */
+    fun glideFileFor(context: Context, language: String): File = File(dir(context), "glide_${code(language)}.txt")
+
+    /** How many of a wordlist's words glide typing keeps: the most frequent, so working out their paths stays quick. */
+    const val GLIDE_WORDS = 40_000
+
     /** "en" for "en_US", "en-US" or "EN". Pure. */
     fun code(locale: String): String = locale.substringBefore('_').substringBefore('-').lowercase(Locale.ROOT)
 
@@ -85,12 +91,43 @@ object KeyboardDictionaries {
             temp.delete()
             return Added.Refused("The dictionary could not be saved")
         }
+        writeGlideWords(fileFor(context, language).parentFile!!, glideFileFor(context, language), parsed.words)
         generation++
         return Added.Done(language, parsed.words.size, bytes.size)
     }
 
+    /** The [GLIDE_WORDS] most frequent single words of [words] as "word<TAB>frequency" lines, most frequent first. */
+    fun glideLines(words: Map<String, Int>): List<String> =
+        words.entries.filter { (w, _) -> w.isNotEmpty() && w.all { it.isLetter() || it == '\'' } }
+            .sortedByDescending { it.value }.take(GLIDE_WORDS).map { "${it.key}\t${it.value}" }
+
+    private fun writeGlideWords(dir: File, target: File, words: Map<String, Int>) {
+        val temp = File(dir, target.name + ".part")
+        temp.writeText(glideLines(words).joinToString("\n"), Charsets.UTF_8)
+        if (!temp.renameTo(target)) temp.delete()
+    }
+
+    /** [language]'s glide words and their frequencies, or null when it has none. Disk: off the main thread. */
+    fun glideWords(context: Context, language: String): Pair<List<String>, IntArray>? {
+        val file = glideFileFor(context, language)
+        if (!file.isFile) return null
+        val words = ArrayList<String>()
+        val frequencies = ArrayList<Int>()
+        file.forEachLine(Charsets.UTF_8) { line ->
+            val tab = line.indexOf('\t')
+            if (tab > 0) {
+                words += line.substring(0, tab)
+                frequencies += line.substring(tab + 1).toIntOrNull() ?: 0
+            }
+        }
+        return if (words.isEmpty()) null else words to frequencies.toIntArray()
+    }
+
     /** Forgets [language]'s dictionary. Disk: off the main thread. */
-    fun remove(context: Context, language: String): Boolean = fileFor(context, language).delete().also { if (it) generation++ }
+    fun remove(context: Context, language: String): Boolean {
+        glideFileFor(context, language).delete()
+        return fileFor(context, language).delete().also { if (it) generation++ }
+    }
 
     /**
      * Loads [language]'s dictionary on the background thread and, on the main thread, gives it to [suggest] if that is
