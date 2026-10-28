@@ -5206,7 +5206,9 @@ droidtop 0.2.0-dev.1931).
   ("Disconnect"). `GameControls.asks` is the one decision whether a row asks first: the runner's or a plugin's
   `confirm` flag; **Ask before stopping** (Companion group, on by default) for Quit, Restart, Kill, an Apps row's
   Stop and Clear all; **Ask before load and overwrite** (on by default) for plugin rows flagged `confirm`; and Kid
-  and Kiosk always ask. The running game's L2 sheet reads the same decision. The question starts on Keep playing,
+  and Kiosk always ask. The running game's L2 sheet reads the same decision, and so does Home's Now card: its
+  Quit asks the Game tab's question and opens the Game tab on it, or asks in the card (`CompanionAsk`) where there
+  are no tabs (it used to quit at once, even in Kid; Droidtop/tracker#588). The question starts on Keep playing,
   the two answers large and well apart; a pad press that reaches the companion while it is open closes it as
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
 - **The one question (Droidtop/tracker#786 S2a, 2026-10-30).** Every question the companion asks is `CompanionAsk`:
