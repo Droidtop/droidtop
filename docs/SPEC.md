@@ -647,6 +647,46 @@ forecloses it: entries carry their `LibraryEntryKind` all the way to
 launch, and nothing in Desktop's launch path should assume "a window
 means a Linux process."
 
+**The design (Droidtop/tracker#615, proposal for later; design only, nothing
+built).** The owner, 2026-10-23: "since we want to present Android
+applications in desktop environments, can we maybe use windowcast for that?
+per-window streaming would be great, if we can stream android applications
+that are running in the background", then "Maybe something for later. Put a
+proposal issue in the tracker". This fills the first direction above.
+
+- **One virtual display per app, made through Shizuku.** A plain app can
+  start activities only on its own displays and cannot make one other apps
+  launch onto, so droidtop asks Shizuku (or Sui) for a shell-owned virtual
+  display, as scrcpy's `--new-display` does, and launches the app there with
+  `ActivityOptions.setLaunchDisplayId`, the call `:display` already uses for
+  the companion and the second screen (`SecondScreenOrchestrator`). Elevated
+  access only through Shizuku or Sui, as everywhere (`ElevatedAccess`);
+  without it the row says so and nothing is offered. On Android 10 and later
+  an app on its own display stays resumed while something else is in front,
+  so a window keeps running behind the desktop. The display's size is the
+  window's: a resize resizes the display.
+- **Capture, input and audio are windowcast's, never droidtop's** (product
+  rule: no streaming code in droidtop). windowcast's Android host agent (the
+  same shape as its X11 host, Droidtop/tracker#609) captures each such display
+  as one window, injects touch, keys and pad into that display id, and takes
+  the app's sound by UID with AudioPlaybackCapture (an app that opts out is
+  silent). Its client inside the desktop container's compositor shows each as
+  an ordinary window that moves, resizes and closes. The same agent streams an
+  Android app to a PC, so the desktop and remote use are one path.
+- **droidtop's part** is the display and the launch: a "Open as a window"
+  entry for an Android app in the Start menu and the taskbar's Android apps
+  (2b, Droidtop/tracker#352), the display's lifetime tied to the window, and
+  the task manager listing the app as usual. The on-screen keyboard follows
+  the focused window's display, as it follows the second screen (4c).
+- **Limits, said in the UI:** a `FLAG_SECURE` app (banking, DRM video) shows
+  black; some apps refuse a secondary display and are relaunched on the main
+  one with a sentence why; every display costs GPU and memory, so a handful
+  at a time is the scale.
+- **Order when it starts:** windowcast's Android host agent and its client in
+  the container come first (windowcast's lane); droidtop's display and launch
+  piece is small and lands after them, behind a Desktop setting until the rig
+  has run it.
+
 ## 2c. Modes and what each contributes (directed 2026-09-11)
 
 droidtop is one app and one process hosting three modes. The user's words:
