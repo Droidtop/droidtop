@@ -48,7 +48,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 
 /**
- * The five stores droidtop can read a library from, and the one place that
+ * The stores droidtop can read a library from, and the one place that
  * knows how each is signed in to, signed out of, asked to sync and asked
  * whether it is signed in (docs/SPEC.md 7i and 7j "Places"). Before this
  * the signed-in check was written out three times in
@@ -60,14 +60,20 @@ import kotlinx.coroutines.withContext
  * sign-in shows the store's own page, a key sign-in takes the key the person
  * made on the store's site, and Steam signs in step by step on droidtop's
  * own screen (a QR code, or a password Steam checks and droidtop does not keep).
+ *
+ * A plugin's store (docs/plugin-api.md 3 A13, Droidtop/tracker#220) is one more: it is registered in
+ * [StoreLibraries] while its plugin runs, and [entries] lists it after droidtop's five, with the same
+ * row and page. Its sign-in is the plugin's own site account, opened like a web sign-in.
  */
-internal enum class PcStore(val key: String) {
-    STEAM("steam"),
-    GOG("gog"),
-    EPIC("epic"),
-    AMAZON("amazon"),
-    ITCH("itch"),
-    ;
+internal data class PcStore(val key: String) {
+    companion object {
+        /** droidtop's own stores, in the order the place lists them. */
+        private val OWN = listOf("steam", "gog", "epic", "amazon", "itch")
+
+        /** droidtop's five, then every store a running plugin provides, by label. */
+        val entries: List<PcStore>
+            get() = OWN.map(::PcStore) + StoreLibraries.all().filter { it.id !in OWN }.sortedBy { it.label.lowercase() }.map { PcStore(it.id) }
+    }
 
     /** The store, or null when this build has none of that id. */
     val own: StoreLibrary? get() = StoreLibraries.byId(key)
