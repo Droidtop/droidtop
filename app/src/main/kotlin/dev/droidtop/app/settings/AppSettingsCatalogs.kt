@@ -3398,15 +3398,26 @@ object AppSettingsCatalogs {
                             title = "PC & engine game source",
                             subtitle = "Searched by name. Once a game is found, IGDB, the Steam store and SteamGridDB " +
                                 "add what they hold for that same game when they are set up",
+                            // A metadata plugin is a choice beside the built-in sources, asked alone like them
+                            // (Droidtop/tracker#67).
                             options = dev.droidtop.library.scraper.PcScraperSource.entries.map {
                                 ChoiceOption(it.name, it.label)
+                            } + dev.droidtop.library.integrations.PluginMetadataSources.sources(context).map {
+                                ChoiceOption(dev.droidtop.library.scraper.PcScraperSourcePrefs.PLUGIN_PREFIX + it.record.manifest.id, "${it.label} (plugin)")
                             },
-                            current = dev.droidtop.library.scraper.PcScraperSourcePrefs.get(context).name,
+                            current = dev.droidtop.library.scraper.PcScraperSourcePrefs.plugin(context)
+                                ?.let { dev.droidtop.library.scraper.PcScraperSourcePrefs.PLUGIN_PREFIX + it }
+                                ?: dev.droidtop.library.scraper.PcScraperSourcePrefs.get(context).name,
                             onSelect = { ctx, value ->
-                                dev.droidtop.library.scraper.PcScraperSourcePrefs.set(
-                                    ctx,
-                                    dev.droidtop.library.scraper.PcScraperSource.valueOf(value),
-                                )
+                                val prefix = dev.droidtop.library.scraper.PcScraperSourcePrefs.PLUGIN_PREFIX
+                                if (value.startsWith(prefix)) {
+                                    dev.droidtop.library.scraper.PcScraperSourcePrefs.setPlugin(ctx, value.removePrefix(prefix))
+                                } else {
+                                    dev.droidtop.library.scraper.PcScraperSourcePrefs.set(
+                                        ctx,
+                                        dev.droidtop.library.scraper.PcScraperSource.valueOf(value),
+                                    )
+                                }
                             },
                         ),
                     ),

@@ -78,6 +78,18 @@ object PcScraperSourcePrefs {
     fun set(context: Context, source: PcScraperSource) {
         prefs(context).putString(KEY_SOURCE, source.key)
     }
+
+    /** What the source choice stores for a metadata plugin chosen as the source (Droidtop/tracker#67). */
+    const val PLUGIN_PREFIX = "plugin:"
+
+    /** The metadata plugin chosen as the PC source, by its id, or null when a built-in source is chosen. */
+    fun plugin(context: Context): String? =
+        prefs(context).getString(KEY_SOURCE, null)?.takeIf { it.startsWith(PLUGIN_PREFIX) }?.removePrefix(PLUGIN_PREFIX)?.takeIf { it.isNotBlank() }
+
+    /** Chooses the metadata plugin [pluginId] as the one source every PC pass asks. */
+    fun setPlugin(context: Context, pluginId: String) {
+        prefs(context).putString(KEY_SOURCE, PLUGIN_PREFIX + pluginId)
+    }
 }
 
 /**
@@ -521,7 +533,10 @@ object PcScraper {
     ): String = withContext(Dispatchers.IO) {
         if (entries.isEmpty()) return@withContext "PC and engine games: none in the library."
         ScraperReadiness.pcSourceProblem(context)?.let { return@withContext it }
-        val source = source(context) ?: return@withContext "No PC scraper source is configured."
+        // A metadata plugin chosen as the source is the one source the pass asks (Droidtop/tracker#67): no built-in
+        // search, as with any other choice.
+        val chosen = chosenPlugin(context)
+        val source = if (chosen != null) PluginChosenSource(chosen.label) else source(context) ?: return@withContext "No PC scraper source is configured."
         val wantMetadata = ScrapeOptionsPrefs.scrapeMetadata(context)
         val wantArtwork = ScrapeOptionsPrefs.scrapeArtwork(context)
         if (!wantMetadata && !wantArtwork) {
@@ -561,7 +576,11 @@ object PcScraper {
         val flavour = PcFlavour(context)
         // Metadata plugins (docs/plugin-api.md 3 A3), the same way the ROM pass asks them: after every built-in source,
         // filling only what those left empty. One scrape path for ROMs and PC and engine games.
-        val plugins = if (wantMetadata) dev.droidtop.library.integrations.PluginMetadataSources.open(context) else null
+        val plugins = when {
+            !wantMetadata -> null
+            chosen != null -> dev.droidtop.library.integrations.PluginMetadataSources.Session(context, listOf(chosen))
+            else -> dev.droidtop.library.integrations.PluginMetadataSources.open(context)
+        }
         // The same rule as the ROM pass, kept per source: several refusals in a row are about that server, not about
         // any game. The selected source refusing ends the pass; the Steam store refusing only stops the store games'
         // lookups by app id for the rest of it, so the folder games after them are still asked.
@@ -585,10 +604,19 @@ object PcScraper {
             if (index > 0) kotlinx.coroutines.delay(GAME_PACE_MS)
             counts.attempted++
             try {
-                val outcome = scrapeOne(context, entry, source, flavour, steamStopped, refresh)
-                logOutcome(source.label, entry, outcome)
+                var outcome = scrapeOne(context, entry, source, flavour, steamStopped, refresh, searchByName = chosen == null)
                 // A plugin source whose best candidates tie leaves the game for the person to pick, as a built-in one does.
-                val pluginTie = plugins?.let { fillFromPlugins(context, entry, it) } ?: false
+                val fill = plugins?.let { fillFromPlugins(context, entry, it, replace = refresh && chosen != null, always = chosen != null) }
+                val pluginTie = fill?.tie ?: false
+                // The chosen plugin's answer is the pass's answer for a game its store id did not settle.
+                if (chosen != null && outcome is PcOutcome.NoMatch) {
+                    outcome = when {
+                        fill?.matched == true -> PcOutcome.ByName
+                        pluginTie -> PcOutcome.NeedsPicking(outcome.searched, 0)
+                        else -> outcome
+                    }
+                }
+                logOutcome(source.label, entry, outcome)
                 if (outcome is PcOutcome.Refused) {
                     counts.lastRefusal = outcome.refusal
                     when {
@@ -722,9 +750,13 @@ object PcScraper {
         context: Context,
         entry: LibraryEntry,
         plugins: dev.droidtop.library.integrations.PluginMetadataSources.Session,
-    ): Boolean {
+        // A refresh with the plugin as the chosen source replaces what is there (Droidtop/tracker#67).
+        replace: Boolean = false,
+        // The plugin is the chosen source: asked even when the built-in fields are all filled.
+        always: Boolean = false,
+    ): PluginFill {
         // Nothing left for a source to fill: it is not asked (docs/SPEC.md 7h, "Fewer requests").
-        if (!PluginScrapeMemory.wantsPluginFields(RomDatabase.get(context).romDao().getGameMetadataSingle(entry.id))) return false
+        if (!always && !PluginScrapeMemory.wantsPluginFields(RomDatabase.get(context).romDao().getGameMetadataSingle(entry.id))) return PluginFill(tie = false, matched = false)
         val facts = pluginFacts(context, entry)
         val linked = facts.optJSONObject("sourceLinks")?.keys()?.asSequence()?.toSet().orEmpty()
         val now = System.currentTimeMillis()
@@ -735,9 +767,24 @@ object PcScraper {
         }
         answers.forEach { PluginScrapeMemory.note(context, it.source.record.manifest.id, entry.id, missed = it.noMatch, now) }
         answers.forEach { linkFromPlugin(context, entry, it.links) }
-        writePluginFields(context, entry, answers.mapNotNull { it.fields }.filterNot { it.isEmpty })
+        writePluginFields(context, entry, answers.mapNotNull { it.fields }.filterNot { it.isEmpty }, replace)
         coverFromPlugins(context, entry, answers)
-        return answers.any { it.ambiguous.isNotEmpty() } && answers.none { it.fields != null || it.links.isNotEmpty() }
+        val matched = answers.any { it.fields != null || it.links.isNotEmpty() }
+        return PluginFill(tie = answers.any { it.ambiguous.isNotEmpty() } && !matched, matched = matched)
+    }
+
+    /** What the metadata plugins did for one game: [matched] when one found it, [tie] when only ties came back. */
+    private data class PluginFill(val tie: Boolean, val matched: Boolean)
+
+    /** The metadata plugin chosen as the PC source, when it is installed and running (Droidtop/tracker#67). */
+    internal fun chosenPlugin(context: Context): dev.droidtop.library.integrations.PluginMetadataSources.Source? {
+        val id = PcScraperSourcePrefs.plugin(context) ?: return null
+        return dev.droidtop.library.integrations.PluginMetadataSources.sources(context).firstOrNull { it.record.manifest.id == id }
+    }
+
+    /** Names a chosen plugin in the pass's lines; it is never searched by name here (the plugin answers in [fillFromPlugins]). */
+    private class PluginChosenSource(override val label: String) : PcMetadataSource {
+        override fun search(title: String): ScrapeLookup<List<PcMatch>> = ScrapeLookup.NoMatch
     }
 
     /** Links [entry] under each key a source matched it to, unless the game is already linked under that key. */
@@ -780,11 +827,11 @@ object PcScraper {
         dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] cover from ${won.source.label}")
     }
 
-    private suspend fun writePluginFields(context: Context, entry: LibraryEntry, found: List<MetadataFields>) {
+    private suspend fun writePluginFields(context: Context, entry: LibraryEntry, found: List<MetadataFields>, replace: Boolean = false) {
         if (found.isEmpty()) return
         val dao = RomDatabase.get(context).romDao()
         val row = dao.getGameMetadataSingle(entry.id) ?: GameMetadataEntity(id = entry.id)
-        val (filled, sources) = PcPluginFields.fill(row, found)
+        val (filled, sources) = PcPluginFields.fill(row, found, replace)
         if (sources.isNotEmpty()) dao.upsertGameMetadata(filled.copy(fieldSources = FieldSources.merge(row.fieldSources, sources)))
     }
 
@@ -858,6 +905,8 @@ object PcScraper {
         flavour: PcFlavour,
         steamStopped: ScrapeLookup.Refused? = null,
         refresh: Boolean = false,
+        // False when a metadata plugin is the chosen source: only the game's own store id is asked here.
+        searchByName: Boolean = true,
     ): PcOutcome {
         val own = PcGameIds.of(entry)
         own.steamAppId?.let { appId ->
@@ -879,6 +928,7 @@ object PcScraper {
             }
         }
         val title = searchTitleFor(entry)
+        if (!searchByName) return PcOutcome.NoMatch(title)
         // A name the person matched by hand before is that match, with no search (Droidtop/tracker#318 §6.4, tier A-).
         dev.droidtop.library.identity.MatchAliases.find(context, title)?.let { taught ->
             write(context, entry, flavour.complete(entry, taught), confidence = "alias", replaceExisting = refresh)

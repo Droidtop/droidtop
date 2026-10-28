@@ -4604,9 +4604,16 @@ arrays under the manifest's own keys (`V2Declarations`).
     after every built-in source: it fills a field none of them found and
     never replaces one, and each field it supplied is recorded in
     `fieldSources` under the plugin's name. `rating` is 0..1 and release
-    dates are normalised to ES-DE's `YYYYMMDDT000000` or dropped. Not built:
-    listing a plugin as a choice on the Scraper screen, "Rescrape with...",
-    and the PC scrape.
+    dates are normalised to ES-DE's `YYYYMMDDT000000` or dropped. The PC scrape
+    asks it the same way. **A plugin as the PC source (2026-10-28,
+    Droidtop/tracker#67):** Settings > Accounts and sources > PC & engine game
+    source lists every running `library.metadata` plugin beside the built-in
+    sources ("<label> (plugin)"). Chosen, it is the one source a PC pass asks:
+    no built-in search and no other plugin, only the game's own store id first.
+    Its match fills the game, a tie leaves it for the person's pick, and a pass
+    the person started over everything replaces what the game had (not their
+    edits). Not built: a plugin as the console scrape's source, and "Rescrape
+    with..." on a game.
   - **Quick Menu tiles (C2, C3).** `PluginTiles` reads `ui.status_tile` and
     `ui.quick_tile` entries whose `surfaces` include `gaming.quick_menu`
     (or list none) from manifests when the sheet opens; the Plugins tab

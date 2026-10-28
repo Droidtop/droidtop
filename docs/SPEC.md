@@ -14066,6 +14066,16 @@ the same care as the art.
     plugin declares one) are asked with the game's title, folder name and source links for every game the
     pass reaches, after the built-in sources, filling only what those left empty; that is unchanged, and
     now reaches the engine games the old "has details" rule passed over.
+  - **A metadata plugin can be the PC source (2026-10-28, Droidtop/tracker#67; owner: "Plugin can be THE
+    source").** The PC & engine game source choice also lists every running metadata plugin, as "<label>
+    (plugin)". Chosen, it is the one source a PC pass asks, under the same one-source rule as the built-in
+    choices (`PcScraperSourcePrefs.plugin`, stored as `plugin:<id>`). No built-in name search, no alias and no
+    other plugin is asked; only the game's own store id comes first, since that is identity, not a search. Its
+    match fills the game, its tie leaves the game for the person's pick, and nothing found leaves it in Review
+    matches under Not found. A pass the person started over everything (a refresh) replaces what the game had
+    from any source, never the person's edits (`PcPluginFields.fill(replace)`); any other pass fills gaps. A
+    chosen plugin that is uninstalled or turned off stops the pass with a sentence saying so
+    (`ScraperReadiness.pcSourceProblem`).
 - **Calibrating name matching from recorded answers (decided 2026-10-24, Droidtop/tracker#318 §3.3).** The score
   and tiers that will replace `PcMatching`'s exact-only bar (`identity/MatchScore`) are graded offline against a set
   of games with the right answers (`identity/MatchCalibration`, one JSON line per game). The set is built from real

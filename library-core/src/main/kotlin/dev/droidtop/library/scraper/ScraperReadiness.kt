@@ -43,7 +43,17 @@ object ScraperReadiness {
      * null when it can. Named settings, not codes: a person who has never
      * opened the scraper screen can act on this sentence alone.
      */
-    fun pcSourceProblem(context: Context): String? = when (PcScraperSourcePrefs.get(context)) {
+    fun pcSourceProblem(context: Context): String? {
+        // A metadata plugin chosen as the source (Droidtop/tracker#67) must be there to ask.
+        PcScraperSourcePrefs.plugin(context)?.let { id ->
+            return if (PcScraper.chosenPlugin(context) != null) null else
+                "The plugin chosen as the PC & engine game source ($id) is not installed or is turned off. " +
+                    "Choose another source under $SOURCE_SETUP, or turn the plugin on."
+        }
+        return builtinPcSourceProblem(context)
+    }
+
+    private fun builtinPcSourceProblem(context: Context): String? = when (PcScraperSourcePrefs.get(context)) {
         PcScraperSource.LUTRIS -> null
         PcScraperSource.IGDB -> if (ScraperPrefs.isConfigured(context)) {
             null

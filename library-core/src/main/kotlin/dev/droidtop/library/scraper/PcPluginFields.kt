@@ -9,12 +9,17 @@ import dev.droidtop.pluginhost.MetadataFields
  * written ([FieldSources.writable]), and the first plugin that has a value wins it. Pure, for the tests.
  */
 internal object PcPluginFields {
-    /** [row] with the gaps [found] fills, and which source each filled field came from (empty when nothing changed). */
-    fun fill(row: GameMetadataEntity, found: List<MetadataFields>): Pair<GameMetadataEntity, Map<String, String>> {
+    /**
+     * [row] with the gaps [found] fills, and which source each filled field came from (empty when nothing changed). With
+     * [replace] (a refresh with a plugin as the chosen source, Droidtop/tracker#67) a field already set is replaced too;
+     * a field the person edited never is.
+     */
+    fun fill(row: GameMetadataEntity, found: List<MetadataFields>, replace: Boolean = false): Pair<GameMetadataEntity, Map<String, String>> {
         val sources = mutableMapOf<String, String>()
         fun <T> gap(field: String, current: T?, pick: (MetadataFields) -> T?): T? {
-            if (current != null || !FieldSources.writable(row.fieldSources, field)) return current
-            val hit = found.firstNotNullOfOrNull { fields -> pick(fields)?.let { fields.source to it } } ?: return null
+            if (!FieldSources.writable(row.fieldSources, field)) return current
+            if (current != null && !replace) return current
+            val hit = found.firstNotNullOfOrNull { fields -> pick(fields)?.let { fields.source to it } } ?: return current
             sources[field] = hit.first
             return hit.second
         }
