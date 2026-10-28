@@ -117,6 +117,10 @@ class WineGameActivity : Activity() {
         override fun setPadMouse(on: Boolean) {
             runOnUiThread { this@WineGameActivity.padMouse?.let { it.set(it.settings.copy(on = on)) } }
         }
+        override val canReport: Boolean get() = true
+        override fun reportProblem(done: (String) -> Unit) {
+            report(heading = "Wine report: from the Quick Menu", screen = null, frame = null, done = done)
+        }
         override fun stop() {
             // The guest's teardown is queued now (off the main thread), so a relaunch that follows
             // (Restart) waits for it; the screen then closes.
@@ -369,13 +373,23 @@ class WineGameActivity : Activity() {
         }, "droidtop-wine-record").start()
     }
 
+    /** Report a problem from the black-screen notice: [report] with the dark frame that was shown. */
+    private fun reportBlackScreen(frame: android.graphics.Bitmap?, done: (String) -> Unit) =
+        report(
+            heading = "Wine report: black screen",
+            screen = "flat dark for ${dev.droidtop.library.diagnostics.BlackScreenWatch.HOLD_MS / 1000} s",
+            frame = frame,
+            done = done,
+        )
+
     /**
-     * Report a problem from the black-screen notice (docs/SPEC.md 7e2, "A black screen is noticed"): the run's record
-     * as it stands, made while the game still runs (Wine's output so far, the run's setup and the game's own logs), the
-     * frame that was shown beside it as a PNG, then Share diagnostics so the person chooses where it goes. Nothing is
-     * sent by droidtop. Off the main thread; [done] gets the line to say.
+     * Report a problem (docs/SPEC.md 7e2, "A black screen is noticed"; from the Quick Menu too, owner 2026-10-28,
+     * Droidtop/tracker#601: "Yes"): the run's record as it stands, made while the game still runs (Wine's output so far,
+     * the run's setup and the game's own logs), [frame] beside it as a PNG when there is one, then Share diagnostics so
+     * the person chooses where it goes. Nothing is sent by droidtop, and no tracker link is offered (owner: "no. The
+     * tracker is private"). Off the main thread; [done] gets the line to say.
      */
-    private fun reportBlackScreen(frame: android.graphics.Bitmap?, done: (String) -> Unit) {
+    private fun report(heading: String, screen: String?, frame: android.graphics.Bitmap?, done: (String) -> Unit) {
         val context = applicationContext
         val target = launchTarget ?: tool
         val key = entryId ?: target?.let(WinePresentation::fullscreenWMClass) ?: "unknown"
@@ -384,17 +398,18 @@ class WineGameActivity : Activity() {
         val startedWall = startedAtWallMs
         val ranMs = SystemClock.elapsedRealtime() - startedAtMs
         val output = session?.outputSoFar().orEmpty()
+        val shown = guestShowedWindow
         Thread({
             val said = runCatching {
                 val attachments = WineGameLogs.find(dirs, prefixDir, launchTarget).mapNotNull { RunRecords.attach(it.label, it.file, startedWall) }
                 val now = System.currentTimeMillis()
                 val record = RunRecords.render(
-                    heading = "Wine report: black screen",
-                    facts = listOf(
+                    heading = heading,
+                    facts = listOfNotNull(
                         "Started" to (target ?: "unknown"),
                         "Running for" to "$ranMs ms",
-                        "Showed a window" to "yes",
-                        "Screen" to "flat dark for ${dev.droidtop.library.diagnostics.BlackScreenWatch.HOLD_MS / 1000} s",
+                        "Showed a window" to if (shown) "yes" else "no",
+                        screen?.let { "Screen" to it },
                     ) + setupFacts,
                     outputLabel = "Wine printed so far",
                     output = output,

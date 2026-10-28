@@ -37,6 +37,15 @@ object OwnGameScreens {
 
         fun setPadMouse(on: Boolean) {}
 
+        /**
+         * Report a problem (docs/SPEC.md 7e2; from the Quick Menu, owner 2026-10-28, Droidtop/tracker#601): whether
+         * this screen can make a report of its running game, and makes one, ending in the share sheet. [done] gets the
+         * line to say, on any thread. Never a link to the tracker, which is private.
+         */
+        val canReport: Boolean get() = false
+
+        fun reportProblem(done: (String) -> Unit) {}
+
         /** The game's pointer, which mouse mode and the companion's trackpad both drive; null where there is none. */
         val pointer: Pointer? get() = null
     }

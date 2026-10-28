@@ -9713,8 +9713,11 @@ runs (Wine's output so far from the run's `RunLogCollector`, the run's setup, th
 Share diagnostics (`DiagnosticsArchive.share`, the same step as Settings' row), so the person chooses where it goes;
 droidtop sends nothing itself. Every Wine record now also names the run's setup: the Wine build, Direct3D (DXVK or
 VKD3D and its version), the graphics driver and its version, and the emulator. The owner confirmed 45 s
-(2026-10-23, asked "Is 45 seconds right": "yeah"). Still to be decided: whether Report a problem is also in the
-Quick Menu for any running Wine game, and whether a report offers a link to open a tracker issue.
+(2026-10-23, asked "Is 45 seconds right": "yeah"). **Report a problem is also in the Quick Menu's Game section**
+for a running Wine game (owner, 2026-10-28, asked whether it should be: "Yes"): the same report, headed "Wine report:
+from the Quick Menu", with no frame, the row saying "Saving the report..." and then what happened. **A report never
+links to the tracker** (owner: "no. The tracker is private. We need, like, a bugzilla"); a public bug tracker is
+Droidtop/tracker#655, and until it exists a report shows no link at all.
 
 **Leaving Enginehost is not a failure** (Droidtop/tracker#289, 2026-10-15). Enginehost's launch screen asks
 first (the no-sandbox warning on every unsandboxed run, a configuration question) and reports its own failures
