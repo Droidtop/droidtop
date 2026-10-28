@@ -142,6 +142,15 @@ public class Suggest implements Dictionary.WordCallback {
         mCorrectionMode = mode;
     }
 
+    /**
+     * droidtop: a main dictionary that arrived after this was made (a converted wordlist, loaded off the main thread,
+     * Droidtop/tracker#339). Main thread only.
+     */
+    public void setMainDictionary(BinaryDictionary dictionary) {
+        if (mMainDict != null) mMainDict.close();
+        mMainDict = dictionary;
+    }
+
     public boolean hasMainDictionary() {
         return mMainDict.getSize() > LARGE_DICTIONARY_THRESHOLD;
     }
