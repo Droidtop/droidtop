@@ -4185,7 +4185,9 @@ internal fun GameCard(
                         onActivate()
                         true
                     }
-                    GamepadAction.Y -> {
+                    // L2 is the focused game's menu everywhere in Gaming (proposal 6.A, Droidtop/tracker#644 slice
+                    // 4); a Retro game's menu is its details, the long press's target too.
+                    GamepadAction.Y, GamepadAction.L2 -> {
                         onShowDetail()
                         true
                     }

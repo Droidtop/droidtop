@@ -104,7 +104,8 @@ internal fun AppOptionsMenu(
                 when (press.action) {
                     GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, options.size, press)
                     GamepadAction.A -> options.getOrNull(focusIndex)?.onClick?.invoke()
-                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
+                    // L2 opened it, so L2 closes it too (proposal 6.E, Droidtop/tracker#644 slice 4).
+                    GamepadAction.B, GamepadAction.SELECT, GamepadAction.L2 -> onDismiss()
                     else -> Unit
                 }
                 true
