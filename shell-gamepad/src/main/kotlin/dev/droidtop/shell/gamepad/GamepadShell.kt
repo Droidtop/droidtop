@@ -128,7 +128,6 @@ import dev.droidtop.shell.gamepad.input.FocusedHints
 import dev.droidtop.shell.gamepad.input.LocalFocusedHints
 import dev.droidtop.shell.gamepad.input.LocalShellMenus
 import dev.droidtop.shell.gamepad.input.ShellMenuHints
-import dev.droidtop.shell.gamepad.input.ShellMenuPills
 import dev.droidtop.shell.gamepad.input.ShellMenus
 import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.menuStep
@@ -1550,18 +1549,6 @@ internal fun GamepadShellBody(
                         overlays.quickMenuOpen = true
                     },
                     modifier = Modifier.align(Alignment.TopEnd),
-                )
-            }
-            // A theme that draws its own help legend (a pad is attached, so
-            // the legend is the theme's) names nothing of the two menus and
-            // is not tappable: the Start and R2 pills sit in the corner
-            // beside it (docs/SPEC.md 7j, "Gaming controls").
-            if (helpRowOwner == HelpRowOwner.THEME && !screensaverOn) {
-                // Each pill carries its own plate (TouchHintBar over a theme), so the pair needs none of its own.
-                ShellMenuPills(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = shellWindow.edgePadding, bottom = 4.dp),
                 )
             }
             // Over the themed canvas, at the place the theme itself laid

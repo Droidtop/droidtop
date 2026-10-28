@@ -130,7 +130,6 @@ import dev.droidtop.shell.gamepad.input.FocusedHints
 import dev.droidtop.shell.gamepad.input.LocalFocusedHints
 import dev.droidtop.shell.gamepad.input.LocalShellMenus
 import dev.droidtop.shell.gamepad.input.ShellMenuHints
-import dev.droidtop.shell.gamepad.input.ShellMenuPills
 import dev.droidtop.shell.gamepad.input.ShellMenus
 import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.menuStep

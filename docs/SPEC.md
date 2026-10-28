@@ -18217,9 +18217,10 @@ Consequences:
   `LocalHelpRowOwner`): the shell's `ButtonHintFooter` draws exactly when
   it says SHELL, a screen's own `TouchHintBar` exactly when it says
   SCREEN, and the themed renderer draws the theme's `<helpsystem>`
-  exactly when it says THEME. A theme's row is a LEGEND -- it names
-  buttons, it does not dispatch them -- so a touch-first window takes it
-  over; a screen's own row is a real control surface with this screen's
+  exactly when it says THEME. A theme's row is drawn for a pad -- its
+  entries press their buttons when tapped (owner, 2026-10-29), but they
+  are sized and placed by the theme, not for a finger -- so a touch-first
+  window takes it over; a screen's own row is a real control surface with this screen's
   own actions in it (the PC Games tab: A names the focused game's own
   primary action), so it is never doubled by the shell's bar in either shape.
   Independent conditions for the one row are how droidtop drew two,
@@ -18420,9 +18421,12 @@ Select is Options and the Home button is never used.
 Both menus are named on every Gaming screen by two tappable pills, **Start Menu**
 and **R2 Quick Menu**, that begin the footer (`ShellMenuHints`, one list). Where
 the shell draws the footer they are its first two hints. Where a theme draws the
-help legend itself (Retro Games with a pad attached) the same two pills sit in a
-small plate in the bottom-right corner (`ShellMenuPills`), since a theme's legend
-is neither tappable nor aware of the menus. A modal sheet shows its own hints
+help legend itself (Retro Games with a pad attached) the same two end the theme's
+own row, in the theme's own style, as real ES-DE's row ends on START MENU, and
+every entry of that row is tappable (it presses its button, never a focus target).
+There is ONE help row on the screen: a corner plate beside the theme's row drew
+over the theme's own text, the gamelist's metadata column (Droidtop/tracker#510,
+BlueStacks 1920x1080, build 1767), and was the second row ES-DE never has. A modal sheet shows its own hints
 alone, the menus doing nothing behind it; the PC game page is the one layer that
 answers Start and R2 itself (it is a window of its own) and so keeps both pills
 (`DeclareLayerHints(menusReachable = true)`). The menu is the only route between

@@ -130,7 +130,6 @@ import dev.droidtop.shell.gamepad.input.FocusedHints
 import dev.droidtop.shell.gamepad.input.LocalFocusedHints
 import dev.droidtop.shell.gamepad.input.LocalShellMenus
 import dev.droidtop.shell.gamepad.input.ShellMenuHints
-import dev.droidtop.shell.gamepad.input.ShellMenuPills
 import dev.droidtop.shell.gamepad.input.ShellMenus
 import dev.droidtop.shell.gamepad.input.declaresHints
 import dev.droidtop.shell.gamepad.input.menuStep
@@ -854,9 +853,8 @@ internal fun GamesSection(
                         // 2026-09-24, screenshots 01/06). No shoulder either: L1/R1
                         // never switch sections (docs/SPEC.md 7j, "Gaming controls"),
                         // and nothing here is a tab strip they could step.
-                        val systemListHints = listOf(
-                            GamepadAction.A to "Select",
-                        )
+                        // Start and R2 end the theme's row, as real ES-DE's own row ends on START MENU (#510).
+                        val systemListHints = listOf(GamepadAction.A to "Select") + rememberHintList(ShellMenuHints)
                         val systemView = theme?.views?.get("system")
                         // Same rule as the gamelist's own claim above: a
                         // themed canvas lays the help row out itself,
@@ -1084,7 +1082,7 @@ internal fun GamesSection(
                             HintBinding(GamepadAction.Y, "Info") { gameUnderCursor },
                             HintBinding(GamepadAction.X, "Favorite") { gameUnderCursor },
                             HintBinding(GamepadAction.B, "Back"),
-                        )
+                        ) + ShellMenuHints
                     ),
                     systemContext = dev.droidtop.shell.gamepad.theme.EsDeSystemContext(
                         name = selectedGroupLabel,
