@@ -151,6 +151,7 @@ object LibraryGrouping {
                     // the game it installs is the same card (docs/SPEC.md 7g, "Installers in a games folder").
                     name = entry.gameName ?: entry.title.takeIf { PcSource.of(entry) is PcSource.Store || entry.pcInfo?.installer != null },
                     namePath = roots.firstNotNullOfOrNull { root -> GameNaming.relativeTo(root, path).takeIf { it != path } } ?: path,
+                    filesVersion = entry.filesVersion,
                 )
             },
         )

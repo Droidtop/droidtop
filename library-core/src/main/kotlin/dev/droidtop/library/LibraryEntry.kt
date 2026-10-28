@@ -204,6 +204,14 @@ data class LibraryEntry(
      */
     val latestKnown: String? = null,
     /**
+     * The version the game's own files declare ([GameFileVersions]: Ren'Py's
+     * options.rpy, RPG Maker MV/MZ's package.json), read by the walk that
+     * found the folder, and only when the folder's name names no version
+     * (Droidtop/tracker#406). Grouping and update checks compare it where the
+     * name is silent ([GameGrouping.Found.filesVersion]); null otherwise.
+     */
+    val filesVersion: String? = null,
+    /**
      * Set only on the entry a list draws for a whole game
      * ([LibraryGameGroup.displayEntry]): the version a source knows of
      * that none of the game's folders is ([GroupedGame.availableUpdate]).
