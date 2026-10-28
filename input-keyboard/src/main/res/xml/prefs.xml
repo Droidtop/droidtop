@@ -32,6 +32,11 @@
             android:summaryOff="@string/summary_pro_mode_off"
             />
     <Preference
+            android:key="pref_keyboard_preset"
+            android:title="@string/title_keyboard_preset"
+            android:summary="@string/summary_keyboard_preset"
+            />
+    <Preference
             android:key="pref_reset_modern"
             android:title="@string/title_reset_modern"
             android:summary="@string/summary_reset_modern"
