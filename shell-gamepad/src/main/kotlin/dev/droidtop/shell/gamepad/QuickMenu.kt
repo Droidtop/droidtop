@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -236,14 +237,18 @@ internal fun QuickMenu(
         val rail: @Composable () -> Unit = {
             QuickRail(sections, section, dots, vertical = !window.portrait) { section = it }
         }
+        // The pane's width: the sheet less the rail beside it in landscape, the whole sheet under the rail in portrait.
+        val paneWidthDp = sheetWidth.value.toInt() - if (window.portrait) 0 else RailWidthDp
         val pane: @Composable (Modifier) -> Unit = { paneModifier ->
-            Column(modifier = paneModifier.padding(16.dp)) {
+            // Top and bottom only: the heading and the drawn sections take the sheet's 16dp side gutter themselves, and a
+            // catalog section takes it from its own gutter, sized to the pane (Droidtop/tracker#649).
+            Column(modifier = paneModifier.padding(vertical = 16.dp)) {
                 // L1/R1 step the rail; the glyphs beside the section's
                 // name say so instead of a "Switch tab" hint-bar pill
                 // (owner, 2026-09-25).
                 // The section's name in the heading role, as Steam's panels head
                 // theirs (it was a small label, ui-compare pair 10).
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
                     ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
                     Text(
                         section.label,
@@ -262,17 +267,33 @@ internal fun QuickMenu(
                 // the next.
                 key(section) {
                     when (section) {
-                        QuickSection.GAME -> runningEntry?.let {
-                            GameTab(it, library, onResume, onQuit, onKill, quitOutcome, close, onSearchSystem)
+                        // Catalog pages (Social, Downloads, Plugins and every plugin's page) pad their rows by the
+                        // window's content gutter. Under the window's own size that was 2.8 percent of the whole
+                        // screen inside a sheet a third as wide, on top of the pane's 16dp: 36dp + 16dp a side at
+                        // 1280dp, 54dp + 16dp at 1920dp (owner: "The plugin pages have margins that are ridiculously
+                        // large", Droidtop/tracker#649). They now see the pane as their window, so the gutter is the
+                        // scale's floor, 16dp, and it is the only one.
+                        QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS ->
+                            CompositionLocalProvider(LocalShellWindow provides window.copy(widthDp = paneWidthDp)) {
+                                when (section) {
+                                    QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
+                                    QuickSection.DOWNLOADS -> DownloadsSection(close)
+                                    else -> PluginsTab(runningEntry, placeAvailable, close)
+                                }
+                            }
+                        else -> Box(Modifier.padding(horizontal = 16.dp)) {
+                            when (section) {
+                                QuickSection.GAME -> runningEntry?.let {
+                                    GameTab(it, library, onResume, onQuit, onKill, quitOutcome, close, onSearchSystem)
+                                }
+                                QuickSection.APPS -> AppsTab(close)
+                                QuickSection.NOTIFICATIONS -> NotificationsTab(close)
+                                QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
+                                    QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
+                                QuickSection.PERFORMANCE -> PerformanceSection(close)
+                                else -> Unit
+                            }
                         }
-                        QuickSection.APPS -> AppsTab(close)
-                        QuickSection.NOTIFICATIONS -> NotificationsTab(close)
-                        QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
-                        QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
-                            QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
-                        QuickSection.PERFORMANCE -> PerformanceSection(close)
-                        QuickSection.DOWNLOADS -> DownloadsSection(close)
-                        QuickSection.PLUGINS -> PluginsTab(runningEntry, placeAvailable, close)
                     }
                 }
             }
