@@ -187,6 +187,18 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
             items = buildList {
                 // A plugin droidtop cannot read is listed, never hidden (Droidtop/tracker#854: Enginehost was nowhere).
                 val unreadableRows = unreadable.map { unreadableRow(it) }
+                // One search over the installed plugins and every catalog (Droidtop/tracker#513).
+                if (installed.isNotEmpty() || listings.isNotEmpty()) {
+                    add(
+                        TextInputItem(
+                            id = "plugins_search",
+                            title = "Search",
+                            value = pluginSearch,
+                            search = true,
+                            onChange = { _, value -> pluginSearch = value.trim() },
+                        ),
+                    )
+                }
                 if (installed.isEmpty()) {
                     if (unreadableRows.isNotEmpty()) {
                         addAll(unreadableRows)
@@ -250,17 +262,24 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                     )
                 }
                 val kind = pluginKind.takeIf { it in kinds } ?: ALL_KINDS
+                val query = pluginSearch
                 val shown = cards.filter { (record, state, _) ->
-                    pluginFilter.keeps(state, newer[record.manifest.id] != null) && (kind == ALL_KINDS || kindOf(record) == kind)
+                    pluginFilter.keeps(state, newer[record.manifest.id] != null) && (kind == ALL_KINDS || kindOf(record) == kind) &&
+                        PluginCatalogScreen.matchesInstalled(record, query)
                 }
                 if (shown.isEmpty()) {
-                    add(ActionItem(id = "plugins_filter_none", title = "No plugin ${pluginFilter.none}"))
+                    add(
+                        ActionItem(
+                            id = "plugins_filter_none",
+                            title = if (query.isBlank()) "No plugin ${pluginFilter.none}" else "No installed plugin matches \"$query\"",
+                        ),
+                    )
                 }
                 shown.forEach { (_, _, card) -> add(card) }
                 addAll(unreadableRows)
             },
         ),
-    ) + listOfNotNull(appInterfacesGroup(context, installed)) + providedByGroups(resolution, providerChoices) + listOf(
+    ) + listOfNotNull(catalogSearchGroup(context)) + listOfNotNull(appInterfacesGroup(context, installed)) + providedByGroups(resolution, providerChoices) + listOf(
         CatalogGroup(
             id = "plugins_more",
             title = null,
@@ -289,6 +308,19 @@ internal suspend fun AppSettingsCatalogs.pluginsGroups(context: Context): List<C
                 ),
             ),
         ),
+    )
+}
+
+/** The catalogs' plugins that answer the Plugins page's search and are not installed (Droidtop/tracker#513). */
+private fun catalogSearchGroup(context: Context): CatalogGroup? {
+    val query = pluginSearch.takeIf { it.isNotBlank() } ?: return null
+    val rows = PluginCatalogScreen.searchRows(context, query)
+    return CatalogGroup(
+        id = "plugins_search_catalogs",
+        title = "In catalogs",
+        items = rows.ifEmpty {
+            listOf(ActionItem(id = "plugins_search_catalogs_none", title = "No catalog plugin matches \"$query\"", subtitle = "Searched as each catalog was last fetched"))
+        },
     )
 }
 
@@ -460,6 +492,9 @@ internal enum class PluginListFilter(val label: String, val none: String) {
 }
 
 @Volatile private var pluginFilter = PluginListFilter.ALL
+
+/** What the Plugins page's search holds (Droidtop/tracker#513): it narrows the installed cards and lists catalog matches. */
+@Volatile private var pluginSearch = ""
 
 /** The kind the installed list is narrowed to (docs/plugin-api.md 1.2, "Categories"), or [ALL_KINDS]. */
 @Volatile private var pluginKind = ALL_KINDS
