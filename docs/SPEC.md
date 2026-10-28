@@ -99,6 +99,31 @@ folder of separate emulator-style apps:
   Mobile, which doesn't make sense when droidtop isn't the home
   screen) — configurable in settings like everything else in §7b.
 
+
+### droidtop as a mobile Linux desktop environment (idea, design only; Droidtop/tracker#345)
+
+The owner, 2026-10-08: "how hard would it be to port droidtop to mobile linux, as a DE?". Nothing is built or
+scheduled; this records the shape so nothing built now forecloses it.
+
+- **Not the SteamOS model.** A gaming session under gamescope with a separate desktop session to log out to would break
+  what Desktop mode is (2a, 2b): one shared desktop with every container's windows side by side, one task manager across
+  them, and live switching between Gaming, Standard and Desktop over one library.
+- **droidtop is the shell on a stock wlroots compositor** (the sway and labwc family 2a already assumes). The Gaming
+  shell is a fullscreen client; the taskbar, Start menu and companion pieces are layer-shell clients; a mode switch is
+  droidtop showing other surfaces in the one session. The primary container of 2a becomes the host session, siblings
+  become ordinary distrobox or podman containers, and `:host-bridge`'s cross-container role becomes a small host service.
+- **The in-container launcher comes first** (2a, Droidtop/tracker#353: the library as desktop entries and
+  `droidtop-open`): it is most of the same work done inside today's container, and de-risks the port.
+- **The code split it needs:** a platform-neutral Kotlin core (the library and identity, scraping, stores with
+  JavaSteam, the ES-DE theme renderer, the plugin API's model) and an Android layer and a Linux layer under it, the UI
+  through Compose Multiplatform. Each Android service has a Linux counterpart: intents become desktop entries and D-Bus
+  activation, the notification listener the freedesktop notification service, the input method Wayland's text-input and
+  input-method protocols, Android displays Wayland outputs, Shizuku polkit. Games run natively there: Wine and Proton
+  (FEX on Arm64), native emulators, and Enginehost becomes a launcher for native engine builds.
+- **The first measurable step, when it starts:** a survey of which modules touch `android.*` beyond their edges
+  (Context, SharedPreferences, Room), since the core's size decides the effort; the issue's estimate is weeks for a
+  proof of concept (library, stores, Gaming shell, native emulators and Proton) and months for parity.
+
 ## 2. Core architectural decision: Qubes-style split, not a hand-rolled compositor
 
 The single biggest design decision in this project: **Android does not host
