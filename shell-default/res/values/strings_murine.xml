@@ -7,8 +7,6 @@
     <string name="pref_group_qsb_transparency">Transparency</string>
     <string name="pref_group_qsb_transparency_desc">Set transparency effects for quick search box</string>
 
-    <string name="pref_category_general_title">General</string>
-    <string name="pref_category_general_desc">Light or dark theme, screen mode and blur</string>
     <string name="pref_category_icons_title">Icons</string>
     <string name="pref_category_icons_desc">Set icon size and appearance</string>
     <string name="pref_category_home_title">Home screen</string>
@@ -29,7 +27,6 @@
     <string name="pref_subcategory_other_shells">Other modes</string>
     <string name="pref_subcategory_places">droidtop</string>
 
-    <string name="pref_subcategory_day_night">UI theme</string>
     <string name="pref_subcategory_layout">Layout</string>
     <string name="pref_subcategory_appearance">Appearance</string>
     <string name="pref_subcategory_gestures">Gestures</string>

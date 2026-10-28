@@ -771,7 +771,15 @@ internal object StoresCatalog {
                 id = "store_${store.key}_signin",
                 title = "Sign in",
                 subtitle = store.signInNote,
-                run = { ctx -> store.signInIntent(ctx)?.let(ctx::startActivity) },
+                // A store this build has no sign-in for says so rather than doing nothing (Droidtop/tracker#571 row 22).
+                run = { ctx ->
+                    store.signInIntent(ctx)?.let(ctx::startActivity)
+                        ?: dev.droidtop.library.settings.Notices.flash(
+                            "Signing in to ${store.label} is not in this build",
+                            tone = dev.droidtop.library.settings.NoticeTone.Caution,
+                            context = ctx,
+                        )
+                },
             ),
         )
     }

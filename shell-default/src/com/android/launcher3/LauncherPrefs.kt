@@ -23,7 +23,6 @@ import app.murinelauncher.graphics.WorkspaceBlurUtils
 import app.murinelauncher.settings.prefs.AdaptiveIcons
 import app.murinelauncher.settings.prefs.LabelVisibility
 import app.murinelauncher.settings.SettingsDrawerFragment
-import app.murinelauncher.settings.SettingsGeneralFragment
 import app.murinelauncher.settings.SettingsHomeFragment
 import app.murinelauncher.settings.SettingsIconsFragment
 import app.murinelauncher.settings.SettingsQsbFragment
@@ -464,7 +463,7 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val FIXED_LANDSCAPE_MODE = backedUpItem(SettingsHomeFragment.FIXED_LANDSCAPE_MODE, false)
         @JvmField
-        val BLUR_PREVIEW = backedUpItem(SettingsGeneralFragment.BLUR_PREVIEW, WorkspaceBlurUtils.isBlurSupported)
+        val BLUR_PREVIEW = backedUpItem(SettingsHomeFragment.BLUR_PREVIEW, WorkspaceBlurUtils.isBlurSupported)
         @JvmField
         val DRAWER_TYPE = backedUpItem(SettingsDrawerFragment.DRAWER_TYPE, if (WorkspaceBlurUtils.isBlurSupported) WorkspaceBlurUtils.Companion.DRAWER_TYPES.GLASS else WorkspaceBlurUtils.Companion.DRAWER_TYPES.NONE).listen { value ->
             WorkspaceBlurUtils.blurType = value.type

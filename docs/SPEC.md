@@ -18742,7 +18742,9 @@ UI through the one palette (`GamingPalette`) every token reads:
   stale on its next start and recreates. `ThemeOverride.watchAppearance` (from `LauncherApplication`) sets the night
   mode again when the setting changes and, with an icon pack in use, reloads icons for the pack's day or night set.
   droidtop's own pad dialogs in the launcher (`DroidtopDialog`, the radio list) and the large-screen taskbar keep their
-  dark plate in both appearances: light ink on a dark ground, readable over either.
+  dark plate in both appearances: light ink on a dark ground, readable over either. With the choice gone, Settings >
+  General held one switch, "Blur preview mode" (hidden below Android 12, so the page was empty there), under a "UI
+  theme" heading; the switch is in Home screen now and the General page is deleted (Droidtop/tracker#571 row 38).
 - **From the first rig run in Light (2026-10-16).** A switch's knob when on is the ink that reads on the affirmative
   fill (`MenuTokens.OnAffirmative`, black or white by the fill's luminance); it was the text ink, near black on a dark
   green track. A side panel (the left menu, the Quick Menu) sets the page back with `MenuTokens.Veil` and `PanelVeil`:

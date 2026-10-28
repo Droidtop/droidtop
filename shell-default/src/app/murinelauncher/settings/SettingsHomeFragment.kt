@@ -33,11 +33,18 @@ import com.android.launcher3.util.DisplayController
 
 public final class SettingsHomeFragment: AbstractSettingsFragment() {
 
+    private fun updateBlurWarning(on: Boolean) {
+        findPreference<Preference>(BLUR_PREVIEW_WARNING)?.isVisible =
+            on && !app.murinelauncher.graphics.WorkspaceBlurUtils.isBlurSupported
+    }
+
     companion object {
         const val FIXED_LANDSCAPE_MODE: String = "pref_fixed_landscape_mode"
         const val GRID_SIZE_WIDTH: String = "pref_grid_size_width"
         const val GRID_SIZE_HEIGHT: String = "pref_grid_size_height"
         const val LOCK_HOME_SCREEN: String = "pref_lock_home_screen"
+        const val BLUR_PREVIEW: String = "pref_blur_preview"
+        const val BLUR_PREVIEW_WARNING: String = "pref_blur_preview_warning"
         const val DOCK_ICONS_OVERRIDE_SWITCH: String = "pref_dock_icons_override_switch"
         const val DOCK_ICONS: String = "pref_dock_icons"
         const val DOUBLE_TAP_ACTION: String = "pref_gesture_double_tap_action"
@@ -155,6 +162,19 @@ public final class SettingsHomeFragment: AbstractSettingsFragment() {
                 }
                 return true
             }
+            BLUR_PREVIEW -> {
+                // Shown only where Android can blur; the card says so when it is on and the device cannot after all.
+                preference as SwitchPreferenceCompat
+                val shown = app.murinelauncher.graphics.WorkspaceBlurUtils.isBlurSupportedSDK
+                preference.isChecked = LauncherPrefs.BLUR_PREVIEW.get(requireContext())
+                updateBlurWarning(shown && preference.isChecked)
+                if (shown) preference.setOnPreferenceChangeListener { _, newValue ->
+                    updateBlurWarning(newValue as Boolean)
+                    true
+                }
+                return shown
+            }
+            BLUR_PREVIEW_WARNING -> return true
             LOCK_HOME_SCREEN -> {
                 val addIcon = findPreference<Preference>(SessionCommitReceiver.ADD_ICON_PREFERENCE_KEY)
                 addIcon?.isEnabled = !(preference as SwitchPreferenceCompat).isChecked
