@@ -1007,10 +1007,11 @@ no destination, such as the PC library). Ops:
   `X.zip.001`, `X.rar.001`, `.002`, ...) are joined in part order once the last
   has arrived and been checked, the parts deleted, and the joined archive
   unpacked into the folder `X` like a single archive. RAR volumes
-  (`X.part1.rar`, `X.part2.rar`, ...) cannot be unpacked by droidtop's
-  extractor (its libarchive binding opens one file, and the first volume alone
-  would silently drop the rest), so they are placed together as they are and
-  the job says so; the person unpacks them with an app that can. One
+  (`X.part1.rar`, `X.part2.rar`, ...) are unpacked together into the folder
+  `X`: libarchive reads them in part order as one stream, so a file spanning
+  two volumes comes out whole, and the volumes are deleted once the folder is
+  in place. When they cannot be unpacked (a damaged or encrypted set), they
+  are placed together as they are and the job says why. One
   `open_in_session` with `max` captures every part a page offers in one
   visit (#419), and its `downloads` is the reply's `values.downloads` as is.
   **Headers across redirects:** `headers` (cookies, Referer, Origin and the

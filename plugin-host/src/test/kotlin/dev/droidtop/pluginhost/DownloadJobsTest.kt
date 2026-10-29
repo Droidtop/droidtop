@@ -354,13 +354,16 @@ class DownloadJobsTest {
     }
 
     @Test
-    fun rarVolumesArePlacedTogetherAndNotHalfUnpacked() = runBlocking {
+    fun rarVolumesThatCannotBeUnpackedArePlacedTogetherAndNotHalfUnpacked() = runBlocking {
+        // Not RAR at all (and no native libarchive on the JVM): the unpack fails, so the parts are placed as they are.
         val games = File(dir, "games/pc")
         val files = (1..2).map { File(dir, "downloads/v$it.rar").also { f -> f.parentFile.mkdirs(); f.writeText("v$it") } }
         val parts = listOf("Big.part1.rar", "Big.part2.rar").map { mapOf("destinationPath" to games.path, "targetName" to it, "unpack" to "archive") }
         val (placed, summary) = DownloadJobs.placeSplitSet(files, parts)
         assertEquals(2, placed.size)
-        assertTrue(summary.contains("cannot unpack split RAR"))
+        assertTrue(summary, summary.startsWith("Added 2 parts as they are: could not unpack the 2 RAR parts"))
+        assertTrue(File(games, "Big.part1.rar").isFile)
+        assertTrue(games.listFiles()!!.none { it.name.endsWith(".unpacking") })
         assertEquals("v2", File(games, "Big.part2.rar").readText())
     }
 

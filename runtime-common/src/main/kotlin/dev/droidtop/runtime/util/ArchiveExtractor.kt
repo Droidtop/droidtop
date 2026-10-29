@@ -88,6 +88,37 @@ object ArchiveExtractor {
             )
         }
 
+    /**
+     * Unpacks a RAR archive split into volumes (`X.part1.rar`, `X.part2.rar`, ...; Droidtop/tracker#419) into
+     * [destination]: libarchive reads [volumes], in part order, as one stream, so an entry that runs across two
+     * volumes comes out whole. The same checks as [extract]; a failure clears [destination] and leaves the volumes.
+     */
+    suspend fun extractVolumes(
+        volumes: List<File>,
+        destination: File,
+        onProgress: (ArchiveExtractionProgress) -> Unit = {},
+    ): ArchiveExtractionResult =
+        withContext(Dispatchers.IO) {
+            require(volumes.isNotEmpty()) { "no volumes to unpack" }
+            volumes.firstOrNull { !it.isFile }?.let { throw IOException("Archive does not exist: ${it.absolutePath}") }
+            if (destination.exists() && !clear(destination)) {
+                throw IOException("Could not clear extraction directory: ${destination.absolutePath}")
+            }
+            if (!destination.mkdirs() && !destination.isDirectory) {
+                throw IOException("Could not create extraction directory: ${destination.absolutePath}")
+            }
+            val entries = try {
+                extractLibarchive(volumes, destination, "rar", onProgress) {
+                    Archive.readSupportFormatRar(it)
+                    Archive.readSupportFormatRar5(it)
+                }
+            } catch (e: Exception) {
+                clear(destination)
+                throw e
+            }
+            ArchiveExtractionResult(destination = destination, entries = entries.sortedBy { it.path.lowercase() })
+        }
+
     /** Removes [dir] without ever following a link out of it. */
     private fun clear(dir: File): Boolean = dir.parentFile?.let { SafeDelete.deleteWithin(it, dir) } ?: false
 
@@ -231,6 +262,15 @@ object ArchiveExtractor {
         format: String,
         onProgress: (ArchiveExtractionProgress) -> Unit,
         supportFormat: (Long) -> Unit,
+    ): List<ArchiveEntryInfo> = extractLibarchive(listOf(archiveFile), destination, format, onProgress, supportFormat)
+
+    /** [archiveFiles] is one archive, or the volumes of one in order, read as one stream. */
+    private fun extractLibarchive(
+        archiveFiles: List<File>,
+        destination: File,
+        format: String,
+        onProgress: (ArchiveExtractionProgress) -> Unit,
+        supportFormat: (Long) -> Unit,
     ): List<ArchiveEntryInfo> {
         val entries = mutableListOf<ArchiveEntryInfo>()
         var expandedBytes = 0L
@@ -244,11 +284,19 @@ object ArchiveExtractor {
             Archive.setCharset(archive, Charsets.UTF_8.name().toByteArray(Charsets.UTF_8))
             Archive.readSupportFilterAll(archive)
             supportFormat(archive)
-            Archive.readOpenFileName(
-                archive,
-                archiveFile.absolutePath.toByteArray(Charsets.UTF_8),
-                ARCHIVE_READ_BLOCK_SIZE.toLong(),
-            )
+            if (archiveFiles.size == 1) {
+                Archive.readOpenFileName(
+                    archive,
+                    archiveFiles.single().absolutePath.toByteArray(Charsets.UTF_8),
+                    ARCHIVE_READ_BLOCK_SIZE.toLong(),
+                )
+            } else {
+                Archive.readOpenFileNames(
+                    archive,
+                    archiveFiles.map { it.absolutePath.toByteArray(Charsets.UTF_8) }.toTypedArray(),
+                    ARCHIVE_READ_BLOCK_SIZE.toLong(),
+                )
+            }
 
             while (true) {
                 val entry = try {

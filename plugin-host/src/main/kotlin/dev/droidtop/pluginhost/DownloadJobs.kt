@@ -398,17 +398,29 @@ object DownloadJobs {
      * Finishes a download whose files were asked to be unpacked and are the parts of one split archive
      * ([SplitArchives]). Byte-split parts (`.7z.001`, `.zip.001`, `.rar.001`) are joined in order into one file, the parts
      * deleted, and the joined archive unpacked like any single one ([unpackIntoFolder]); a failed unpack keeps the joined
-     * file. RAR volumes (`.part1.rar`) cannot be read by the extractor's libarchive binding, which opens one file, so
-     * unpacking only the first would silently drop the rest: they are placed together as they are and the summary says so.
-     * Returns what the library should look at, and the line the job shows.
+     * file. RAR volumes (`.part1.rar`) are unpacked together, libarchive reading them in part order as one stream
+     * ([unpackVolumesIntoFolder]); when it cannot (a volume damaged, an encrypted set) they are placed together as they
+     * are and the summary says why, so nothing downloaded is lost. Returns what the library should look at, and the
+     * line the job shows.
      */
     internal suspend fun placeSplitSet(files: List<File>, parts: List<Map<String, String>>): Pair<List<File>, String> {
         val set = requireNotNull(SplitArchives.detect(parts.map { it[ARG_TARGET].orEmpty() })) {
             "unpacking takes one archive, or every part of one split archive"
         }
         if (set.volumes) {
-            val placed = placeAllInFolder(files, parts)
-            return placed to "Added ${placed.size} parts. droidtop cannot unpack split RAR files yet, so they are in the game folder as they are"
+            val ordered = set.order.map { files[it] }
+            val args = buildMap {
+                put("destinationPath", requireNotNull(parts.first()["destinationPath"]))
+                put(ARG_TARGET, set.baseName)
+                parts.first()[ARG_VERSION_FOLDER]?.let { put(ARG_VERSION_FOLDER, it) }
+            }
+            return try {
+                val folder = unpackVolumesIntoFolder(ordered, args)
+                listOf(folder) to "Added ${folder.name}"
+            } catch (e: IllegalStateException) {
+                val placed = placeAllInFolder(files, parts)
+                placed to "Added ${placed.size} parts as they are: ${e.message}"
+            }
         }
         val joined = File(files.first().parentFile, "joined_${System.nanoTime()}.${set.extension}")
         try {
@@ -456,6 +468,31 @@ object DownloadJobs {
         check((inner ?: building).renameTo(folder)) { "the unpacked game could not be placed in the game folder" }
         if (inner != null) building.delete()
         file.delete()
+        return folder
+    }
+
+    /**
+     * [volumes], the parts of one RAR archive in order, unpacked into a new folder named [ARG_TARGET] (the set's base
+     * name) in the destination, as [unpackIntoFolder] does for one archive: filled under a hidden name and renamed when
+     * whole, never over an existing folder, an update's version folder unwrapped. The volumes are deleted only once the
+     * folder is in place; a failure throws with the reason and leaves them where they are.
+     */
+    internal suspend fun unpackVolumesIntoFolder(volumes: List<File>, args: Map<String, String>): File {
+        val destination = File(requireNotNull(args["destinationPath"]) { "the game folder is missing" })
+        require(destination.isDirectory || destination.mkdirs()) { "the game folder is not available" }
+        val name = requireNotNull(args[ARG_TARGET]) { "the file name is missing" }
+        val version = args[ARG_VERSION_FOLDER]
+        val folder = if (version != null) newVersionFolder(destination, version) else freeName(destination, name)
+        val building = File(destination, ".${folder.name}.unpacking")
+        try {
+            ArchiveExtractor.extractVolumes(volumes, building)
+        } catch (e: java.io.IOException) {
+            throw IllegalStateException("could not unpack the ${volumes.size} RAR parts: ${e.message}", e)
+        }
+        val inner = if (version != null) building.listFiles()?.singleOrNull()?.takeIf { it.isDirectory } else null
+        check((inner ?: building).renameTo(folder)) { "the unpacked game could not be placed in the game folder" }
+        if (inner != null) building.delete()
+        volumes.forEach { it.delete() }
         return folder
     }
 
