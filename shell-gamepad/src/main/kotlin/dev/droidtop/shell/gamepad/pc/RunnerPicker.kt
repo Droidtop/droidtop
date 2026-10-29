@@ -1,9 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -234,7 +234,7 @@ private fun RunnerRow(
             }
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled = enabled)
-            .then(if (enabled) Modifier.clickable(onClick = onSelect) else Modifier)
+            .then(if (enabled) Modifier.padRow(onClick = onSelect) else Modifier)
             .selectionFrame(focused, RoundedCornerShape(8.dp), rest = MenuTokens.CardInset)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),

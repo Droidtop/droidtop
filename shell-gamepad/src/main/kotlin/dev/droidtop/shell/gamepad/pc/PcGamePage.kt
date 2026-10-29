@@ -1,10 +1,10 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.library.friendlyLocation
 import dev.droidtop.library.runsInEnginehost
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -49,7 +49,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Size
@@ -1131,8 +1130,7 @@ private fun PageIconButton(glyph: String?, description: String, on: Boolean, sel
         modifier = Modifier
             .size(48.dp)
             .semantics { contentDescription = description }
-            .focusProperties { canFocus = false }
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .selectionFrame(selected, Corners.Crisp, selectedFill = MenuTokens.Selected),
     ) {
         if (glyph != null) {

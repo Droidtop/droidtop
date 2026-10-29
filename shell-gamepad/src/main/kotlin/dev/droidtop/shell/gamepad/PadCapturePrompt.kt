@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -71,7 +70,7 @@ internal fun PadCapturePrompt(light: Boolean, onDone: () -> Unit) {
                     .heightIn(min = window.minTouchTarget)
                     .clip(RoundedCornerShape(8.dp))
                     .selectionFrame(false, RoundedCornerShape(8.dp), rest = Color.Transparent)
-                    .clickable {
+                    .padRow {
                         ControllerLayouts.dismissRecapture()
                         onDone()
                     }

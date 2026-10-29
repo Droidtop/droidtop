@@ -2,7 +2,6 @@ package dev.droidtop.shell.gamepad
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -119,7 +118,7 @@ internal fun SidePanelFrame(
                     .fillMaxSize()
                     .graphicsLayer { alpha = shown.value }
                     .background(scrim)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { close() },
+                    .padRow(silent = true) { close() },
             )
             Column(Modifier.fillMaxSize()) {
                 BoxWithConstraints(

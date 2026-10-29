@@ -26,7 +26,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -93,8 +92,7 @@ fun TabRail(
                 .clip(RoundedCornerShape(10.dp))
                 .background(if (current) colors.selected else Color.Transparent)
                 // Ahead of the clickable: a plain clickable is still a focus target, and the pad never drives this.
-                .focusProperties { canFocus = false }
-                .clickable { onSelect(tab) }
+                .padRow { onSelect(tab) }
                 // One spoken element per entry: its name and count, the tab role, its state, and the tap.
                 .clearAndSetSemantics {
                     contentDescription = tab.spoken

@@ -2,7 +2,6 @@ package dev.droidtop.shell.gamepad
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -26,7 +25,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -136,8 +134,7 @@ fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Mo
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
             .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-            .focusProperties { canFocus = false }
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .clearAndSetSemantics {
                 contentDescription = statusDescription(clock, snapshot)
             },

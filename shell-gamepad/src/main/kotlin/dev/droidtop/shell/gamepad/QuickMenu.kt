@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -40,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
@@ -705,7 +703,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                         modifier = Modifier
                             .fillMaxWidth()
                             .selectionFrame(focused, MenuTokens.RowShape, row = true)
-                            .clickable { focusIndex = index }
+                            .padRow { focusIndex = index }
                             .padding(10.dp),
                     ) {
                         androidx.compose.material3.Icon(
@@ -759,7 +757,7 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                                 // phone user opens most. After the
                                 // background, so the press indication is
                                 // drawn over it rather than under it.
-                                .clickable {
+                                .padRow {
                                     focusIndex = recent.size + index
                                     press(GamepadAction.A)
                                 }
@@ -1132,8 +1130,7 @@ private fun StopPill(label: String, selected: Boolean, onClick: () -> Unit) {
                 restOutline = MenuTokens.NoticeDanger.copy(alpha = 0.55f),
                 selectedFill = MenuTokens.NoticeDanger.copy(alpha = 0.18f),
             )
-            .focusProperties { canFocus = false }
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .padding(start = 12.dp, end = 14.dp),
     ) {
         QuickGlyphIcon(QuickGlyph.POWER, tint = MenuTokens.NoticeDanger, modifier = Modifier.size(18.dp))

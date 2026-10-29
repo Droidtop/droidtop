@@ -1,7 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -239,7 +239,7 @@ private fun volumeRow(text: String, selected: Boolean, action: () -> Unit) {
             .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
             .clip(RoundedCornerShape(8.dp))
             .selectionFrame(selected, RoundedCornerShape(8.dp), rest = Color.Transparent)
-            .clickable(onClick = action)
+            .padRow(onClick = action)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     )
 }

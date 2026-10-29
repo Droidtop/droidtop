@@ -5,7 +5,6 @@ import dev.droidtop.shell.gamepad.input.PressWords
 import android.text.format.DateFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.input.pointer.pointerInput
@@ -448,7 +447,7 @@ private fun QuickTileView(
             .clip(shape)
             .background(background)
             .focusRing(ring, shape)
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

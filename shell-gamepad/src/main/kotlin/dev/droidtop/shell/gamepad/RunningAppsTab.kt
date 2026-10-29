@@ -4,7 +4,6 @@ import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.PressWords
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -204,7 +203,7 @@ fun SharedRunningAppsList(
             Row(
                 modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView).clip(MenuTokens.RowShape)
                     .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
-                    .clickable { onSwitch(i, app) }.heightIn(min = MenuTokens.RowMinHeight),
+                    .padRow { onSwitch(i, app) }.heightIn(min = MenuTokens.RowMinHeight),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 AppIcon(app.packageName, modifier = Modifier.padding(start = 12.dp))
@@ -233,7 +232,7 @@ fun SharedRunningAppsList(
 private fun SharedTaskAction(label: String, selected: Boolean, onClick: () -> Unit) {
     Box(modifier = Modifier.padding(horizontal = 4.dp).clip(RoundedCornerShape(8.dp))
         .background(if (selected) MenuTokens.Selected else MenuTokens.CardInset)
-        .clickable(onClick = onClick).heightIn(min = 48.dp).widthIn(min = 64.dp).padding(horizontal = 10.dp),
+        .padRow(onClick = onClick).heightIn(min = 48.dp).widthIn(min = 64.dp).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center) {
         Text(label, color = if (selected) MenuTokens.OnSelected else MenuTokens.OnSurface, style = MaterialTheme.typography.labelMedium)
     }

@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -57,7 +56,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -4041,7 +4039,7 @@ private fun AppIconTile(
             // does on every thing (owner, 2026-10-23, Droidtop/tracker#610);
             // Mark as game is a row of that menu. It used to mark the app at
             // once, with nothing on screen saying so.
-            .combinedClickable(onClick = onLaunch, onLongClick = onOptions)
+            .padRow(onClick = onLaunch, onLongClick = onOptions)
             // The shell's ONE selection idiom, the same one [GameCard]
             // and the menus draw: the accent ring over a brightened
             // surface. This tile kept a third one -- a thin white
@@ -4269,7 +4267,7 @@ internal fun GameCard(
             // (§7).
             // A long press is the touch path to L2: the game's own menu
             // (Droidtop/tracker#621), Android's list convention.
-            .combinedClickable(onClick = onActivate, onLongClick = onOptions)
+            .padRow(onClick = onActivate, onLongClick = onOptions)
             // ONE selection idiom across the shell: the menus' own
             // accent border over a brightened surface (MenuTokens), not a
             // third one. The rig counted three at once -- this card's 1px

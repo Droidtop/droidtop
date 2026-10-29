@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -114,7 +113,7 @@ private fun EmulatorRow(title: String, detail: String, onPick: () -> Unit) {
             }
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable(onClick = onPick)
+            .padRow(onClick = onPick)
             .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
             .heightIn(min = 64.dp)
             .padding(12.dp),

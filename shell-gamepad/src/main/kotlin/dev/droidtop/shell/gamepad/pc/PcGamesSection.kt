@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.R
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
@@ -81,7 +82,6 @@ import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
 import dev.droidtop.shell.gamepad.query.NamedLibraryView
 import dev.droidtop.shell.gamepad.query.OwnershipOptions
 import dev.droidtop.shell.gamepad.query.StripTabs
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.width
 import dev.droidtop.library.PcSource
 import dev.droidtop.library.CollectionMembership
@@ -1775,7 +1775,7 @@ private fun PcShelvesHome(
                                 bottom = Space.Sm,
                             )
                             .focusRing(onThisShelf && state.headingFocused, dev.droidtop.shell.gamepad.Corners.Crisp)
-                            .clickable { onOpenShelf(shelf) },
+                            .padRow { onOpenShelf(shelf) },
                     )
                     LazyRow(
                         state = rowState(shelf.id),

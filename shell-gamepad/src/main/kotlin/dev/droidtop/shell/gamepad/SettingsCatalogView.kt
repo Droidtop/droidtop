@@ -12,7 +12,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
@@ -1298,7 +1297,7 @@ private fun CategoryEntry(label: String, icon: CatalogIcon?, current: Boolean, c
             // The one row focus (Droidtop/tracker#644): the accent fill and bar under the cursor, the short pill on the
             // category on show.
             .rowFocus(shown, current = current)
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .padding(start = LocalShellWindow.current.edgePadding, end = Space.Md, top = Space.Sm, bottom = Space.Sm),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1658,7 +1657,7 @@ private fun TextBlockRow(block: TextBlockItem, selected: Boolean, onShown: () ->
             .fillMaxWidth()
             .clip(MenuTokens.RowShape)
             .selectionFrame(selected, MenuTokens.RowShape, row = true)
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = MenuTokens.RowVerticalPadding),
     ) {
         if (block.title.isNotBlank()) {
@@ -1813,7 +1812,7 @@ internal fun NoticeInfoSheet(item: NoticeItem, onDismiss: () -> Unit) {
                     text = if (copied) "Copied" else "Copy",
                     ink = MenuTokens.OnSurface,
                     fill = MenuTokens.SurfaceSelected,
-                    modifier = Modifier.padding(top = 12.dp).clickable { copy() },
+                    modifier = Modifier.padding(top = 12.dp).padRow { copy() },
                 )
             }
         }
@@ -2055,7 +2054,7 @@ private fun SettingsSearchOverlay(
                     style = MaterialTheme.typography.labelLarge,
                     modifier = Modifier
                         .padding(start = 12.dp)
-                        .clickable { onQueryChange("") },
+                        .padRow { onQueryChange("") },
                 )
             }
         }

@@ -7,7 +7,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.HoverInteraction
@@ -320,7 +319,7 @@ private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit, onHov
         .rowFocus(shown, current = current)
         // No indication of its own: the cursor above is the one selection. The default one drew a grey plate on the
         // row under the pointer or with Android's focus while the cursor sat on another (Droidtop/tracker#639).
-        .clickable(interactionSource = source, indication = null, onClick = onClick)
+        .padRow(silent = true, interactionSource = source, onClick = onClick)
 }
 
 /** A side-menu row's height: Steam's 48dp, and at least one touch target where fingers are the input. */

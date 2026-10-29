@@ -4,6 +4,7 @@ import android.view.KeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -188,6 +189,38 @@ internal fun TouchHintBar(
     }
 }
 
+/**
+ * The one way a shell element takes a tap (Droidtop/tracker#679): the click, and the click's own focus target made
+ * unfocusable ahead of it. A `clickable` is a focus target, so without this the D-pad could park on a row or pill
+ * whose screen moves its own cursor, a node with no visible selection where A does nothing (rig, build 546: Down out
+ * of the PC grid landed in the hint bar). The shell's cursor is the selection everywhere; a tap is still the press.
+ * [onLongClick] makes it a combined click. [silent] draws no press indication (the cursor is the one selection);
+ * [interactionSource] then reports the presses to the caller. An element that is itself a focus target keeps its own
+ * `focusable()` ahead of this; only the click's extra node goes.
+ */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+internal fun Modifier.padRow(
+    enabled: Boolean = true,
+    onLongClick: (() -> Unit)? = null,
+    silent: Boolean = false,
+    interactionSource: androidx.compose.foundation.interaction.MutableInteractionSource? = null,
+    onClick: () -> Unit,
+): Modifier {
+    val press = when {
+        silent && onLongClick != null -> Modifier.combinedClickable(
+            interactionSource = interactionSource,
+            indication = null,
+            enabled = enabled,
+            onLongClick = onLongClick,
+            onClick = onClick,
+        )
+        silent -> Modifier.clickable(interactionSource = interactionSource, indication = null, enabled = enabled, onClick = onClick)
+        onLongClick != null -> Modifier.combinedClickable(enabled = enabled, onLongClick = onLongClick, onClick = onClick)
+        else -> Modifier.clickable(enabled = enabled, onClick = onClick)
+    }
+    return this.focusProperties { canFocus = false }.then(press)
+}
+
 /** A touch pill's side padding inside its outline; the fit rule counts it. */
 private val TOUCH_PILL_PADDING = 8.dp
 
@@ -212,12 +245,10 @@ private fun TouchHint(action: GamepadAction, label: String?, plated: Boolean, on
             // so D-pad Down out of the last row of the PC grid landed in
             // here, where A does nothing at all and the way back is Up
             // (rig, build 546). One selection, and it stays on the
-            // content -- `canFocus = false` ahead of the clickable in the
-            // same chain makes exactly that node unfocusable while
+            // content: [padRow] makes exactly that node unfocusable while
             // leaving the tap intact.
-            .focusProperties { canFocus = false }
             .then(if (window.touchFirst) Modifier.heightIn(min = MenuTokens.HintTouchTarget) else Modifier)
-            .clickable(onClick = onPress),
+            .padRow(onClick = onPress),
     ) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(4.dp),

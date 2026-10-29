@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.input.PadCadence
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.animation.core.Animatable
@@ -943,7 +944,7 @@ private fun EsDeCarouselItem(
     // item directly.
     val baseModifier = modifier
         .size(width = width, height = height)
-        .then(if (onSelect != null) Modifier.clickable(onClick = onSelect) else Modifier)
+        .then(if (onSelect != null) Modifier.padRow(onClick = onSelect) else Modifier)
     // Real entry-name assembly -- the per-collection letter case and the
     // system-name suffix, see [esDeEntryLabel].
     val label = esDeEntryLabel(
@@ -1478,7 +1479,7 @@ private fun EsDeTextListRow(
                 // Real touch-input fix, reported directly: nothing in
                 // Gaming mode responded to taps -- the list's own
                 // container-level key handling only covers D-pad/gamepad.
-                .clickable(onClick = onSelect),
+                .padRow(onClick = onSelect),
         )
     }
 }
@@ -1777,7 +1778,7 @@ private fun EsDeGridEntry(
                 .graphicsLayer { alpha = opacity }
                 .clip(RoundedCornerShape(config.imageCornerRadius.dp))
                 .esDeColorShiftGradient(shift, shiftEnd, horizontal)
-                .clickable(onClick = onSelect),
+                .padRow(onClick = onSelect),
         )
     } else {
         Box(
@@ -1791,7 +1792,7 @@ private fun EsDeGridEntry(
                 .background(
                     colorOfPacked(if (selected) config.textSelectedBackgroundColor else config.textBackgroundColor),
                 )
-                .clickable(onClick = onSelect),
+                .padRow(onClick = onSelect),
             contentAlignment = androidx.compose.ui.Alignment.Center,
         ) {
             // Same item-label path as the carousel, for the same reason: ES-DE

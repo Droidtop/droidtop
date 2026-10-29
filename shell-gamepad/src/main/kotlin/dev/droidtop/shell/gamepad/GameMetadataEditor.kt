@@ -3,7 +3,6 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -300,7 +299,7 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
             .fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable { onToggle(!value) }
+            .padRow { onToggle(!value) }
             .onPad { press ->
                 if (press.action == GamepadAction.A) {
                     onToggle(!value)
@@ -335,7 +334,7 @@ private fun MetadataPickerRow(label: String, currentValueLabel: String, onClick:
             }
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -400,7 +399,7 @@ private fun ControllerRow(label: String, isCurrent: Boolean, onPick: () -> Unit)
             }
             .onFocusChanged { focused = it.isFocused }
             .focusable()
-            .clickable(onClick = onPick)
+            .padRow(onClick = onPick)
             .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
             .padding(12.dp),
     )

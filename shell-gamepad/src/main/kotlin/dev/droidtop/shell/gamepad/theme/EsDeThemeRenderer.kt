@@ -124,8 +124,7 @@ import dev.droidtop.library.theme.esDeImageArea
 import dev.droidtop.library.theme.esDeImageFittedSize
 import dev.droidtop.library.theme.esDeVideoArea
 import dev.droidtop.library.theme.esDeVideoStaticImageArea
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.focus.focusProperties
+import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import androidx.compose.ui.text.font.Font
@@ -3442,9 +3441,7 @@ private fun EsDeThemedHelpSystem(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(iconTextSpacing.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .focusProperties { canFocus = false }
-                    .clickable { press(action) },
+                modifier = Modifier.padRow { press(action) },
             ) {
                 // Real `entryLayout` (HelpComponent.cpp:254-268, and the two
                 // grid-building branches at :693-720): "iconFirst" is the

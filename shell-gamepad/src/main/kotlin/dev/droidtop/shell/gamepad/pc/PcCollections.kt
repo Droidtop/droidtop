@@ -1,7 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.padRow
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -219,7 +219,7 @@ private fun CollectionTileCard(tile: CollectionTile, selected: Boolean, onClick:
             .heightIn(min = 88.dp)
             .clip(dev.droidtop.shell.gamepad.Corners.Crisp)
             .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padRow(onClick = onClick, onLongClick = onLongClick)
             .padding(Space.Md),
     ) {
         Text(tile.name, color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, overflow = TextOverflow.Ellipsis)

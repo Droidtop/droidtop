@@ -1,12 +1,12 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.R
 import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -224,7 +224,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                             }
                         }
                         .focusable()
-                        .clickable(enabled = fetchFailed) { coroutineScope.launch { fetchIndex() } },
+                        .padRow(enabled = fetchFailed) { coroutineScope.launch { fetchIndex() } },
                 ) {
                     if (fetchRunning) {
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
@@ -342,7 +342,7 @@ private fun ThemeBrowserRow(
             .focusable()
             // Same real touch-input fix used throughout this shell --
             // .focusable() alone only covers D-pad/gamepad focus, never touch.
-            .clickable(onClick = onDownload)
+            .padRow(onClick = onDownload)
             .selectionFrame(focused, RoundedCornerShape(12.dp), rest = MenuTokens.Card)
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),

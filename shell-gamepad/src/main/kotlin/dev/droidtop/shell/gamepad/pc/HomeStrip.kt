@@ -1,9 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.padRow
 import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -268,9 +268,8 @@ private fun BandButton(icon: ImageVector, label: String, onClick: () -> Unit, ov
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(48.dp)
-            .focusProperties { canFocus = false }
             .semantics { contentDescription = label }
-            .clickable(onClick = onClick),
+            .padRow(onClick = onClick),
     ) {
         Icon(icon, contentDescription = null, tint = MenuTokens.OnSurface, modifier = Modifier.size(24.dp))
         overlay()
@@ -335,7 +334,7 @@ private fun HomeCardView(card: HomeCard, selected: Boolean, onClick: () -> Unit)
             .heightIn(min = HOME_CARD_HEIGHT)
             .focusRing(selected, Corners.Tile)
             .background(if (selected) MenuTokens.CardFocused else MenuTokens.Card, Corners.Tile)
-            .clickable(onClick = onClick)
+            .padRow(onClick = onClick)
             .padding(Space.Md),
     ) {
         Text(card.title, color = MenuTokens.OnSurface, style = TypeRole.body, maxLines = 2, overflow = TextOverflow.Ellipsis)

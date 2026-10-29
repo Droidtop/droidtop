@@ -3,7 +3,6 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.ui.res.stringResource
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -335,7 +334,7 @@ private fun ChoiceRow(choice: MatchQueue.Choice, selected: Boolean, onClick: () 
     Row(
         Modifier
             .background(if (selected) MenuTokens.SurfaceSelected else MenuTokens.Surface)
-            .clickable(onClick = onClick),
+            .padRow(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {

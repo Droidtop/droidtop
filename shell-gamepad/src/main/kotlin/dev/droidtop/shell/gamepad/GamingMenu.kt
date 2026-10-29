@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -46,7 +45,6 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -259,7 +257,7 @@ internal fun ShellChip(
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = if (large) Corners.Crisp else Corners.Pill
-    val press = if (onLongClick != null) Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick) else Modifier.clickable(onClick = onClick)
+    val press = if (onLongClick != null) Modifier.padRow(onClick = onClick, onLongClick = onLongClick) else Modifier.padRow(onClick = onClick)
     // A chosen tab is a place on the strip, not a filter in effect: it keeps the quiet look.
     val filled = (on && !tab) || primary
     val isSelected = selected ?: focused
@@ -305,12 +303,8 @@ internal fun ShellChip(
                         .focusable()
                         .then(press)
                 } else {
-                    // The caller's cursor is the selection; a tap is still
-                    // the press. `clickable` brings a focus target, made
-                    // unfocusable here exactly as the tab bar's are.
-                    Modifier
-                        .focusProperties { canFocus = false }
-                        .then(press)
+                    // The caller's cursor is the selection; a tap is still the press ([padRow]).
+                    press
                 },
             )
             .then(
@@ -551,8 +545,8 @@ internal fun MenuRow(
             // gamepad-first, never gamepad-only.
             .then(
                 when {
-                    onClick != null && onLongClick != null -> Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                    onClick != null -> Modifier.clickable(onClick = onClick)
+                    onClick != null && onLongClick != null -> Modifier.padRow(onClick = onClick, onLongClick = onLongClick)
+                    onClick != null -> Modifier.padRow(onClick = onClick)
                     else -> Modifier
                 },
             )
@@ -729,7 +723,7 @@ internal fun MenuRow(
                 modifier = if (onInfo != null) {
                     Modifier
                         .clip(Corners.Pill)
-                        .clickable(onClick = onInfo)
+                        .padRow(onClick = onInfo)
                         .size(if (window.touchFirst) window.minTouchTarget else 20.dp)
                         .wrapContentSize()
                         .size(20.dp)
@@ -899,7 +893,7 @@ private fun AdjustArrow(glyph: String, onPress: () -> Unit) {
         modifier = Modifier
             .size(LocalShellWindow.current.minTouchTarget)
             .clip(RoundedCornerShape(24.dp))
-            .clickable(onClick = onPress),
+            .padRow(onClick = onPress),
         contentAlignment = Alignment.Center,
     ) {
         Text(glyph, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium)
@@ -1082,7 +1076,7 @@ internal fun DialogChoices(groups: List<List<DialogChoice>>, selected: Int, onCh
                         // A row is a button here, so it is at least as big as a finger on a screen without a pad.
                         .heightIn(min = if (window.touchFirst) window.minTouchTarget else DialogLook.RowMinHeight)
                         .selectionFrame(row == selected, Corners.Crisp, rest = Color.Transparent, selectedFill = MenuTokens.Selected)
-                        .clickable { onChoose(row) }
+                        .padRow { onChoose(row) }
                         .padding(horizontal = Space.Lg, vertical = Space.Sm),
                     verticalArrangement = Arrangement.Center,
                 ) {
