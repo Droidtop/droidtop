@@ -29,6 +29,13 @@ class EngineCliTest {
         // -f follows (#715).
         assertEquals(EngineRequest.Logs("gitea", 5, follow = true), EngineCli.DOCKER.parse(listOf("logs", "-f", "-n", "5", "gitea")))
         assertEquals(EngineRequest.Logs("gitea", EngineCli.DEFAULT_TAIL, follow = true), EngineCli.PODMAN.parse(listOf("logs", "gitea", "--follow")))
+        assertEquals(
+            EngineRequest.Logs("gitea", EngineCli.DEFAULT_TAIL, sinceMs = 1_698_573_600_000L, untilMs = 1_698_581_234_000L),
+            EngineCli.DOCKER.parse(listOf("logs", "--since", "2023-10-29T10:00:00Z", "--until=1698581234", "gitea")),
+        )
+        val recent = EngineCli.PODMAN.parse(listOf("logs", "--since", "10m", "gitea")) as EngineRequest.Logs
+        assertTrue(recent.sinceMs!! in System.currentTimeMillis() - 601_000..System.currentTimeMillis() - 599_000)
+        assertTrue((EngineCli.DOCKER.parse(listOf("logs", "--since", "soon", "gitea")) as EngineRequest.Answer).text.contains("takes a time"))
         assertEquals(EngineRequest.Start(listOf("a", "b")), EngineCli.DOCKER.parse(listOf("start", "a", "b")))
         assertEquals(EngineRequest.Stop(listOf("a")), EngineCli.DOCKER.parse(listOf("stop", "a")))
     }

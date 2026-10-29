@@ -132,6 +132,9 @@ class EngineCli private constructor(val front: Front) {
         var tail = DEFAULT_TAIL
         var container: String? = null
         var follow = false
+        var since: Long? = null
+        var until: Long? = null
+        val now = System.currentTimeMillis()
         var i = 0
         while (i < args.size) {
             val a = args[i]
@@ -139,6 +142,15 @@ class EngineCli private constructor(val front: Front) {
                 a == "-n" || a == "--tail" -> args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} logs: $a needs a number\n", 1)
                 a.startsWith("--tail=") -> a.substringAfter('=')
                 a == "-f" || a == "--follow" -> { follow = true; null }
+                a == "--since" || a == "--until" || a.startsWith("--since=") || a.startsWith("--until=") -> {
+                    val flag = a.substringBefore('=')
+                    val given = if ('=' in a) a.substringAfter('=') else args.getOrNull(++i)
+                        ?: return EngineRequest.Answer("${front.command} logs: $flag needs a time\n", 1)
+                    val ms = EngineTime.parse(given, now)
+                        ?: return EngineRequest.Answer("${front.command} logs: $flag takes a time (10m, 2026-10-29T10:00:00Z or Unix seconds), not: $given\n", 1)
+                    if (flag == "--since") since = ms else until = ms
+                    null
+                }
                 a.startsWith("-") -> return error("logs", a)
                 container == null -> { container = a; null }
                 else -> return error("logs", a)
@@ -148,7 +160,7 @@ class EngineCli private constructor(val front: Front) {
             }
             i++
         }
-        return container?.let { EngineRequest.Logs(it, tail.coerceAtMost(MAX_TAIL), follow) } ?: EngineRequest.Answer("${front.command} logs: name a container\n", 1)
+        return container?.let { EngineRequest.Logs(it, tail.coerceAtMost(MAX_TAIL), follow, since, until) } ?: EngineRequest.Answer("${front.command} logs: name a container\n", 1)
     }
 
     private fun exec(args: List<String>): EngineRequest {

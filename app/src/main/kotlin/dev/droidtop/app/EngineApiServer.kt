@@ -287,17 +287,19 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.Pull -> pull(app, libpod, call)
             is DockerApi.Call.Logs -> withContainer(libpod, runtime, call.id) { _, info ->
-                val tail = DockerApi.logFrames(EngineActions.logs(app, info, call.tail))
+                val tail = DockerApi.logFrames(EngineActions.logs(app, info, call.tail, call.sinceMs, call.untilMs))
                 val id = info.container.id
                 // follow (Droidtop/tracker#715): the tail, then what the program writes next, until it ends, as
-                // Docker's follow ends with its container. A program not running has nothing more to follow.
-                if (call.follow && ContainerPrograms.isRunning(id)) {
+                // Docker's follow ends with its container. A program not running has nothing more to follow, and
+                // neither has an until already past.
+                val untilAhead = call.untilMs.let { it == null || it > System.currentTimeMillis() }
+                if (call.follow && untilAhead && ContainerPrograms.isRunning(id)) {
                     val log = dev.droidtop.runtime.ContainerProgram.hostLogFile(app.filesDir, id)
                     EngineHttp.Response(
                         status = 200,
                         contentType = "application/vnd.docker.multiplexed-stream",
                         body = tail,
-                        stream = { out -> followLog(log, id, fromStart = false, live = true, out) },
+                        stream = { out -> followLog(log, id, fromStart = false, live = true, out, endAtMs = call.untilMs) },
                     )
                 } else {
                     EngineHttp.Response(200, "application/vnd.docker.multiplexed-stream", tail)
@@ -597,9 +599,17 @@ internal object EngineApiServer {
      * Attach's stream (docs/SPEC.md 3d, "Attach"), and logs' with follow: a program's output goes to its log, so attach follows that file and
      * sends what is added as stdout frames, from where it ends now (or from the start with [fromStart]). With [live]
      * it goes on until the program has run and ended: attach comes before start, so it waits for the start, giving up
-     * after [ATTACH_START_WAIT_MS] if none comes. The log may be trimmed under it, which starts it from the top.
+     * after [ATTACH_START_WAIT_MS] if none comes, or until [endAtMs] (logs' until). The log may be trimmed under it,
+     * which starts it from the top.
      */
-    private suspend fun followLog(log: File, containerId: String, fromStart: Boolean, live: Boolean, out: java.io.OutputStream) {
+    private suspend fun followLog(
+        log: File,
+        containerId: String,
+        fromStart: Boolean,
+        live: Boolean,
+        out: java.io.OutputStream,
+        endAtMs: Long? = null,
+    ) {
         var offset = if (fromStart) 0L else withContext(Dispatchers.IO) { log.length() }
         val startBy = System.currentTimeMillis() + ATTACH_START_WAIT_MS
         // A program that starts and ends between two looks is seen by its state changing to over since the attach.
@@ -621,7 +631,7 @@ internal object EngineApiServer {
                     from
                 }
             }
-            if (!live) return
+            if (!live || (endAtMs != null && System.currentTimeMillis() >= endAtMs)) return
             val running = ContainerPrograms.isRunning(containerId)
             if (ContainerPrograms.ranSince(containerId, before)) started = true
             if (started && !running) {

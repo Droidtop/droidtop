@@ -18,7 +18,14 @@ sealed interface EngineRequest {
      * `logs`: the last [tail] lines of a container's program log; with [follow] (`-f`), then what it writes next, until
      * its program ends (Droidtop/tracker#715).
      */
-    data class Logs(val container: String, val tail: Int, val follow: Boolean = false) : EngineRequest
+    /** [sinceMs] and [untilMs] bound the lines by when they were written ([LogTimes]); null is no bound. */
+    data class Logs(
+        val container: String,
+        val tail: Int,
+        val follow: Boolean = false,
+        val sinceMs: Long? = null,
+        val untilMs: Long? = null,
+    ) : EngineRequest
 
     /** `start`: starts each container's own program. */
     data class Start(val containers: List<String>) : EngineRequest

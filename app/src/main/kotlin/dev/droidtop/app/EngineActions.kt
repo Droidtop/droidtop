@@ -12,6 +12,7 @@ import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.Crane
 import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.HomeChoice
+import dev.droidtop.runtime.LogTimes
 import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.Pod
 import dev.droidtop.runtime.RootfsImage
@@ -264,7 +265,12 @@ internal object EngineActions {
     }
 
     /** The last [tail] lines of [info]'s program log. */
-    suspend fun logs(app: Context, info: ContainerInfo, tail: Int): List<String> = withContext(Dispatchers.IO) {
-        ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, info.container.id), tail)
-    }
+    suspend fun logs(app: Context, info: ContainerInfo, tail: Int, sinceMs: Long? = null, untilMs: Long? = null): List<String> =
+        withContext(Dispatchers.IO) {
+            val log = ContainerProgram.hostLogFile(app.filesDir, info.container.id)
+            if (sinceMs == null && untilMs == null) return@withContext ContainerProgram.lastLines(log, tail)
+            // By when the lines were written (Droidtop/tracker#715): the log's times say where those are.
+            val range = LogTimes.range(LogTimes.read(LogTimes.fileFor(log)), log.length(), sinceMs, untilMs)
+            LogTimes.lines(log, range).takeLast(tail)
+        }
 }

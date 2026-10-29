@@ -178,10 +178,11 @@ object ContainerProgram {
     /**
      * Keeps [log] under [LOG_MAX_BYTES]: past it, the file keeps its last [LOG_KEEP_BYTES], cut at a line start. The
      * file is rewritten in place, never replaced, because the running program holds it open for appending, and an
-     * append always lands at the file's current end. Returns whether it trimmed.
+     * append always lands at the file's current end. Returns how many bytes it took off the start, 0 for none, for
+     * the log's times to move with ([LogTimes.shift]).
      */
-    fun trim(log: File, maxBytes: Long = LOG_MAX_BYTES, keepBytes: Long = LOG_KEEP_BYTES): Boolean {
-        if (!log.isFile || log.length() <= maxBytes) return false
+    fun trim(log: File, maxBytes: Long = LOG_MAX_BYTES, keepBytes: Long = LOG_KEEP_BYTES): Long {
+        if (!log.isFile || log.length() <= maxBytes) return 0L
         RandomAccessFile(log, "rw").use { file ->
             val length = file.length()
             val tail = ByteArray(keepBytes.coerceAtMost(length).toInt())
@@ -191,8 +192,8 @@ object ContainerProgram {
             file.seek(0)
             file.write(tail, lineStart, tail.size - lineStart)
             file.setLength((tail.size - lineStart).toLong())
+            return length - (tail.size - lineStart)
         }
-        return true
     }
 
     /** The log's last [lines] lines, for the container page. */

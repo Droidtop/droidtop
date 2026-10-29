@@ -67,7 +67,7 @@ class ContainerProgramTest {
         log.writeText((1..1000).joinToString("") { "line $it\n" })
         // A writer holding the file open, as the running program does, keeps appending at the new end.
         RandomAccessFile(log, "rw").use { writer ->
-            assertTrue(ContainerProgram.trim(log, maxBytes = 1000, keepBytes = 100))
+            assertTrue(ContainerProgram.trim(log, maxBytes = 1000, keepBytes = 100) > 0)
             writer.seek(writer.length())
             writer.write("after\n".toByteArray())
         }
@@ -76,7 +76,7 @@ class ContainerProgramTest {
         assertEquals("after", lines.last())
         assertTrue(lines.first().startsWith("line "))
         assertTrue(log.length() < 200)
-        assertFalse(ContainerProgram.trim(log, maxBytes = 1000, keepBytes = 100))
+        assertEquals(0L, ContainerProgram.trim(log, maxBytes = 1000, keepBytes = 100))
     }
 
     @Test

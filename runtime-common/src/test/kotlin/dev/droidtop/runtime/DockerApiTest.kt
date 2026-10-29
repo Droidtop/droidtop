@@ -150,6 +150,11 @@ class DockerApiTest {
             DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "follow" to "1")),
         )
         assertTrue(DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "timestamps" to "1")) is DockerApi.Call.NotBuilt)
+        assertEquals(
+            DockerApi.Call.Logs("web", 20, stdout = true, stderr = false, sinceMs = 1_698_581_234_000L, untilMs = null),
+            DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "tail" to "20", "since" to "1698581234", "until" to "0")),
+        )
+        assertTrue(DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "since" to "soon")) is DockerApi.Call.Refused)
         assertEquals(DockerApi.Call.Refused(400, "You must choose at least one stream"), DockerApi.route("GET", "/containers/web/logs", emptyMap()))
         assertEquals(DockerApi.Call.Wait("web", "not-running"), DockerApi.route("POST", "/containers/web/wait", emptyMap()))
         assertEquals(DockerApi.Call.Wait("web", "removed"), DockerApi.route("POST", "/containers/web/wait", mapOf("condition" to "removed")))

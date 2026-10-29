@@ -2842,10 +2842,17 @@ the `ContainerRuntime` interface that already exists (§3):
   own state: `ps [-a] [-q]` (NAME, IMAGE, STATUS from the container's
   program first, PORTS from its image; without `-a`, the ones whose
   program runs or whose container is started), `images [-q]` (the image
-  store), `logs [-n N] [-f] CONTAINER` (the program's log, at most 2000
-  lines; `-f` then follows what the program writes, read as an attached
-  `run` reads it, until the program ends, Droidtop/tracker#715; the Engine
-  API's and libpod's `follow` are not built yet), `start` and `stop CONTAINER...` (the container's
+  store), `logs [-n N] [-f] [--since T] [--until T] CONTAINER` (the
+  program's log, at most 2000 lines; `-f` then follows what the program
+  writes, read as an attached `run` reads it, until the program ends or
+  `--until` comes, Droidtop/tracker#715, and so do the Engine API's and
+  libpod's `follow`. A program writes straight to its log, so its lines
+  carry no times: while it runs, droidtop notes the log's length each
+  second it grew in `<id>.times` beside it (`LogTimes`), and `--since` and
+  `--until` read a time as a place in the log through those marks, right
+  to the second; a log from before the marks reads whole. They take Unix
+  seconds, RFC 3339, a date, or a duration back from now such as `10m`
+  (`EngineTime`), on the commands and both APIs), `start` and `stop CONTAINER...` (the container's
   own program, as its page's Start it and Stop it; a container whose
   image names no program says so), and `exec [-e K=V] [-w DIR] CONTAINER
   COMMAND...` (the enter path with any command, behind the same
@@ -2952,7 +2959,7 @@ the `ContainerRuntime` interface that already exists (§3):
   `DELETE /containers/{id}` (409 for a running one without `force`, and for the desktop's own), `images/create`
   (a pull; its progress lines all at once after it), `containers/{id}/logs` (Docker's multiplexed frames, the
   program's log as stdout; with `follow`, the tail and then what the program writes, until it ends, read as attach
-  reads it (Droidtop/tracker#715); `timestamps`, `since` and `until` not built) and `containers/{id}/wait`
+  reads it (Droidtop/tracker#715); `since` and `until` as below; `timestamps` not built) and `containers/{id}/wait`
   (until the program is over, or for a program not started yet its start and end: "Wait before a start", below; its
   exit code, 125 when it could not start). `version` gives every field of Docker's own reply (GitCommit and GoVersion
   name droidtop's engine, which has neither), the Engine component's Details all strings, as Docker's CLI reads them

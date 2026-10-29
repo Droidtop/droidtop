@@ -166,6 +166,10 @@ class LibpodApiTest {
             DockerApi.Call.Logs("web", 10, stdout = true, stderr = true, follow = true),
             LibpodApi.route("GET", "/v5.2.5/libpod/containers/web/logs", mapOf("since" to zero, "tail" to "10", "stdout" to "true", "stderr" to "true", "follow" to "true")),
         )
+        assertEquals(
+            DockerApi.Call.Logs("web", 10, stdout = true, stderr = true, sinceMs = 1_698_573_600_000L),
+            LibpodApi.route("GET", "/v5.2.5/libpod/containers/web/logs", mapOf("since" to "2023-10-29T10:00:00Z", "until" to zero, "tail" to "10", "stdout" to "true", "stderr" to "true")),
+        )
         assertEquals(DockerApi.Call.ExecCreate("web"), post("/containers/web/exec"))
         assertEquals(DockerApi.Call.ExecStart("e1"), post("/exec/e1/start"))
         assertEquals(DockerApi.Call.ExecRemove("e1"), post("/exec/e1/remove"))

@@ -182,10 +182,13 @@ internal object ContainerEnterRequests {
             }
             is EngineRequest.Logs -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
-                if (command.follow) {
-                    followLogs(app, dir, info.container.id, EngineActions.logs(app, info, command.tail))
+                val lines = EngineActions.logs(app, info, command.tail, command.sinceMs, command.untilMs)
+                // With --until, the lines stop there, and so does a follow (Docker's -f ends at --until too).
+                val follows = command.follow && command.untilMs.let { it == null || it > System.currentTimeMillis() }
+                if (follows) {
+                    followLogs(app, dir, info.container.id, lines, command.untilMs)
                 } else {
-                    answer(dir, EngineActions.logs(app, info, command.tail).joinToString("") { it + "\n" }, "", 0)
+                    answer(dir, lines.joinToString("") { it + "\n" }, "", 0)
                 }
             }
             is EngineRequest.Start, is EngineRequest.Stop -> {
@@ -387,9 +390,9 @@ internal object ContainerEnterRequests {
     /**
      * `logs -f` (Droidtop/tracker#715): the [tail] lines, then what the program writes next, read the way an attached
      * run reads it, until the program is no longer running, as Docker's and Podman's follow end with their container.
-     * The helper's own end (Ctrl+C) closes the FIFO, and the next write ends this.
+     * The helper's own end (Ctrl+C) closes the FIFO, and the next write ends this. With [untilMs] it ends then too.
      */
-    private suspend fun followLogs(app: Context, dir: File, id: String, tail: List<String>) = withContext(Dispatchers.IO) {
+    private suspend fun followLogs(app: Context, dir: File, id: String, tail: List<String>, untilMs: Long? = null) = withContext(Dispatchers.IO) {
         val log = ContainerProgram.hostLogFile(app.filesDir, id)
         runCatching { FileOutputStream(File(dir, "err")).use { } }
         runCatching {
@@ -398,7 +401,7 @@ internal object ContainerEnterRequests {
                 out.flush()
                 // From where the tail ended: what is written from now on.
                 val follow = LogFollower(log, startAt = log.length())
-                while (ContainerPrograms.isRunning(id)) {
+                while (ContainerPrograms.isRunning(id) && (untilMs == null || System.currentTimeMillis() < untilMs)) {
                     follow.copyTo(out)
                     kotlinx.coroutines.delay(FOLLOW_MS)
                 }

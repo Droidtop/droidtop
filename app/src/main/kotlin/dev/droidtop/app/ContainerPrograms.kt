@@ -7,6 +7,7 @@ import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ExposedPort
+import dev.droidtop.runtime.LogTimes
 import dev.droidtop.runtime.nameOf
 import java.io.File
 import java.util.Properties
@@ -118,10 +119,28 @@ internal object ContainerPrograms {
                 return@launch
             }
             val log = ContainerProgram.hostLogFile(app.filesDir, container.id).apply { parentFile?.mkdirs() }
+            // Each second the log grew, its length and the time (`logs --since`, Droidtop/tracker#715); every
+            // TRIM_EVERY_MS it is trimmed, and the times move with it. One loop, so the two never cross.
             val trimmer = launch {
+                val times = LogTimes.fileFor(log)
+                var marked = -1L
+                var trimmedAt = 0L
                 while (isActive) {
-                    runCatching { ContainerProgram.trim(log) }
-                    delay(TRIM_EVERY_MS)
+                    runCatching {
+                        val now = System.currentTimeMillis()
+                        if (now - trimmedAt >= TRIM_EVERY_MS) {
+                            trimmedAt = now
+                            val removed = ContainerProgram.trim(log)
+                            if (removed > 0 || times.length() > LogTimes.MAX_FILE_BYTES) LogTimes.shift(times, removed)
+                            marked -= removed
+                        }
+                        val length = log.length()
+                        if (length != marked) {
+                            LogTimes.append(times, LogTimes.Mark(length, now))
+                            marked = length
+                        }
+                    }
+                    delay(LogTimes.MARK_EVERY_MS)
                 }
             }
             var failures = 0
@@ -260,7 +279,10 @@ internal object ContainerPrograms {
         props.remove(containerId + KEY_AUTOSTART)
         props.remove(containerId + KEY_CREATED)
         runCatching { settingsFile(context).outputStream().use { props.store(it, "droidtop app container programs") } }
-        ContainerProgram.hostLogFile(context.filesDir, containerId).delete()
+        ContainerProgram.hostLogFile(context.filesDir, containerId).let { log ->
+            log.delete()
+            LogTimes.fileFor(log).delete()
+        }
         ContainerProgram.overridesFile(context.filesDir, containerId).delete()
         states.value = states.value - containerId
     }
