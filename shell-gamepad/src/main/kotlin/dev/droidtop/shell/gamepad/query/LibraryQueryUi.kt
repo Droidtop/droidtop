@@ -384,7 +384,6 @@ internal class SavedViews(
 
     suspend fun load() {
         views = withContext(Dispatchers.IO) {
-            LibraryViewPrefs.seedOnce(context, scopeId)
             LibraryViewPrefs.savedViews(context, scopeId)
         }
     }

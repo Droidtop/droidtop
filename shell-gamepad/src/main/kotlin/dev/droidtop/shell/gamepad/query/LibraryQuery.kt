@@ -670,18 +670,61 @@ object LibraryViewPrefs {
     private const val VIEWS_PREFIX = "droidtop_library_views_"
     private const val ACTIVE_PREFIX = "droidtop_library_active_"
 
+    /** The launcher prefs file every view setting lives in. */
+    private fun prefs(context: Context) = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+
     fun savedViews(context: Context, scopeId: String): List<NamedLibraryView> {
-        val raw = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-            .getString(VIEWS_PREFIX + scopeId, null) ?: return emptyList()
-        val views = decodeViews(raw)
-        // Once, the first time views saved before facet values were ids are read.
-        if (views.none { LEGACY_STORE_KEY in it.query.facets }) return views
-        val roots = rootsOf(context)
-        val migrated = views.map { it.copy(query = migrateLegacyStore(it.query, ::storeIdForLabel, roots)) }
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-            .edit().putString(VIEWS_PREFIX + scopeId, encodeViews(migrated)).apply()
-        return migrated
+        ensureMigrated(context)
+        return prefs(context).getString(VIEWS_PREFIX + scopeId, null)?.let(::decodeViews) ?: emptyList()
     }
+
+    /**
+     * What older builds stored, brought to today's shape once and never looked at again
+     * (Droidtop/tracker#763): every saved view and every left-showing query whose Store facet still names stores
+     * ([migrateLegacyStore]), and the PC library's "Updates" view given once ([withUpdatesView]). The first read
+     * of any view setting runs it; [MIGRATED_KEY] records that it ran, so later reads are plain reads.
+     */
+    @Volatile private var migrated = false
+
+    private fun ensureMigrated(context: Context) {
+        if (migrated) return
+        synchronized(this) {
+            if (migrated) return
+            val store = prefs(context)
+            if (store.getInt(MIGRATED_KEY, 0) < MIGRATED_VERSION) {
+                val roots = rootsOf(context)
+                val edit = store.edit()
+                store.all.forEach { (key, value) ->
+                    val raw = value as? String ?: return@forEach
+                    when {
+                        key.startsWith(VIEWS_PREFIX) -> {
+                            val views = decodeViews(raw)
+                            if (views.any { LEGACY_STORE_KEY in it.query.facets }) {
+                                edit.putString(key, encodeViews(views.map { it.copy(query = migrateLegacyStore(it.query, ::storeIdForLabel, roots)) }))
+                            }
+                        }
+                        key.startsWith(ACTIVE_PREFIX) -> {
+                            val query = decodeQuery(raw)
+                            if (query != null && LEGACY_STORE_KEY in query.facets) {
+                                edit.putString(key, encodeQuery(migrateLegacyStore(query, ::storeIdForLabel, roots)))
+                            }
+                        }
+                    }
+                }
+                if (!store.getBoolean(SEEDED_UPDATES, false)) {
+                    val pc = store.getString(VIEWS_PREFIX + PC_SCOPE_ID, null)?.let(::decodeViews) ?: emptyList()
+                    edit.putString(VIEWS_PREFIX + PC_SCOPE_ID, encodeViews(withUpdatesView(pc)))
+                    edit.putBoolean(SEEDED_UPDATES, true)
+                }
+                edit.putInt(MIGRATED_KEY, MIGRATED_VERSION).commit()
+            }
+            migrated = true
+        }
+    }
+
+    // Not under VIEWS_PREFIX or ACTIVE_PREFIX, so the pass above never reads it as a view.
+    private const val MIGRATED_KEY = "droidtop_library_viewstore_version"
+    private const val MIGRATED_VERSION = 1
 
     /**
      * Saving a view whose id is already saved replaces it in place (an edit
@@ -704,7 +747,7 @@ object LibraryViewPrefs {
 
     /** All of a list's saved views at once, in the order given: a reorder, a pin or an unpin. */
     fun writeViews(context: Context, scopeId: String, views: List<NamedLibraryView>) {
-        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+        val prefs = prefs(context).edit()
         if (views.isEmpty()) prefs.remove(VIEWS_PREFIX + scopeId) else prefs.putString(VIEWS_PREFIX + scopeId, encodeViews(views))
         prefs.apply()
     }
@@ -718,7 +761,7 @@ object LibraryViewPrefs {
 
     /**
      * The pinned "Updates" view over the Update available facet, first among
-     * [views], given once when the Updates built-in tab went away. Pure, for
+     * [views], given once when the Updates built-in tab went away ([ensureMigrated]). Pure, for
      * the JVM tests; unpinning or removing it later is the person's choice.
      */
     internal fun withUpdatesView(views: List<NamedLibraryView>): List<NamedLibraryView> =
@@ -728,22 +771,11 @@ object LibraryViewPrefs {
             listOf(NamedLibraryView("Updates", LibraryQuery(facets = mapOf(LibraryFacet.UPDATE.key to setOf(UPDATE_YES))), UPDATES_VIEW_ID)) + views
         }
 
-    /** Gives the PC library its "Updates" view, once ever; off the main thread. */
-    fun seedOnce(context: Context, scopeId: String) {
-        if (scopeId != PC_SCOPE_ID) return
-        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-        if (prefs.getBoolean(SEEDED_UPDATES, false)) return
-        writeViews(context, scopeId, withUpdatesView(savedViews(context, scopeId)))
-        prefs.edit().putBoolean(SEEDED_UPDATES, true).apply()
-    }
-
     /** The query the list was left showing, or [default] when it has never been changed (Last played opens by recency). */
     fun activeQuery(context: Context, scopeId: String, default: LibraryQuery = LibraryQuery()): LibraryQuery {
-        val raw = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-            .getString(ACTIVE_PREFIX + scopeId, null) ?: return default
-        val query = decodeQuery(raw) ?: LibraryQuery()
-        if (LEGACY_STORE_KEY !in query.facets) return query
-        return migrateLegacyStore(query, ::storeIdForLabel, rootsOf(context)).also { setActiveQuery(context, scopeId, it) }
+        ensureMigrated(context)
+        val raw = prefs(context).getString(ACTIVE_PREFIX + scopeId, null) ?: return default
+        return decodeQuery(raw) ?: LibraryQuery()
     }
 
     /**
@@ -788,7 +820,7 @@ object LibraryViewPrefs {
 
     /** The ownership List options (docs/SPEC.md 7j), global, not per view. A preferences read: off the main thread. */
     fun ownershipOptions(context: Context): OwnershipOptions {
-        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+        val prefs = prefs(context)
         val defaults = OwnershipOptions()
         return OwnershipOptions(
             showShared = prefs.getBoolean(SHOW_SHARED, defaults.showShared),
@@ -800,10 +832,10 @@ object LibraryViewPrefs {
 
     /** Whether the person was asked once whether [storeId]'s imported collections become tabs; a preferences read. */
     fun importPrompted(context: Context, storeId: String): Boolean =
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getBoolean(IMPORT_PROMPTED + storeId, false)
+        prefs(context).getBoolean(IMPORT_PROMPTED + storeId, false)
 
     fun setImportPrompted(context: Context, storeId: String) {
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().putBoolean(IMPORT_PROMPTED + storeId, true).apply()
+        prefs(context).edit().putBoolean(IMPORT_PROMPTED + storeId, true).apply()
     }
 
     private const val TAB_FAVOURITES = "droidtop_library_pc_tab_favourites"
@@ -811,12 +843,12 @@ object LibraryViewPrefs {
 
     /** Which of the PC strip's optional built-in tabs show (List options > Strip tabs); a preferences read. */
     fun stripTabs(context: Context): StripTabs {
-        val prefs = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+        val prefs = prefs(context)
         return StripTabs(favourites = prefs.getBoolean(TAB_FAVOURITES, true), collections = prefs.getBoolean(TAB_COLLECTIONS, true))
     }
 
     fun setStripTabs(context: Context, tabs: StripTabs) {
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+        prefs(context).edit()
             .putBoolean(TAB_FAVOURITES, tabs.favourites)
             .putBoolean(TAB_COLLECTIONS, tabs.collections)
             .apply()
@@ -826,12 +858,12 @@ object LibraryViewPrefs {
 
     /** What a PC capsule's badge says (List options > Capsule badge, docs/SPEC.md 7i); Full until changed. A preferences read. */
     fun capsuleBadge(context: Context): dev.droidtop.library.CapsuleBadgeStyle {
-        val stored = context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getString(CAPSULE_BADGE, null)
+        val stored = prefs(context).getString(CAPSULE_BADGE, null)
         return dev.droidtop.library.CapsuleBadgeStyle.entries.firstOrNull { it.name == stored } ?: dev.droidtop.library.CapsuleBadgeStyle.FULL
     }
 
     fun setCapsuleBadge(context: Context, style: dev.droidtop.library.CapsuleBadgeStyle) {
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().putString(CAPSULE_BADGE, style.name).apply()
+        prefs(context).edit().putString(CAPSULE_BADGE, style.name).apply()
     }
 
     private const val NAMES_UNDER_IMAGES = "droidtop_library_pc_names_under_images"
@@ -842,21 +874,21 @@ object LibraryViewPrefs {
      * A preferences read.
      */
     fun namesUnderImages(context: Context): Boolean =
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getBoolean(NAMES_UNDER_IMAGES, true)
+        prefs(context).getBoolean(NAMES_UNDER_IMAGES, true)
 
     fun setNamesUnderImages(context: Context, on: Boolean) {
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit().putBoolean(NAMES_UNDER_IMAGES, on).apply()
+        prefs(context).edit().putBoolean(NAMES_UNDER_IMAGES, on).apply()
     }
 
     fun setOwnershipOptions(context: Context, options: OwnershipOptions) {
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).edit()
+        prefs(context).edit()
             .putBoolean(SHOW_SHARED, options.showShared)
             .putBoolean(SHOW_FREE, options.showFree)
             .apply()
     }
 
     fun setActiveQuery(context: Context, scopeId: String, query: LibraryQuery) {
-        context.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
+        prefs(context)
             .edit().putString(ACTIVE_PREFIX + scopeId, encodeQuery(query)).apply()
     }
 
