@@ -32,7 +32,12 @@ import dev.droidtop.library.stores.StoreAutoUpdates
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.shell.standard.BackButtonMenu
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
@@ -73,13 +78,87 @@ object UpdatesPage {
         needsNetwork = true,
         // Off the main thread as a whole: the rows read preferences, caches and the package manager.
         groups = { context -> withContext(Dispatchers.IO) { listOf(CatalogGroup(id = "updates", title = null, items = rows(context))) } },
+        // Live (Droidtop/tracker#748, the owner: "It not auto-refreshing is a ux bug"): a section that finished reading,
+        // an update that started or finished, each rebuilds the rows at once, so no row waits for a whole Update all.
+        live = changes,
     )
 
     /** One update: its row, and what Update all does for it (null where it opens a page instead of installing). */
     private class Update(val row: CatalogItem, val apply: (suspend (Context, (String) -> Unit) -> String)?)
 
+    /**
+     * Where the rows come from. The quick ones (droidtop's own build, the library's games) are read each time the rows
+     * are; the slow ones (the plugin catalogs, the package manager's apps) are read in the background and kept, so the
+     * page shows at once and a slow section fills in its own rows when it is ready (Droidtop/tracker#748: the page took
+     * about 10 s to show anything).
+     */
+    private enum class Section(val checking: String) { PLUGINS("Checking your plugins"), APPS("Checking your apps") }
+
+    /** Each slow section's last rows and when they were read. */
+    private val kept = ConcurrentHashMap<Section, Pair<Long, List<Update>>>()
+    private val reading: MutableSet<Section> = ConcurrentHashMap.newKeySet()
+
+    /** The rows being updated now, by row id: drawn as Updating with the moving bar until their update returns. */
+    private val busy: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val changes = MutableStateFlow(0)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** Reads [section] in the background unless it is being read or was read within [FRESH_MS] ([force] reads it anyway). */
+    private fun refresh(context: Context, section: Section, force: Boolean = false) {
+        val at = kept[section]?.first
+        if (!force && at != null && System.currentTimeMillis() - at < FRESH_MS) return
+        if (!reading.add(section)) return
+        val app = context.applicationContext
+        scope.launch {
+            try {
+                val rows = when (section) {
+                    Section.PLUGINS -> plugins(app)
+                    Section.APPS -> apps(app)
+                }
+                kept[section] = System.currentTimeMillis() to rows
+            } catch (e: Exception) {
+                android.util.Log.w("droidtop.Updates", "reading ${section.name.lowercase()} failed: ${e.message}")
+            } finally {
+                reading.remove(section)
+                changes.value++
+            }
+        }
+    }
+
+    /**
+     * [install] for the row [id] of [section]: the row says Updating with the moving bar while it runs, and once it
+     * returns its section is read again, so the row goes (or says what is left) at once.
+     */
+    private fun tracked(
+        id: String,
+        section: Section?,
+        install: suspend (Context, (String) -> Unit) -> String,
+    ): suspend (Context, (String) -> Unit) -> String = { ctx, onStatus ->
+        busy.add(id)
+        changes.value++
+        try {
+            install(ctx, onStatus)
+        } finally {
+            busy.remove(id)
+            if (section != null) refresh(ctx, section, force = true) else changes.value++
+        }
+    }
+
+    /** [update]'s row as drawn now: Updating, with the bar, while its update runs (show, then say: Droidtop/tracker#738). */
+    private fun shown(update: Update): CatalogItem {
+        val row = update.row
+        if (row.id !in busy) return row
+        return ActionItem(id = row.id, title = row.title, subtitle = row.subtitle, value = "Updating", progress = -1f)
+    }
+
     private suspend fun rows(context: Context): List<CatalogItem> {
-        val updates = droidtop(context) + plugins(context) + apps(context) + games(context)
+        Section.entries.forEach { refresh(context, it) }
+        val slow = Section.entries.associateWith { kept[it]?.second }
+        val updates = droidtop(context) + slow[Section.PLUGINS].orEmpty() + slow[Section.APPS].orEmpty() + games(context)
+        // A section not read yet is one row of its own, loading; the rest of the page does not wait for it.
+        val checking = Section.entries.filter { slow[it] == null }.map { section ->
+            ActionItem(id = "updates_checking_${section.name.lowercase()}", title = section.checking, progress = -1f)
+        }
         val failure = AppSelfUpdate.lastFailure(context)
         val checked = UpdateChecks.lastCheck(context)
         val lastLine = checked?.let { "Last checked " + ValueFormat.ago(System.currentTimeMillis(), it).replaceFirstChar { c -> c.lowercase() } }
@@ -96,7 +175,9 @@ object UpdatesPage {
                         failure != null -> "Check failed"
                         else -> "Up to date"
                     },
-                    run = { ctx, onStatus -> UpdateChecks.checkAll(ctx, onStatus) },
+                    run = { ctx, onStatus ->
+                        UpdateChecks.checkAll(ctx, onStatus).also { Section.entries.forEach { refresh(ctx, it, force = true) } }
+                    },
                 ),
             )
             val installable = updates.mapNotNull { it.apply }
@@ -107,6 +188,7 @@ object UpdatesPage {
                         title = "Update all",
                         subtitle = "Each update downloads and installs the way its own Update does, one after another",
                         value = installable.size.toString(),
+                        // Each update is the row's own (tracked), so each row changes as its own update starts and ends.
                         run = { ctx, onStatus -> installable.map { it(ctx, onStatus) }.joinToString(". ") },
                     ),
                 )
@@ -114,7 +196,8 @@ object UpdatesPage {
             if (updates.isEmpty() && checked != null && failure == null) {
                 add(TextBlockItem(id = "updates_none", text = "Everything is up to date."))
             }
-            updates.forEach { add(it.row) }
+            updates.forEach { add(shown(it)) }
+            addAll(checking)
             add(
                 NestedScreenItem(
                     id = "updates_settings",
@@ -164,7 +247,7 @@ object UpdatesPage {
     private fun droidtop(context: Context): List<Update> {
         val newer = AppSelfUpdate.newerSeenVersionName(context) ?: return emptyList()
         val updating = UpdateDownload.liveLine()
-        val install: suspend (Context, (String) -> Unit) -> String = { ctx, onStatus -> UpdateNow.startAndAwait(ctx, onStatus) }
+        val install = tracked("updates_droidtop", null) { ctx, onStatus -> UpdateNow.startAndAwait(ctx, onStatus) }
         return listOf(
             Update(
                 AsyncActionItem(
@@ -184,7 +267,7 @@ object UpdatesPage {
         val installed = PluginStore.installed(context)
         val offers = PluginCatalog.offersFor(installed, PluginCatalog.listings(context), UserOriginKeys.load(UserOriginKeys.storeFile(context)))
         return offers.map { (record, offer) ->
-            val install: suspend (Context, (String) -> Unit) -> String = { ctx, onStatus ->
+            val install = tracked("updates_plugin_${record.manifest.id}", Section.PLUGINS) { ctx, onStatus ->
                 val outcome = PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
                 "${record.manifest.label}: ${outcome.line}"
             }
@@ -209,7 +292,7 @@ object UpdatesPage {
         return states.take(MAX_APP_ROWS).map { state ->
             when (state) {
                 is AppCatalogs.UpdateState.Available -> {
-                    val install: suspend (Context, (String) -> Unit) -> String = { ctx, onStatus -> updateApp(ctx, state, onStatus) }
+                    val install = tracked("updates_app_${state.offer.id}", Section.APPS) { ctx, onStatus -> updateApp(ctx, state, onStatus) }
                     Update(
                         AsyncActionItem(
                             id = "updates_app_${state.offer.id}",
@@ -261,7 +344,7 @@ object UpdatesPage {
                 val path = pc?.installPath
                 if (pc != null && pc.installed && path != null && GameUpdates.forStore(pc) != null) {
                     val key = pc.storeId ?: entry.id
-                    val install: suspend (Context, (String) -> Unit) -> String = { ctx, _ ->
+                    val install = tracked("updates_game_${entry.id}", null) { ctx, _ ->
                         if (StoreAutoUpdates.startUpdate(ctx, key, entry.title, path, pc.sizeBytes)) {
                             "${entry.title}: updating. It is listed under Downloads"
                         } else {
@@ -381,6 +464,9 @@ object UpdatesPage {
             }
         },
     )
+
+    /** How long a slow section's rows stand before opening the page reads them again. */
+    private const val FRESH_MS = 30_000L
 
     private const val MAX_APP_ROWS = 50
     private const val MAX_GAME_ROWS = 30

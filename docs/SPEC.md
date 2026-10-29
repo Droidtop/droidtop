@@ -18157,6 +18157,14 @@ menu still list every `listed` place.
     (its row pushes the update's own screen in place, 7g "Facets in place"; the version picked lands as a new version
     folder, and droidtop never replaces a folder's files). With
     nothing to update after a check that worked: "Everything is up to date", once.
+  - **Live, and quick to show** (Droidtop/tracker#748; the owner: "It not auto-refreshing is a ux bug"). On the
+    console each plugin of an Update all said it was ready in a notice while its row still read "Available" until the
+    whole run ended, and the page took about 10 s to show anything. Now the screen is live (`CatalogScreen.live`): a
+    row whose update is running says Updating with the moving bar (#738), and the moment its update returns its kind
+    is read again, so the row goes or says what is left; Update all is those same updates, one after another, so each
+    row changes on its own. The slow kinds (plugins from the catalogs, apps from the package manager) are read in the
+    background and kept for 30 s: the page draws at once from what is known, and a kind not read yet is one loading
+    row of its own ("Checking your plugins") until its rows fill in. Check now reads every kind again when it ends.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
     privilege allows a silent install). Then **Get apps**.
