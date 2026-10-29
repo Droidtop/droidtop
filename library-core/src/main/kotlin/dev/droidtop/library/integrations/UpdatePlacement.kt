@@ -65,7 +65,7 @@ object UpdatePlacement {
 
     /**
      * The offer that follows a placed update (Droidtop/tracker#624): the version it follows, by name and size, can be
-     * removed from the game's Versions and updates, where its saves are moved first ([OldVersions]). Null when the job
+     * removed from the game's Versions, where its saves are moved first ([OldVersions]). Null when the job
      * is not an update's or that folder is gone. Walks the old folder for its size: on the job's thread.
      */
     fun removalOffer(args: Map<String, String>): String? {
@@ -76,7 +76,7 @@ object UpdatePlacement {
         val size = dev.droidtop.library.FolderSizes.measure(previous.absolutePath)
             ?.let { dev.droidtop.library.FolderSizes.words(it, dev.droidtop.library.format.ValueFormat::size) }
         val frees = size?.let { " to free $it" }.orEmpty()
-        return "Remove $name$frees? It is under Versions and updates on the game's page, and its saves are kept"
+        return "Remove $name$frees? It is under Versions on the game's page, and its saves are kept"
     }
 
     /**

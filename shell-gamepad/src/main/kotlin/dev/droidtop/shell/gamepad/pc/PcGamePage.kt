@@ -80,6 +80,7 @@ import dev.droidtop.library.LibraryGrouping
 import dev.droidtop.library.ownership
 import dev.droidtop.library.ownershipLabel
 import dev.droidtop.library.scraper.FieldSources
+import dev.droidtop.shell.gamepad.fadeWhileMoreSideways
 import dev.droidtop.shell.gamepad.input.PressWords
 import dev.droidtop.shell.gamepad.CatalogDetailStrip
 import dev.droidtop.shell.gamepad.labelCase
@@ -141,7 +142,7 @@ import java.io.File
  *   what runs it, each a small capitals label over its value), small
  *   Favourite and Options (a gear) square buttons at the right edge, and the
  *   one-line reason under it.
- * - **The tab strip** (Overview, Versions and updates, Extras, Details),
+ * - **The tab strip** (Overview, Versions, Extras, Details),
  *   Steam's uppercase tab pills, centred under the band. It OWNS L1/R1 while the page is open: the page
  *   is a window of its own over the library, so its one `onPad` handler is
  *   what the shoulders reach, the same "nearest strip takes them" rule the
@@ -1147,8 +1148,9 @@ private fun PageFactsStrip(facts: List<Pair<String, String>>, modifier: Modifier
 
 /**
  * The tab strip, L1 and R1 at its ends: while the page is open it owns
- * the shoulders. It scrolls sideways, so no tab is ever clipped at a large
- * text size or in portrait.
+ * the shoulders. Its four short names fit a landscape page; at a large
+ * text size or in portrait it scrolls sideways, and the end it can scroll
+ * to fades, so a tab cut at the edge says there is more (Droidtop/tracker#661).
  */
 @Composable
 private fun PageTabStrip(
@@ -1166,7 +1168,7 @@ private fun PageTabStrip(
             state = state,
             contentPadding = PaddingValues(vertical = Space.Sm),
             horizontalArrangement = Arrangement.spacedBy(Space.Sm, Alignment.CenterHorizontally),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fadeWhileMoreSideways(state),
         ) {
             items(count = tabs.size, key = { "tab:$it" }) { index ->
                 ShellChip(
@@ -1279,7 +1281,7 @@ internal data class PageFact(
 )
 
 /**
- * One row per copy of a game on Versions and updates (docs/SPEC.md 7i, "Which
+ * One row per copy of a game on Versions (docs/SPEC.md 7i, "Which
  * copy", Droidtop/tracker#397 slice H): where it is from and how it is held,
  * what A does to it (its own Install, Update or Play) and whether it is the one
  * the person chose. Only for a card of more than one copy, one of them a
@@ -1318,7 +1320,7 @@ internal fun copyRows(
 }
 
 /**
- * One row per other version folder of the game on Versions and updates (docs/SPEC.md 7i; Droidtop/tracker#624): its
+ * One row per other version folder of the game on Versions (docs/SPEC.md 7i; Droidtop/tracker#624): its
  * version and size, and Remove in two presses. The first arms it ([armed], the folder's path) and says what the second
  * does; the second removes it, its saves moved to the version kept first ([dev.droidtop.library.integrations.OldVersions]).
  * [status] is the last removal's line, on a heading row that stays after the folder's row is gone. Pure.
@@ -1612,7 +1614,7 @@ internal fun sourcesLine(entry: LibraryEntry): String? {
  */
 internal enum class PageTab(val label: String, val emptyLine: String) {
     OVERVIEW("Overview", "Nothing is known about this game yet"),
-    VERSIONS("Versions and updates", "No version information for this game"),
+    VERSIONS("Versions", "No version information for this game"),
     EXTRAS("Extras", "No extras for this game yet"),
     DETAILS("Details", "No details for this game yet"),
 }
@@ -1741,7 +1743,7 @@ internal fun heroCaption(entry: LibraryEntry, now: Long): String {
 }
 
 /**
- * The game's versions on the person's other devices, on Versions and updates
+ * The game's versions on the person's other devices, on Versions
  * (docs/SPEC.md 7o, "Versions" and "Game updates"): one row per device, its
  * version now or last, and the ones it had before. A paired computer's newer
  * version is copied here as a new version folder when its row is chosen

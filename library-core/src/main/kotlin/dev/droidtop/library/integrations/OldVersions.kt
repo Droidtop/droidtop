@@ -12,7 +12,7 @@ import dev.droidtop.runtime.SafeDelete
 import java.io.File
 
 /**
- * A game's older version folders, and removing one (docs/SPEC.md 7i, "Versions and updates"; Droidtop/tracker#624).
+ * A game's older version folders, and removing one (docs/SPEC.md 7i, "Versions"; Droidtop/tracker#624).
  * 7m keeps every version an update placed beside the newest; this is how the person clears the ones they are done with.
  * A version's saves kept in its own folder (the engine's `beside` places, the same ones an update copies) are never
  * removed with it: each one the kept version lacks is copied there first, and a save in the old folder that is newer

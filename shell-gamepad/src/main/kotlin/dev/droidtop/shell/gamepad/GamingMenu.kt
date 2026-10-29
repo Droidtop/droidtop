@@ -1119,6 +1119,44 @@ internal fun Modifier.fadeWhileMoreBelow(scroll: androidx.compose.foundation.Scr
             }
         }
 
+/**
+ * The ends of a scrolling row fading out on the side it can still scroll to, so a tab or chip cut at the edge reads
+ * as "more this way" (Droidtop/tracker#661): a row of tabs never ends mid-letter with nothing to say so. Drawn in the
+ * draw phase; the row is composited offscreen only while a fade shows.
+ */
+internal fun Modifier.fadeWhileMoreSideways(state: androidx.compose.foundation.lazy.LazyListState): Modifier =
+    this
+        .graphicsLayer {
+            compositingStrategy = if (state.canScrollForward || state.canScrollBackward) {
+                androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+            } else {
+                androidx.compose.ui.graphics.CompositingStrategy.Auto
+            }
+        }
+        .drawWithContent {
+            drawContent()
+            val fade = MoreFadeDp.dp.toPx().coerceAtMost(size.width / 4f)
+            if (state.canScrollForward) {
+                drawRect(
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        listOf(Color.Black, Color.Transparent),
+                        startX = size.width - fade,
+                        endX = size.width,
+                    ),
+                    topLeft = androidx.compose.ui.geometry.Offset(size.width - fade, 0f),
+                    size = androidx.compose.ui.geometry.Size(fade, size.height),
+                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                )
+            }
+            if (state.canScrollBackward) {
+                drawRect(
+                    androidx.compose.ui.graphics.Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = fade),
+                    size = androidx.compose.ui.geometry.Size(fade, size.height),
+                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                )
+            }
+        }
+
 /** The small down chevron under a sheet that goes on below the fold. */
 @Composable
 private fun MoreBelowArrow(modifier: Modifier = Modifier) {

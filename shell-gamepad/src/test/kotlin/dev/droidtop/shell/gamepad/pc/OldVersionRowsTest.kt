@@ -9,7 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** The rows that remove a game's older version folders on Versions and updates (docs/SPEC.md 7i; Droidtop/tracker#624). */
+/** The rows that remove a game's older version folders on Versions (docs/SPEC.md 7i; Droidtop/tracker#624). */
 class OldVersionRowsTest {
     private val old = OldVersions.Old(LibraryEntry(id = "/g/Game v0.37", title = "Game v0.37", kind = LibraryEntryKind.RENPY), File("/g/Game v0.37"), "0.37")
     private val sizes = mapOf("/g/Game v0.37" to FolderSizes.Size(1_288_490_189L))

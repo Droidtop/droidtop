@@ -56,7 +56,8 @@ internal fun ViewStrip(
             state = state,
             contentPadding = PaddingValues(vertical = Space.Xs),
             horizontalArrangement = Arrangement.spacedBy(Space.Sm),
-            modifier = Modifier.weight(1f, fill = false),
+            // The end the strip can scroll to fades, so a chip cut at the edge says there is more (Droidtop/tracker#661).
+            modifier = Modifier.weight(1f, fill = false).fadeWhileMoreSideways(state),
         ) {
             items(count = labels.size, key = { "chip:$it" }) { index ->
                 ShellChip(
