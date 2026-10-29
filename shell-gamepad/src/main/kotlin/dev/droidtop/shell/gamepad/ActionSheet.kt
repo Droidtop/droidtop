@@ -29,10 +29,11 @@ class ActionRow(
     val title: String,
     val detail: String? = null,
     val danger: Boolean = false,
-    val onSelect: (() -> Unit)?,
     /** A job this row stands for: its bar under the title, as on every job row (show, then say: Droidtop/tracker#738). */
     val progress: Float? = null,
     val look: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
+    // Last, so a row's action can follow it as a trailing lambda.
+    val onSelect: (() -> Unit)?,
 ) : ActionSheetItem
 
 /** A heading over the rows that follow it, named in the section-label style. */
