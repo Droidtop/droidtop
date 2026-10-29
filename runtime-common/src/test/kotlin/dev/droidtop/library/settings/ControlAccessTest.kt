@@ -117,7 +117,7 @@ class ControlAccessTest {
         // Play time is Kid's alone: the line on Home is not Guest's or Kiosk's.
         assertTrue(ControlAccess.shows(UiMode.KID, ControlRow.PLAY_TIME))
         assertFalse(ControlAccess.shows(UiMode.GUEST, ControlRow.PLAY_TIME) || ControlAccess.shows(UiMode.KIOSK, ControlRow.PLAY_TIME))
-        // Kid and Kiosk keep every Quick Menu section, as before.
-        assertEquals(ControlPanel.entries.toSet(), ControlAccess.panels(UiMode.KID, ControlSurface.QUICK_MENU))
+        // Kid and Kiosk keep every Quick Menu section but the owner's Profile (Droidtop/tracker#586).
+        assertEquals(ControlPanel.entries.toSet() - ControlPanel.PROFILE, ControlAccess.panels(UiMode.KID, ControlSurface.QUICK_MENU))
     }
 }
