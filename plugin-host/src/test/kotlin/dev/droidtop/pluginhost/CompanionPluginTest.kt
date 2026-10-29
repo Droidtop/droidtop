@@ -97,4 +97,30 @@ class CompanionPluginTest {
         assertEquals("Recording 0:05", PluginRecording.timer(0, 5_000))
         assertEquals("Recording 1:02:05", PluginRecording.timer(0, 3_725_000))
     }
+
+    @Test fun `a plugin on facets declares its companion abilities on the ui facets entry that names companion tab`() {
+        val faceted = TestPlugins.record(
+            TestPlugins.manifest(id = "acme.ra", label = "Acme RA") {
+                it.put(
+                    "provides",
+                    arr(
+                        obj(
+                            "point" to "ui.facets",
+                            "targets" to JSONArray(listOf("companion.tab", "quickmenu")),
+                            "companion" to JSONArray(listOf(CompanionAbilities.GAME)),
+                            "gamePackages" to JSONArray(listOf("com.retroarch")),
+                        ),
+                    ),
+                )
+            },
+        )
+        val entry = faceted.manifest.v2.provides.single()
+        assertTrue(CompanionAbilities.declaresCompanionTab(entry))
+        assertTrue(CompanionAbilities.declares(faceted.manifest, CompanionAbilities.GAME))
+        assertTrue(CompanionAbilities.gameRowsFor(entry, "com.retroarch"))
+        assertFalse(CompanionAbilities.gameRowsFor(entry, "org.other"))
+        // A facets entry without the companion tab target declares nothing for the companion.
+        val quickOnly = ProvidedPoint("ui.facets", extra = """{"targets":["quickmenu"],"companion":["game"]}""")
+        assertFalse(CompanionAbilities.declaresCompanionTab(quickOnly))
+    }
 }

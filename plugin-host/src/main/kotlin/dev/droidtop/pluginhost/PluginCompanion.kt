@@ -38,9 +38,16 @@ object CompanionAbilities {
     fun gameRowsFor(entry: ProvidedPoint?, runningPackage: String?): Boolean =
         GAME in of(entry) && gamePackages(entry).let { it.isEmpty() || runningPackage in it }
 
-    /** Whether [manifest]'s panel declares [ability]. */
+    /**
+     * Whether [manifest]'s panel declares [ability]: on its `ui.panel` entry, or on a `ui.facets` entry that declares
+     * the `companion.tab` target (a plugin on facets, Droidtop/tracker#602).
+     */
     fun declares(manifest: PluginManifest, ability: String): Boolean =
-        manifest.v2.provides.any { it.point == PANEL_POINT && ability in of(it) }
+        manifest.v2.provides.any { (it.point == PANEL_POINT || declaresCompanionTab(it)) && ability in of(it) }
+
+    /** Whether [entry] is a `ui.facets` entry that declares the `companion.tab` target. */
+    fun declaresCompanionTab(entry: ProvidedPoint): Boolean =
+        entry.point == FacetGuards.POINT && COMPANION_TAB in FacetGuards.declaredTargets(listOf(entry))
 
     /** The abilities line: plain words for each declared ability and the tiles a person can pin; null when there is nothing to say. */
     fun line(abilities: Set<String>, tiles: Int): String? = buildList {
@@ -51,6 +58,7 @@ object CompanionAbilities {
     }.takeIf { it.isNotEmpty() }?.joinToString(" · ")
 
     private const val PANEL_POINT = "ui.panel"
+    private const val COMPANION_TAB = "companion.tab"
 }
 
 /**

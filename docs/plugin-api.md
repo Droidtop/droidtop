@@ -3153,7 +3153,16 @@ dropped, one panel per plugin).
   The call's `context.surface` is `<mode>.companion` (`gaming.companion`,
   `standard.companion`, `desktop.companion`); `context.game` is the running
   game under the `library.read` rule, as in the Quick Menu.
-- **Abilities**, declared on the `ui.panel` entry as `"companion": [...]` and
+- **On facets (Droidtop/tracker#602).** A plugin whose `ui.facets` entry
+  declares `companion.tab` is drawn on the companion from those facets, never
+  from its `ui.panel` view: `get {target: "companion.tab", subject}` with the
+  device as the subject on its tab and the Plugins tab, and with the running
+  game (under the `library.read` rule) for its rows on the Game tab. Its
+  abilities and `gamePackages` go on that `ui.facets` entry, as below. A
+  plugin that declares only `quickmenu` is drawn on the companion from its
+  `quickmenu` facets, as before.
+- **Abilities**, declared on the `ui.panel` entry (or the `ui.facets` entry
+  that declares `companion.tab`) as `"companion": [...]` and
   shown on the panel's line before it is opened (unknown names are ignored):
   - `game`: the panel has rows for the running game. The companion's Game tab
     asks the panel with `context.surface` `<mode>.companion_game` and draws

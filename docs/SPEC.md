@@ -4421,7 +4421,12 @@ droidtop 0.2.0-dev.1931).
   Cancel and says "Cancelled. Tap Quit on this screen to quit." Restart is the one quit, then the one launch.
 - **Plugins (slice C9).** A plugin's companion panel is its Quick Menu panel (`ui.panel`, docs/plugin-api.md 3
   C15 and C17), drawn for touch by `CompanionPluginsTab` with `context.surface` `<mode>.companion`: there is no
-  second panel point. The Plugins tab lists every installed plugin, the Quick Menu's own list
+  second panel point. **A plugin on facets (Droidtop/tracker#602):** one whose `ui.facets` entry declares the
+  `companion.tab` target is drawn from those facets on the companion (`PluginPanels.panelScreen`), asked about the
+  device on its tab and about the running game for its Game tab rows, and its `companion` abilities and
+  `gamePackages` are read from that entry (`PluginPanels.Panel.abilities`, `gameRowsFor`); this is what lets
+  RetroArch's game controls leave `ui.panel`. A plugin with `quickmenu` facets only is drawn from those, as in the
+  Quick Menu. The Plugins tab lists every installed plugin, the Quick Menu's own list
   (`PluginPanels.listed`, Droidtop/tracker#644): its icon, its name (no line of droidtop's internals under it,
   Droidtop/tracker#515) and its status glyph, with the state in words when it needs the person; a tap opens its
   panel with Back. **One panel frame** (Droidtop/tracker#515, built

@@ -64,14 +64,28 @@ object PluginPanels {
 
     /**
      * One plugin's Quick Menu presence: its `ui.panel` entry if it declared one, its tiles on the Quick Menu, and
-     * [facets], its `ui.facets` entry when that declares the `quickmenu` target.
+     * [facets], its `ui.facets` entry when that declares the `quickmenu` target. [companionFacets] is its `ui.facets`
+     * entry when that declares `companion.tab` (Droidtop/tracker#602): the companion draws the panel from those facets.
      */
-    data class Panel(val record: PluginRecord, val entry: ProvidedPoint?, val tiles: List<PluginTiles.Tile>, val facets: ProvidedPoint? = null) {
+    data class Panel(
+        val record: PluginRecord,
+        val entry: ProvidedPoint?,
+        val tiles: List<PluginTiles.Tile>,
+        val facets: ProvidedPoint? = null,
+        val companionFacets: ProvidedPoint? = null,
+    ) {
         val pluginId: String get() = record.manifest.id
-        val label: String get() = entry?.label ?: facets?.label ?: record.manifest.label
+        val label: String get() = entry?.label ?: facets?.label ?: companionFacets?.label ?: record.manifest.label
 
-        /** What the panel declares it does on the companion ([CompanionAbilities]): rows on Game, recording, keep-on. */
-        val abilities: Set<String> get() = CompanionAbilities.of(entry)
+        /**
+         * What the panel declares it does on the companion ([CompanionAbilities]): rows on Game, recording, keep-on. A
+         * plugin on facets declares them on its `ui.facets` entry, as a `ui.panel` entry does.
+         */
+        val abilities: Set<String> get() = CompanionAbilities.of(entry) + CompanionAbilities.of(companionFacets)
+
+        /** Whether the companion's Game tab asks this panel while [runningPackage] runs the game. */
+        fun gameRowsFor(runningPackage: String?): Boolean =
+            CompanionAbilities.gameRowsFor(entry, runningPackage) || CompanionAbilities.gameRowsFor(companionFacets, runningPackage)
     }
 
     /**
@@ -80,21 +94,25 @@ object PluginPanels {
      */
     fun panelsFor(context: Context, mode: String? = null): List<Panel> {
         val declared = providersOf(context, POINT, mode).distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
-        val faceted = providersOf(context, PluginFacets.POINT, mode)
+        val facetEntries = providersOf(context, PluginFacets.POINT, mode)
+        fun facetedFor(target: String) = facetEntries
             .filter { (record, entry) ->
-                PluginFacets.QUICK_MENU in dev.droidtop.pluginhost.FacetGuards.declaredTargets(listOf(entry)) &&
-                    PluginFacets.shows(context, record, PluginFacets.QUICK_MENU)
+                target in dev.droidtop.pluginhost.FacetGuards.declaredTargets(listOf(entry)) && PluginFacets.shows(context, record, target)
             }
             .distinctBy { it.first.manifest.id }.associateBy { it.first.manifest.id }
+        val faceted = facetedFor(PluginFacets.QUICK_MENU)
+        val companion = facetedFor(PluginFacets.COMPANION_TAB)
         val tiles = PluginTiles.tilesFor(context, mode = mode).groupBy { it.record.manifest.id }
-        return (declared.keys + faceted.keys + tiles.keys).map { id ->
+        return (declared.keys + faceted.keys + companion.keys + tiles.keys).map { id ->
             val panel = declared[id]
             val facets = faceted[id]
+            val companionFacets = companion[id]
             Panel(
-                record = panel?.first ?: facets?.first ?: tiles.getValue(id).first().record,
+                record = panel?.first ?: facets?.first ?: companionFacets?.first ?: tiles.getValue(id).first().record,
                 entry = panel?.second,
                 tiles = tiles[id].orEmpty(),
                 facets = facets?.second,
+                companionFacets = companionFacets?.second,
             )
         }.sortedBy { it.label.lowercase() }
     }
@@ -222,7 +240,27 @@ object PluginPanels {
         val more: List<CatalogGroup> = if (withMore) moreGroups(record) else emptyList()
         val id = "plugin_panel_${panel.pluginId}_$surface"
         val entry = panel.entry
-        return if (panel.facets != null) {
+        // The companion draws a plugin's `companion.tab` facets where it has them (Droidtop/tracker#602): about the
+        // running game on the Game tab, else about the device.
+        val surfaceMode = PluginModes.ofSurface(surface)
+        val onGame = surfaceMode != null && surface == PluginModes.Surfaces.companionGame(surfaceMode)
+        val onCompanion = onGame || (surfaceMode != null && surface == PluginModes.Surfaces.companion(surfaceMode))
+        return if (onCompanion && panel.companionFacets != null) {
+            val subject = if (onGame) game?.let { PluginFacets.gameSubject(targetArg(context, record, it)) } else PluginFacets.DEVICE_SUBJECT
+            PluginViews.screen(
+                record = record,
+                point = PluginFacets.POINT,
+                op = PluginFacets.OP_GET,
+                id = id,
+                title = panel.label,
+                args = PluginFacets.getArgs(PluginFacets.COMPANION_TAB, subject),
+                hostContext = hostContext,
+                leadGroups = tiles,
+                extraGroups = { _, _ -> more },
+                panel = true,
+                iconFile = PluginStore.iconFile(context, record),
+            )
+        } else if (panel.facets != null) {
             // Facets first: a plugin that declares the Quick Menu target is drawn from them, never from its old panel.
             PluginViews.screen(
                 record = record,

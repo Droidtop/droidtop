@@ -25,6 +25,10 @@ object PluginFacets {
     const val PLUGIN_PAGE = "plugin.page"
     const val SETTINGS_PAGE = "settings.page"
     const val ITEM_PAGE = "item.page"
+    const val COMPANION_TAB = "companion.tab"
+
+    /** The subject of a companion tab's `get` away from a game: the device (docs/plugin-api.md 1.10, Targets). */
+    val DEVICE_SUBJECT: JSONObject get() = JSONObject().put("type", "device")
 
     /** True when [record] declares [target] on a `ui.facets` entry. Reads the manifest only. */
     fun declares(record: PluginRecord, target: String): Boolean =

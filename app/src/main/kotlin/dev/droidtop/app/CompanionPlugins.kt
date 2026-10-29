@@ -231,7 +231,7 @@ internal fun CompanionGamePluginRows(entry: LibraryEntry) {
     val settings by CompanionPrefs.settings.collectAsState()
     if (!ControlAccess.shows(uiMode, ControlRow.GAME_PLUGIN_ROWS)) return
     val runningPackage = LaunchDisplay.runningPackageName
-    val panels = rememberCompanionPanels(mode)?.filter { CompanionAbilities.gameRowsFor(it.entry, runningPackage) } ?: return
+    val panels = rememberCompanionPanels(mode)?.filter { it.gameRowsFor(runningPackage) } ?: return
     val game = remember(entry.id) { dev.droidtop.library.integrations.PluginContextActions.targetOf(entry) }
     panels.forEach { panel ->
         key(panel.pluginId) {
