@@ -119,7 +119,17 @@ object HomeRows {
         return rules.copy(pinned = next)
     }
 
-    private fun set(context: Context, rules: Rules) {
+    /**
+     * [rules] with the pinned row [id] moved one place earlier ([by] -1) or later ([by] 1) among the pinned rows, as
+     * the heading's Move up and Move down do. A row not pinned, or already at that end, stays. Pure.
+     */
+    fun move(rules: Rules, id: String, by: Int): Rules {
+        val from = rules.pinned.indexOf(id)
+        return if (from < 0) rules else place(rules, from + by, id)
+    }
+
+    /** Stores [rules] and shows them at once. Writes the preferences file: not for the main thread. */
+    fun set(context: Context, rules: Rules) {
         state.value = rules
         prefs(context).edit()
             .putString(KEY_PINNED, rules.pinned.joinToString("\n"))

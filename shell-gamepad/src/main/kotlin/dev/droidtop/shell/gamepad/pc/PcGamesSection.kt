@@ -51,6 +51,8 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import dev.droidtop.library.settings.SettingsScreenRegistry
+import dev.droidtop.shell.gamepad.ActionRow
+import dev.droidtop.shell.gamepad.ActionSheet
 import dev.droidtop.shell.gamepad.AppOptionsMenu
 import dev.droidtop.shell.gamepad.GamelistOptionsMenu
 import dev.droidtop.shell.gamepad.HelpRowClaim
@@ -511,10 +513,12 @@ internal fun PcGamesSection(
     val homeUse by produceState(initialValue = emptyMap<String, Int>(), state.home) {
         value = if (state.home) withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.use(context) } else emptyMap()
     }
-    // What the person pinned and hid (Settings > Shell > Home rows), read when Home opens.
-    val homeRules by produceState(initialValue = dev.droidtop.library.settings.HomeRows.Rules(), state.home) {
-        value = withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.load(context) }
-    }
+    // What the person pinned and hid (Settings > Shell > Home rows, or a row heading's menu), read when Home opens and
+    // followed after: a change is the person's own, so the row moves with the cursor on it.
+    LaunchedEffect(state.home) { withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.load(context) } }
+    val homeRules by dev.droidtop.library.settings.HomeRows.rules.collectAsState()
+    // The Home row whose heading menu is open (Droidtop/tracker#611): Pin to top, Move up and down, Hide.
+    var rowMenu by remember { mutableStateOf<PcShelf?>(null) }
     LaunchedEffect(games, others, ownership, recentlyAdded, homeUse, homeRules) {
         val all = games ?: return@LaunchedEffect
         onHomeActivityChanged(all + others)
@@ -790,6 +794,9 @@ internal fun PcGamesSection(
     // A shelf heading that opens something: Update available's, on Overview. The pad reaches it with Left.
     fun headingOpens(shelf: PcShelf): Boolean = shelf.id == SHELF_UPDATES && !state.home
 
+    // Every Home row's heading has the row's menu, so the pad reaches each with Left too.
+    fun headingReached(shelf: PcShelf): Boolean = headingOpens(shelf) || state.home
+
     // Update available's heading opens the Updates tab (the view everyone was given), else the same filter.
     fun openUpdates() {
         val updates = savedViews.views.firstOrNull { it.id == LibraryViewPrefs.UPDATES_VIEW_ID }?.query
@@ -800,8 +807,12 @@ internal fun PcGamesSection(
     }
 
     fun openShelf(shelf: PcShelf) {
-        state.headingFocused = false
-        if (headingOpens(shelf)) openUpdates()
+        if (headingOpens(shelf)) {
+            state.headingFocused = false
+            openUpdates()
+        } else if (state.home) {
+            rowMenu = shelf
+        }
     }
 
     // Which level B leaves (docs/SPEC.md 6e: B always goes back one level).
@@ -1059,7 +1070,7 @@ internal fun PcGamesSection(
                                         EsDeNavigationSounds.play(UiSound.MOVE)
                                         state.headingFocused = false
                                     }
-                                    step < 0 && state.itemIndex == 0 && currentShelf?.let(::headingOpens) == true -> {
+                                    step < 0 && state.itemIndex == 0 && currentShelf?.let(::headingReached) == true -> {
                                         EsDeNavigationSounds.play(UiSound.MOVE)
                                         state.headingFocused = true
                                     }
@@ -1096,6 +1107,7 @@ internal fun PcGamesSection(
                             val pinned = (tabs.getOrNull(state.stripIndex) as? PcTab.Grid)?.takeIf { state.stripFocused && !it.builtIn }
                             when {
                                 pinned != null -> tabMenu = pinned.view
+                                state.home && state.onShelves && state.headingFocused -> rowMenu = currentShelf
                                 focusedTile != null -> tileMenu = focusedTile
                                 focusedEntry != null -> openOptions(focusedEntry)
                                 else -> return@onPad false
@@ -1519,6 +1531,19 @@ internal fun PcGamesSection(
     // The free-space offer before a store install or update.
     PcLaunchOfferSheet(pcLaunch)
 
+    rowMenu?.let { shelf ->
+        HomeRowMenu(
+            shelf = shelf,
+            rules = homeRules,
+            onChange = { change ->
+                rowMenu = null
+                coroutines.launch(Dispatchers.IO) {
+                    dev.droidtop.library.settings.HomeRows.set(context, change(dev.droidtop.library.settings.HomeRows.rules.value))
+                }
+            },
+            onDismiss = { rowMenu = null },
+        )
+    }
     tileMenu?.let { tile ->
         CollectionTileMenu(
             tile = tile,
@@ -1924,4 +1949,35 @@ internal fun cardPress(entry: LibraryEntry): CardPress = when {
     entry.inPcFold -> CardPress.PAGE
     entry.appFacts != null -> CardPress.LAUNCH
     else -> CardPress.DETAILS
+}
+
+/**
+ * A Home row heading's menu (Droidtop/tracker#611, "A row heading's menu has Pin to top, Move up / Move down, and
+ * Hide"): the same choices Settings > Shell > Home rows has for the row, on the row itself. Move is among the pinned
+ * rows, the only ones with a place of their own; the others go where use puts them.
+ */
+@Composable
+private fun HomeRowMenu(
+    shelf: PcShelf,
+    rules: dev.droidtop.library.settings.HomeRows.Rules,
+    onChange: ((dev.droidtop.library.settings.HomeRows.Rules) -> dev.droidtop.library.settings.HomeRows.Rules) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val rows = dev.droidtop.library.settings.HomeRows
+    val slot = rules.pinned.indexOf(shelf.id)
+    ActionSheet(
+        title = shelf.title,
+        rows = buildList {
+            if (slot < 0) {
+                add(ActionRow("Pin to top", "Home leads with it, whatever you play") { onChange { rows.with(it, shelf.id, rows.PINNED) } })
+            } else {
+                add(ActionRow("Unpin", "It goes where your use puts it") { onChange { rows.with(it, shelf.id, rows.SHOWN) } })
+                if (slot > 0) add(ActionRow("Move up") { onChange { rows.move(it, shelf.id, -1) } })
+                if (slot < rules.pinned.lastIndex) add(ActionRow("Move down") { onChange { rows.move(it, shelf.id, 1) } })
+            }
+            add(ActionRow("Hide", "Settings > Shell > Home rows shows it again") { onChange { rows.with(it, shelf.id, rows.HIDDEN) } })
+            add(ActionRow("Close", onSelect = onDismiss))
+        },
+        onDismiss = onDismiss,
+    )
 }

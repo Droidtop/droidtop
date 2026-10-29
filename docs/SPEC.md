@@ -15582,8 +15582,10 @@ own games, in droidtop's own treatment:
   (`HomeRows`) lists every row Home has shown, its own or a plugin's, each Shown, Pinned to top or Hidden; pinned
   rows lead Home in the order the screen's "Pinned order" slots give, hidden rows are not drawn, and Reset clears
   both. **Forget when I play**, on the same screen, empties the launch log and the rows' counts, so Usual at this time
-  and the use order start again from nothing; the play counts and last-played times stay. Still to build: the same
-  choices on a row's heading on Home itself. Not there yet: store recommendations, since no store droidtop runs offers them (a store plugin's
+  and the use order start again from nothing; the play counts and last-played times stay. The same choices are on
+  the row itself: on Home, Left from a row's first card reaches its heading, and A, L2 or a tap on the heading opens
+  the row's menu (Pin to top, or Unpin with Move up and Move down among the pinned rows, then Hide), on the one
+  `ActionSheet`. The change shows at once and the cursor stays on the row wherever it goes. Not there yet: store recommendations, since no store droidtop runs offers them (a store plugin's
   facet, docs/plugin-api.md, is the way they will come). Gaming opens
   on Home: the Default section setting's `home` is its default, and a cold
   start never restores the last place. Saved shell state is restored only

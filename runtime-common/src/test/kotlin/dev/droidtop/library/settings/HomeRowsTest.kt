@@ -25,4 +25,14 @@ class HomeRowsTest {
         assertEquals(rules, HomeRows.place(rules, 5, "c"))
         assertEquals(rules, HomeRows.place(rules, 0, "x"))
     }
+
+    @Test
+    fun `moving a pinned row steps it one place, and an unpinned row or an end stays`() {
+        val rules = HomeRows.Rules(pinned = listOf("a", "b", "c"))
+        assertEquals(listOf("a", "c", "b"), HomeRows.move(rules, "c", -1).pinned)
+        assertEquals(listOf("b", "a", "c"), HomeRows.move(rules, "a", 1).pinned)
+        assertEquals(rules, HomeRows.move(rules, "a", -1))
+        assertEquals(rules, HomeRows.move(rules, "c", 1))
+        assertEquals(rules, HomeRows.move(rules, "x", 1))
+    }
 }
