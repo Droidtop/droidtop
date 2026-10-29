@@ -276,13 +276,12 @@ class PcPageAboutTest {
     }
 
     @Test
-    fun `the cloud saves row draws its state too: syncing, offline, failed, synced`() {
-        val mark = dev.droidtop.library.settings.StatusMark
+    fun `the cloud saves row draws its state too, syncing, offline, failed or synced`() {
         val synced = dev.droidtop.library.stores.StoreSaves.LastSync(okAt = 1L, failedAt = null)
-        assertEquals(mark.WORKING, cloudSavesMark(true, synced, online = true, syncing = true))
-        assertEquals(mark.OFFLINE, cloudSavesMark(true, synced, online = false, syncing = false))
-        assertEquals(mark.ATTENTION, cloudSavesMark(true, synced.copy(failedAt = 2L), online = true, syncing = false))
-        assertEquals(mark.SYNCED, cloudSavesMark(true, synced, online = true, syncing = false))
+        assertEquals(dev.droidtop.library.settings.StatusMark.WORKING, cloudSavesMark(true, synced, online = true, syncing = true))
+        assertEquals(dev.droidtop.library.settings.StatusMark.OFFLINE, cloudSavesMark(true, synced, online = false, syncing = false))
+        assertEquals(dev.droidtop.library.settings.StatusMark.ATTENTION, cloudSavesMark(true, synced.copy(failedAt = 2L), online = true, syncing = false))
+        assertEquals(dev.droidtop.library.settings.StatusMark.SYNCED, cloudSavesMark(true, synced, online = true, syncing = false))
         assertEquals(null, cloudSavesMark(true, null, online = true, syncing = false))
         assertEquals(null, cloudSavesMark(false, synced, online = true, syncing = false))
     }
