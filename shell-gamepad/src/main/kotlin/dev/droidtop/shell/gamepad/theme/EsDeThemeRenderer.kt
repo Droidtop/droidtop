@@ -1300,7 +1300,6 @@ private fun EsDeThemedText(
             if (metadata == "name" && collectionGamelist) selectedGame?.systemId else null,
     )
 
-    val hasSize = element.valueOrNull<EsDeThemeValue.Pair>("size") != null
     val (width, height) = sizeOf(element, viewWidth, viewHeight)
     val (offsetX, offsetY) = positionOf(element, viewWidth, viewHeight, width, height)
 
@@ -1317,8 +1316,6 @@ private fun EsDeThemedText(
     val lineSpacing = (element.valueOrNull<EsDeThemeValue.FloatValue>("lineSpacing")?.value ?: 1.5f).coerceIn(0.5f, 3f)
 
     val textAlign = esDeTextAlign(element)
-    // Real default is ALIGN_CENTER, not top -- see [EsDeVerticalAlignment].
-    val boxAlignment = esDeVerticalBoxAlignment(element)
 
     // Real ES-DE `text` scrolling container, the `container*` family.
     // Eight of the ten themes measured for this pass put their game
@@ -1366,96 +1363,20 @@ private fun EsDeThemedText(
             textAlign = textAlign,
             verticalAlignment = element.valueOrNull<EsDeThemeValue.Str>("verticalAlignment")?.value,
         )
-    } else if (hasSize) {
-        // ES-DE's own box-vs-line arithmetic; see [esDeTextBoxFit]. The
-        // origin is anchored on THAT box -- a `size.y` of zero becomes one
-        // line's height there, not a zero-height element to centre on.
-        val fit = esDeTextBoxFit(height, fontSizeDp * lineSpacing)
-        val (boxOffsetX, boxOffsetY) = positionOf(element, viewWidth, viewHeight, width, fit.height)
-        Box(
-            modifier = Modifier
-                .absoluteOffset(x = boxOffsetX, y = boxOffsetY)
-                // Real exception, not an omission: the CONTAINER branch above
-                // takes no rotation at all, because ES-DE applies a container
-                // text's theme with `ALL ^ POSITION ^ ORIGIN ^ Z_INDEX ^ SIZE
-                // ^ VISIBLE ^ ROTATION` (GamelistView.cpp:317-319) -- the
-                // scrollable parent owns its transform.
-                .esDeRotation(element)
-                .esDeBackgroundBox(backgroundMarginsBoxOf(element, viewWidth, opacity))
-                .size(width = width, height = fit.height),
-            contentAlignment = boxAlignment,
-        ) {
-            Text(
-                text = text,
-                color = color.copy(alpha = color.alpha * opacity),
-                fontSize = fontSizeSp,
-                fontFamily = themeFontFamily(element),
-                lineHeight = fontSizeSp * lineSpacing,
-                textAlign = textAlign,
-                maxLines = fit.maxLines,
-                // Real ES-DE abbreviates rather than cutting: whatever
-                // does not fit the box loses glyphs until the ellipsis
-                // glyph fits (Font.cpp:1074-1078). Compose's own default
-                // is a hard clip, which is what drew "RELEASE" for
-                // "RELEASED:" on the rig.
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().esDeTextOverflow(fit),
-            )
-        }
     } else {
-        // Real bug this fixes: with no declared `size`, origin math was
-        // applied against a width/height of ZERO -- decaffe anchors
-        // nearly every label with `origin="0.5 0.5"` (center-anchored),
-        // so `pos - 0 * origin` always reduced to plain top-left
-        // placement at `pos`, silently ignoring origin entirely instead
-        // of centering the element's own REAL rendered size on `pos` the
-        // way real ES-DE's `TextComponent` does (it measures its own
-        // text first, then applies origin against that real size --
-        // confirmed against `GuiComponent::getPosition`'s real origin
-        // formula, the same one every real ES-DE component uses). This
-        // is why sidebar labels like decaffe's own "SYSTEM TITLE:"/
-        // "RELEASED:" rendered visibly offset from the reference render.
-        // EsDeAutoOriginBox measures Text FIRST (loose max-width, real
-        // rendered size), THEN positions using that real size -- the
-        // only way to get this right in Compose's own layout model,
-        // since the size genuinely isn't known before the child itself
-        // is measured.
-        // Real ES-DE draws `backgroundColor` sized to the element's own
-        // real `mSize` PLUS `backgroundMargins` on both sides
-        // (TextComponent.cpp:263-274: `drawRect(0, 0, mSize.x +
-        // margins.x + margins.y, ...)`) -- for an auto-sized element,
-        // `mSize` IS the measured text size (real ES-DE always measures
-        // it, whether from a declared `size` or from the rendered text),
-        // so background isn't a has-size-only feature. Applying it here
-        // as padding+background on the SAME child EsDeAutoOriginBox
-        // measures means the background box's real total size (text +
-        // margins) is exactly what origin math ends up centering/
-        // anchoring, matching real ES-DE with no separate pre-measure
-        // pass needed.
-        EsDeAutoOriginBox(
+        // A sized box or an auto-sized one measured first so `origin` applies to its real size: the one text block
+        // `datetime`, `clock` and `gamelistinfo` draw too. Unlike the container above, it takes the element's
+        // rotation (ES-DE strips ROTATION only from a container's text, GamelistView.cpp:317-319), and its
+        // background is the element's own `backgroundColor` grown by `backgroundMargins` (TextComponent.cpp:263-274).
+        EsDeAlignedTextBlock(
+            element = element,
             viewWidth = viewWidth,
             viewHeight = viewHeight,
-            posFraction = element.valueOrNull<EsDeThemeValue.Pair>("pos") ?: EsDeThemeValue.Pair(0f, 0f),
-            originFraction = element.valueOrNull<EsDeThemeValue.Pair>("origin") ?: EsDeThemeValue.Pair(0f, 0f),
-        ) {
-            Box(
-                modifier = Modifier
-                    .esDeRotation(element)
-                    // Real `backgroundMargins` -- see backgroundMarginsBoxOf for
-                    // why this is a horizontal (leading, trailing) pair and not
-                    // the (horizontal, vertical) one droidtop read it as.
-                    .esDeBackgroundBox(backgroundMarginsBoxOf(element, viewWidth, opacity)),
-            ) {
-                Text(
-                    text = text,
-                    color = color.copy(alpha = color.alpha * opacity),
-                    fontSize = fontSizeSp,
-                    fontFamily = themeFontFamily(element),
-                    lineHeight = fontSizeSp * lineSpacing,
-                    textAlign = textAlign,
-                )
-            }
-        }
+            text = text,
+            color = color.copy(alpha = color.alpha * opacity),
+            fontSizeSp = fontSizeSp,
+            background = backgroundMarginsBoxOf(element, viewWidth, opacity),
+        )
     }
 }
 
