@@ -363,8 +363,6 @@ class ProotRuntime(
     override suspend fun clone(container: Container, name: String): Container {
         val existing = listContainers()
         val source = existing.firstOrNull { it.container.id == container.id } ?: error("${container.id} no longer exists")
-        // The desktop's own carries the desktop's provisioning and session; a second one is not a sibling.
-        check(source.container.role == ContainerRole.SIBLING) { "the desktop's own container is not copied" }
         check(!source.running) { "${source.displayName} is running: stop it to copy it" }
         val chosen = name.trim()
         ContainerNames.problemWith(chosen, existing.map { it.displayName })?.let { error(it) }
@@ -375,9 +373,18 @@ class ProotRuntime(
                 check(containerDir(id).mkdirs()) { "could not make a place for the copy" }
                 ContainerArchive.copy(rootfsOf(container.id), rootfsOf(id), backupLog())
                 // Its image, sockets, run settings, home and folders: what makes it the same container.
-                for (file in listOf(::configOf, ::runConfigOf, ::mountsFile)) {
+                for (file in listOf(::runConfigOf, ::mountsFile)) {
                     file(container.id).takeIf { it.isFile }?.copyTo(file(id))
                 }
+                // Always a sibling: a copy of the desktop's own is everything installed in it, run as a container of
+                // its own, never a second desktop (the provisioning plan stays with the desktop's own).
+                val config = readConfig(container.id).apply {
+                    this[KEY_ROLE] = ContainerRole.SIBLING.name
+                    remove(KEY_INSTALL)
+                    remove(KEY_COMPOSITOR)
+                    remove(KEY_DAEMONS)
+                }
+                configOf(id).outputStream().use { config.store(it, "droidtop proot container") }
                 names.set(id, chosen)
             } catch (e: Throwable) {
                 TreeDelete.delete(containerDir(id), containersDir)

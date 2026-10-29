@@ -414,10 +414,8 @@ object ContainersCatalog {
             groups += CatalogGroup(id = "commands", title = "Commands in the desktop's terminal", items = commandItems(context, info))
         }
         groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
-        if (info.container.role == ContainerRole.SIBLING) {
-            val others = runCatching { runtime.listContainers() }.getOrDefault(emptyList()).map { it.displayName }
-            groups += CatalogGroup(id = "copy", title = "Copy", items = copyItems(runtime, info, running, others))
-        }
+        val others = runCatching { runtime.listContainers() }.getOrDefault(emptyList()).map { it.displayName }
+        groups += CatalogGroup(id = "copy", title = "Copy", items = copyItems(runtime, info, running, others))
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
     }
@@ -927,7 +925,8 @@ object ContainersCatalog {
             return listOf(ActionItem(id = "container_copy", title = "Make a copy", subtitle = it))
         }
         if (running) {
-            return listOf(ActionItem(id = "container_copy", title = "Make a copy", subtitle = "Running: stop it to copy it"))
+            val stop = if (info.container.role == ContainerRole.PRIMARY) "Live desktop: stop it to copy it" else "Running: stop it to copy it"
+            return listOf(ActionItem(id = "container_copy", title = "Make a copy", subtitle = stop))
         }
         val id = info.container.id
         val name = copyNames[id] ?: ContainerNames.copyName(info.displayName, others)

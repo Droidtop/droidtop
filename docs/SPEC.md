@@ -3338,9 +3338,13 @@ the `ContainerRuntime` interface that already exists (§3):
     terminal, start with the desktop, pods and networks. The copy is a new
     container, and those are the person's choice for it.
   - **Failure:** a copy that fails part-way is deleted whole.
-  - **Scope:** the desktop's own container is not copied, since a second
-    one would not be a sibling. Proot backend only, as backup is;
-    droidspaces shows why on the row (`cloneUnavailableReason`).
+  - **The desktop's own** is copied too, while the desktop is stopped. The
+    copy is always a sibling: everything installed in the desktop, run as
+    a container of its own, never a second desktop. Its role is set to
+    sibling and the provisioning plan stays with the original.
+  - **Backend:** proot only for now, as with backup. droidspaces shows why
+    on the row (`cloneUnavailableReason`); its copy and backup are their
+    own queued item (Droidtop/tracker#758).
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend
