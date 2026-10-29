@@ -12,6 +12,7 @@ import dev.droidtop.library.LaunchDisplay
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notices
 import dev.droidtop.library.settings.PlayEnforcer
+import dev.droidtop.library.settings.PlayLogStore
 import dev.droidtop.library.settings.PlayStep
 import dev.droidtop.library.settings.PlayTime
 import dev.droidtop.library.settings.PlayTimePrefs
@@ -23,6 +24,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Counts play and holds the play-time limits (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421): while
@@ -32,7 +34,8 @@ import kotlinx.coroutines.launch
  * ([dev.droidtop.library.Library.quitRunning]), so the emulator saves the way a Quit from the Quick Menu does.
  * Watched from the process, not from a screen: the game is another app and no shell of droidtop is in front.
  * Nothing runs for a person who has set no limit beyond one prefs read per tick, and nothing at all while no
- * game runs.
+ * game runs. In every mode it also adds the session to the game's own play time ([PlayLogStore], docs/SPEC.md 7f
+ * "Your play", Droidtop/tracker#597).
  */
 object PlayTimeLimiter {
     private const val TAG = "droidtop.PlayTime"
@@ -52,21 +55,23 @@ object PlayTimeLimiter {
         scope.launch {
             LaunchDisplay.running.collectLatest { session ->
                 if (session == null) return@collectLatest
-                watch(app)
+                watch(app, session.context)
             }
         }
     }
 
     /** One game session: runs until the game ends (the collector cancels it). */
-    private suspend fun watch(app: Context) {
+    private suspend fun watch(app: Context, game: dev.droidtop.library.LaunchContext) {
         val enforcer = PlayEnforcer()
         var last = System.currentTimeMillis()
+        val (title, system) = withContext(Dispatchers.IO) { nameOf(app, game) }
         try {
             while (true) {
                 delay(TICK_MS)
                 val now = System.currentTimeMillis()
                 val kid = UiModePrefs.get(app) == UiMode.KID
                 if (kid) PlayTimePrefs.record(app, last, now)
+                PlayLogStore.record(app, game.gameId, title, system, last, now)
                 last = now
                 if (!kid) continue
                 val (limits, today, week) = PlayTimePrefs.snapshot(app, now)
@@ -80,8 +85,25 @@ object PlayTimeLimiter {
             }
         } finally {
             // The time since the last tick: the game ended (or droidtop is going) between two ticks.
-            if (UiModePrefs.get(app) == UiMode.KID) PlayTimePrefs.record(app, last, System.currentTimeMillis())
+            val end = System.currentTimeMillis()
+            if (UiModePrefs.get(app) == UiMode.KID) PlayTimePrefs.record(app, last, end)
+            PlayLogStore.record(app, game.gameId, title, system, last, end)
         }
+    }
+
+    /**
+     * The name the person knows [game] by (their own name for it, else its title) and its system's name, read once
+     * per session from the library; the id itself when the library does not hold it.
+     */
+    private suspend fun nameOf(app: Context, game: dev.droidtop.library.LaunchContext): Pair<String, String?> {
+        val entry = runCatching {
+            LibraryCore.library(app).currentEntriesOf(dev.droidtop.library.LibraryEntryKind.entries.toSet()).firstOrNull { it.id == game.gameId }
+        }.getOrNull()
+        val systemId = game.systemId ?: entry?.systemId
+        val system = systemId?.let { id ->
+            runCatching { dev.droidtop.library.consoles.PlatformsDatabase.builtIns(app).firstOrNull { it.id == id }?.displayName }.getOrNull() ?: id
+        }
+        return (entry?.gameName?.takeIf { it.isNotBlank() } ?: entry?.title ?: game.gameId) to system
     }
 
     private suspend fun quit(app: Context) {
