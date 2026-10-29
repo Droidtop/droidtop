@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 /**
  * A full-trust plugin process (docs/plugin-api.md 5.3): droidtop's own UID, the plugin loaded from its install folder.
- * Only a plugin the person allowed `host.full_trust`, and every contract 1 plugin, runs here. Each runs in a process of
+ * Only a plugin the person allowed `host.full_trust` runs here. Each runs in a process of
  * its own, one of the declared slots ([PluginRuntimeService] is slot 0, `:pluginhost`; [FullTrustSlot1] to
  * [FullTrustSlot7] the rest, [PluginProcesses] hands them out), so no plugin can reach another one's class loader or
  * objects. That is crash containment and nothing more: a plugin here can do anything droidtop's UID can, including open

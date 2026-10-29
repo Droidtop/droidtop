@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Contract 2 manifest fields (docs/plugin-api.md 1.2) and the v1 translation (docs/plugin-api.md 6). */
+/** Contract 2 manifest fields (docs/plugin-api.md 1.2). */
 class PluginDeclarationsTest {
     private fun base(contractVersion: Int, capabilities: List<String> = emptyList()): JSONObject = JSONObject().apply {
         put("id", "acme.vpn-tile")
@@ -82,7 +82,7 @@ class PluginDeclarationsTest {
         assertTrue(req.optional)
         assertEquals("adb", req.minLevel)
         assertEquals("Restart the app", req.reason)
-        // The status tile point is also served as the v1 capability it replaces.
+        // The status tile point is also served as the capability it maps to.
         assertEquals(setOf(PluginCapability.STATUS_TILE), m.capabilities)
     }
 
@@ -109,48 +109,11 @@ class PluginDeclarationsTest {
     }
 
     @Test
-    fun `a v1 manifest yields the implicit v2 set`() {
-        val json = base(1, listOf("acquire_content", "app_status", "library_action")).apply {
-            put("requestsRoot", true)
-            put("boundServiceTargets", JSONArray(listOf("org.example.b", "org.example.a")))
-            put("subscribedEvents", JSONArray(listOf("default_player_changed")))
-        }
-        val v2 = PluginManifest.fromJson(json)!!.v2
-        assertEquals(listOf("library.sources", "ui.context_action", "apps.bridge"), v2.provides.map { it.point })
-        assertTrue(v2.provides[1].extra.contains("game"))
-        val ids = v2.permissions.map { it.id }
-        assertEquals(ids.distinct(), ids)
-        assertEquals(
-            setOf(
-                "provide:library.sources", "library.folders.write", "net.any",
-                "provide:ui.context_action", "library.read",
-                "provide:apps.bridge",
-                "host.full_trust", "apps.check", "apps.launch", "apps.intents.out",
-                "priv.shell.root", "apps.bind",
-            ),
-            ids.toSet(),
-        )
-        assertTrue(v2.permissions.single { it.id == "apps.bind" }.extra.contains("org.example.a"))
-        assertEquals(listOf(EventSubscription("library.default_player_changed", 2)), v2.subscribes)
-        val root = v2.requires.single()
-        assertEquals(RequiredApi("priv.shell", "1.0", optional = true, minLevel = "root"), root)
-    }
-
-    @Test
-    fun `a plain v1 status tile gets only the always implied set`() {
-        val v2 = PluginManifest.fromJson(base(1, listOf("status_tile")))!!.v2
-        assertEquals(listOf("ui.status_tile"), v2.provides.map { it.point })
-        assertEquals(setOf("provide:ui.status_tile", "host.full_trust", "apps.check", "apps.launch", "apps.intents.out"), v2.permissions.map { it.id }.toSet())
-        assertTrue(v2.requires.isEmpty())
-    }
-
-    @Test
-    fun `a v1 record re-derives its v2 set on read`() {
-        val manifest = PluginManifest.fromJson(base(1, listOf("settings_rows")))!!
-        val record = PluginRecord(manifest, "b".repeat(64), "", PluginTrustState.APPROVED, enabled = true, rootApproved = false, disabledReason = null)
-        val back = PluginRecord.fromJson(JSONObject(record.toJson().toString()))!!
-        assertEquals(manifest.v2, back.manifest.v2)
-        val strippedJson = record.toJson().apply { remove("provides"); remove("permissions") }
-        assertEquals(manifest.v2, PluginRecord.fromJson(strippedJson)!!.manifest.v2)
+    fun `a contract 1 manifest gets no derived v2 declarations`() {
+        val json = base(1, listOf("status_tile")).put("provides", JSONArray(listOf(JSONObject().put("point", "ui.settings"))))
+        val m = PluginManifest.fromJson(json)!!
+        assertEquals(V2Declarations.EMPTY, m.v2)
+        val record = PluginRecord(m, "b".repeat(64), "", PluginTrustState.APPROVED, enabled = true, rootApproved = false, disabledReason = null)
+        assertEquals(V2Declarations.EMPTY, PluginRecord.fromJson(JSONObject(record.toJson().toString()))!!.manifest.v2)
     }
 }

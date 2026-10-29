@@ -79,6 +79,16 @@ class PluginManifestTest {
     }
 
     @Test
+    fun `refuses a contract 1 manifest at install: it needs an update (tracker 766)`() {
+        val manifest = PluginManifest.fromJson(manifestJson(contractVersion = 1))!!
+        assertEquals(
+            listOf("contractVersion 1 is older than this build of droidtop runs ($PLUGIN_MANIFEST_MIN_CONTRACT_VERSION): it needs an update"),
+            manifest.structuralProblems(),
+        )
+        assertTrue("its v2 declarations are never derived", manifest.v2.provides.isEmpty() && manifest.v2.permissions.isEmpty())
+    }
+
+    @Test
     fun `a contract 3 manifest, one that needs facets, installs while calls stay contract 2`() {
         val manifest = PluginManifest.fromJson(manifestJson(contractVersion = 3))!!
         assertTrue(manifest.structuralProblems().none { it.contains("contractVersion") })

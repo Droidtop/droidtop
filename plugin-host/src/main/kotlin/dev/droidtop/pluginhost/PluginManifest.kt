@@ -4,13 +4,11 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * The highest plugin contract version this build of droidtop reads
- * (docs/plugin-api.md 7): 1 is today's capabilities and [PluginApi], 2
- * adds the manifest fields in [V2Declarations]. A contract 1 manifest is
- * translated to the 2 shape by [LegacyManifest.toV2], so both install and
- * run; the v2 call envelope itself is not served yet, so v2 plugins are
- * reached through the capabilities their `provides` maps to. Bump when
- * [PluginApi] changes in a way an old plugin couldn't safely run against.
+ * The plugin contract version this build of droidtop speaks to plugins
+ * (docs/plugin-api.md 7): 2 is the manifest fields in [V2Declarations]
+ * and the call envelope ([PluginCall], [PluginReply]). Calls carry it.
+ * Bump when [PluginApi] changes in a way an old plugin couldn't safely
+ * run against.
  */
 const val PLUGIN_CONTRACT_VERSION = 2
 
@@ -21,6 +19,13 @@ const val PLUGIN_CONTRACT_VERSION = 2
  * them as before.
  */
 const val PLUGIN_MANIFEST_CONTRACT_VERSION = 3
+
+/**
+ * The oldest manifest contract this build installs or runs. Contract 1 (capabilities only, no permissions, run with
+ * full access) is no longer served (Droidtop/tracker#766): a contract 1 manifest is refused at install, and one already
+ * installed is never called and shows that it needs an update ([PluginTiers.refusal]).
+ */
+const val PLUGIN_MANIFEST_MIN_CONTRACT_VERSION = 2
 
 /** One payload file's declared hash (trust-boundary checklist point 1: every file, always, no "no hash recorded" skip). */
 data class PluginPayloadFile(val path: String, val sha256: String)
@@ -115,9 +120,8 @@ data class PluginManifest(
     val subscribedEvents: Set<String> = emptySet(),
     /**
      * The contract 2 fields: provides, permissions, subscribes, exports,
-     * requires. For a contract 1 manifest this is derived by
-     * [LegacyManifest.toV2] at parse time (never read from the manifest),
-     * so everything above the parser sees one model.
+     * requires. Empty for a contract 1 manifest, which declares none of
+     * them and is refused ([PLUGIN_MANIFEST_MIN_CONTRACT_VERSION]).
      */
     val v2: V2Declarations = V2Declarations.EMPTY,
     /** Summary, publisher, home page, category, icon and screenshots ([PluginPresentation], Droidtop/tracker#521 item 2). */
@@ -157,7 +161,7 @@ data class PluginManifest(
             }
             val contractVersion = json.optInt("contractVersion", -1)
             if (contractVersion < 0) return null
-            val declaredV2 = if (contractVersion >= 2) V2Declarations.fromJson(json) else V2Declarations.EMPTY
+            val declaredV2 = if (contractVersion >= PLUGIN_MANIFEST_MIN_CONTRACT_VERSION) V2Declarations.fromJson(json) else V2Declarations.EMPTY
             // A v2 plugin may declare only `provides`; the capabilities they map to are served like declared ones.
             val allCapabilities = capabilities + LegacyManifest.capabilitiesFor(declaredV2.provides)
             // A v2 plugin whose points map to no capability (a tray item) is still installable.
@@ -202,7 +206,7 @@ data class PluginManifest(
                 presentation = PluginPresentation.fromJson(json, payload.map { it.path }.toSet()),
                 app = AppTarget.fromJson(json.optJSONObject("app")),
             )
-            return manifest.withDerivedV2()
+            return manifest
         }
     }
 
@@ -213,9 +217,6 @@ data class PluginManifest(
      */
     fun subscribesTo(event: PluginEvent): Boolean =
         subscribedEvents.any { PluginEvent.fromId(it) == event } || v2.subscribes.any { PluginEvent.fromId(it.event) == event }
-
-    /** A contract 1 manifest gets its v2 declarations derived; a contract 2 one keeps what it declared. */
-    fun withDerivedV2(): PluginManifest = if (contractVersion >= 2) this else copy(v2 = LegacyManifest.toV2(this))
 
     /**
      * Structural problems [PluginBundleInstaller] refuses on, beyond the
@@ -229,13 +230,15 @@ data class PluginManifest(
         if (contractVersion > PLUGIN_MANIFEST_CONTRACT_VERSION) {
             add("contractVersion $contractVersion is newer than this build of droidtop understands ($PLUGIN_MANIFEST_CONTRACT_VERSION)")
         }
+        if (contractVersion < PLUGIN_MANIFEST_MIN_CONTRACT_VERSION) {
+            add("contractVersion $contractVersion is older than this build of droidtop runs ($PLUGIN_MANIFEST_MIN_CONTRACT_VERSION): it needs an update")
+        }
         if (kind == PluginKind.NATIVE_BUNDLE && entryClass == null) {
             add("a native_bundle plugin must declare entryClass")
         }
         if (kind == PluginKind.APP_INTERFACE) {
             if (app == null) add("an app_interface plugin must name its app: {\"package\", \"service\"}")
             if (payload.isNotEmpty() || entryClass != null) add("an app_interface plugin carries no payload or entryClass: its code is its app")
-            if (contractVersion < 2) add("an app_interface plugin must be contract 2 or later")
             // docs/plugin-api.md 1.3: the app never runs in a droidtop process, so nothing that reaches past one applies.
             v2.permissions.filter { it.id == PluginTiers.FULL_TRUST || it.id == "gpu.render" }.forEach {
                 add("an app_interface plugin cannot ask for ${it.id}: its app never runs in droidtop's process")
@@ -285,9 +288,9 @@ data class PluginManifest(
                 add("ui.main must name the Dart entrypoint it starts (\"entrypoint\")")
             }
         }
-        // docs/plugin-api.md 5.3: a contract 2 plugin runs contained unless the person allows it full access, so one that
-        // cannot run contained must ask for full access where the person sees it, on the approval list.
-        if (contractVersion >= 2 && !PluginTiers.declaresFullTrust(this@PluginManifest)) {
+        // docs/plugin-api.md 5.3: a plugin runs contained unless the person allows it full access, so one that cannot run
+        // contained must ask for full access where the person sees it, on the approval list.
+        if (!PluginTiers.declaresFullTrust(this@PluginManifest)) {
             PluginTiers.containmentBlocker(this@PluginManifest)?.let { add("this plugin cannot run contained ($it), so it must declare ${PluginTiers.FULL_TRUST}") }
         }
         if (!PluginOriginKeys.isOfficial(origin)) {

@@ -143,6 +143,7 @@ data class PluginRecord(
             val boundServiceTargets = buildSet { for (i in 0 until boundTargetsJson.length()) add(boundTargetsJson.optString(i)) }
             val subscribedEventsJson = json.optJSONArray("subscribedEvents") ?: JSONArray()
             val subscribedEvents = buildSet { for (i in 0 until subscribedEventsJson.length()) add(subscribedEventsJson.optString(i)) }
+            val contractVersion = json.optInt("contractVersion")
             val manifest = PluginManifest(
                 id = json.optString("id"),
                 origin = json.optString("origin"),
@@ -151,7 +152,7 @@ data class PluginRecord(
                 version = json.optString("version"),
                 kind = kind,
                 capabilities = capabilities,
-                contractVersion = json.optInt("contractVersion"),
+                contractVersion = contractVersion,
                 requestsRoot = json.optBoolean("requestsRoot"),
                 abis = buildSet { for (i in 0 until abisJson.length()) add(abisJson.optString(i)) },
                 entryClass = optNullableString(json, "entryClass"),
@@ -159,10 +160,11 @@ data class PluginRecord(
                 payload = payload,
                 boundServiceTargets = boundServiceTargets,
                 subscribedEvents = subscribedEvents,
-                v2 = V2Declarations.fromJson(json),
+                // A contract 1 record (installed before Droidtop/tracker#766) keeps none: it is never run.
+                v2 = if (contractVersion >= PLUGIN_MANIFEST_MIN_CONTRACT_VERSION) V2Declarations.fromJson(json) else V2Declarations.EMPTY,
                 presentation = PluginPresentation.fromJson(json, payload.map { it.path }.toSet()),
                 app = AppTarget.fromJson(json.optJSONObject("app")),
-            ).withDerivedV2()
+            )
             val trust = runCatching { PluginTrustState.valueOf(json.optString("trust")) }.getOrNull() ?: PluginTrustState.PENDING
             return PluginRecord(
                 manifest = manifest,

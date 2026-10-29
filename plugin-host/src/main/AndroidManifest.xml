@@ -31,9 +31,9 @@
 
           Full trust: droidtop's own UID, one process per plugin from eight
           slots (:pluginhost and :pluginhost1 to :pluginhost7). Only a plugin
-          the person allowed host.full_trust, and an older contract 1 plugin,
-          runs here. This is crash containment, not security: a plugin here can
-          do anything droidtop's UID can. A plugin that throws, hangs or
+          the person allowed host.full_trust runs here. This is crash
+          containment, not security: a plugin here can do anything droidtop's
+          UID can. A plugin that throws, hangs or
           native-crashes takes down its own process, never :app.
         -->
         <service
@@ -50,7 +50,7 @@
         <service android:name="dev.droidtop.pluginhost.FullTrustSlot7" android:process=":pluginhost7" android:exported="false" />
 
         <!--
-          Contained, the default for a contract 2 plugin: an isolated process
+          Contained, the default for every plugin: an isolated process
           with a random UID of its own, no permissions, no network and no access
           to droidtop's files or shared storage. Everything the plugin does
           beyond its process goes through its broker. From API 29 :app starts

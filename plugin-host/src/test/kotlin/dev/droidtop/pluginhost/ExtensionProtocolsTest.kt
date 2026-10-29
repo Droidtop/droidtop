@@ -41,13 +41,6 @@ class ExtensionProtocolsTest {
     }
 
     @Test
-    fun `the derived filter of a contract 1 library_action is games`() {
-        val v1 = TestPlugins.manifest(contract = 1) { it.put("capabilities", strings("library_action")) }
-        val entry = v1.v2.provides.single { it.point == "ui.context_action" }
-        assertTrue(ContextActionFilter.matches(entry, game))
-    }
-
-    @Test
     fun `a game's identity is handed over only with library read`() {
         val withIdentity = ContextActionFilter.targetJson(game, includeIdentity = true)
         assertEquals("/roms/snes/zelda.sfc", withIdentity.getString("id"))

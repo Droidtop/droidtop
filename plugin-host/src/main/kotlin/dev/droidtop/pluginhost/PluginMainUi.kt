@@ -36,7 +36,7 @@ object PluginMainUi {
 
     /** The entry [manifest] declares, or null when it declares none or its kind cannot host one. */
     fun declared(manifest: PluginManifest): Entry? {
-        if (manifest.kind != PluginKind.FLUTTER_EMBED || manifest.contractVersion < 2) return null
+        if (manifest.kind != PluginKind.FLUTTER_EMBED) return null
         return manifest.v2.provides.firstOrNull { it.point == POINT }?.let { entryOf(it) }
     }
 
