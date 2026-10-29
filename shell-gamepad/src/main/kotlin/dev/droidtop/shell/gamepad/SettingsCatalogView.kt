@@ -1925,6 +1925,7 @@ internal fun TextEditDialog(
                         search -> androidx.compose.ui.text.input.ImeAction.Search
                         else -> androidx.compose.ui.text.input.ImeAction.Done
                     },
+                    showKeyboardOnFocus = raisesKeyboardWithFocus,
                 ),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { onCommit(value) }, onSearch = { onCommit(value) }),
                 visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
@@ -1934,6 +1935,7 @@ internal fun TextEditDialog(
                     .padding(top = 12.dp)
                     .clip(Corners.Crisp)
                     .background(MenuTokens.SurfaceSelected)
+                    .opensFocused("Text field")
                     .padding(12.dp),
             )
             // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).

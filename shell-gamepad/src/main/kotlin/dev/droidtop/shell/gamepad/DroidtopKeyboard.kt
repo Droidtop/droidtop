@@ -12,6 +12,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -109,3 +111,32 @@ fun OwnFieldKeyboard(modifier: Modifier = Modifier, active: Boolean = true) {
 }
 
 private const val KEYBOARD_GUARD_MS = 150L
+
+/**
+ * A dialog's one text field, holding the cursor from the moment the dialog opens (Droidtop/tracker#523): keys from any
+ * keyboard, the companion's included (it types into the focused field, [OwnFieldKeyboard]), land in it with no press
+ * to reach it first. Android's keyboard comes up with that focus only where droidtop raises one on its own
+ * ([KeyboardTargets.raisesOnOwnFocus]: one screen, no controller or keyboard); pass [raisesKeyboardWithFocus] as the field's
+ * KeyboardOptions. Otherwise A on the field brings it up, where droidtop's own keyboard does not serve the screen.
+ * [tag] names the field in the log when focus never attaches.
+ */
+@Composable
+fun Modifier.opensFocused(tag: String): Modifier {
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val view = LocalView.current
+    val keyboard = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
+    LaunchedEffect(Unit) { requestFocusWhenAttached(focus, tag) }
+    return this
+        .onPad { press ->
+            if (press.action == dev.droidtop.shell.gamepad.input.GamepadAction.A && !KeyboardTargets.servesField(view.display?.displayId)) {
+                keyboard?.show()
+                true
+            } else {
+                false
+            }
+        }
+        .focusRequester(focus)
+}
+
+/** Whether a field that takes the cursor on its own also brings Android's keyboard up ([opensFocused]). */
+val raisesKeyboardWithFocus: Boolean get() = KeyboardTargets.raisesOnOwnFocus()

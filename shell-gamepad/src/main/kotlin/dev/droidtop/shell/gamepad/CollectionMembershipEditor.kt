@@ -117,13 +117,14 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
                                 onValueChange = { newName = it },
                                 label = { Text(stringResource(R.string.collection_name)) },
                                 singleLine = true,
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(showKeyboardOnFocus = raisesKeyboardWithFocus),
                                 colors = TextFieldDefaults.colors(
                                     focusedTextColor = MenuTokens.OnSurface,
                                     unfocusedTextColor = MenuTokens.OnSurface,
                                     focusedLabelColor = MenuTokens.OnSurface,
                                     unfocusedLabelColor = MenuTokens.OnSurfaceMuted,
                                 ),
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier.fillMaxWidth().opensFocused("Collection name"),
                             )
                             // On a screen Android draws no keyboard on (the add-on display), droidtop's own (SPEC 4c, tracker#314).
                             OwnFieldKeyboard()
