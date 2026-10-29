@@ -1,6 +1,8 @@
 package dev.droidtop.library
 
 import android.content.Context
+import dev.droidtop.library.integrations.CoreVerdict
+import dev.droidtop.library.integrations.EngineCoreList
 import java.io.File
 
 /**
@@ -77,6 +79,10 @@ object PcRunnerOptions {
         val engine = detected?.engine
         val target = engine?.let { EnginesDatabase.enginehostTargetFor(context, it) }
         val engineVersion = engine?.let { resolveEngineVersion(context, gameRoot, it) }
+        // What Enginehost itself lists for this engine (docs/plugin-api.md 3 A7b, Droidtop/tracker#752): a core it has
+        // or can get; null when no list decides, and the bundle provider's answer stands as before.
+        val cores = engine?.let { EnginesDatabase.defFor(context, it) }
+            ?.let { def -> EngineCoreList.verdict(context, def.id, engineVersion) }
         val runtime = PcGameRuntimeRegistry.runtime
         val options = RunnerAvailability.evaluate(
             GameLaunchStrategyResolver.facts(
@@ -86,8 +92,13 @@ object PcRunnerOptions {
                 engineHostInstalled = EngineHost.isInstalled(context),
                 engineHostEngineVersionKnown = engineVersion != null,
                 engineHostCanReachFolder = EngineHost.canReachGameFolder(context, gameRoot),
-                enginehostSupported = target != null,
-                enginehostBundleCovers = bundleCoverage(context, target, engineVersion),
+                enginehostSupported = target != null && cores != CoreVerdict.None,
+                enginehostBundleCovers = when (cores) {
+                    is CoreVerdict.Installed -> true
+                    is CoreVerdict.Installable -> false
+                    else -> bundleCoverage(context, target, engineVersion)
+                },
+                enginehostCoreLabel = (cores as? CoreVerdict.Installable)?.core?.label,
                 windowsEnvironmentReady = runtime?.isProvisioned == true,
                 wineRendererWired = RunnerAvailability.WINE_RENDERER_WIRED,
                 linuxContainerAvailable = runtime?.isLinuxContainerAvailable == true,

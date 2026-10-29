@@ -2493,6 +2493,45 @@ difference:
   registered, asked by the save model next, and the reported folder shown
   on the game's Saves row.
 
+**A7b Engine cores (Droidtop/tracker#752, 2026-10-29).** EP
+`engines.cores@1`. Risk low. Only an `app_interface` plugin is asked.
+Host API `engines` (no permission; only an `app_interface` plugin that
+provides `engines.cores`, with the point on, may call it, any other gets
+`PERMISSION_DENIED`). The owner: "we also can use the application
+interface plugin code to present an engine core list that droidtop can
+use". It decides a game's runner without droidtop knowing which cores
+exist:
+- **droidtop asks the plugin:** `list_cores {}` → `{cores: [{id, engine,
+  label, contexts?, engineVersions: {series, any}, rows, installed,
+  installedVersion?, availableVersion?, updateAvailable}],
+  catalogCheckedAtMs}`. One entry per core line, installed or one the
+  app's catalog can install. `id` is the bundle id, stable across
+  versions. `rows` are the ids of the engines-database rows whose
+  `enginehost` mapping the core serves, so droidtop matches its own
+  detection to a core. `engineVersions` gives the game versions it runs
+  (a series such as `8.3`, or `any`). An installable core has
+  `installed: false` and its `availableVersion`. Reads only: answering
+  never fetches anything, and `catalogCheckedAtMs` (0: never) says how
+  old the catalog part is. droidtop keeps at most 200 cores per app.
+- **When:** at droidtop's start, when the app connects through the door,
+  and after each `engines report_changed`. Never on a timer. The last
+  answer is kept in droidtop's files, so a decision made before the app
+  connects still has it.
+- **The plugin tells droidtop:** `engines report_changed {}` →
+  `{accepted}`: a core was installed, removed or updated, or the catalog
+  changed. droidtop asks `list_cores` again, off the caller's thread.
+- **What droidtop does with it** (docs/SPEC.md 7i): for a game whose
+  engines-database row a core serves, at the game's engine version, an
+  installed core makes Enginehost Ready, and an installable one makes
+  its setup step "Get <core label> support". When a checked catalog has
+  no core for the row, Enginehost is not a runner for that game. When no
+  list decides (none read, or the catalog never checked), droidtop keeps
+  Enginehost's capabilities provider's answer, which stays advisory.
+  The plugin's page lists the cores, installed first, then the ones that
+  can be installed.
+- **Status:** built (`EngineCores.kt`, `PcRunnerOptions`); Enginehost
+  answers since its manifest version 3.
+
 **A8 Achievements.** EP `achievements.provider@1`. Risk medium.
 - **For:** achievement sets and progress, for example RetroAchievements
   (#14) or a store's own achievements.

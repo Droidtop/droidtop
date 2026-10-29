@@ -2428,6 +2428,7 @@ object AppSettingsCatalogs {
             consentGroup,
             permissionsGroup,
             CatalogGroup(id = "plugin_${m.id}_provides_group", title = "What it provides", items = providesGroup),
+            engineCoresGroup(context, m.id),
             runtimeGroupItem.takeIf { runtimeNeed == null },
             aboutGroup.takeIf { it.isNotEmpty() }?.let { CatalogGroup(id = "plugin_${m.id}_about_group", title = "About", items = it) },
             CatalogGroup(id = "plugin_${m.id}_update_group", title = "Version", items = updateGroup),
@@ -2436,6 +2437,27 @@ object AppSettingsCatalogs {
             CatalogGroup(id = "plugin_${m.id}_advanced_group", title = "Advanced", items = advancedGroup).takeIf { DeveloperMenu.on(context) },
         )
         return pluginPageTop(context, record, userKeys, catalogNames, grantSnapshot, runtimeNeed, catalogOffer, approveAction, groups)
+    }
+
+    /**
+     * An app's engine cores as it last listed them (`engines.cores`, docs/plugin-api.md 3 A7b, Droidtop/tracker#752):
+     * installed ones first, then what its catalog can install. Null for a plugin that never listed any.
+     */
+    private fun engineCoresGroup(context: Context, pluginId: String): CatalogGroup? {
+        val answer = dev.droidtop.library.integrations.EngineCoreList.answers(context)[pluginId] ?: return null
+        if (answer.cores.isEmpty()) return null
+        val items = answer.cores.sortedWith(compareBy({ !it.installed }, { it.label.lowercase() })).map { core ->
+            ActionItem(
+                id = "plugin_${pluginId}_core_${core.id}",
+                title = core.label,
+                subtitle = when {
+                    !core.installed -> listOfNotNull("Can be installed", core.availableVersion).joinToString(" ")
+                    else -> listOfNotNull("Installed", core.installedVersion).joinToString(" ") +
+                        (core.availableVersion?.takeIf { core.updateAvailable }?.let { ", update $it waiting" } ?: "")
+                },
+            )
+        }
+        return CatalogGroup(id = "plugin_${pluginId}_cores_group", title = "Engine cores", items = items)
     }
 
     /** [pluginDetailPage]'s header and bar, around its [groups]. */

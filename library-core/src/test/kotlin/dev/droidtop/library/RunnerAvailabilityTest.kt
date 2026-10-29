@@ -21,6 +21,7 @@ class RunnerAvailabilityTest {
         enginehostCanReachFolder: Boolean = true,
         enginehostEngineVersionKnown: Boolean = true,
         enginehostBundleCovers: Boolean? = null,
+        enginehostCoreLabel: String? = null,
         kirikiroid2Installed: Boolean = false,
         windowsEnvironmentReady: Boolean = true,
         wineRendererWired: Boolean = true,
@@ -36,6 +37,7 @@ class RunnerAvailabilityTest {
         enginehostCanReachFolder = enginehostCanReachFolder,
         enginehostEngineVersionKnown = enginehostEngineVersionKnown,
         enginehostBundleCovers = enginehostBundleCovers,
+        enginehostCoreLabel = enginehostCoreLabel,
         kirikiroid2Installed = kirikiroid2Installed,
         windowsEnvironmentReady = windowsEnvironmentReady,
         wineRendererWired = wineRendererWired,
@@ -187,17 +189,62 @@ class RunnerAvailabilityTest {
     fun `availability comes first and the database's priority only ranks what is available`() {
         val options = RunnerAvailability.evaluate(
             facts(
+                engine = GameEngine.GODOT,
                 hasWindowsExecutable = true,
                 hasLinuxBuild = true,
-                // The database would rather have enginehost, but it needs
-                // setup here, so a Ready row still leads.
-                enginehostInstalled = false,
+                // No Enginehost core for it at all, so the engine's own runner
+                // is not a choice and the Ready rows lead, the database's
+                // priority ordering them.
+                enginehostSupported = false,
                 preferredOrder = listOf(GameLaunchStrategy.ENGINEHOST, GameLaunchStrategy.LINUX_CONTAINER, GameLaunchStrategy.WINE_PREFIX),
             ),
         )
         assertEquals(GameLaunchStrategy.LINUX_CONTAINER, options.first().strategy)
         assertEquals(GameLaunchStrategy.WINE_PREFIX, options[1].strategy)
         assertEquals(GameLaunchStrategy.ENGINEHOST, options[2].strategy)
+    }
+
+    @Test
+    fun `a Ren'Py game with an exe runs in Enginehost, and its missing core is the primary action, not Wine (tracker 752)`() {
+        val options = RunnerAvailability.evaluate(
+            facts(
+                hasWindowsExecutable = true,
+                enginehostBundleCovers = false,
+                enginehostCoreLabel = "Ren'Py 8.3",
+                preferredOrder = listOf(GameLaunchStrategy.WINE_PREFIX, GameLaunchStrategy.ENGINEHOST),
+            ),
+        )
+        val resolved = RunnerAvailability.resolve(options, override = null, engine = GameEngine.RENPY)!!
+        assertEquals(GameLaunchStrategy.ENGINEHOST, resolved.option.strategy)
+        assertEquals(RunnerState.NEEDS_SETUP, resolved.option.state)
+        assertEquals(RunnerAction.INSTALL_ENGINEHOST_PLUGIN, resolved.option.action)
+        assertEquals("Get Ren'Py 8.3 support", resolved.option.actionLabel)
+        // Wine is still there to choose, Ready.
+        assertEquals(RunnerState.READY, options.of(GameLaunchStrategy.WINE_PREFIX).state)
+    }
+
+    @Test
+    fun `Enginehost not installed still leads for an engine it covers, with its install as the step (tracker 752)`() {
+        val options = RunnerAvailability.evaluate(facts(hasWindowsExecutable = true, enginehostInstalled = false))
+        val resolved = RunnerAvailability.resolve(options, override = null, engine = GameEngine.RENPY)!!
+        assertEquals(GameLaunchStrategy.ENGINEHOST, resolved.option.strategy)
+        assertEquals(RunnerAction.INSTALL_ENGINEHOST, resolved.option.action)
+    }
+
+    @Test
+    fun `Run with Wine instead is a kept choice that wins over the engine's own runner (tracker 752)`() {
+        val options = RunnerAvailability.evaluate(facts(hasWindowsExecutable = true, enginehostBundleCovers = false))
+        val resolved = RunnerAvailability.resolve(options, override = GameLaunchStrategy.WINE_PREFIX.name, engine = GameEngine.RENPY)!!
+        assertEquals(GameLaunchStrategy.WINE_PREFIX, resolved.option.strategy)
+        assertEquals("your choice", resolved.reason)
+    }
+
+    @Test
+    fun `with no core label the Get support action names the engine`() {
+        val option = RunnerAvailability
+            .evaluate(facts(enginehostBundleCovers = false))
+            .of(GameLaunchStrategy.ENGINEHOST)
+        assertEquals("Get Ren'Py support", option.actionLabel)
     }
 
     @Test

@@ -94,6 +94,11 @@ data class RunnerFacts(
      * into a setup step.
      */
     val enginehostBundleCovers: Boolean? = null,
+    /**
+     * The name Enginehost gives the core it can install for this game (its `engines.cores` list,
+     * Droidtop/tracker#752), for the "Get … support" action; null names the engine instead.
+     */
+    val enginehostCoreLabel: String? = null,
     val kirikiroid2Installed: Boolean = false,
     /** Whether the Windows environment (ImageFS + a container) has been provisioned. */
     val windowsEnvironmentReady: Boolean = true,
@@ -136,10 +141,18 @@ object RunnerAvailability {
     const val WINE_RENDERER_WIRED = true
 
     /**
-     * Every runner's state for one game, ordered: the rows the user can
-     * act on first (READY, then NEEDS_SETUP), each group in the database's
-     * declared priority, then the dimmed device rows, then the hidden
-     * game rows.
+     * Every runner's state for one game, ordered: the engine's own runners
+     * first whenever they can be chosen at all, Ready or one setup step
+     * away (Droidtop/tracker#752); then the rows the user can act on
+     * (READY, then NEEDS_SETUP), each group in the database's declared
+     * priority, then the dimmed device rows, then the hidden game rows.
+     *
+     * The first group is the owner's rule: a Ren'Py game that ships a
+     * `.exe` is a Ren'Py game, so a Wine row that happens to be Ready never
+     * takes it over while Enginehost only lacks its core. Its setup step
+     * ("Get Ren'Py support") becomes the game's primary action, and Wine
+     * stays a choice the person makes ("Run with Wine instead"), kept per
+     * game in [LaunchStrategyOverridePrefs].
      */
     fun evaluate(facts: RunnerFacts): List<RunnerOption> {
         val order = facts.preferredOrder.ifEmpty { if (facts.engine == null) PC_GAME_ORDER else emptyList() }
@@ -150,6 +163,7 @@ object RunnerAvailability {
             linuxContainer(facts),
         ).sortedWith(
             compareBy(
+                { if (it.isEngineRunner && it.selectable) 0 else 1 },
                 { it.state.ordinal },
                 { order.indexOf(it.strategy).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE },
                 { it.strategy.ordinal },
@@ -167,6 +181,14 @@ object RunnerAvailability {
      * row it can.
      */
     private val PC_GAME_ORDER = listOf(GameLaunchStrategy.LINUX_CONTAINER, GameLaunchStrategy.WINE_PREFIX)
+
+    /**
+     * The runners that run this game through its own engine, never as a Windows or Linux program. Kirikiroid2 is
+     * not one here: it opens its own app rather than this game, so it keeps the database's rank beside Wine.
+     */
+    val ENGINE_RUNNERS = setOf(GameLaunchStrategy.ENGINEHOST)
+
+    private val RunnerOption.isEngineRunner: Boolean get() = strategy in ENGINE_RUNNERS
 
     private fun enginehost(facts: RunnerFacts): RunnerOption {
         val strategy = GameLaunchStrategy.ENGINEHOST
@@ -207,7 +229,7 @@ object RunnerAvailability {
                 RunnerState.NEEDS_SETUP,
                 "Install the ${facts.engine.displayName()} plugin",
                 RunnerAction.INSTALL_ENGINEHOST_PLUGIN,
-                actionLabel = "Get ${facts.engine.displayName()} support",
+                actionLabel = "Get ${facts.enginehostCoreLabel ?: facts.engine.displayName()} support",
             )
         }
         return RunnerOption(strategy, RunnerState.READY)

@@ -1225,6 +1225,7 @@ object GameLaunchStrategyResolver {
         engineHostCanReachFolder: Boolean = true,
         enginehostSupported: Boolean = true,
         enginehostBundleCovers: Boolean? = null,
+        enginehostCoreLabel: String? = null,
         windowsEnvironmentReady: Boolean = true,
         wineRendererWired: Boolean = true,
         linuxContainerAvailable: Boolean = true,
@@ -1243,6 +1244,7 @@ object GameLaunchStrategyResolver {
         // resolveEngineVersion's own doc comment.
         enginehostEngineVersionKnown = engineHostEngineVersionKnown || File(folder, "enginehost.json").isFile,
         enginehostBundleCovers = enginehostBundleCovers,
+        enginehostCoreLabel = enginehostCoreLabel,
         kirikiroid2Installed = kirikiroid2Installed,
         windowsEnvironmentReady = windowsEnvironmentReady,
         wineRendererWired = wineRendererWired,

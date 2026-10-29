@@ -1,5 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
+import androidx.compose.ui.res.stringResource
+import dev.droidtop.shell.gamepad.R
 import dev.droidtop.runtime.FailureText
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.library.friendlyLocation
@@ -931,6 +933,24 @@ internal fun PcGameMenu(
     } else {
         null
     }
+    // Run with Wine instead (Droidtop/tracker#752): the engine's own runner is the default even while it needs its core,
+    // so Wine is never taken silently; this is the one press that makes it this game's runner, kept like a Runs with pick.
+    val wineInsteadRow = if (
+        loaded && runner?.option?.strategy == GameLaunchStrategy.ENGINEHOST &&
+        LaunchStrategyOverridePrefs.get(context, entry.id) == null &&
+        runners.options.any { it.strategy == GameLaunchStrategy.WINE_PREFIX && it.selectable }
+    ) {
+        ActionRow(
+            stringResource(R.string.run_with_wine_instead),
+            stringResource(R.string.run_with_wine_instead_detail),
+            onSelect = {
+                LaunchStrategyOverridePrefs.set(context, entry.id, GameLaunchStrategy.WINE_PREFIX)
+                reloadToken++
+            },
+        )
+    } else {
+        null
+    }
     val playEntries = buildList<ActionSheetItem> {
         // Play, or the one action that makes Play possible -- the
         // gamelist's own A makes this exact decision on its own
@@ -1130,7 +1150,7 @@ internal fun PcGameMenu(
         PcMenuPage.Organise to actions.organise,
         PcMenuPage.Install to actions.install,
         PcMenuPage.Updates to actions.updates,
-        PcMenuPage.Runs to (listOfNotNull(runsWithRow, runOnceRow) + actions.runs),
+        PcMenuPage.Runs to (listOfNotNull(runsWithRow, wineInsteadRow, runOnceRow) + actions.runs),
         PcMenuPage.Saves to actions.saves,
         PcMenuPage.Manage to actions.manage,
     )

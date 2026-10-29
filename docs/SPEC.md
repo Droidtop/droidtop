@@ -16643,9 +16643,24 @@ folder, and which plugin bundles its capabilities provider reports.
 Enginehost's bundle list stays **advisory** (§7d): droidtop annotates with
 it and never gates a launch enginehost would otherwise resolve.
 
-**Resolution order: availability first, the database's priority second.**
-The engines database's `strategies` list only ranks what is already
-available. The resolved runner and the reason it won are stated on the
+**Resolution order: the engine's own runner first, then availability,
+then the database's priority (Droidtop/tracker#752, owner 2026-10-29).**
+A game whose engine Enginehost has or can get a core for runs in
+Enginehost: its row leads whenever it can be chosen at all, Ready or one
+setup step away, even when Wine is Ready because the game ships a `.exe`.
+The setup step is then the game's primary action ("Get Ren'Py 8.3
+support", named by the core Enginehost lists, or "Install Enginehost"),
+and droidtop never falls back to Wine or Linux without the person saying
+so. "Run with Wine instead" (the game's menu, under Runs with) is that
+choice, kept per game like any Runs with pick and cleared the same way.
+Which cores exist comes from Enginehost itself over its application
+interface (`engines.cores@1`, docs/plugin-api.md 3 A7b), never from a
+list droidtop carries: an installed core serving the game's
+engines-database row at its version makes the row Ready, an installable
+one makes it the "Get … support" step, and a checked catalog with none
+makes Enginehost no runner for the game. Kirikiroid2 is not in that first
+group: it opens its own app, not the game. After that group, the engines
+database's `strategies` list only ranks what is already available. The resolved runner and the reason it won are stated on the
 game's page ("Runs with"), which is what turns that priority from an
 invisible constant into something the user can see. The runner's name
 carries the engine where the engine is what it means — "enginehost

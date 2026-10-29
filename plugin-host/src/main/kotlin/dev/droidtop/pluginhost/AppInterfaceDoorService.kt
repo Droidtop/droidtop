@@ -37,7 +37,10 @@ class AppInterfaceDoorService : Service() {
                 scope.launch {
                     val policy = PluginCrashPolicy(context)
                     try {
-                        policy.connectApp(record)?.let { Log.w("droidtop.plugin", "${record.manifest.id}: the door did not connect it: $it") }
+                        when (val refusal = policy.connectApp(record)) {
+                            null -> PluginBrokers.enginesChanged(record.manifest.id)
+                            else -> Log.w("droidtop.plugin", "${record.manifest.id}: the door did not connect it: $refusal")
+                        }
                     } finally {
                         policy.shutdown()
                     }

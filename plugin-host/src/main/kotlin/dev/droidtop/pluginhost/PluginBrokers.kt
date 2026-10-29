@@ -279,6 +279,8 @@ class AppBrokerEnvironment(context: Context) : BrokerEnvironment {
 
     override fun socialChanged(pluginId: String, change: JSONObject): Boolean = PluginBrokers.socialChanged(pluginId, change)
 
+    override fun enginesChanged(pluginId: String): Boolean = PluginBrokers.enginesChanged(pluginId)
+
     // ---- Android permissions droidtop holds for plugins (docs/plugin-api.md 4.1) ----
 
     override fun holdsAndroid(need: AndroidNeed): Boolean =
@@ -668,6 +670,13 @@ object PluginBrokers {
      * social hub, which lives in :library-core above this module. Called on a binder thread; it must not block.
      */
     @Volatile var socialChanged: (pluginId: String, change: JSONObject) -> Boolean = { _, _ -> false }
+
+    /**
+     * :app sets this at start: an app's plugin connected through the door or said its engine core list changed
+     * (docs/plugin-api.md 3 A7b), handed to the library's core list in :library-core. Called on a binder thread or the
+     * door's own scope; it must not block.
+     */
+    @Volatile var enginesChanged: (pluginId: String) -> Boolean = { false }
 
     private val binders = ConcurrentHashMap<String, IPluginHostBroker>()
     private var environment: AppBrokerEnvironment? = null

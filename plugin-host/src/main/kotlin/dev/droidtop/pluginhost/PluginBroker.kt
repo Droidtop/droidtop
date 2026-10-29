@@ -117,6 +117,12 @@ interface BrokerEnvironment {
      */
     fun socialChanged(pluginId: String, change: JSONObject): Boolean = false
 
+    /**
+     * An app's plugin says its engine core list changed (`engines report_changed`, docs/plugin-api.md 3 A7b): droidtop
+     * asks it for `list_cores` again off this thread. True when the report was taken. The broker checks the point first.
+     */
+    fun enginesChanged(pluginId: String): Boolean = false
+
     /** The per-plugin secret store behind `vault` (docs/plugin-api.md 3 G1); null where there is none (the call is UNSUPPORTED). */
     fun vault(): PluginVault? = null
 
@@ -611,6 +617,15 @@ object HostApis {
             if (args.optString("reason").length > MAX_REASON) invalid("reason must be at most $MAX_REASON characters")
             env.savesChanged(record.manifest.id, args)
         },
+        // docs/plugin-api.md 3 A7b: an app's plugin says its engine core list changed, so droidtop never polls it. Only an app
+        // interface plugin that provides engines.cores, with that point still on, may say so.
+        HostOp("engines", "report_changed") { env, record, _ ->
+            appOnly(record, "only an app's plugin lists engine cores")
+            PluginGrants.pointRefusal(record, env.grants(record.manifest.id), "engines.cores")?.let {
+                throw BrokerException(PluginErrorCode.PERMISSION_DENIED, it)
+            }
+            JSONObject().put("accepted", env.enginesChanged(record.manifest.id))
+        },
         // docs/plugin-api.md 3 G1: the caller's own secrets. The broker names the caller, so a plugin can only ever reach its own;
         // the audit and every log carry the key's name at most, never a value.
         HostOp("vault", "put", permission = "vault.own", target = { it.optString("key") }) { env, record, args ->
@@ -657,9 +672,9 @@ object HostApis {
     const val MAX_PATH = 4096
     const val MAX_REASON = 200
 
-    private fun appOnly(record: PluginRecord) {
+    private fun appOnly(record: PluginRecord, refusal: String = "only an app's plugin exchanges saves with droidtop") {
         if (record.manifest.kind != PluginKind.APP_INTERFACE) {
-            throw BrokerException(PluginErrorCode.PERMISSION_DENIED, "only an app's plugin exchanges saves with droidtop")
+            throw BrokerException(PluginErrorCode.PERMISSION_DENIED, refusal)
         }
     }
 

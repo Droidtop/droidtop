@@ -22,6 +22,8 @@
     <string name="cancel">Cancel</string>
     <string name="windows_setup_title">Windows games need a one-time download</string>
     <string name="no_games_match_view">No games match this view</string>
+    <string name="run_with_wine_instead">Run with Wine instead</string>
+    <string name="run_with_wine_instead_detail">Play this game as a Windows game from now on; Runs with changes it back</string>
     <string name="shelves_empty">Nothing on the shelves yet</string>
     <string name="browse_themes">Browse themes</string>
     <string name="theme_deprecated">DEPRECATED</string>

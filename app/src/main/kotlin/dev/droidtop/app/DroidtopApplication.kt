@@ -147,6 +147,12 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
             library = { LibraryCore.library(this) },
             records = { LibraryCore.records(this) },
         )
+        // `engines.cores` (docs/plugin-api.md 3 A7b, Droidtop/tracker#752): what Enginehost can run or get decides a game's
+        // runner, so its list is asked at start, when its app connects through the door and when it says the list changed.
+        dev.droidtop.pluginhost.PluginBrokers.enginesChanged = { pluginId ->
+            dev.droidtop.library.integrations.EngineCoreList.changed(this, pluginId)
+        }
+        dev.droidtop.library.integrations.EngineCoreList.refreshAll(this)
         // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
         // engine before the library indexes it, and an update's saves are copied into its new version folder
         // (docs/SPEC.md 7g, "Getting an update"), with the version it follows offered for removal.
