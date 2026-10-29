@@ -17937,9 +17937,14 @@ sent beyond the app id) through `SteamNewsClient`: the newest post tagged as
 patch notes, else the newest announcement, shown as its title, "Patch notes,
 <date>" and a plain-text start of it; selecting it again opens Steam's news
 page for the app, which is the full history. Nothing is fetched until the
-row is selected, and every outcome is a sentence on the row. Other stores
-have no such row yet: GOG's per-product changelog and itch.io devlogs are
-the candidates, and a folder game's notes come from its source plugin.
+row is selected, and every outcome is a sentence on the row. A GOG game
+(2026-10-29) has the same row: `GogChangelogClient` reads the changelog GOG
+keeps for the product from its public products API
+(`api.gog.com/products/<id>?expand=changelog`, no key and no account, only the
+product id sent) and shows its newest entry, the text up to the next version
+heading, as plain text; selecting it again opens the game's GOG page, where the
+whole changelog is. A game sold on both shows Steam's. itch.io devlogs are the
+remaining candidate, and a folder game's notes come from its source plugin.
 
 ### Relationship to the Quick Menu
 

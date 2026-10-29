@@ -55,6 +55,8 @@ import dev.droidtop.library.WineGameSettings
 import dev.droidtop.library.WineGameSettingsPrefs
 import dev.droidtop.library.displayName
 import dev.droidtop.library.SimilarGames
+import dev.droidtop.library.scraper.GogChangelog
+import dev.droidtop.library.scraper.GogChangelogClient
 import dev.droidtop.library.scraper.PcScraper
 import dev.droidtop.library.settings.LibraryPaths
 import dev.droidtop.library.settings.PathChange
@@ -209,6 +211,7 @@ private fun PcGameMenuSheet(
     var wineSettings by remember(entry) { mutableStateOf<WineGameSettings?>(null) }
     var protonDb by remember(entry) { mutableStateOf<ProtonDbState>(ProtonDbState.NotAsked) }
     var steamNews by remember(entry) { mutableStateOf<SteamNewsState>(SteamNewsState.NotAsked) }
+    var gogNews by remember(entry) { mutableStateOf<GogNewsState>(GogNewsState.NotAsked) }
     // Which page of the menu is showing and which row of it the cursor is
     // on (docs/SPEC.md 7i): the short top page, or one of the two longer
     // lists it opens. A sub-page's B goes back to the top, never out.
@@ -1181,7 +1184,30 @@ private fun PcGameMenuSheet(
                 },
             )
         }
-        pageInfo = aboutEntries + listOfNotNull(newsRow)
+        // The same row for a GOG game: the newest entry of the changelog GOG keeps for it.
+        val gogId = if (newsAppId == null) gogProductIdOf(entry) else null
+        val gogRow = gogId?.let { productId ->
+            val state = gogNews
+            ActionRow(
+                title = "What's new",
+                detail = state.detail(),
+                onSelect = if (state !is GogNewsState.Looking) {
+                    {
+                        val page = (state as? GogNewsState.Found)?.changelog?.pageUrl
+                        if (page != null) {
+                            dev.droidtop.library.Links.open(context, page)
+                            status = null
+                        } else if (state !is GogNewsState.Found) {
+                            gogNews = GogNewsState.Looking
+                            scope.launch { gogNews = lookUpGogChangelog(productId) }
+                        }
+                    }
+                } else {
+                    null
+                },
+            )
+        }
+        pageInfo = aboutEntries + listOfNotNull(newsRow, gogRow)
     }
 
     // The categories (docs/SPEC.md 7i, "The game menu", owner 2026-10-23: "No more than one nested menu deep, and
@@ -1743,6 +1769,37 @@ private sealed interface SteamNewsState {
             .filterNotNull().joinToString(". ")
         is Unavailable -> line
     }
+}
+
+/** The What's new row's states for a GOG game: nothing is fetched until the person asks. */
+private sealed interface GogNewsState {
+    data object NotAsked : GogNewsState
+    data object Looking : GogNewsState
+    data class Found(val changelog: GogChangelog) : GogNewsState
+    data class Unavailable(val line: String) : GogNewsState
+
+    fun detail(): String = when (this) {
+        NotAsked -> "The newest entry of the game's changelog on GOG"
+        Looking -> "Looking it up…"
+        is Found -> listOfNotNull(changelog.latest, "Select for the whole changelog on GOG".takeIf { changelog.pageUrl != null }).joinToString(". ")
+        is Unavailable -> line
+    }
+}
+
+/** The GOG product id of a game GOG sells: its own row, or the store row an engine copy kept; null otherwise. */
+private fun gogProductIdOf(entry: LibraryEntry): Long? =
+    listOfNotNull(entry.id, entry.pcInfo?.storeId)
+        .firstNotNullOfOrNull { id -> id.takeIf { it.startsWith("gog:") }?.substringAfter(':')?.toLongOrNull() }
+
+/** Network: the IO dispatcher. Every outcome is a sentence. */
+private suspend fun lookUpGogChangelog(productId: Long): GogNewsState = withContext(Dispatchers.IO) {
+    runCatching {
+        when (val lookup = GogChangelogClient.latest(productId)) {
+            is ScrapeLookup.Found -> GogNewsState.Found(lookup.value)
+            ScrapeLookup.NoMatch -> GogNewsState.Unavailable("GOG keeps no changelog for this game")
+            is ScrapeLookup.Refused -> GogNewsState.Unavailable("GOG's changelog could not be reached (error ${lookup.httpStatus})")
+        }
+    }.getOrElse { GogNewsState.Unavailable("GOG's changelog could not be reached: ${FailureText.of("PcGameMenu", it)}") }
 }
 
 /** The Steam app id a game is known by on Steam itself (its own row, or the store row an engine copy kept); null otherwise. */
