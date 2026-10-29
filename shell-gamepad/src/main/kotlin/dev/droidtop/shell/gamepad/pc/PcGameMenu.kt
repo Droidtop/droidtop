@@ -558,12 +558,7 @@ internal fun PcGameMenu(
                 editingSource = viewing.first
             },
             onOpen = { url ->
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
+                dev.droidtop.library.Links.open(context, url)
             },
             onClose = { viewingRecord = null },
             startTab = viewing.third,
@@ -1031,17 +1026,8 @@ internal fun PcGameMenu(
         // person can buy or claim it and the store is synced after (docs/SPEC.md 7g, "A store's own pages"); any
         // other link goes to the device's browser.
         val openLink = { url: String ->
-            status = if (dev.droidtop.library.stores.StoreWeb.openLink(context, url)) {
-                null
-            } else {
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                    null
-                }.getOrElse { "Nothing on this device opens $url" }
-            }
+            dev.droidtop.library.Links.open(context, url)
+            status = null
         }
         val pointers = if (ownedOn.isEmpty() && !storeLinksHidden) {
             dev.droidtop.library.StorePages.getItOn(entry.links) + dev.droidtop.library.StorePages.support(entry.links)
@@ -1088,15 +1074,10 @@ internal fun PcGameMenu(
                         onSelect = if (state !is ProtonDbState.Looking) {
                             {
                                 when (state) {
-                                    is ProtonDbState.Found -> status = runCatching {
-                                        context.startActivity(
-                                            android.content.Intent(
-                                                android.content.Intent.ACTION_VIEW,
-                                                android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
-                                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                        )
-                                        null
-                                    }.getOrElse { "There is no browser on this device to open ProtonDB in." }
+                                    is ProtonDbState.Found -> {
+                                        dev.droidtop.library.Links.open(context, ProtonDbClient.pageUrl(state.appId))
+                                        status = null
+                                    }
                                     else -> {
                                         protonDb = ProtonDbState.Looking
                                         scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
@@ -1120,15 +1101,8 @@ internal fun PcGameMenu(
                 onSelect = if (state !is SteamNewsState.Looking) {
                     {
                         if (state is SteamNewsState.Found) {
-                            status = runCatching {
-                                context.startActivity(
-                                    android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse(SteamNewsClient.pageUrl(newsAppId)),
-                                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                )
-                                null
-                            }.getOrElse { "There is no browser on this device to open Steam's news in." }
+                            dev.droidtop.library.Links.open(context, SteamNewsClient.pageUrl(newsAppId))
+                            status = null
                         } else {
                             steamNews = SteamNewsState.Looking
                             scope.launch { steamNews = lookUpSteamNews(newsAppId) }

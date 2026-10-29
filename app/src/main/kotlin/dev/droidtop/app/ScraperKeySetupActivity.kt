@@ -3,7 +3,6 @@ package dev.droidtop.app
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.KeyEvent
 import androidx.activity.compose.setContent
@@ -135,7 +134,7 @@ private fun SetupHost(
             onFallback = {
                 // The provider refused the pane: the browser opens on its page and the session to type from a phone over it.
                 mode = SetupMode.MANUAL
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                dev.droidtop.library.Links.open(context, service.url)
                 RemoteInputActivity.open(context)
             },
             onClose = onClose,
@@ -195,7 +194,7 @@ private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolea
     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
         QrCode(content = service.url, size = 180.dp)
         Button(onClick = {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            dev.droidtop.library.Links.open(context, service.url)
         }) { Text(stringResource(R.string.scraper_key_setup_open_on_this_device)) }
     }
 

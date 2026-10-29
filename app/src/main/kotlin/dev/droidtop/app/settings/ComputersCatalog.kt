@@ -2,7 +2,6 @@ package dev.droidtop.app.settings
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import dev.droidtop.app.LibraryCore
 import dev.droidtop.app.PairComputerActivity
 import dev.droidtop.library.LibraryEntry
@@ -96,7 +95,7 @@ object ComputersCatalog {
                                 title = "Get droidtop-agent",
                                 subtitle = "For Windows, Linux and macOS: the program the computer runs",
                                 run = { ctx ->
-                                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(PairComputerActivity.AGENT_RELEASES)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                    dev.droidtop.library.Links.open(ctx, PairComputerActivity.AGENT_RELEASES)
                                 },
                             ),
                         )

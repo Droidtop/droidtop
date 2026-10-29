@@ -2,7 +2,6 @@ package dev.droidtop.app.settings
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import dev.droidtop.app.GamesRootPrefs
 import dev.droidtop.app.LauncherGamesActivity
@@ -807,9 +806,7 @@ internal object StoresCatalog {
                     title = "Make a key",
                     subtitle = "Opens ${store.label}'s API keys page in the browser",
                     run = { ctx ->
-                        runCatching {
-                            ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(signIn.keyPage)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                        }
+                        dev.droidtop.library.Links.open(ctx, signIn.keyPage)
                     },
                 ),
             )

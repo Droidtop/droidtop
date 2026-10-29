@@ -1,8 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -225,7 +223,7 @@ internal fun storeAchievementsScreen(storeLabel: String, gameId: String, list: d
                 CatalogGroup(
                     "store_site",
                     null,
-                    listOf(ActionItem(id = "store_open_site", title = "Open on $storeLabel", run = { context -> openAddress(context, url) })),
+                    listOf(ActionItem(id = "store_open_site", title = "Open on $storeLabel", run = { context -> dev.droidtop.library.Links.open(context, url) })),
                 )
             },
         )
@@ -393,7 +391,7 @@ internal fun achievementsScreen(gameId: Int, gameTitle: String, progress: RaProg
                     ActionItem(
                         id = "ra_open_site",
                         title = "Open on retroachievements.org",
-                        run = { context -> openAddress(context, RetroAchievementsClient.gameUrl(gameId)) },
+                        run = { context -> dev.droidtop.library.Links.open(context, RetroAchievementsClient.gameUrl(gameId)) },
                     ),
                 ),
             ),
@@ -416,9 +414,3 @@ private fun achievementItem(achievement: RaAchievement): ActionItem {
     )
 }
 
-/** Opens an address in the system browser (a link on a page, never a request droidtop makes). */
-internal fun openAddress(context: Context, url: String) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
-}

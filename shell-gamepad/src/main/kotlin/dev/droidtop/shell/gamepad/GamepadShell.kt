@@ -1928,7 +1928,7 @@ internal fun EntryDetailScreen(
                         val page = row.screen
                         val address = row.url
                         val step = row.run
-                        if (step != null) step(context) else if (page != null) pluginActionScreen = page else if (address != null) openAddress(context, address)
+                        if (step != null) step(context) else if (page != null) pluginActionScreen = page else if (address != null) dev.droidtop.library.Links.open(context, address)
                     },
                 )
             }

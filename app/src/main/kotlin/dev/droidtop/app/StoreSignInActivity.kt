@@ -13,7 +13,6 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.KeyEvent
@@ -395,9 +394,7 @@ private fun QrStep(label: String, url: String, session: StoreAccountSignIn) {
         // The code is Steam's own s.team address; the Steam app on this
         // device, when there is one, claims it and shows its approve screen.
         Button(onClick = {
-            runCatching {
-                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-            }
+            dev.droidtop.library.Links.open(context, url)
         }) { Text(stringResource(R.string.store_sign_in_open_in_the_app_on, label)) }
         OutlinedButton(onClick = { session.backToChoices() }) { Text(stringResource(R.string.store_sign_in_back)) }
     }

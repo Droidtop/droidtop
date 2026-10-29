@@ -2372,7 +2372,7 @@ object AppSettingsCatalogs {
                     subtitle = url.removePrefix("https://").removeSuffix("/"),
                     value = "Open",
                     run = { ctx ->
-                        runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        dev.droidtop.library.Links.open(ctx, url)
                     },
                 )
             },

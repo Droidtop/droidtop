@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.usb.UsbManager
-import android.net.Uri
 import android.net.VpnService
 import android.provider.Settings
 import dev.droidtop.app.ContainerPrograms
@@ -673,9 +672,7 @@ object ContainersCatalog {
             subtitle = note,
             value = "Open on Android",
             run = { ctx ->
-                runCatching {
-                    ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                }
+                dev.droidtop.library.Links.open(ctx, url)
             },
         )
     }
@@ -1019,10 +1016,7 @@ object ContainersCatalog {
                         title = "Add a printer",
                         subtitle = "Opens CUPS's own page in the browser",
                         run = { ctx ->
-                            ctx.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("http://127.0.0.1:${CompositorProvisioning.PRINTING_WEB_PORT}/admin"))
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
+                            dev.droidtop.library.Links.open(ctx, "http://127.0.0.1:${CompositorProvisioning.PRINTING_WEB_PORT}/admin")
                         },
                     ),
                 )

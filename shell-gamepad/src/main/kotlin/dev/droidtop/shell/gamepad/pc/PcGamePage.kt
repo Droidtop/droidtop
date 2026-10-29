@@ -363,12 +363,7 @@ internal fun PcGamePage(
             scrapeStatus = scrapeStatus,
             latest = links?.latestKnown ?: entry.latestKnown,
             onOpenLink = { url ->
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
+                dev.droidtop.library.Links.open(context, url)
             },
             sourceRows = if (library != null && isFolder) {
                 sourceRows(
@@ -380,12 +375,7 @@ internal fun PcGamePage(
                         if (link != null) viewingRecord = Triple(source, link.externalId, RecordTab.OVERVIEW) else editingSource = source
                     },
                     onOpen = { url ->
-                        runCatching {
-                            context.startActivity(
-                                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        }
+                        dev.droidtop.library.Links.open(context, url)
                     },
                 )
             } else {
@@ -891,12 +881,7 @@ internal fun PcGamePage(
                 editingSource = viewing.first
             },
             onOpen = { url ->
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                }
+                dev.droidtop.library.Links.open(context, url)
             },
             onClose = { viewingRecord = null },
             startTab = viewing.third,
@@ -1231,7 +1216,7 @@ private fun dev.droidtop.shell.gamepad.GameInfoRow.toPageFact(
     } else if (page != null) {
         ({ openScreen(page) })
     } else if (address != null) {
-        ({ dev.droidtop.shell.gamepad.openAddress(context, address) })
+        ({ dev.droidtop.library.Links.open(context, address) })
     } else {
         null
     }

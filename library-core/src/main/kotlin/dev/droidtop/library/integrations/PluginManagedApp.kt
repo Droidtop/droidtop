@@ -1,8 +1,6 @@
 package dev.droidtop.library.integrations
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.Notice
 import dev.droidtop.library.settings.NoticeAction
@@ -70,7 +68,7 @@ object PluginManagedApp {
                         body = "${record.manifest.label} works with it once it is on this device.",
                         action = app.getUrl?.let { url ->
                             NoticeAction("Get") { ctx ->
-                                runCatching { ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                                dev.droidtop.library.Links.open(ctx, url)
                             }
                         },
                         source = record.manifest.label,
