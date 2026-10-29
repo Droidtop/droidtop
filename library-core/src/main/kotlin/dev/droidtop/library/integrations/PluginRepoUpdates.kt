@@ -347,8 +347,11 @@ object PluginRepoUpdates {
             )
         }
 
-    /** Installs one bundle of the repository's latest release by hand (a plugin not installed yet); it arrives unapproved, like any new plugin. */
-    fun installFromRepo(context: Context, entry: UserOriginKey, assetName: String): String {
+    /**
+     * Installs one bundle of the repository's latest release by hand (a plugin not installed yet); it arrives unapproved, like
+     * any new plugin. [onInstalled] gets its id, for the caller to open its page, where it is approved (Droidtop/tracker#759).
+     */
+    fun installFromRepo(context: Context, entry: UserOriginKey, assetName: String, onInstalled: (pluginId: String) -> Unit = {}): String {
         val repo = entry.repo ?: return "Not a repository."
         val token = GitHubTokenStore.get(context)
         val release = latestRelease(context, repo, token) ?: return "Couldn't read the latest release."
@@ -366,8 +369,7 @@ object PluginRepoUpdates {
             return when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
                 is PluginInstallResult.Refused -> "Not installed: ${result.error.reason}"
                 is PluginInstallResult.Installed -> {
-                    // Open on the finished job goes to the plugin's page, where it is approved (Droidtop/tracker#759).
-                    dev.droidtop.pluginhost.JobHandle.current()?.open(dev.droidtop.pluginhost.OpenTarget.Plugin(result.record.manifest.id))
+                    onInstalled(result.record.manifest.id)
                     "${result.record.manifest.label} ${result.record.manifest.version} installed. Open it to approve it before it runs."
                 }
             }

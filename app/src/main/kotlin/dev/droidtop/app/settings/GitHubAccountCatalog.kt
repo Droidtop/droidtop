@@ -508,7 +508,14 @@ object GitHubAccountCatalog {
                                 subtitle = "Install it. A new plugin arrives unapproved and runs only after you approve it",
                                 run = { ctx, onStatus ->
                                     onStatus("Downloading...")
-                                    PluginRepoUpdates.installFromRepo(ctx, entry, assetName)
+                                    PluginRepoUpdates.installFromRepo(ctx, entry, assetName) { pluginId ->
+                                        // Approving happens on the plugin's own page; the notice opens it (Droidtop/tracker#759).
+                                        dev.droidtop.library.settings.Notices.flash(
+                                            "A new plugin is waiting for your approval",
+                                            context = ctx,
+                                            opens = { dev.droidtop.library.settings.SettingsScreenRegistry.get(AppSettingsCatalogs.SCREEN_PLUGINS, pluginId) },
+                                        )
+                                    }
                                 },
                             )
                         } ?: listOf(ActionItem(id = "repo_no_release", title = "Nothing listed yet", subtitle = "Check for updates to see what its latest release carries")),
