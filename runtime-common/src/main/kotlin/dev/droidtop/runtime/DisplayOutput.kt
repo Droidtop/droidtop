@@ -80,20 +80,3 @@ object DisplayModes {
 
 enum class DisplayOutputKind { PRIMARY_SCREEN, SECOND_SCREEN, EXTERNAL }
 
-/**
- * Which [DisplayOutput] a given window is currently assigned to. Windows
- * default to [WindowPlacement.merged] on the primary screen's shared desktop
- * — the "PC-in-a-box" experience — but any window can be reassigned to its
- * own output at runtime without restarting the app/container that owns it.
- * This is a compositor-side operation (see host-bridge), not a per-app one.
- */
-data class WindowPlacement(
-    val windowId: String,
-    val output: DisplayOutput,
-    val fullscreen: Boolean,
-) {
-    companion object {
-        fun merged(windowId: String, primary: DisplayOutput) =
-            WindowPlacement(windowId, primary, fullscreen = false)
-    }
-}

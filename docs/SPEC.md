@@ -414,8 +414,9 @@ nothing else of this section exists:
   view, not into the compositor (§5b), and an emulator is an Android
   Activity (the section below). A Windows program as a window INSIDE the
   container's desktop is Wine-in-the-container, §11's open risk, and no
-  launch path assumes it. `WindowPlacement` therefore applies to
-  container windows and to compositor outputs, not to Activities.
+  launch path assumes it. Placing a window on another output would apply
+  to container windows and compositor outputs, not to Activities, and is
+  not built (§4c "Per-window placement").
   A PC or engine game's tap takes Gaming's primary-action rule, and its
   page is a row of the entry's menu (Y, or a long press) in the Start menu
   (§7i "The game page, outside Gaming"); the page and the install offer
@@ -3351,13 +3352,17 @@ the `ContainerRuntime` interface that already exists (§3):
   it, or the game launch target, re-runs orchestration immediately.
 - Each `DisplayOutput` maps to one headless output inside the primary
   container's compositor (whichever the user's configured — see §2).
-- **Default**: every window is placed on the primary screen's output —
-  `WindowPlacement.merged()` — one shared desktop, nothing hidden away.
-- **Opt-in**: any window can be reassigned to a different `DisplayOutput` at
-  runtime (fullscreen or windowed) without touching the process/container
-  that owns it — this is sway reassigning a surface to a different headless
-  output, a compositor-side operation, not something `:host-bridge` or the
-  owning app needs to know about.
+- **Every window is on the primary screen's output**: one shared desktop,
+  nothing hidden away. host-bridge presents one output, the primary
+  (`wayland_client.cpp`'s capture is single-output), and the taskbar has no
+  "Move to another screen".
+- **Per-window placement is not built (corrected 2026-10-29,
+  Droidtop/tracker#695).** This section used to promise that any window could
+  be reassigned to a different `DisplayOutput` at runtime, sway moving a
+  surface to another headless output. Nothing did it: `WindowPlacement`, the
+  type for it, was used nowhere and is deleted. It needs host-bridge to
+  capture and present more than one output first; a window moved to a
+  second headless output today would be on a screen nothing shows.
 - **Configurable per-output role, KDE KScreen-modeled**: which screen shows
   what isn't hardcoded — the user configures, per `DisplayOutput`, whether
   it mirrors the primary, presents an independent `SecondaryDisplayLauncher`
