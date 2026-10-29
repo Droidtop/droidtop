@@ -161,7 +161,9 @@ internal fun leftMenuAttention(running: List<Float>, needYou: Int): Map<GamingSe
 @Composable
 internal fun LeftMenu(
     entries: List<LeftMenuEntry>,
-    current: GamingSection,
+    // Where the person is; null over a game (the in-game overlay, Droidtop/tracker#740), where no row is "here" and
+    // the cursor starts on Resume.
+    current: GamingSection?,
     runningTitle: String?,
     onResume: () -> Unit,
     onSelect: (LeftMenuEntry) -> Unit,
@@ -210,7 +212,7 @@ internal fun LeftMenu(
         val press = rememberGamepadTouch()
         // Keyed on where the person is: the cursor starts on the row the "you are here" pill marks, even when the
         // place changes while the menu is composed (Droidtop/tracker#493: the pill on Apps, the cursor on Plugins).
-        var focusIndex by remember(current, rowsAbove) { mutableIntStateOf(leftMenuStartIndex(entries, current, rowsAbove)) }
+        var focusIndex by remember(current, rowsAbove) { mutableIntStateOf(current?.let { leftMenuStartIndex(entries, it, rowsAbove) } ?: 0) }
         var heldStep by remember { mutableStateOf(false) }
         val listState = rememberLazyListState()
         val focusRequester = remember { FocusRequester() }
@@ -284,7 +286,7 @@ internal fun LeftMenu(
                 itemsIndexed(entries, key = { _, entry -> entry.key }) { index, entry ->
                     SideMenuRow(
                         entry = entry,
-                        isCurrent = entry.isAt(current),
+                        isCurrent = current != null && entry.isAt(current),
                         waiting = attention[entry.section],
                         selected = index + rowsAbove == focusIndex,
                         onClick = {

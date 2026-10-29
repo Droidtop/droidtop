@@ -58,6 +58,9 @@ import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.menuMove
 import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.ShellDialog
+import dev.droidtop.shell.gamepad.groundBackground
+import dev.droidtop.library.scraper.isPcOrEngineGame
+import androidx.compose.ui.window.DialogProperties
 
 /*
  * The Gaming shell's own pieces, handed to the modes that have no Gaming shell around them
@@ -381,3 +384,115 @@ fun QuickMenuStandalone(
 
 /** A hosted list sheet's width where the window allows: four hint pills fit on one line. */
 private val HOSTED_SHEET_WIDTH = 520.dp
+
+/**
+ * The left menu's launcher content over a game (HOME + Start, docs/SPEC.md "In-game overlays: HOME chords",
+ * Droidtop/tracker#740): the shell's own [dev.droidtop.shell.gamepad.LeftMenu], with the destinations the UI mode
+ * allows, Resume first while a game runs and the cursor on it, then Search. A destination is opened by the host
+ * ([onOpenSection], a Gaming section's name, and its place's screen id when it is a place), which leaves the game
+ * for droidtop; R2 swaps to the Quick Menu, as it does in Gaming.
+ */
+@Composable
+fun LeftMenuStandalone(
+    runningTitle: String?,
+    onResume: () -> Unit,
+    onOpenSection: (section: String, placeScreenId: String?) -> Unit,
+    onOpenQuickMenu: () -> Unit,
+    onSearch: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    // Read from storage before anything is drawn: over a game the shell may never have loaded the live mode, and Kiosk
+    // and Kid must not show the places for a frame.
+    val context = LocalContext.current
+    val stored by androidx.compose.runtime.produceState<dev.droidtop.library.settings.UiMode?>(null) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { UiModePrefs.get(context) }
+    }
+    val uiMode = stored ?: return
+    val sections = dev.droidtop.shell.gamepad.menuSectionsFor(uiMode)
+    CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
+        dev.droidtop.shell.gamepad.LeftMenu(
+            entries = dev.droidtop.shell.gamepad.leftMenuEntries(sections),
+            current = null,
+            runningTitle = runningTitle,
+            onResume = onResume,
+            onSelect = { entry -> onOpenSection(entry.section.name, entry.section.placeScreenId) },
+            onOpenQuickMenu = onOpenQuickMenu,
+            // Kiosk and Kid have no Search here either (the same rule as the shell's left menu).
+            onSearch = if (sections.any { it.managesDevice }) onSearch else null,
+            onDismiss = onDismiss,
+        )
+    }
+}
+
+/**
+ * The running game's own menu over it (HOME + L2, docs/SPEC.md "In-game overlays: HOME chords",
+ * Droidtop/tracker#740): what L2 opens on that game in Gaming. A PC or engine game's is [PcGameMenu], its Game
+ * page drawn over the game too; a console game's is the game menu ([AppOptionsMenu]), whose details are Gaming's
+ * detail screen. Play is Resume here: the game never left, so it closes the overlay ([onResume]).
+ */
+@Composable
+fun GameOptionsStandalone(
+    library: Library,
+    entry: dev.droidtop.library.LibraryEntry,
+    onResume: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var pageOpen by remember(entry.id) { mutableStateOf(false) }
+    var detailOpen by remember(entry.id) { mutableStateOf(false) }
+    CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
+        if (entry.isPcOrEngineGame) {
+            if (pageOpen) {
+                dev.droidtop.shell.gamepad.pc.PcGameStandalone(
+                    library = library,
+                    entryId = entry.id,
+                    onLaunch = { onResume() },
+                    onOpenDownloads = onOpenDownloads,
+                    onClose = { pageOpen = false },
+                )
+            } else {
+                dev.droidtop.shell.gamepad.pc.PcGameMenu(
+                    entry = entry,
+                    library = library,
+                    onLaunch = onResume,
+                    onClose = onDismiss,
+                    onOpenPage = { pageOpen = true },
+                    onOpenDownloads = onOpenDownloads,
+                )
+            }
+            return@CompositionLocalProvider
+        }
+        if (detailOpen) {
+            ShellDialog(
+                onDismissRequest = { detailOpen = false },
+                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+            ) {
+                GatePadInThisDialog()
+                HideSystemBarsInThisDialog()
+                Box(Modifier.fillMaxSize().groundBackground()) {
+                    dev.droidtop.shell.gamepad.EntryDetailScreen(
+                        entry = entry,
+                        library = library,
+                        onLaunch = onResume,
+                        onClose = { detailOpen = false },
+                    )
+                }
+            }
+            return@CompositionLocalProvider
+        }
+        dev.droidtop.shell.gamepad.AppOptionsMenu(
+            entry = entry,
+            detailsLabel = "Game details",
+            onDetails = { detailOpen = true },
+            onToggleFavorite = {
+                // Closed once it is written: the overlay's scope ends with it.
+                scope.launch {
+                    library.toggleFavorite(entry)
+                    onDismiss()
+                }
+            },
+            onDismiss = onDismiss,
+        )
+    }
+}
