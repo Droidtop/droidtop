@@ -116,6 +116,10 @@ object WineOptions {
     const val STEAMWORKS_APPID = "wine_steamworks_appid"
     private const val STEAMWORKS_KEY = "steamworks"
     private const val STEAMWORKS_APPID_KEY = "steamworks_appid"
+    private const val GESTURES_KEY = "gestures"
+
+    /** The container field the game's gestures are laid over at launch (`Container.LAUNCH_OVERRIDE_KEYS`). */
+    const val GESTURE_OVERRIDE = "gestureConfig"
     private const val STEAMWORKS_ON = "on"
     private const val STEAMWORKS_OFF = "off"
 
@@ -235,6 +239,12 @@ object WineOptions {
                 if (rowId == LSFG && entryId != null) {
                     val stored = WineGameOptionsPrefs.get(app, entryId) - LSFG_KEY
                     WineGameOptionsPrefs.set(app, entryId, if (value == LSFG_OFF) stored else stored + (LSFG_KEY to value))
+                    return@runCatching
+                }
+                if (rowId.startsWith(WineGestures.ROW_PREFIX) && entryId != null) {
+                    val stored = WineGameOptionsPrefs.get(app, entryId) - GESTURES_KEY
+                    val next = WineGestures.apply(gestures(app, entryId), rowId, value)
+                    WineGameOptionsPrefs.set(app, entryId, stored + (GESTURES_KEY to next.toJson()))
                     return@runCatching
                 }
                 if (rowId == STEAMWORKS && entryId != null) {
@@ -386,7 +396,23 @@ object WineOptions {
      * in a prefix of its own, and its frame generation. Disk work.
      */
     fun launchOverrides(context: Context, entryId: String?, container: Container): Map<String, String> =
-        wineOverrides(context, entryId, container) + lsfgOverrides(context, entryId)
+        wineOverrides(context, entryId, container) + lsfgOverrides(context, entryId) + gestureOverrides(context, entryId)
+
+    /** The game's own touchscreen gestures over the prefix's (Droidtop/tracker#618 C8), when it has chosen any. */
+    private fun gestureOverrides(context: Context, entryId: String?): Map<String, String> {
+        val own = entryId?.let { WineGameOptionsPrefs.get(context, it)[GESTURES_KEY] } ?: return emptyMap()
+        return mapOf(GESTURE_OVERRIDE to own)
+    }
+
+    /**
+     * [entryId]'s touchscreen gestures (Droidtop/tracker#618 C8): its own when it chose any, else its prefix's, else
+     * the defaults. Disk work.
+     */
+    fun gestures(context: Context, entryId: String): dev.droidtop.runtime.windows.data.TouchGestureConfig {
+        val own = WineGameOptionsPrefs.get(context, entryId)[GESTURES_KEY]
+        val base = own ?: PcContainers.forGame(context, entryId)?.gestureConfig
+        return dev.droidtop.runtime.windows.data.TouchGestureConfig.fromJson(base)
+    }
 
     private fun wineOverrides(context: Context, entryId: String?, container: Container): Map<String, String> {
         if (entryId == null || PcContainers.isOwnPrefix(entryId, container)) return emptyMap()
