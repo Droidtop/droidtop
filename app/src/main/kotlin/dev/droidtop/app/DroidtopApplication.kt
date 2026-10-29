@@ -104,93 +104,19 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // A second-screen surface that becomes the top activity hands the pad back to the
         // shell instead of leaving keys without a window (SPEC 4c, console build 1386 ANR).
         ForegroundShell.installPadReturn(this)
-        // A plugin's web sign-in follows the keyboard placement droidtop's own pages do (WebViewKeys, docs/SPEC.md 4c).
-        dev.droidtop.pluginhost.WebSessionActivity.webViewSetup = { view ->
-            WebViewKeys.attach(view)
-            // No app-named X-Requested-With on a site's requests (Droidtop/tracker#600): XenForo, which F95zone runs,
-            // reads that header to tell its own in-page requests, and its log-in overlay failed in this view.
-            if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.REQUESTED_WITH_HEADER_ALLOW_LIST)) {
-                androidx.webkit.WebSettingsCompat.setRequestedWithHeaderOriginAllowList(view.settings, emptySet())
-            }
-        }
+        // Every seam droidtop's modules call back through, installed in one place before anything can ask one (Seams).
+        Seams.install(this)
         // Colour-vision filter and text size, on every activity (SPEC, Accessibility).
         AccessibilityPrefs.install(this)
         // Android's Remove animations reaches every surface's motion, not only Gaming's (Droidtop/tracker#643).
         dev.droidtop.ui.shared.MotionWatch.install(this)
         // Which release line each catalog and plugin is offered on (SPEC 12a "Channels", Droidtop/tracker#179).
         dev.droidtop.library.integrations.PluginChannels.install(this)
-        // What `host.info` tells a plugin about the mode droidtop is in (docs/plugin-api.md 3 J4).
-        // One spelling for a mode wherever a plugin meets it (docs/plugin-api.md 1.9): `standard`, `gaming`, `desktop`.
-        dev.droidtop.pluginhost.PluginBrokers.modeProvider = { dev.droidtop.library.settings.Modes.lastMode(this) }
-        // Standard is always there (the Home button's screen); Gaming and Desktop when the person has them on.
-        dev.droidtop.pluginhost.PluginBrokers.modesProvider = {
-            val on = dev.droidtop.library.settings.Modes.enabled.map { it.id }.toSet() + dev.droidtop.pluginhost.PluginModes.STANDARD
-            dev.droidtop.pluginhost.PluginModes.ALL.filter { it in on }
-        }
-        // A plugin's first-use permission sheet (docs/plugin-api.md 4.3): one window, drawn over whatever is on screen
-        // in every mode, opened by the broker during a call the person started.
-        dev.droidtop.pluginhost.PluginGrantPrompts.setSurface { PluginGrantSheetActivity.open(this) }
-        // A plugin's secret facet, shown on droidtop's own sheet when the person presses Show (docs/plugin-api.md 1.10).
-        dev.droidtop.pluginhost.PluginSecrets.setSurface { PluginSecretSheetActivity.open(this) }
-        // The keyboard's "Follow light or dark" follows droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562).
-        org.pocketworkstation.pckeyboard.KeyboardAppearance.host =
-            org.pocketworkstation.pckeyboard.KeyboardAppearance.Host { context -> dev.droidtop.library.settings.AppearancePrefs.light(context) }
         // The plugin host starts after droidtop, by droidtop (Droidtop/tracker#775): PluginHostStart, once droidtop's
         // first screen has drawn, or a little after a start with no screen. Nothing above or below needs it.
         PluginHostStart.armAfterStart(this)
-        // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
-        // the answer comes from the library's in-memory index, never a folder walk.
-        dev.droidtop.pluginhost.PluginBrokers.librarySystemsProvider = {
-            kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                dev.droidtop.library.integrations.PluginLibraryRead.snapshot(this@DroidtopApplication, LibraryCore.library(this@DroidtopApplication))
-            }
-        }
-        // `saves` and `library.read` `list_engine_games` (docs/plugin-api.md 3 A7a): an app's plugin asks where a game's
-        // saves go and says where it saved, answered by the same save model droidtop's own Enginehost launch uses.
-        dev.droidtop.pluginhost.PluginBrokers.saves = dev.droidtop.library.integrations.AppInterfaceSaves(
-            this,
-            library = { LibraryCore.library(this) },
-            records = { LibraryCore.records(this) },
-        )
-        // `engines.cores` (docs/plugin-api.md 3 A7b, Droidtop/tracker#752): what Enginehost can run or get decides a game's
-        // runner, so its list is asked at start, when its app connects through the door and when it says the list changed.
-        dev.droidtop.pluginhost.PluginBrokers.enginesChanged = { pluginId ->
-            dev.droidtop.library.integrations.EngineCoreList.changed(this, pluginId)
-        }
+        // What Enginehost can run decides a game's runner: its list is asked at start (docs/plugin-api.md 3 A7b).
         dev.droidtop.library.integrations.EngineCoreList.refreshAll(this)
-        // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
-        // engine before the library indexes it, and an update's saves are copied into its new version folder
-        // (docs/SPEC.md 7g, "Getting an update"), with the version it follows offered for removal.
-        // The guided key setup, opened in place from a game page's sign-in row (Droidtop/tracker#143).
-        dev.droidtop.library.scraper.ScraperKeySetupLink.open = { context, service ->
-            context.startActivity(ScraperKeySetupActivity.intent(context, service).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-        }
-        // Debrid (Droidtop/tracker#638): a torrent job asks the person's accounts first, from the keys they entered.
-        dev.droidtop.pluginhost.debrid.DebridStep.accounts = { context -> dev.droidtop.library.debrid.DebridAccounts.connected(context) }
-        dev.droidtop.pluginhost.debrid.DebridStep.waitsForService = { context -> dev.droidtop.library.debrid.DebridAccounts.waits(context) }
-        // And a source's link on a file hoster the account serves (Pixeldrain, Mega, ...), before the page opens.
-        dev.droidtop.pluginhost.debrid.DebridLinks.accounts = { dev.droidtop.library.debrid.DebridAccounts.connected(this@DroidtopApplication) }
-        dev.droidtop.pluginhost.debrid.DebridLinks.waits = { dev.droidtop.library.debrid.DebridAccounts.waits(this@DroidtopApplication) }
-        // The person's own account on a file host (PixelDrain): its premium downloads are asked before any debrid account.
-        dev.droidtop.pluginhost.hosts.HostLinks.accounts = { hostId ->
-            dev.droidtop.library.scraper.ScraperKeyService.entries.firstOrNull { it.hostId == hostId }
-                ?.read(this@DroidtopApplication)?.values?.firstOrNull()?.takeIf { it.isNotBlank() }
-        }
-        dev.droidtop.pluginhost.debrid.DebridChoice.spreadMode = { dev.droidtop.library.debrid.DebridAccounts.spread(this@DroidtopApplication) }
-        dev.droidtop.pluginhost.debrid.DebridChoice.onKeyRefused = { id, message -> dev.droidtop.library.debrid.DebridAccounts.refused(this@DroidtopApplication, id, message) }
-        dev.droidtop.pluginhost.DownloadJobs.onPlaced = { context, placed, args ->
-            dev.droidtop.library.integrations.AcquireEngineHint.apply(context, placed, args[dev.droidtop.library.integrations.AcquireEngineHint.KEY])
-            listOfNotNull(
-                dev.droidtop.library.integrations.UpdatePlacement.copySaves(placed, args),
-                // The version it follows, offered for removal (Droidtop/tracker#624).
-                dev.droidtop.library.integrations.UpdatePlacement.removalOffer(args),
-            ).joinToString(". ").ifEmpty { null }
-        }
-        // `social.changed` (docs/plugin-api.md 3 C19): a social provider plugin says something changed, and the
-        // social hub asks it again off the binder thread (SPEC "Social").
-        dev.droidtop.pluginhost.PluginBrokers.socialChanged = { pluginId, change ->
-            dev.droidtop.library.integrations.PluginSocialProviders.changed(this, pluginId, change)
-        }
         // The task manager asks one privileged shell to force-stop an app and to read the system's task list:
         // the Shizuku app (or Sui) or the Shizuku plugin, whichever the user picked; with none, it says what to
         // enable (docs/SPEC.md "The task manager"). Runs in every process: the binder is shared across them.
