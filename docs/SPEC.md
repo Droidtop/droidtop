@@ -3523,7 +3523,12 @@ the `ContainerRuntime` interface that already exists (§3):
   and its Close is the row's `B Close` pill rather than a second text
   button; on the Notifications tab `A Open`, `X Dismiss` and `Y Clear all`
   are drawn only while there is a notification to act on (§7j: a hint
-  row promises only what dispatches). **Fully controller-driven, per direction**: L1/R1 tabs,
+  row promises only what dispatches). What can be cleared is listed first;
+  what an app keeps up while it runs follows under one **Active** heading,
+  with no per-row "ongoing" tag. A notification's own sentences telling a
+  finger what to do ("Tap to turn off wireless debugging") are left out of
+  its text (`notificationBody`), since A opens it and the footer says so
+  (Droidtop/tracker#674). **Fully controller-driven, per direction**: L1/R1 tabs,
   D-pad focus, A act, X dismiss, Y clear-all, B close, with the hint
   row stating exactly that --- and, since 2026-09-11, fully reachable
   by touch as well (§7j): the hint row IS the touch control surface,

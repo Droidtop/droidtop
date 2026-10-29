@@ -596,7 +596,11 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
             NotificationsStore.openGrantScreen(context)
         }
     }
-    val items by NotificationsStore.items.collectAsState()
+    val posted by NotificationsStore.items.collectAsState()
+    // What can be cleared first, then what an app keeps up while it runs under one "Active" heading: whether a
+    // notification can be cleared is a property of the group, not something to read on every row (Droidtop/tracker#674).
+    val items = remember(posted) { posted.sortedBy { !it.clearable } }
+    val activeStart = items.indexOfFirst { !it.clearable }
     val recent by dev.droidtop.library.settings.Notices.recent.collectAsState()
     // The dot says what was new when the tab opened; leaving the tab marks it read.
     val unreadAtOpen = remember { dev.droidtop.library.settings.Notices.unread.value }
@@ -625,8 +629,13 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
     // List items: the Recent heading (when there is Recent), its rows, then the system rows.
     val headingOffset = if (recent.isNotEmpty()) 1 else 0
-    LaunchedEffect(focusIndex, rowCount) {
-        if (rowCount > 0) listState.keepInView(focusIndex.coerceIn(0, rowCount - 1) + headingOffset, animate = !heldStep)
+    LaunchedEffect(focusIndex, rowCount, activeStart) {
+        if (rowCount > 0) {
+            val row = focusIndex.coerceIn(0, rowCount - 1)
+            // The Active heading sits in the list ahead of the first row it heads.
+            val activeHeading = if (granted && activeStart >= 0 && row - recent.size >= activeStart) 1 else 0
+            listState.keepInView(row + headingOffset + activeHeading, animate = !heldStep)
+        }
     }
     val systemIndex = focusIndex - recent.size
     val current = if (granted) items.getOrNull(systemIndex) else null
@@ -736,50 +745,44 @@ private fun NotificationsTab(onDismiss: () -> Unit) {
                         modifier = Modifier.padding(vertical = 12.dp),
                     )
                 }
-                else -> itemsIndexed(items, key = { _, item -> item.key }) { index, item ->
-                    val focused = index == systemIndex
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectionFrame(focused, MenuTokens.RowShape, row = true)
-                            // Without this a notification could only be
-                            // reached with a pad: the rows carried no
-                            // touch route at all, in the one sheet a
-                            // phone user opens most. After the
-                            // background, so the press indication is
-                            // drawn over it rather than under it.
-                            .clickable {
-                                focusIndex = recent.size + index
-                                press(GamepadAction.A)
-                            }
-                            .padding(10.dp),
-                    ) {
-                        Row {
+                else -> items.forEachIndexed { index, note ->
+                    if (index == activeStart) item(key = "active_heading") { MenuSectionLabel("Active") }
+                    item(key = note.key) {
+                        val focused = index == systemIndex
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectionFrame(focused, MenuTokens.RowShape, row = true)
+                                // Without this a notification could only be
+                                // reached with a pad: the rows carried no
+                                // touch route at all, in the one sheet a
+                                // phone user opens most. After the
+                                // background, so the press indication is
+                                // drawn over it rather than under it.
+                                .clickable {
+                                    focusIndex = recent.size + index
+                                    press(GamepadAction.A)
+                                }
+                                .padding(10.dp),
+                        ) {
                             Text(
-                                item.appLabel,
+                                note.appLabel,
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MenuTokens.OnSurfaceMuted,
                             )
-                            Spacer(Modifier.weight(1f))
-                            if (!item.clearable) {
+                            Text(
+                                note.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MenuTokens.OnSurface,
+                            )
+                            val body = notificationBody(note.text)
+                            if (body.isNotBlank()) {
                                 Text(
-                                    "ongoing",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MenuTokens.Placeholder,
+                                    body,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MenuTokens.Value,
                                 )
                             }
-                        }
-                        Text(
-                            item.title,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MenuTokens.OnSurface,
-                        )
-                        if (item.text.isNotBlank()) {
-                            Text(
-                                item.text,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MenuTokens.Value,
-                            )
                         }
                     }
                 }
@@ -1137,3 +1140,16 @@ private fun StopPill(label: String, selected: Boolean, onClick: () -> Unit) {
         Text(label, style = TypeRole.button, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = MenuTokens.NoticeDanger)
     }
 }
+
+/**
+ * A notification's text as the Quick Menu shows it: without the app's own sentences telling a finger what to do
+ * ("Tap to turn off wireless debugging"), which are wrong advice on a pad, where A opens it and the footer says so
+ * (Droidtop/tracker#674). The rest of the text is the app's, unchanged. Pure, for the tests.
+ */
+internal fun notificationBody(text: String): String =
+    text.split(Regex("(?<=[.!?])\\s+"))
+        .filterNot { TOUCH_INSTRUCTION.containsMatchIn(it.trim()) }
+        .joinToString(" ")
+        .trim()
+
+private val TOUCH_INSTRUCTION = Regex("^(tap|touch|click)\\b", RegexOption.IGNORE_CASE)
