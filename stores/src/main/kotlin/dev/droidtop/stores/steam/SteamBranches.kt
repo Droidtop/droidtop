@@ -3,6 +3,7 @@ package dev.droidtop.stores.steam
 import `in`.dragonbra.javasteam.enums.EResult
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.SteamApps
 import `in`.dragonbra.javasteam.types.KeyValue
+import dev.droidtop.runtime.util.runCatchingCancellable
 import kotlinx.coroutines.future.await
 
 /**
@@ -83,7 +84,7 @@ internal object SteamBranches {
 
     /** The access token Steam asks for the app's product info, or 0. */
     suspend fun accessToken(apps: SteamApps, appId: Int): Long =
-        runCatching { apps.picsGetAccessTokens(appIds = listOf(appId), packageIds = emptyList()).await().appTokens[appId] }
+        runCatchingCancellable { apps.picsGetAccessTokens(appIds = listOf(appId), packageIds = emptyList()).await().appTokens[appId] }
             .getOrNull() ?: 0L
 
     /**

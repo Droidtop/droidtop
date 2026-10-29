@@ -5,6 +5,7 @@ import dev.droidtop.library.stores.SaveConflict
 import dev.droidtop.library.stores.SaveConflictResolver
 import dev.droidtop.library.stores.SaveSide
 import dev.droidtop.library.stores.SaveSyncResult
+import dev.droidtop.runtime.util.runCatchingCancellable
 import dev.droidtop.stores.steam.SteamCloudPlan.Decision
 import dev.droidtop.stores.steam.SteamCloudPlan.Facts
 import `in`.dragonbra.javasteam.enums.EResult
@@ -132,7 +133,7 @@ internal object SteamCloudSync {
             progress("Downloading saves ${index + 1}/${decision.fetch.size}")
             val file = remote.getValue(key)
             val target = layout.localFile(file.name)
-            val written = target != null && runCatching { fetch(http, cloud, app.id, file, target) }
+            val written = target != null && runCatchingCancellable { fetch(http, cloud, app.id, file, target) }
                 .onFailure { Timber.tag(TAG).w(it, "Could not download ${file.apiName}") }.getOrDefault(false)
             if (written) {
                 downloaded++
@@ -190,7 +191,7 @@ internal object SteamCloudSync {
             progress("Uploading saves ${index + 1}/${decision.send.size}")
             val file = local.getValue(key).file
             val mine = localFacts.getValue(key)
-            val sent = runCatching { send(http, cloud, app.id, batch.batchID, names.getValue(key), file, mine) }
+            val sent = runCatchingCancellable { send(http, cloud, app.id, batch.batchID, names.getValue(key), file, mine) }
                 .onFailure { Timber.tag(TAG).w(it, "Could not upload ${names.getValue(key)}") }.getOrDefault(false)
             if (sent) {
                 uploaded++
@@ -200,7 +201,7 @@ internal object SteamCloudSync {
             }
         }
         for ((key, name) in removeNames) {
-            val gone = runCatching { cloud.deleteFile(app.id, name, batch.batchID).await() }
+            val gone = runCatchingCancellable { cloud.deleteFile(app.id, name, batch.batchID).await() }
                 .onFailure { Timber.tag(TAG).w(it, "Could not delete $name from the cloud") }.getOrDefault(false)
             if (gone) {
                 removed++
@@ -210,7 +211,7 @@ internal object SteamCloudSync {
             }
         }
         for ((key, mine) in localFacts) if (remote[key]?.facts?.sha == mine.sha) facts[key] = mine
-        runCatching { cloud.completeAppUploadBatch(app.id, batch.batchID, if (failed == 0) EResult.OK else EResult.Fail).await() }
+        runCatchingCancellable { cloud.completeAppUploadBatch(app.id, batch.batchID, if (failed == 0) EResult.OK else EResult.Fail).await() }
             .onFailure { Timber.tag(TAG).w(it, "Could not close the save upload batch") }
         finish(filesDir, app.id, facts)
         val line = if (failed > 0) "Cloud saves: $failed of ${decision.send.size + decision.removeRemote.size} files could not be sent" else "Saves sent to Steam Cloud ($uploaded)"

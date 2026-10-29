@@ -9,6 +9,7 @@ import `in`.dragonbra.javasteam.enums.ELicenseFlags
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.License
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.PICSRequest
 import `in`.dragonbra.javasteam.steam.handlers.steamapps.SteamApps
+import dev.droidtop.runtime.util.runCatchingCancellable
 import java.util.EnumSet
 import kotlinx.coroutines.future.await
 import timber.log.Timber
@@ -60,7 +61,7 @@ internal object SteamLibrarySync {
         // Steam's own owned-games answer (SteamOwnedGames); the last one stands when Steam gives none.
         val steamId64 = SteamCredentials.load(context)?.steamId64?.takeIf { it != 0L }
         val answerNow = steamId64?.let { id ->
-            runCatching { SteamOwnedGames.read(steam, id) }.onFailure { Timber.tag(TAG).w(it, "Steam gave no owned-games answer") }.getOrNull()
+            runCatchingCancellable { SteamOwnedGames.read(steam, id) }.onFailure { Timber.tag(TAG).w(it, "Steam gave no owned-games answer") }.getOrNull()
         }
         answerNow?.let { SteamOwnedGames.save(context, it) }
         val rows = SteamLibraryRows.read(context, db)
@@ -230,7 +231,7 @@ internal object SteamLibrarySync {
         if (appIds.isEmpty()) return
         val tokens = HashMap<Int, Long>()
         for (chunk in appIds.toList().chunked(PICS_CHUNK)) {
-            runCatching { apps.picsGetAccessTokens(appIds = chunk, packageIds = emptyList()).await().appTokens }
+            runCatchingCancellable { apps.picsGetAccessTokens(appIds = chunk, packageIds = emptyList()).await().appTokens }
                 .onSuccess { tokens.putAll(it) }
                 .onFailure { Timber.tag(TAG).w(it, "Steam gave no access tokens for ${chunk.size} apps") }
         }
@@ -260,9 +261,9 @@ internal object SteamLibrarySync {
      */
     suspend fun refreshApp(db: SteamDatabase, apps: SteamApps, appId: Int, onUfs: (SteamUfs) -> Unit = {}): SteamApp? {
         val known = db.apps().find(appId)
-        val token = runCatching { apps.picsGetAccessTokens(appIds = listOf(appId), packageIds = emptyList()).await().appTokens[appId] }
+        val token = runCatchingCancellable { apps.picsGetAccessTokens(appIds = listOf(appId), packageIds = emptyList()).await().appTokens[appId] }
             .getOrNull() ?: 0L
-        val info = runCatching {
+        val info = runCatchingCancellable {
             apps.picsGetProductInfo(apps = listOf(PICSRequest(id = appId, accessToken = token)), packages = emptyList()).await()
                 .results.firstNotNullOfOrNull { it.apps[appId] }
         }.onFailure { Timber.tag(TAG).w(it, "Steam did not answer for app $appId") }.getOrNull() ?: return known
@@ -274,7 +275,7 @@ internal object SteamLibrarySync {
         )
         db.apps().insert(fresh)
         // Where the game keeps its cloud saves is read from the same answer, for the save sync.
-        runCatching { onUfs(SteamUfsParser.parse(info.keyValues)) }.onFailure { Timber.tag(TAG).w(it, "Could not read the save locations of app $appId") }
+        runCatchingCancellable { onUfs(SteamUfsParser.parse(info.keyValues)) }.onFailure { Timber.tag(TAG).w(it, "Could not read the save locations of app $appId") }
         return fresh
     }
 }

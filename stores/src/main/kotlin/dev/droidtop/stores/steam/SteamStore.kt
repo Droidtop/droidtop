@@ -24,6 +24,7 @@ import dev.droidtop.library.stores.WinePrefixLocation
 import dev.droidtop.library.stores.Wishlist
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
+import dev.droidtop.runtime.util.runCatchingCancellable
 import dev.droidtop.stores.epic.EpicGameLauncher
 import dev.droidtop.stores.util.StoreFiles
 import dev.droidtop.stores.util.StoreLanguage
@@ -108,10 +109,10 @@ class SteamStore : StoreLibrary {
     override fun settingsItems(context: Context): List<CatalogItem> = SteamSettings.items(context)
 
     override suspend fun signOut(context: Context): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
+        runCatchingCancellable {
             SteamConnection.stop(context)
             SteamFriendsHub.clear()
-            runCatching { SteamSession.logOff() }
+            runCatchingCancellable { SteamSession.logOff() }
             SteamCredentials.clear(context)
             Wishlist.clear(context, id)
             val db = db(context)
@@ -126,13 +127,13 @@ class SteamStore : StoreLibrary {
     }
 
     override suspend fun sync(context: Context): Result<Int> = withContext(Dispatchers.IO) {
-        runCatching {
+        runCatchingCancellable {
             SteamSession.use(context) { steam ->
                 SteamSession.logOn(context).getOrThrow()
                 val apps = SteamSession.apps ?: error("Steam is not connected")
                 val count = SteamLibrarySync.run(context, steam, apps, SteamSession.licences())
                 // The person's collections ride the connection the read already holds; a failure here never fails the library read.
-                runCatching {
+                runCatchingCancellable {
                     SteamCollections.fetch(steam)?.let { parsed ->
                         SteamCollections.save(context, parsed)
                         // Dynamic collections are not shown yet (Droidtop/tracker#403); their filters go to the scan log
@@ -142,8 +143,8 @@ class SteamStore : StoreLibrary {
                 }
                     .onFailure { Timber.tag("SteamStore").w(it, "Steam collections could not be read") }
                 // The wishlist is a second read as well (Droidtop/tracker#134): its failure leaves the library read and the old copy in place.
-                runCatching {
-                    val credentials = SteamCredentials.load(context)?.takeIf { it.steamId64 != 0L } ?: return@runCatching
+                runCatchingCancellable {
+                    val credentials = SteamCredentials.load(context)?.takeIf { it.steamId64 != 0L } ?: return@runCatchingCancellable
                     val token = steam.authentication.generateAccessTokenForApp(SteamID(credentials.steamId64), credentials.refreshToken).await().accessToken
                     if (token.isNotBlank()) SteamWishlist.refresh(context, credentials.steamId64, token)
                 }.onFailure { Timber.tag("SteamStore").w(it, "Steam's wishlist could not be read") }
@@ -229,7 +230,7 @@ class SteamStore : StoreLibrary {
         val steamId64 = SteamCredentials.load(context)?.steamId64 ?: 0L
         // The Steam3 account id is the low half of the 64-bit id.
         val accountId = steamId64 and 0xFFFFFFFFL
-        val install = runCatching { installOf(context, gameId).second }.getOrNull()
+        val install = runCatchingCancellable { installOf(context, gameId).second }.getOrNull()
         val dirs = SaveLayout.windowsDirs(prefix.prefixDir, prefix.user, install ?: prefix.prefixDir, accountId, appId)
             .let { if (install == null) it - SaveRoot.GameInstall else it }
         SaveLayout(dirs, steamId64, accountId, ufs).saveFolder()
@@ -239,7 +240,7 @@ class SteamStore : StoreLibrary {
     private suspend fun fetchUfs(context: Context, appId: Int): SteamUfs? {
         if (!signedIn(context)) return null
         withTimeoutOrNull(UFS_WAIT_MS) {
-            runCatching {
+            runCatchingCancellable {
                 SteamSession.use(context) {
                     SteamSession.logOn(context).getOrThrow()
                     val apps = SteamSession.apps ?: error("Steam is not connected")
@@ -270,10 +271,10 @@ class SteamStore : StoreLibrary {
         // A person who turned cloud saves off is only asked again by "Sync cloud saves" on the game's menu.
         if (phase != SaveSyncPhase.MANUAL && !withContext(Dispatchers.IO) { SteamPrefs.cloudSaves(context) }) return null
         val found = withContext(Dispatchers.IO) {
-            if (!File(prefix.prefixDir, "drive_c").isDirectory) null else runCatching { installOf(context, gameId) }.getOrNull()
+            if (!File(prefix.prefixDir, "drive_c").isDirectory) null else runCatchingCancellable { installOf(context, gameId) }.getOrNull()
         } ?: return null
         val (install, dir) = found
-        return runCatching {
+        return runCatchingCancellable {
             SteamSession.use(context) {
                 SteamSession.logOn(context).getOrThrow()
                 val apps = SteamSession.apps ?: error("Steam is not connected")
@@ -305,9 +306,9 @@ class SteamStore : StoreLibrary {
                 // Steam's own client tells Steam a game starts after the sync and ends after the sync.
                 when (phase) {
                     SaveSyncPhase.BEFORE_LAUNCH -> if (outcome.settled) {
-                        runCatching { cloud.signalAppLaunchIntent(appId, clientId, SteamSession.machineName(context), true, EOSType.WinUnknown).await() }
+                        runCatchingCancellable { cloud.signalAppLaunchIntent(appId, clientId, SteamSession.machineName(context), true, EOSType.WinUnknown).await() }
                     }
-                    SaveSyncPhase.AFTER_EXIT -> runCatching { cloud.signalAppExitSyncDone(appId, clientId, outcome.uploadsCompleted, outcome.uploadsRequired) }
+                    SaveSyncPhase.AFTER_EXIT -> runCatchingCancellable { cloud.signalAppExitSyncDone(appId, clientId, outcome.uploadsCompleted, outcome.uploadsRequired) }
                     SaveSyncPhase.MANUAL -> Unit
                 }
                 outcome.result
@@ -338,7 +339,7 @@ class SteamStore : StoreLibrary {
 
     override suspend fun chooseContent(context: Context, gameId: String, choice: StoreContentChoice): Result<Boolean> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            runCatchingCancellable {
                 val appId = gameId.toIntOrNull() ?: error("$gameId is not a Steam app id")
                 val db = db(context)
                 val app = db.apps().find(appId) ?: error("Steam no longer lists this game")
@@ -354,7 +355,7 @@ class SteamStore : StoreLibrary {
         }
 
     override suspend fun unlockBranch(context: Context, gameId: String, branchId: String, password: String): Result<Unit> =
-        runCatching {
+        runCatchingCancellable {
             val appId = gameId.toIntOrNull() ?: error("$gameId is not a Steam app id")
             val typed = password.trim()
             require(typed.isNotEmpty()) { "Enter the password for the $branchId version" }
@@ -402,7 +403,7 @@ class SteamStore : StoreLibrary {
         val appId = gameId.toIntOrNull() ?: return@withContext Result.failure(IllegalArgumentException("$gameId is not a Steam app id"))
         val db = db(context)
         val install = db.installs().find(appId) ?: return@withContext Result.failure(IllegalStateException("This game is not installed"))
-        runCatching {
+        runCatchingCancellable {
             if (install.installPath.isNotBlank()) {
                 val dir = File(install.installPath)
                 val parent = dir.parentFile ?: error("${install.installPath} is not a game folder")
@@ -418,7 +419,7 @@ class SteamStore : StoreLibrary {
      * folder, so this needs no network.
      */
     override suspend fun verify(context: Context, gameId: String): Result<String> = withContext(Dispatchers.IO) {
-        runCatching {
+        runCatchingCancellable {
             val (install, dir) = installOf(context, gameId)
             val builds = SteamInstalls.installedBuilds(dir)
             check(builds.isNotEmpty()) { "Steam's file lists are not in this game's folder. Update or install again to repair it" }
@@ -446,7 +447,7 @@ class SteamStore : StoreLibrary {
         if (!install.isDownloaded || install.installPath.isBlank()) return null
         val builds = withContext(Dispatchers.IO) { SteamInstalls.installedBuilds(File(install.installPath)) }
         if (builds.isEmpty()) return null
-        return runCatching {
+        return runCatchingCancellable {
             SteamSession.use(context) {
                 SteamSession.logOn(context).getOrThrow()
                 val apps = SteamSession.apps ?: return@use null
@@ -456,7 +457,7 @@ class SteamStore : StoreLibrary {
                 val branch = install.branch.ifBlank { SteamDownload.BRANCH }
                 // A locked branch's manifests are encrypted until its password has opened them.
                 val password = withContext(Dispatchers.IO) { SteamChoices.get(context, appId).branchPasswords[branch] }
-                val live = runCatching { SteamBranches.resolve(apps, fresh, branch, password) }.getOrDefault(fresh)
+                val live = runCatchingCancellable { SteamBranches.resolve(apps, fresh, branch, password) }.getOrDefault(fresh)
                 val behind = SteamInstalls.isBehind(builds, live.depots, branch) ?: return@use null
                 StoreUpdateCheck(
                     if (behind) StoreUpdate.AVAILABLE else StoreUpdate.CURRENT,
@@ -472,13 +473,13 @@ class SteamStore : StoreLibrary {
      * its launch entry's working folder and arguments.
      */
     override suspend fun launch(context: Context, gameId: String): StoreLaunch? = withContext(Dispatchers.IO) {
-        val (_, dir) = runCatching { installOf(context, gameId) }.getOrNull() ?: return@withContext null
+        val (_, dir) = runCatchingCancellable { installOf(context, gameId) }.getOrNull() ?: return@withContext null
         val app = db(context).apps().find(gameId.toInt()) ?: return@withContext null
         val entries = SteamExecutables.windowsLaunchEntries(app)
         val candidates = SteamInstalls.installedBuilds(dir).flatMap { (depot, gid) ->
             val depotInfo = app.depots[depot]
             if (depotInfo != null && (depotInfo.sharedInstall || !depotInfo.isWindowsCompatible)) return@flatMap emptyList()
-            val manifest = runCatching { DepotManifest.loadFromFile(SteamInstalls.manifestFile(dir, depot, gid).absolutePath) }.getOrNull()
+            val manifest = runCatchingCancellable { DepotManifest.loadFromFile(SteamInstalls.manifestFile(dir, depot, gid).absolutePath) }.getOrNull()
                 ?: return@flatMap emptyList()
             val files = manifest.files.orEmpty()
             val depotSize = files.sumOf { it.totalSize }
