@@ -1490,6 +1490,20 @@ class Library(
      * Downloads the version [link] of [source]'s record names and places it as a new version folder beside [newest]
      * (docs/SPEC.md 7g, "Getting an update"). Returns the job's last line; the library learns of the folder from the job.
      */
+    /** Downloads a release in [parts] from [source] as one job ([UpdateSources.downloadParts]); the last line to show. */
+    suspend fun downloadUpdateParts(
+        source: String,
+        externalId: String,
+        parts: List<UpdateSources.Download.Part>,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = withContext(Dispatchers.IO) {
+        runCatching { updateSources.downloadParts(source, externalId, parts, version, gameName, newest, onStatus) }
+            .getOrElse { it.message ?: "The download failed" }
+    }
+
     suspend fun downloadUpdate(
         source: String,
         externalId: String,

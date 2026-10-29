@@ -129,9 +129,21 @@ internal fun groupedDownloads(downloads: List<UpdateSources.Download>): List<Upd
 /** The systems the record's links are for (Droidtop/tracker#617), in the order the Downloads tab's picker offers them. */
 internal fun downloadSystems(record: UpdateSources.Record): List<String> = DownloadSystems.offered(record.downloads.map { it.systems })
 
-/** One link's row: the host and its label, and under it the heading the source gave it, which says what it is. */
+/**
+ * One link's row: the host and its label, and under it the heading the source gave it, which says what it is. A
+ * release in parts is one row, its parts counted beside it ("4 parts, 12 GB").
+ */
 private fun linkRow(d: UpdateSources.Download): RecordRow =
-    RecordRow("${d.host} · ${d.label}".takeIf { d.label != d.host } ?: d.host, subtitle = d.section, action = RecordAction.Download(d))
+    RecordRow("${d.host} · ${d.label}".takeIf { d.label != d.host } ?: d.host, value = partsLine(d), subtitle = d.section, action = RecordAction.Download(d))
+
+/** "4 parts, 12 GB" for a release in parts (the size when the source gave every part's); null for a single link. Pure. */
+internal fun partsLine(d: UpdateSources.Download): String? {
+    if (d.parts.isEmpty()) return null
+    val sizes = d.parts.map { it.size }
+    val total = if (sizes.all { it != null && it > 0 }) dev.droidtop.library.format.ValueFormat.size(sizes.sumOf { it!! }) else null
+    val count = if (d.parts.size == 1) "1 part" else "${d.parts.size} parts"
+    return listOfNotNull(count, total).joinToString(", ")
+}
 
 /**
  * The Downloads tab's rows: when the links differ by system, a System row first, droidtop's word on the picked system
@@ -186,6 +198,15 @@ internal suspend fun getDownload(
     suspend fun pickOnSitePage(): String {
         say("Pick ${picked.host} on ${source.label}'s page that opens")
         return library.openUpdateLink(source.key, externalId, sitePage!!, null, record.version, gameName, newest) { status -> say(status) }
+    }
+    // A release in parts: every part, then one job that joins and unpacks them (docs/plugin-api.md 1.10, `download` `parts`).
+    // Its parts have no one address, so the site page is never the fallback; the site's check is passed first.
+    if (picked.parts.isNotEmpty()) {
+        if (library.sourceNeedsCheck(source.key)) {
+            say("${source.label} checks the browser first")
+            if (!library.passSourceCheck(source.key)) return "${source.label}'s check was not passed, so nothing was downloaded"
+        }
+        return library.downloadUpdateParts(source.key, externalId, picked.parts, record.version, gameName, newest) { status -> say(status) }
     }
     if (picked.url == null && sitePage != null && library.sourceNeedsCheck(source.key)) return pickOnSitePage()
     // A site that checks the browser first: its check, then the rest (Droidtop/tracker#600).

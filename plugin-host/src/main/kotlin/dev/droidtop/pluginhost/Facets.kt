@@ -164,7 +164,12 @@ sealed interface FacetBody {
         val version: String?,
         val entryKind: String,
         val systems: List<String> = emptyList(),
+        /** The pieces of one split release on one host (2026-10-29): picked together, as one Downloads job. */
+        val parts: List<DownloadPart> = emptyList(),
     )
+
+    /** One piece of a split release: an address, or a token only the plugin's `download` job understands. */
+    data class DownloadPart(val label: String, val url: String?, val link: String?, val size: Long?)
 
     data class Download(val entries: List<DownloadEntry>) : FacetBody
 
@@ -500,7 +505,13 @@ object Facets {
                 capped(json.optJSONArray("entries"), "downloadEntries", "entries") { e ->
                     val url = url("url", e)
                     val link = e.text("link")
-                    if (url == null && link == null) return@capped null
+                    val parts = capped(e.optJSONArray("parts"), "downloadParts", "parts") { p ->
+                        val partUrl = url("url", p)
+                        val partLink = p.text("link")?.cut(length("value"))
+                        if (partUrl == null && partLink == null) return@capped null
+                        FacetBody.DownloadPart(text("label", "label", p) ?: return@capped null, partUrl, partLink, p.optLong("size", -1).takeIf { it >= 0 })
+                    }
+                    if (url == null && link == null && parts.isEmpty()) return@capped null
                     val section = text("section", "label", e) ?: ""
                     FacetBody.DownloadEntry(
                         section = section,
@@ -512,6 +523,7 @@ object Facets {
                         version = text("version", "label", e),
                         entryKind = e.optString("kind", "page").let { if (it in DOWNLOAD_KINDS) it else "page" },
                         systems = DownloadSystems.of(DownloadSystems.read(e.optJSONArray("systems")), section),
+                        parts = parts,
                     )
                 },
             ).takeIf { it.entries.isNotEmpty() }

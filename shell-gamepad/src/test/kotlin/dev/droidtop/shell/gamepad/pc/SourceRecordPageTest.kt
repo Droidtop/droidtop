@@ -132,4 +132,20 @@ class SourceRecordPageTest {
         assertEquals(false, pressedState(watch))
         assertNull(pressedState(thread))
     }
+
+    @Test
+    fun aReleaseInPartsIsOneRowThatCountsItsParts() {
+        val gb = 1024L * 1024 * 1024
+        val parts = (1..4).map { UpdateSources.Download.Part("Part $it", "https://mega.nz/$it", null, 3 * gb) }
+        val split = UpdateSources.Download("Win", "MEGA", "MEGA", "", parts = parts)
+        assertEquals("4 parts, 12.0 GB", partsLine(split))
+        // Without every part's size, only the count: a total would be wrong.
+        assertEquals("2 parts", partsLine(split.copy(parts = listOf(parts[0], parts[1].copy(size = null)))))
+        assertNull(partsLine(d("Win", "MEGA")))
+        val rows = recordRows(record.copy(downloads = listOf(split)), RecordTab.DOWNLOADS) { "" }
+        assertEquals(1, rows.size)
+        assertEquals("4 parts, 12.0 GB", rows.single().value)
+        assertEquals(RecordAction.Download(split), rows.single().action)
+    }
+
 }

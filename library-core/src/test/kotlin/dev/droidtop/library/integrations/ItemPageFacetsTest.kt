@@ -91,4 +91,29 @@ class ItemPageFacetsTest {
         assertEquals(true, record.controls[1].confirm)
         assertNull(record.controls[2].action)
     }
+
+    @Test
+    fun `a release in parts is one download carrying every part`() {
+        val item = JSONObject(
+            """
+            {"facets": [{"id": "dl", "kind": "download", "entries": [
+              {"section": "Win", "host": "MEGA", "label": "MEGA", "parts": [
+                {"label": "Part 1", "url": "https://mega.nz/file/a", "size": 4000000000},
+                {"label": "Part 2", "link": "1:MEGA:2", "size": 2000000000},
+                {"label": "No address"},
+                {"url": "https://mega.nz/file/c"}
+              ]}
+            ]}]}
+            """.trimIndent(),
+        )
+        val record = ItemPageFacets.record(ItemPageFacets.admitted(item, "f95zone", "93340", f95, mutableListOf()), "93340")!!
+        val download = record.downloads.single()
+        // A part needs a label and an address or a token; the entry needs neither of its own.
+        assertEquals(listOf("Part 1", "Part 2"), download.parts.map { it.label })
+        assertNull(download.url)
+        assertEquals("https://mega.nz/file/a", download.parts[0].url)
+        assertEquals("1:MEGA:2", download.parts[1].link)
+        assertEquals(2000000000L, download.parts[1].size)
+    }
+
 }

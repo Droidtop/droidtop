@@ -76,7 +76,19 @@ interface UpdateSources {
      * job takes ([link]). [systems] are the systems it is for (dev.droidtop.pluginhost.DownloadSystems), empty for
      * any: the Downloads tab shows the picked system's links (Droidtop/tracker#617).
      */
-    data class Download(val section: String, val host: String, val label: String, val link: String, val url: String? = null, val systems: List<String> = emptyList())
+    data class Download(
+        val section: String,
+        val host: String,
+        val label: String,
+        val link: String,
+        val url: String? = null,
+        val systems: List<String> = emptyList(),
+        /** A split release's pieces (docs/plugin-api.md 1.10, `download` `parts`): one row, fetched as one job. */
+        val parts: List<Part> = emptyList(),
+    ) {
+        /** One piece: its page ([url]) or the source's token ([link]), and its size when the source knows it. */
+        data class Part(val label: String, val url: String?, val link: String?, val size: Long?)
+    }
 
     /**
      * A record's page, as the source tells it (docs/plugin-api.md 3 A6 `record`); droidtop draws it (docs/SPEC.md 7g,
@@ -181,6 +193,20 @@ interface UpdateSources {
         newest: LibraryEntry,
         onStatus: (String) -> Unit,
     ): String = "This source cannot download an update"
+
+    /**
+     * Downloads every one of [parts] (the person picked a split release on the record page) as one Downloads job,
+     * joined and unpacked as droidtop's split-set path does, into the new version folder beside [newest].
+     */
+    suspend fun downloadParts(
+        source: String,
+        externalId: String,
+        parts: List<Download.Part>,
+        version: String?,
+        gameName: String,
+        newest: LibraryEntry,
+        onStatus: (String) -> Unit,
+    ): String = "This source cannot download a release in parts"
 }
 
 object NoUpdateSources : UpdateSources {

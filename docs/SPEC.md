@@ -12652,6 +12652,13 @@ reimplemented it as my own f95seeker code." So:
     record is asked again afterwards so a switch shows what the source now
     says.
   - **Changelog**: the source's changelog text, as given.
+  - **Downloads**, a release in parts (2026-10-29, Droidtop/tracker#602): an
+    entry with `parts` is one row ("MEGA", "4 parts, 12.0 GB"). Picking it gets
+    every part in turn (a page part in droidtop's web view, "Part 2 of 4: start
+    the download on the page that opens"; a token part through the source's
+    `download` job), then places them as one Downloads job, joined and unpacked
+    as the split-set path does. A part that brings nothing stops it, saying
+    which, and nothing is placed.
   - **Downloads**: every link, grouped under the source's own section headings
     ("Win/Linux", "Mac", "Android") and, within one, by file host, each row
     the host and the link's label. **One system at a time (2026-10-23,

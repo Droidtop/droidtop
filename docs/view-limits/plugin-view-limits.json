@@ -72,6 +72,7 @@
       "chartPoints": 60,
       "chartBars": 12,
       "downloadEntries": 200,
+      "downloadParts": 100,
       "linksEntries": 32,
       "tags": 64,
       "genres": 16,

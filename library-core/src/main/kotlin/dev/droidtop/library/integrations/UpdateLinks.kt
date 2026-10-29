@@ -14,6 +14,19 @@ import org.json.JSONObject
  * them. The user can start the download, and it'll be kicked over automatically."
  */
 object UpdateLinks {
+    /** Whether files of [names] are unpacked: one archive, or the numbered parts of one split archive. Pure. */
+    fun unpackFor(names: List<String>): Boolean = when {
+        names.isEmpty() -> false
+        names.size == 1 -> DownloadJobs.archiveStem(names.single()) != null
+        else -> SplitArchives.detect(names)?.let { !it.volumes } == true
+    }
+
+    /** The files of a release in parts, gathered from wherever each came, unpacked by the one rule over all their names. */
+    fun joined(descriptors: List<AcquireDownloadDescriptor>): List<AcquireDownloadDescriptor> {
+        val unpack = unpackFor(descriptors.map { it.fileName })
+        return descriptors.map { it.copy(unpack = unpack) }
+    }
+
     /**
      * What the web view captured as the downloads droidtop runs: each file under the name the site gave it (made safe for
      * a file system), with the cookies, user agent and referrer the page used, held in memory by Downloads. A zip, 7z or
@@ -21,10 +34,7 @@ object UpdateLinks {
      */
     fun descriptorsFor(captured: List<WebSessionDownload>): List<AcquireDownloadDescriptor> {
         val names = captured.map { WebSessions.safeFileName(WebSessions.fileNameFor(it.url, it.contentDisposition)) }
-        val unpack = when {
-            captured.size == 1 -> DownloadJobs.archiveStem(names.single()) != null
-            else -> SplitArchives.detect(names)?.let { !it.volumes } == true
-        }
+        val unpack = unpackFor(names)
         return captured.mapIndexed { index, download ->
             AcquireDownloadDescriptor(
                 url = download.url,
