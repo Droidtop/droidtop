@@ -399,26 +399,8 @@ internal fun GamepadShellBody(
     // detail itself; null is the generic "Select". Reset per detail.
     var detailPrimaryLabel by remember(nav.detailId) { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
-    // Real user-visible launch-failure state -- see launchError's render
-    // site. A failed launch must inform, never kill.
-    var launchError by remember { mutableStateOf<String?>(null) }
-    // Live setup progress for the same launch path (Droidtop/tracker#140):
-    // what a Windows setup is fetching and how far along it is. A
-    // different state from launchError because it is not a failure --
-    // painted as one, the system-files download read as an error the
-    // person never asked for. Cleared when the attempt ends either way.
-    var launchProgress by remember { mutableStateOf<String?>(null) }
-    // The fixable half of a launch failure: which system had no
-    // emulator, so the banner can offer to go get one.
-    var missingEmulator by remember {
-        mutableStateOf<dev.droidtop.library.consoles.NoEmulatorInstalled?>(null)
-    }
-    // The other fixable kind: a Windows game whose program droidtop could
-    // not tell (Droidtop/tracker#308), and the program choice once opened.
-    var unknownProgram by remember { mutableStateOf<dev.droidtop.library.ProgramNotIdentified?>(null) }
-    // A RetroArch core droidtop saw missing or incomplete before the launch (Droidtop/tracker#271).
-    var missingCore by remember { mutableStateOf<dev.droidtop.library.consoles.RetroArchCores.Missing?>(null) }
-    var programScreen by remember { mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null) }
+    // What the last launch left to say or fix ([LaunchProblems]).
+    val launchProblems = remember { LaunchProblems() }
     // The game being started, if any: drives the launch screen (real
     // ES-DE has one; without it the shell simply freezes mid-frame for
     // the several seconds a cold emulator start takes, which reads as a
@@ -468,11 +450,9 @@ internal fun GamepadShellBody(
     // more than one candidate; state renders LaunchDisplayChooserDialog
     // below. Installed only while this composition is live.
     // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
-    var quickMenuOpen by remember { mutableStateOf(false) }
-    // The section the Quick Menu opens on when something asked for one (Downloads, for a link to Updates); cleared on
-    // close.
-    var quickMenuStart by remember { mutableStateOf<QuickSection?>(null) }
-    LaunchedEffect(quickMenuOpen) { if (!quickMenuOpen) quickMenuStart = null }
+    // Which of the shell's own overlays is open ([ShellOverlays]).
+    val overlays = remember { ShellOverlays() }
+    LaunchedEffect(overlays.quickMenuOpen) { if (!overlays.quickMenuOpen) overlays.quickMenuStart = null }
     // A quick menu left open when this shell lost the foreground (the
     // Switch-mode dialog's own "Android"/"Desktop" rows, or Home) must not
     // still be showing when a fresh, real deep-link brings this same
@@ -482,16 +462,11 @@ internal fun GamepadShellBody(
     // Quick Menu stacked on top of Gaming.
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
-    var leftMenuOpen by remember { mutableStateOf(false) }
-    // The one search over the library, the apps, the download sources and the settings (the left menu's Search row).
-    var globalSearchOpen by remember { mutableStateOf(false) }
-    // One system's search, opened from the Quick Menu's Game section: its id and name.
-    var systemSearch by remember { mutableStateOf<Pair<String, String>?>(null) }
     // The game screen of a Windows game sends Back here with openQuickMenu set (OwnGameScreens): the
     // menu opens on its Game section, since the game is running.
     LaunchedEffect(deepLinkToken) {
-        quickMenuOpen = openQuickMenu
-        leftMenuOpen = false
+        overlays.quickMenuOpen = openQuickMenu
+        overlays.leftMenuOpen = false
         Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu")
     }
     // Updates is the Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749): every way into the Updates
@@ -501,8 +476,8 @@ internal fun GamepadShellBody(
     LaunchedEffect(nav.section) {
         if (nav.section == GamingSection.UPDATES) {
             nav.openSection(lastSection.takeIf { it != GamingSection.UPDATES } ?: GamingSection.DOWNLOADS)
-            quickMenuStart = QuickSection.DOWNLOADS
-            quickMenuOpen = true
+            overlays.quickMenuStart = QuickSection.DOWNLOADS
+            overlays.quickMenuOpen = true
         } else {
             lastSection = nav.section
         }
@@ -513,7 +488,7 @@ internal fun GamepadShellBody(
     // dialog opening or closing, resume, and window-focus regain; the glyphs and the key map both
     // read ControllerLayouts.layout, so they change together and nothing else recomposes.
     LaunchedEffect(Unit) { ControllerLayouts.attach(context) }
-    LaunchedEffect(nav.place.key, quickMenuOpen, leftMenuOpen, focusedHints.layerOpen) {
+    LaunchedEffect(nav.place.key, overlays.quickMenuOpen, overlays.leftMenuOpen, focusedHints.layerOpen) {
         ControllerLayouts.recheck(context)
     }
     val windowInfo = androidx.compose.ui.platform.LocalWindowInfo.current
@@ -544,12 +519,12 @@ internal fun GamepadShellBody(
     val shellMenus = remember {
         ShellMenus(
             openLeft = {
-                quickMenuOpen = false
-                leftMenuOpen = true
+                overlays.quickMenuOpen = false
+                overlays.leftMenuOpen = true
             },
             openQuick = {
-                leftMenuOpen = false
-                quickMenuOpen = true
+                overlays.leftMenuOpen = false
+                overlays.quickMenuOpen = true
             },
         )
     }
@@ -564,7 +539,7 @@ internal fun GamepadShellBody(
         // there arrives here rather than through library.launch.
         dev.droidtop.library.LaunchDisplay.onLaunchFailed = {
             launching = null
-            launchError = LaunchFailureMessage.userMessage(null, it)
+            launchProblems.error = LaunchFailureMessage.userMessage(null, it)
         }
         onDispose {
             dev.droidtop.library.LaunchDisplay.chooser = null
@@ -679,7 +654,7 @@ internal fun GamepadShellBody(
         )
         EsDeNavigationSounds.play(UiSound.LAUNCH)
         scope.launch {
-            launchError = null
+            launchProblems.error = null
             launching = entry
             // The audio hand-off happens where the app is actually
             // dispatched (LaunchDisplay.startOn), after the display
@@ -688,10 +663,10 @@ internal fun GamepadShellBody(
                 .onFailure {
                     android.util.Log.e("droidtop.GamepadShell", "Launching ${entry.title} failed", it)
                     launching = null
-                    missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
-                    unknownProgram = it as? dev.droidtop.library.ProgramNotIdentified
-                    missingCore = it as? dev.droidtop.library.consoles.RetroArchCores.Missing
-                    launchError = LaunchFailureMessage.userMessage(entry.title, it)
+                    launchProblems.missingEmulator = it as? dev.droidtop.library.consoles.NoEmulatorInstalled
+                    launchProblems.unknownProgram = it as? dev.droidtop.library.ProgramNotIdentified
+                    launchProblems.missingCore = it as? dev.droidtop.library.consoles.RetroArchCores.Missing
+                    launchProblems.error = LaunchFailureMessage.userMessage(entry.title, it)
                 }
             // Held briefly after the launch call returns: the call
             // returns as soon as the intent is dispatched, while the
@@ -714,8 +689,8 @@ internal fun GamepadShellBody(
     val onLaunch: (LibraryEntry) -> Unit = { entry ->
         if (entry.isPcOrEngineGame) {
             scope.launch {
-                launchError = null
-                launchProgress = null
+                launchProblems.error = null
+                launchProblems.progress = null
                 dev.droidtop.library.PcRunnerOptions.resolveAndPlay(
                     context = context,
                     entry = entry,
@@ -724,15 +699,15 @@ internal fun GamepadShellBody(
                     // which stay until the attempt ends. A successful
                     // Windows setup ends with nothing more to say -- the
                     // next A press launches, exactly as the offer said.
-                    onStatus = { message -> launchProgress = message },
+                    onStatus = { message -> launchProblems.progress = message },
                     onFailure = { message ->
-                        launchProgress = null
-                        launchError = message
+                        launchProblems.progress = null
+                        launchProblems.error = message
                     },
                     // An installer's row installed (or said why not): a flash, not a failure.
                     onDone = { message -> dev.droidtop.library.settings.Notices.flash(message, context = context) },
                 )
-                launchProgress = null
+                launchProblems.progress = null
             }
         } else {
             dispatchLaunch(entry)
@@ -767,7 +742,7 @@ internal fun GamepadShellBody(
     // same answer (docs/SPEC.md 7j). A game that ended unseen ends the
     // session in SessionMonitor, which this follows, so a menu never
     // offers a dead launch.
-    val sideMenuOpen = quickMenuOpen || leftMenuOpen
+    val sideMenuOpen = overlays.quickMenuOpen || overlays.leftMenuOpen
     val runningSession by dev.droidtop.library.LaunchDisplay.running.collectAsState()
     val runningEntry = remember(sideMenuOpen, runningSession, gameEntries, appEntries) {
         if (!sideMenuOpen) {
@@ -787,11 +762,11 @@ internal fun GamepadShellBody(
     // closing; reset whenever the running game changes.
     var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
     LaunchedEffect(runningEntry?.id) { quitOutcome = null }
-    if (quickMenuOpen) {
+    if (overlays.quickMenuOpen) {
         QuickMenu(
             runningEntry = runningEntry,
             library = library,
-            startSection = quickMenuStart,
+            startSection = overlays.quickMenuStart,
             // The same launch path every entry already goes through
             // (console ROM, PC and engine games alike) -- relaunching the
             // entry is what "resume" already means for the planned
@@ -799,12 +774,12 @@ internal fun GamepadShellBody(
             // reused here rather than a second resume mechanism.
             quitOutcome = quitOutcome,
             onResume = { entry ->
-                quickMenuOpen = false
+                overlays.quickMenuOpen = false
                 onLaunch(entry)
             },
             onSearchSystem = { id, name ->
-                quickMenuOpen = false
-                systemSearch = id to name
+                overlays.quickMenuOpen = false
+                overlays.systemSearch = id to name
             },
             onQuit = { entry, restart ->
                 // The sheet stays open until the game really ended, so a
@@ -815,7 +790,7 @@ internal fun GamepadShellBody(
                     val outcome = library.quitRunning(context, entry)
                     quitOutcome = outcome
                     if (outcome is dev.droidtop.library.QuitResult.Ended) {
-                        quickMenuOpen = false
+                        overlays.quickMenuOpen = false
                         // Restart (the Quick Menu's Game section): start the
                         // entry again, but only now that it really ended.
                         if (restart) onLaunch(entry)
@@ -827,57 +802,57 @@ internal fun GamepadShellBody(
                 scope.launch {
                     val outcome = library.killRunning(context, entry)
                     quitOutcome = outcome
-                    if (outcome is dev.droidtop.library.QuitResult.Ended) quickMenuOpen = false
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) overlays.quickMenuOpen = false
                 }
             },
             onOpenLeftMenu = {
-                quickMenuOpen = false
-                leftMenuOpen = true
+                overlays.quickMenuOpen = false
+                overlays.leftMenuOpen = true
             },
             openPlace = { screenId ->
                 placeForScreen(screenId, uiMode)?.let { place ->
-                    quickMenuOpen = false
+                    overlays.quickMenuOpen = false
                     nav.openSection(place)
                 } != null
             },
             placeAvailable = { screenId -> placeForScreen(screenId, uiMode) != null },
             onDismiss = {
                 Log.i("droidtop.ReturnToGame", "Quick Menu closed")
-                quickMenuOpen = false
+                overlays.quickMenuOpen = false
             },
         )
     }
-    if (leftMenuOpen) {
+    if (overlays.leftMenuOpen) {
         LeftMenu(
             entries = leftMenuEntries(menuSectionsFor(uiMode)),
             current = section,
             runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
             // The Quick Menu Game section's Resume: the one launch path, reused.
             onResume = {
-                leftMenuOpen = false
+                overlays.leftMenuOpen = false
                 runningEntry?.let(onLaunch)
             },
             onSelect = { entry ->
-                leftMenuOpen = false
+                overlays.leftMenuOpen = false
                 selectSection(entry.section)
             },
             onOpenQuickMenu = {
-                leftMenuOpen = false
-                quickMenuOpen = true
+                overlays.leftMenuOpen = false
+                overlays.quickMenuOpen = true
             },
             // Kiosk and Kid keep the library and leave out what manages the device, downloads and settings with it.
             onSearch = if (menuSectionsFor(uiMode).any { it.managesDevice }) {
                 {
-                    leftMenuOpen = false
-                    globalSearchOpen = true
+                    overlays.leftMenuOpen = false
+                    overlays.globalSearchOpen = true
                 }
             } else {
                 null
             },
-            onDismiss = { leftMenuOpen = false },
+            onDismiss = { overlays.leftMenuOpen = false },
         )
     }
-    if (globalSearchOpen) {
+    if (overlays.globalSearchOpen) {
         dev.droidtop.shell.gamepad.query.LauncherSearchScreen(
             initialText = "",
             games = gameEntries,
@@ -894,14 +869,14 @@ internal fun GamepadShellBody(
             },
             // Every game opens its page (Play or Install is there), never a raw start (docs/SPEC.md 12a).
             onOpen = { entry ->
-                globalSearchOpen = false
+                overlays.globalSearchOpen = false
                 nav.openDetail(entry.id)
             },
             settingsRoot = remember(uiMode) { gamingSettingsRoot(menuSectionsFor(uiMode).filter { it.isPlace }.mapNotNull { it.placeScreenId }.toSet()) },
-            onDismiss = { globalSearchOpen = false },
+            onDismiss = { overlays.globalSearchOpen = false },
         )
     }
-    systemSearch?.let { (systemId, systemName) ->
+    overlays.systemSearch?.let { (systemId, systemName) ->
         // One system's search (docs/SPEC.md 12a, "One search: where it opens"): its games, matched in memory over the
         // list already loaded, and the sources that serve it.
         // Missing games too, as the system's list shows them (searchablePool).
@@ -911,7 +886,7 @@ internal fun GamepadShellBody(
             matchCount = 0,
             totalCount = systemGames.size,
             onTextChange = {},
-            onDismiss = { systemSearch = null },
+            onDismiss = { overlays.systemSearch = null },
             systemId = systemId,
             localKey = systemGames,
             local = { text ->
@@ -922,7 +897,7 @@ internal fun GamepadShellBody(
                         dev.droidtop.library.GameNaming.displayName(game.title),
                         listOf(systemName, if (game.needsInstall()) "Not installed" else "Installed").joinToString(" · "),
                     ) {
-                        systemSearch = null
+                        overlays.systemSearch = null
                         // Its page, with Play or Install, as the global search does (docs/SPEC.md 12a).
                         nav.openDetail(game.id)
                     }
@@ -1095,7 +1070,7 @@ internal fun GamepadShellBody(
                     // release is this owner's and goes nowhere, and a fresh
                     // press inside the menu closes it there.
                     GamepadAction.R2 -> {
-                        if (!quickMenuOpen) quickMenuOpen = true
+                        if (!overlays.quickMenuOpen) overlays.quickMenuOpen = true
                         true
                     }
                     // Start, the left menu's button: navigation, where the
@@ -1104,7 +1079,7 @@ internal fun GamepadShellBody(
                     // once a launched game is in front the shell is not
                     // the foreground and receives no input.
                     GamepadAction.START -> {
-                        if (!leftMenuOpen) leftMenuOpen = true
+                        if (!overlays.leftMenuOpen) overlays.leftMenuOpen = true
                         true
                     }
                     // L1/R1 step the page's own nearest strip only. A page
@@ -1142,7 +1117,7 @@ internal fun GamepadShellBody(
         // system-files setup came to read as an error nobody asked for.
         // No self-dismiss: the line stays honest for as long as the
         // attempt runs, and onLaunch clears it when the attempt ends.
-        launchProgress?.let { message ->
+        launchProblems.progress?.let { message ->
             Text(
                 message,
                 color = MenuTokens.OnSurface,
@@ -1158,10 +1133,10 @@ internal fun GamepadShellBody(
         // visible behind it, and the pad's B, a row tap or a tap outside
         // dismisses it; a failure the user can fix offers the fix on the
         // spot instead of getting out of the way.
-        launchError?.let { message ->
+        launchProblems.error?.let { message ->
             LaunchFailureDialog(
                 message = message,
-                actions = listOfNotNull(missingEmulator?.let { problem ->
+                actions = listOfNotNull(launchProblems.missingEmulator?.let { problem ->
                     LaunchFailureAction("Get an emulator") {
                         // The players database's own package for this
                         // system, straight to the store: the fix, at
@@ -1180,40 +1155,40 @@ internal fun GamepadShellBody(
                                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                             )
                         }
-                        missingEmulator = null
-                        launchError = null
+                        launchProblems.missingEmulator = null
+                        launchProblems.error = null
                     }
-                }, unknownProgram?.let { problem ->
+                }, launchProblems.unknownProgram?.let { problem ->
                     // The game's program choice, the same screen its options open.
                     LaunchFailureAction("Choose the program") {
-                        programScreen = dev.droidtop.library.WindowsPrograms.screen(problem.entryId, problem.title, problem.gameRoot)
-                        unknownProgram = null
-                        launchError = null
+                        launchProblems.programScreen = dev.droidtop.library.WindowsPrograms.screen(problem.entryId, problem.title, problem.gameRoot)
+                        launchProblems.unknownProgram = null
+                        launchProblems.error = null
                     }
-                }, missingCore?.let { problem ->
+                }, launchProblems.missingCore?.let { problem ->
                     // The launch watchdog's Get the core, here before anything started: RetroArch's Core
                     // Downloader, or droidtop placing it once the person confirms on the emulator screen.
                     LaunchFailureAction("Get the core") {
-                        missingCore = null
-                        launchError = null
+                        launchProblems.missingCore = null
+                        launchProblems.error = null
                         scope.launch {
                             when (val outcome = dev.droidtop.library.consoles.RetroArchCores.ensure(context, problem.need, asked = true)) {
                                 dev.droidtop.library.consoles.RetroArchCores.Outcome.Ready -> Unit
-                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Manual -> launchError = outcome.line
-                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Failed -> launchError = outcome.line
+                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Manual -> launchProblems.error = outcome.line
+                                is dev.droidtop.library.consoles.RetroArchCores.Outcome.Failed -> launchProblems.error = outcome.line
                             }
                         }
                     }
                 }),
                 onDismiss = {
-                    missingEmulator = null
-                    unknownProgram = null
-                    missingCore = null
-                    launchError = null
+                    launchProblems.missingEmulator = null
+                    launchProblems.unknownProgram = null
+                    launchProblems.missingCore = null
+                    launchProblems.error = null
                 },
             )
         }
-        programScreen?.let { screen -> CatalogSheet(root = screen, onExit = { programScreen = null }) }
+        launchProblems.programScreen?.let { screen -> CatalogSheet(root = screen, onExit = { launchProblems.programScreen = null }) }
         // A launch that never answered or left at once (LaunchWatchdog, docs/SPEC.md "The launch
         // watchdog"): plain words and the three ways out, never a black screen.
         val watchAlert by dev.droidtop.library.LaunchWatchdog.alert.collectAsState()
@@ -1226,7 +1201,7 @@ internal fun GamepadShellBody(
                             val outcome = dev.droidtop.library.LaunchWatchdog.closeIt(context, alert)
                             if (outcome !is dev.droidtop.runtime.tasks.CloseOutcome.Closed) {
                                 dev.droidtop.library.LaunchWatchdog.dismiss()
-                                launchError = outcome.text
+                                launchProblems.error = outcome.text
                             }
                         }
                     },
@@ -1240,7 +1215,7 @@ internal fun GamepadShellBody(
                     val core = alert.retroArchCore?.let {
                         LaunchFailureAction("Get the core") {
                             scope.launch {
-                                dev.droidtop.library.LaunchWatchdog.getCore(context, alert)?.let { launchError = it }
+                                dev.droidtop.library.LaunchWatchdog.getCore(context, alert)?.let { launchProblems.error = it }
                             }
                         }
                     }
@@ -1512,7 +1487,7 @@ internal fun GamepadShellBody(
                                 onCanGoBackChanged = { canGoBack = it },
                                 onRequestRescan = { rescanTrigger++ },
                                 onOpenSection = { target -> selectSection(target) },
-                                onOpenQuickMenu = { quickMenuOpen = true },
+                                onOpenQuickMenu = { overlays.quickMenuOpen = true },
                             ) }
                             GamingSection.APPS -> {
                                 canGoBack = false
@@ -1568,12 +1543,12 @@ internal fun GamepadShellBody(
             val homeBand = section == GamingSection.HOME && nav.place is ShellPlace.Section
             if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && retroView in GamingTheme.palette.ownStatusViews)) {
                 FloatingStatusCluster(
-                    onClick = { quickMenuOpen = true },
+                    onClick = { overlays.quickMenuOpen = true },
                     // The activity spot opens where the jobs are: the Quick Menu's Downloads tab
                     // (Droidtop/tracker#742).
                     onActivity = {
-                        quickMenuStart = QuickSection.DOWNLOADS
-                        quickMenuOpen = true
+                        overlays.quickMenuStart = QuickSection.DOWNLOADS
+                        overlays.quickMenuOpen = true
                     },
                     modifier = Modifier.align(Alignment.TopEnd),
                 )
@@ -2415,4 +2390,38 @@ internal data class DisplayChoiceRequest(
 internal class EsDeGroupHistory {
     var previous: GameGroup? = null
     var current: GameGroup? = null
+}
+
+/**
+ * What the last launch left for the person (Droidtop/tracker#763: the shell body's launch state, held together).
+ * [error] is the user-visible failure: a failed launch must inform, never kill. [progress] is a Windows setup's live
+ * progress on the same path (Droidtop/tracker#140), kept apart from [error] because it is not a failure, and cleared
+ * when the attempt ends either way. The fixable kinds a banner offers to fix: [missingEmulator] (the system had no
+ * emulator), [unknownProgram] (a Windows game whose program droidtop could not tell, Droidtop/tracker#308) and
+ * [missingCore] (a RetroArch core missing or incomplete, Droidtop/tracker#271); [programScreen] is the program
+ * choice once opened.
+ */
+@androidx.compose.runtime.Stable
+internal class LaunchProblems {
+    var error by mutableStateOf<String?>(null)
+    var progress by mutableStateOf<String?>(null)
+    var missingEmulator by mutableStateOf<dev.droidtop.library.consoles.NoEmulatorInstalled?>(null)
+    var unknownProgram by mutableStateOf<dev.droidtop.library.ProgramNotIdentified?>(null)
+    var missingCore by mutableStateOf<dev.droidtop.library.consoles.RetroArchCores.Missing?>(null)
+    var programScreen by mutableStateOf<dev.droidtop.library.settings.CatalogScreen?>(null)
+}
+
+/**
+ * The shell's own overlays and which is open (Droidtop/tracker#763: held together): the Quick Menu (hold Select) and
+ * the section it opens on when something asked for one ([quickMenuStart], Downloads for a link to Updates, cleared on
+ * close); the left menu (Start, docs/SPEC.md 7j); the one search over the library, apps, sources and settings; and one
+ * system's search, by its id and name, from the Quick Menu's Game section.
+ */
+@androidx.compose.runtime.Stable
+internal class ShellOverlays {
+    var quickMenuOpen by mutableStateOf(false)
+    var quickMenuStart by mutableStateOf<QuickSection?>(null)
+    var leftMenuOpen by mutableStateOf(false)
+    var globalSearchOpen by mutableStateOf(false)
+    var systemSearch by mutableStateOf<Pair<String, String>?>(null)
 }
