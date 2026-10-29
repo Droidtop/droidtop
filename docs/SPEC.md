@@ -7928,8 +7928,12 @@ Droidtop/tracker#386): it was one logical pixel per 1/200 inch of the
 physical density (xdpi); the console's panel is 319 dpi, not the 400 first
 assumed, so that gave 1.5x, and Linux text was still too small to read.
 Physical density takes no account of how close a handheld is held;
-Android's density does. The viewport sends it with every size, so a change
-applies the next time the desktop is shown.
+Android's density does. The viewport sends it with every size. A change
+applies at once to the desktop already showing: the shell follows Desktop
+mode's settings (`DesktopPrefs.changes`, read off the main thread, the one
+definition of their keys, which the settings rows write too) and sends the
+output's size again (Droidtop/tracker#764). The same goes for "Taskbar at
+top".
 
 **Desktop resolution (decided 2026-10-14, Droidtop/tracker#426).** Beside the
 scale, "Desktop resolution" (`DesktopScale.RESOLUTION_KEY`): Full (default),
@@ -7939,8 +7943,7 @@ multiplied by the same fraction (`outputScale`), so the layout keeps its
 logical size and only gets blurrier; the present path already scales the
 buffer to fill the view, and the pointer transform takes the smaller output
 size, so input lands where it is drawn. Faster because the compositor draws,
-and screencopy delivers, fewer pixels. Applies the next time the desktop is
-shown.
+and screencopy delivers, fewer pixels. Applies at once, as the scale does.
 
 **The frame path's threading (rebuilt 2026-09-24).** `:host-bridge`'s native
 client has one dispatch thread, and it owns everything the compositor's

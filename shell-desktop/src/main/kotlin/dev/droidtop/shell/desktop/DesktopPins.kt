@@ -1,6 +1,5 @@
 package dev.droidtop.shell.desktop
 
-import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,15 +10,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import dev.droidtop.library.TaskbarPin
 import dev.droidtop.library.TaskbarPins
-import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.library.settings.DesktopPrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /** The taskbar's pins and the one way to change them (docs/SPEC.md 2b, Droidtop/tracker#348). */
 internal class Pins(val list: List<TaskbarPin>, val toggle: (TaskbarPin) -> Unit)
-
-private const val KEY_PINS = "pref_desktop_taskbar_pins"
 
 /**
  * The pins, read from the launcher preferences file off the main thread (they show as soon as it is read)
@@ -32,7 +29,7 @@ internal fun rememberPins(): Pins {
     var list by remember { mutableStateOf<List<TaskbarPin>>(emptyList()) }
     LaunchedEffect(Unit) {
         list = withContext(Dispatchers.IO) {
-            TaskbarPins.decode(appContext.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE).getString(KEY_PINS, null))
+            TaskbarPins.decode(DesktopPrefs.pins(appContext))
         }
     }
     return remember(list) {
@@ -40,8 +37,7 @@ internal fun rememberPins(): Pins {
             val next = TaskbarPins.toggled(list, pin)
             list = next
             scope.launch(Dispatchers.IO) {
-                appContext.getSharedPreferences(LAUNCHER_PREFS_FILE_NAME, Context.MODE_PRIVATE)
-                    .edit().putString(KEY_PINS, TaskbarPins.encode(next)).apply()
+                DesktopPrefs.setPins(appContext, TaskbarPins.encode(next))
             }
         }
     }

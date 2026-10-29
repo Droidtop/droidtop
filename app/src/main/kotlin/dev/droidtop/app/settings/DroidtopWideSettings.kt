@@ -8,6 +8,7 @@ import android.util.Base64
 import dev.droidtop.app.AccessibilityPrefs
 import dev.droidtop.app.OnboardingActivity
 import dev.droidtop.app.ScreenOrientationPrefs
+import dev.droidtop.library.settings.DesktopPrefs
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -60,7 +61,6 @@ object DroidtopWideSettings {
     const val SCREEN_DESKTOP = "desktop_settings"
     const val SCREEN_STANDARD = "standard_settings"
 
-    private const val KEY_TASKBAR_TOP = "pref_desktop_taskbar_top"
 
     fun globalScreen() = CatalogScreen(
         id = SCREEN_GLOBAL,
@@ -306,11 +306,11 @@ object DroidtopWideSettings {
                     items = listOf(
                         orientationChoice(context, Mode.DESKTOP),
                         ToggleItem(
-                            id = KEY_TASKBAR_TOP,
+                            id = DesktopPrefs.KEY_TASKBAR_TOP,
                             title = "Taskbar at top",
                             subtitle = "Move the desktop taskbar to the top of the screen instead of the bottom",
-                            current = CatalogPrefs.prefs(context).getBoolean(KEY_TASKBAR_TOP, false),
-                            onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_TASKBAR_TOP, on).apply() },
+                            current = DesktopPrefs.read(context).taskbarAtTop,
+                            onToggle = { ctx, on -> DesktopPrefs.setTaskbarAtTop(ctx, on) },
                         ),
                         desktopScaleChoice(context),
                         desktopResolutionChoice(context),

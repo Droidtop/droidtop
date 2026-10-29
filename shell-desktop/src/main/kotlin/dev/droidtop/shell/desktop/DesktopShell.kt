@@ -69,12 +69,13 @@ import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.integrations.PluginHub
 import dev.droidtop.library.integrations.PluginPanels
 import dev.droidtop.pluginhost.PluginModes
-import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
+import dev.droidtop.library.settings.DesktopPrefs
 import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.Place
 import dev.droidtop.library.LibraryEntry
@@ -283,16 +284,21 @@ fun DesktopShell(
         val density = androidx.compose.ui.platform.LocalDensity.current
         var barHeightPx by remember { mutableStateOf(0) }
         val barHeight = with(density) { barHeightPx.toDp() }
-        val barAtTop = DesktopPrefs.taskbarAtTop(LocalContext.current)
+        // Desktop mode's settings, read off the main thread and followed while the shell shows (Droidtop/tracker#764).
+        val shellContext = LocalContext.current
+        val prefs by remember(shellContext) { DesktopPrefs.changes(shellContext).flowOn(Dispatchers.IO) }
+            .collectAsState(initial = DesktopPrefs.Values())
+        val barAtTop = prefs.taskbarAtTop
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = if (barAtTop) barHeight else 0.dp, bottom = if (barAtTop) 0.dp else barHeight),
         ) {
-            DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup)
+            DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup, prefs)
         }
 
         Taskbar(
+            atTop = barAtTop,
             onHeight = { barHeightPx = it },
             hostBridge = hostBridge,
             toplevels = toplevels,
@@ -420,6 +426,7 @@ private fun BoxScope.DesktopViewport(
     sessionMessage: DesktopSessionMessage,
     onStartSession: () -> Unit,
     onOpenSetup: () -> Unit,
+    prefs: DesktopPrefs.Values,
 ) {
     if (hostBridge != null && primaryOutput != null) {
         var presentFailed by remember { mutableStateOf(false) }
@@ -455,6 +462,30 @@ private fun BoxScope.DesktopViewport(
             onDispose { router.seat = null }
         }
 
+        // The output is sized from the surface and the scale and resolution settings; the latest settings are read
+        // here, so a change made while the desktop shows applies at once, not at the next surface change.
+        val currentPrefs by rememberUpdatedState(prefs)
+        var surfaceSize by remember(hostBridge) { mutableStateOf<Pair<Int, Int>?>(null) }
+        fun applySize(width: Int, height: Int) {
+            val metrics = context.resources.displayMetrics
+            val scale = DesktopScale.resolve(currentPrefs.scale, metrics.densityDpi)
+            // Below full resolution the output is asked for fewer pixels than the view
+            // has and SurfaceFlinger scales the buffer up (Droidtop/tracker#426); the
+            // scale shrinks with it so the layout keeps its size.
+            val factor = DesktopScale.resolutionFactor(currentPrefs.resolution)
+            val (outW, outH) = DesktopScale.outputSize(width, height, factor)
+            val sized = hostBridge.setOutputSize(outW, outH, DesktopScale.outputScale(scale, factor))
+            router.transform = PointerTransform(
+                viewWidth = width,
+                viewHeight = height,
+                outputWidth = if (sized) outW else primaryOutput.widthPx,
+                outputHeight = if (sized) outH else primaryOutput.heightPx,
+            )
+        }
+        LaunchedEffect(prefs.scale, prefs.resolution) {
+            surfaceSize?.let { (width, height) -> applySize(width, height) }
+        }
+
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -484,20 +515,8 @@ private fun BoxScope.DesktopViewport(
                             width: Int,
                             height: Int,
                         ) {
-                            val metrics = context.resources.displayMetrics
-                            val scale = DesktopScale.resolve(DesktopPrefs.scale(context), metrics.densityDpi)
-                            // Below full resolution the output is asked for fewer pixels than the view
-                            // has and SurfaceFlinger scales the buffer up (Droidtop/tracker#426); the
-                            // scale shrinks with it so the layout keeps its size.
-                            val factor = DesktopScale.resolutionFactor(DesktopPrefs.resolution(context))
-                            val (outW, outH) = DesktopScale.outputSize(width, height, factor)
-                            val sized = hostBridge.setOutputSize(outW, outH, DesktopScale.outputScale(scale, factor))
-                            router.transform = PointerTransform(
-                                viewWidth = width,
-                                viewHeight = height,
-                                outputWidth = if (sized) outW else primaryOutput.widthPx,
-                                outputHeight = if (sized) outH else primaryOutput.heightPx,
-                            )
+                            surfaceSize = width to height
+                            applySize(width, height)
                         }
 
                         override fun surfaceDestroyed(holder: SurfaceHolder) {
@@ -597,6 +616,7 @@ private fun BoxScope.DesktopViewport(
 
 @Composable
 private fun BoxScope.Taskbar(
+    atTop: Boolean,
     onHeight: (Int) -> Unit,
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
@@ -610,7 +630,6 @@ private fun BoxScope.Taskbar(
     onOpenQuickMenu: () -> Unit,
 ) {
     val context = LocalContext.current
-    val atTop = DesktopPrefs.taskbarAtTop(context)
     // With a pad in hand the bar names the four buttons that reach droidtop's chrome (the activity
     // answers them, see DesktopPadRoutes), on a strip of its own so the bar keeps its width for the
     // window list on a 768 dp console.
@@ -1185,29 +1204,6 @@ private fun NotificationCount(count: Int) {
             style = MaterialTheme.typography.labelSmall,
         )
     }
-}
-
-/**
- * Reads the mode-specific preference set that :app's Desktop mode
- * settings catalog (DroidtopWideSettings) writes. No
- * compile-time dependency on :shell-default -- see :shell-gamepad's
- * equivalent GamingPrefs for the same reasoning -- so this reads the
- * shared [LAUNCHER_PREFS_FILE_NAME] SharedPreferences file instead.
- */
-private object DesktopPrefs {
-    private const val PREFS_NAME = LAUNCHER_PREFS_FILE_NAME
-    private const val KEY_TASKBAR_TOP = "pref_desktop_taskbar_top"
-
-    fun taskbarAtTop(context: Context): Boolean =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TASKBAR_TOP, false)
-
-    /** The Desktop scale setting as stored ([DesktopScale.KEY]); null when never set. */
-    fun scale(context: Context): String? =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(DesktopScale.KEY, null)
-
-    /** The Desktop resolution setting as stored ([DesktopScale.RESOLUTION_KEY]); null when never set. */
-    fun resolution(context: Context): String? =
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(DesktopScale.RESOLUTION_KEY, null)
 }
 
 // The container manager in droidtop's screen host (CatalogScreenLink): an
