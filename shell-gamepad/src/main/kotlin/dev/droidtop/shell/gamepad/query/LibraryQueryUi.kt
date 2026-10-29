@@ -84,6 +84,7 @@ import dev.droidtop.shell.gamepad.TextEditDialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
+import dev.droidtop.ui.shared.holdKeyFocus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -507,6 +508,8 @@ internal fun LibrarySearchDialog(
     }
     val text = field.text
     val fieldFocus = remember { FocusRequester() }
+    // The panel's own focus, which it takes back whenever the field gives focus up (Droidtop/tracker#747).
+    val panelFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val view = LocalView.current
     // A page a result opens (a source's detail, a plugin's settings) takes the window over: the
@@ -866,6 +869,9 @@ internal fun LibrarySearchDialog(
                             at == 0 -> {
                                 moveCue(true, press.repeat)
                                 focusKey = null
+                                // The cursor is back in the field, and so is focus: the panel may hold it since Back
+                                // hid the keyboard.
+                                runCatching { fieldFocus.requestFocus() }
                                 if (typing) androidKeyboard()
                                 true
                             }
@@ -880,12 +886,17 @@ internal fun LibrarySearchDialog(
                         } else {
                             // A on the field is choosing to type.
                             typing = true
+                            runCatching { fieldFocus.requestFocus() }
                             androidKeyboard()
                             true
                         }
                         else -> false
                     }
                 }
+                // Under the handler, so it always hears the pad: Back hiding the on-screen keyboard clears the
+                // field's focus, and with no focus inside the panel D-pad Up and A did nothing while a tap still
+                // worked (console, Droidtop/tracker#747). The rows take no focus (padRow), so the panel holds it.
+                .holdKeyFocus(panelFocus)
                 .clip(MenuTokens.OverlayShape)
                 .background(MenuTokens.OverlaySurface)
                 // The panel stays above the soft keyboard (the dialog window is edge to edge, so the keyboard's

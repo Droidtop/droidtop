@@ -24263,7 +24263,12 @@ match" for games Gaming listed (console, 2026-10-17).
   The pad reaches every row: Down leaves the field for the first row (the
   soft keyboard goes away), Up from the first row returns to the field, A
   opens the row, and typing puts the cursor back in the field. The cursor
-  follows a row by its key, so a source answering above it does not move it.
+  follows a row by its key, so a source answering above it does not move it. The sheet always hears the pad (Droidtop/tracker#747): Back hiding the
+  on-screen keyboard clears the field's focus, and with nothing focused inside
+  the sheet D-pad Up and A did nothing on the console while a tap still worked.
+  The sheet is a focus target of its own under its key handler and takes focus
+  back whenever nothing inside it holds it (`holdKeyFocus`), without raising a
+  keyboard; Up to the field and A on the field give the field its focus again.
 - **A page a row opens replaces the search, it is not drawn over it**
   (Droidtop/tracker#542). A source's detail and a plugin's settings
   open in a window of their own while the search panel is not composed; what was
