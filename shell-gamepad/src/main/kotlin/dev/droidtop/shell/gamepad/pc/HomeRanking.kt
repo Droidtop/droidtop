@@ -1,12 +1,7 @@
 package dev.droidtop.shell.gamepad.pc
 
-import android.content.Context
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PlayStart
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 /** Home's row of the games this person plays at this time of day (Droidtop/tracker#611, owner's "a", 2026-10-28). */
 internal const val SHELF_USUAL_NOW = "usual-now"
@@ -57,32 +52,4 @@ internal fun rankHomeShelves(
                 .thenBy { it.index },
         )
         .map { it.value }
-}
-
-/**
- * How many games each Home row has started (Droidtop/tracker#611), the ranking's sign of use: a preferences map, read
- * once off the main thread ([load]) and written off it ([noteStart]). On the device only.
- */
-internal object HomeRowUse {
-    private const val PREFS = "home_row_use"
-    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    @Volatile
-    private var counts: Map<String, Int>? = null
-
-    /** The counts as stored. Touches the preferences file: not for the main thread. */
-    fun load(context: Context): Map<String, Int> = counts ?: context.applicationContext
-        .getSharedPreferences(PREFS, Context.MODE_PRIVATE).all
-        .mapNotNull { (k, v) -> (v as? Int)?.let { k to it } }.toMap()
-        .also { counts = it }
-
-    /** A game was started from the Home row [shelfId]. */
-    fun noteStart(context: Context, shelfId: String) {
-        val app = context.applicationContext
-        io.launch {
-            val next = load(app).toMutableMap().apply { merge(shelfId, 1, Int::plus) }
-            counts = next
-            app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(shelfId, next.getValue(shelfId)).apply()
-        }
-    }
 }

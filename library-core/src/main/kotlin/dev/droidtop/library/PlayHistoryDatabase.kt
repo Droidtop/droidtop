@@ -430,6 +430,8 @@ class RoomPlayHistoryStore(context: Context) : PlayHistoryStore {
     override suspend fun moveTo(fromId: String, toId: String) = dao.moveTo(fromId, toId)
 
     override suspend fun startsSince(sinceMs: Long): List<PlayStart> = dao.startsSince(sinceMs).map { PlayStart(it.gameId, it.startedAt) }
+
+    override suspend fun forgetStarts() = dao.pruneStarts(Long.MAX_VALUE)
 }
 
 /**

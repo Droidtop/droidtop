@@ -130,6 +130,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.library.integrations.JobNotices.start()
         dev.droidtop.app.LaunchWatchNotification.start(appContext)
         AppSettingsCatalogs.ensureRegistered()
+        dev.droidtop.library.settings.HomeRows.forgetLaunchLog = { ctx -> dev.droidtop.app.LibraryCore.library(ctx).forgetStarts() }
         dev.droidtop.library.settings.LibraryRescan.handler = { ctx, onStatus ->
             onStatus("Looking for new or changed games and apps\u2026")
             val started = android.os.SystemClock.elapsedRealtime()

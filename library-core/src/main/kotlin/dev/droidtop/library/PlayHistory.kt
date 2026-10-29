@@ -40,6 +40,9 @@ interface PlayHistoryStore {
 
     /** The launch log since [sinceMs] (Droidtop/tracker#611): one [PlayStart] per start, kept [PlayStarts.KEEP_MS]. */
     suspend fun startsSince(sinceMs: Long): List<PlayStart> = emptyList()
+
+    /** Empties the launch log; the play counts and last-played times stay (Home rows, "Forget when I play"). */
+    suspend fun forgetStarts() {}
 }
 
 /** One start of a game: which, and when (epoch ms). */

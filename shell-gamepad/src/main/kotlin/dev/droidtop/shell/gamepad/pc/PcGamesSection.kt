@@ -509,7 +509,7 @@ internal fun PcGamesSection(
     // Which Home rows started the most games, read once each time Home opens, so the order is worked out then and never
     // shifts while the person is on it (Droidtop/tracker#611).
     val homeUse by produceState(initialValue = emptyMap<String, Int>(), state.home) {
-        value = if (state.home) withContext(Dispatchers.IO) { HomeRowUse.load(context) } else emptyMap()
+        value = if (state.home) withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.use(context) } else emptyMap()
     }
     // What the person pinned and hid (Settings > Shell > Home rows), read when Home opens.
     val homeRules by produceState(initialValue = dev.droidtop.library.settings.HomeRows.Rules(), state.home) {
@@ -688,7 +688,7 @@ internal fun PcGamesSection(
     val pcLaunch = rememberPcLaunch(
         onLaunch = { entry ->
             // A start from a Home row counts for that row's place on Home (Droidtop/tracker#611).
-            if (state.home && !state.stripFocused) currentShelf?.id?.let { HomeRowUse.noteStart(context, it) }
+            if (state.home && !state.stripFocused) currentShelf?.id?.let { dev.droidtop.library.settings.HomeRows.noteStart(context, it) }
             onLaunch(folded?.continuing?.get(entry.id) ?: entry)
         },
         onOpenDownloads = { onOpenSection(GamingSection.DOWNLOADS) },

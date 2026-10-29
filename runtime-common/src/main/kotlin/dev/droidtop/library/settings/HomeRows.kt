@@ -1,19 +1,24 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
  * The person's say over Home's rows (Droidtop/tracker#611, the adaptive Home: "The person can always pin, hide or
  * reorder rows"): rows pinned to the top in their order, and rows hidden. Every other row takes the place Home's use
  * gives it. Home notes the rows it has shown ([noteSeen]), by id and title, so a plugin's shelf can be pinned or
- * hidden as droidtop's own can. Preferences, read and written off the main thread.
+ * hidden as droidtop's own can. It also keeps how many games each row has started ([use]), the ranking's sign of use,
+ * so the person can forget that use here ([screen]). Preferences, read and written off the main thread.
  */
 object HomeRows {
     private const val PREFS = "home_rows"
+    private const val USE_PREFS = "home_row_use"
     private const val KEY_PINNED = "pinned"
     private const val KEY_HIDDEN = "hidden"
     private const val KEY_SEEN = "seen"
@@ -27,6 +32,40 @@ object HomeRows {
     private var loaded = false
 
     val rules: StateFlow<Rules> = state
+
+    private val io = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    private var useCounts: Map<String, Int>? = null
+
+    /**
+     * Clears the launch log Home's "Usual at this time" row reads (library-core's, set where the library is made):
+     * this module cannot reach the play history itself. Null where nothing set it.
+     */
+    @Volatile
+    var forgetLaunchLog: (suspend (Context) -> Unit)? = null
+
+    /** How many games each row has started, as stored. Touches the preferences file: not for the main thread. */
+    fun use(context: Context): Map<String, Int> = useCounts ?: usePrefs(context).all
+        .mapNotNull { (k, v) -> (v as? Int)?.let { k to it } }.toMap()
+        .also { useCounts = it }
+
+    /** A game was started from the Home row [rowId]; written off the main thread. */
+    fun noteStart(context: Context, rowId: String) {
+        val app = context.applicationContext
+        io.launch {
+            val next = use(app).toMutableMap().apply { merge(rowId, 1, Int::plus) }
+            useCounts = next
+            usePrefs(app).edit().putInt(rowId, next.getValue(rowId)).apply()
+        }
+    }
+
+    /** Forgets what Home learned from use: the rows' counts and the launch log. Not for the main thread. */
+    suspend fun forgetUse(context: Context) {
+        useCounts = emptyMap()
+        usePrefs(context).edit().clear().apply()
+        forgetLaunchLog?.invoke(context.applicationContext)
+    }
 
     /** Reads what is stored. Touches the preferences file: not for the main thread. */
     fun load(context: Context): Rules {
@@ -150,6 +189,16 @@ object HomeRows {
                             confirmTitle = "Show every row and unpin them all?",
                             run = { ctx -> set(ctx, Rules()) },
                         ),
+                        AsyncActionItem(
+                            id = "home_rows_forget_use",
+                            title = "Forget when I play",
+                            subtitle = "Clears the launch log behind Usual at this time, and the order your use gave the rows",
+                            confirmTitle = "Forget when you play and which rows you use?",
+                            run = { ctx, _ ->
+                                withContext(Dispatchers.IO) { forgetUse(ctx) }
+                                "Forgotten"
+                            },
+                        ),
                     ),
                 ),
             )
@@ -158,4 +207,6 @@ object HomeRows {
     )
 
     private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    private fun usePrefs(context: Context) = context.applicationContext.getSharedPreferences(USE_PREFS, Context.MODE_PRIVATE)
 }

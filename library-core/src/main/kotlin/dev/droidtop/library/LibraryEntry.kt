@@ -2028,6 +2028,9 @@ class Library(
     suspend fun recentStarts(nowMs: Long = System.currentTimeMillis()): List<PlayStart> =
         withContext(Dispatchers.IO) { playHistory.startsSince(nowMs - PlayStarts.KEEP_MS) }
 
+    /** Empties the launch log [recentStarts] reads. */
+    suspend fun forgetStarts() = withContext(Dispatchers.IO) { playHistory.forgetStarts() }
+
     suspend fun launch(entry: LibraryEntry) {
         withContext(Dispatchers.IO) {
             // Which game this launch is for, published for the duration of
