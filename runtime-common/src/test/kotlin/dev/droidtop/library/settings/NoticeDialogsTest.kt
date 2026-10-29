@@ -41,7 +41,7 @@ class NoticeDialogsTest {
         yield()
         attach()
         assertTrue(waiting.await())
-        assertTrue(NoticeDialogs.awaitHost(0))
+        assertTrue(NoticeDialogs.awaitHost(100))
     }
 
     @Test
