@@ -8502,7 +8502,7 @@ app-drawer icon or a floating switcher button:
   droidtop has, **Modes** (the default mode, offering only enabled modes,
   and the Desktop/Gaming enable switches; a disabled mode is absent from
   `BackButtonMenu`'s shell switcher, not greyed out) and **Data** (Rerun
-  onboarding from `OnboardingStep.WELCOME`; Back up/Restore settings, a
+  onboarding from `OnboardingStep.WELCOME`; Back up/Restore droidtop, below, which began as a
   JSON export/import of the one shared `"com.android.launcher3.prefs"`
   file through the system file picker, `DocumentPickItem`, and NOT games,
   ROMs, downloaded themes or folder grants, which need consent again
@@ -8515,7 +8515,24 @@ app-drawer icon or a floating switcher button:
   nothing that needs a grant; the row is named "Back up droidtop" for
   that reason, and Restore says what it will and will not bring back
   before it runs. The index is rebuilt from the restored records (Developer
-  › Rebuild the library index), never copied. Android's own Settings are reached from
+  › Rebuild the library index), never copied. **Built (2026-10-29,
+  Droidtop/tracker#625):** Data's two rows are now Back up droidtop and
+  Restore droidtop (`DroidtopBackup`). The archive is a zip with
+  `manifest.json` (format 1), `settings.json` (what Back up settings wrote,
+  credentials only when the person chose so), `files/library/games/**`,
+  `files/play-log.json`, `databases/droidtop-play-history.db` and
+  `databases/droidtop-rom-cache.db` (play history and sessions, favourites,
+  collections, links; scraped metadata and edits; each folded out of its
+  write-ahead log first, and copied whole rather than exported as JSON:
+  Room's own migrations then carry an older copy forward), and `plugins.json`, the installed plugins' ids,
+  names, versions and origins. Restore asks first, applies the settings at
+  once and stages every other file; the next start moves them into place
+  before any database opens (`finishPendingRestore`), so nothing is replaced
+  under a running library. An entry the format does not name, or one that
+  climbs out of its folder, is skipped. Plugins are not in the archive: the
+  restore names them so the person reinstalls them from their sources, where
+  they are verified and approved again, as are folder grants. A settings file
+  from before (JSON) still restores. Controls profiles are not in it yet. Android's own Settings are reached from
   Settings > Android settings, so Global has no second shortcut to them.
   Standard mode's launcher pages (icons, drawer, home screen) stay stock
   launcher3 preferences. A

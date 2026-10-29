@@ -223,19 +223,24 @@ object DroidtopWideSettings {
                             current = CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false),
                             onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_BACKUP_CREDENTIALS, on).apply() },
                         ),
+                        // One archive of what a person did in droidtop (docs/SPEC.md "Data", Droidtop/tracker#625).
                         DocumentPickItem(
                             id = "pref_global_backup",
-                            title = "Back up settings",
-                            subtitle = "Save droidtop's settings to a file (not games, ROMs or downloaded themes)",
-                            mimeType = "application/json",
-                            createName = "droidtop-backup.json",
+                            title = "Back up droidtop",
+                            subtitle = "Settings, game records, play history, favourites, collections, scraped details " +
+                                "and the list of plugins, in one file. Not games, ROMs, themes or permissions",
+                            mimeType = "application/zip",
+                            createName = "droidtop-backup.zip",
                             onPicked = ::writeBackup,
                         ),
                         DocumentPickItem(
                             id = "pref_global_restore",
-                            title = "Restore settings",
-                            subtitle = "Load droidtop's settings from a backup file",
-                            mimeType = "application/json",
+                            title = "Restore droidtop",
+                            subtitle = "From a droidtop backup. Settings apply now; the rest when droidtop next starts. " +
+                                "Folder access and plugin permissions are asked again, and plugins are reinstalled from their sources",
+                            mimeType = "*/*",
+                            confirmTitle = "Restoring replaces this device's game records, play history, favourites, " +
+                                "collections and scraped details with the backup's",
                             onPicked = ::readBackup,
                         ),
                     ),
@@ -600,6 +605,14 @@ object DroidtopWideSettings {
      * folder grants are separate state, and grants need consent again.
      */
     private fun writeBackup(context: Context, uri: Uri): String = runCatching {
+        DroidtopBackup.write(context, uri, settingsJson(context))
+    }.getOrElse {
+        android.util.Log.w("droidtop.settings", "Backup failed", it)
+        "Backup failed. Check there is space left on the storage you chose and try again."
+    }
+
+    /** The settings file as JSON, with the credentials only when the person chose to back them up (encoded). */
+    private fun settingsJson(context: Context): JSONObject {
         val json = JSONObject()
         val includeCredentials = CatalogPrefs.prefs(context).getBoolean(KEY_BACKUP_CREDENTIALS, false)
         val credentials = JSONObject()
@@ -620,12 +633,7 @@ object DroidtopWideSettings {
             CredentialStore.snapshot(context).forEach { (key, value) -> credentials.put(key, value) }
             json.put(BACKUP_CREDENTIALS_FIELD, Base64.encodeToString(credentials.toString().toByteArray(Charsets.UTF_8), Base64.NO_WRAP))
         }
-        context.contentResolver.openOutputStream(uri)?.use { it.write(json.toString(2).toByteArray()) }
-            ?: error("the file could not be opened")
-        "Backup saved"
-    }.getOrElse {
-        android.util.Log.w("droidtop.settings", "Backup failed", it)
-        "Backup failed. Check there is space left on the storage you chose and try again."
+        return json
     }
 
     /**
@@ -634,10 +642,32 @@ object DroidtopWideSettings {
      */
     private fun shareDiagnostics(context: Context): String = dev.droidtop.library.diagnostics.DiagnosticsArchive.share(context)
 
+    /**
+     * A droidtop backup archive (a zip), or a settings file from before the archive (JSON): the settings apply now,
+     * and an archive's files wait for the next start ([DroidtopBackup.finishPendingRestore]).
+     */
     private fun readBackup(context: Context, uri: Uri): String = runCatching {
+        val head = context.contentResolver.openInputStream(uri)?.use { stream -> ByteArray(2).also { stream.read(it) } }
+            ?: error("the file could not be opened")
+        if (head[0] == 'P'.code.toByte() && head[1] == 'K'.code.toByte()) {
+            val staged = DroidtopBackup.stage(context, uri)
+            staged.settings?.let { applySettings(context, it) }
+            val plugins = if (staged.plugins.isEmpty()) "" else
+                " Reinstall these plugins from Plugins: ${staged.plugins.joinToString(", ")}."
+            return@runCatching "Restored the settings. The rest (${staged.files} files) is put in place the next time droidtop " +
+                "starts: restart droidtop now.$plugins"
+        }
         val text = context.contentResolver.openInputStream(uri)?.use { it.bufferedReader().readText() }
             ?: error("the file could not be opened")
-        val json = JSONObject(text)
+        applySettings(context, JSONObject(text))
+        "Restored. Restart droidtop for every setting to apply."
+    }.getOrElse {
+        android.util.Log.w("droidtop.settings", "Restore failed", it)
+        "Restore failed. Check that the file is a droidtop backup and try again."
+    }
+
+    /** Writes a backup's settings into the settings file; credentials only from the backup's encoded section. */
+    private fun applySettings(context: Context, json: JSONObject) {
         val editor = CatalogPrefs.prefs(context).edit()
         for (key in json.keys()) {
             if (key == BACKUP_CREDENTIALS_FIELD || key == KEY_BACKUP_CREDENTIALS || isCredentialKey(key)) continue
@@ -661,9 +691,5 @@ object DroidtopWideSettings {
             }
         }
         editor.apply()
-        "Restored. Restart droidtop for every setting to apply."
-    }.getOrElse {
-        android.util.Log.w("droidtop.settings", "Restore failed", it)
-        "Restore failed. Check that the file is a droidtop backup and try again."
     }
 }
