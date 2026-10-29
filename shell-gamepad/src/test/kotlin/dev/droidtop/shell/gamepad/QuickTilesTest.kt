@@ -270,9 +270,10 @@ class QuickTilesTest {
 
     @Test
     fun `Kid and Kiosk sections come from ControlAccess and match Full's, without the restriction's own items`() {
+        // Full's sections less the owner's Profile (Droidtop/tracker#586).
         for (mode in listOf(dev.droidtop.library.settings.UiMode.KID, dev.droidtop.library.settings.UiMode.KIOSK)) {
             assertEquals(
-                QuickTiles.visibleSections(gameRunning = true, hasPlugins = true),
+                QuickTiles.visibleSections(gameRunning = true, hasPlugins = true) - QuickSection.PROFILE,
                 QuickTiles.visibleSections(gameRunning = true, hasPlugins = true, mode = mode),
             )
         }
