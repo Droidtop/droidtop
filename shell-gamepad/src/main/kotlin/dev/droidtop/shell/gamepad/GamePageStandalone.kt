@@ -8,7 +8,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
@@ -48,7 +47,7 @@ fun GamePageStandalone(
         return
     }
     if (entry.kind != LibraryEntryKind.CONSOLE_ROM) return
-    Dialog(
+    ShellDialog(
         onDismissRequest = onClose,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {
