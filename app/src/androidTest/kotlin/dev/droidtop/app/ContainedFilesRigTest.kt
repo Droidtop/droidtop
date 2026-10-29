@@ -1,14 +1,14 @@
 package dev.droidtop.app
 
-import android.content.Context
-import android.database.sqlite.SQLiteDatabase
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.droidtop.pluginhost.ContainedPreferences
 import dev.droidtop.pluginhost.DroidtopPlugin
 import dev.droidtop.pluginhost.NativePluginRunner
 import dev.droidtop.pluginhost.PluginArgs
 import dev.droidtop.pluginhost.PluginCall
 import dev.droidtop.pluginhost.PluginCapability
+import dev.droidtop.pluginhost.PluginContext
 import dev.droidtop.pluginhost.PluginDataStore
 import dev.droidtop.pluginhost.PluginManifest
 import dev.droidtop.pluginhost.PluginRecord
@@ -48,18 +48,27 @@ class ContainedFilesRigTest {
     private val context = instrumentation.targetContext
     private val runner = NativePluginRunner(context, onCrash = { _, _, _ -> })
 
-    /** What runs inside the sandbox: each check answers "ok" or the error it met. */
+    /**
+     * What runs inside the sandbox: each check answers "ok" or the error it met. It uses only what droidtop gives a
+     * plugin (its [PluginContext]: its folder, its preferences), never Android's own context or services.
+     */
     class Probe : DroidtopPlugin {
+        private lateinit var context: PluginContext
+
+        override fun onLoad(context: PluginContext) {
+            this.context = context
+        }
+
         override fun invoke(capability: PluginCapability, args: PluginArgs): PluginResult = PluginResult.failure("contract 2 only")
 
         override fun handle(call: PluginCall): PluginReply {
-            // Android's own context of this process, as a Flutter package's Android half gets it.
-            val app = Class.forName("android.app.ActivityThread").getMethod("currentApplication").invoke(null) as Context
             val out = JSONObject()
             fun check(name: String, block: () -> Unit) {
                 out.put(name, runCatching { block(); "ok" }.getOrElse { "error: ${it::class.java.simpleName}: ${it.message}" })
             }
-            val dir = File(app.filesDir, "rig")
+            // The plugin's own folder by path; "files" is where Android's getFilesDir would put a plugin's files.
+            val files = File(context.privateDataDir(), "files")
+            val dir = File(files, "rig")
             when (call.op) {
                 "files" -> {
                     check("write") {
@@ -70,11 +79,11 @@ class ContainedFilesRigTest {
                     check("list") {
                         // Which half fails, when one does: opening the folder (File.list answers null) or reading it.
                         val opened = runCatching {
-                            android.system.Os.open(app.filesDir.path, android.system.OsConstants.O_RDONLY or android.system.OsConstants.O_DIRECTORY, 0)
+                            android.system.Os.open(files.path, android.system.OsConstants.O_RDONLY or android.system.OsConstants.O_DIRECTORY, 0)
                         }
                         opened.getOrNull()?.let { android.system.Os.close(it) }
-                        require(app.filesDir.list()?.contains("rig") == true) {
-                            "filesDir lists ${app.filesDir.list()?.toList()}; opening it: ${opened.exceptionOrNull()?.message ?: "ok"}"
+                        require(files.list()?.contains("rig") == true) {
+                            "files lists ${files.list()?.toList()}; opening it: ${opened.exceptionOrNull()?.message ?: "ok"}"
                         }
                         require(dir.listFiles()?.any { it.name == "a.txt" } == true) { "rig lists ${dir.list()?.toList()}" }
                     }
@@ -89,12 +98,14 @@ class ContainedFilesRigTest {
                         require(file.lastModified() == 1_000_000_000_000L) { "lastModified is ${file.lastModified()}" }
                     }
                     check("prefs") {
-                        require(app.getSharedPreferences("rig", 0).edit().putString("k", "v").commit()) { "commit answered false" }
-                        val reread = app.getSharedPreferences("rig", 0).getString("k", null)
+                        val prefs = requireNotNull(context.preferences("rig")) { "no preferences for the plugin" }
+                        require(prefs.edit().putString("k", "v").commit()) { "commit answered false" }
+                        val reread = ContainedPreferences.read(File(context.privateDataDir(), "shared_prefs/rig.xml"))["k"]
                         require(reread == "v") { "read back $reread" }
                     }
-                    check("sqlite") { sqlite(app, "rig.db", wal = false) }
-                    check("sqlite-wal") { sqlite(app, "rig-wal.db", wal = true) }
+                    // Android's own SQLite is not a plugin's: droidtop's bundled one answers here once it is built.
+                    check("sqlite") { error("droidtop's SQLite is not built yet (Droidtop/tracker#741)") }
+                    check("sqlite-wal") { error("droidtop's SQLite is not built yet (Droidtop/tracker#741)") }
                 }
                 "quota" -> {
                     dir.mkdirs()
@@ -126,19 +137,6 @@ class ContainedFilesRigTest {
                 }
             }
             return PluginReply.ok(out)
-        }
-
-        private fun sqlite(app: Context, name: String, wal: Boolean) {
-            val file = app.getDatabasePath(name).also { it.parentFile?.mkdirs() }
-            val db = SQLiteDatabase.openOrCreateDatabase(file.path, null)
-            try {
-                if (wal) require(db.enableWriteAheadLogging()) { "WAL refused" }
-                db.execSQL("create table if not exists t(x text)")
-                db.execSQL("insert into t values ('row')")
-                db.rawQuery("select count(*) from t", null).use { require(it.moveToFirst() && it.getInt(0) >= 1) { "no row" } }
-            } finally {
-                db.close()
-            }
         }
     }
 

@@ -95,7 +95,10 @@ internal object FlutterEngineHost {
         // through DownloadedFlutterJNI.init instead ([containedShellArgs]).
         val dartVmArgs = if (source.contained) emptyArray() else arrayOf("--aot-shared-library-name=${source.libapp}")
         // false, not true: automatic registration only looks on this process's own classloader, which never has the plugin's generated registrant (see registerGeneratedPlugins).
-        val engine = FlutterEngine(appContext, flutterLoader, flutterJNI, dartVmArgs, false)
+        // In a plugin process the packages' Android halves get droidtop's own preferences (docs/plugin-api.md 5.3,
+        // "Preferences and SQLite are droidtop's"): the engine hands them its context's application context.
+        val context = if (dev.droidtop.runtime.util.IsolatedProcess.runsPluginCode()) PluginProcessContext(appContext) else appContext
+        val engine = FlutterEngine(context, flutterLoader, flutterJNI, dartVmArgs, false)
         // An isolated process cannot have a display-event connection (Choreographer and AChoreographer both need
         // SurfaceFlinger, which it may not look up), so no vsync ever arrived and a ui.main screen stayed black
         // (emulator-5560). There the engine waits for vsync through FlutterJNI, and droidtop answers it on a timer.

@@ -3485,7 +3485,7 @@ database on the PC follows.
 
 | Id | Group | For | Ops and events | Surfaces | Permission | Risk | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in the full-trust tier, a host-backed fd API in the contained tier); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 48 KiB, as}` (2026-10-15, Droidtop/tracker#544 item 4: the reply crosses the broker as UTF-16 text and base64 adds a third, so 120 KiB came back as a 327808-byte binder reply; a longer `length` is answered with 48 KiB and `eof: false`, so a reader that loops until `eof` is unchanged; a large file is opened instead, `open` → fd; writes stay at 128 KiB), `list {prefix}`, `delete`, `move {from, to}`, `usage`, `open {name, mode}` → fd, `path {name}` (droidtop's path of the file, only to hand to a provider plugin), names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
+| H1 | Per-plugin storage | the plugin's own files and preferences | `privateDataDir()` (exists; a path in every tier, in a plugin process the private-folder path its broker answers with the plugin's own folder, 2026-10-29); `preferences(name)` (droidtop's store, §5.3 "Preferences and SQLite are droidtop's", 2026-10-29); `prefs.get/set` (small key/value, host-stored, shown in the export); quota §8 | — | — (own data) | low | built: `privateDataDir` with full access; contained, the `data` API on the same folder (2026-10-08): `write {name, text \| base64, append}`, `read {name, offset, length ≤ 48 KiB, as}` (2026-10-15, Droidtop/tracker#544 item 4: the reply crosses the broker as UTF-16 text and base64 adds a third, so 120 KiB came back as a 327808-byte binder reply; a longer `length` is answered with 48 KiB and `eof: false`, so a reader that loops until `eof` is unchanged; a large file is opened instead, `open` → fd; writes stay at 128 KiB), `list {prefix}`, `delete`, `move {from, to}`, `usage`, `open {name, mode}` → fd, `path {name}` (droidtop's path of the file, only to hand to a provider plugin), names of `[A-Za-z0-9._-]` segments, writes stop at 512 MiB; `prefs` not built |
 | H2 | Shared databases | data other plugins or droidtop may read: droidtop's library index (A1), and a plugin's own published dataset | droidtop's own databases: only through A1 APIs, never a handle. A plugin publishing data does it as a plugin-provided API (§2), e.g. `acme.playlog.query` | — | per API | varies | by design |
 | H3 | Import and export | move a plugin's settings or data between devices | EP `data.export@1`: `export → job writing into a host-chosen fd`; `import {fd}` | A/G/D: Accounts and sources → Plugins → <plugin> → Export / Import | none (user-initiated) | low | not built |
 | H4 | Backup and restore | droidtop's own backup includes plugin data | manifest `backup: {include: ["prefs", "data/<subpath>"]}`; vault entries never included; restore re-verifies the plugin and asks before re-granting dangerous permissions | Settings → Backup | none | medium | not built (#46 is the credentials-in-backup issue) |
@@ -4095,6 +4095,45 @@ Containment check's "droidtop's files" line looks for droidtop's
 `files/plugins` folder by its own name, which in a plugin process is the
 plugin's folder, where there is none.
 
+**Preferences and SQLite are droidtop's (decided 2026-10-29,
+Droidtop/tracker#741).** The first emulator run of `ContainedFilesRigTest`
+(Android 13 and 14) found Android's own Java paths to preferences and SQLite
+failing in an isolated process before any file is touched:
+`getSharedPreferences` first asks the user service whether storage is unlocked
+(an isolated process cannot look it up), and opening a `SQLiteDatabase` first
+reads a global setting through the settings provider (an isolated process may
+call no content provider). The owner: "Android updates can't be allowed to
+affect this", and "Plugins don't have to be given access to ANY android
+internals". So:
+
+- **A plugin depends on the plugin API only**, never on Android's services or
+  on which Android it runs on. Where a plugin reads an Android version, it is
+  a value droidtop's plugin runtime defines (the API level droidtop is
+  prepared to handle, in host info and in the runtime's environment), not the
+  device's, and nothing is intercepted to make it so.
+- **Preferences.** droidtop's own store (`ContainedPreferences`): a map in
+  memory and one file per name at `<private folder>/shared_prefs/<name>.xml`,
+  in Android's own XML format (so a plugin's settings read the same in either
+  tier, after a move between them, and from a file Android wrote, its `.bak`
+  of an unfinished write taken first), written by a temporary file renamed
+  over the old one, `commit` and `apply` in order on one writer thread,
+  listeners on the main thread (a `clear` heard as one null key). A Flutter
+  plugin's engine is built in a plugin process with droidtop's
+  `PluginProcessContext`, which is its own application context and whose
+  `getSharedPreferences` is this store, so `shared_preferences`' Android half
+  gets it unchanged (its DataStore-based API writes plain files and needs
+  nothing). A Kotlin plugin gets no Android `Context`: it has
+  `PluginContext.preferences(name)`, and `privateDataDir()` is its own folder
+  by path in every tier. Both tiers, contained and open, get the same store.
+- **SQLite** is a bundled SQLite at a pinned version, never Android's
+  framework SQLite: droidtop answers `sqflite`'s method channel itself, and a
+  Kotlin plugin gets a small plugin-host API for it. Being built; until then
+  the rig test's `sqlite` checks say so.
+- **The guard** is the emulator job: `ContainedFilesRigTest` runs on Android
+  13 and 14 and must answer the same on both. Its probe uses only what
+  droidtop gives a plugin (its `PluginContext`), never Android's context or a
+  hidden API.
+
 **What a contained plugin's own folder holds (design 2026-10-16,
 Droidtop/tracker#375).** Decided by the coordinator, 2026-10-16:
 "Contained Flutter plugins get shared_preferences, path_provider and `open`
@@ -4104,9 +4143,10 @@ authors and users." On listing: "don't leave listing as a permanent limit if
 the broker can answer it." The folder above is the mechanism; what it serves:
 
 - **Packages that keep files.** `path_provider` (Flutter's `app_flutter`,
-  `getFilesDir`, `getCacheDir`), `shared_preferences` (Android's
-  `SharedPreferences` files under `shared_prefs`, written by a temporary file
-  and a rename, both brokered) and `sqflite` (the database under
+  `getFilesDir`, `getCacheDir`), `shared_preferences` (droidtop's own
+  preferences store since 2026-10-29, "Preferences and SQLite are droidtop's"
+  below; its files under `shared_prefs`, written by a temporary file and a
+  rename, both brokered) and `sqflite` (the database under
   `databases`, with its `-journal`, `-wal` and `-shm` files: each is created,
   opened, renamed and unlinked by path, all brokered; its locks are `fcntl`
   on the descriptor, which never leaves the process). The WAL's `-shm` is

@@ -517,7 +517,7 @@ interface HostedScreen {
  * object, which names the caller. The local answers are a contained plugin's: no folder, no root, no Shizuku. A full-trust
  * process overrides them ([PluginRuntimeService]).
  */
-internal open class BrokerPluginContext(private val broker: IPluginHostBroker) : PluginContext {
+internal open class BrokerPluginContext(private val broker: IPluginHostBroker, private val folder: String = "") : PluginContext {
     private fun request(api: String, version: Int, op: String, argsJson: String): String =
         JSONObject().put("api", api).put("version", version).put("op", op)
             .put("args", runCatching { JSONObject(argsJson) }.getOrDefault(JSONObject())).toString()
@@ -543,8 +543,11 @@ internal open class BrokerPluginContext(private val broker: IPluginHostBroker) :
         reply.optBoolean("ok") && reply.optJSONObject("data")?.optBoolean(key) == true
     }.getOrDefault(false)
 
-    /** A contained plugin has no folder: its files live behind the `data` API (docs/plugin-api.md 3 H1). */
-    override fun privateDataDir(): String = ""
+    /**
+     * The process's own private-folder path, which its file broker sends to the plugin's own folder (docs/plugin-api.md
+     * 5.3, "The plugin's own folder by path"); empty when the process was given none.
+     */
+    override fun privateDataDir(): String = folder
 
     // The library folder is resolved by :app before a call and passed in its arguments; this process never reads it.
     override fun libraryFolderPath(systemId: String): String? = null

@@ -21794,7 +21794,11 @@ Advanced.
   of its own (`android:isolatedProcess="true"`), with a random UID, no
   permissions, no network and no access to droidtop's files or shared
   storage; droidtop's private folder, by whatever name its code uses, is a
-  folder of the plugin's own (since 2026-10-14, Droidtop/tracker#470). Its
+  folder of the plugin's own (since 2026-10-14, Droidtop/tracker#470). A
+  plugin depends on the plugin API only, never on Android's services or on
+  the Android it runs on: its preferences and its SQLite are droidtop's own,
+  in both tiers (2026-10-29, Droidtop/tracker#741; `docs/plugin-api.md` §5.3
+  "Preferences and SQLite are droidtop's"). Its
   code arrives as file descriptors, and everything it does
   beyond its process goes through its broker, where the caller's grant, the
   parameters it declared, the quota and the activity log apply. **For a

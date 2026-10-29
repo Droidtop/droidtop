@@ -76,7 +76,8 @@ open class PluginSandboxService : PluginProcessService() {
         if (!requiresIsolation && !PluginSyscallFilter.isOn(report)) {
             return failLoad(pluginId, "its process could not take droidtop's system-call filter ($report), so it is not run outside the sandbox")
         }
-        val context = BrokerPluginContext(broker)
+        // The plugin's folder is droidtop's private-folder path, which this process's broker answers with the plugin's own.
+        val context = BrokerPluginContext(broker, applicationInfo.dataDir)
         return when (manifest.kind) {
             PluginKind.NATIVE_BUNDLE -> loadDex(pluginId, manifest, files, context)
             PluginKind.PYTHON -> loadPython(pluginId, manifest, files, context)

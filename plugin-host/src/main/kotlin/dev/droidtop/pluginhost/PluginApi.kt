@@ -138,11 +138,19 @@ interface PluginContext {
         PluginFileReply(PluginReply.error(PluginErrorCode.UNSUPPORTED, "this host hands over no files").encode(), null)
 
     /**
-     * A full-trust plugin's own directory (`filesDir/plugins/<id>/data`), separate from its read-only installed
-     * payload. A contained plugin gets an empty string: it can open no path at all, and the same directory is
-     * reached through the `data` API instead (docs/plugin-api.md 3 H1).
+     * The plugin's own folder, separate from its read-only installed payload: a full-trust plugin's
+     * `filesDir/plugins/<id>/data`; in a plugin process, the private-folder path its file broker sends to the plugin's
+     * own folder (docs/plugin-api.md 5.3, "The plugin's own folder by path"). Empty where a host has none.
      */
     fun privateDataDir(): String
+
+    /**
+     * The plugin's preferences named [name]: droidtop's own store in its folder (docs/plugin-api.md 5.3, "Preferences
+     * and SQLite are droidtop's"), in Android's file format, never Android's own `getSharedPreferences`, so they work
+     * the same in every tier and on every Android. Null where the host has no folder for the plugin.
+     */
+    fun preferences(name: String): android.content.SharedPreferences? =
+        privateDataDir().takeIf { it.isNotEmpty() }?.let { ContainedPreferences.of(java.io.File(it), name) }
 
     /**
      * The real, already-configured destination folder for one system, by
