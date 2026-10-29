@@ -4612,7 +4612,11 @@ arrays under the manifest's own keys (`V2Declarations`).
   - Accounts and sources > Plugins > a plugin > Permissions lists every
     declared permission, each high-risk point it may provide and each
     export, with Allowed / Ask first / Blocked, its reason, "tried to use
-    this while you were not being asked" and when it was last used. New
+    this while you were not being asked" and when it was last used (a
+    logged call's time; an everyday permission, only counted per day
+    (4.6), the day of its newest count, Droidtop/tracker#60). Opening a
+    plugin's own screen (`ui.main`) set to Ask first is its first use and
+    asks on the sheet, as any point does (#59). New
     items from an update sit under "Wants new access" and the plugin's row
     says so. The state is a chip with a tone (Droidtop/tracker#519, built
     2026-10-16): Allowed neutral, Ask first caution, Blocked danger, from

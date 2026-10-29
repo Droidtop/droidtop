@@ -25,6 +25,16 @@ class PluginCallCountsTest {
         assertEquals(listOf("data.private" to 3, "log write" to 1), days[1].second)
     }
 
+    @Test fun `an everyday permission's last use is the newest day it was counted (Droidtop tracker 60)`() {
+        val counts = PluginCallCounts(dir)
+        counts.count("acme.last", "net.domains", nowMs = 1_000, zone = utc)
+        counts.count("acme.last", "data.private", nowMs = 2 * day + 5, zone = utc)
+        counts.count("acme.last", "net.domains", nowMs = day + 5, zone = utc)
+        assertEquals("1970-01-02", counts.lastDay("acme.last", "net.domains", nowMs = 2 * day + 6))
+        assertEquals("1970-01-03", counts.lastDay("acme.last", "data.private", nowMs = 2 * day + 6))
+        assertEquals(null, counts.lastDay("acme.last", "notify", nowMs = 2 * day + 6))
+    }
+
     @Test fun `counts held in memory reach a new instance over the same folder, and survive a flush`() {
         PluginCallCounts(dir).count("acme.tool", "data.private", nowMs = 1_000, zone = utc)
         val other = PluginCallCounts(dir)

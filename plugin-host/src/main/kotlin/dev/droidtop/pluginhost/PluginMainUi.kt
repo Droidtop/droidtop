@@ -52,9 +52,15 @@ object PluginMainUi {
         val m = record.manifest
         val entry = declared(m) ?: return "${m.label} has no screen of its own"
         if (!record.runnable()) return "${m.label} is not approved and turned on"
-        // The same per-item approval every other call honours (#164): the user may have unticked this one.
-        if (PluginGrants.provideState(record, PluginGrants.forContext(context).read(m.id), POINT) != GrantState.GRANTED) {
-            return "${m.label} has not been allowed to open its own screen. Allow it under Permissions"
+        // The same per-item approval every other call honours (#164): the user may have unticked this one. Set to Ask
+        // first (or not answered yet), opening it is the first use, so the first-use sheet asks (Droidtop/tracker#59,
+        // emulator rig: Ask first was refused like Blocked); Not now and Never leave it closed.
+        when (PluginGrants.provideState(record, PluginGrants.forContext(context).read(m.id), POINT)) {
+            GrantState.GRANTED -> Unit
+            GrantState.DENIED -> return "${m.label} has not been allowed to open its own screen. Allow it under Permissions"
+            GrantState.ASK -> if (!PluginGrants.askPoint(context, record, POINT)) {
+                return "${m.label} was not allowed to open its own screen. You can allow it under Permissions"
+            }
         }
         PluginRuntimeNeeds.missing(context, m)?.let { return "${m.label} ${it.message}" }
         val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))

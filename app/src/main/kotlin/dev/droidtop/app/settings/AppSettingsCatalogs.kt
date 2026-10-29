@@ -2758,8 +2758,17 @@ object AppSettingsCatalogs {
         val providerLabels = installed.flatMap { it.manifest.v2.exports }.flatMap { it.permissions }.associate { it.id to it.label }
         val rows = permissionRows(record, snap, providerLabels)
         val format = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+        val dayFormat = java.text.DateFormat.getDateInstance(java.text.DateFormat.SHORT)
+        val counts = PluginAudit.countsForContext(context)
         fun item(row: PermissionRow): CatalogItem {
+            // A logged call has its time; an everyday one is only counted per day (Droidtop/tracker#60, #61), so its day.
             val lastUsed = audit.lastUsed(pluginId, row.id)?.let { "Last used ${format.format(java.util.Date(it))}" }
+                ?: counts.lastDay(pluginId, row.id)?.let { day ->
+                    runCatching {
+                        val start = java.time.LocalDate.parse(day).atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+                        "Last used ${dayFormat.format(java.util.Date(start))}"
+                    }.getOrNull()
+                }
             val wanted = if (row.id in snap.wanted) "It tried to use this but could not ask you first" else null
             return dev.droidtop.library.settings.ChoiceItem(
                 id = "plugin_${pluginId}_perm_${row.id}",

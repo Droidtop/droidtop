@@ -42,6 +42,14 @@ class PluginCallCounts(private val dir: File) {
                 .map { (day, counts) -> day to counts.entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key }).map { it.key to it.value } }
         }
 
+    /**
+     * The newest day (`YYYY-MM-DD`) on which [pluginId] made a call counted under [key], or null when none in the last
+     * [DAYS] days: an everyday permission's "last used" on the Permissions page, which the activity ring never lists
+     * (Droidtop/tracker#60).
+     */
+    fun lastDay(pluginId: String, key: String, nowMs: Long = System.currentTimeMillis()): String? =
+        days(pluginId, nowMs).firstOrNull { (_, counts) -> counts.any { it.first == key } }?.first
+
     /** Writes what is held in memory for [pluginId], merged into the file, and drops days older than [DAYS]. */
     fun flush(pluginId: String, nowMs: Long = System.currentTimeMillis()) {
         synchronized(LOCK) { flushLocked(pluginId, nowMs) }
