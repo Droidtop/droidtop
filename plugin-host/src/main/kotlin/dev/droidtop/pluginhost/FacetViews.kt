@@ -19,13 +19,19 @@ object FacetViews {
      */
     const val MARK = "@facet"
 
+    /**
+     * The host's mark on a form's submit: `{fields: {facetId: type}, required: {facetId: label}}`. Removed by
+     * [PluginViewCall.args], which sends those fields' values, typed, as `args.values` (docs/plugin-api.md 1.10, `group`).
+     */
+    const val FORM = "@form"
+
     fun toView(facets: List<Facet>, title: String? = null): PluginView {
         val loose = facets.filter { it.body !is FacetBody.Group }
         val sections = buildList {
             if (loose.isNotEmpty()) add(section("facets", null, loose))
             for (facet in facets) {
                 val group = facet.body as? FacetBody.Group ?: continue
-                add(section(facet.id, group.title, group.facets))
+                add(section(facet.id, group.title, group.facets, group.submit?.let { submit(facet.id, it, group.facets) }))
             }
         }
         return PluginView(title = title, subtitle = null, sections = sections)
@@ -39,10 +45,10 @@ object FacetViews {
         return toView(reading.facets, json.optString("title").takeIf { it.isNotBlank() })
     }
 
-    private fun section(id: String, title: String?, facets: List<Facet>): ViewSection = ViewSection(
+    private fun section(id: String, title: String?, facets: List<Facet>, submit: ViewNode? = null): ViewSection = ViewSection(
         id = id,
         title = title,
-        nodes = facets.flatMap { f -> if (f.body is FacetBody.ListBody) rows(f) else listOfNotNull(node(f)) },
+        nodes = facets.flatMap { f -> if (f.body is FacetBody.ListBody) rows(f) else listOfNotNull(node(f)) } + listOfNotNull(submit),
         needs = facets.mapNotNull { f -> f.needs?.let { f.id to it } }.toMap(),
     )
 
@@ -59,10 +65,11 @@ object FacetViews {
             is FacetBody.Meter -> ViewNode.Progress(id, b.label, meterWords(b), meterPercent(b))
             is FacetBody.Chart -> ViewNode.Info(id, b.label, null, chartWords(b))
             is FacetBody.Action -> ViewNode.Button(id, b.label, b.sub, null, if (b.confirm == "none") null else b.label, action(b.call, id, null))
-            is FacetBody.Toggle -> ViewNode.Toggle(id, b.label, b.sub, b.value, action(b.call, id, "bool"))
-            is FacetBody.Choice -> ViewNode.Choice(id, b.label, b.sub, b.options, b.value, action(b.call, id, "string"))
-            is FacetBody.Slider -> ViewNode.Slider(id, b.label, b.unit, b.min.toInt(), b.max.toInt(), b.value.toInt(), action(b.call, id, "number"))
-            is FacetBody.Input -> ViewNode.Text(id, b.label, b.hint, b.value, action(b.call, id, "string"))
+            // Inside a form an input has no call: droidtop only holds its value until the form's submit.
+            is FacetBody.Toggle -> ViewNode.Toggle(id, b.label, b.sub, b.value, b.call?.let { action(it, id, "bool") })
+            is FacetBody.Choice -> ViewNode.Choice(id, b.label, b.sub, b.options, b.value, b.call?.let { action(it, id, "string") })
+            is FacetBody.Slider -> ViewNode.Slider(id, b.label, b.unit, b.min.toInt(), b.max.toInt(), b.value.toInt(), b.call?.let { action(it, id, "number") })
+            is FacetBody.Input -> ViewNode.Text(id, b.label, b.hint, b.value, b.call?.let { action(it, id, "string") })
             is FacetBody.Text -> ViewNode.Info(id, b.body.lineSequence().first().take(PluginView.MAX_TITLE), b.body, null)
             is FacetBody.Notice -> ViewNode.Notice(
                 id, b.title, b.sub, b.details, if (b.tone in PluginViewLimits.tones) b.tone else "info", b.placement == "banner",
@@ -70,6 +77,26 @@ object FacetViews {
             )
             else -> null
         }
+    }
+
+    /** A form's submit: the group's last button, marked with the form's fields so its values go back with it. */
+    fun submit(groupId: String, submit: FacetBody.Action, facets: List<Facet>): ViewNode {
+        val fields = JSONObject()
+        val required = JSONObject()
+        for (f in facets) {
+            val (type, label) = when (val b = f.body) {
+                is FacetBody.Toggle -> "bool" to null
+                is FacetBody.Choice -> "string" to null
+                is FacetBody.Slider -> "number" to null
+                is FacetBody.Input -> (if (b.inputKind == "number") "number" else "string") to b.label.takeUnless { b.optional }
+                else -> continue
+            }
+            fields.put(f.id, type)
+            label?.let { required.put(f.id, it) }
+        }
+        val action = action(submit.call, groupId, null)
+        val args = JSONObject(action.argsJson).put(FORM, JSONObject().put("fields", fields).put("required", required))
+        return ViewNode.Button("$groupId.submit", submit.label, submit.sub, null, if (submit.confirm == "none") null else submit.label, action.copy(argsJson = args.toString()))
     }
 
     /** A list's entries as rows, for a target that draws a list (search results, a watch list). */

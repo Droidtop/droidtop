@@ -332,21 +332,29 @@ object PluginViewCall {
         actionArgs.keys().forEach { out.put(it, actionArgs.get(it)) }
         // A facet's input sends its own committed value as `value`, typed (docs/plugin-api.md 1.10, "Interaction").
         (out.remove(FacetViews.MARK) as? JSONObject)?.let { mark ->
-            val raw = values[mark.optString("id")]
-            if (raw != null) {
-                out.put(
-                    "value",
-                    when (mark.optString("type")) {
-                        "bool" -> raw == "true"
-                        "number" -> raw.toDoubleOrNull() ?: raw
-                        else -> raw
-                    },
-                )
-            }
+            values[mark.optString("id")]?.let { out.put("value", typed(it, mark.optString("type"))) }
         }
-        out.put("values", JSONObject(values as Map<*, *>))
+        // A form's submit sends its own fields, typed, by facet id (docs/plugin-api.md 1.10, `group`); a view's action, every input.
+        val form = (out.remove(FacetViews.FORM) as? JSONObject)?.optJSONObject("fields")
+        out.put(
+            "values",
+            if (form == null) JSONObject(values as Map<*, *>)
+            else JSONObject().also { o -> form.keys().forEach { id -> values[id]?.let { o.put(id, typed(it, form.optString(id))) } } },
+        )
         out.put("context", context)
         return out
+    }
+
+    /** The labels of a form's fields that must have a value and are empty; empty for any other action. */
+    fun missing(actionArgs: JSONObject, values: Map<String, String>): List<String> {
+        val required = actionArgs.optJSONObject(FacetViews.FORM)?.optJSONObject("required") ?: return emptyList()
+        return required.keys().asSequence().filter { values[it].isNullOrBlank() }.map { required.optString(it) }.toList()
+    }
+
+    private fun typed(raw: String, type: String): Any = when (type) {
+        "bool" -> raw == "true"
+        "number" -> raw.toDoubleOrNull() ?: raw
+        else -> raw
     }
 
     /** A `call` or `job` reply may carry a whole new view for the page that ran it; null when it does not. */

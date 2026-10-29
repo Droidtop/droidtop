@@ -141,6 +141,12 @@ object PluginViews {
         onStatus: (String) -> Unit = {},
         onJobDone: suspend (Context, PluginResult) -> Unit = { _, _ -> },
     ): ActionOutcome {
+        // A form is sent only once what it needs is filled in (docs/plugin-api.md 1.10, `group`); nothing reaches the plugin before.
+        val missing = PluginViewCall.missing(action.args(), values)
+        if (missing.isNotEmpty()) {
+            val sentence = "Fill in ${missing.joinToString(", ")} first"
+            return ActionOutcome(sentence, null, refetch = false, notice = ViewNode.Notice("form", "Not sent yet", sentence, null, "caution", false, null))
+        }
         val callArgs = PluginViewCall.args(action.args(), HashMap(values), hostContext)
         val messages = mutableListOf<String>()
         val outcome = when (action.kind) {

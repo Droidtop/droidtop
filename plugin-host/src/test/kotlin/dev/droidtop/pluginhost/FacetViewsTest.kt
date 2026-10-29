@@ -71,4 +71,66 @@ class FacetViewsTest {
         assertEquals(ViewAction.Kind.VIEW, rows[0].action!!.kind)
         assertEquals("a", rows[0].action!!.args().getString("id"))
     }
+
+    private val addDevice = """{"facets": [
+        {"id": "add", "kind": "group", "title": "Add a device", "form": true,
+         "submit": {"label": "Add", "call": {"op": "addDevice", "args": {"folder": "music"}}},
+         "facets": [
+            {"id": "deviceId", "kind": "input", "label": "Device ID"},
+            {"id": "name", "kind": "input", "label": "Name", "optional": true},
+            {"id": "trusted", "kind": "toggle", "label": "Trust it", "value": false, "call": {"op": "ignored"}},
+            {"id": "port", "kind": "input", "label": "Port", "value": "22000", "optional": true}
+        ]},
+        {"id": "other", "kind": "toggle", "label": "Elsewhere", "value": true, "call": {"op": "setOther"}}
+    ]}"""
+
+    @Test
+    fun `a form's inputs send nothing and its submit sends them all, typed`() {
+        val reading = Facets.read(JSONObject(addDevice))
+        val group = reading.facets.first().body as FacetBody.Group
+        assertTrue(group.isForm)
+        // Inside a form an input needs no call, and one it gives is not used.
+        assertTrue(group.facets.all { f -> (f.body as? FacetBody.Toggle)?.call == null && (f.body as? FacetBody.Input)?.call == null })
+
+        val view = FacetViews.toView(reading.facets)
+        val form = view.sections.single { it.id == "add" }.nodes
+        assertNull((form[2] as ViewNode.Toggle).action)
+        val submit = form.last() as ViewNode.Button
+        assertEquals("add.submit", submit.id)
+        assertEquals("addDevice", submit.action.op)
+
+        val values = view.initialValues() + mapOf("deviceId" to "ABC-123", "trusted" to "true")
+        val args = PluginViewCall.args(submit.action.args(), values, JSONObject())
+        assertFalse(args.has(FacetViews.FORM))
+        assertEquals("music", args.getString("folder"))
+        val sent = args.getJSONObject("values")
+        // Only the form's own fields, typed: an input outside the form is not part of it.
+        assertEquals(setOf("deviceId", "name", "trusted", "port"), sent.keys().asSequence().toSet())
+        assertEquals("ABC-123", sent.getString("deviceId"))
+        assertEquals(true, sent.get("trusted"))
+        assertEquals("22000", sent.get("port"))
+    }
+
+    @Test
+    fun `a form is not sent until what it needs is filled in`() {
+        val view = FacetViews.toView(Facets.read(JSONObject(addDevice)).facets)
+        val submit = view.sections.single { it.id == "add" }.nodes.last() as ViewNode.Button
+        assertEquals(listOf("Device ID"), PluginViewCall.missing(submit.action.args(), view.initialValues()))
+        assertEquals(emptyList<String>(), PluginViewCall.missing(submit.action.args(), view.initialValues() + ("deviceId" to "X")))
+        // Any other action has nothing to fill in.
+        val other = view.sections.single { it.id == "facets" }.nodes.single() as ViewNode.Toggle
+        assertEquals(emptyList<String>(), PluginViewCall.missing(other.action!!.args(), emptyMap()))
+    }
+
+    @Test
+    fun `a form without a submit is a plain group whose inputs need their own calls`() {
+        val reading = Facets.read(JSONObject("""{"facets": [{"id": "g", "kind": "group", "form": true, "facets": [
+            {"id": "a", "kind": "toggle", "label": "A"},
+            {"id": "b", "kind": "toggle", "label": "B", "call": {"op": "setB"}}
+        ]}]}"""))
+        val group = reading.facets.single().body as FacetBody.Group
+        assertFalse(group.isForm)
+        assertEquals(listOf("b"), group.facets.map { it.id })
+        assertTrue(reading.messages.any { "without a valid submit" in it })
+    }
 }

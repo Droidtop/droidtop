@@ -1451,7 +1451,7 @@ Every facet is one JSON object:
 | `toggle` | `label`, `value: bool`, `sub?`, `call` | A switch; the change is sent at once |
 | `choice` | `label`, `options: [{value, label}]` (at most 100), `value`, `sub?`, `call` | A pick-one |
 | `slider` | `label`, `min`, `max`, `step?`, `value`, `unit?`, `call` | A stepper or slider |
-| `input` | `label`, `value`, `hint?`, `kind?` (`text`, `number`, `url`, `search`), `call` | A text field (controller and touch entry). Never secret: secrets stay with G1/G3 |
+| `input` | `label`, `value`, `hint?`, `kind?` (`text`, `number`, `url`, `search`), `call`, `optional?` | A text field (controller and touch entry). Never secret: secrets stay with G1/G3. In a form group it has no `call`, and `optional: true` lets the form be sent with it empty; any other empty input holds the submit back ("Fill in Device ID first"), and nothing reaches the plugin |
 | `list` | `title?`, `entries: [{id, title, sub?, value?, badges?, media?, call?}]` (at most 200), `more?` (an action that asks for the next page) | Rows (a search's results, a watch list, a friends list, a download's mirrors) |
 | `collection` | `title?`, `entries: [{id, title, media, badges?, call?}]` (at most 60), `shape?` (`capsule`, `wide`, `square`) | Tiles or capsules (a Home shelf, a store's sale) |
 | `media` | `role` (`cover`, `wide`, `hero`, `logo`, `icon`, `screenshot`, `banner`, `video`), `url`, `poster?` (a video's still), `width?`, `height?`, `alt` | A picture by role (Droidtop/tracker#585), fetched and checked by droidtop; a video plays only on the person's press, muted until unmuted |

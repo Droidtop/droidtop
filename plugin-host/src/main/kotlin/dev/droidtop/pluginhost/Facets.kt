@@ -92,13 +92,15 @@ sealed interface FacetBody {
 
     data class Action(val label: String, val sub: String?, val call: FacetCall, val confirm: String, val icon: String?) : FacetBody
 
-    data class Toggle(val label: String, val value: Boolean, val sub: String?, val call: FacetCall) : FacetBody
+    // An input's [call] is null inside a form group: the form's submit sends its value (docs/plugin-api.md 1.10, `group`).
+    data class Toggle(val label: String, val value: Boolean, val sub: String?, val call: FacetCall?) : FacetBody
 
-    data class Choice(val label: String, val options: List<Pair<String, String>>, val value: String, val sub: String?, val call: FacetCall) : FacetBody
+    data class Choice(val label: String, val options: List<Pair<String, String>>, val value: String, val sub: String?, val call: FacetCall?) : FacetBody
 
-    data class Slider(val label: String, val min: Double, val max: Double, val step: Double?, val value: Double, val unit: String?, val call: FacetCall) : FacetBody
+    data class Slider(val label: String, val min: Double, val max: Double, val step: Double?, val value: Double, val unit: String?, val call: FacetCall?) : FacetBody
 
-    data class Input(val label: String, val value: String, val hint: String?, val inputKind: String, val call: FacetCall) : FacetBody
+    /** [optional]: a form's submit may be pressed with it empty. */
+    data class Input(val label: String, val value: String, val hint: String?, val inputKind: String, val call: FacetCall?, val optional: Boolean = false) : FacetBody
 
     data class ListEntry(val id: String, val title: String, val sub: String?, val value: String?, val badges: List<String>, val media: String?, val call: FacetCall?)
 
@@ -118,8 +120,13 @@ sealed interface FacetBody {
 
     data class Account(val site: String, val signedIn: Boolean, val name: String?) : FacetBody
 
-    /** [slot] opens a place in this group that another plugin may target as `<this plugin>:<slot>`. */
-    data class Group(val title: String?, val facets: List<Facet>, val slot: String?) : FacetBody
+    /**
+     * [slot] opens a place in this group that another plugin may target as `<this plugin>:<slot>`. A group with a
+     * [submit] is a form: its inputs send nothing of their own, and [submit] sends them all as `args.values`.
+     */
+    data class Group(val title: String?, val facets: List<Facet>, val slot: String?, val submit: Action? = null) : FacetBody {
+        val isForm: Boolean get() = submit != null
+    }
 
     data class Metadata(
         val title: String?,
@@ -204,6 +211,7 @@ object Facets {
         defaultSubject: FacetSubject = FacetSubject.Plugin,
         messages: MutableList<String> = mutableListOf(),
         depth: Int = 0,
+        inForm: Boolean = false,
     ): Facet? {
         if (raw == null) return null
         val json = if (raw.optString("kind") == "use") expand(raw, templates, messages) ?: return null else raw
@@ -218,7 +226,7 @@ object Facets {
             messages += "facet \"$id\": kind \"$kind\" v$v is not one this droidtop draws, so it was skipped"
             return null
         }
-        val body = Body(id, json, templates, defaultSubject, messages, depth).read(kind) ?: run {
+        val body = Body(id, json, templates, defaultSubject, messages, depth, inForm).read(kind) ?: run {
             messages += "facet \"$id\" ($kind) was dropped: a required field is missing or not valid"
             return null
         }
@@ -313,6 +321,8 @@ object Facets {
         val defaultSubject: FacetSubject,
         val messages: MutableList<String>,
         val depth: Int,
+        /** Read inside a form group: an input's own `call` is not needed, and not used. */
+        val inForm: Boolean = false,
     ) {
         fun length(name: String) = PluginViewLimits.facetLength(name)
 
@@ -328,6 +338,9 @@ object Facets {
         fun label() = text("label", "label")
 
         fun call(key: String = "call") = callOf(json.optJSONObject(key))
+
+        /** An input's call: none inside a form; outside one it is required, so null drops the input. */
+        fun <T> input(make: (FacetCall?) -> T?): T? = if (inForm) make(null) else call()?.let(make)
 
         fun <T> capped(array: JSONArray?, limit: String, what: String, each: (JSONObject) -> T?): List<T> {
             if (array == null) return emptyList()
@@ -377,8 +390,8 @@ object Facets {
                 val call = call()
                 if (call == null) null else label()?.let { FacetBody.Action(it, text("sub", "sub"), call, oneOf("confirm", CONFIRMS, "none"), json.text("icon")) }
             }
-            "toggle" -> call()?.let { c -> label()?.let { FacetBody.Toggle(it, json.optBoolean("value"), text("sub", "sub"), c) } }
-            "choice" -> call()?.let { c ->
+            "toggle" -> input { c -> label()?.let { FacetBody.Toggle(it, json.optBoolean("value"), text("sub", "sub"), c) } }
+            "choice" -> input { c ->
                 val options = capped(json.optJSONArray("options"), "options", "options") { o ->
                     val value = o.text("value") ?: return@capped null
                     value to (o.text("label")?.cut(length("label")) ?: value)
@@ -386,14 +399,14 @@ object Facets {
                 if (options.isEmpty()) null
                 else label()?.let { FacetBody.Choice(it, options, json.text("value")?.takeIf { v -> options.any { o -> o.first == v } } ?: options.first().first, text("sub", "sub"), c) }
             }
-            "slider" -> call()?.let { c ->
+            "slider" -> input { c ->
                 val min = number("min") ?: 0.0
                 val max = (number("max") ?: min).coerceAtLeast(min)
                 label()?.let { FacetBody.Slider(it, min, max, number("step")?.takeIf { s -> s > 0 }, (number("value") ?: min).coerceIn(min, max), text("unit", "badge"), c) }
             }
             // Never secret: a secret stays with the vault (G1) and the web session (G3).
-            "input" -> if (json.optBoolean("secret")) null else call()?.let { c ->
-                label()?.let { FacetBody.Input(it, json.text("value")?.cut(length("value")).orEmpty(), text("hint", "sub"), oneOf("kind", INPUT_KINDS, "text"), c) }
+            "input" -> if (json.optBoolean("secret")) null else input { c ->
+                label()?.let { FacetBody.Input(it, json.text("value")?.cut(length("value")).orEmpty(), text("hint", "sub"), oneOf("kind", INPUT_KINDS, "text"), c, json.optBoolean("optional")) }
             }
             "list" -> FacetBody.ListBody(
                 text("title", "label"),
@@ -438,10 +451,20 @@ object Facets {
                 val facets = json.optJSONArray("facets") ?: JSONArray()
                 val max = count("groupFacets")
                 if (facets.length() > max) messages += "group \"$id\": only the first $max facets were kept"
+                // A form needs its submit: without one there is no way to send what is entered, so it is a plain group.
+                val submit = if (json.optBoolean("form")) {
+                    json.optJSONObject("submit")?.let { Body(id, it, templates, defaultSubject, messages, depth).read("action") as? FacetBody.Action }
+                        ?: null.also { messages += "group \"$id\": a form without a valid submit was drawn as a plain group" }
+                } else null
                 FacetBody.Group(
                     text("title", "label"),
-                    buildList { for (i in 0 until minOf(facets.length(), max)) parse(facets.optJSONObject(i), templates, defaultSubject, messages, depth + 1)?.let { add(it) } },
+                    buildList {
+                        for (i in 0 until minOf(facets.length(), max)) {
+                            parse(facets.optJSONObject(i), templates, defaultSubject, messages, depth + 1, inForm = submit != null)?.let { add(it) }
+                        }
+                    },
                     json.text("slot"),
+                    submit,
                 )
             }
             "metadata" -> FacetBody.Metadata(
