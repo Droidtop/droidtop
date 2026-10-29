@@ -95,11 +95,23 @@ class GameInfoTest {
     }
 
     @Test
-    fun `the search path is read from the script that posts the search`() {
-        val script = """a.get=function(){return fetch("/api/other/x",{method:"GET"})};fetch("/api/finder/v2?q=1",{method:"POST",body:b})"""
-        assertEquals("api/finder/v2", HltbClient.searchPathIn(script))
-        assertEquals("api/search/site", HltbClient.searchPathIn("""fetch('/api/search/site/', { method: 'POST' })"""))
-        assertNull(HltbClient.searchPathIn("""fetch("/api/other/x",{method:"GET"})"""))
+    fun `every POST in a script is listed, past a GET and with its options in either order`() {
+        val script = """a.get=function(){return fetch("/api/other/x",{method:"GET"})};fetch("/api/finder/v2?q=1",{method:"POST",body:b});""" +
+            """fetch("/api/error",{headers:{"Content-Type":"application/json"},method:"POST"});fetch('/api/search/site/', { method: 'POST' });""" +
+            """fetch("/api/user",{headers:{a:1}});fetch("/api/logout",{method:"POST"})"""
+        assertEquals(listOf("api/finder/v2", "api/error", "api/search/site", "api/logout"), HltbClient.searchCallsIn(script))
+        assertEquals(emptyList<String>(), HltbClient.searchCallsIn("""fetch("/api/other/x",{method:"GET"})"""))
+    }
+
+    @Test
+    fun `the search is the POST that names a search, never the error report or an account call`() {
+        // The site's own bundle posts to /api/error before it posts the search, and calls /api/user and /api/logout.
+        assertEquals("api/search/site", HltbClient.bestSearchPath(listOf("api/error", "api/user", "api/search/site", "api/logout")))
+        assertEquals("api/finder/v2", HltbClient.bestSearchPath(listOf("api/finder/v2")))
+        assertEquals("api/s", HltbClient.bestSearchPath(listOf("api/log", "api/s")))
+        assertNull(HltbClient.bestSearchPath(listOf("api/error", "api/user", "api/logout")))
+        assertNull(HltbClient.bestSearchPath(listOf("api/error/search")))
+        assertNull(HltbClient.bestSearchPath(emptyList()))
     }
 
     @Test
@@ -117,6 +129,11 @@ class GameInfoTest {
     fun `a failure with no status does not show a number`() {
         assertEquals("HowLongToBeat did not answer the search (HTTP 403)", HowLongToBeat.refusalMessage(403))
         assertEquals("HowLongToBeat did not give a way to search", HowLongToBeat.refusalMessage(0))
+        assertEquals(
+            "HowLongToBeat did not give a way to search (api/search/site/init answered HTTP 404)",
+            HowLongToBeat.refusalMessage(0, "api/search/site/init answered HTTP 404"),
+        )
+        assertEquals("HowLongToBeat did not give a way to search", HowLongToBeat.refusalMessage(0, ""))
     }
 
     @Test
