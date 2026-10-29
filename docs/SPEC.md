@@ -16461,9 +16461,13 @@ name on the bottom edge made those plates look empty and collided with the
 bottom corner marks (Droidtop/tracker#273, build 1397). The corners, each at most one
 mark, all from state already on the entry or in the live download map, so
 a card costs no lookup of its own: top-left the game's state
-(`CapsuleStatus`, from `capsuleStatusOf`): a download's percent or Paused,
-Update, Not installed, Missing (a folder the walk lost), or an installed
-tick for a store game (a folder game that is simply here needs no mark);
+(`CapsuleStatus`, from `capsuleStatusOf`), drawn as its glyph with its word as
+the accessible label (show, then say, Droidtop/tracker#738; `capsuleStatusWord`):
+downloading (an arrow down), waiting (an hourglass), paused, failed (a circled "!"),
+Update (an upgrade arrow on the affirmative chip), Not installed (a cloud with an
+arrow down), Wishlist (a bookmark), Missing (a crossed-out folder, a folder the walk
+lost), or an installed tick for a store game (a folder game that is simply here
+needs no mark); each its own shape, so the chip's tone is never the only signal;
 top-right the favourite star; bottom-left the store it is from, one letter
 (droidtop draws no store's own artwork); bottom-right "x3" when the card
 stands for several folders or store copies ON THIS DEVICE (installed
@@ -17777,7 +17781,8 @@ a flip that A does not do. Sign-in and sync are glyphs beside their words (`Stat
 SYNCED and OFFLINE, each its own shape: a circle with a check, a crossed-out person, a cloud with a check, a crossed-out
 cloud): the stores' rows, the GitHub account row, the download sites' rows (an expired sign-in is ATTENTION), and the
 PC game page's Cloud saves row (`cloudSavesMark`: syncing turns, offline, a failed sync waits for the person, synced).
-The rest of the shell moves one surface at a time.
+A capsule's state badge is its glyph, the word its accessible label (7i). The rest of the shell moves one surface at
+a time.
 
 **Colour.** One source per surface family, and the families are named so a screen cannot pick
 the wrong one. The shell's palette (`MenuTokens`) is absolute against its own grounds, so any

@@ -287,4 +287,12 @@ class PcCapsuleStateTest {
         assertFalse(state.ready)
         assertEquals(StoreStage.WISHLIST, state.store)
     }
+
+    @Test
+    fun `every capsule state has its own words for the glyph badge`() {
+        val words = CapsuleStatus.entries.map { capsuleStatusWord(it) }
+        assertEquals(CapsuleStatus.entries.size, words.toSet().size)
+        assertEquals("Not installed", capsuleStatusWord(CapsuleStatus.NOT_INSTALLED))
+        assertEquals("Installed", capsuleStatusWord(CapsuleStatus.INSTALLED))
+    }
 }

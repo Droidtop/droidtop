@@ -18,6 +18,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.CloudDownload
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.FolderOff
+import androidx.compose.material.icons.outlined.HourglassTop
+import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.Upgrade
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -412,24 +425,56 @@ private const val SOFT_ART_WIDTH_PX = 24
 private const val SOFT_ART_HEIGHT_PX = 36
 private const val SOFT_ART_DARKEN = 0.45f
 
-/** The top-left badge: the game's [CapsuleStatus], on a chip that stays legible over any art. */
+/** What [status] is called: the badge's words for TalkBack and the focus line. Pure. */
+internal fun capsuleStatusWord(status: CapsuleStatus): String = when (status) {
+    CapsuleStatus.UPDATE -> "Update"
+    CapsuleStatus.DOWNLOADING -> "Downloading"
+    CapsuleStatus.WAITING -> "Waiting"
+    CapsuleStatus.PAUSED -> "Paused"
+    CapsuleStatus.FAILED -> "Failed"
+    CapsuleStatus.NOT_INSTALLED -> "Not installed"
+    CapsuleStatus.WISHLIST -> "Wishlist"
+    CapsuleStatus.MISSING -> "Missing"
+    CapsuleStatus.INSTALLED -> "Installed"
+}
+
+/**
+ * The top-left badge: the game's [CapsuleStatus] as a glyph on a chip that stays legible over any art (show, then say:
+ * Droidtop/tracker#738; the owner: "visual indicators instead of words whenever possible"). Each state has its own
+ * shape, so its tone is never the only signal, and its word ([capsuleStatusWord]) is the badge's accessible label. How
+ * far a download is, is the bar along the capsule's foot; the badge names the state and never counts (#643).
+ */
 @Composable
 internal fun BoxScope.CapsuleStatusBadge(entry: LibraryEntry, download: PluginJobsCenter.Entry? = null) {
     val status = capsuleStatusOf(entry, download) ?: return
-    val (text, fill, ink) = when (status) {
-        CapsuleStatus.UPDATE -> Triple("Update", MenuTokens.Affirmative, MenuTokens.OnSelected)
-        // How far is the bar along the capsule's foot; the chip names the state and never counts (Droidtop/tracker#643).
-        CapsuleStatus.DOWNLOADING -> Triple("Downloading", MenuTokens.Selected, MenuTokens.OnSelected)
-        CapsuleStatus.WAITING -> Triple("Waiting", MenuTokens.Scrim, MenuTokens.OnSurface)
-        CapsuleStatus.PAUSED -> Triple("Paused", MenuTokens.Scrim, MenuTokens.OnSurface)
-        CapsuleStatus.FAILED -> Triple("Failed", MenuTokens.Scrim, MenuTokens.NoticeDanger)
-        CapsuleStatus.NOT_INSTALLED -> Triple("Not installed", MenuTokens.Scrim, MenuTokens.OnSurface)
-        CapsuleStatus.WISHLIST -> Triple("Wishlist", MenuTokens.Scrim, MenuTokens.OnSurface)
-        CapsuleStatus.MISSING -> Triple("Missing", MenuTokens.Scrim, MenuTokens.NoticeDanger)
-        CapsuleStatus.INSTALLED -> Triple("✓", MenuTokens.Scrim, MenuTokens.Affirmative)
+    val (glyph, fill, ink) = when (status) {
+        CapsuleStatus.UPDATE -> Triple(Icons.Outlined.Upgrade, MenuTokens.Affirmative, MenuTokens.OnSelected)
+        CapsuleStatus.DOWNLOADING -> Triple(Icons.Outlined.Download, MenuTokens.Selected, MenuTokens.OnSelected)
+        CapsuleStatus.WAITING -> Triple(Icons.Outlined.HourglassTop, MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.PAUSED -> Triple(Icons.Outlined.Pause, MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.FAILED -> Triple(Icons.Outlined.ErrorOutline, MenuTokens.Scrim, MenuTokens.NoticeDanger)
+        CapsuleStatus.NOT_INSTALLED -> Triple(Icons.Outlined.CloudDownload, MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.WISHLIST -> Triple(Icons.Outlined.BookmarkBorder, MenuTokens.Scrim, MenuTokens.OnSurface)
+        CapsuleStatus.MISSING -> Triple(Icons.Outlined.FolderOff, MenuTokens.Scrim, MenuTokens.NoticeDanger)
+        CapsuleStatus.INSTALLED -> Triple(Icons.Outlined.Check, MenuTokens.Scrim, MenuTokens.Affirmative)
     }
-    CapsuleChip(text, ink, fill, Modifier.align(Alignment.TopStart))
+    val word = capsuleStatusWord(status)
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .align(Alignment.TopStart)
+            .padding(Space.Sm)
+            .background(fill, Corners.Pill)
+            .border(1.dp, ink.copy(alpha = 0.3f), Corners.Pill)
+            .padding(horizontal = Space.Sm, vertical = Space.Hair)
+            .semantics { contentDescription = word },
+    ) {
+        androidx.compose.material3.Icon(glyph, contentDescription = null, tint = ink, modifier = Modifier.size(CAPSULE_GLYPH))
+    }
 }
+
+/** A status glyph's size on a capsule: the eyebrow type's height, so the chip is as small as the word was. */
+private val CAPSULE_GLYPH = 14.dp
 
 /**
  * The bottom corners and the progress bar: what the game is and where it is
