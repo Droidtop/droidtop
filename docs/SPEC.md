@@ -608,7 +608,12 @@ or a container app appears as an ordinary icon.
 Enablement follows the HOME role rather than a switch of its own —
 `HomeRolePrefs` enables exactly one of the fork's two HOME activities (or
 neither), and `Modes` reads that component state rather than a second
-flag.
+flag. It writes a HOME activity's state only when that state changes
+(Droidtop/tracker#736): each write is a package change on which Android
+re-reads the Home candidates, so asking again for the state already in place
+(onboarding, the "Use droidtop as home screen" row, the Alternative forwarder)
+touches nothing. Turning droidtop's home off and on does change the set, and
+Android then asks for a Home again; that is Android's choice to make.
 
 **Holding the role is Android's decision, and droidtop watches it.**
 Enabling the HOME activity is what droidtop can do; which app answers the

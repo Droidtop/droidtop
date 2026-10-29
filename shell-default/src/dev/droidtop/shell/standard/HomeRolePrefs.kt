@@ -34,18 +34,20 @@ object HomeRolePrefs {
 
     fun setActiveHomeImplementation(context: Context, implementation: HomeImplementation) {
         val pm = context.packageManager
-        val standardEnabled = implementation == HomeImplementation.STANDARD
-        val alternativeEnabled = implementation == HomeImplementation.ALTERNATIVE
-        pm.setComponentEnabledSetting(
-            ComponentName(context.packageName, STANDARD_ACTIVITY),
-            enabledState(standardEnabled),
-            PackageManager.DONT_KILL_APP,
-        )
-        pm.setComponentEnabledSetting(
-            ComponentName(context.packageName, ALTERNATIVE_ACTIVITY),
-            enabledState(alternativeEnabled),
-            PackageManager.DONT_KILL_APP,
-        )
+        setHomeComponent(pm, context.packageName, STANDARD_ACTIVITY, implementation == HomeImplementation.STANDARD)
+        setHomeComponent(pm, context.packageName, ALTERNATIVE_ACTIVITY, implementation == HomeImplementation.ALTERNATIVE)
+    }
+
+    /**
+     * Changes a HOME activity's state only when it really changes (Droidtop/tracker#736). Every write is a package
+     * change Android re-reads the Home candidates on, and onboarding, the "Use droidtop as home screen" row and the
+     * Alternative forwarder all called this with the state already in place: the trampoline written ENABLED over its
+     * manifest default of enabled. Reading first keeps those calls from touching the HOME set at all, so only turning
+     * droidtop's home off and on again asks Android to choose a Home anew.
+     */
+    private fun setHomeComponent(pm: PackageManager, packageName: String, activity: String, enabled: Boolean) {
+        if (isEnabled(pm, packageName, activity) == enabled) return
+        pm.setComponentEnabledSetting(ComponentName(packageName, activity), enabledState(enabled), PackageManager.DONT_KILL_APP)
     }
 
     private fun enabledState(enabled: Boolean): Int =
