@@ -308,16 +308,16 @@ stock bar (`bar-0`) run `true` instead of swaybar, starts Waybar with
 droidtop's Waybar config, and binds the stock launcher key (`$mod+d`) to
 `droidtop-open start`, which opens droidtop's Start menu. That Waybar config
 is a 26 px status strip with only what droidtop's bar lacks: the
-workspaces, the tray of the Linux programs and a clock from `date`, so it
-reads the container's POSIX `TZ`.
+workspaces and the tray of the Linux programs. Its clock went to droidtop's
+tray in #691 (2b "One bar, in droidtop's look").
 
 The coordinator's Desktop review (#683) found two launchers and two window
 lists: Waybar's Apps button ran wofi, a list with no library art, pins or
 search, beside droidtop's Start, and Waybar's focused-window title sat beside
 droidtop's window list; Super+D opened wofi. Decided: one launcher and one
 window list, droidtop's, because only it has the library, pins, the one
-search and Android's apps. Waybar keeps the workspaces, the Linux tray and
-the clock, which droidtop's bar does not show, and wofi is no longer
+search and Android's apps. Waybar keeps the workspaces and the Linux tray,
+which droidtop's bar does not show (its clock moved to droidtop's tray in #691), and wofi is no longer
 installed (a desktop made before keeps the copy it has, unused). The launch
 helper takes one word besides a token, `start`: it drops
 `start.<pid>.request`, and droidtop opens the showing Desktop shell's Start
@@ -481,10 +481,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   active theme's), through `MaterialTheme` and `MenuTokens` alike; the bar's ground is `MenuTokens.Ground`
   and its buttons are flat chips (`MenuTokens.Card`, `RowShape`), not Material's filled pills. droidtop's bar
   keeps what only Android can do: Start, pins, the running windows and Android apps, Modes, the plugin,
-  companion and clipboard items, and the tray (network, VPN, battery, notifications), which opens the Quick
-  Menu. Terminal, Containers and Settings are Start's System rows, not bar buttons. There is no second clock:
-  the clock is the panel's (Waybar's `custom/clock`, or swaybar's status line from the stock sway config),
-  and the panel choice is unchanged. The container's windows are in the bar's list, the desktop's only one
+  companion and clipboard items, and the tray, which opens the Quick Menu. Terminal, Containers and Settings
+  are Start's System rows, not bar buttons. The tray is Gaming's status readout (`StatusCluster`, one component,
+  Droidtop/tracker#691): the clock in Android's 12 or 24 hour format, the network and battery glyphs with the
+  battery's percent, then VPN when one is up and the waiting notifications as a count on a badge. Before, it was
+  a line of glyph text ("◤ 3/4", "ETH", "✕", "⚡", "3 new"), and the only clock was Waybar's `date +%H:%M`, 24
+  hour always and absent with no session or under labwc. The tray's clock is the desktop's one clock, shown with
+  or without a session, and Waybar has none. Someone on Sway's own bar keeps their own config's status line. The container's windows are in the bar's list, the desktop's only one
   since Waybar dropped its window title (#683): a finger needs a way to raise, minimise and close one.
 - **Window controls** (Droidtop/tracker#686, the coordinator's Desktop review, decided 2026-10-29). Under
   sway, windows float by default: droidtop's sway config adds `for_window [all] floating enable` and an

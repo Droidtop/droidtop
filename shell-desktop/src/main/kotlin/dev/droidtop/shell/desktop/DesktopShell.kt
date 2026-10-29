@@ -94,6 +94,8 @@ import dev.droidtop.shell.gamepad.currentShellWindow
 import dev.droidtop.shell.gamepad.ActionNote
 import dev.droidtop.shell.gamepad.ActionRow
 import dev.droidtop.shell.gamepad.ActionSheet
+import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.StatusCluster
 import dev.droidtop.shell.gamepad.hosted.HostedArt
 import dev.droidtop.shell.gamepad.query.LauncherSearchApp
 import dev.droidtop.shell.gamepad.query.LauncherSearchScreen
@@ -1113,22 +1115,35 @@ private fun SystemTray(onClick: () -> Unit) {
     // notification access is granted. Ongoing notifications (a foreground service's) are not waiting for anyone.
     val waiting = NotificationsStore.items.collectAsState().value.count { it.clearable }
     TaskbarButton(onClick = onClick) {
-        val network = when (status.network) {
-            dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
-                "◤" + (status.wifiLevel?.let { " $it/4" } ?: "")
-            dev.droidtop.runtime.systemstatus.NetworkKind.ETHERNET -> "ETH"
-            dev.droidtop.runtime.systemstatus.NetworkKind.CELLULAR -> "LTE"
-            dev.droidtop.runtime.systemstatus.NetworkKind.NONE -> "✕"
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            // Gaming's status readout, the one component (Droidtop/tracker#691): the clock in Android's 12 or 24 hour
+            // format, the network and battery glyphs and the battery's percent. The desktop's only clock, shown with
+            // or without a session and under either compositor.
+            StatusCluster(showBatteryPercent = true, onClick = onClick)
+            if (status.vpnActive) {
+                Text(stringResource(R.string.desktop_tray_vpn), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.labelMedium)
+            }
+            if (waiting > 0) NotificationCount(waiting)
         }
-        val noInternet = if (
-            status.network != dev.droidtop.runtime.systemstatus.NetworkKind.NONE && !status.validated
-        ) " !" else ""
-        val vpn = if (status.vpnActive) "  VPN" else ""
-        val battery = status.batteryPercent?.let { "  $it%" + if (status.charging) "⚡" else "" } ?: ""
-        // "!" = connected without validated internet (captive portal); the Quick Menu's System
-        // section opens the system sheet where signing in happens.
-        val notifications = if (waiting > 0) "  $waiting new" else ""
-        Text(network + noInternet + vpn + battery + notifications, color = MaterialTheme.colorScheme.onSurface)
+    }
+}
+
+/** The notifications waiting, as a count on a badge. */
+@Composable
+private fun NotificationCount(count: Int) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .heightIn(min = 20.dp)
+            .widthIn(min = 20.dp)
+            .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape)
+            .padding(horizontal = 5.dp),
+    ) {
+        Text(
+            if (count > 99) "99+" else count.toString(),
+            color = MaterialTheme.colorScheme.onPrimary,
+            style = MaterialTheme.typography.labelSmall,
+        )
     }
 }
 

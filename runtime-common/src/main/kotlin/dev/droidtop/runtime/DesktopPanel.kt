@@ -67,13 +67,12 @@ enum class DesktopPanel(val id: String, val label: String) {
         const val FLOATING_BORDER_PX = 8
 
         /**
-         * Waybar along the top, a status strip: the workspaces, the tray of
-         * the Linux programs and a clock. No launcher and no window title:
-         * droidtop's bar has Start and the window list, and two of each was
-         * two ways to do one thing (Droidtop/tracker#683). The clock is
-         * `date`, which reads the container's POSIX `TZ`
-         * ([ContainerLayout.posixTimeZone]); Waybar's own clock module wants
-         * a tz database the image may not have.
+         * Waybar along the top, a status strip: the workspaces and the tray
+         * of the Linux programs. No launcher and no window title: droidtop's
+         * bar has Start and the window list, and two of each was two ways to
+         * do one thing (Droidtop/tracker#683). No clock either: droidtop's
+         * tray shows the one clock, in Android's 12 or 24 hour format, with
+         * or without a session (Droidtop/tracker#691).
          */
         fun waybarConfig(): String =
             """
@@ -82,8 +81,7 @@ enum class DesktopPanel(val id: String, val label: String) {
               "position": "top",
               "height": 26,
               "modules-left": ["sway/workspaces", "sway/mode"],
-              "modules-right": ["tray", "custom/clock"],
-              "custom/clock": { "exec": "date +%H:%M", "interval": 30, "tooltip": false }
+              "modules-right": ["tray"]
             }
             """.trimIndent() + "\n"
 

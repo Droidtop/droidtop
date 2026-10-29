@@ -98,7 +98,7 @@ internal fun FloatingStatusCluster(onClick: () -> Unit, modifier: Modifier = Mod
  * readings. Not a focus target, like everything in the top bar.
  */
 @Composable
-internal fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val status by produceState<SystemStatusSnapshot?>(null, context) {
         SystemStatus.flow(context).flowOn(Dispatchers.IO).collect { value = it }

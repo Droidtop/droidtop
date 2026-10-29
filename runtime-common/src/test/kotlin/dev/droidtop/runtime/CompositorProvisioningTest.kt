@@ -44,6 +44,9 @@ class CompositorProvisioningTest {
         val waybar = DesktopPanel.waybarConfig()
         assertTrue(waybar.contains("\"modules-left\": [\"sway/workspaces\", \"sway/mode\"]"))
         assertFalse(waybar.contains("wofi") || waybar.contains("custom/apps") || waybar.contains("sway/window"))
+        // The clock is droidtop's tray's (#691).
+        assertTrue(waybar.contains("\"modules-right\": [\"tray\"]"))
+        assertFalse(waybar.contains("clock"))
         // Windows float unless the person tiles them (#686).
         assertTrue("for_window [all] floating enable" in lines)
         assertTrue("default_floating_border normal 8" in lines)
