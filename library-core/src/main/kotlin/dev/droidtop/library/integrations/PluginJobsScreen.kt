@@ -18,6 +18,7 @@ import dev.droidtop.pluginhost.JobState
 import dev.droidtop.pluginhost.Outcome
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.ReportItem
+import dev.droidtop.runtime.util.guarded
 import kotlinx.coroutines.launch
 
 /**
@@ -132,12 +133,10 @@ object PluginJobsScreen {
                 val app = context.applicationContext
                 scope.launch {
                     try {
-                        groups = lead(app) to trail(app)
-                        atMs = System.currentTimeMillis()
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        android.util.Log.w("droidtop.Jobs", "reading Get games and Sources failed: ${e.message}")
+                        guarded("droidtop.Jobs", "reading Get games and Sources", Unit) {
+                            groups = lead(app) to trail(app)
+                            atMs = System.currentTimeMillis()
+                        }
                     } finally {
                         reading.set(false)
                         changes.value++

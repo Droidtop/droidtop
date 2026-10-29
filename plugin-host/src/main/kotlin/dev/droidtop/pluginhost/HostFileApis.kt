@@ -1,6 +1,5 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.util.Base64
 import java.util.UUID
@@ -15,15 +14,12 @@ data class PickedDocument(val uri: String, val name: String, val size: Long?, va
  * per plugin so a pick survives a restart, and deleted with the plugin. The plugin holds only the token; droidtop holds
  * the URI and opens it.
  */
-class PluginFileTokens(private val dir: File) {
-    private fun fileFor(pluginId: String) = File(dir, "$pluginId.json")
+class PluginFileTokens(dir: File) {
+    private val store = PerPluginJsonStore(dir)
 
-    private fun read(pluginId: String): JSONObject =
-        runCatching { JSONObject(fileFor(pluginId).readText()) }.getOrDefault(JSONObject())
+    private fun read(pluginId: String): JSONObject = store.readOrSetAside(pluginId) ?: JSONObject()
 
-    private fun write(pluginId: String, json: JSONObject) {
-        AtomicWrite.text(fileFor(pluginId), json.toString())
-    }
+    private fun write(pluginId: String, json: JSONObject) = store.write(pluginId, json)
 
     fun add(pluginId: String, document: PickedDocument): String = synchronized(LOCK) {
         val json = read(pluginId)
@@ -47,7 +43,7 @@ class PluginFileTokens(private val dir: File) {
     }
 
     fun delete(pluginId: String) = synchronized(LOCK) {
-        fileFor(pluginId).delete()
+        store.delete(pluginId)
     }
 
     companion object {

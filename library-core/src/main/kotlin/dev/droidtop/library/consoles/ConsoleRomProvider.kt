@@ -25,6 +25,8 @@ import dev.droidtop.library.romdetect.PlayStationDiscType
 import dev.droidtop.library.romdetect.SerialScanner
 import dev.droidtop.library.romdetect.SystemID
 import dev.droidtop.library.romdetect.toConsoleSystemId
+import dev.droidtop.runtime.util.guarded
+import dev.droidtop.runtime.util.runCatchingCancellable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.ProducerScope
@@ -525,7 +527,7 @@ class ConsoleRomProvider(
                         units.forEach { unit ->
                             val system = unit.system
                             coroutineLaunch {
-                                try {
+                                guarded("droidtop.ConsoleRomProvider", "scan system=${system.id} under ${root.absolutePath}", Unit) {
                                     val walkStartedAt = System.currentTimeMillis()
                                     val folderEntries = scanSystemUnit(unit)
                                     writeRomRecords(folderEntries, root, system.id)
@@ -539,14 +541,6 @@ class ConsoleRomProvider(
                                         ),
                                     )
                                     if (pauseMs > 0) delay(pauseMs)
-                                } catch (t: kotlinx.coroutines.CancellationException) {
-                                    throw t
-                                } catch (t: Throwable) {
-                                    android.util.Log.e(
-                                        "droidtop.ConsoleRomProvider",
-                                        "scan system=${system.id} under ${root.absolutePath} FAILED",
-                                        t,
-                                    )
                                 }
                             }
                         }
@@ -904,14 +898,13 @@ class ConsoleRomProvider(
      * pattern as [detectSystemIdFromContent] -- one bad lookup never
      * fails the whole scan).
      */
-    private suspend fun detectSystemIdFromFilename(romFile: File): String? {
-        return try {
+    // A cancelled scan stops here (Droidtop/tracker#766): the database lookup suspends, and a catch-all used to keep
+    // going with no answer. Any other failure is "no answer", as before.
+    private suspend fun detectSystemIdFromFilename(romFile: File): String? =
+        runCatchingCancellable {
             val rom = libretroDao.findByFileName(romFile.name) ?: return null
             SystemID.entries.firstOrNull { it.dbname == rom.system }?.toConsoleSystemId()
-        } catch (t: Throwable) {
-            null
-        }
-    }
+        }.getOrNull()
 
     override suspend fun launch(entry: LibraryEntry) {
         val romFile = File(entry.id)
@@ -1127,11 +1120,9 @@ class ConsoleRomProvider(
     // for apps targeting 34, so there it does nothing and the emulator is
     // simply relaunched as it is (docs/SPEC.md 7i). Never fails a launch.
     private fun killPackageProcessesBestEffort(packageName: String) {
-        try {
+        guarded("droidtop.ConsoleRomProvider", "Ending $packageName's background processes", Unit) {
             (context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager)
                 .killBackgroundProcesses(packageName)
-        } catch (t: Throwable) {
-            android.util.Log.d("droidtop.ConsoleRomProvider", "Couldn't end $packageName's background processes", t)
         }
     }
 }

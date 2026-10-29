@@ -1,6 +1,5 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
@@ -16,7 +15,7 @@ import org.json.JSONObject
  * what a count (not a log) can afford.
  */
 class PluginCallCounts(private val dir: File) {
-    private fun fileFor(pluginId: String) = File(dir, "$pluginId.counts.json")
+    private val store = PerPluginJsonStore(dir, ".counts.json")
 
     /** Counts one call of [pluginId] under [key] on [nowMs]'s day. */
     fun count(pluginId: String, key: String, nowMs: Long = System.currentTimeMillis(), zone: ZoneId = ZoneId.systemDefault()) {
@@ -63,13 +62,11 @@ class PluginCallCounts(private val dir: File) {
         val kept = all.entries.sortedByDescending { it.key }.take(DAYS)
         val json = JSONObject()
         for ((d, counts) in kept) json.put(d, JSONObject(counts as Map<*, *>))
-        AtomicWrite.text(fileFor(pluginId), json.toString())
+        store.write(pluginId, json)
     }
 
     private fun readLocked(pluginId: String): Map<String, Map<String, Int>> {
-        val file = fileFor(pluginId)
-        if (!file.isFile) return emptyMap()
-        val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return emptyMap()
+        val json = store.readOrSetAside(pluginId) ?: return emptyMap()
         return json.keys().asSequence().associateWith { d ->
             val day = json.optJSONObject(d) ?: return@associateWith emptyMap()
             day.keys().asSequence().associateWith { day.optInt(it) }
@@ -80,7 +77,7 @@ class PluginCallCounts(private val dir: File) {
     fun delete(pluginId: String) {
         synchronized(LOCK) {
             pending.remove(id(pluginId))
-            fileFor(pluginId).delete()
+            store.delete(pluginId)
         }
     }
 
