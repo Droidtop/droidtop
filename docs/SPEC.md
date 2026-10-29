@@ -20134,13 +20134,20 @@ docs/DESIGN.md section 17, "Games the host starts").
   that Stream with Steam Link is in its menu. An application (`REMOTE_STREAM`)
   is not asked: launch_host covers the host's games.
 - **`started` says how to show it.** With `stream: windowcast`, droidtop
-  opens windowcast's viewer (`dev.windowcast.viewer`) plainly, and the line
-  says to choose the computer there. The viewer takes no link that names a
-  computer yet (its manifest has only the launcher entry), so this is the
-  same two steps as Steam Link. Pythia answers `windowcast` only while a
-  windowcast host runs on the computer. Without a stream, the line says the
-  game shows on the computer's own screen and nothing here streams it.
-  droidtop streams nothing itself.
+  opens windowcast's viewer (`dev.windowcast.viewer`) on that computer and the
+  game's window, with the viewer's own request (windowcast docs/ANDROID-VIEWER.md,
+  action `dev.windowcast.viewer.action.CONNECT`): the host is the computer's
+  id (the agent and windowcast share one identity on a computer), the window is
+  the game's title, and the address is the one the answer gave
+  (`address`, `HOST:PORT`, which a host that knows where its windowcast listens
+  should send), else the computer's most recent address with windowcast's
+  default port 47100, since the port in the computer's addresses is the
+  agent's. The viewer connects only to a host it has paired with and says so
+  itself otherwise; droidtop never pairs for it. With no address to name, the
+  viewer is opened plainly and the line says to choose the computer there.
+  Pythia answers `windowcast` only while a windowcast host runs on the
+  computer. Without a stream, the line says the game shows on the computer's
+  own screen and nothing here streams it. droidtop streams nothing itself.
 - **Honest states.** The answers and their words are Steam Link's
   (allowed, too old, failed, offline), with one difference. For a key that
   is not Steam's, `unknown_game` also says that only a desktop manager such
@@ -20149,9 +20156,10 @@ docs/DESIGN.md section 17, "Games the host starts").
   report hello features, so the answer is the only signal.
 - **The viewer missing** is said plainly. It is not published yet (windowcast
   CI builds it), so no store page is offered.
-- **Not built:** a link into windowcast's viewer that picks the computer and
-  the window. That is windowcast's to add, and droidtop passes it on when
-  one exists.
+- **Not built:** the host sending its windowcast address in the answer (an
+  `address` beside `stream`; droidtop-agent and Pythia), so a host whose
+  windowcast does not listen on 47100 is named correctly. Until then a changed
+  port needs the person to open the viewer themselves.
 
 ### Transports
 

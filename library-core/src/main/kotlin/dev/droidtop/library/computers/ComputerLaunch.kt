@@ -21,15 +21,33 @@ object ComputerLaunch {
     /** The `stream` of a `started` answer when windowcast shows the game. */
     const val STREAM_WINDOWCAST = "windowcast"
 
-    /** windowcast's Android viewer. It takes no link yet, so it is opened plainly and the person picks the computer there. */
+    /** windowcast's Android viewer (`dev.windowcast.viewer`), which opens a named host and window (windowcast docs/ANDROID-VIEWER.md). */
     const val WINDOWCAST_VIEWER = "dev.windowcast.viewer"
+
+    /** The viewer's explicit intent: [VIEWER_CONNECT] with the host's device id, its address and, optionally, part of a window's title. */
+    const val VIEWER_CONNECT = "dev.windowcast.viewer.action.CONNECT"
+    const val EXTRA_HOST_ID = "dev.windowcast.viewer.extra.HOST_ID"
+    const val EXTRA_ADDRESS = "dev.windowcast.viewer.extra.ADDRESS"
+    const val EXTRA_WINDOW = "dev.windowcast.viewer.extra.WINDOW"
+
+    /** The port a windowcast host listens on unless its owner changed it (windowcast `app/src/config.rs`, `listen`). */
+    const val WINDOWCAST_DEFAULT_PORT = 47100
+
+    private val HOST_PORT = Regex("""^(\[[0-9A-Fa-f:.]+]|[A-Za-z0-9.-]+):([0-9]{1,5})$""")
 
     /**
      * What one computer said, and the words for it. [definitive] is false when
      * only another computer might do better; [stream] is how the started game
      * is shown (null: nothing names a viewer, Steam Link for a Steam game).
      */
-    data class Outcome(val started: Boolean, val line: String, val definitive: Boolean = true, val stream: String? = null)
+    data class Outcome(
+        val started: Boolean,
+        val line: String,
+        val definitive: Boolean = true,
+        val stream: String? = null,
+        /** Where the host's windowcast listens, when the answer said (`HOST:PORT`); null when it did not. */
+        val streamAddress: String? = null,
+    )
 
     /** The computers to ask for a game, in order: the primary one first, then the one met most recently. */
     fun order(computers: List<Computer>): List<Computer> =
@@ -42,7 +60,12 @@ object ComputerLaunch {
         }
         reply.optString("error").takeIf { reply.has("error") }?.let { return Outcome(false, "$computer: $it") }
         return when (reply.optString("result")) {
-            "started" -> Outcome(true, "$game is starting on $computer.", stream = reply.optString("stream").takeIf { it.isNotBlank() })
+            "started" -> Outcome(
+                true,
+                "$game is starting on $computer.",
+                stream = reply.optString("stream").takeIf { it.isNotBlank() },
+                streamAddress = reply.optString("address").takeIf { isHostPort(it) },
+            )
             "agent_too_old" -> Outcome(false, "droidtop-agent on $computer is too old to start games. Update it on the computer.")
             "not_allowed" -> Outcome(
                 false,
@@ -84,17 +107,45 @@ object ComputerLaunch {
             Computers.call(context, pc, "launch_game", JSONObject().put("game", JSONObject().put("key", key).put("title", title)))
         }
 
+    /** Whether [text] is `HOST:PORT` as the viewer takes it: an IPv6 host in brackets, a port from 1 to 65535, nothing else. */
+    fun isHostPort(text: String): Boolean = HOST_PORT.matchEntire(text)?.groupValues?.get(2)?.toIntOrNull()?.let { it in 1..65535 } == true
+
     /**
-     * Opens windowcast's viewer for a game a computer started with
-     * `stream: windowcast`, and returns the line to show after [started].
-     * The viewer is not published yet; when it is not here, this says so
-     * rather than offering a store page.
+     * Where to reach [computer]'s windowcast: the address its answer gave, else its most recent address with windowcast's
+     * default port (the sync port in [Computer.addresses] is the agent's, not windowcast's). Null when it has no address.
      */
-    fun openWindowcast(context: Context, computer: String, started: String): String {
-        val open = context.packageManager.getLaunchIntentForPackage(WINDOWCAST_VIEWER)?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            ?: return "$started windowcast's viewer isn't on this device to show it."
+    fun windowcastAddress(computer: Computer, answered: String?): String? {
+        answered?.takeIf { isHostPort(it) }?.let { return it }
+        val host = computer.addresses.firstNotNullOfOrNull { it.substringBeforeLast(':', "").takeIf { h -> h.isNotEmpty() } } ?: return null
+        val plain = if (host.startsWith("[") || !host.contains(':')) host else "[$host]"
+        return "$plain:$WINDOWCAST_DEFAULT_PORT".takeIf { isHostPort(it) }
+    }
+
+    /** The extras of the viewer's request for [computer] and the game's [window] title, or null when the computer has no address to name. */
+    fun viewerExtras(computer: Computer, answered: String?, window: String): Map<String, String>? {
+        val address = windowcastAddress(computer, answered) ?: return null
+        return buildMap {
+            put(EXTRA_HOST_ID, computer.id)
+            put(EXTRA_ADDRESS, address)
+            window.trim().takeIf { it.isNotEmpty() }?.let { put(EXTRA_WINDOW, it) }
+        }
+    }
+
+    /**
+     * Opens windowcast's viewer on [computer] for a game it started with `stream: windowcast`, at the game's window, and
+     * returns the line to show after [started]. The viewer connects only to a host it has paired with; if it has not, it
+     * says so itself. With no address to name, the viewer is opened plainly and the person picks the computer there.
+     * The viewer may not be here: this says so rather than offering a store page.
+     */
+    fun openWindowcast(context: Context, computer: Computer, answered: String?, title: String, started: String): String {
+        val extras = viewerExtras(computer, answered, title)
+        val open = if (extras == null) {
+            context.packageManager.getLaunchIntentForPackage(WINDOWCAST_VIEWER)
+        } else {
+            Intent(VIEWER_CONNECT).setPackage(WINDOWCAST_VIEWER).also { intent -> extras.forEach { (k, v) -> intent.putExtra(k, v) } }
+        }?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return "$started windowcast's viewer isn't on this device to show it."
         val failure = runCatching { context.startActivity(open) }.exceptionOrNull()
-            ?: return "$started In windowcast choose $computer."
+            ?: return if (extras != null) "$started Opening ${computer.name} in windowcast." else "$started In windowcast choose ${computer.name}."
         return "$started windowcast's viewer would not open: ${failure.message}."
     }
 }

@@ -106,7 +106,7 @@ class ComputerEntriesProvider(private val context: Context) : LibraryProvider {
             return outcome.line
         }
         return when (outcome.stream) {
-            ComputerLaunch.STREAM_WINDOWCAST -> ComputerLaunch.openWindowcast(context, computer.name, outcome.line)
+            ComputerLaunch.STREAM_WINDOWCAST -> ComputerLaunch.openWindowcast(context, computer, outcome.streamAddress, title, outcome.line)
             // Started, with nothing on this device to show it (no windowcast host there).
             else -> "${outcome.line} It shows on ${computer.name}'s screen; nothing here streams it."
         }
