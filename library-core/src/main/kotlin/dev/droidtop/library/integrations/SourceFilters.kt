@@ -29,7 +29,7 @@ object SourceFilters {
     /** An input's raw value as the plugin reads it; null for a node that is no option. Pure. */
     fun typed(node: ViewNode, raw: String): Any? = when (node) {
         is ViewNode.Toggle -> raw == "true"
-        is ViewNode.Slider -> raw.toDoubleOrNull() ?: return null
+        is ViewNode.Slider -> raw.toDoubleOrNull()
         is ViewNode.Choice, is ViewNode.Text -> raw
         else -> null
     }
