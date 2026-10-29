@@ -10,8 +10,11 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.os.Bundle
+import android.util.DisplayMetrics
 import android.view.View
 import dev.droidtop.library.settings.CatalogPrefs
+import dev.droidtop.shell.gamepad.canvasDensity
+import kotlin.math.roundToInt
 
 /**
  * droidtop's own two accessibility controls (docs/SPEC.md, Accessibility):
@@ -136,13 +139,48 @@ object AccessibilityPrefs {
         CatalogPrefs.prefs(app).registerOnSharedPreferenceChangeListener(l)
     }
 
+    /**
+     * Applies the text scale and the display's canvas density ([canvasDensity], docs/SPEC.md 7k) to [activity]'s
+     * Resources, so every window it opens follows: its own content, and the dialogs and popups that create Compose
+     * views of their own (the Quick Menu among them) and read their density from these Resources. Called on create,
+     * on resume and from an activity that handles its own configuration changes, since a new configuration from the
+     * system replaces both.
+     */
     @Suppress("DEPRECATION")
-    private fun applyTextScale(activity: Activity) {
+    fun applyTextScale(activity: Activity) {
         val res = activity.resources
+        val current = res.configuration
         val wanted = Resources.getSystem().configuration.fontScale * textScale(activity)
-        if (res.configuration.fontScale == wanted) return
-        val config = Configuration(res.configuration).apply { fontScale = wanted }
+        val canvasDpi = canvasDensityDpi(activity) ?: current.densityDpi
+        if (current.fontScale == wanted && current.densityDpi == canvasDpi) return
+        val config = Configuration(current).apply {
+            fontScale = wanted
+            if (current.densityDpi != canvasDpi) {
+                // The same pixels at the new density: a dp size scales by the ratio of the two.
+                val ratio = current.densityDpi.toFloat() / canvasDpi
+                densityDpi = canvasDpi
+                screenWidthDp = (current.screenWidthDp * ratio).roundToInt()
+                screenHeightDp = (current.screenHeightDp * ratio).roundToInt()
+                smallestScreenWidthDp = (current.smallestScreenWidthDp * ratio).roundToInt()
+            }
+        }
         res.updateConfiguration(config, res.displayMetrics)
+    }
+
+    /** The canvas density, as a dpi, for the display [activity] is on, from what that display reports; null if it reports nothing. */
+    @Suppress("DEPRECATION")
+    private fun canvasDensityDpi(activity: Activity): Int? {
+        val display = activity.windowManager?.defaultDisplay ?: return null
+        val metrics = DisplayMetrics().also { display.getRealMetrics(it) }
+        if (metrics.densityDpi <= 0 || metrics.widthPixels <= 0) return null
+        val density = metrics.densityDpi / 160f
+        val target = canvasDensity(
+            density,
+            (metrics.widthPixels / density).roundToInt(),
+            (metrics.heightPixels / density).roundToInt(),
+            metrics.xdpi,
+        )
+        return (target * 160f).roundToInt()
     }
 
     private fun applyColorFilter(activity: Activity) {

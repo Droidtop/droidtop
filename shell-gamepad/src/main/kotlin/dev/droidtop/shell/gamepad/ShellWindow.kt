@@ -350,27 +350,29 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val xdpi = LocalContext.current.resources.displayMetrics.xdpi
-    val target = canvasDensity(density.density, configuration.screenWidthDp, configuration.screenHeightDp, xdpi)
-    if (target >= density.density * 0.99f) {
-        CompositionLocalProvider(
-            LocalTouchTarget provides touchTargetDp(xdpi, density.density, density.density).dp,
-            content = content,
-        )
+    // The window's pixels, from the configuration's own dp size and dpi (a consistent pair even when the Resources
+    // under it were already moved to the canvas, as droidtop's activities are).
+    val configDensity = configuration.densityDpi / 160f
+    val widthPx = configuration.screenWidthDp * configDensity
+    val heightPx = configuration.screenHeightDp * configDensity
+    val target = canvasDensity(configDensity, configuration.screenWidthDp, configuration.screenHeightDp, xdpi)
+    val touchTarget = touchTargetDp(xdpi, configDensity, target).dp
+    if (kotlin.math.abs(target - configDensity) < 0.01f && kotlin.math.abs(target - density.density) < 0.01f) {
+        CompositionLocalProvider(LocalTouchTarget provides touchTarget, content = content)
         return
     }
-    val ratio = density.density / target
-    val scaled = remember(configuration, ratio) {
+    val scaled = remember(configuration, target) {
         Configuration(configuration).apply {
-            screenWidthDp = (configuration.screenWidthDp * ratio).roundToInt()
-            screenHeightDp = (configuration.screenHeightDp * ratio).roundToInt()
-            smallestScreenWidthDp = (configuration.smallestScreenWidthDp * ratio).roundToInt()
-            densityDpi = (configuration.densityDpi / ratio).roundToInt()
+            screenWidthDp = (widthPx / target).roundToInt()
+            screenHeightDp = (heightPx / target).roundToInt()
+            smallestScreenWidthDp = (minOf(widthPx, heightPx) / target).roundToInt()
+            densityDpi = (target * 160f).roundToInt()
         }
     }
     CompositionLocalProvider(
         LocalConfiguration provides scaled,
         LocalDensity provides Density(target, density.fontScale),
-        LocalTouchTarget provides touchTargetDp(xdpi, density.density, target).dp,
+        LocalTouchTarget provides touchTarget,
         content = content,
     )
 }

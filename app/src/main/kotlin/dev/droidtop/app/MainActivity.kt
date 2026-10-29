@@ -932,6 +932,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
      * a topology change clears it.
      */
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        // The system's new configuration replaces the canvas density and text scale on this activity's Resources.
+        AccessibilityPrefs.applyTextScale(this)
         super.onConfigurationChanged(newConfig)
         displayOrchestrator.onConfigurationChanged()
     }
