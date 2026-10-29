@@ -219,4 +219,10 @@ class FacetsTest {
         assertTrue(messages.single().contains("priv.packages"))
     }
 
+    @Test
+    fun `every target droidtop draws has room for a plugin's facets`() {
+        // A target missing from the limits file's perTarget would take none at all (search.filter, before its entry).
+        val none = FacetGuards.TARGETS.keys.filter { PluginViewLimits.facetsPerTarget(it) <= 0 }
+        assertEquals(emptyList<String>(), none)
+    }
 }
