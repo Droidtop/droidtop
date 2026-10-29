@@ -1,0 +1,108 @@
+name: Emulator tests
+
+# The on-device tests, run (Droidtop/tracker#735): the x86_64 debug build and its test APK from one android-build run
+# on an Android emulator, with the rig tests that make sense on a stock emulator and a start-up check
+# (scripts/emulator-tests.sh). Nightly, by hand (optionally for a given android-build run), and when this workflow,
+# its script or the tests change. It tests the APKs android-build already made, so it does not build droidtop a
+# second time. The emulator is started the way Droidtop/enginehost's conformance-emulator.yml starts its own.
+on:
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "The android-build run whose APKs are tested (default: the latest successful one on main)"
+        required: false
+        type: string
+  push:
+    paths:
+      - ".github/workflows/emulator-tests.yml"
+      - "scripts/emulator-tests.sh"
+      - "app/src/androidTest/**"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout (scripts only)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Find the build to test
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID_INPUT: ${{ inputs.run_id }}
+        run: |
+          id="$RUN_ID_INPUT"
+          if [ -z "$id" ]; then
+            id="$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/android-build.yml/runs?branch=main&status=success&per_page=1" \
+              | python3 -c 'import json, sys; runs = json.load(sys.stdin)["workflow_runs"]; print(runs[0]["id"] if runs else "")')"
+          fi
+          if [ -z "$id" ]; then
+            echo "No successful android-build run on main to test." >&2
+            exit 1
+          fi
+          echo "Testing the APKs of android-build run $id" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Download the build's APKs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: droidtop-apk
+          path: apk
+          run-id: ${{ steps.build.outputs.id }}
+          github-token: ${{ github.token }}
+
+      - name: Download the build's test APK
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: droidtop-android-test
+          path: apk
+          run-id: ${{ steps.build.outputs.id }}
+          github-token: ${{ github.token }}
+
+      - name: Let the emulator use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run the tests
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          # The plain AOSP image: Google Play services' processes come and go on an emulator and Android kills every
+          # app process using one of their providers when they do (the same finding as conformance-emulator.yml in
+          # Droidtop/enginehost, run 40834905579).
+          target: default
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/emulator-tests.sh apk results
+
+      # The summary as the run's own: read where the logs' download is refused.
+      - name: Summarise
+        if: always()
+        run: |
+          if [ -f results/summary.md ]; then cat results/summary.md >> "$GITHUB_STEP_SUMMARY"; else echo "No summary was written." >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload the results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: emulator-tests
+          path: results
+          if-no-files-found: warn

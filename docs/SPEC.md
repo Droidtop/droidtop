@@ -22388,6 +22388,15 @@ the secondary path for sources that publish no key.
   test installs and removes itself ("never one of the owner's apps"). The
   JVM-side fixtures and the fake host are in `:plugin-host-testing`
   (`docs/plugin-api.md` 3 I2).
+  **The on-device tests also run on an emulator (decided 2026-10-29, Droidtop/tracker#735).** `emulator-tests.yml`,
+  nightly, by hand and when it or the tests change, takes the x86_64 debug APK and the test APK of one `android-build`
+  run (the latest successful one on `main`, or the run it is given) and runs them on an x86_64 AOSP emulator with
+  `scripts/emulator-tests.sh`, started as Droidtop/enginehost's `conformance-emulator.yml` starts its own (the same
+  pinned `ReactiveCircus/android-emulator-runner`). It fails when `ContainedFilesRigTest` fails or droidtop is not
+  running, or has crashed, 30 s after it is started. `PluginStartRigTest` is run and reported without failing the run,
+  since the start-time budget it holds is the rig's and not an emulator's. `PrivPackagesRigTest` is not run: it needs
+  the installed Shizuku plugin and a console's privileged package service. The rig tests stay "run by hand" for
+  what only the rig has.
 - **Plugin bundles are signed by CI (owner, 2026-10-07).** Official plugin
   repos sign in their GitHub Actions jobs, not by
   hand: the repo secret `PLUGIN_SIGNING_KEY` (that repository's derived EC
