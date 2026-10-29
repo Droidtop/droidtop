@@ -1508,8 +1508,10 @@ object GamingSettingsCatalog {
         add(
             NestedScreenItem(
                 id = ID_DISPLAY_COMPANION,
-                // Its category's name in the Settings column ("Companion screen", CATEGORY_ORDER).
+                // Its category's name in the Settings column ("Companion screen", CATEGORY_ORDER); every category
+                // has an icon (Droidtop/tracker#676).
                 title = "Companion screen",
+                icon = CatalogIcon.DISPLAY,
                 inline = CatalogScreen(
                     id = ID_DISPLAY_COMPANION,
                     title = "Companion",

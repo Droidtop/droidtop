@@ -98,6 +98,22 @@ class SettingsCategoriesTest {
     }
 
     @Test
+    fun `a merged screen joins the category of the group that linked it, never a category of its own`() = runBlocking {
+        val shortGroups = listOf(CatalogGroup(id = "only", title = null, items = listOf(toggle("inner"))))
+        val short = screen("short", merged = true, groups = shortGroups)
+        val groups = listOf(
+            CatalogGroup(id = "modes", title = "Modes", items = listOf(toggle("outer"), link("toShort", short)), category = "Modes"),
+            CatalogGroup(id = "other", title = "Other", items = listOf(toggle("x"))),
+        )
+
+        val merged = mergeShortScreens(groups) { if (it === short) shortGroups else emptyList() }
+        val categories = settingsCategories(merged, "Settings")
+
+        assertEquals("Modes", merged.first { it.id == "short/only" }.category)
+        assertEquals(listOf("Modes", "Other"), categories.map { it.label })
+    }
+
+    @Test
     fun `groups without a merged link come back unchanged`() = runBlocking {
         val groups = listOf(CatalogGroup(id = "g", title = "G", items = listOf(toggle("t"), link("l", screen("s")))))
 

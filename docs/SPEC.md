@@ -18576,7 +18576,10 @@ Settings tab, the left menu's places, Console systems and Containers.
   never the column. A short screen is marked `CatalogScreen.merged` and is
   drawn as sections of the pane that links it instead
   (`mergeShortScreens`; Standard mode's one row inside Global settings).
-  Merging is one level deep and keeps each row's id and write path.
+  Merging is one level deep and keeps each row's id and write path. A
+  merged section takes the category and icon of the group that linked it,
+  so in a column it is part of that category, never an icon-less category
+  of its own; every category in the column has an icon (Droidtop/tracker#676).
 - **Which screens merge, and one way in per mode (2026-10-03,
   Droidtop/tracker#273).** A screen is merged only if it is a handful of
   fixed rows with no list and no screen of its own behind it (about six or

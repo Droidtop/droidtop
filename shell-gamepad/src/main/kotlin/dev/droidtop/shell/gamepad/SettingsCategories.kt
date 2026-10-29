@@ -142,6 +142,11 @@ internal suspend fun mergeShortScreens(
                 out += section.copy(
                     id = "${screen.id}/${section.id}",
                     title = section.title ?: if (index == 0) screen.title else null,
+                    // A merged screen is a section of the page that linked it, so it is in that page's category,
+                    // never one of its own: "Standard mode" (one row) was a whole, icon-less category in the
+                    // column beside the Modes it belongs to (Droidtop/tracker#676).
+                    category = section.category ?: group.category,
+                    icon = section.icon ?: group.icon,
                 )
             }
         }
