@@ -130,6 +130,8 @@ import dev.droidtop.library.theme.esDeImageArea
 import dev.droidtop.library.theme.esDeImageFittedSize
 import dev.droidtop.library.theme.esDeVideoArea
 import dev.droidtop.library.theme.esDeVideoStaticImageArea
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.focus.focusProperties
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GamepadKeyMap
 import androidx.compose.ui.text.font.Font
@@ -3395,6 +3397,10 @@ private fun EsDeThemedHelpSystem(
     // Compose change counter), and the setting lives on the library one.
     val controllerFamily =
         dev.droidtop.library.theme.ThemePrefs.controllerFamily(LocalContext.current)
+    // Each entry is tappable, as the shell's own pills are (owner, 2026-10-29: "the pills need to be tappable, they
+    // currently aren't. That's the main reason for HAVING the pills"): a tap sends the button the entry names. It is
+    // a legend the cursor never visits, so the entries are not focusable.
+    val press = dev.droidtop.shell.gamepad.rememberGamepadTouch()
 
     Row(
         modifier = Modifier
@@ -3427,6 +3433,9 @@ private fun EsDeThemedHelpSystem(
             Row(
                 horizontalArrangement = Arrangement.spacedBy(iconTextSpacing.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .focusProperties { canFocus = false }
+                    .clickable { press(action) },
             ) {
                 // Real `entryLayout` (HelpComponent.cpp:254-268, and the two
                 // grid-building branches at :693-720): "iconFirst" is the

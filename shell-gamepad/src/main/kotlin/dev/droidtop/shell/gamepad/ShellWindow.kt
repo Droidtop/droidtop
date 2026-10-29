@@ -7,6 +7,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -50,6 +51,11 @@ data class ShellWindow(
      * external pad would, which is what [touchFirst] uses them for.
      */
     val padPresent: Boolean = false,
+    /**
+     * A touch target is at least this tall: a finger's size on this panel ([touchTargetDp]), which is Android's own
+     * 48dp where the layout is at Android's density and more of the canvas where it is drawn smaller.
+     */
+    val minTouchTarget: Dp = 48.dp,
 ) {
     val portrait: Boolean get() = heightDp > widthDp
 
@@ -119,8 +125,6 @@ data class ShellWindow(
     /** The one height of the header and footer bars (docs/SPEC.md 7k). */
     val frameBarHeight: Dp get() = if (touchFirst) MenuTokens.FrameBarHeightTouch else MenuTokens.FrameBarHeight
 
-    /** A touch target is at least this tall -- Android's own 48dp minimum. */
-    val minTouchTarget: Dp get() = 48.dp
 
     /**
      * How wide a modal panel (options menu, picker) may get. Landscape
@@ -289,39 +293,57 @@ val LocalShellWindow = staticCompositionLocalOf {
 const val CANVAS_SHORT_SIDE_DP = 720
 
 /**
- * The density a window [widthDp] by [heightDp] at [density] lays the shell out at. A window with a pad draws the
- * shell's canvas whatever its panel's dpi: a 1080p panel is 720dp on its short side, so a Retroid Pocket 5's 5.5"
- * panel (1080x1920 at 360dpi, 853x480dp) gets the same layout and the same proportions as the 1080p DP screen,
- * instead of 1.5 times the text and spacing in the same pixels (owner, 2026-10-29: the text needed to come "WWAAYY
- * down"; "We need responsive design and intelligent scaling"). A window that is already at least the canvas keeps its
- * own density, so a bigger screen is never shrunk below Android's own size. The console held upright keeps the canvas
- * too: it is still pad-driven. A window with no pad (a phone) keeps Android's density, because touch is all it has and
- * its targets must stay a finger's size. Pure.
+ * The density a window [widthDp] by [heightDp] at [density] lays the shell out at: the one that makes its short side
+ * [CANVAS_SHORT_SIDE_DP], never above Android's own. It reads the display alone, never what input is attached (owner,
+ * 2026-10-29: "Phones can have controllers. Can't we look at device-reported display information?"). The pixels do not
+ * change, only how many of them a dp is: a Retroid Pocket 5's 5.5" 1080p panel reports 360dpi, so Android counts a dp
+ * as 2.25 pixels and gives the shell 853x480dp, where the 1080p DP screen counts 1.5 and gives 1280x720dp. Drawn at 1.5
+ * here too, the panel shows the same layout and proportions as the DP screen instead of 1.5 times the text and spacing
+ * in the same pixels (owner, the same night: the text needed to come "WWAAYY down"; "We need responsive design and
+ * intelligent scaling"); so does a 1080p phone, in either orientation. A window already at least the canvas keeps its
+ * own density, so a big screen is never shrunk below Android's size. Touch targets do not shrink with it:
+ * [touchTargetDp] sizes them from the panel's own reported dpi. Pure.
  */
-fun canvasDensity(density: Float, widthDp: Int, heightDp: Int, padPresent: Boolean): Float {
-    if (!padPresent) return density
+fun canvasDensity(density: Float, widthDp: Int, heightDp: Int): Float {
     val shortSidePx = minOf(widthDp, heightDp) * density
     return minOf(density, shortSidePx / CANVAS_SHORT_SIDE_DP)
 }
 
+/** A finger's target, 48dp at Android's reference 160dpi: 0.3 inch, about 7.6 mm. */
+const val TOUCH_TARGET_INCHES = 0.3f
+
+/**
+ * The touch target, in dp at [layoutDensity], that is [TOUCH_TARGET_INCHES] on a panel the display reports at [xdpi]
+ * pixels per inch, so it is a finger's size whatever density the layout is drawn at. A display that reports no
+ * believable dpi (outside 80 to 1000, as some external screens do) falls back to Android's 48dp at [systemDensity].
+ * Never under 48dp of the layout. Pure.
+ */
+fun touchTargetDp(xdpi: Float, systemDensity: Float, layoutDensity: Float): Float {
+    val px = if (xdpi in 80f..1000f) xdpi * TOUCH_TARGET_INCHES else 48f * systemDensity
+    return maxOf(48f, px / layoutDensity)
+}
+
+/** The live [touchTargetDp], provided by [ProvideShellCanvas] and read into [ShellWindow.minTouchTarget]. */
+val LocalTouchTarget = staticCompositionLocalOf { 48.dp }
+
 /**
  * Lays [content] out at [canvasDensity]: the composition's density and its configuration's dp sizes both follow, so
  * every `dp`, every `sp` (with the Text size setting's scale kept), [currentShellWindow] and every
- * `BoxWithConstraints` measure the same canvas. Applying it twice changes nothing, since the window's pixels are the
- * same at either density. Every droidtop Compose root goes through it, from `GamingTheme` and `DroidtopTheme`.
+ * `BoxWithConstraints` measure the same canvas, and [LocalTouchTarget] keeps touch targets a finger's size. Applying
+ * it twice changes nothing, since the window's pixels are the same at either density. Every droidtop Compose root goes
+ * through it, from `GamingTheme` and `DroidtopTheme`.
  */
 @Composable
 fun ProvideShellCanvas(content: @Composable () -> Unit) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val target = canvasDensity(
-        density.density,
-        configuration.screenWidthDp,
-        configuration.screenHeightDp,
-        currentShellWindow().padPresent,
-    )
+    val xdpi = LocalContext.current.resources.displayMetrics.xdpi
+    val target = canvasDensity(density.density, configuration.screenWidthDp, configuration.screenHeightDp)
     if (target >= density.density * 0.99f) {
-        content()
+        CompositionLocalProvider(
+            LocalTouchTarget provides touchTargetDp(xdpi, density.density, density.density).dp,
+            content = content,
+        )
         return
     }
     val ratio = density.density / target
@@ -336,6 +358,7 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalConfiguration provides scaled,
         LocalDensity provides Density(target, density.fontScale),
+        LocalTouchTarget provides touchTargetDp(xdpi, density.density, target).dp,
         content = content,
     )
 }
@@ -349,5 +372,6 @@ fun currentShellWindow(): ShellWindow {
         widthDp = configuration.screenWidthDp,
         heightDp = configuration.screenHeightDp,
         padPresent = ControllerLayouts.attachedControllers().isNotEmpty(),
+        minTouchTarget = LocalTouchTarget.current,
     )
 }

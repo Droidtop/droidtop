@@ -48,23 +48,25 @@ class ShellWindowTest {
     @Test
     fun `a Retroid Pocket 5 panel lays out at the 1080p canvas`() {
         // 1080x1920 at 360dpi, landscape: 853x480dp at 2.25, drawn at 1.5 so it is 1280x720dp like the DP screen.
-        assertEquals(1.5f, canvasDensity(2.25f, 853, 480, padPresent = true), 0.001f)
+        assertEquals(1.5f, canvasDensity(2.25f, 853, 480), 0.001f)
+        // Held upright, the same.
+        assertEquals(1.5f, canvasDensity(2.25f, 480, 853), 0.001f)
     }
 
     @Test
     fun `a window already at the canvas keeps its own density`() {
         // The 1080p DP screen at 1.5x, and a 4K television at 2x (1920x1080dp).
-        assertEquals(1.5f, canvasDensity(1.5f, 1280, 720, padPresent = true), 0.001f)
-        assertEquals(2f, canvasDensity(2f, 1920, 1080, padPresent = true), 0.001f)
+        assertEquals(1.5f, canvasDensity(1.5f, 1280, 720), 0.001f)
+        assertEquals(2f, canvasDensity(2f, 1920, 1080), 0.001f)
     }
 
     @Test
-    fun `the console held upright keeps the canvas`() {
-        assertEquals(1.5f, canvasDensity(2.25f, 480, 853, padPresent = true), 0.001f)
-    }
-
-    @Test
-    fun `a window with no pad keeps Android's density`() {
-        assertEquals(2.625f, canvasDensity(2.625f, 411, 731, padPresent = false), 0.001f)
+    fun `touch targets stay a finger's size on the canvas`() {
+        // A panel reporting 401 ppi: 0.3 inch is 120.3px, 80.2dp of the 1.5x canvas.
+        assertEquals(80.2f, touchTargetDp(xdpi = 401f, systemDensity = 2.25f, layoutDensity = 1.5f), 0.1f)
+        // A display reporting no believable dpi falls back to Android's 48dp at its own density.
+        assertEquals(72f, touchTargetDp(xdpi = 0f, systemDensity = 2.25f, layoutDensity = 1.5f), 0.1f)
+        // Never under 48dp of the layout.
+        assertEquals(48f, touchTargetDp(xdpi = 100f, systemDensity = 1f, layoutDensity = 1f), 0.1f)
     }
 }
