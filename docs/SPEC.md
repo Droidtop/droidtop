@@ -1979,6 +1979,19 @@ uses). Coming back with an image chosen starts the session. A failed start
 (including an image the catalog has since dropped) has Desktop setup beside
 Try again.
 
+**The desktop's pages speak plainly (decided 2026-10-29, Droidtop/tracker#693).**
+The Starting, failed and "couldn't show" pages say what happened and the one thing
+to do, never the machinery. "Starting the desktop…" says the first start downloads
+a Linux system and sets up the desktop, which takes several minutes, with the boot's
+own latest line under it. It no longer tells a rooted device to grant root when
+asked: droidtop never asks for root itself (root goes through Shizuku). A failed
+start is "The desktop didn't start" with Try again and Desktop setup. Its reason is
+plain too: "Couldn't install the Linux system", "The Linux system didn't start",
+"The desktop started, but droidtop couldn't show it". The container, compositor and
+socket details go to logcat (`DesktopSessionService.fail`'s `log`). A view that
+cannot present the output says "Couldn't show the desktop. Restart it from Start,
+under System."
+
 **Stopping is a stop (decided 2026-09-25, rig dq-coordinator-23 F9).**
 proot ignores SIGTERM (`src/tracee/event.c` sets every terminating signal
 but SIGQUIT and the fault signals to SIG_IGN) and sets no

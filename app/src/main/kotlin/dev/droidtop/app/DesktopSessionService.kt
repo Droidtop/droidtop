@@ -167,8 +167,9 @@ class DesktopSessionService : Service() {
                 if (runtime !is dev.droidtop.runtime.linux.root.DroidSpacesRuntime && detail.contains("ptrace", ignoreCase = true)) {
                     "${desktopCheckMessage(false, rooted = false, error = detail)} ($detail)"
                 } else {
-                    "This device can't run ${runtime.javaClass.simpleName}: $detail"
+                    "This device can't run the desktop ($detail)."
                 },
+                log = "This device can't run ${runtime.javaClass.simpleName}: $detail",
             )
             return
         }
@@ -183,7 +184,8 @@ class DesktopSessionService : Service() {
         val provisioning = try {
             provisioningFor(repository)
         } catch (t: Throwable) {
-            fail("Couldn't determine how to provision a compositor: ${t.message}", t)
+            fail("This Linux system has no desktop droidtop can set up. Choose another in Desktop setup.", t,
+                log = "Couldn't determine how to provision a compositor: ${t.message}")
             return
         }
 
@@ -196,7 +198,7 @@ class DesktopSessionService : Service() {
             // failure to report either.
             throw e
         } catch (t: Throwable) {
-            fail("Couldn't create the primary container: ${t.message}", t)
+            fail("Couldn't install the Linux system (${t.message}).", t, log = "Couldn't create the primary container: ${t.message}")
             return
         }
         android.util.Log.i(TAG, "Primary container: ${primary.id}")
@@ -214,7 +216,7 @@ class DesktopSessionService : Service() {
             // Stop, leaving Desktop): that is not a failure to report.
             throw e
         } catch (t: Throwable) {
-            fail("Couldn't start the primary container: ${t.message}", t)
+            fail("The Linux system didn't start (${t.message}).", t, log = "Couldn't start the primary container: ${t.message}")
             return
         }
         android.util.Log.i(TAG, "Primary container started")
@@ -223,7 +225,7 @@ class DesktopSessionService : Service() {
         val hostBridge = HostBridge()
         val socketPath = runtime.primaryWaylandSocketPath()
         if (!hostBridge.connect(socketPath)) {
-            fail("HostBridge couldn't connect to $socketPath")
+            fail("The desktop started, but droidtop couldn't show it.", log = "HostBridge couldn't connect to $socketPath")
             return
         }
         android.util.Log.i(TAG, "HostBridge connected to $socketPath — desktop session up")
@@ -356,8 +358,10 @@ class DesktopSessionService : Service() {
     // debugging the first real on-device pipeline run meant screenshotting
     // the shell to read error strings. Every failure now also lands in
     // logcat with its stack trace.
-    private fun fail(message: String, cause: Throwable? = null) {
-        android.util.Log.e(TAG, "Desktop session failed: $message", cause)
+    // [message] is what the page says, in plain words with the one thing to do (Droidtop/tracker#693); [log] is the
+    // same failure in droidtop's own terms (the container, the compositor, the socket) for logcat.
+    private fun fail(message: String, cause: Throwable? = null, log: String = message) {
+        android.util.Log.e(TAG, "Desktop session failed: $log", cause)
         _stateHolder.value = DesktopSessionState.Failed(message)
     }
 

@@ -497,7 +497,7 @@ private fun BoxScope.DesktopViewport(
             Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(stringResource(R.string.desktop_output_failed), color = MaterialTheme.colorScheme.onSurface)
                 Text(
-                    "Check that the primary container's compositor is running.",
+                    stringResource(R.string.desktop_output_failed_hint),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -511,10 +511,10 @@ private fun BoxScope.DesktopViewport(
             when (sessionMessage) {
                 is DesktopSessionMessage.Connecting -> {
                     Text(stringResource(R.string.desktop_starting), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    // What is going on and how long it takes, nothing about root or the machinery (Droidtop/tracker#693):
+                    // droidtop never asks for root itself, and the line under it is the boot's own progress.
                     Text(
-                        "The first start downloads a Linux system and installs the desktop " +
-                            "into it, which takes several minutes. On a rooted device, grant " +
-                            "root access if droidtop asks for it.",
+                        stringResource(R.string.desktop_starting_detail),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
