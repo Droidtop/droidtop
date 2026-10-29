@@ -397,13 +397,22 @@ internal object StoresCatalog {
             CatalogGroup(
                 id = "stores_add_group",
                 title = null,
-                items = listOf(
+                items = listOfNotNull(
                     NestedScreenItem(
                         id = "stores_add_game",
                         title = "Add a game",
                         subtitle = "A game already on this device, from its folder or file, or one from a store's pages",
                         inline = addGameScreen(),
                         icon = CatalogIcon.LIBRARY,
+                    ),
+                    // Get new games and Get apps were Updates' rows; updates moved to the Quick Menu, and getting things is
+                    // this place's (owner, 2026-10-29, Droidtop/tracker#749).
+                    UpdatesPage.getNewGamesRow(context),
+                    NestedScreenItem(
+                        id = "updates_get_apps",
+                        title = "Get apps",
+                        subtitle = "Browse and install apps from the catalogs your plugins add, such as F-Droid repositories",
+                        registryId = dev.droidtop.library.integrations.AppCatalogScreen.ID,
                     ),
                 ),
             ),

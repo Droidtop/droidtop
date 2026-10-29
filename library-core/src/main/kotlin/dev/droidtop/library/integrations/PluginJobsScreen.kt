@@ -18,6 +18,7 @@ import dev.droidtop.pluginhost.JobState
 import dev.droidtop.pluginhost.Outcome
 import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.ReportItem
+import kotlinx.coroutines.launch
 
 /**
  * The one shared "what plugin jobs are running" screen (docs/SPEC.md 12a
@@ -43,7 +44,9 @@ import dev.droidtop.pluginhost.ReportItem
  * Registered once (in `:app`'s `AppSettingsCatalogs`) and reached from
  * the "Downloads and Updates" entry of Settings and, in the Gaming
  * shell, from the left menu's place of the same name (docs/SPEC.md 7j
- * "Places"), which holds Updates as its first row (Droidtop/tracker#639)
+ * "Places"): the Steam-style downloads view, where nothing starts an
+ * update (owner, 2026-10-29, Droidtop/tracker#749; updates are checked
+ * for and started in the Quick Menu's Downloads tab, [QUICK_MENU_ID])
  * -- same shared-catalog registry every other cross-module
  * management screen uses, so every renderer gets it for free. A store's
  * page lists its own installs with the same rows ([jobRow]).
@@ -51,8 +54,11 @@ import dev.droidtop.pluginhost.ReportItem
 object PluginJobsScreen {
     const val ID = "plugin_jobs"
 
-    /** The first row, Updates: a page of this place (Droidtop/tracker#639). Gaming opens its own Updates page for it. */
-    const val UPDATES_ROW_ID = "plugin_jobs_updates"
+    /**
+     * The Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749): Check now, Update all, every update,
+     * then the jobs. Registered by `:app` (`UpdatesPage`), which owns the updates.
+     */
+    const val QUICK_MENU_ID = "quick_menu_downloads"
 
     /** The Download rules screen's registry id, registered by :app (`DownloadRulesCatalog`). */
     const val RULES_SCREEN_ID = "download_rules"
@@ -63,11 +69,12 @@ object PluginJobsScreen {
     /**
      * The one place the list of "what is running" is reached; every store's installs are jobs in
      * it. [headed] false is for a host that already names the screen in its own header (the Quick
-     * Menu's panel), so the heading is not said twice. [lead] comes after Updates and [trail] after the
-     * jobs: the place registered by `:app` puts Get games and the Sources status list there
-     * (Droidtop/tracker#644 slice 3), and the Quick Menu's compact panel leaves them out. The page is read
-     * again on every job report, so the two are kept for [EXTRA_KEEP_MS] rather than read each time (they
-     * read plugins and stat game folders), and read afresh on the next visit.
+     * Menu's panel), so the heading is not said twice. In order (Droidtop/tracker#749): the jobs, then [lead] and
+     * [trail] (the place registered by `:app` puts Get games and the Sources status list there,
+     * Droidtop/tracker#644 slice 3), then Download rules. The page is read again on every job report, so the two are
+     * kept for [EXTRA_KEEP_MS] rather than read each time (they read plugins and stat game folders); they are read in
+     * the background, so the jobs show at once and the two fill in under a loading row of their own
+     * (Droidtop/tracker#748: the page took about 10 s to show anything).
      */
     fun screen(
         headed: Boolean = true,
@@ -81,31 +88,64 @@ object PluginJobsScreen {
             subtitle = "Getting games, plugin downloads, library scrapes and other long-running actions, and updates".takeIf { headed },
             groups = { context ->
                 val nowMs = System.currentTimeMillis()
-                val (before, after) = kept.read(context, nowMs)
-                listOf(updatesGroup()) + before + groupsFor(PluginJobsCenter.entries().value, nowMs) + after + rulesGroup()
+                val extra = kept.read(context, nowMs)
+                groupsFor(PluginJobsCenter.entries().value, nowMs) +
+                    (extra?.let { (before, after) -> before + after } ?: listOf(loadingGroup())) +
+                    rulesGroup()
             },
             onLeave = { kept.clear() },
-            live = PluginJobsCenter.entries(),
+            live = kotlinx.coroutines.flow.merge(PluginJobsCenter.entries(), kept.changes),
         )
     }
+
+    /** Get games and Sources while they are first read: one row of their own, loading. */
+    private fun loadingGroup() = CatalogGroup(
+        id = "plugin_jobs_loading",
+        title = null,
+        items = listOf(ActionItem(id = "plugin_jobs_loading_row", title = "Getting your sources", progress = -1f)),
+    )
+
+    /** The jobs list's groups as they stand, for a screen that adds its own above them (the Quick Menu's Downloads tab). */
+    fun jobGroups(nowMs: Long = System.currentTimeMillis()): List<CatalogGroup> = groupsFor(PluginJobsCenter.entries().value, nowMs)
 
     /** How long the place's own groups stand before a job report reads them again. */
     const val EXTRA_KEEP_MS = 5_000L
 
-    /** [lead] and [trail] as last read, for [EXTRA_KEEP_MS]. */
+    /**
+     * [lead] and [trail] as last read, for [EXTRA_KEEP_MS]. A read runs in the background: [read] answers at once with
+     * what is kept (null before the first read ends), and [changes] says when a read ended so the page is built again.
+     */
     private class Kept(
         val lead: suspend (Context) -> List<CatalogGroup>,
         val trail: suspend (Context) -> List<CatalogGroup>,
     ) {
         @Volatile private var atMs = 0L
         @Volatile private var groups: Pair<List<CatalogGroup>, List<CatalogGroup>>? = null
+        private val reading = java.util.concurrent.atomic.AtomicBoolean(false)
+        private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+        val changes = kotlinx.coroutines.flow.MutableStateFlow(0)
 
-        suspend fun read(context: Context, nowMs: Long): Pair<List<CatalogGroup>, List<CatalogGroup>> {
-            groups?.takeIf { nowMs - atMs < EXTRA_KEEP_MS }?.let { return it }
-            return (lead(context) to trail(context)).also {
-                groups = it
-                atMs = nowMs
+        fun read(context: Context, nowMs: Long): Pair<List<CatalogGroup>, List<CatalogGroup>>? {
+            val shown = groups
+            if (shown != null && nowMs - atMs < EXTRA_KEEP_MS) return shown
+            if (reading.compareAndSet(false, true)) {
+                val app = context.applicationContext
+                scope.launch {
+                    try {
+                        groups = lead(app) to trail(app)
+                        atMs = System.currentTimeMillis()
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        android.util.Log.w("droidtop.Jobs", "reading Get games and Sources failed: ${e.message}")
+                    } finally {
+                        reading.set(false)
+                        changes.value++
+                    }
+                }
             }
+            // What was read last stands while it is read again.
+            return shown
         }
 
         fun clear() {
@@ -146,20 +186,6 @@ object PluginJobsScreen {
         subtitle = "Forgets every finished job and what it did",
         confirmTitle = "Clear every finished job from this list?",
         run = { PluginJobsCenter.clearFinished() },
-    )
-
-    /** Updates, a page of this place (owner, 2026-10-24, Droidtop/tracker#639: "Updates should be in the Downloads and Updates menu"). */
-    private fun updatesGroup() = CatalogGroup(
-        id = "plugin_jobs_updates_group",
-        title = null,
-        items = listOf(
-            NestedScreenItem(
-                id = UPDATES_ROW_ID,
-                title = Place.UPDATES.title,
-                subtitle = "What has a newer version, checking for updates, and Get new games",
-                registryId = Place.ID_UPDATES,
-            ),
-        ),
     )
 
     /** The way to the download rules (network, update window, automatic updates), from the place where downloads are seen. */

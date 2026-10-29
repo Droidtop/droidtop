@@ -18078,18 +18078,20 @@ menu still list every `listed` place.
 - **Social** (`social`, `SocialCatalog`; Droidtop/tracker#313, #327): the friends
   and conversations of every social provider, Steam and plugins alike, see
   "Social" below. In Gaming it is the Quick Menu's Social section, not a left menu row.
-- **Downloads and Updates** (`plugin_jobs`, `PluginJobsScreen`; "Downloads and installs" until 2026-10-24): its
-  first row is **Updates**, a page of this place rather than a place of its own (owner, 2026-10-24,
-  Droidtop/tracker#639: "Updates should be in the Downloads and Updates menu"): `Place.UPDATES` is not `listed`, so
-  no left menu, settings root or Start menu lists it, while its links, notifications and the Quick Menu still open
-  it (`Place.reachable`), and in Gaming its page and Get new games mark this row (`menuSection`) and Back from Updates
-  returns here. Then **Get games** (every source plugin's row and Add a game, moved from Game sources; see there), then
-  the one jobs list, then **Sources** (`StoresCatalog.sourcesGroups`): each signed-in store and each game folder, one
-  row each opening its page, with one status glyph from the host set (a turning ring while a store installs, the
-  circled "!" on a folder that cannot be read) and nothing to set up; its last row, **Game sources**, opens the setup
-  page. The two groups are read at most every five seconds while the page shows (`PluginJobsScreen.EXTRA_KEEP_MS`; the
-  page is read again on every job report) and afresh on each visit. The Quick Menu's Downloads panel has neither: it is
-  the jobs. The
+- **Downloads and Updates** (`plugin_jobs`, `PluginJobsScreen`; "Downloads and installs" until 2026-10-24) is the
+  Steam-style downloads view, and **nothing here starts an update** (owner, 2026-10-29, Droidtop/tracker#749, replacing
+  the 2026-10-24 placement of #639 where Updates was this place's first row: "This is supposed to be a tab like the
+  steam downloads tab, with actually initializing updates and stuff handled in the QAM. Is that not what was settled
+  on? I defer a lot for UX stuff, I'm just confused", then, on the coordinator's proposal, "Yes, the new organization
+  you just proposed is what I want"). In order: the one **jobs list** (Current, Paused and Completed, each job with its
+  bar, time left and Pause, Resume or Cancel); **Get games** (every source plugin's row, then Add a game, Get new games
+  in Gaming, and Get apps; moved from Game sources and from Updates); **Sources** (`StoresCatalog.sourcesGroups`): each
+  signed-in store and each game folder, one row each opening its page, with one status glyph from the host set (a
+  turning ring while a store installs, the circled "!" on a folder that cannot be read) and nothing to set up, its last
+  row, **Game sources**, opening the setup page; then **Download rules**. Get games and Sources are read in the
+  background (#748): the jobs show at once, the two fill in under one loading row of their own ("Getting your sources"),
+  and they are kept for five seconds while the page shows (`PluginJobsScreen.EXTRA_KEEP_MS`; the page is read again on
+  every job report) and read afresh on each visit. The
   jobs list (plugin work, library scrapes, store depots, single-file
   downloads, plugin updates) with progress, Pause, Resume and Cancel where
   the job supports them (12a "Jobs"); every store installs as a
@@ -18131,7 +18133,15 @@ menu still list every `listed` place.
   list ends with a **Download rules** row that opens that screen.
   The name stays the one the rest of the app already uses. Theme downloads
   and update installs are not yet jobs in that list; folding them in is open.
-- **Updates** (`updates`, a page of Downloads and Updates since 2026-10-24) is **one list, never tabs** (decided 2026-10-16, Droidtop/tracker#570; the owner: "the
+- **Updates are checked for and started in the Quick Menu's Downloads tab** (owner, 2026-10-29, Droidtop/tracker#749,
+  quoted above; `UpdatesPage.quickMenuScreen`, registered as `PluginJobsScreen.QUICK_MENU_ID`). In order: Check now,
+  Update all with its count, every game, plugin and app with an update (A starts it; Y is its Info, and a folder game's
+  row opens its record with the changelog), then the running and recent jobs (the jobs list's own rows), then Update
+  settings. A started update is a job, so it shows there and in Downloads and Updates alike. Every way to Updates opens
+  it: in Gaming the Updates section (a notification, Home's More card, a link) opens the Quick Menu on Downloads over the
+  section the person was on; elsewhere the `updates` screen is the same rows from the same builder. Not built yet: a
+  plugin's changelog on Y, which needs the plugin catalog's releases to carry one.
+- **Updates** (`updates`) is **one list, never tabs** (decided 2026-10-16, Droidtop/tracker#570; the owner: "the
   updates menu is fucky, it has a tab that just always shows up to date. WE don't have an option to ask the user if
   they want to install an update (that's an issue), so it will never know about an update, taht tab is useless.
   Updates should be a single tab"). It was a group per kind plus droidtop's settings and Android apps, at least
@@ -18167,7 +18177,8 @@ menu still list every `listed` place.
     row of its own ("Checking your plugins") until its rows fill in. Check now reads every kind again when it ends.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
-    privilege allows a silent install). Then **Get apps**.
+    privilege allows a silent install), after the jobs. Get apps and Get new games are Downloads and Updates' Get games
+    rows now (#749).
   It reads only what checks recorded and is built off the main thread.
   **Checks run on their own schedule** (`UpdateChecks`): one job, at the "Check for updates" interval (every day by
   default; Never cancels it) and on an unmetered network when that is set, runs the same check as Check now. It

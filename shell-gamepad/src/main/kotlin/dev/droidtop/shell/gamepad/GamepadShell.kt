@@ -474,6 +474,9 @@ private fun GamepadShellBody(
     // below. Installed only while this composition is live.
     // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
     var quickMenuOpen by remember { mutableStateOf(false) }
+    // The section the Quick Menu opens on when something asked for one (Downloads, for a link to Updates); cleared on close.
+    var quickMenuStart by remember { mutableStateOf<QuickSection?>(null) }
+    LaunchedEffect(quickMenuOpen) { if (!quickMenuOpen) quickMenuStart = null }
     // A quick menu left open when this shell lost the foreground (the
     // Switch-mode dialog's own "Android"/"Desktop" rows, or Home) must not
     // still be showing when a fresh, real deep-link brings this same
@@ -496,6 +499,19 @@ private fun GamepadShellBody(
         quickMenuOpen = openQuickMenu
         leftMenuOpen = false
         Log.i("droidtop.ReturnToGame", "deep link $deepLinkToken applied: quickMenu=$openQuickMenu")
+    }
+    // Updates is the Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749): every way into the Updates
+    // section (a notification, Home's More card, a link from a place) opens the Quick Menu there instead, over the
+    // section the person was on.
+    var lastSection by remember { mutableStateOf(nav.section) }
+    LaunchedEffect(nav.section) {
+        if (nav.section == GamingSection.UPDATES) {
+            nav.openSection(lastSection.takeIf { it != GamingSection.UPDATES } ?: GamingSection.DOWNLOADS)
+            quickMenuStart = QuickSection.DOWNLOADS
+            quickMenuOpen = true
+        } else {
+            lastSection = nav.section
+        }
     }
     // The face-button layout of the pad in use (SPEC 7b, "Console and controller detection"),
     // followed live because a handheld's own toggle can flip it while this shell stays in front.
@@ -781,6 +797,7 @@ private fun GamepadShellBody(
         QuickMenu(
             runningEntry = runningEntry,
             library = library,
+            startSection = quickMenuStart,
             // The same launch path every entry already goes through
             // (console ROM, PC and engine games alike) -- relaunching the
             // entry is what "resume" already means for the planned
@@ -1388,7 +1405,8 @@ private fun GamepadShellBody(
                             GetNewGamesPage(
                                 entries = foldedGameEntries.orEmpty(),
                                 onOpenUpdates = { nav.openSection(GamingSection.UPDATES) },
-                                onBack = { nav.openSection(GamingSection.UPDATES) },
+                                // Get new games is a row of Downloads and Updates' Get games now (Droidtop/tracker#749).
+                                onBack = { nav.openSection(GamingSection.DOWNLOADS) },
                             )
                         }
                         // The left menu's places: a registered settings screen each,
@@ -1413,10 +1431,8 @@ private fun GamepadShellBody(
                                     val wine = PcSource.WineShortcut.id
                                     put("${PcSource.LIBRARY_ITEM_PREFIX}$wine", openGames { pcGames.showSource(wine) })
                                     put(PcSource.IMPORTED_ITEM_ID, openGames { pcGames.showImported() })
-                                    // Updates' Get new games row opens the search here, in place.
+                                    // Get games' Get new games row opens the search here, in place.
                                     put(dev.droidtop.library.integrations.GetGamesEntry.UPDATES_ROW_ID) { nav.openSection(GamingSection.NEW_GAMES) }
-                                    // Downloads and Updates' Updates row opens Updates' own page, whose Back returns there.
-                                    put(dev.droidtop.library.integrations.PluginJobsScreen.UPDATES_ROW_ID) { nav.openSection(GamingSection.UPDATES) }
                                 }
                             }
                             PlaceCatalogView(

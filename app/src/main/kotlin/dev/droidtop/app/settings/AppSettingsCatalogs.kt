@@ -252,6 +252,7 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(androidSettingsScreen())
         SettingsScreenRegistry.register(enginehostScreen())
         SettingsScreenRegistry.register(UpdatesPage.screen())
+        SettingsScreenRegistry.register(UpdatesPage.quickMenuScreen())
         SettingsScreenRegistry.register(ComputersCatalog.screen())
         SettingsScreenRegistry.register(DroidtopWideSettings.globalScreen())
         SettingsScreenRegistry.register(DroidtopWideSettings.desktopScreen())

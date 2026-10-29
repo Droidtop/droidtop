@@ -16,6 +16,7 @@ import dev.droidtop.library.format.ValueFormat
 import dev.droidtop.library.integrations.AppCatalogs
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.integrations.PluginCatalog
+import dev.droidtop.library.integrations.PluginJobsScreen
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
@@ -71,17 +72,67 @@ object UpdatesPage {
         )
     }
 
-    fun screen() = CatalogScreen(
-        id = AppSettingsCatalogs.SCREEN_UPDATES,
-        title = "Updates",
-        subtitle = "What has a newer version",
+    /**
+     * The Quick Menu's Downloads tab (owner, 2026-10-29, Droidtop/tracker#749: "This is supposed to be a tab like the
+     * steam downloads tab, with actually initializing updates and stuff handled in the QAM"): Check now, Update all,
+     * every game and plugin with an update, then the running and recent jobs, then Update settings. A started update is
+     * a job, so it shows here and in Downloads and Updates alike.
+     */
+    fun quickMenuScreen() = screen(PluginJobsScreen.QUICK_MENU_ID, "Downloads")
+
+    /**
+     * The same, for a link to Updates where no Quick Menu is drawn (a notification opened outside Gaming, Settings in
+     * Standard or Desktop): one builder, so the two never differ.
+     */
+    fun screen() = screen(AppSettingsCatalogs.SCREEN_UPDATES, "Updates")
+
+    private fun screen(id: String, title: String) = CatalogScreen(
+        id = id,
+        title = title,
+        subtitle = "What has a newer version, and what is downloading",
         needsNetwork = true,
-        // Off the main thread as a whole: the rows read preferences, caches and the package manager.
-        groups = { context -> withContext(Dispatchers.IO) { listOf(CatalogGroup(id = "updates", title = null, items = rows(context))) } },
-        // Live (Droidtop/tracker#748, the owner: "It not auto-refreshing is a ux bug"): a section that finished reading,
-        // an update that started or finished, each rebuilds the rows at once, so no row waits for a whole Update all.
-        live = changes,
+        // Off the main thread as a whole: the rows read preferences and what the slow kinds last read.
+        groups = { context ->
+            withContext(Dispatchers.IO) {
+                listOf(CatalogGroup(id = "updates", title = null, items = rows(context))) +
+                    PluginJobsScreen.jobGroups() +
+                    CatalogGroup(id = "updates_more", title = null, items = listOf(settingsRow()))
+            }
+        },
+        // Live (Droidtop/tracker#748, the owner: "It not auto-refreshing is a ux bug"): a kind that finished reading,
+        // an update that started or finished, a job that moved, each rebuilds the rows at once, so no row waits for a
+        // whole Update all.
+        live = kotlinx.coroutines.flow.merge(changes, dev.droidtop.pluginhost.PluginJobsCenter.entries()),
     )
+
+    private fun settingsRow() = NestedScreenItem(
+        id = "updates_settings",
+        title = "Update settings",
+        subtitle = "How often droidtop checks, which builds it follows, and what updates without asking",
+        inline = settingsScreen(),
+    )
+
+    /**
+     * Get new games, in Gaming only: the page is Gaming's, which opens it in place by the row's id; in another mode the
+     * row is not listed, since it would open Gaming over that mode (Droidtop/tracker#639). Under Downloads and Updates'
+     * Get games since updates moved to the Quick Menu (Droidtop/tracker#749).
+     */
+    fun getNewGamesRow(context: Context): CatalogItem? {
+        if (Modes.lastMode(context) != Mode.GAMING.id) return null
+        return ActionItem(
+            id = GetGamesEntry.UPDATES_ROW_ID,
+            title = GetGamesEntry.NEW_GAMES,
+            subtitle = "Search the sources your plugins add for games to download",
+            run = { ctx ->
+                ctx.startActivity(
+                    Intent(ctx, MainActivity::class.java)
+                        .putExtra(BackButtonMenu.EXTRA_MODE, Mode.GAMING.id)
+                        .putExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION, GAMING_NEW_GAMES)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            },
+        )
+    }
 
     /** One update: its row, and what Update all does for it (null where it opens a page instead of installing). */
     private class Update(val row: CatalogItem, val apply: (suspend (Context, (String) -> Unit) -> String)?)
@@ -198,42 +249,6 @@ object UpdatesPage {
             }
             updates.forEach { add(shown(it)) }
             addAll(checking)
-            add(
-                NestedScreenItem(
-                    id = "updates_settings",
-                    title = "Update settings",
-                    subtitle = "How often droidtop checks, which builds it follows, and what updates without asking",
-                    inline = settingsScreen(),
-                ),
-            )
-            // Get new games is a page of Updates (owner, 2026-10-23: "THe "get new games" menu needs to be UNDER
-            // Updates", Droidtop/tracker#621). The page is Gaming's, which opens it in place by the row's id; in another
-            // mode the row is not listed, since it would open Gaming over that mode (Droidtop/tracker#639).
-            if (Modes.lastMode(context) == Mode.GAMING.id) {
-                add(
-                    ActionItem(
-                        id = GetGamesEntry.UPDATES_ROW_ID,
-                        title = GetGamesEntry.NEW_GAMES,
-                        subtitle = "Search the sources your plugins add for games to download",
-                        run = { ctx ->
-                            ctx.startActivity(
-                                Intent(ctx, MainActivity::class.java)
-                                    .putExtra(BackButtonMenu.EXTRA_MODE, Mode.GAMING.id)
-                                    .putExtra(BackButtonMenu.EXTRA_GAMING_START_SECTION, GAMING_NEW_GAMES)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                        },
-                    ),
-                )
-            }
-            add(
-                NestedScreenItem(
-                    id = "updates_get_apps",
-                    title = "Get apps",
-                    subtitle = "Browse and install apps from the catalogs your plugins add, such as F-Droid repositories",
-                    registryId = dev.droidtop.library.integrations.AppCatalogScreen.ID,
-                ),
-            )
         }
     }
 

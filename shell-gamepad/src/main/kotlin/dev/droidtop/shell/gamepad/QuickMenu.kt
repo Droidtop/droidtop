@@ -144,6 +144,8 @@ internal fun QuickMenu(
     onDismiss: () -> Unit,
     // The running console game's system searched (docs/SPEC.md 12a, "One search: where it opens"): its id and name.
     onSearchSystem: (systemId: String, systemName: String) -> Unit = { _, _ -> },
+    // The section to open on, when it is shown (a link to Updates opens Downloads, Droidtop/tracker#749); null is the usual one.
+    startSection: QuickSection? = null,
 ) {
     val window = currentShellWindow()
     // The shared side-panel frame (SidePanel.kt): a right-edge panel, or a bottom sheet on a screen held upright.
@@ -185,7 +187,7 @@ internal fun QuickMenu(
         val sections = remember(gameRunning, hasPlugins, hasSocial, uiMode, order) {
             QuickTiles.visibleSections(gameRunning, hasPlugins, hasSocial, uiMode, order)
         }
-        var section by remember { mutableStateOf(QuickTiles.initialSection(gameRunning, granted)) }
+        var section by remember { mutableStateOf(startSection?.takeIf { it in sections } ?: QuickTiles.initialSection(gameRunning, granted)) }
         LaunchedEffect(sections, section) {
             if (section !in sections) section = QuickTiles.initialSection(gameRunning, granted)
         }
@@ -566,13 +568,19 @@ private fun ReadoutRow(label: String, value: String, fill: Int?, detail: String?
 }
 
 /**
- * Downloads and jobs: the one jobs screen ([PluginJobsScreen], the same as Settings' "Downloads and
- * installs") hosted in the sheet through the catalog's own navigator, so a job reads the same here
- * as there and nothing is listed twice by two mechanisms.
+ * Downloads: where updates are checked for and started, then the running and recent jobs (owner, 2026-10-29,
+ * Droidtop/tracker#749: "actually initializing updates and stuff handled in the QAM"). The screen is `:app`'s
+ * ([PluginJobsScreen.QUICK_MENU_ID], built by UpdatesPage with the jobs list's own rows), hosted through the catalog's
+ * navigator; without it (a build with no `:app`) the jobs list alone.
  */
 @Composable
 private fun DownloadsSection(onDismiss: () -> Unit) {
-    CatalogNavigator(root = remember { PluginJobsScreen.screen(headed = false) }, onExit = onDismiss)
+    CatalogNavigator(
+        root = remember {
+            dev.droidtop.library.settings.SettingsScreenRegistry.get(PluginJobsScreen.QUICK_MENU_ID) ?: PluginJobsScreen.screen(headed = false)
+        },
+        onExit = onDismiss,
+    )
 }
 
 /**
