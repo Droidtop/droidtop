@@ -223,11 +223,15 @@ Android side — that broke the actual intent:
   socket/PulseAudio sharing §2/§3 already describe) is itself
   user-configurable per container, matching real distrobox's own
   `--volume`-style semantics rather than a fixed set of mounts.
-- **Native Android apps join the same desktop via freeform windowing**
-  (`android:resizeableActivity` + `ActivityOptions.setLaunchWindowingMode(
-  WINDOWING_MODE_FREEFORM)`, the platform's real large-screen/desktop-mode
-  API) — resizable, movable windows sitting alongside Wine/Linux windows
-  in the same Desktop shell, not a separate "Android apps" mode.
+- **Native Android apps are not windows on the desktop yet (corrected
+  2026-10-29, Droidtop/tracker#696).** This bullet used to say they joined
+  the desktop through freeform windowing (`setLaunchWindowingMode(
+  WINDOWING_MODE_FREEFORM)`). No code does that. Today an Android app or
+  game started from Desktop is a fullscreen Activity over the desktop, which
+  the bar lists beside the container's windows (2b, Droidtop/tracker#352).
+  Android apps as real windows on the desktop are future work: see
+  "Emulators, and Android apps as windows" below and #615, which proposes
+  one virtual display per app, streamed into the desktop per window.
 
 **The injection channel and the launch helper (built 2026-10-08,
 Droidtop/tracker#353).** Both are freedesktop standards, so no image
@@ -3489,7 +3493,8 @@ the `ContainerRuntime` interface that already exists (§3):
   controls, calendars, whatever's installed) laid over droidtop's own
   focused-game/info backdrop, plus resizable/floating apps (launched to
   that display via the same launch-display targeting; freeform
-  windowing per §2a's native-apps plan). The widget set persists once
+  windowing is not built, see §2a's corrected native-apps bullet and
+  Droidtop/tracker#696). The widget set persists once
   and every companion host shows the same set (`CompanionWidgets`, one
   `AppWidgetHost`): the companion is one surface wherever it lands, so
   there is one layout, not one per display role. droidtop's info stays
