@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.groundBackground
 import android.content.ComponentName
 import android.content.Context
@@ -779,7 +780,7 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
     if (confirmLeaving) {
         AlertDialog(
             onDismissRequest = { confirmLeaving = false },
-            title = { Text("Leave setup?") },
+            title = { Text(stringResource(R.string.onboarding_leave_setup)) },
             text = {
                 Text(
                     "Your answers are kept. Open droidtop again to carry on from this step. " +
@@ -791,9 +792,9 @@ private fun OnboardingScreen(run: OnboardingRun, isReEntry: Boolean, onDone: () 
                     confirmLeaving = false
                     dev.droidtop.shell.standard.OnboardingGate.leave()
                     onDone()
-                }) { Text("Leave") }
+                }) { Text(stringResource(R.string.onboarding_leave)) }
             },
-            dismissButton = { TextButton(onClick = { confirmLeaving = false }) { Text("Keep setting up") } },
+            dismissButton = { TextButton(onClick = { confirmLeaving = false }) { Text(stringResource(R.string.onboarding_keep_setting_up)) } },
         )
     }
 
@@ -1655,8 +1656,8 @@ private fun GamesStep(
                 value = pathEntry,
                 onValueChange = onPathEntryChange,
                 singleLine = true,
-                label = { Text("Folder path") },
-                placeholder = { Text("A full path, starting with /") },
+                label = { Text(stringResource(R.string.onboarding_folder_path)) },
+                placeholder = { Text(stringResource(R.string.onboarding_a_full_path_starting_with)) },
                 isError = pathError != null,
                 modifier = Modifier
                     .fillMaxWidth()

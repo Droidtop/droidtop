@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notice
@@ -135,7 +136,7 @@ private fun CompanionSocialList(onOpen: (OpenConversation) -> Unit) {
         val notes by NotificationsStore.items.collectAsState()
         val messages = remember(notes) { dev.droidtop.runtime.systemstatus.NotificationRows.messages(notes) }
         if (messages.isNotEmpty()) {
-            Text("Messages", style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.companion_social_messages), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
             CompanionNotificationList(messages)
         }
         if (current?.needsAccess == true) {

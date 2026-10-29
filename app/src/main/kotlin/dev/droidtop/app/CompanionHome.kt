@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.labelCase
 import dev.droidtop.library.format.ValueFormat
 import androidx.compose.foundation.background
@@ -324,7 +325,7 @@ private fun FocusedGameCard(entry: LibraryEntry) {
         }
         // The existing update tracking (docs/SPEC.md 7g), never a second check.
         entry.availableUpdate?.let { latest ->
-            Text("Update available: $latest", style = MaterialTheme.typography.bodyMedium, color = colors.tertiary)
+            Text(stringResource(R.string.companion_home_update_available, latest), style = MaterialTheme.typography.bodyMedium, color = colors.tertiary)
         }
         entry.description?.let { description ->
             Text(description, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis)

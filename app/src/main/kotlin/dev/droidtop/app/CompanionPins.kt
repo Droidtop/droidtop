@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notice
 import dev.droidtop.ui.shared.LocalNoticePalette
@@ -460,7 +461,7 @@ internal fun CompanionProviderLine() {
     val colors = MaterialTheme.colorScheme
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-            Text("More controls need a one-time setup.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.companion_pins_more_controls_need_a_one), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
             CompanionPill(if (open) "Close" else "Set up", selected = !open) { open = !open }
         }
         if (open) {
@@ -468,13 +469,13 @@ internal fun CompanionProviderLine() {
                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(colors.surface).padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("More controls", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                Text(stringResource(R.string.companion_pins_more_controls), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
                 Text(
                     "They let droidtop switch Wi-Fi, Bluetooth and airplane mode here, put the console to sleep, " +
                         "open the power menu and close apps for good.",
                     style = MaterialTheme.typography.bodyMedium, color = colors.onSurface,
                 )
-                Text("Everything else works without it.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
+                Text(stringResource(R.string.companion_pins_everything_else_works_without_it), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
                 Text(
                     "Setting it up is fiddly: Shizuku asks for wireless debugging and a pairing code in its own app. " +
                         "Skipping it loses nothing important.",

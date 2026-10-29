@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -183,10 +184,10 @@ private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolea
             result = ScraperKeyState.CONNECTED
             scope.launch { refresh() }
         })
-        Text("Or paste a token", style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.scraper_key_setup_or_paste_a_token), style = MaterialTheme.typography.titleMedium)
     }
     if (browserPaneAvailable) {
-        Button(onClick = onBrowserPane) { Text("Open the key page here") }
+        Button(onClick = onBrowserPane) { Text(stringResource(R.string.scraper_key_setup_open_the_key_page_here)) }
     }
     service.steps.forEachIndexed { index, step ->
         Text("${index + 1}  $step", style = MaterialTheme.typography.bodyLarge)
@@ -195,7 +196,7 @@ private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolea
         QrCode(content = service.url, size = 180.dp)
         Button(onClick = {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(service.url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-        }) { Text("Open on this device") }
+        }) { Text(stringResource(R.string.scraper_key_setup_open_on_this_device)) }
     }
 
     if (loaded) {
@@ -209,13 +210,13 @@ private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolea
                     visualTransformation = if (field.secret) PasswordVisualTransformation() else VisualTransformation.None,
                     modifier = Modifier.weight(1f),
                 )
-                TextButton(onClick = { clipboardText(context)?.let { buffer[field.id] = it } }) { Text("Paste") }
+                TextButton(onClick = { clipboardText(context)?.let { buffer[field.id] = it } }) { Text(stringResource(R.string.scraper_key_setup_paste)) }
             }
         }
     }
 
     // The same session as everywhere: scan, confirm the code, then type from the phone into the field in focus.
-    Button(onClick = { RemoteInputActivity.open(context) }) { Text("Type from another device") }
+    Button(onClick = { RemoteInputActivity.open(context) }) { Text(stringResource(R.string.scraper_key_setup_type_from_another_device)) }
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
         Button(enabled = !testing && loaded, onClick = {
@@ -230,7 +231,7 @@ private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolea
                 result = line
                 testing = false
             }
-        }) { Text("Test") }
+        }) { Text(stringResource(R.string.scraper_key_setup_test)) }
         if (state != ScraperKeyState.NOT_SET && state != ScraperKeyState.NO_ACCOUNT && state != ScraperKeyState.BUILT_IN) {
             Button(onClick = {
                 scope.launch {
@@ -239,7 +240,7 @@ private fun ManualSetup(service: ScraperKeyService, browserPaneAvailable: Boolea
                     result = null
                     refresh()
                 }
-            }) { Text("Clear") }
+            }) { Text(stringResource(R.string.scraper_key_setup_clear)) }
         }
     }
 }
@@ -300,17 +301,17 @@ private fun RealDebridSignInPanel(onSignedIn: (String) -> Unit) {
     val shown = code
     if (shown == null) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Button(enabled = !waiting, onClick = { start() }) { Text("Sign in with a code") }
+            Button(enabled = !waiting, onClick = { start() }) { Text(stringResource(R.string.scraper_key_setup_sign_in_with_a_code)) }
             line?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
         }
     } else {
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
             QrCode(content = shown.verificationUrl, size = 180.dp)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Enter this code at ${shown.verificationUrl.removePrefix("https://")}", style = MaterialTheme.typography.bodyLarge)
+                Text(stringResource(R.string.scraper_key_setup_enter_this_code_at, shown.verificationUrl.removePrefix("https://")), style = MaterialTheme.typography.bodyLarge)
                 Text(shown.userCode, style = MaterialTheme.typography.headlineMedium)
                 Text("%d:%02d left".format(secondsLeft / 60, secondsLeft % 60), style = MaterialTheme.typography.bodyMedium)
-                TextButton(onClick = { cancelled.set(true) }) { Text("Cancel") }
+                TextButton(onClick = { cancelled.set(true) }) { Text(stringResource(R.string.scraper_key_setup_cancel)) }
             }
         }
     }

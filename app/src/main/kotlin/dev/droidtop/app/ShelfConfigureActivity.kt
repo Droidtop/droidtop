@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 
 /**
@@ -66,7 +67,7 @@ class ShelfConfigureActivity : ComponentActivity() {
                 val chosen = picked ?: choices?.firstOrNull { it.kind == current?.kind && it.arg == current.arg } ?: choices?.firstOrNull()
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     Column(modifier = Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("Shelf", style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.shelf_configure_shelf), style = MaterialTheme.typography.titleLarge)
                         Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             ShelfContent.Layout.entries.forEach { option ->
                                 Row(
@@ -82,10 +83,10 @@ class ShelfConfigureActivity : ComponentActivity() {
                             Options("Art", ShelfContent.Art.entries, chosenArt, { it.label }) { art = it }
                         }
                         Options("Text size", ShelfContent.TextSize.entries, chosenSize, { it.label }) { textSize = it }
-                        Text("Shows", style = MaterialTheme.typography.titleMedium)
+                        Text(stringResource(R.string.shelf_configure_shows), style = MaterialTheme.typography.titleMedium)
                         val list = choices
                         if (list == null) {
-                            Text("Reading your library", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.shelf_configure_reading_your_library), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         } else {
                             LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
                                 items(list, key = { "${it.kind}:${it.arg}" }) { choice ->
@@ -106,7 +107,7 @@ class ShelfConfigureActivity : ComponentActivity() {
                             enabled = chosen != null,
                             onClick = { chosen?.let { save(widgetId, ShelfContent(it.kind, it.arg, chosenLayout, chosenArt, chosenSize)) } },
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text("Done") }
+                        ) { Text(stringResource(R.string.shelf_configure_done)) }
                     }
                 }
             }

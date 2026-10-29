@@ -18,6 +18,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import dev.droidtop.runtime.systemstatus.PrivacyAccess
@@ -60,7 +61,7 @@ internal fun CompanionPrivacyCard() {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         recent?.let { (available, apps) ->
             if (available) {
-                Text("Last 24 hours", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+                Text(stringResource(R.string.companion_privacy_last_24_hours), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
                 if (apps.isEmpty()) CompanionNote("No app used the camera, microphone or location")
                 apps.forEach { (key, uses) ->
                     val (label, pkg) = key.split('|', limit = 2).let { it[0] to it[1] }
@@ -68,7 +69,7 @@ internal fun CompanionPrivacyCard() {
                 }
             }
         }
-        Text("What droidtop can access", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+        Text(stringResource(R.string.companion_privacy_what_droidtop_can_access), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
         grants?.forEach { grant ->
             PrivacyRow(grant.label, (if (grant.held) "Allowed. " else "Not allowed. ") + grant.reason) { appInfo(context.packageName) }
         } ?: CompanionNote("Reading…")

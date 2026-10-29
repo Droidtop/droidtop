@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -89,7 +90,7 @@ internal fun CompanionConnections() {
     val colors = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         LocalCompanionNav.current?.let { nav -> CompanionPill("Network") { nav.openTab(CompanionTab.NETWORK) } }
-        Text("Bluetooth devices", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+        Text(stringResource(R.string.companion_connections_bluetooth_devices), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
         val list = devices
         when {
             list == null -> {

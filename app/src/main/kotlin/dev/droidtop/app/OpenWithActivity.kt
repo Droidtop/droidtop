@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.app.ui.SelectableRow
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.runtime.ContainerLayout
@@ -227,7 +228,7 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = onClose, modifier = Modifier.heightIn(min = window.minTouchTarget)) {
-                Text("Close", style = TypeRole.button)
+                Text(stringResource(R.string.open_with_close), style = TypeRole.button)
             }
             val ready = state as? OpenWithState.Ready
             if (ready != null && !ready.kind.runsInWine && !connected) {
@@ -240,7 +241,7 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
                         )
                     },
                     modifier = Modifier.heightIn(min = window.minTouchTarget),
-                ) { Text("Start the desktop", style = TypeRole.button) }
+                ) { Text(stringResource(R.string.open_with_start_the_desktop), style = TypeRole.button) }
             }
             if (ready != null && ready.choices.any { it.available }) {
                 Button(

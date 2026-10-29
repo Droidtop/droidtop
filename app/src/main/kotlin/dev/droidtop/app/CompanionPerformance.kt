@@ -23,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -170,7 +171,7 @@ private fun Sparkline(values: List<Float?>, min: Float, max: Float, color: Color
         contentAlignment = Alignment.Center,
     ) {
         if (collecting) {
-            Text("Collecting readings...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.companion_performance_collecting_readings), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (collecting || max <= min) return@Canvas

@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notice
 import dev.droidtop.ui.shared.LocalNoticePalette
@@ -144,7 +145,7 @@ internal fun CompanionPluginsTab(only: String?) {
             CompanionNote("Not running")
             return@Column
         }
-        Text("Plugins", style = MaterialTheme.typography.titleMedium, color = colors.onBackground, modifier = Modifier.semantics { heading() })
+        Text(stringResource(R.string.companion_plugins_plugins), style = MaterialTheme.typography.titleMedium, color = colors.onBackground, modifier = Modifier.semantics { heading() })
         if (all.isEmpty()) CompanionNote("No plugins yet")
         all.forEach { item ->
             CompanionTile(

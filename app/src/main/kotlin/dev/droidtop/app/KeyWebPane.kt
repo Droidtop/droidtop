@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.ProfileStore
@@ -235,8 +236,8 @@ internal fun KeyWebPane(
                 if (index == step) item.hint?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             if (notice != PaneNotice.NONE) {
-                Text("This site won't sign in here.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = onFallback) { Text("Use browser and phone") }
+                Text(stringResource(R.string.key_web_pane_this_site_won_t_sign), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Button(onClick = onFallback) { Text(stringResource(R.string.key_web_pane_use_browser_and_phone)) }
             }
             service.fields.forEach { field ->
                 val candidate = found[field.id]
@@ -250,11 +251,11 @@ internal fun KeyWebPane(
                                 stored++
                                 result = null
                             }
-                        }) { Text("Use") }
+                        }) { Text(stringResource(R.string.key_web_pane_use)) }
                         TextButton(onClick = {
                             ignored.value = ignored.value + candidate
                             found.remove(field.id)
-                        }) { Text("Ignore") }
+                        }) { Text(stringResource(R.string.key_web_pane_ignore)) }
                     }
                 } else {
                     storedMasks[field.id]?.let { Text("${field.label}: $it", style = MaterialTheme.typography.bodyMedium) }
@@ -271,16 +272,16 @@ internal fun KeyWebPane(
                         testing = false
                     }
                 },
-            ) { Text("Test") }
+            ) { Text(stringResource(R.string.key_web_pane_test)) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Stay signed in", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.key_web_pane_stay_signed_in), style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = stay, onCheckedChange = {
                     stay = it
                     PrefsFile(context, LAUNCHER_PREFS_FILE_NAME).putBoolean(KeyWebProfiles.stayKey(service), it)
                 })
             }
-            TextButton(onClick = onOtherWays) { Text("Other ways") }
-            TextButton(onClick = onClose) { Text("Close") }
+            TextButton(onClick = onOtherWays) { Text(stringResource(R.string.key_web_pane_other_ways)) }
+            TextButton(onClick = onClose) { Text(stringResource(R.string.key_web_pane_close)) }
         }
     }
 }

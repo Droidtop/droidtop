@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.droidtop.app.ui.DroidtopTheme
 import dev.droidtop.app.ui.QrCode
@@ -145,27 +146,27 @@ private fun RemoteInputScreen(
         modifier = modifier.padding(20.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Type from another device", style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(R.string.remote_input_type_from_another_device), style = MaterialTheme.typography.headlineMedium)
         Text(state.consoleLine(), style = MaterialTheme.typography.titleLarge)
         when (val shown = state) {
             is RemoteInputState.Waiting -> Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 QrCode(content = shown.url, size = 220.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(shown.url, style = MaterialTheme.typography.bodyLarge)
-                    Text("Open it in a browser on the same network. Nothing is typed until you confirm the code here.", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(R.string.remote_input_open_it_in_a_browser), style = MaterialTheme.typography.bodyMedium)
                 }
             }
             is RemoteInputState.Confirming -> Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { RemoteInputs.confirm() }, modifier = Modifier.focusRequester(confirm)) { Text("Confirm") }
-                Button(onClick = { RemoteInputs.refuse() }) { Text("Refuse") }
+                Button(onClick = { RemoteInputs.confirm() }, modifier = Modifier.focusRequester(confirm)) { Text(stringResource(R.string.remote_input_confirm)) }
+                Button(onClick = { RemoteInputs.refuse() }) { Text(stringResource(R.string.remote_input_refuse)) }
             }
             is RemoteInputState.Paired -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                shown.lastSent?.let { Text("Last sent: $it", style = MaterialTheme.typography.bodyLarge) }
+                shown.lastSent?.let { Text(stringResource(R.string.remote_input_last_sent, it), style = MaterialTheme.typography.bodyLarge) }
                 shown.notice?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-                shown.clip?.let { Text("Clipboard from the device: $it", style = MaterialTheme.typography.bodyLarge) }
-                shown.receiving?.let { Text("Receiving $it", style = MaterialTheme.typography.bodyLarge) }
+                shown.clip?.let { Text(stringResource(R.string.remote_input_clipboard_from_the_device, it), style = MaterialTheme.typography.bodyLarge) }
+                shown.receiving?.let { Text(stringResource(R.string.remote_input_receiving, it), style = MaterialTheme.typography.bodyLarge) }
                 shown.received?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
-                shown.offered?.let { Text("Offered to the phone: $it", style = MaterialTheme.typography.bodyLarge) }
+                shown.offered?.let { Text(stringResource(R.string.remote_input_offered_to_the_phone, it), style = MaterialTheme.typography.bodyLarge) }
                 Text(
                     "Leave this screen and put the cursor in a field. Close ends it, here or on the notification.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -174,20 +175,20 @@ private fun RemoteInputScreen(
             else -> Unit
         }
         if (state !is RemoteInputState.Closed) {
-            Text("Files from the phone go into: $folder", style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.remote_input_files_from_the_phone_go, folder), style = MaterialTheme.typography.bodyLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = onPickFolder) { Text("Choose folder") }
-                TextButton(onClick = onDefaultFolder) { Text("Use Download/droidtop") }
+                Button(onClick = onPickFolder) { Text(stringResource(R.string.remote_input_choose_folder)) }
+                TextButton(onClick = onDefaultFolder) { Text(stringResource(R.string.remote_input_use_download_droidtop)) }
             }
             // The failure stays on the screen it belongs to (docs/SPEC.md 7k, "Notices"), not a toast.
             offerFailure?.let { NoticeCard(Notice(NoticeTone.Caution, "That file cannot be sent", body = it), NoticePlacement.Row) }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Button(onClick = onOffer) { Text("Send to the phone") }
-                if ((state as? RemoteInputState.Paired)?.offered != null) TextButton(onClick = { RemoteInputs.withdrawOffer() }) { Text("Stop offering") }
+                Button(onClick = onOffer) { Text(stringResource(R.string.remote_input_send_to_the_phone)) }
+                if ((state as? RemoteInputState.Paired)?.offered != null) TextButton(onClick = { RemoteInputs.withdrawOffer() }) { Text(stringResource(R.string.remote_input_stop_offering)) }
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (state !is RemoteInputState.Closed) Button(onClick = onClose) { Text("Close") }
+            if (state !is RemoteInputState.Closed) Button(onClick = onClose) { Text(stringResource(R.string.remote_input_close)) }
             TextButton(onClick = onLeave) { Text(if (state is RemoteInputState.Closed) "Done" else "Keep it open and leave") }
         }
     }

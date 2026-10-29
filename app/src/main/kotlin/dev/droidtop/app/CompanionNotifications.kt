@@ -42,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -156,7 +157,7 @@ private fun CompanionNotificationRow(item: NotificationsStore.Item, showText: Bo
             if (showText || revealed) {
                 Text(item.text, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 4, overflow = TextOverflow.Ellipsis)
             } else {
-                Text("Tap to show", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                Text(stringResource(R.string.companion_notifications_tap_to_show), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -274,7 +275,7 @@ internal fun CompanionNowPlayingCard() {
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Text("Now playing · ${card.app}", style = MaterialTheme.typography.labelMedium, color = colors.primary)
+        Text(stringResource(R.string.companion_notifications_now_playing, card.app), style = MaterialTheme.typography.labelMedium, color = colors.primary)
         Text(card.title, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
         card.artist?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1) }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.heightIn(min = 48.dp)) {

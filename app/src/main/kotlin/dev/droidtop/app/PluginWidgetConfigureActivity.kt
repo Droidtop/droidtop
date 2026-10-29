@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.integrations.PluginWidgets
 import kotlinx.coroutines.Dispatchers
@@ -52,7 +53,7 @@ class PluginWidgetConfigureActivity : ComponentActivity() {
                         Text(getString(R.string.widget_plugin_pick), style = MaterialTheme.typography.titleLarge)
                         val list = sources
                         when {
-                            list == null -> Text("Reading your plugins", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            list == null -> Text(stringResource(R.string.plugin_widget_configure_reading_your_plugins), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             list.isEmpty() -> Text(getString(R.string.widget_plugin_none), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                                 items(list, key = { it.key }) { source ->

@@ -22,6 +22,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.droidtop.runtime.systemstatus.PowerProbe
 import dev.droidtop.runtime.systemstatus.SettingsLaunch
@@ -77,7 +78,7 @@ internal fun CompanionPowerCard() {
             battery?.tempTenthC?.let { "%.1f °C".format(it / 10.0) },
             battery?.watts?.let { "%.1f W".format(it) + if (battery?.charging == true) " charging" else " draw" },
         )
-        if (facts.isNotEmpty()) Text("Battery: " + facts.joinToString(", "), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
+        if (facts.isNotEmpty()) Text(stringResource(R.string.companion_power_battery, facts.joinToString(", ")), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             CompanionPill("Battery saver") {
                 SettingsLaunch.start(context, dev.droidtop.runtime.systemstatus.SystemControls.batterySaverSettingsIntent())
@@ -85,8 +86,8 @@ internal fun CompanionPowerCard() {
         }
         val v = visible ?: run { CompanionNote("Reading…"); return@Column }
         if (v.fan.isNotEmpty() || v.chargeLimit.isNotEmpty()) {
-            v.fan.forEach { (key, value) -> Text("Fan (${key.substringAfter('/')}): $value", style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
-            v.chargeLimit.forEach { (key, value) -> Text("Charge limit (${key.substringAfter('/')}): $value", style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
+            v.fan.forEach { (key, value) -> Text(stringResource(R.string.companion_power_fan, key.substringAfter('/'), value), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
+            v.chargeLimit.forEach { (key, value) -> Text(stringResource(R.string.companion_power_charge_limit, key.substringAfter('/'), value), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
             CompanionNote("Change them in the device's own settings")
             CompanionPill("Open battery settings") {
                 val page = PowerProbe.pageFor(emptyList(), Intent(Intent.ACTION_POWER_USAGE_SUMMARY)) { it.resolveActivity(context.packageManager) != null }
@@ -122,6 +123,6 @@ internal fun CompanionPowerCard() {
             }
             status[cluster.policy]?.let { CompanionNote(it) }
         }
-        v.gpuMHz?.let { Text("GPU: $it MHz", style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
+        v.gpuMHz?.let { Text(stringResource(R.string.companion_power_gpu_mhz, it), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) }
     }
 }
