@@ -1462,6 +1462,7 @@ private fun GamepadShellBody(
                                 }.filterNot { it.onPcGamesTab },
                                 library = library,
                                 nav = nav,
+                                onLaunch = onLaunch,
                                 onShowDetail = { nav.rememberFocus(it.id); nav.openDetail(it.id) },
                                 onDrillDownChanged = { canGoBack = it },
                                 onFocusedEntryChanged = onFocusedEntryChanged,
@@ -2504,6 +2505,7 @@ private fun GamesSection(
     entries: List<LibraryEntry>,
     library: Library,
     nav: ShellBackStack,
+    onLaunch: (LibraryEntry) -> Unit,
     onShowDetail: (LibraryEntry) -> Unit,
     onDrillDownChanged: (Boolean) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
@@ -2517,6 +2519,8 @@ private fun GamesSection(
     // the same for artwork after an in-place scrape.
     var gamelistOptionsOpen by remember { mutableStateOf(false) }
     var sortVersion by remember { mutableIntStateOf(0) }
+    // The focused game's own menu, from L2 or a long press on its card (Droidtop/tracker#621 M6).
+    var optionsFor by remember { mutableStateOf<LibraryEntry?>(null) }
     val firstFocus = remember { FocusRequester() }
     val context = LocalContext.current
 
@@ -3359,6 +3363,7 @@ private fun GamesSection(
                                     HomeSection("Continue Playing", continuePlaying),
                                     firstCardFocus = null,
                                     onShowDetail = onShowDetail,
+                                    onOptions = { optionsFor = it },
                                     onFocusedEntryChanged = onFocusedEntryChanged,
                                     modifier = Modifier.align(Alignment.TopStart).padding(top = 16.dp),
                                     onToggleFavorite = onToggleFavorite,
@@ -3529,6 +3534,7 @@ private fun GamesSection(
                                 // A opens the details, where Play is (Droidtop/tracker#641).
                                 onActivate = { onShowDetail(entry) },
                                 onShowDetail = { onShowDetail(entry) },
+                                onOptions = { optionsFor = entry },
                                 onFocused = {
                                     pad.focused = index
                                     onFocusedEntryChanged(entry)
@@ -3541,6 +3547,25 @@ private fun GamesSection(
             }
         }
 
+    }
+    optionsFor?.let { entry ->
+        AppOptionsMenu(
+            entry = entry,
+            detailsLabel = "Game details",
+            onPrimary = {
+                optionsFor = null
+                onLaunch(entry)
+            },
+            onDetails = {
+                optionsFor = null
+                onShowDetail(entry)
+            },
+            onToggleFavorite = {
+                optionsFor = null
+                onToggleFavorite(entry)
+            },
+            onDismiss = { optionsFor = null },
+        )
     }
 }
 
@@ -3797,6 +3822,7 @@ private fun AppsSection(
                             homeSection,
                             firstCardFocus = if (!firstAssigned) firstFocus else null,
                             onShowDetail = onShowDetail,
+                            onOptions = { optionsFor = it },
                             onFocusedEntryChanged = onFocusedEntryChanged,
                             onToggleFavorite = onToggleFavorite,
                         )
@@ -4109,6 +4135,7 @@ private fun HomeSectionRow(
     section: HomeSection,
     firstCardFocus: FocusRequester?,
     onShowDetail: (LibraryEntry) -> Unit,
+    onOptions: (LibraryEntry) -> Unit,
     onFocusedEntryChanged: (LibraryEntry?) -> Unit,
     modifier: Modifier = Modifier,
     onToggleFavorite: (LibraryEntry) -> Unit = {},
@@ -4136,6 +4163,7 @@ private fun HomeSectionRow(
                     // A opens the details, where Play is (Droidtop/tracker#641).
                     onActivate = { onShowDetail(entry) },
                     onShowDetail = { onShowDetail(entry) },
+                    onOptions = { onOptions(entry) },
                     onFocused = { onFocusedEntryChanged(entry) },
                     onToggleFavorite = { onToggleFavorite(entry) },
                 )
@@ -4152,7 +4180,11 @@ internal fun GameCard(
     // What A and a tap do. Gaming opens the game's details, where Play is (owner, 2026-10-24, Droidtop/tracker#641:
     // "it should open the game's page"); Standard's games screen plays.
     onActivate: () -> Unit,
+    // Y: the game's details.
     onShowDetail: () -> Unit,
+    // L2 and a long press: the game's own menu, one menu by two paths (Droidtop/tracker#621). Standard's games
+    // screen has no details page and passes its options as both.
+    onOptions: () -> Unit = onShowDetail,
     onFocused: () -> Unit = {},
     onToggleFavorite: () -> Unit = {},
 ) {
@@ -4192,10 +4224,14 @@ internal fun GameCard(
                         onActivate()
                         true
                     }
-                    // L2 is the focused game's menu everywhere in Gaming (proposal 6.A, Droidtop/tracker#644 slice
-                    // 4); a Retro game's menu is its details, the long press's target too.
-                    GamepadAction.Y, GamepadAction.L2 -> {
+                    GamepadAction.Y -> {
                         onShowDetail()
+                        true
+                    }
+                    // L2 is the focused game's menu everywhere in Gaming (proposal 6.A, Droidtop/tracker#644 slice
+                    // 4), a Retro game's too (Droidtop/tracker#621 M6).
+                    GamepadAction.L2 -> {
+                        onOptions()
                         true
                     }
                     // Real, previously-dead action -- LibraryEntry.favorite
@@ -4222,12 +4258,9 @@ internal fun GameCard(
             // mappings, so it's still handled explicitly below rather than
             // relying on clickable() to cover it. Y opens the detail screen
             // (§7).
-            // Long-press is the touch equivalent of Y: the same
-            // "tell me more / act on this one" the pad reaches with a
-            // second button, on a surface that only has one gesture.
-            // Android's own list convention, and the one Daijisho and
-            // the platform launchers already train.
-            .combinedClickable(onClick = onActivate, onLongClick = onShowDetail)
+            // A long press is the touch path to L2: the game's own menu
+            // (Droidtop/tracker#621), Android's list convention.
+            .combinedClickable(onClick = onActivate, onLongClick = onOptions)
             // ONE selection idiom across the shell: the menus' own
             // accent border over a brightened surface (MenuTokens), not a
             // third one. The rig counted three at once -- this card's 1px

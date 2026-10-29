@@ -16429,9 +16429,10 @@ Consequences:
   it: "Three options for the same menu is excessive"). One menu per thing, one button and one touch to it; Select is
   the list's options, never a thing's menu. It covers a PC game's game menu, a collection tile's menu, a pinned tab's
   menu, an app tile's app menu (Mark as game is a row of it; a long press used to mark the app at once, with nothing
-  on screen saying so), and for a Retro game or an app on Home's shelves the same small menu. A Retro Games card's
-  long press stays its details, which are a console game's own actions; that tab has no L2 menu for one game yet, and
-  whether it gets one is part of the #621 review;
+  on screen saying so), and for a Retro game or an app on Home's shelves the same small menu. A Retro Games card
+  has that menu too (Droidtop/tracker#621 M6, owner-approved): L2 or a long press gives Play, Game details, Plugin
+  actions when a plugin offers any, and Add to / Remove from favourites. A opens the details and Y still does. The
+  themed ES-DE gamelist keeps its theme's own buttons, and Select stays the list's options;
 - a value that is **stepped** rather than opened --- a slider, a small
   cycling choice --- makes the two arrows the row already draws into two
   targets, because a touch screen has no Left/Right and a slider has no
