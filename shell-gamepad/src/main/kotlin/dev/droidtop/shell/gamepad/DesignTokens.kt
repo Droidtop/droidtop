@@ -563,6 +563,13 @@ object MenuTokens {
      */
     val CategoryRowMinHeight = 56.dp
 
+    /**
+     * The least height of a row in a scrolling settings list ([uniformRowHeight]): one touch target. Its one-line
+     * title and padding make it about 52dp at the default text size, so a landscape page holds five or six rows
+     * where [RowMinHeight]'s 72dp held three (Droidtop/tracker#664).
+     */
+    val ListRowMinHeight = 48.dp
+
     /** Generous vertical padding inside a row (owner, tracker#154). */
     val RowVerticalPadding = 14.dp
 

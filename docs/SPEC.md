@@ -18210,16 +18210,19 @@ up, the largest Text size cutting everything off, scrolling text disliked);
 the tester's words are not decisions (Droidtop/tracker#176). The rule, in the
 shared components (`MenuRow`, `SettingsCatalogView`):
 
-- **Every settings row is the same height, always.** `MenuRow(uniformHeight
-  = true)` is exactly `uniformRowHeight(summaryLines)` tall: two lines of
-  the title style plus `summaryLines` lines of the summary style plus
-  `MenuTokens.RowVerticalPadding` (14dp) top and bottom, at least
-  `RowMinHeight` (72dp). Settings rows pass no summary lines (their
-  explanation is a HintTip, "Settings layout" below); a page that shows
-  summaries (the PC game page's facts) passes two. It is computed from the
-  current type scale in sp, so the Text size setting (the activity's font
-  scale) makes every row taller together, and it never varies per row, in
-  portrait or landscape. A row never grows.
+- **Every settings row is one line tall unless its title wraps.**
+  `MenuRow(uniformHeight = true)` is at least `uniformRowHeight(summaryLines)`
+  tall: one line of the title style plus `summaryLines` lines of the summary
+  style plus `MenuTokens.RowVerticalPadding` (14dp) top and bottom, at least
+  `MenuTokens.ListRowMinHeight` (48dp, one touch target). Settings rows pass no
+  summary lines (their explanation is on the focus line, "Settings layout"
+  below); a page that shows summaries (the PC game page's facts) passes two.
+  It is computed from the current type scale in sp, so the Text size setting
+  (the activity's font scale) makes every row taller together. A title that
+  wraps to its second line grows its own row. It made room for two title
+  lines on every row and floored at 72dp, so nearly every row stood twice its
+  text's height and a landscape page showed three of them; now it shows five
+  or six (Droidtop/tracker#664).
 - **A title wraps to two lines; the rest ellipsizes** on the row. A
   settings row's whole text is its HintTip and the Y Info sheet. A page
   that shows summaries keeps its **detail strip** under the list
@@ -18360,7 +18363,7 @@ Settings tab, the left menu's places, Console systems and Containers.
   position), which covered the next row and the next section's heading on every catalog screen
   (Droidtop/tracker#495), so the bubble is gone from catalog rows; `HintTip` stays for hover and
   long press on other controls. An armed confirmation shows at once in the same strip. A live status
-  (working, a failure) takes the value column while it lasts. Rows are `uniformRowHeight(0)` tall.
+  (working, a failure) takes the value column while it lasts. Rows are at least `uniformRowHeight(0)` tall.
 - **The page has no dead space.** The pane's list runs to the bottom of the
   view (the hint bar is drawn below the view, so no room is kept for it),
   with no strip under it but the explanation strip above. A row the viewport cuts fades out at that edge

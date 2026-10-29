@@ -441,11 +441,13 @@ internal fun MenuRow(
     // and tiles"); a caller only ever passes a limit for a surface that is
     // not a settings row.
     subtitleLines: Int = Int.MAX_VALUE,
-    // True for a row in a SCROLLING list that must scroll evenly (the
-    // Settings catalog): the row is exactly [uniformRowHeight] tall, a
-    // two-line title and a two-line summary fit, and what does not fit is
-    // ellipsized (the full text is on the focus line and in the Info
-    // sheet). Never grows.
+    // True for a row in a SCROLLING list (the Settings catalog): the row is
+    // at least [uniformRowHeight] tall, one title line and its summary lines
+    // plus padding, so single-line rows (nearly all) share one height and a
+    // page shows five or six of them, and a title that wraps to its second
+    // line grows the row rather than being cut (Droidtop/tracker#664). What
+    // does not fit two lines is ellipsized (the full text is on the focus
+    // line and in the Info sheet).
     uniformHeight: Boolean = false,
     // How many summary lines a [uniformHeight] row makes room for: two
     // where a page shows summaries, none for a settings row, whose
@@ -537,7 +539,7 @@ internal fun MenuRow(
             // with its text, never a fixed height.
             .then(
                 if (uniformHeight) {
-                    Modifier.height(uniformRowHeight(uniformSummaryLines))
+                    Modifier.heightIn(min = maxOf(uniformRowHeight(uniformSummaryLines), if (window.touchFirst) window.minTouchTarget else 0.dp))
                 } else {
                     Modifier.heightIn(min = maxOf(minHeight ?: MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
                 },
@@ -1194,10 +1196,13 @@ internal fun Modifier.focusMarquee(active: Boolean): Modifier =
 internal val LocalValueColumnWidth = androidx.compose.runtime.compositionLocalOf<androidx.compose.ui.unit.Dp?> { null }
 
 /**
- * The one height of a [uniformHeight] row: a two-line title plus
+ * The least height of a [uniformHeight] row: one title line plus
  * [summaryLines] lines of summary plus the row's padding, derived from the
  * CURRENT type scale (sp through the font scale the Text size setting
- * drives), so it grows with the setting but never varies per row.
+ * drives), so it grows with the setting. It used to make room for two title
+ * lines on every row, which left single-line rows twice their height and
+ * three rows to a page (Droidtop/tracker#664); a wrapped title now grows its
+ * own row.
  */
 @Composable
 internal fun uniformRowHeight(summaryLines: Int = 2): androidx.compose.ui.unit.Dp {
@@ -1207,6 +1212,6 @@ internal fun uniformRowHeight(summaryLines: Int = 2): androidx.compose.ui.unit.D
     return with(density) {
         fun line(style: androidx.compose.ui.text.TextStyle) =
             (if (style.lineHeight.isSpecified) style.lineHeight else style.fontSize * 1.4f).toDp()
-        maxOf(MenuTokens.RowMinHeight, line(title) * 2 + line(summary) * summaryLines + MenuTokens.RowVerticalPadding * 2)
+        maxOf(MenuTokens.ListRowMinHeight, line(title) + line(summary) * summaryLines + MenuTokens.RowVerticalPadding * 2)
     }
 }
