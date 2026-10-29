@@ -13160,10 +13160,21 @@ notifications are allowed, a notification that returns to droidtop. A game
 started after the limit is told and closed after the same minute. The
 companion's Home shows "Today 45 min of 2 h · This week 3 h 10 min of 10 h"
 under the status line in Full and Kid while a limit is set
-(`ControlRow.PLAY_TIME`, Kid's alone among the restricted modes). Real play
-time is not stored per game (7g): this ledger is the only measure, and counts
+(`ControlRow.PLAY_TIME`, Kid's alone among the restricted modes). This ledger
+is the limits' only measure (per-game time is "Your play", below), and counts
 droidtop's own running-game state, so a game droidtop never saw start is not
 counted.
+
+**Your play (2026-10-29, Droidtop/tracker#597).** UI review 265: "There is no
+play-time summary anywhere: no total, no per-system, no 'this week'". Kid mode's
+ledger counts all play together, and only in Kid, for its limits. The same
+watcher (`PlayTimeLimiter`) now also keeps the person's own record, in every mode:
+each session of a game droidtop started adds its time to that game (`PlayLog`,
+`PlayLogStore`, droidtop's own `play-log.json`), under the name the person knows it
+by and its system's name, read once per session. Settings > Library > Your play
+shows this week (from Monday), all time, the five games played most, and the time
+per system ("PC and other games" for a game with no system). Only time counted
+from this change on is there; nothing is estimated for earlier play.
 
 **Screensaver.** ES-DE's four kinds — dim, black, slideshow and video —
 after Off/2/5/10/15/30 minutes (today: the slideshow only), with the
