@@ -136,6 +136,9 @@ class OciImageStore(
         }
     }
 
+    /** What the stored images take on disk together: each blob once, however many images share it. */
+    suspend fun diskBytes(): Long = lock.withLock { withContext(Dispatchers.IO) { blobBytes() } }
+
     /** Forgets the image pulled by [digest] and deletes every blob no other image uses. */
     suspend fun remove(digest: String) = lock.withLock {
         withContext(Dispatchers.IO) {

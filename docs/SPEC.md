@@ -2760,6 +2760,23 @@ the `ContainerRuntime` interface that already exists (§3):
   most 200, the rest reachable as a Custom reference), Name (defaulting as
   below) and Create, which reports its progress on its own row. Text is
   edited in the navigator's dialog, where the keyboard's Done key saves.
+  **Images (Droidtop/tracker#757, #750 part 1).** Under the containers, an
+  Images row shows how many images are stored and what they take on disk,
+  counting each layer once however many images share it
+  (`OciImageStore.diskBytes`). Its screen lists every stored image,
+  newest-built first (`ImageListing.rows`). Each row shows the reference
+  without Docker Hub's own prefixes, its size, and "Used by" the containers
+  made from it (by digest), or "No container made from it". An image's page
+  shows:
+  - when it was built, its size, its containers and its full reference;
+  - New container: a Name and Create a container. This makes a sibling
+    pinned to that digest, so nothing is downloaded.
+  - Remove: always offered, after a confirm. An image is the template, not
+    the container: each container keeps its own copy of the image's files,
+    so removing an image breaks nothing. The row says so when a container
+    uses the image, and says that making another from it downloads it
+    again. It removes by `rmi`'s path (`EngineActions.removeImages`, with
+    force once the page has named the users).
   **Home and folders (decided 2026-10-14, built 2026-10-15,
   Droidtop/tracker#555 D3).** One description, `EnvironmentMounts`
   (runtime-common), says what a container sees of the device: its home

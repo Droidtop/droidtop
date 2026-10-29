@@ -57,6 +57,8 @@ import dev.droidtop.runtime.ExposedPort
 import dev.droidtop.runtime.ExtraMount
 import dev.droidtop.runtime.HomeChoice
 import dev.droidtop.runtime.ImageRunConfig
+import dev.droidtop.runtime.OciImageStore
+import dev.droidtop.runtime.ImageListing
 import dev.droidtop.runtime.ImageCatalogRole
 import dev.droidtop.runtime.ImageTags
 import dev.droidtop.runtime.KnownImageRepository
@@ -181,6 +183,122 @@ object ContainersCatalog {
         return listOf(
             CatalogGroup(id = "create", title = null, items = listOf(create)),
             CatalogGroup(id = "containers", title = "Containers", items = rows),
+            CatalogGroup(id = "images", title = null, items = listOf(imagesItem(context))),
+        )
+    }
+
+    // ---- images (Droidtop/tracker#757) ----
+
+    /** The images stored on this device, with how many and what they take on disk. */
+    private suspend fun imagesItem(context: Context): CatalogItem {
+        val store = OciImageStore.of(context)
+        val count = runCatching { store.entries().size }.getOrNull()
+        val bytes = runCatching { store.diskBytes() }.getOrNull()
+        val value = listOfNotNull(count?.toString(), bytes?.let { dev.droidtop.library.format.ValueFormat.size(it) }).joinToString(" · ")
+        return NestedScreenItem(
+            id = "containers_images",
+            title = "Images",
+            subtitle = "What containers are made from, kept so a new one needs no download",
+            inline = imagesScreen(),
+            valueLabel = { value.ifEmpty { null } },
+        )
+    }
+
+    private fun imagesScreen() = CatalogScreen(
+        id = "containers_images",
+        title = "Images",
+        subtitle = "Each container keeps its own copy of its image's files, so removing an image breaks nothing",
+        groups = { context ->
+            val runtime = ContainerRuntimeFactory.select(context)
+            val listed = runCatching { ImageListing.rows(OciImageStore.of(context).entries(), runtime.listContainers()) }
+            val items: List<CatalogItem> = listed.fold(
+                onSuccess = { rows ->
+                    rows.map { row ->
+                        NestedScreenItem(
+                            id = "image:${row.entry.digest}",
+                            title = row.name,
+                            subtitle = usedByLine(row),
+                            inline = imageScreen(row.entry.digest, row.name),
+                            valueLabel = { dev.droidtop.library.format.ValueFormat.size(row.entry.sizeBytes) },
+                        )
+                    }.ifEmpty {
+                        listOf(ActionItem(id = "images_none", title = "No images", subtitle = "Creating a container downloads its image"))
+                    }
+                },
+                onFailure = { error ->
+                    listOf(ActionItem(id = "images_error", title = "Couldn't list the images", subtitle = FailureText.of("Containers", error)))
+                },
+            )
+            listOf(CatalogGroup(id = "images", title = null, items = items))
+        },
+    )
+
+    private fun usedByLine(row: ImageListing.Row): String =
+        if (row.usedBy.isEmpty()) "No container made from it" else "Used by ${row.usedBy.joinToString(", ")}"
+
+    /** One image's page: when it was built, what it takes, who uses it; a container from it, and Remove. */
+    private fun imageScreen(digest: String, name: String): CatalogScreen {
+        val form = CreateForm()
+        return CatalogScreen(id = "image:$digest", title = name, groups = { context -> imageGroups(context, digest, name, form) })
+    }
+
+    private suspend fun imageGroups(context: Context, digest: String, name: String, form: CreateForm): List<CatalogGroup> {
+        val runtime = ContainerRuntimeFactory.select(context)
+        val containers = runCatching { runtime.listContainers() }.getOrDefault(emptyList())
+        val row = ImageListing.rows(OciImageStore.of(context).entries(), containers).firstOrNull { it.entry.digest == digest }
+            ?: return listOf(
+                CatalogGroup(
+                    id = "gone",
+                    title = null,
+                    items = listOf(ActionItem(id = "image_gone", title = "This image was removed", subtitle = "Go back to Images")),
+                ),
+            )
+        val about = listOfNotNull(
+            row.entry.createdMs?.let { ActionItem(id = "image_built", title = "Built", value = java.text.DateFormat.getDateInstance().format(java.util.Date(it))) },
+            ActionItem(id = "image_size", title = "Size", value = dev.droidtop.library.format.ValueFormat.size(row.entry.sizeBytes)),
+            ActionItem(id = "image_used", title = "Containers", value = row.usedBy.joinToString(", ").ifEmpty { "None" }),
+            ActionItem(id = "image_reference", title = "Reference", value = row.entry.reference),
+        )
+        val newName = form.name ?: ContainerNames.defaultName(ContainerRole.SIBLING, row.entry.reference, containers.map { it.displayName })
+        val create = listOf(
+            TextInputItem(
+                id = "image_create_name",
+                title = "Name",
+                subtitle = "What droidtop calls it; you can rename it later",
+                value = newName,
+                onChange = { _, value -> form.name = value.trim().ifEmpty { null } },
+            ),
+            AsyncActionItem(
+                id = "image_create",
+                title = "Create a container",
+                subtitle = "Makes \"$newName\" from this image, with nothing to download",
+                run = { ctx, onStatus ->
+                    onStatus("Making \"$newName\"...")
+                    val created = runtime.createSibling(RootfsImage(row.entry.reference, row.entry.digest), newName)
+                    ContainerPrograms.recordCreated(ctx, created.id)
+                    "Created \"$newName\". It is in Containers."
+                },
+            ),
+        )
+        val remove = AsyncActionItem(
+            id = "image_remove",
+            title = "Remove",
+            subtitle = if (row.usedBy.isEmpty()) {
+                "Frees ${dev.droidtop.library.format.ValueFormat.size(row.entry.sizeBytes)}, less any part another image shares"
+            } else {
+                "${row.usedBy.joinToString(", ")} keep working; making one again from it downloads it again"
+            },
+            confirmTitle = "Remove $name?",
+            run = { ctx, _ ->
+                // The rule `rmi` follows (Droidtop/tracker#715); this page has already said who uses it.
+                dev.droidtop.app.EngineActions.removeImages(ctx, containers, listOf(digest), force = true)
+                "Removed. Go back to Images."
+            },
+        )
+        return listOf(
+            CatalogGroup(id = "image", title = null, items = about),
+            CatalogGroup(id = "image_create", title = "New container", items = create),
+            CatalogGroup(id = "image_remove", title = null, items = listOf(remove)),
         )
     }
 
