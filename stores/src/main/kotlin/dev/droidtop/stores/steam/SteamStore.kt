@@ -21,6 +21,7 @@ import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
 import dev.droidtop.library.stores.StoreUpdateCheck
 import dev.droidtop.library.stores.WinePrefixLocation
+import dev.droidtop.library.stores.Wishlist
 import dev.droidtop.pluginhost.DownloadJobs
 import dev.droidtop.runtime.SafeDelete
 import dev.droidtop.stores.epic.EpicGameLauncher
@@ -112,6 +113,7 @@ class SteamStore : StoreLibrary {
             SteamFriendsHub.clear()
             runCatching { SteamSession.logOff() }
             SteamCredentials.clear(context)
+            Wishlist.clear(context, id)
             val db = db(context)
             val installed = db.installs().all().filter { it.isDownloaded }.map { it.id }.toSet()
             db.licenses().deleteAll()
@@ -132,6 +134,12 @@ class SteamStore : StoreLibrary {
                 // The person's collections ride the connection the read already holds; a failure here never fails the library read.
                 runCatching { SteamCollections.fetch(steam)?.let { SteamCollections.save(context, it) } }
                     .onFailure { Timber.tag("SteamStore").w(it, "Steam collections could not be read") }
+                // The wishlist is a second read as well (Droidtop/tracker#134): its failure leaves the library read and the old copy in place.
+                runCatching {
+                    val credentials = SteamCredentials.load(context)?.takeIf { it.steamId64 != 0L } ?: return@runCatching
+                    val token = steam.authentication.generateAccessTokenForApp(SteamID(credentials.steamId64), credentials.refreshToken).await().accessToken
+                    if (token.isNotBlank()) SteamWishlist.refresh(context, credentials.steamId64, token)
+                }.onFailure { Timber.tag("SteamStore").w(it, "Steam's wishlist could not be read") }
                 count
             }
         }
@@ -485,7 +493,12 @@ class SteamStore : StoreLibrary {
         if (optionId == SteamLinkStream.OPTION_ID) SteamLinkStream.stream(context, gameId, title) else super.playWith(context, gameId, optionId, title)
 
     override fun changeStamp(context: Context): Long =
-        StoreFiles.stamp(SteamDatabase.files(context) + SteamCredentials.file(context) + SteamOwnedGames.file(context))
+        StoreFiles.stamp(SteamDatabase.files(context) + SteamCredentials.file(context) + SteamOwnedGames.file(context) + Wishlist.file(context, id))
+
+    /** The account's wishlist as the last sync read it ([SteamWishlist]); no network. */
+    override suspend fun wishlist(context: Context): List<StoreGame> = withContext(Dispatchers.IO) {
+        Wishlist.rows(id, Wishlist.read(context, id))
+    }
 
     private suspend fun installOf(context: Context, gameId: String): Pair<AppInfo, File> {
         val appId = gameId.toIntOrNull() ?: error("$gameId is not a Steam app id")

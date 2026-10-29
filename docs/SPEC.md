@@ -13827,8 +13827,13 @@ store's own pages searched for the title (`StoreWeb.search`), where the person
 can buy it; nothing can be installed from here and nothing is added to or removed
 from the wishlist. GOG's wishlist is read (`GOGWishlist`: the ids at
 `embed.gog.com/user/wishlist.json` with the sign-in token, then a name and a
-cover for each id not already in the copy, at most 200). Steam's and Epic's
-are not read yet.
+cover for each id not already in the copy, at most 200). Steam's is read too
+(`SteamWishlist`: the app ids from the Web API's `IWishlistService/GetWishlist`
+with an access token for the signed-in account, so a private wishlist reads,
+in Steam's own order; a name for each id not already in the copy from the
+storefront's keyless `appdetails`, at most 40 new ones a sync so the 1.5 s
+pacing never holds a sync up for minutes and a long wishlist fills over a few
+syncs; the cover is the app's library capsule). Epic's is not read yet.
 
 **Recently added** means added since that source's first sync or scan
 (`SyncBaselines`, one record per `PcSource` id, stores and game folders
