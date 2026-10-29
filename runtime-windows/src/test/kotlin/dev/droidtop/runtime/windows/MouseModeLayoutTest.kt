@@ -29,6 +29,8 @@ class MouseModeLayoutTest {
         val move = e.tick(1000).single() as Output.MouseMove
         // Full push: 1.5 screen widths a second, as mouse mode always moved.
         assertEquals(MappingEngine.MOUSE_FULL_WIDTHS_PER_S, move.dx, 0.001f)
+        // The stick back at rest, so the clicks below carry no pointer travel with them.
+        e.stick("right_joystick", 0f, 0f, 1000)
         assertEquals(listOf(Output.MouseDown("LEFT")), e.press("switch", "right_bumper", 1000))
         assertEquals(listOf(Output.MouseUp("LEFT")), e.release("switch", "right_bumper", 1100))
         assertEquals(listOf(Output.MouseDown("RIGHT")), e.press("switch", "left_bumper", 1200))
