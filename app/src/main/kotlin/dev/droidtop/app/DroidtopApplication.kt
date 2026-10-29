@@ -53,6 +53,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The download engine's process (docs/SPEC.md 12a "One download engine") is the same: libaria2 reads untrusted
         // network data there, so droidtop starts nothing beside it, and in the default `:aria2_open` process the UID is droidtop's.
         if (dev.droidtop.runtime.util.IsolatedProcess.runsPluginCode() || dev.droidtop.runtime.util.IsolatedProcess.runsDownloadEngine()) return
+        // Main-thread file, database and network work is logged in debuggable builds, from here on (Droidtop/tracker#729).
+        DebugStrictMode.install(this)
         // A restore staged by "Restore droidtop" goes into place before anything opens a database (Droidtop/tracker#625).
         dev.droidtop.app.settings.DroidtopBackup.finishPendingRestore(this)
         // The scan log goes to logcat AND to a file droidtop owns, and

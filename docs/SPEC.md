@@ -21031,6 +21031,16 @@ Preference access uses `runtime-common`'s `PrefsFile` typed delegates and
 the existing file names and keys, and persist through `apply()`; they do
 not migrate or rename stored values.
 
+**Main-thread work (decided 2026-10-29, Droidtop/tracker#729).** The rule that no file, database, image or network
+work runs on the main thread is checked, not only written: a debuggable build starts StrictMode on the main thread
+(`DebugStrictMode`, from `DroidtopApplication.onCreate`) for disk reads, disk writes and network, and logs a violation
+whose stack holds droidtop's own code as `droidtop.StrictMode` with the first such frame (API 28 and later; below that
+StrictMode's own log, unfiltered). Libraries' own work is not reported. A rig run fails on a `droidtop.StrictMode`
+line. The classes that block the main thread on purpose (`UpdateRelaunch` and `CrashRecovery`, both `commit()`, the
+value having to be on disk before the process goes) are listed in `DebugStrictMode` with their reasons; a violation
+that is intended gets the same entry, one that is not gets fixed. The list starts with those two because they are
+the ones known today: the first rig run is what shows the rest.
+
 A handheld is used away from a computer, so the evidence for a defect has
 to be gathered on the device, by the person holding it, and handed over
 in one motion. Three mechanisms, one folder, and one privacy rule.
