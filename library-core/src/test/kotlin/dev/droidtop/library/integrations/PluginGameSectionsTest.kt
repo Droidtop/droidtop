@@ -67,7 +67,8 @@ class PluginGameSectionsTest {
         assertEquals("40%", rows[1].value)
         assertEquals("Ren'Py · v2", rows[2].subtitle)
         assertEquals("Sync?", rows[3].confirm)
-        assertEquals("On", rows[4].value)
+        assertEquals(true, rows[4].on)
+        assertEquals(null, rows[4].value)
         assertEquals("Auto", rows[5].value)
     }
 

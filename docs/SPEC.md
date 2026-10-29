@@ -17616,7 +17616,12 @@ ES-DE theme's own badges stay the theme's). Every drawing has its words for a sc
 colour is never the only signal. A job row is its title, its bar or mark, and one short line under the title (where
 it stands, who runs it); it has no value column, which in a narrow pane took the title's width and broke it mid-word
 ("Synct / hing"). Moved so far: the jobs list (Downloads, the Quick Menu's Downloads, Settings' "Downloads and
-installs"); the rest of the shell moves one surface at a time.
+installs"); the game menu's Downloads row; Home's activity spot; and on/off, which is a switch everywhere a state is
+shown: Settings' rows and their Info sheet, the PC library's own options (`ListOption`), search's switches, the
+metadata editor, the controller's "Swap A and B" tile (`ActionItem.state`), a source's controls on its record page
+(`RecordRow.on`), a plugin's game-page rows (`PluginGameSections.Row.on`, `PageFact.on`) and the companion's rows and
+pinned tiles. A link to a page keeps its word for the page's state ("Risky actions: On"): a switch there would promise
+a flip that A does not do. The rest of the shell moves one surface at a time.
 
 **Colour.** One source per surface family, and the families are named so a screen cannot pick
 the wrong one. The shell's palette (`MenuTokens`) is absolute against its own grounds, so any

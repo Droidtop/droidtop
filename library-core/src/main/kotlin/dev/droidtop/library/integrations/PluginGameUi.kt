@@ -140,6 +140,8 @@ object PluginGameSections {
         val action: RowAction,
         val viewAction: ViewAction? = null,
         val confirm: String? = null,
+        /** An on/off row's state, drawn as a switch rather than said (show, then say: Droidtop/tracker#738). */
+        val on: Boolean? = null,
     )
 
     /**
@@ -160,7 +162,7 @@ object PluginGameSections {
                 is ViewNode.Progress -> Row(node.title, node.subtitle, if (node.percent >= 0) "${node.percent}%" else null, RowAction.NONE)
                 is ViewNode.Row -> actionRow(node.title, node.shownSubtitle(), node.shownValue(), node.action, null)
                 is ViewNode.Button -> actionRow(node.title, node.subtitle, node.value, node.action, node.confirm)
-                is ViewNode.Toggle -> Row(node.title, node.subtitle, if (node.value) "On" else "Off", RowAction.OPEN_SECTION)
+                is ViewNode.Toggle -> Row(node.title, node.subtitle, null, RowAction.OPEN_SECTION, on = node.value)
                 is ViewNode.Choice -> Row(node.title, node.subtitle, node.options.firstOrNull { it.first == node.value }?.second ?: node.value, RowAction.OPEN_SECTION)
                 is ViewNode.Slider -> Row(node.title, node.subtitle, node.value.toString(), RowAction.OPEN_SECTION)
                 is ViewNode.Text -> Row(node.title, node.subtitle, node.value.ifBlank { null }, RowAction.OPEN_SECTION)

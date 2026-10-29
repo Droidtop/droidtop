@@ -194,6 +194,8 @@ private fun CatalogRow(
     look: dev.droidtop.library.settings.JobLook? = null,
     // One status glyph beside the title (CatalogItem.statusMark): a plugin that needs you or cannot run.
     statusMark: dev.droidtop.library.settings.StatusMark? = null,
+    // An on/off state (ActionItem.state), drawn as the switch a toggle row draws, not said (Droidtop/tracker#738).
+    switchOn: Boolean? = null,
     onClick: (() -> Unit)?,
 ) {
     val colors = MaterialTheme.colorScheme
@@ -248,6 +250,7 @@ private fun CatalogRow(
                 Text(value, style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, modifier = Modifier.padding(start = 12.dp))
             }
         }
+        if (switchOn != null) Switch(checked = switchOn, onCheckedChange = null, modifier = Modifier.padding(start = 12.dp))
     }
 }
 
@@ -378,7 +381,7 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
     var status by remember(item.id) { mutableStateOf<String?>(null) }
     var asking by remember(item.id) { mutableStateOf(false) }
     val state = (item as? ActionItem)?.state
-    val value = status ?: item.value ?: state?.let { if (it) "On" else "Off" }
+    val value = status ?: item.value
     fun run() {
         asking = false
         when (item) {
@@ -391,7 +394,7 @@ private fun CatalogActionRow(item: CatalogItem, onChanged: () -> Unit, asksFirst
             else -> Unit
         }
     }
-    CatalogRow(item.title, item.subtitle, value, progress = item.progress, look = item.progressLook, statusMark = item.statusMark) { if (asksFirst) asking = true else run() }
+    CatalogRow(item.title, item.subtitle, value, progress = item.progress, look = item.progressLook, statusMark = item.statusMark, switchOn = state) { if (asksFirst) asking = true else run() }
     if (asking) {
         Column(modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)) {
             Text(item.confirmText ?: "${item.title}?", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)

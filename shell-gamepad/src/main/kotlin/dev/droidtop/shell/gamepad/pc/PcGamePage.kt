@@ -779,6 +779,7 @@ internal fun PcGamePage(
                                         title = fact.title,
                                         subtitle = fact.subtitle,
                                         value = fact.value,
+                                        switchOn = fact.on,
                                         chevron = fact.onActivate != null,
                                         selected = zone == PageZone.CONTENT && row == index,
                                         uniformHeight = true,
@@ -1303,6 +1304,8 @@ internal data class PageFact(
     val tab: PageTab,
     /** What Select does on this row (a copy's Options); null for a row that has none. */
     val onOptions: (() -> Unit)? = null,
+    /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
+    val on: Boolean? = null,
 )
 
 /**

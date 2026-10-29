@@ -29,12 +29,12 @@ sealed interface RecordAction {
 }
 
 /**
- * The source's own controls, as the Overview tab's rows: a switch says On or Off and A flips it, a button runs, a link
- * opens, and a notice says, running its fix when it has one. Pure.
+ * The source's own controls, as the Overview tab's rows: a switch is drawn as a switch ([RecordRow.on]) and A flips
+ * it, a button runs, a link opens, and a notice says, running its fix when it has one. Pure.
  */
 fun controlRows(record: UpdateSources.Record): List<RecordRow> = record.controls.map { c ->
     when (c.kind) {
-        UpdateSources.Control.Kind.TOGGLE -> RecordRow(c.title, if (c.on) "On" else "Off", c.subtitle, RecordAction.Control(c))
+        UpdateSources.Control.Kind.TOGGLE -> RecordRow(c.title, subtitle = c.subtitle, action = RecordAction.Control(c), on = c.on)
         UpdateSources.Control.Kind.ACTION -> RecordRow(c.title, subtitle = c.subtitle, action = RecordAction.Control(c))
         UpdateSources.Control.Kind.LINK -> RecordRow(c.title, c.subtitle, action = c.url?.let { RecordAction.Open(it) })
         UpdateSources.Control.Kind.NOTICE -> RecordRow(c.title, subtitle = c.subtitle, action = c.action?.let { RecordAction.Control(c) })
@@ -56,7 +56,8 @@ fun signInRow(sourceLabel: String, record: UpdateSources.Record, signedOut: Bool
     RecordRow("Sign in to $sourceLabel", subtitle = "to get download links", action = RecordAction.SignIn)
         .takeIf { signedOut && record.downloads.any { it.url == null } }
 
-data class RecordRow(val title: String, val value: String? = null, val subtitle: String? = null, val action: RecordAction? = null)
+/** One row; [on] is an on/off row's state, drawn as a switch rather than said (show, then say: Droidtop/tracker#738). */
+data class RecordRow(val title: String, val value: String? = null, val subtitle: String? = null, val action: RecordAction? = null, val on: Boolean? = null)
 
 /** "4.3 of 5 (1,234 votes)" for a 0-to-1 rating; null when the source gives none. */
 fun ratingLine(rating: Double?, votes: Int?): String? {

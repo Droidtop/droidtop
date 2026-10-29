@@ -365,6 +365,7 @@ internal fun SourceRecordPage(
                         MenuRow(
                             title = row.title,
                             value = row.value,
+                            switchOn = row.on,
                             subtitle = row.subtitle,
                             selected = index == focusIndex,
                             chevron = row.action != null,
@@ -384,6 +385,7 @@ internal fun SourceRecordPage(
                         MenuRow(
                             title = row.title,
                             value = row.value,
+                            switchOn = row.on,
                             subtitle = if (armed == index) "Press again to download this version. It lands beside your other versions" else row.subtitle,
                             selected = index == focusIndex,
                             chevron = row.action != null,
