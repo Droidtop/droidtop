@@ -155,6 +155,21 @@ object PluginMetadataProtocol {
     /** A candidate below this is not a match: a wrong guess is worse than none. */
     const val MIN_CONFIDENCE = 0.5
 
+    /** Calls a minute to one source when its `provides` entry names no `rate` (docs/plugin-api.md 3 A3). */
+    const val DEFAULT_PER_MINUTE = 30
+
+    /** The most calls a minute a source may ask for: the host paces, the plugin is not trusted to. */
+    const val MAX_PER_MINUTE = 120
+
+    /** The calls a minute [entry] asked for (`rate: {perMinute}`), at most [MAX_PER_MINUTE]; [DEFAULT_PER_MINUTE] when it asked for none. */
+    fun perMinute(entry: ProvidedPoint): Int =
+        runCatching { JSONObject(entry.extra).optJSONObject("rate")?.optInt("perMinute", 0) }.getOrNull()
+            ?.takeIf { it > 0 }?.coerceAtMost(MAX_PER_MINUTE) ?: DEFAULT_PER_MINUTE
+
+    /** How long to wait before the next call to a source last called at [lastCallAtMs] (null: never), at [perMinute]. */
+    fun waitMs(lastCallAtMs: Long?, nowMs: Long, perMinute: Int): Long =
+        lastCallAtMs?.let { (it + 60_000L / perMinute.coerceIn(1, MAX_PER_MINUTE) - nowMs).coerceAtLeast(0L) } ?: 0L
+
     /**
      * `match` answers `{candidates: [{ids: {...}, confidence: 0..1}]}`. The ids of the most confident candidate
      * at or above [MIN_CONFIDENCE], or null when there is none (a candidate with no confidence counts as 0.5).

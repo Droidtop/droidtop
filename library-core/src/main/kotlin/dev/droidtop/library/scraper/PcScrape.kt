@@ -773,7 +773,24 @@ object PcScraper {
         PcMediaLayout.systemFolderFor(entry)?.let { facts.put("systemId", it) }
         val links = dev.droidtop.library.RoomGameLinksStore(context).getAll(listOf(entry.id))[entry.id]?.sources.orEmpty()
         if (links.isNotEmpty()) facts.put("sourceLinks", org.json.JSONObject(links.associate { it.source to it.externalId }))
+        storeIdsOf(entry, links.associate { it.source to it.externalId }).takeIf { it.isNotEmpty() }?.let { facts.put("storeIds", org.json.JSONObject(it)) }
+        entry.pcInfo?.installedVersion?.takeIf { it.isNotBlank() }?.let { facts.put("version", it) }
         return facts
+    }
+
+    /**
+     * Every id the game is known by, by store or site (`{steam: "620", gog: "1207658924", f95: "12345"}`, docs/plugin-api.md
+     * 3 A3 `storeIds`): the store's own row, the ids that row names, a store's marker in the folder, and the game's source
+     * links, which win, being what the person or an earlier scrape chose. Pure, for the tests.
+     */
+    internal fun storeIdsOf(entry: LibraryEntry, links: Map<String, String>): Map<String, String> {
+        val pc = entry.pcInfo
+        val ids = LinkedHashMap<String, String>()
+        pc?.storeId?.let { key -> dev.droidtop.library.PcSource.storeIdOf(key)?.let { store -> ids[store] = key.substringAfter(':') } }
+        pc?.externalIds?.forEach { (store, id) -> ids.putIfAbsent(store, id) }
+        pc?.marker?.let { ids.putIfAbsent(it.storeId, it.gameId) }
+        ids.putAll(links)
+        return ids.filterValues { it.isNotBlank() }
     }
 
     /**

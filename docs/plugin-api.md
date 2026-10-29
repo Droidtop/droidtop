@@ -2337,8 +2337,20 @@ talk over the API".
     fields, as a background job.
 - **Permission:** `provide:library.metadata`, `net.domains`.
 - **Status:** match and fetch are called by the scrape job
-  (`PluginMetadataSources`). The new facts and fields, the rate limit
-  and `cancel` are being built (#568).
+  (`PluginMetadataSources`). Built (#568, 2026-10-29): the facts
+  `storeIds` (the store row's own id, the ids it names, a store marker in
+  the folder, and the game's source links, which win) and `version` (the
+  installed build, when one is known); the pace below, enforced per
+  source by the pass (`PluginMetadataSources.Session`,
+  `PluginMetadataProtocol.perMinute`/`waitMs`), with a `RATE_LIMITED`
+  source resting for the rest of the pass and saying so in the scan log.
+  The pace covers every call to the source, the picker's `match` and the
+  `fetch` that names an unnamed candidate (1.11) included. `title` is read
+  only to name a picker's candidate (1.11). Not built yet: `folder.exe`,
+  `folder.engine`, `folder.sizeBytes`; the fetch fields `title` as a field
+  the scrape fills, `tags`, `screenshots`, `links`, `storeIds`; and
+  `cancel` (a cancelled scrape stops waiting on the call, but the plugin
+  is not told).
 - **Rules:**
   - The host merges, stores and attributes the result.
   - A plugin fills only fields still empty after the built-in sources,
