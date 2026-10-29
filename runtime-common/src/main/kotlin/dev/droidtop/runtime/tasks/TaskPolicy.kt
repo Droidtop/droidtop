@@ -87,6 +87,16 @@ object TaskPolicy {
     fun protectedPackages(ownPackage: String, homePackages: Set<String>, userProtected: Set<String>): Set<String> =
         SYSTEM_PROTECTED + ownPackage + ENGINEHOST_PACKAGE + homePackages + userProtected
 
+    /**
+     * The home apps among [candidates] (each a package that answers Android's home intent, with the priority it
+     * declares there): only those at priority 0 or above. Settings answers it too, at -1000, with a screen Android
+     * shows only while a phone starts up locked (AOSP's FallbackHome); counting it hid Settings from the running list
+     * and the Desktop bar, and the launch watchdog then read Settings, still open, as closed (Droidtop/tracker#750,
+     * console 0.2.0-dev.2554).
+     */
+    fun homeApps(candidates: List<Pair<String, Int>>): Set<String> =
+        candidates.filter { (_, priority) -> priority >= 0 }.mapTo(HashSet()) { it.first }
+
     /** Left out of the running-apps list itself: droidtop's own tasks, home apps and the system surfaces are not apps to manage. */
     fun hiddenFromList(ownPackage: String, homePackages: Set<String>): Set<String> =
         SYSTEM_PROTECTED + ownPackage + homePackages

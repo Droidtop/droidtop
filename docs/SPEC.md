@@ -4066,7 +4066,11 @@ a close path of its own. Every call works off the main thread.
     itself, and cannot tell when one of them closed by itself." The same note names a provider that
     could not answer. A list is never padded with a guess.
   Never listed or closed by Clear all: droidtop's own tasks (shell and companion), home apps, the
-  system UI, and (Clear all only) Enginehost, which may be hosting a game.
+  system UI, and (Clear all only) Enginehost, which may be hosting a game. A home app is one that answers
+  Android's home intent at priority 0 or above (`TaskPolicy.homeApps`). Settings answers it too, at -1000, with
+  the screen Android shows only while a phone starts up locked (AOSP's FallbackHome), and is an app like any
+  other: counted as a home app, it was missing from the list and the Desktop bar, and the launch watchdog read
+  Settings, still open behind a HOME press, as closed (Droidtop/tracker#750, console 0.2.0-dev.2554).
 - **Nothing polls while the list is hidden.** `TaskManager.watch` is a loop the surface runs in the
   scope that owns its visibility (the Apps tab's `LaunchedEffect`, the companion panel's); leaving
   composition ends it. Reads run on `Dispatchers.IO`.
@@ -10067,7 +10071,11 @@ background with nothing open: `pidof`, then each process's start time, field 22 
 stalled (under
 1 s of processor time 15 s after the launch, `STALLED`). A black window of a live, responsive
 app is in general indistinguishable from a game that is running and is never claimed, and a person returning to
-the shell on purpose while the app is open or after 10 s is not a problem. The stall is the one black
+the shell on purpose while the app is open or after 10 s is not a problem. An app opened by itself (an installed
+app's library entry, from Gaming or Desktop's search) is handed no game file, so its "closed straight after it
+started" says to try again and that it may need an update, not to check its game file (Droidtop/tracker#750). The
+alert drawn over the app (`LaunchAlertOverlay`) uses droidtop's buttons: sentence case in the Label style, 8 dp
+corners, Back to droidtop in the accent with a ring for the pad's focus, Dismiss on the row fill, on a 12 dp card. The stall is the one black
 screen that is claimed, for emulator launches only, because its evidence is not a guess: a running game or
 an emulator's own menu draws every frame and has used seconds by then, while the console's hung RetroArch
 GBC and N64 launches (build 1649, Droidtop/tracker#271) showed 0.14 s of processor time after 90 s and

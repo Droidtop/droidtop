@@ -107,6 +107,15 @@ class TaskPolicyTest {
     }
 
     @Test
+    fun `Settings' start-up home screen does not make Settings a home app`() {
+        val homes = TaskPolicy.homeApps(
+            listOf("dev.droidtop.app" to 0, "com.example.launcher" to 1, "com.android.settings" to -1000),
+        )
+        assertEquals(setOf("dev.droidtop.app", "com.example.launcher"), homes)
+        assertFalse("com.android.settings" in TaskPolicy.hiddenFromList("dev.droidtop.app", homes))
+    }
+
+    @Test
     fun `the other screen is the built-in one for an app elsewhere, and null with one screen`() {
         assertEquals(0, TaskPolicy.otherDisplay(current = 2, all = listOf(0, 2)))
         assertEquals(2, TaskPolicy.otherDisplay(current = 0, all = listOf(0, 2)))

@@ -372,7 +372,9 @@ object LaunchDisplay {
         // how its game ended itself, with Wine's exit code and output, where the watchdog could only
         // say that droidtop closed and point at emulator setup (Droidtop/tracker#302).
         if (packageName != null && runningGame != null && packageName != context.packageName) {
-            LaunchWatchdog.start(context, packageName, launchedAtMs, intent.getStringExtra("LIBRETRO"))
+            // An installed app's library entry is the package itself: it is opened, not handed a game file.
+            val opensFile = runningGame?.gameId != packageName
+            LaunchWatchdog.start(context, packageName, launchedAtMs, intent.getStringExtra("LIBRETRO"), opensFile)
         }
         parkedDisplayId = resolvedDisplayId
         onLaunched?.invoke(resolvedDisplayId)

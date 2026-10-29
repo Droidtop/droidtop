@@ -62,23 +62,39 @@ internal object LaunchAlertOverlay {
         val wm = context.getSystemService(WindowManager::class.java) ?: return
         val density = context.resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
-        val back = Button(context).apply {
-            text = "Back to droidtop"
-            setOnClickListener {
-                hide()
-                LaunchWatchdog.returnToShell(app)
+        // droidtop's buttons, not the platform's (docs/DESIGN-LANGUAGE.md, Droidtop/tracker#750: the console drew
+        // "DISMISS" and "BACK TO DROIDTOP"): sentence case in the Label style, 8 dp corners, the accent on the primary.
+        fun button(label: String, primary: Boolean, onClick: () -> Unit) = Button(context, null, 0, 0).apply {
+            text = label
+            isAllCaps = false
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+            setTextColor((if (primary) palette.onAccent else palette.onSurface).toArgb())
+            val fill = GradientDrawable().apply {
+                setColor((if (primary) palette.accent else palette.rowFill).toArgb())
+                cornerRadius = dp(8).toFloat()
             }
+            background = fill
+            minHeight = dp(40)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+            isFocusable = true
+            // The focus mark for the pad: a ring in the text colour, so it shows on the accent fill too.
+            setOnFocusChangeListener { _, focused ->
+                fill.setStroke(if (focused) dp(2) else 0, palette.onSurface.toArgb())
+            }
+            setOnClickListener { onClick() }
         }
-        val dismiss = Button(context).apply {
-            text = "Dismiss"
-            setOnClickListener { LaunchWatchdog.dismiss() }
+        val back = button("Back to droidtop", primary = true) {
+            hide()
+            LaunchWatchdog.returnToShell(app)
         }
+        val dismiss = button("Dismiss", primary = false) { LaunchWatchdog.dismiss() }
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(12))
             background = GradientDrawable().apply {
                 setColor(palette.overlaySurface.copy(alpha = 0.94f).toArgb())
-                cornerRadius = dp(16).toFloat()
+                cornerRadius = dp(12).toFloat()
             }
             addView(TextView(context).apply {
                 text = alert.message
@@ -91,7 +107,7 @@ internal object LaunchAlertOverlay {
                     gravity = Gravity.END
                     setPadding(0, dp(12), 0, 0)
                     addView(dismiss)
-                    addView(back)
+                    addView(back, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply { marginStart = dp(8) })
                 },
             )
             isFocusable = true

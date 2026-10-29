@@ -215,10 +215,18 @@ internal object LaunchWatchPolicy {
         return if (any) ticks * 1000 / ticksPerSecond else null
     }
 
-    /** The plain sentence for [trouble], naming the app and what to do. */
-    fun message(appName: String, trouble: LaunchTrouble): String = when (trouble) {
+    /**
+     * The plain sentence for [trouble], naming the app and what to do. [opensFile] is a launch that hands the app a game
+     * file (an emulator's); an app opened by itself (an installed app, from the library or Desktop's search) has no game
+     * file to check (Droidtop/tracker#750, console 0.2.0-dev.2554: Settings was told to check "its game file").
+     */
+    fun message(appName: String, trouble: LaunchTrouble, opensFile: Boolean = true): String = when (trouble) {
         LaunchTrouble.EXITED_AT_ONCE ->
-            "$appName closed straight after it started. Try again; if it keeps happening, check that its game file and settings are still there."
+            if (opensFile) {
+                "$appName closed straight after it started. Try again; if it keeps happening, check that its game file and settings are still there."
+            } else {
+                "$appName closed straight after it started. Try again; if it keeps happening, it may need an update."
+            }
         LaunchTrouble.NOT_RESPONDING ->
             "$appName has stopped responding. You can close it and try again, or go back to droidtop."
         LaunchTrouble.GONE_WHILE_AWAY ->
@@ -281,10 +289,11 @@ object LaunchWatchdog {
      * Watches [packageName], launched at [launchedAtMs]; replaces any launch still being watched.
      * [retroArchCorePath] is a RetroArch launch's LIBRETRO extra: a stuck RetroArch is most often a
      * core that is not installed, which RetroArch never reports, so the alert then says so. A RetroArch launch, and
-     * any launch the provider announced with [expectNext], has its processor time checked for a stall.
+     * any launch the provider announced with [expectNext], has its processor time checked for a stall. [opensFile] is
+     * false for an app opened by itself, not handed a game ([LaunchWatchPolicy.message]).
      */
     @Synchronized
-    fun start(context: Context, packageName: String, launchedAtMs: Long, retroArchCorePath: String? = null) {
+    fun start(context: Context, packageName: String, launchedAtMs: Long, retroArchCorePath: String? = null, opensFile: Boolean = true) {
         val appContext = context.applicationContext
         job?.cancel()
         alertFlow.value = null
@@ -357,7 +366,7 @@ object LaunchWatchdog {
                             appName,
                             verdict.trouble,
                             listOfNotNull(
-                                LaunchWatchPolicy.message(appName, verdict.trouble),
+                                LaunchWatchPolicy.message(appName, verdict.trouble, opensFile),
                                 if (closed) "droidtop closed what it left running." else null,
                                 core?.let(RetroArchCores::troubleHint),
                                 note,

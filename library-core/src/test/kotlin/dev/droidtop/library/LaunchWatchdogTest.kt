@@ -170,6 +170,14 @@ class LaunchWatchdogTest {
     }
 
     @Test
+    fun anAppOpenedByItselfIsNotToldToCheckAGameFile() {
+        val app = LaunchWatchPolicy.message("Settings", LaunchTrouble.EXITED_AT_ONCE, opensFile = false)
+        assertTrue(app, app.startsWith("Settings closed straight after it started. Try again"))
+        assertFalse(app, "game" in app)
+        assertTrue("game file" in LaunchWatchPolicy.message("RetroArch", LaunchTrouble.EXITED_AT_ONCE))
+    }
+
+    @Test
     fun enginehostReturningAtOnceIsLeavingNotFailing() {
         // Cancel on Enginehost's no-sandbox warning hands straight back (Droidtop/tracker#289): not a crash.
         assertTrue(LaunchWatchPolicy.leftBeforePlaying(EngineHost.PACKAGE_NAME, LaunchTrouble.EXITED_AT_ONCE))

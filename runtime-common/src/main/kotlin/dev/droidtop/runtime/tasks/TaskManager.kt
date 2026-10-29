@@ -210,7 +210,9 @@ object TaskManager {
 
     /** Every installed home app: not something a task manager lists or clears. */
     private fun homePackages(context: Context): Set<String> =
-        context.packageManager
-            .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
-            .mapTo(HashSet()) { it.activityInfo.packageName }
+        TaskPolicy.homeApps(
+            context.packageManager
+                .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), PackageManager.MATCH_DEFAULT_ONLY)
+                .map { it.activityInfo.packageName to it.priority },
+        )
 }
