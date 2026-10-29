@@ -82,12 +82,42 @@ object UpdateChecks {
     fun lastCheck(context: Context): Long? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_LAST_CHECK, 0L).takeIf { it > 0 }
 
+    /** The check as a job in the one jobs center, so it shows where every running thing does (Home's activity spot). */
+    const val JOB_KIND = dev.droidtop.library.integrations.HappeningNow.UPDATE_CHECK
+    private const val JOB_TITLE = "Check for updates"
+
+    /** Once, at process start (SettingsCatalogInitProvider). */
+    fun register(context: Context) {
+        val app = context.applicationContext
+        dev.droidtop.pluginhost.PluginJobsCenter.registerNative(JOB_KIND) { _, _, report ->
+            report(-1, "Starting", null)
+            checkNow(app) { line -> report(-1, line, null) }
+        }
+    }
+
+    /**
+     * The check, as a job (Droidtop/tracker#742): starts it, or follows the one already running, telling [onStatus] its
+     * line, and returns how it ended. Both the Updates page's Check now and the scheduled pass run it this way.
+     */
+    suspend fun checkAll(context: Context, onStatus: (String) -> Unit): String {
+        val jobs = dev.droidtop.pluginhost.PluginJobsCenter
+        val jobId = jobs.entries().value.firstOrNull { it.nativeKind == JOB_KIND && !it.done }?.jobId
+            ?: jobs.startNative(null, JOB_KIND, JOB_TITLE, owner = "Updates", pausable = false)
+            ?: return checkNow(context, onStatus)
+        val end = jobs.follow(jobId, onStatus)
+        return when {
+            end == null -> "Check cancelled"
+            end.result?.ok == false -> end.result?.error ?: "The check failed"
+            else -> end.result?.values?.get("summary") ?: "Checked"
+        }
+    }
+
     /**
      * Asks every kind's source: droidtop's newest build (recorded, never installed here), every plugin catalog, the
      * trusted plugin repositories (which install by themselves when Plugins installs automatically), every app catalog,
      * the platform databases and the stores' automatic updates. Blocking network calls, off the main thread.
      */
-    suspend fun checkAll(context: Context, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
+    private suspend fun checkNow(context: Context, onStatus: (String) -> Unit): String = withContext(Dispatchers.IO) {
         val app = context.applicationContext
         val metered = isMetered(app)
         onStatus("Checking droidtop...")

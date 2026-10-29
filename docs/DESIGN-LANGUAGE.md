@@ -143,6 +143,12 @@ progress as a bar, ring or segmented bar; a job's state as its mark; quantities 
 connection and sync as glyphs; droidtop's badges as glyphs. Words and numbers go beside the drawing, never instead of
 it, every drawing keeps its words for a screen reader, and colour is never the only signal.
 
+Chrome carries state or nothing (owner, 2026-10-29, #742: "2 is my choice. Have a contextual spot that shows an icon
+for whatever's currently happening"). An icon in a top bar earns its place by showing something: the bell only while
+something is unread, Friends only while a service reports presence, and one activity spot on the status pill for
+whatever is happening now, drawn as its icon in a ring, with a count when several run. An icon that would only repeat
+a button (Search is Y) is not drawn.
+
 ### One component set
 Page frame, sheet (left, right, bottom), anchored menu, work panel, dialog, row (nav, action, toggle, choice, slider,
 info, text, progress), group header, tile (cover, wide, plate; host badge bottom-left, plugin badge bottom-right),

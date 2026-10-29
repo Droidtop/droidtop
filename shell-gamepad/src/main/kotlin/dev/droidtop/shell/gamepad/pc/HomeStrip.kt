@@ -22,10 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -79,8 +76,6 @@ import java.io.File
 internal data class HomeStripData(
     val tabs: List<HomeTab> = listOf(HomeTab(HomeTabKind.WHATS_NEW, emptyList())),
     val attention: List<AttentionItem> = emptyList(),
-    /** The running job's progress for the band's Downloads glyph (0 to 1, negative unknown), null when none runs. */
-    val downloading: Float? = null,
     val friendsOn: Boolean = false,
     /** The person's own presence on the first service that reports one, for the avatar's ring. */
     val presence: SocialPresence? = null,
@@ -151,11 +146,9 @@ internal fun rememberHomeStrip(all: List<LibraryEntry>, systemNames: Map<String,
                     look = dev.droidtop.library.integrations.PluginJobsScreen.lookOf(job),
                 )
             }
-            val running = jobs.firstOrNull { !it.done && !it.paused }
             HomeStripData(
                 tabs = HomeModel.tabs(whatsNew, friends.first, friends.second, downloads, keep),
                 attention = attention,
-                downloading = running?.let { if (it.percent < 0) -1f else it.percent / 100f },
                 friendsOn = friends.first,
                 presence = friends.third,
                 unreadMessages = SocialHub.unread(),
@@ -183,16 +176,17 @@ private fun biosAttention(context: Context, systems: Map<String, String>): List<
 }
 
 /**
- * The top band (Home only): a scrim from the ground at 60 percent to clear, then, right to left, the status
- * facts on a solid plate, a divider, Friends (the avatar, with a ring for the person's presence), the bell
- * with the unread count, Search, and Downloads with a progress ring while a job runs. 48dp targets with
+ * The top band (Home only): a scrim from the ground at 60 percent to clear, then, right to left, only what carries
+ * state (the owner, 2026-10-29, Droidtop/tracker#742: "2 is my choice. Have a contextual spot that shows an icon for
+ * whatever's currently happening"): the status pill on a solid plate, with the activity spot ([ActivitySpot]) on it, a
+ * divider, Friends while a service reports the person's presence (the avatar in a ring), and the bell while something
+ * is unread, with the count. Search is not here: Y is Search everywhere, and the icon said nothing. 48dp targets with
  * content descriptions; not a stop of the pad.
  */
 @Composable
 internal fun HomeTopBand(
     data: HomeStripData,
-    onDownloads: () -> Unit,
-    onSearch: () -> Unit,
+    onActivity: () -> Unit,
     onBell: () -> Unit,
     bellCount: Int,
     onFriends: () -> Unit,
@@ -214,30 +208,8 @@ internal fun HomeTopBand(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.Xs),
         ) {
-            data.downloading?.let { progress ->
-                BandButton(Icons.Outlined.Download, "Downloads", onDownloads) {
-                    // A ring that fills while a download runs, gliding between reports; one whose size is not known
-                    // turns, unless motion is off (Droidtop/tracker#643).
-                    if (progress < 0f && dev.droidtop.ui.shared.Motion.enabled) {
-                        CircularProgressIndicator(color = MenuTokens.Accent, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
-                    } else {
-                        val shown by androidx.compose.animation.core.animateFloatAsState(
-                            progress.coerceIn(0f, 1f),
-                            dev.droidtop.ui.shared.Motion.progress(),
-                            label = "downloads-ring",
-                        )
-                        CircularProgressIndicator(
-                            progress = { shown },
-                            color = MenuTokens.Accent,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.size(32.dp),
-                        )
-                    }
-                }
-            }
-            BandButton(Icons.Outlined.Search, "Search", onSearch)
-            BandButton(Icons.Outlined.Notifications, if (bellCount > 0) "Notifications, $bellCount new" else "Notifications", onBell) {
-                if (bellCount > 0) {
+            if (bellCount > 0) {
+                BandButton(Icons.Outlined.Notifications, "Notifications, $bellCount new", onBell) {
                     Text(
                         bellCount.coerceAtMost(99).toString(),
                         color = MenuTokens.OnSelected,
@@ -246,18 +218,16 @@ internal fun HomeTopBand(
                     )
                 }
             }
-            if (data.friendsOn) {
+            val presence = data.presence?.takeIf { data.friendsOn }
+            if (presence != null) {
                 BandButton(Icons.Outlined.AccountCircle, "Friends", onFriends) {
-                    val ring = when (data.presence) {
-                        SocialPresence.OFFLINE, null -> null
-                        else -> MenuTokens.Affirmative
-                    }
-                    if (ring != null) Box(Modifier.size(34.dp).border(2.dp, ring, CircleShape))
+                    val ring = if (presence == SocialPresence.OFFLINE) MenuTokens.OnSurfaceMuted else MenuTokens.Affirmative
+                    Box(Modifier.size(34.dp).border(2.dp, ring, CircleShape))
                 }
             }
             Box(Modifier.padding(horizontal = Space.Xs).width(1.dp).height(24.dp).background(MenuTokens.CardOutline))
             // The facts, on the one status pill, here on a solid plate in full ink.
-            StatusPill(onClick = onQuickMenu, plate = MenuTokens.Surface)
+            StatusPill(onClick = onQuickMenu, plate = MenuTokens.Surface, onActivity = onActivity)
         }
     }
 }

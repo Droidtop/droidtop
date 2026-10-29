@@ -1201,8 +1201,8 @@ internal fun PcGamesSection(
                                     state.homeCard = index
                                 }
                             },
-                            onDownloads = { onOpenSection(GamingSection.DOWNLOADS) },
-                            onSearch = { state.searchOpen = true },
+                            // Every way into Updates opens the Quick Menu's Downloads tab, where the jobs are (Droidtop/tracker#749).
+                            onActivity = { onOpenSection(GamingSection.UPDATES) },
                             onBell = onOpenQuickMenu,
                             onFriends = { onOpenSection(GamingSection.SOCIAL) },
                             onQuickMenu = onOpenQuickMenu,
@@ -1737,8 +1737,7 @@ private fun PcShelvesHome(
     if (home != null) {
         HomeTopBand(
             data = home.strip,
-            onDownloads = home.onDownloads,
-            onSearch = home.onSearch,
+            onActivity = home.onActivity,
             onBell = home.onBell,
             bellCount = home.strip.unreadMessages,
             onFriends = home.onFriends,
@@ -1850,8 +1849,7 @@ internal class HomeParts(
     val cardsState: LazyListState,
     val onTab: (Int) -> Unit,
     val onTapCard: (Int) -> Unit,
-    val onDownloads: () -> Unit,
-    val onSearch: () -> Unit,
+    val onActivity: () -> Unit,
     val onBell: () -> Unit,
     val onFriends: () -> Unit,
     val onQuickMenu: () -> Unit,

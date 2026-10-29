@@ -3,14 +3,9 @@ package dev.droidtop.library
 import android.content.Context
 import dev.droidtop.library.settings.LibraryRescan
 import dev.droidtop.pluginhost.PluginJobsCenter
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.launch
 
 /**
  * "Rescan library" and "Rescan PC game folders" as a job in the one jobs center (docs/SPEC.md "Jobs and their
@@ -69,20 +64,11 @@ object LibraryRescanJob {
                 pausable = false,
             )
             ?: return LibraryRescan.walk(context, pcOnly, onStatus)
-        return coroutineScope {
-            val follower = launch {
-                PluginJobsCenter.entries().map { list -> list.firstOrNull { it.jobId == jobId }?.statusLine }
-                    .distinctUntilChanged()
-                    .collect { line -> line?.let(onStatus) }
-            }
-            val end = PluginJobsCenter.entries().first { list -> list.none { it.jobId == jobId && !it.done } }
-                .firstOrNull { it.jobId == jobId }
-            follower.cancel()
-            when {
-                end == null -> "Rescan cancelled."
-                end.result?.ok == false -> end.result?.error ?: "The rescan failed."
-                else -> end.result?.values?.get("summary") ?: "Rescan finished."
-            }
+        val end = PluginJobsCenter.follow(jobId, onStatus)
+        return when {
+            end == null -> "Rescan cancelled."
+            end.result?.ok == false -> end.result?.error ?: "The rescan failed."
+            else -> end.result?.values?.get("summary") ?: "Rescan finished."
         }
     }
 }

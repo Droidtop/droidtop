@@ -1587,7 +1587,15 @@ private fun GamepadShellBody(
             // Home's top band draws the status facts itself (docs/SPEC.md 7i, "Home"; Droidtop/tracker#494, #485 F7a).
             val homeBand = section == GamingSection.HOME && nav.place is ShellPlace.Section
             if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && retroView in GamingTheme.palette.ownStatusViews)) {
-                FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
+                FloatingStatusCluster(
+                    onClick = { quickMenuOpen = true },
+                    // The activity spot opens where the jobs are: the Quick Menu's Downloads tab (Droidtop/tracker#742).
+                    onActivity = {
+                        quickMenuStart = QuickSection.DOWNLOADS
+                        quickMenuOpen = true
+                    },
+                    modifier = Modifier.align(Alignment.TopEnd),
+                )
             }
             // A theme that draws its own help legend (a pad is attached, so
             // the legend is the theme's) names nothing of the two menus and

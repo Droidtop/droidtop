@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 
 // A damaged jobs file starts the list empty: an unreadable record of past jobs must never stop droidtop from starting.
 private val Context.pluginJobsStore by preferencesDataStore(
@@ -240,6 +242,22 @@ object PluginJobsCenter {
     fun entries(): StateFlow<List<Entry>> = state
 
     fun find(jobId: String): Entry? = state.value.firstOrNull { it.jobId == jobId }
+
+    /**
+     * Follows [jobId] until it ends, telling [onStatus] each new line: the entry it ended as, or null when it went
+     * (cancelled, or cleared). For the row that started a job and says its outcome where the person asked; the job
+     * itself shows under Downloads and installs and in Home's activity spot like any other.
+     */
+    suspend fun follow(jobId: String, onStatus: (String) -> Unit): Entry? = kotlinx.coroutines.coroutineScope {
+        val follower = launch {
+            state.map { list -> list.firstOrNull { it.jobId == jobId }?.statusLine }
+                .distinctUntilChanged()
+                .collect { line -> line?.let(onStatus) }
+        }
+        val end = state.first { list -> list.none { it.jobId == jobId && !it.done } }.firstOrNull { it.jobId == jobId }
+        follower.cancel()
+        end
+    }
 
     /**
      * Starts [capability]'s job for [record] and tracks it under the id
