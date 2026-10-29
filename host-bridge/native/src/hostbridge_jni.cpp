@@ -82,6 +82,30 @@ struct ToplevelsSink {
 
 std::unordered_map<jint, std::shared_ptr<ToplevelsSink>> g_toplevelsSinks;
 
+/**
+ * The Kotlin end of the text-field focus notification (Droidtop/tracker#685):
+ * HostBridge's onTextFieldFocus(boolean). Same shape and lifetime as
+ * ToplevelsSink, and called from the dispatch thread the same way.
+ */
+struct TextFieldSink {
+    jobject bridgeRef = nullptr;
+    jmethodID method = nullptr;
+
+    ~TextFieldSink() {
+        if (!bridgeRef || !g_vm) return;
+        JNIEnv* env = nullptr;
+        bool attached = false;
+        if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+            if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+            attached = true;
+        }
+        env->DeleteGlobalRef(bridgeRef);
+        if (attached) g_vm->DetachCurrentThread();
+    }
+};
+
+std::unordered_map<jint, std::shared_ptr<TextFieldSink>> g_textFieldSinks;
+
 // One WaylandClient per HostBridge.kt instance. In practice there's only
 // ever one (the DesktopSessionService's connection to the primary
 // container), but keying by the Kotlin object's identity hash rather than
@@ -190,6 +214,34 @@ void toplevelsChangedTrampoline(void* userData) {
     if (attached) g_vm->DetachCurrentThread();
 }
 
+void textFieldTrampoline(void* userData, bool focused) {
+    if (!g_vm) return;
+    auto key = static_cast<jint>(reinterpret_cast<intptr_t>(userData));
+
+    std::shared_ptr<TextFieldSink> sink;
+    {
+        std::lock_guard<std::mutex> lock(g_sinksMutex);
+        auto it = g_textFieldSinks.find(key);
+        if (it != g_textFieldSinks.end()) sink = it->second;
+    }
+    if (!sink) return;
+
+    JNIEnv* env = nullptr;
+    bool attached = false;
+    if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        if (g_vm->AttachCurrentThread(&env, nullptr) != JNI_OK) return;
+        attached = true;
+    }
+
+    env->CallVoidMethod(sink->bridgeRef, sink->method, focused ? JNI_TRUE : JNI_FALSE);
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        env->ExceptionClear();
+    }
+
+    if (attached) g_vm->DetachCurrentThread();
+}
+
 } // namespace
 
 extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
@@ -239,6 +291,22 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeConnect(JNIEnv* env, jobject thiz,
         LOGI("onToplevelsChanged not found — the taskbar's window list will not update");
     }
 
+    // Text fields (Droidtop/tracker#685): set before connect(), which asks
+    // for the seat's input method.
+    auto textFieldSink = std::make_shared<TextFieldSink>();
+    textFieldSink->bridgeRef = env->NewGlobalRef(thiz);
+    textFieldSink->method = env->GetMethodID(env->GetObjectClass(thiz), "onTextFieldFocus", "(Z)V");
+    if (textFieldSink->method) {
+        {
+            std::lock_guard<std::mutex> lock(g_sinksMutex);
+            g_textFieldSinks[key] = textFieldSink;
+        }
+        client->setTextFieldListener(textFieldTrampoline, reinterpret_cast<void*>(static_cast<intptr_t>(key)));
+    } else {
+        env->ExceptionClear();
+        LOGI("onTextFieldFocus not found — the keyboard will not follow text fields");
+    }
+
     bool ok = client->connect(path);
 
     env->ReleaseStringUTFChars(waylandSocketPath, path);
@@ -250,6 +318,7 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeConnect(JNIEnv* env, jobject thiz,
         std::lock_guard<std::mutex> lock(g_sinksMutex);
         g_clipboardSinks.erase(key);
         g_toplevelsSinks.erase(key);
+        g_textFieldSinks.erase(key);
     }
 
     return ok ? JNI_TRUE : JNI_FALSE;
@@ -281,6 +350,7 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeDisconnect(JNIEnv* env, jobject th
         std::lock_guard<std::mutex> lock(g_sinksMutex);
         g_clipboardSinks.erase(key);
         g_toplevelsSinks.erase(key);
+        g_textFieldSinks.erase(key);
     }
     std::lock_guard<std::mutex> lock(g_clientsMutex);
     // Capture stops before its window is released: the dispatch thread

@@ -26,6 +26,7 @@ namespace hostbridge {
 struct WaylandGlobals;
 struct OutputCapture;
 struct ClipboardState;
+struct TextFieldState;
 struct DispatchTasks;
 
 /**
@@ -55,6 +56,11 @@ using ClipboardTextCallback = void (*)(void* userData, const char* utf8Text, siz
  * fetch-on-notify shape as everything else this class exposes to Kotlin.
  */
 using ToplevelsChangedCallback = void (*)(void* userData);
+
+// A text field in the container took (true) or lost (false) the keyboard
+// focus, as the compositor tells its input method (input-method-unstable-v2).
+// Called on the dispatch thread. See setTextFieldListener.
+using TextFieldCallback = void (*)(void* userData, bool focused);
 
 /**
  * One opened window as wlr-foreign-toplevel-management-unstable-v1 reports
@@ -151,6 +157,17 @@ public:
     // sees it.
     void setToplevelsListener(ToplevelsChangedCallback callback, void* userData);
 
+    // ---- Text fields, over input-method-unstable-v2 (Droidtop/tracker#685) ----
+    //
+    // host-bridge registers as the seat's input method, which is how a
+    // compositor tells a keyboard that a text field (a text-input-v3 client:
+    // GTK, Qt, foot) has the focus. Only that is used: typing still goes
+    // through the virtual keyboards. Optional, like the toplevel manager: a
+    // compositor without it, or one whose seat already has an input method
+    // (the protocol's `unavailable`), simply never calls back. Set before
+    // connect().
+    void setTextFieldListener(TextFieldCallback callback, void* userData);
+
     // A copy of the current list, safe to call from any thread. Entries are
     // only ever mutated on the dispatch thread; reads take the same mutex
     // that guards those mutations (see ToplevelState in the .cpp).
@@ -203,6 +220,7 @@ private:
     OutputCapture* capture_ = nullptr;
     ClipboardState* clipboard_ = nullptr;
     struct ToplevelState* toplevels_ = nullptr;
+    struct TextFieldState* textField_ = nullptr;
 
     void* dispatchThreadHandle_ = nullptr; // pthread_t, opaque here to avoid pulling <pthread.h> into the header
     std::atomic<bool> dispatchThreadRunning_{false};

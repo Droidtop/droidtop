@@ -51,6 +51,7 @@ set(HOSTBRIDGE_PROTOCOLS
     "ext-data-control-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wayland-protocols/staging/ext-data-control/ext-data-control-v1.xml"
     "wlr-output-management-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-output-management-unstable-v1.xml"
     "wlr-foreign-toplevel-management-unstable-v1;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/wlr-foreign-toplevel-management-unstable-v1.xml"
+    "input-method-unstable-v2;${CMAKE_CURRENT_SOURCE_DIR}/../../vendor/wlroots/protocol/input-method-unstable-v2.xml"
 )
 
 set(GENERATED_SOURCES "")

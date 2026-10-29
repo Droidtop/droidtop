@@ -7941,9 +7941,19 @@ typing into a URL bar or a terminal meant a trip to the companion's Keys tab). T
 while a hardware keyboard is attached. It shows Android's keyboard (droidtop's own, when it is the one chosen) over
 the desktop, or hides it. The surface is an editor for it (`DesktopSurfaceView`) with a terminal's attributes, so no
 suggestions or composing. Committed text becomes key presses through Android's virtual key map, and keys the keyboard
-sends as keys (Enter, Backspace, arrows, Ctrl, Esc) go as they are; both take the router's typed-text path. The
-keyboard shows when asked for, not when a Linux text field takes focus: that needs host-bridge to speak Wayland's
-text-input and input-method protocols, the next step on #685.
+sends as keys (Enter, Backspace, arrows, Ctrl, Esc) go as they are; both take the router's typed-text path.
+
+The keyboard also follows Linux text fields (2026-10-29, the second step on #685). host-bridge registers as the
+seat's input method (input-method-unstable-v2, which sway offers). The compositor activates it when a text-input-v3
+client (GTK, Qt, foot) focuses a text field, and deactivates it when the focus leaves. On that change
+(`WaylandClient::setTextFieldListener`, `HostBridge.textFieldListener`) the Desktop shell shows or hides the keyboard
+(`DesktopSurfaceView.followTextField`). With a hardware keyboard attached it does neither. Only the focus is used:
+typing still goes through the virtual keyboards as above, so nothing about keys or layouts changes. The input method
+does not grab the keyboard or commit text. Decided: droidtop takes the seat's one input method. sway allows one per
+seat, so an input method run inside the container (fcitx5 or ibus, for CJK input) cannot register while droidtop
+holds it. Such a person types through droidtop's keyboard, or through the container's input method on a hardware
+keyboard after turning droidtop's off. Turning droidtop's off is not built yet. If the seat already has an input
+method when droidtop connects, the protocol says `unavailable`, and the keyboard is then shown from the bar only.
 
 **When the desktop stops** (Droidtop/tracker#688, the coordinator's Desktop review: a dead compositor still showed
 "Connected", with the last frame frozen and input going nowhere). host-bridge's dispatch thread is the one reader of

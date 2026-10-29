@@ -188,6 +188,7 @@ fun DesktopShell(
     }
     // One listener on the bridge feeds the taskbar and the windows sheet alike.
     val toplevels = rememberToplevels(hostBridge)
+    FollowTextFields(hostBridge)
     LaunchedEffect(windows, toplevels) { windows?.forget(toplevels) }
     // What Android is running that droidtop started (a game or an app launched from here is a fullscreen
     // Activity over the desktop, not a window the compositor knows), polled only while Desktop shows.
@@ -791,6 +792,22 @@ private fun rememberHiddenWindows(windows: DesktopWindows?) =
 private suspend fun minimizeWindow(context: Context, windows: DesktopWindows?, toplevel: Toplevel) {
     if (windows?.minimize(toplevel) != true) {
         dev.droidtop.library.settings.Notices.flash("Couldn't minimize this window", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
+    }
+}
+
+/**
+ * The on-screen keyboard comes up when a text field in the container takes the focus, and goes when it loses it
+ * (Droidtop/tracker#685); the bar's Keyboard button still shows and hides it by hand.
+ */
+@Composable
+private fun FollowTextFields(hostBridge: HostBridge?) {
+    DisposableEffect(hostBridge) {
+        val mainHandler = Handler(Looper.getMainLooper())
+        hostBridge?.textFieldListener = { focused ->
+            // Fires from a native worker thread (see HostBridge.kt).
+            mainHandler.post { DesktopKeyboardTarget.surface?.get()?.followTextField(focused) }
+        }
+        onDispose { hostBridge?.textFieldListener = null }
     }
 }
 

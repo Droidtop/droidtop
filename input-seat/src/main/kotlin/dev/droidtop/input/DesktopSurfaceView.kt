@@ -41,6 +41,19 @@ class DesktopSurfaceView(context: Context, private val router: DesktopInputRoute
         }
     }
 
+    /**
+     * A text field in the container took or lost the focus (host-bridge's input method, Droidtop/tracker#685): the
+     * on-screen keyboard follows, as it does for an Android text field. Not while a hardware keyboard is attached,
+     * which already types into the desktop. Main thread.
+     */
+    fun followTextField(focused: Boolean) {
+        val config = resources.configuration
+        val hardware = config.keyboard == android.content.res.Configuration.KEYBOARD_QWERTY &&
+            config.hardKeyboardHidden == android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO
+        if (hardware || focused == keyboardWanted) return
+        toggleKeyboard()
+    }
+
     override fun onCheckIsTextEditor(): Boolean = keyboardWanted
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {

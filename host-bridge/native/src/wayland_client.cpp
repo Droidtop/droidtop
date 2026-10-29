@@ -36,6 +36,7 @@
 #include "ext-data-control-v1-client-protocol.h"
 #include "wlr-output-management-unstable-v1-client-protocol.h"
 #include "wlr-foreign-toplevel-management-unstable-v1-client-protocol.h"
+#include "input-method-unstable-v2-client-protocol.h"
 
 #define LOG_TAG "hostbridge/wl"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -87,6 +88,9 @@ struct WaylandGlobals {
     // above: absent means the taskbar simply has no window list, not a
     // broken connection.
     zwlr_foreign_toplevel_manager_v1* toplevel_manager = nullptr;
+
+    // Text fields (input-method-unstable-v2, Droidtop/tracker#685). Optional.
+    zwp_input_method_manager_v2* input_method_manager = nullptr;
     // The state the manager's events land in, made by connect() before the
     // registry is read so registry_global can attach the listener at bind
     // time (see there).
@@ -248,6 +252,20 @@ struct ToplevelState {
 
     ToplevelsChangedCallback callback = nullptr;
     void* callbackUserData = nullptr;
+};
+
+/**
+ * What the compositor tells the seat's input method: whether a text field
+ * has the focus. activate and deactivate are pending until `done`, as the
+ * protocol says; only a change at `done` reaches the callback. Touched on
+ * the dispatch thread only, apart from the callback set before connect().
+ */
+struct TextFieldState {
+    zwp_input_method_v2* method = nullptr;
+    bool pending = false;
+    bool active = false;
+    TextFieldCallback callback = nullptr;
+    void* userData = nullptr;
 };
 
 namespace {
@@ -634,6 +652,10 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
         // graceful degradation.
         globals->data_control_manager = static_cast<ext_data_control_manager_v1*>(
             wl_registry_bind(registry, name, &ext_data_control_manager_v1_interface, 1));
+    } else if (std::strcmp(interface, zwp_input_method_manager_v2_interface.name) == 0) {
+        // Version 1, the only one this client's listener is written for.
+        globals->input_method_manager = static_cast<zwp_input_method_manager_v2*>(
+            wl_registry_bind(registry, name, &zwp_input_method_manager_v2_interface, 1));
     } else if (std::strcmp(interface, zwlr_foreign_toplevel_manager_v1_interface.name) == 0) {
         // Capped like zwlr_output_manager_v1 above, for the same reason:
         // binding higher than this client's listener (kToplevelHandleListener,
@@ -654,6 +676,51 @@ void registry_global(void* data, wl_registry* registry, uint32_t name,
         }
     }
 }
+
+// ---- text fields (input-method-unstable-v2) ----
+
+void imActivate(void* data, zwp_input_method_v2* /* method */) {
+    static_cast<TextFieldState*>(data)->pending = true;
+}
+
+void imDeactivate(void* data, zwp_input_method_v2* /* method */) {
+    static_cast<TextFieldState*>(data)->pending = false;
+}
+
+void imSurroundingText(void*, zwp_input_method_v2*, const char*, uint32_t, uint32_t) {}
+
+void imTextChangeCause(void*, zwp_input_method_v2*, uint32_t) {}
+
+void imContentType(void*, zwp_input_method_v2*, uint32_t, uint32_t) {}
+
+void imDone(void* data, zwp_input_method_v2* /* method */) {
+    auto* state = static_cast<TextFieldState*>(data);
+    if (state->pending == state->active) return;
+    state->active = state->pending;
+    if (state->callback) state->callback(state->userData, state->active);
+}
+
+void imUnavailable(void* data, zwp_input_method_v2* /* method */) {
+    // The seat has another input method (one run in the container); the
+    // keyboard is then shown from the bar only.
+    LOGW("the seat already has an input method: the keyboard will not follow text fields");
+    auto* state = static_cast<TextFieldState*>(data);
+    state->pending = false;
+    if (state->active) {
+        state->active = false;
+        if (state->callback) state->callback(state->userData, false);
+    }
+}
+
+constexpr zwp_input_method_v2_listener kInputMethodListener = {
+    .activate = imActivate,
+    .deactivate = imDeactivate,
+    .surrounding_text = imSurroundingText,
+    .text_change_cause = imTextChangeCause,
+    .content_type = imContentType,
+    .done = imDone,
+    .unavailable = imUnavailable,
+};
 
 void registry_global_remove(void* /* data */, wl_registry* /* registry */, uint32_t /* name */) {
     // TODO: handle the primary container's compositor restarting mid-session
@@ -1397,6 +1464,17 @@ bool WaylandClient::connect(const char* socketPath) {
              "no window list (is vendor/sway built with wlr-foreign-toplevel-management?)");
     }
 
+    // Text fields. Non-fatal when absent, like the two above.
+    if (!textField_) textField_ = new TextFieldState();
+    if (globals_->input_method_manager) {
+        textField_->method = zwp_input_method_manager_v2_get_input_method(
+            globals_->input_method_manager, globals_->seat);
+        zwp_input_method_v2_add_listener(textField_->method, &kInputMethodListener, textField_);
+    } else {
+        LOGW("compositor advertised no zwp_input_method_manager_v2 — the keyboard will not "
+             "follow text fields, only the bar's Keyboard button");
+    }
+
     LOGI("connected to primary container compositor at %s", socketPath);
 
     startDispatchThread();
@@ -1442,7 +1520,11 @@ void WaylandClient::disconnect() {
         if (globals_->virtual_keyboard) zwp_virtual_keyboard_v1_destroy(globals_->virtual_keyboard);
         if (globals_->text_keyboard) zwp_virtual_keyboard_v1_destroy(globals_->text_keyboard);
         if (globals_->toplevel_manager) zwlr_foreign_toplevel_manager_v1_destroy(globals_->toplevel_manager);
+        if (textField_ && textField_->method) zwp_input_method_v2_destroy(textField_->method);
+        if (globals_->input_method_manager) zwp_input_method_manager_v2_destroy(globals_->input_method_manager);
     }
+    delete textField_;
+    textField_ = nullptr;
     delete globals_;
     globals_ = nullptr;
 
@@ -1652,6 +1734,12 @@ bool WaylandClient::offerClipboardText(const char* utf8Text, size_t length) {
 
     wl_display_flush(display_);
     return true;
+}
+
+void WaylandClient::setTextFieldListener(TextFieldCallback callback, void* userData) {
+    if (!textField_) textField_ = new TextFieldState();
+    textField_->callback = callback;
+    textField_->userData = userData;
 }
 
 void WaylandClient::setToplevelsListener(ToplevelsChangedCallback callback, void* userData) {

@@ -207,6 +207,24 @@ class HostBridge : HostBridgeInput {
         toplevelsChangedListener?.invoke()
     }
 
+    // ---- Text fields (Droidtop/tracker#685) ----
+
+    /**
+     * Called from a native worker thread when a text field in the container takes (true) or loses (false) the
+     * keyboard focus, as the compositor tells its input method (input-method-unstable-v2). Callers post to the main
+     * thread themselves, as with [toplevelsChangedListener]. Never called when the compositor has no input-method
+     * protocol, or when the seat already has an input method of its own.
+     */
+    @Volatile
+    var textFieldListener: ((Boolean) -> Unit)? = null
+
+    /** Called from JNI (hostbridge_jni.cpp's textFieldTrampoline). [Keep] for the same reason as [onToplevelsChanged]. */
+    @Keep
+    @Suppress("unused")
+    private fun onTextFieldFocus(focused: Boolean) {
+        textFieldListener?.invoke(focused)
+    }
+
     // ---- Clipboard, driven by ClipboardBridge ----
 
     /**
