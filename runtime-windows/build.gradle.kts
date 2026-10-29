@@ -111,4 +111,6 @@ dependencies {
     implementation(libs.xz)
 
     testImplementation(libs.junit)
+    // A real org.json for tests of what is kept as JSON (Android's is a stub off the device).
+    testImplementation(libs.json.v20240303)
 }

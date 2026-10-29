@@ -13,6 +13,7 @@ import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.NestedScreenItem
 import dev.droidtop.library.settings.TextInputItem
+import dev.droidtop.runtime.windows.WineGestures
 import dev.droidtop.runtime.windows.WineOptionRow
 import dev.droidtop.runtime.windows.WineOptions
 import kotlinx.coroutines.Dispatchers
@@ -176,11 +177,48 @@ object WineOptionsCatalog {
                 ),
             )
         }
+        val touchscreen = if (entryId != null && state.setUp) listOf(touchscreenItem(context, entryId, title)) else emptyList()
         return listOf(
             CatalogGroup(
                 id = if (shared) "wine_options_shared" else "wine_options_game",
                 title = if (shared) "Wine and graphics for every game" else null,
-                items = items,
+                items = items + touchscreen,
+            ),
+        )
+    }
+
+    /**
+     * The game's touchscreen gestures, a page of their own (Droidtop/tracker#618 C8): each gesture Off or what it does,
+     * the game's own choice over its prefix's, laid over it at launch.
+     */
+    private suspend fun touchscreenItem(context: Context, entryId: String, title: String?): CatalogItem {
+        val summary = withContext(Dispatchers.IO) { WineGestures.summary(WineOptions.gestures(context, entryId)) }
+        return NestedScreenItem(
+            id = "wine_options_touchscreen",
+            title = "Touchscreen",
+            subtitle = "What each touch gesture does in this game: $summary",
+            inline = CatalogScreen(
+                id = "wine_options_touchscreen_screen",
+                title = "Touchscreen",
+                subtitle = title,
+                groups = { ctx ->
+                    val config = withContext(Dispatchers.IO) { WineOptions.gestures(ctx, entryId) }
+                    listOf(
+                        CatalogGroup(
+                            id = "wine_gestures",
+                            title = null,
+                            items = WineGestures.rows(config).map { row ->
+                                ChoiceItem(
+                                    id = row.id,
+                                    title = row.title,
+                                    options = row.values.map { ChoiceOption(it, row.label(it)) },
+                                    current = row.current,
+                                    onSelect = { c, value -> WineOptions.select(c, entryId, title, row.id, value) },
+                                )
+                            },
+                        ),
+                    )
+                },
             ),
         )
     }

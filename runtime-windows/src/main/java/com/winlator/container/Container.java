@@ -265,7 +265,9 @@ public class Container {
      */
     public static final java.util.List<String> LAUNCH_OVERRIDE_KEYS = java.util.Arrays.asList(
         "graphicsDriver", "graphicsDriverConfig", "dxwrapper", "dxwrapperConfig", "emulator", "box64Version", "fexcoreVersion",
-        "lsfgEnabled", "lsfgMultiplier", LAUNCH_ENV);
+        "lsfgEnabled", "lsfgMultiplier", LAUNCH_ENV,
+        // droidtop: a game's own touchscreen gestures over the prefix's (Droidtop/tracker#618 C8).
+        "gestureConfig");
     private final java.util.Map<String, String> launchOverrides = new java.util.HashMap<>();
 
     public void setLaunchOverrides(java.util.Map<String, String> overrides) {
@@ -1290,7 +1292,7 @@ public class Container {
 
     // Gesture configuration JSON
     public String getGestureConfig() {
-        return gestureConfig != null ? gestureConfig : "";
+        return overridden("gestureConfig", gestureConfig != null ? gestureConfig : "");
     }
 
     public void setGestureConfig(String gestureConfig) {

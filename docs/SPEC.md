@@ -7201,6 +7201,14 @@ two-finger scroll and right-click as everywhere else (`GamePointerTrackpadSink`)
 service. No second touch path is added on the main screen, which keeps the Windows screen's own trackpad (the owner's
 clarification above).
 
+**Touchscreen gestures per game** (Droidtop/tracker#618 C8: "`TouchGestureConfig` has twelve slots stored per
+container and no screen edits it"). A Windows game's Wine and graphics page has a Touchscreen page: one row per gesture
+(tap, double tap, drag, long press, two-finger tap, drag and hold, pinch, three-finger drag and hold), each Off or what
+it does from the actions the touch trackpad performs (clicks, the soft keyboard, Escape, tilde, arrow keys or WASD,
+button drags, scroll wheel and the zoom keys; `WineGestures`, pure). The radial menu is not offered: droidtop draws
+none. The choice is the game's own, kept with its other Wine choices (`gestures`), laid over its prefix's at launch as
+the `gestureConfig` launch override (`Container.LAUNCH_OVERRIDE_KEYS`), so a shared prefix is not changed.
+
 **Back, and ending a game** (Droidtop/tracker#357, #358; owner, 2026-10-08).
 Back in a Windows game does **not** end it: it brings the shell forward with
 the Gaming Quick Menu open on its Game section (Resume, Restart, Stop with two
