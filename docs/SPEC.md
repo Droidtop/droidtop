@@ -12343,7 +12343,11 @@ answered). Steam's are its static collections (cloud config store, namespace 1,
 `user-collections.<id>`; `SteamCollections`, lifted from GameNative like the
 rest of the Steam stack), read with the connection each library sync already
 holds and kept in `steam/collections.json`; a dynamic collection is a filter
-Steam evaluates itself and is counted, not copied, and Steam's hidden-games
+Steam evaluates itself, so it is not shown as a collection. Its filters are
+kept as Steam wrote them (`SteamCollections.Dynamic`, the raw `filterSpec`, in
+the same file) and each sync writes them to the scan log
+(2026-10-29, Droidtop/tracker#403), so the mapping onto droidtop's filters as a
+saved view can be built against real ones; Steam's hidden-games
 list is not a grouping and is left out of the collections. **Steam's hidden
 list becomes droidtop's Hidden (2026-10-14, Droidtop/tracker#402):**
 `StoreLibrary.hiddenGames` gives it from the same saved read, and after each

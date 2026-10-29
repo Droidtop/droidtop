@@ -32,6 +32,9 @@ class SteamCollectionsTest {
         )
         assertEquals(listOf("Backlog"), parsed.collections.map { it.name })
         assertEquals(1, parsed.skippedDynamic)
+        // Its filters are kept as Steam wrote them (Droidtop/tracker#403).
+        assertEquals(listOf("Cheap"), parsed.dynamic.map { it.name })
+        assertEquals(2, org.json.JSONObject(parsed.dynamic.single().filterSpec).getInt("nFormatVersion"))
     }
 
     @Test

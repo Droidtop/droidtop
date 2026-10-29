@@ -132,7 +132,14 @@ class SteamStore : StoreLibrary {
                 val apps = SteamSession.apps ?: error("Steam is not connected")
                 val count = SteamLibrarySync.run(context, steam, apps, SteamSession.licences())
                 // The person's collections ride the connection the read already holds; a failure here never fails the library read.
-                runCatching { SteamCollections.fetch(steam)?.let { SteamCollections.save(context, it) } }
+                runCatching {
+                    SteamCollections.fetch(steam)?.let { parsed ->
+                        SteamCollections.save(context, parsed)
+                        // Dynamic collections are not shown yet (Droidtop/tracker#403); their filters go to the scan log
+                        // so the mapping onto droidtop's filters can be checked against real ones.
+                        parsed.dynamic.forEach { dev.droidtop.library.ScanLog.write("steam: dynamic collection \"${it.name}\" not shown yet, filters ${it.filterSpec.take(2000)}") }
+                    }
+                }
                     .onFailure { Timber.tag("SteamStore").w(it, "Steam collections could not be read") }
                 // The wishlist is a second read as well (Droidtop/tracker#134): its failure leaves the library read and the old copy in place.
                 runCatching {

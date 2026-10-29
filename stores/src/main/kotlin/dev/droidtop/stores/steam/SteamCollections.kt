@@ -40,37 +40,47 @@ internal object SteamCollections {
 
     data class Collection(val id: String, val name: String, val appIds: Set<Int>)
 
-    data class Parsed(val collections: List<Collection>, val skippedDynamic: Int)
+    /**
+     * A dynamic collection: Steam's filters instead of a list of games (Droidtop/tracker#403). Kept as Steam wrote them
+     * ([filterSpec], the raw JSON) until droidtop can map them onto its own filters as a saved view; the mapping needs
+     * Steam's filter groups checked against real collections, which these copies (and the scan log) provide.
+     */
+    data class Dynamic(val id: String, val name: String, val filterSpec: String)
+
+    data class Parsed(val collections: List<Collection>, val dynamic: List<Dynamic> = emptyList()) {
+        /** How many collections droidtop does not show yet. */
+        val skippedDynamic: Int get() = dynamic.size
+    }
 
     data class Raw(val key: String, val value: String, val isDeleted: Boolean)
 
     fun file(context: Context): File = File(File(context.filesDir, "steam"), "collections.json")
 
-    /** The static collections among [entries]; a malformed entry is skipped, a dynamic one counted. */
+    /** The collections among [entries]: static ones as lists, dynamic ones kept as Steam's filters; a malformed entry is skipped. */
     fun parse(entries: List<Raw>): Parsed {
         val collections = mutableListOf<Collection>()
-        var skippedDynamic = 0
+        val dynamic = mutableListOf<Dynamic>()
         for (entry in entries) {
             if (!entry.key.startsWith(KEY_PREFIX) || entry.isDeleted) continue
             try {
                 val json = JSONObject(entry.value)
                 val added = json.optJSONArray("added")
-                // Static collections carry an explicit "added" array; dynamic ones a "filterSpec".
-                if (added == null) {
-                    if (json.has("filterSpec")) skippedDynamic++
-                    continue
-                }
-                val appIds = buildSet { for (i in 0 until added.length()) add(added.getInt(i)) }
                 // optString answers the text "null" for a JSON null, so that and blank both mean absent.
                 val id = json.optString("id").takeUnless { it.isBlank() || it == "null" } ?: entry.key.removePrefix(KEY_PREFIX)
                 if (id.isBlank()) continue
                 val name = json.optString("name").takeUnless { it.isBlank() || it == "null" } ?: id
+                // Static collections carry an explicit "added" array; dynamic ones a "filterSpec".
+                if (added == null) {
+                    json.opt("filterSpec")?.takeUnless { it == JSONObject.NULL }?.let { dynamic += Dynamic(id, name, it.toString()) }
+                    continue
+                }
+                val appIds = buildSet { for (i in 0 until added.length()) add(added.getInt(i)) }
                 collections += Collection(id, name, appIds)
             } catch (failure: Exception) {
                 Timber.tag("SteamCollections").w(failure, "Skipping a malformed collection entry ${entry.key}")
             }
         }
-        return Parsed(collections, skippedDynamic)
+        return Parsed(collections, dynamic)
     }
 
     /** Asks Steam for the collections over [steam]; null when Steam did not answer. Network: never on the main thread. */
@@ -113,7 +123,9 @@ internal object SteamCollections {
             )
         }
         val temp = File(target.path + ".tmp")
-        temp.writeText(JSONObject().put("collections", collections).put("skippedDynamic", parsed.skippedDynamic).toString())
+        val dynamic = JSONArray()
+        parsed.dynamic.forEach { dynamic.put(JSONObject().put("id", it.id).put("name", it.name).put("filterSpec", it.filterSpec)) }
+        temp.writeText(JSONObject().put("collections", collections).put("dynamic", dynamic).toString())
         temp.renameTo(target)
     }
 
@@ -127,7 +139,12 @@ internal object SteamCollections {
             val apps = row.optJSONArray("apps") ?: JSONArray()
             Collection(row.getString("id"), row.getString("name"), (0 until apps.length()).mapTo(HashSet()) { apps.getInt(it) })
         }
-        Parsed(collections, json.optInt("skippedDynamic", 0))
+        val dynamicRows = json.optJSONArray("dynamic") ?: JSONArray()
+        val dynamic = (0 until dynamicRows.length()).mapNotNull { index ->
+            val row = dynamicRows.optJSONObject(index) ?: return@mapNotNull null
+            Dynamic(row.optString("id"), row.optString("name"), row.optString("filterSpec")).takeIf { it.id.isNotBlank() }
+        }
+        Parsed(collections, dynamic)
     }.getOrNull()
 }
 
