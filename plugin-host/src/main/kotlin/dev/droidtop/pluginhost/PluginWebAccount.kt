@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.shared.sitecheck.Clearance
+import dev.droidtop.shared.sitecheck.SiteCheck
 import android.content.Context
 import org.json.JSONObject
 
@@ -104,7 +106,7 @@ object PluginWebAccount {
         )
         // What the view cleared is kept whether or not the person pressed Done: droidtop's requests to the site send it.
         SiteChecks.keep(vault, record.manifest.id, result.session)
-        val cleared = SiteChecks.Clearance.from(result.session) != null
+        val cleared = SiteChecks.clearanceFrom(result.session) != null
         if (account == null) return need == Need.BROWSER_CHECK && cleared
         val session = result.session?.takeIf { result.completed && it.cookies.isNotEmpty() }
             ?.let { it.copy(cookies = it.cookies.filterKeys { domain -> WebSessions.covers(domain, declared) }) }
@@ -117,10 +119,10 @@ object PluginWebAccount {
     }
 
     /** [stored] with [clearance]'s cookies added for each of [domains] it clears; the stored user agent is not used. */
-    private fun withClearance(stored: WebSessions.Stored?, clearance: SiteChecks.Clearance?, domains: List<String>): WebSessions.Stored? {
+    private fun withClearance(stored: WebSessions.Stored?, clearance: Clearance?, domains: List<String>): WebSessions.Stored? {
         clearance ?: return stored
         val cookies = domains.associateWith { domain ->
-            SiteChecks.mergeCookies(stored?.cookies?.get(domain), clearance.forHost(domain))
+            SiteCheck.mergeCookies(stored?.cookies?.get(domain), clearance.forHost(domain))
         }.filterValues { !it.isNullOrBlank() }.mapValues { it.value!! }
         return WebSessions.Stored(stored?.userAgent, cookies, stored?.account).takeIf { cookies.isNotEmpty() } ?: stored
     }

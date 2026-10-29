@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.shared.sitecheck.SiteCheck
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
@@ -231,7 +232,7 @@ class WebSessionActivity : Activity() {
                     }
                     if (asked.mode == WebSessionRequest.Mode.CHECK && host != null &&
                         (asked.domains.isEmpty() || WebSessions.covers(host, asked.domains)) &&
-                        SiteChecks.pagePassed(view.title, cookies.getCookie("https://$host"))
+                        SiteCheck.pagePassed(view.title, cookies.getCookie("https://$host"))
                     ) {
                         if (signedIn != false) {
                             finishWith(completed = true, download = null)

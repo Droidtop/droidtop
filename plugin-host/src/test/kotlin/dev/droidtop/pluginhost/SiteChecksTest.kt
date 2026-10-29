@@ -1,61 +1,26 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.shared.sitecheck.Clearance
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** A site that checks the browser first, and the clearance passing it earns (docs/SPEC.md 12a, Droidtop/tracker#600). */
+/**
+ * A plugin's side of a site that checks the browser first (docs/SPEC.md 12a, Droidtop/tracker#600, #751). Telling a check
+ * from a page, the clearance cookies and the pass test are droidtop-shared's `:sitecheck`, with their own tests.
+ */
 class SiteChecksTest {
-    private fun page(text: String) = text.toByteArray()
-
     @Test
-    fun `a challenge is told from the page by what F95Checker looks for, and by Cloudflare's own header`() {
-        val challenge = page("<!DOCTYPE html><html><head><title>Just a moment...</title></head><script>(function(){window._cf_chl_opt = {")
-        assertTrue(SiteChecks.isChallenge(403, emptyMap(), challenge))
-        assertTrue(SiteChecks.isChallenge(503, emptyMap(), page("<script src=\"/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1\">")))
-        assertTrue(SiteChecks.isChallenge(403, mapOf("CF-Mitigated" to "challenge"), page("")))
-        assertTrue(SiteChecks.isChallenge(403, emptyMap(), page("<title>DDoS-Guard</title>")))
-    }
-
-    @Test
-    fun `a page that only mentions a check, or an ordinary refusal, is not one`() {
-        assertFalse("a thread that quotes the words is a page", SiteChecks.isChallenge(200, emptyMap(), page("<title>Just a moment...</title>")))
-        assertFalse(SiteChecks.isChallenge(403, emptyMap(), page("<title>Forbidden</title>")))
-        assertFalse(SiteChecks.isChallenge(404, mapOf("server" to "cloudflare"), page("Not found")))
-    }
-
-    @Test
-    fun `only a check's clearance cookies are kept, never an account's`() {
-        assertEquals("cf_clearance=abc; __cf_bm=x", SiteChecks.clearanceOf("xf_user=42; cf_clearance=abc; xf_session=s; __cf_bm=x"))
-        assertNull(SiteChecks.clearanceOf("xf_user=42; xf_session=s"))
-        assertTrue(SiteChecks.isClearanceCookie("__ddg1_"))
-        assertFalse(SiteChecks.isClearanceCookie("xf_user"))
-    }
-
-    @Test
-    fun `a request's own cookie keeps its value, and the newest clearance replaces an older one`() {
-        assertEquals("xf_user=42; cf_clearance=new", SiteChecks.mergeCookies("xf_user=42", "cf_clearance=new"))
-        assertEquals("a session kept from before never sends its old clearance", "xf_user=42; cf_clearance=new", SiteChecks.mergeCookies("xf_user=42; cf_clearance=old", "cf_clearance=new"))
-        assertEquals("xf_user=42", SiteChecks.mergeCookies("xf_user=42", "xf_user=7"))
-        assertEquals("cf_clearance=new", SiteChecks.mergeCookies(null, "cf_clearance=new"))
-        assertNull(SiteChecks.mergeCookies(null, null))
-    }
-
-    @Test
-    fun `a web view's clearance covers its site and the site's subdomains, with the view's user agent`() {
+    fun `a web view's session becomes a clearance of its site, with the view's user agent, and back through the vault's JSON`() {
         val session = WebSessions.Stored("Mozilla/5.0 (Linux; Android 14; wv) Chrome/130", mapOf("f95zone.to" to "xf_user=42; cf_clearance=abc", "example.org" to "sid=1"))
-        val clearance = SiteChecks.Clearance.from(session)!!
+        val clearance = SiteChecks.clearanceFrom(session)!!
         assertEquals(mapOf("f95zone.to" to "cf_clearance=abc"), clearance.cookies)
-        assertEquals("cf_clearance=abc", clearance.forHost("attachments.f95zone.to"))
-        assertNull(clearance.forHost("notf95zone.to"))
         assertEquals(session.userAgent, clearance.userAgent)
-        assertNull("a view that cleared nothing earns nothing", SiteChecks.Clearance.from(WebSessions.Stored(null, mapOf("example.org" to "sid=1"))))
-        val newer = clearance.plus(SiteChecks.Clearance("Chrome/131", mapOf("f95zone.to" to "cf_clearance=def")))
-        assertEquals("cf_clearance=def", newer.forHost("f95zone.to"))
-        assertEquals("Chrome/131", newer.userAgent)
-        assertEquals(clearance, SiteChecks.Clearance.parse(clearance.toJson()))
+        assertEquals("cf_clearance=abc", clearance.forHost("attachments.f95zone.to"))
+        assertNull("a view that cleared nothing earns nothing", SiteChecks.clearanceFrom(WebSessions.Stored(null, mapOf("example.org" to "sid=1"))))
+        assertNull(SiteChecks.clearanceFrom(null))
+        assertEquals(clearance, SiteChecks.parse(SiteChecks.toJson(clearance)))
+        assertEquals(Clearance("Chrome/131", mapOf("a.org" to "cf_clearance=1")), SiteChecks.parse(SiteChecks.toJson(Clearance("Chrome/131", mapOf("a.org" to "cf_clearance=1")))))
     }
 
     @Test
@@ -71,16 +36,5 @@ class SiteChecksTest {
     @Test
     fun `the plugin gets one plain sentence, never the page`() {
         assertEquals("f95zone.to checks the browser first; open it in droidtop to continue", SiteChecks.refusal("f95zone.to"))
-    }
-
-    @Test
-    fun `a pass is the site's own page with a pass cookie, never the challenge or a bot cookie alone`() {
-        assertFalse(SiteChecks.pagePassed("Just a moment...", "cf_clearance=abc"))
-        assertFalse(SiteChecks.pagePassed("Just a moment\u2026", "cf_clearance=abc"))
-        assertFalse(SiteChecks.pagePassed("Attention Required! | Cloudflare", "cf_clearance=abc"))
-        assertFalse("a page still loading", SiteChecks.pagePassed("", "cf_clearance=abc"))
-        assertFalse("__cf_bm is set on the challenge itself", SiteChecks.pagePassed("F95zone", "__cf_bm=x; xf_csrf=y"))
-        assertTrue(SiteChecks.pagePassed("F95zone", "xf_csrf=y; cf_clearance=abc"))
-        assertTrue(SiteChecks.pagePassed("Latest Updates | F95zone", "__ddg2_=z"))
     }
 }

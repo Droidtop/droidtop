@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.shared.sitecheck.SiteCheck
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Handler
@@ -90,14 +91,14 @@ object WebFetch {
             override fun onPageFinished(view: WebView, finished: String?) {
                 if (done.isCompleted) return
                 val at = finished ?: url
-                if (SiteChecks.isCheckTitle(view.title)) {
+                if (SiteCheck.isCheckTitle(view.title)) {
                     // A check that passes by itself loads the site's page next; one that does not is the person's.
                     if (System.currentTimeMillis() - startedAt > SETTLE_MS) {
                         Log.i(TAG, "$host: the check did not pass by itself")
                         finish(Result(null, challenged = true, cookies = jar.getCookie("https://$host")))
                     } else {
                         handler.postDelayed({
-                            if (!done.isCompleted && SiteChecks.isCheckTitle(view.title)) onPageFinished(view, view.url)
+                            if (!done.isCompleted && SiteCheck.isCheckTitle(view.title)) onPageFinished(view, view.url)
                         }, 2_000L)
                     }
                     return

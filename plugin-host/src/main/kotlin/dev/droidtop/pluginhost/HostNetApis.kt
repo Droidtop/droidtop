@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.shared.sitecheck.SiteCheck
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.URI
@@ -187,7 +188,7 @@ internal object HostNetApis {
         }
         // A browser check instead of the page (docs/SPEC.md 12a, Droidtop/tracker#600): the plugin gets one plain
         // sentence, never the challenge's HTML, and droidtop remembers where to open the check for the person.
-        if (SiteChecks.isChallenge(answer.status, answer.headers, answer.body)) {
+        if (SiteCheck.isChallenge(answer.status, answer.headers, answer.body)) {
             val at = NetScope.hostOf(answer.finalUrl)?.let { answer.finalUrl } ?: target
             SiteChecks.met(record.manifest.id, at)
             note("${record.manifest.id}: ${NetScope.hostOf(at)} answered with a browser check (${answer.status})")
@@ -214,7 +215,7 @@ internal object HostNetApis {
         val clearance = env.vault()?.let { SiteChecks.read(it, record.manifest.id) } ?: return headers
         val cookies = clearance.forHost(host) ?: return headers
         val cookieKey = headers.keys.firstOrNull { it.equals("Cookie", ignoreCase = true) }
-        val merged = SiteChecks.mergeCookies(cookieKey?.let { headers[it] }, cookies)
+        val merged = SiteCheck.mergeCookies(cookieKey?.let { headers[it] }, cookies)
         return headers.filterKeys { !it.equals("Cookie", ignoreCase = true) && !(clearance.userAgent != null && it.equals("User-Agent", ignoreCase = true)) } +
             listOfNotNull(merged?.let { "Cookie" to it }, clearance.userAgent?.let { "User-Agent" to it })
     }
