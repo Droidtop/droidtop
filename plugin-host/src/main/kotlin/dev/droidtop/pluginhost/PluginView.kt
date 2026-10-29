@@ -131,8 +131,11 @@ data class ViewSection(val id: String, val title: String?, val nodes: List<ViewN
  * compact JSON text so nodes compare by value.
  */
 data class ViewAction(val kind: Kind, val op: String, val argsJson: String = "{}", val title: String? = null) {
-    /** [GRANT] comes only from a facet's grant action: [op] is the permission droidtop asks the person for. */
-    enum class Kind { VIEW, CALL, JOB, GRANT }
+    /**
+     * [GRANT] comes only from a facet's grant action: [op] is the permission droidtop asks the person for. [SECRET] only
+     * from a `secret` facet: a call whose reply's `value` droidtop shows on its own sheet ([PluginSecrets]).
+     */
+    enum class Kind { VIEW, CALL, JOB, GRANT, SECRET }
 
     fun args(): JSONObject = runCatching { JSONObject(argsJson) }.getOrDefault(JSONObject())
 

@@ -147,4 +147,22 @@ class FacetViewsTest {
         assertEquals("{}", notice.action!!.argsJson)
     }
 
+
+    @Test
+    fun `a secret is droidtop's Show button and its value never enters the page`() {
+        val facets = Facets.read(JSONObject("""{"facets": [
+            {"id": "pw", "kind": "secret", "label": "Encryption password", "sub": "For the Music folder", "call": {"op": "folderPassword", "args": {"folder": "music"}}},
+            {"id": "job", "kind": "secret", "label": "As a job", "call": {"op": "x", "kind": "job"}},
+            {"id": "none", "kind": "secret", "label": "No call"}
+        ]}""")).facets
+        assertEquals(listOf("pw"), facets.map { it.id })
+        val show = FacetViews.toView(facets).sections.single().nodes.single() as ViewNode.Button
+        assertEquals("Encryption password", show.title)
+        assertEquals("Show", show.value)
+        assertEquals(ViewAction.Kind.SECRET, show.action.kind)
+        assertEquals("music", show.action.args().getString("folder"))
+        // Nothing of the value is in the view: it holds no input, so no value is ever sent back or kept with the page.
+        assertEquals(emptyMap<String, String>(), FacetViews.toView(facets).initialValues())
+    }
+
 }

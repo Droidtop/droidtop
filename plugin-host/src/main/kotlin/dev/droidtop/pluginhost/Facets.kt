@@ -38,7 +38,7 @@ data class Facet(
         /** The kinds this build reads, each at the versions it reads. Advertised in `host.info().facets`. */
         val KINDS: Map<String, Set<Int>> = listOf(
             "info", "status", "badge", "progress", "meter", "chart", "action", "toggle", "choice", "slider", "input",
-            "list", "collection", "media", "text", "link", "notice", "account", "group",
+            "list", "collection", "media", "text", "link", "notice", "account", "group", "secret",
             "metadata", "description", "image", "download", "links", "store", "update", "identity",
         ).associateWith { setOf(1) }
 
@@ -122,6 +122,9 @@ sealed interface FacetBody {
     data class Notice(val title: String, val sub: String?, val details: String?, val tone: String, val placement: String, val call: FacetCall?) : FacetBody
 
     data class Account(val site: String, val signedIn: Boolean, val name: String?) : FacetBody
+
+    /** A value the person reads or copies elsewhere: [call] gives it only when they press Show, and droidtop never keeps it. */
+    data class Secret(val label: String, val sub: String?, val call: FacetCall) : FacetBody
 
     /**
      * [slot] opens a place in this group that another plugin may target as `<this plugin>:<slot>`. A group with a
@@ -448,6 +451,8 @@ object Facets {
                     FacetBody.Notice(title, text("sub", "sub"), text("details", "sub"), tone, oneOf("placement", PluginViewLimits.placements, "section"), call())
                 }
             }
+            // Show asks the plugin once, as a quick call: never a job, a page or a grant.
+            "secret" -> call()?.takeIf { it.kind == FacetCall.Kind.CALL }?.let { c -> label()?.let { FacetBody.Secret(it, text("sub", "sub"), c) } }
             "account" -> json.text("site")?.let { FacetBody.Account(it, json.optBoolean("signedIn"), text("name", "label")) }
             "group" -> if (depth > 0) {
                 messages += "group \"$id\" was dropped: a group inside a group is one level too deep"

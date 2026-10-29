@@ -171,7 +171,7 @@ object PluginGameSections {
     private fun actionRow(title: String, subtitle: String?, value: String?, action: ViewAction?, confirm: String?): Row = when (action?.kind) {
         null -> Row(title, subtitle, value, RowAction.NONE)
         ViewAction.Kind.VIEW -> Row(title, subtitle, value, RowAction.OPEN_VIEW, action)
-        ViewAction.Kind.CALL, ViewAction.Kind.JOB, ViewAction.Kind.GRANT -> Row(title, subtitle, value, RowAction.RUN, action, confirm)
+        ViewAction.Kind.CALL, ViewAction.Kind.JOB, ViewAction.Kind.GRANT, ViewAction.Kind.SECRET -> Row(title, subtitle, value, RowAction.RUN, action, confirm)
     }
 
     /** Runs a row's `call` or `job` and returns the sentence to show on it. Off the main thread. */

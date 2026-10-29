@@ -103,6 +103,8 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // A plugin's first-use permission sheet (docs/plugin-api.md 4.3): one window, drawn over whatever is on screen
         // in every mode, opened by the broker during a call the person started.
         dev.droidtop.pluginhost.PluginGrantPrompts.setSurface { PluginGrantSheetActivity.open(this) }
+        // A plugin's secret facet, shown on droidtop's own sheet when the person presses Show (docs/plugin-api.md 1.10).
+        dev.droidtop.pluginhost.PluginSecrets.setSurface { PluginSecretSheetActivity.open(this) }
         // The keyboard's "Follow light or dark" follows droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562).
         org.pocketworkstation.pckeyboard.KeyboardAppearance.host =
             org.pocketworkstation.pckeyboard.KeyboardAppearance.Host { context -> dev.droidtop.library.settings.AppearancePrefs.light(context) }

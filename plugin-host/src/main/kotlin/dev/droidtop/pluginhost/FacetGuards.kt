@@ -28,7 +28,7 @@ object FacetGuards {
         Target("quickmenu", setOf("status", "toggle", "action", "progress", "meter", "chart", "choice", "group"), setOf("plugin", "device", "game"), PointRisk.LOW),
         Target("companion.tab", setOf("group"), setOf("plugin", "device", "game"), PointRisk.LOW),
         Target("companion.card", ALL_KINDS - "collection", setOf("plugin", "device", "game"), PointRisk.LOW),
-        Target("settings.page", INPUTS + setOf("info", "action", "notice", "account", "group"), setOf("plugin"), PointRisk.LOW),
+        Target("settings.page", INPUTS + setOf("info", "action", "notice", "account", "group", "secret"), setOf("plugin"), PointRisk.LOW),
         Target("notification", setOf("notice", "action", "progress"), setOf("plugin", "device", "game", "item"), PointRisk.MEDIUM),
         Target("status.area", setOf("status", "badge", "meter"), setOf("plugin", "device"), PointRisk.LOW),
         Target("widget", setOf("info", "status", "progress", "meter", "media", "list", "action"), setOf("plugin", "device"), PointRisk.LOW),

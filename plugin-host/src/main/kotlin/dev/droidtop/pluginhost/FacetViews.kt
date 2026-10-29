@@ -70,6 +70,8 @@ object FacetViews {
             is FacetBody.Choice -> ViewNode.Choice(id, b.label, b.sub, b.options, b.value, b.call?.let { action(it, id, "string") })
             is FacetBody.Slider -> ViewNode.Slider(id, b.label, b.unit, b.min.toInt(), b.max.toInt(), b.value.toInt(), b.call?.let { action(it, id, "number") })
             is FacetBody.Input -> ViewNode.Text(id, b.label, b.hint, b.value, b.call?.let { action(it, id, "string") })
+            // Show is droidtop's button; the value goes to droidtop's sheet, never into the page.
+            is FacetBody.Secret -> ViewNode.Button(id, b.label, b.sub, "Show", null, action(b.call, id, null).copy(kind = ViewAction.Kind.SECRET))
             is FacetBody.Text -> ViewNode.Info(id, b.body.lineSequence().first().take(PluginView.MAX_TITLE), b.body, null)
             is FacetBody.Notice -> ViewNode.Notice(
                 id, b.title, b.sub, b.details, if (b.tone in PluginViewLimits.tones) b.tone else "info", b.placement == "banner",

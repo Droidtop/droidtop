@@ -151,6 +151,20 @@ object PluginViews {
         val messages = mutableListOf<String>()
         val outcome = when (action.kind) {
             ViewAction.Kind.VIEW -> ActionOutcome("", null, refetch = false)
+            // The value goes straight to droidtop's sheet: never into the outcome, a notice or the message log.
+            ViewAction.Kind.SECRET -> {
+                val reply = call(context, record, point, action.op, callArgs)
+                val value = reply.data.optString("value").take(dev.droidtop.pluginhost.PluginViewLimits.facetLength("value"))
+                when {
+                    !reply.ok -> ActionOutcome(
+                        "${record.manifest.label}: ${reply.message ?: "failed"}", null, refetch = false,
+                        notice = PluginViewCall.errorNotice(reply, declared(record), FAILED_TITLE, messages),
+                    )
+                    value.isBlank() -> ActionOutcome("${record.manifest.label} gave nothing to show", null, refetch = false)
+                    !dev.droidtop.pluginhost.PluginSecrets.show(record.manifest.label, label, value) -> ActionOutcome("It cannot be shown right now", null, refetch = false)
+                    else -> ActionOutcome("", null, refetch = false)
+                }
+            }
             // droidtop's own prompt, in place; the page is asked again whatever the answer, so its facets show the new state.
             ViewAction.Kind.GRANT -> {
                 val allowed = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.PluginGrants.askPermission(context, record, action.op) }
@@ -646,7 +660,7 @@ private class PluginPage(
             inline = PluginPage(record, point, action.op, action.args(), hostContext, HashMap(values), null, null, onJobDone, extraWhenFailed, extraGroups)
                 .screen("${screenId}_${action.op}_${itemId.hashCode()}", action.title ?: title),
         )
-        ViewAction.Kind.CALL, ViewAction.Kind.JOB, ViewAction.Kind.GRANT -> AsyncActionItem(
+        ViewAction.Kind.CALL, ViewAction.Kind.JOB, ViewAction.Kind.GRANT, ViewAction.Kind.SECRET -> AsyncActionItem(
             id = itemId,
             title = title,
             subtitle = subtitle,
