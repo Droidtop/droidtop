@@ -536,6 +536,19 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
     }
 
     /**
+     * A control of [source]'s item page, pressed: its call or job on `ui.facets`, as any facet's is ([PluginViews.runAction]),
+     * with a switch's new state as its typed `value` and the item it is about in the host's context.
+     */
+    override suspend fun runControl(source: String, externalId: String, control: dev.droidtop.library.UpdateSources.Control, on: Boolean?): String {
+        val action = control.action ?: return ""
+        val (record, _) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
+        val subject = JSONObject().put("type", "item").put("source", source).put("id", externalId)
+        val hostContext = JSONObject().put("target", PluginFacets.ITEM_PAGE).put("subject", subject)
+        val values = on?.let { mapOf(control.id to it.toString()) }.orEmpty()
+        return PluginViews.runAction(app, record, PluginFacets.POINT, action, values, hostContext, control.title).message
+    }
+
+    /**
      * A record from what [source] gave (or droidtop saved) for [externalId]: its item bundles through the item page's
      * guards when it carries facets, else the contract 2 record. A source's `record` is its declaration of the item page.
      */

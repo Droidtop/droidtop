@@ -19,7 +19,7 @@ object FacetGuards {
         Target("game.page", ALL_KINDS - "collection", setOf("game", "item"), PointRisk.MEDIUM),
         Target("game.row", setOf("badge", "status", "progress"), setOf("game"), PointRisk.MEDIUM),
         Target("game.tile", setOf("badge", "status", "progress"), setOf("game"), PointRisk.MEDIUM),
-        Target("item.page", Facet.BUNDLES + setOf("action", "notice", "link"), setOf("item"), PointRisk.MEDIUM),
+        Target("item.page", Facet.BUNDLES + setOf("action", "notice", "link", "toggle"), setOf("item"), PointRisk.MEDIUM),
         Target("library.filter", setOf("info") + Facet.BUNDLES, setOf("item", "game"), PointRisk.MEDIUM),
         Target("library.sort", setOf("info") + Facet.BUNDLES, setOf("item", "game"), PointRisk.MEDIUM),
         Target("search.result", setOf("list", "collection"), setOf("plugin"), PointRisk.MEDIUM),

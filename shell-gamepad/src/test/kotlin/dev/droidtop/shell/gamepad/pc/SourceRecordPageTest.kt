@@ -116,4 +116,20 @@ class SourceRecordPageTest {
         // Droidtop/tracker#600: F95zone's Cloudflare check, passed in droidtop's web view.
         assertEquals(RecordRow("Open F95zone to pass its check", subtitle = "The site checks the browser first", action = RecordAction.PassCheck), checkRow("F95zone"))
     }
+
+    @Test
+    fun theSourcesControlsAreOverviewRowsAboveTheDescription() {
+        val watch = UpdateSources.Control("watch", UpdateSources.Control.Kind.TOGGLE, "Watch this thread", on = true)
+        val thread = UpdateSources.Control("thread", UpdateSources.Control.Kind.LINK, "Thread", "f95zone.to", url = "https://f95zone.to/threads/18978")
+        val moved = UpdateSources.Control("moved", UpdateSources.Control.Kind.NOTICE, "The thread was moved")
+        val rows = recordRows(record.copy(controls = listOf(watch, thread, moved)), RecordTab.OVERVIEW) { "" }
+        assertEquals(listOf("Version", "Status", "Watch this thread", "Thread", "The thread was moved", "About"), rows.map { it.title })
+        assertEquals("On", rows[2].value)
+        assertEquals(RecordAction.Control(watch), rows[2].action)
+        assertEquals(RecordAction.Open("https://f95zone.to/threads/18978"), rows[3].action)
+        // A notice with nothing to run only says.
+        assertNull(rows[4].action)
+        assertEquals(false, pressedState(watch))
+        assertNull(pressedState(thread))
+    }
 }

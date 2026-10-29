@@ -72,7 +72,26 @@ internal sealed interface RecordAction {
 
     /** The source's site checks the browser first: its check, in droidtop's web view (Droidtop/tracker#600). */
     data object PassCheck : RecordAction
+
+    /** One of the source's own controls (docs/plugin-api.md 1.10, `item.page`): a switch flips, a button runs. */
+    data class Control(val control: UpdateSources.Control) : RecordAction
 }
+
+/**
+ * The source's own controls, as the Overview tab's rows: a switch says On or Off and A flips it, a button runs, a link
+ * opens, and a notice says, running its fix when it has one. Pure.
+ */
+internal fun controlRows(record: UpdateSources.Record): List<RecordRow> = record.controls.map { c ->
+    when (c.kind) {
+        UpdateSources.Control.Kind.TOGGLE -> RecordRow(c.title, if (c.on) "On" else "Off", c.subtitle, RecordAction.Control(c))
+        UpdateSources.Control.Kind.ACTION -> RecordRow(c.title, subtitle = c.subtitle, action = RecordAction.Control(c))
+        UpdateSources.Control.Kind.LINK -> RecordRow(c.title, c.subtitle, action = c.url?.let { RecordAction.Open(it) })
+        UpdateSources.Control.Kind.NOTICE -> RecordRow(c.title, subtitle = c.subtitle, action = c.action?.let { RecordAction.Control(c) })
+    }
+}
+
+/** A switch's new state when [control] is pressed; null for anything that is not a switch. */
+internal fun pressedState(control: UpdateSources.Control): Boolean? = if (control.kind == UpdateSources.Control.Kind.TOGGLE) !control.on else null
 
 /** The row every tab starts with while [sourceLabel]'s site waits for the person to pass its browser check. */
 internal fun checkRow(sourceLabel: String): RecordRow =
@@ -222,8 +241,7 @@ internal fun recordRows(record: UpdateSources.Record, tab: RecordTab, picked: St
     RecordTab.OVERVIEW -> listOfNotNull(
         record.version?.let { RecordRow("Version", it) },
         record.status?.let { RecordRow("Status", it) },
-        RecordRow("About", subtitle = record.overview ?: "The source gives no description"),
-    )
+    ) + controlRows(record) + RecordRow("About", subtitle = record.overview ?: "The source gives no description")
     RecordTab.CHANGELOG -> listOf(RecordRow("Changelog", subtitle = record.changelog ?: "The source gives no changelog"))
     RecordTab.DOWNLOADS -> downloadRows(record, picked)
     RecordTab.INFO -> listOfNotNull(
@@ -311,6 +329,21 @@ internal fun SourceRecordPage(
             }
             RecordAction.PassCheck -> scope.launch {
                 if (library.passSourceCheck(source.key)) asked++
+            }
+            is RecordAction.Control -> {
+                val control = action.control
+                // A button the source marked to confirm asks twice, as a download does.
+                if (control.confirm && armed != index) {
+                    armed = index
+                    return
+                }
+                armed = null
+                val current = record ?: return
+                scope.launch {
+                    library.runSourceControl(source.key, current.externalId, control, pressedState(control)).takeIf { it.isNotBlank() }?.let(say)
+                    // Asked again, so a switch shows what the source now says.
+                    asked++
+                }
             }
             is RecordAction.Download -> {
                 // Two presses: the first says what the second does (the design language's two-step confirm).

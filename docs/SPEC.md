@@ -12644,6 +12644,13 @@ reimplemented it as my own f95seeker code." So:
   link reads "Link this game to a different page"; the site's thread number is
   never shown as a value.
   - **Overview**: the cover, the version, the status and the description.
+    Between the status and the description, the source's own controls from
+    its `item.page` facets (2026-10-29, Droidtop/tracker#602): a switch
+    ("Watch this thread", On or Off, A flips it), a button (asks twice when
+    the source marks it to confirm), a link, and a notice that runs its fix
+    when it has one. Each runs on `ui.facets` as every facet does, and the
+    record is asked again afterwards so a switch shows what the source now
+    says.
   - **Changelog**: the source's changelog text, as given.
   - **Downloads**: every link, grouped under the source's own section headings
     ("Win/Linux", "Mac", "Android") and, within one, by file host, each row

@@ -17,6 +17,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
 import dev.droidtop.library.settings.TextBlockItem
+import dev.droidtop.library.settings.ToggleItem
 import dev.droidtop.pluginhost.DownloadSystems
 import java.text.DateFormat
 import java.util.Date
@@ -133,7 +134,8 @@ object SourceRecordScreen {
             CatalogGroup(
                 id = "update_record_overview",
                 title = RecordTab.OVERVIEW.label,
-                items = listOf(TextBlockItem(id = "update_record_overview_text", text = record.overview ?: "The source gives no description")),
+                items = items(controlRows(record), "controls") +
+                    TextBlockItem(id = "update_record_overview_text", text = record.overview ?: "The source gives no description"),
             ),
             CatalogGroup(
                 id = "update_record_info",
@@ -180,6 +182,24 @@ object SourceRecordScreen {
                     }
                 },
             )
+            // A switch is the settings switch; the source's answer is shown when the screen is opened again.
+            is RecordAction.Control -> if (action.control.kind == UpdateSources.Control.Kind.TOGGLE) {
+                ToggleItem(
+                    id = id,
+                    title = row.title,
+                    subtitle = row.subtitle,
+                    current = action.control.on,
+                    onToggle = { _, on -> library.runSourceControl(facet.source.key, record.externalId, action.control, on) },
+                )
+            } else {
+                AsyncActionItem(
+                    id = id,
+                    title = row.title,
+                    subtitle = row.subtitle,
+                    confirmTitle = row.title.takeIf { action.control.confirm },
+                    run = { _, _ -> library.runSourceControl(facet.source.key, record.externalId, action.control, null).ifBlank { "Done" } },
+                )
+            }
             RecordAction.Relink, RecordAction.PickSystem -> null
             null -> ActionItem(id = id, title = row.title, subtitle = row.subtitle, value = row.value)
         }

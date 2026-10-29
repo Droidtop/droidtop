@@ -1459,6 +1459,10 @@ class Library(
         runCatching { updateSources.signIn(source) }.getOrDefault(false)
     }
 
+    /** Presses one of the source's controls on its record page ([UpdateSources.runControl]); the sentence to show. */
+    suspend fun runSourceControl(source: String, externalId: String, control: UpdateSources.Control, on: Boolean?): String =
+        runCatching { updateSources.runControl(source, externalId, control, on) }.getOrElse { it.message ?: "The source did not answer" }
+
     /** droidtop's saved copy of [source]'s record [externalId], for the record page to show at once; null when there is none. */
     suspend fun savedSourceRecord(source: String, externalId: String): UpdateSources.RecordAnswer? = withContext(Dispatchers.IO) {
         runCatching { updateSources.savedRecord(source, externalId) }.getOrNull()

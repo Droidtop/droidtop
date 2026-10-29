@@ -5,6 +5,8 @@ import dev.droidtop.pluginhost.Facet
 import dev.droidtop.pluginhost.FacetBody
 import dev.droidtop.pluginhost.FacetGuards
 import dev.droidtop.pluginhost.FacetSubject
+import dev.droidtop.pluginhost.FacetViews
+import dev.droidtop.pluginhost.NetScope
 import dev.droidtop.pluginhost.Facets
 import org.json.JSONObject
 
@@ -69,6 +71,21 @@ object ItemPageFacets {
                 if (url == null && d.link.isNullOrBlank()) return@mapNotNull null
                 UpdateSources.Download(section = d.section, host = d.host, label = d.label, link = d.link.orEmpty(), url = url, systems = d.systems)
             },
+            controls = controls(facets),
         )
+    }
+
+    /**
+     * The source's own controls among [facets], in its order: a toggle (watch this thread), an action, a link and a
+     * notice, with what pressing each sends made by the one renderer ([FacetViews]), so it travels as on any target.
+     */
+    fun controls(facets: List<Facet>): List<UpdateSources.Control> = facets.mapNotNull { f ->
+        when (val b = f.body) {
+            is FacetBody.Toggle -> b.call?.let { UpdateSources.Control(f.id, UpdateSources.Control.Kind.TOGGLE, b.label, b.sub, on = b.value, action = FacetViews.action(it, f.id, "bool")) }
+            is FacetBody.Action -> UpdateSources.Control(f.id, UpdateSources.Control.Kind.ACTION, b.label, b.sub, action = FacetViews.action(b.call, f.id, null), confirm = b.confirm != "none")
+            is FacetBody.Link -> UpdateSources.Control(f.id, UpdateSources.Control.Kind.LINK, b.label, NetScope.hostOf(b.url), url = b.url)
+            is FacetBody.Notice -> UpdateSources.Control(f.id, UpdateSources.Control.Kind.NOTICE, b.title, b.sub, action = b.call?.let { FacetViews.action(it, f.id, null) })
+            else -> null
+        }
     }
 }

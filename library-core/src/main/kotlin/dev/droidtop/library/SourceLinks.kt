@@ -97,7 +97,26 @@ interface UpdateSources {
         val overview: String? = null,
         val changelog: String? = null,
         val downloads: List<Download> = emptyList(),
+        /** The source's own switches, buttons, links and notices for this item (docs/plugin-api.md 1.10, `item.page`). */
+        val controls: List<Control> = emptyList(),
     )
+
+    /**
+     * One of the source's controls on the record page: a switch (watch this thread), a button, a link or a notice.
+     * [action] is what pressing it sends the source; a link opens [url]; a notice without an action only says.
+     */
+    data class Control(
+        val id: String,
+        val kind: Kind,
+        val title: String,
+        val subtitle: String? = null,
+        val on: Boolean = false,
+        val url: String? = null,
+        val action: dev.droidtop.pluginhost.ViewAction? = null,
+        val confirm: Boolean = false,
+    ) {
+        enum class Kind { TOGGLE, ACTION, LINK, NOTICE }
+    }
 
     /**
      * What a record page asks for: the record, or why there is none ([unsupported] when the source has no `record`).
@@ -107,6 +126,12 @@ interface UpdateSources {
 
     /** The record's page; a source that cannot answer says why, and droidtop's saved copy stands in when it has one. */
     suspend fun record(source: String, externalId: String): RecordAnswer = RecordAnswer(null, unsupported = true)
+
+    /**
+     * Presses [control] on [source]'s record [externalId]; [on] is a switch's new state. Returns the sentence to show.
+     * The page asks for the record again afterwards, so a switch shows what the source now says.
+     */
+    suspend fun runControl(source: String, externalId: String, control: Control, on: Boolean?): String = "The source cannot do that"
 
     /** droidtop's saved copy of the record's page, shown at once while the source is asked; null when it has none. */
     fun savedRecord(source: String, externalId: String): RecordAnswer? = null

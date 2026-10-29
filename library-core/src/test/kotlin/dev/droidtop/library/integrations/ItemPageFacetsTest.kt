@@ -66,4 +66,29 @@ class ItemPageFacetsTest {
         assertNull(ItemPageFacets.itemJson(JSONObject().put("record", JSONObject().put("id", "1")), "1"))
         assertNull("no bundles, no record", ItemPageFacets.record(emptyList(), "1"))
     }
+
+    @Test
+    fun `the source's own switch, button and notice on an item page are its record's controls`() {
+        val item = JSONObject(
+            """
+            {"facets": [
+              {"id": "meta", "kind": "metadata", "title": "Eternum"},
+              {"id": "watch", "kind": "toggle", "label": "Watch this thread", "value": true, "call": {"op": "setWatched", "args": {"thread": "93340"}}},
+              {"id": "rate", "kind": "action", "label": "Rate it", "confirm": "confirm", "call": {"op": "rate", "kind": "job"}},
+              {"id": "gone", "kind": "notice", "title": "The thread was moved", "tone": "caution"}
+            ]}
+            """.trimIndent(),
+        )
+        val record = ItemPageFacets.record(ItemPageFacets.admitted(item, "f95zone", "93340", f95, mutableListOf()), "93340")!!
+        assertEquals(listOf("watch", "rate", "gone"), record.controls.map { it.id })
+        val watch = record.controls[0]
+        assertEquals(dev.droidtop.library.UpdateSources.Control.Kind.TOGGLE, watch.kind)
+        assertEquals(true, watch.on)
+        // Pressed, the switch sends its new state as a typed value, as any facet input does.
+        val args = dev.droidtop.pluginhost.PluginViewCall.args(watch.action!!.args(), mapOf("watch" to "false"), JSONObject())
+        assertEquals(false, args.get("value"))
+        assertEquals("93340", args.getString("thread"))
+        assertEquals(true, record.controls[1].confirm)
+        assertNull(record.controls[2].action)
+    }
 }
