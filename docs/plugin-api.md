@@ -147,8 +147,7 @@ and whose reply can change what happens next (the pre-launch hook, §3 B3).
 ### 1.2 The manifest: what a plugin provides and what it needs
 
 Contract version 2 adds the fields below. All v1 fields keep their
-meaning, and a v1 manifest is translated into this shape by one function
-(§6).
+meaning. A contract 1 manifest is no longer installed (§6).
 
 ```json
 {
@@ -540,8 +539,7 @@ each plugin:
 - **`PluginContext` becomes a thin client.** The existing methods
   (`hasShizukuAccess`, `isAppInstalled`, `launchApp`,
   `launchAppWithExtras`, `libraryFolderPath`, `privateDataDir`,
-  `hasRootApproval`) are reimplemented as broker calls. They are kept as
-  deprecated wrappers for contract 1 plugins (§6).
+  `hasRootApproval`) are reimplemented as broker calls.
 
 ### 1.5 Lifecycle
 
@@ -764,12 +762,12 @@ it: a source's `destination`, a settings page's `target`, a context
 action's `target`.
 
 **Jobs in contract 2.** `startJob` keeps its signature
-(`jobId, capability, args`); for a v2 job the capability is the contract 1
-capability the point replaced (`library.sources` → `acquire_content`,
+(`jobId, capability, args`); for a v2 job the capability is the label
+the point maps to (§6) (`library.sources` → `acquire_content`,
 `ui.settings` → `settings_rows`, `ui.context_action` → `library_action`)
 and `args` is one entry, `call`, holding the whole v2 envelope as JSON
 text, so the plugin reads a job exactly like a `handle` call. A point with
-no contract 1 capability (`ui.panel`, `ui.game_section`, `ui.quick_tile`) runs
+no capability label (`ui.panel`, `ui.game_section`, `ui.quick_tile`) runs
 jobs too (2026-10-07): the capability handed to `startJob` is `settings_rows`,
 a label only, and the plugin reads the point and op from the envelope. The
 host checks the grant of the envelope's point, never the label's. Progress
@@ -805,7 +803,7 @@ page for a plugin.
 
 | Point | Op that returns a view | Notes |
 | --- | --- | --- |
-| `ui.settings@1` (C1) | `view {context:{target}}` | the plugin's own page under Accounts and sources → Plugins → <plugin> → Settings (`target` `plugin`). Replaces read-only `settings_rows` for contract 2 plugins (contract 1 rows still render). |
+| `ui.settings@1` (C1) | `view {context:{target}}` | the plugin's own page under Accounts and sources → Plugins → <plugin> → Settings (`target` `plugin`). Replaced the read-only `settings_rows` of contract 1. |
 | `library.sources@1` (A2) | `form`, `detail` | below |
 | `ui.context_action@1` (C4) | `run` may reply `{view}` | the view opens as a page over the screen the action ran from |
 | `ui.quick_tile@1` (C2) | `action` may reply `{view}` | the view opens over the Quick Menu |
@@ -852,7 +850,7 @@ no destination, such as the PC library). Ops:
 - `form {context}` → a view whose input nodes are the search field and the
   filters (region, format, a system list, anything the source has). Every
   committed input runs `search` again with all `values`. Optional: a source
-  that answers UNSUPPORTED (or a contract 1 source) gets droidtop's default
+  that answers UNSUPPORTED gets droidtop's default
   form, one `text` node `query`.
 - `search {query, values, limit?, context}` → `{results: [result]}`, where a result
   is `{id, title, subtitle?, columns?[], badges?[], platform?, ref?, version?, size?, get?}` (the last three:
@@ -875,8 +873,7 @@ no destination, such as the PC library). Ops:
 - `featured {platform?, limit, context}` → `{results: [result]}`, the same results as `search`: what the source
   features now (a site's latest updates, its new or popular games), best first, scoped to `platform` (droidtop's
   system id) when given (proposed and approved 2026-10-23, Droidtop/tracker#612). Optional and additive (§7): a
-  source with no such list answers UNSUPPORTED, or never declares it, and features nothing; a contract 1 source is
-  not asked. Send at most `limit`. The same 10 s budget as `search`, and the same errors. Its rows join Get new
+  source with no such list answers UNSUPPORTED, or never declares it, and features nothing. Send at most `limit`. The same 10 s budget as `search`, and the same errors. Its rows join Get new
   games' page under the source's name (docs/SPEC.md 13).
 - **A result's facets (contract 3).** A `search` or `featured` result may carry `facets: [...]` (§1.10): its
   pictures (`media` or `image`, by role), its `metadata`, its badges. Its box art is the first picture by role
@@ -1164,8 +1161,8 @@ granted every listed point.)
 produces it the same way: `native_bundle` from `DroidtopPlugin.handle`,
 `python` from a module-level `handle(call_json) -> reply_json`, and
 `flutter_embed` from the channel method `handle` (envelope in, reply out,
-both JSON text). A contract 2 plugin of any kind must implement `handle`;
-a contract 1 plugin keeps the legacy translation.
+both JSON text). A plugin of any kind must implement `handle`; one that does not answers
+every call UNSUPPORTED.
 
 **As built (2026-10-01, the renderer core).**
 
@@ -1179,8 +1176,7 @@ a contract 1 plugin keeps the legacy translation.
   through `PluginJobsCenter`, input actions off the main thread, and no
   plugin page in the settings search index.
 - `ui.settings`: a contract 2 plugin's Settings row on its plugin page
-  opens its view (`PluginSettingsRows.screenFor`); contract 1 rows are
-  unchanged.
+  opens its view (`PluginSettingsRows.screenFor`).
 - Reply views for `ui.context_action` (`run`) and `ui.quick_tile`
   (`action`): both may reply `{view}`; droidtop opens it with
   `PluginViews.screenFor`, carries the point's `target` or `tileId`
@@ -1188,8 +1184,7 @@ a contract 1 plugin keeps the legacy translation.
 - `handle` for contract 2 `python` and `flutter_embed` plugins, and the
   approval grant of every provided point.
 - `library.sources`: `PluginGameSource` calls contract 2 `search` for the
-  one search (`UnifiedSearch`) and opens source `detail` views, with contract 1
-  droidtop defaults. A source's own page under Game sources (`SourceScreens`)
+  one search (`UnifiedSearch`) and opens source `detail` views. A source's own page under Game sources (`SourceScreens`)
   opens its `form` and adds results after committed inputs. There is no Get
   games screen (2026-10-16, Droidtop/tracker#218). A successful acquire job's files are indexed (A2), not rescanned.
 - **Not built yet** (queued): reply views for `ui.context_action` and
@@ -2072,12 +2067,8 @@ never disables its callers.
      as well as its approval. The grant screen says in words: "This
      plugin, from a source you added and droidtop has not checked, will
      be able to give other plugins root access."
-4. **The legacy fields are shimmed.**
-   - `requestsRoot`, `PluginContext.hasRootApproval()` and
-     `hasShizukuAccess()` keep working for contract 1 plugins through a
-     host shim (§6).
-   - The shim stops being offered to contract 2 manifests, and is
-     removed together with contract 1 support.
+4. **The legacy fields are gone with contract 1** (§6): a plugin asks for
+   root through `requires priv.shell` (`minLevel` root), never `requestsRoot`.
 
 ### 2.8 Trust interaction for providers
 
@@ -3966,7 +3957,7 @@ tick.
 Since 2026-10-08 (Droidtop/tracker#378) a plugin runs in one of two tiers
 (§5.3), and what is enforced depends on which:
 
-| | Contained (the default for contract 2) | Open process (`gpu.render`, `net.sockets`: each grant one hole) | Full trust (`host.full_trust`, and contract 1) |
+| | Contained (the default for contract 2) | Open process (`gpu.render`, `net.sockets`: each grant one hole) | Full trust (`host.full_trust`) |
 | --- | --- | --- | --- |
 | Process | an isolated process of its own: a random UID, no permissions, the `isolated_app` SELinux domain | a process of its own (one of eight slots) under droidtop's UID, **not** isolated, so it may open the GPU | a process of its own (one of eight slots) under droidtop's UID |
 | Graphics chip | no: an isolated process may not open `gpu_device` (sepolicy), so Flutter draws in software | yes: hardware rendering into a droidtop-owned surface | yes |
@@ -4011,7 +4002,7 @@ permissions are declarative consent plus host-side gating of what droidtop
 does for it; they do not bound what it can do on its own, and the Activity
 screen says so (§4.6). That is why full trust is a critical grant, needed
 only by what needs UID-level privilege (`apps.bind`, the `priv.*` and
-`root.*` providers) and by contract 1 plugins. Every kind of
+`root.*` providers). Every kind of
 plugin runs contained, Flutter and native libraries included (§5.3,
 "Guarded hooks"). Where a plugin needs one risky capability and nothing
 more, it declares that one permission and the person ticks it on the usual
@@ -4569,8 +4560,6 @@ opens that one hole:
     on another process to publish it, Droidtop/tracker#775);
   - plugins that bind other apps' services (`apps.bind`: an isolated
     process cannot bind);
-  - contract 1 plugins, which keep running full-trust with the badge
-    "Full access (older plugin)".
   - It needs `host.full_trust` (critical). A contract 2 plugin that cannot
     run contained must declare it or is refused at install; until it is
     granted the plugin is not called (during a call the person started the
@@ -4712,8 +4701,7 @@ relay.
   contract 2 plugin allowed full access on Android 11 or later loads like a
   contained one, in an isolated process with the broker's network
   (`net.sockets`) and a contained process's files; everything else is the
-  API's. A contract 1 plugin stays under droidtop's UID, an open row in
-  the table above. The default changes only after every official and
+  API's. The default changes only after every official and
   gamegrab plugin has passed on CI and on the rig, with the results on
   #53, as the owner asked.
 - **The relay** (`BinderRelay`). A `Binder` in droidtop's process that a
@@ -4739,56 +4727,28 @@ pass, the full-access rows above stay open.
 
 ---
 
-## 6. Mapping today's plugin API onto this model
+## 6. Contract 1 is gone; the capability labels that remain
 
-Everything below keeps working unchanged for contract 1 manifests. One
-translation function (`LegacyManifest.toV2`, P0-2) turns a v1 manifest
-into the v2 shape at parse time, so the host has one model internally.
+**Contract 1 is removed (owner, 2026-10-29, Droidtop/tracker#766: "contract-1 plugin support goes NOW, and we fix
+what breaks").** droidtop installs contract 2 and 3 only (`PLUGIN_MANIFEST_MIN_CONTRACT_VERSION`); a contract 1 bundle
+is refused at install ("contractVersion 1 is older than this build of droidtop runs (2): it needs an update"), and one
+already installed is never called and its page says "Needs an update" (`PluginTiers.refusal`). The translation that
+served it (`LegacyManifest.toV2`, `LegacyHandle`), its derived grants, the "Full access (older plugin)" tier and the
+root and Shizuku shim are deleted. Every official plugin was on contract 2 or 3 when it went.
 
-| Today (code) | v2 | Implicit v2 permissions for a v1 plugin | Callers today |
-| --- | --- | --- | --- |
-| `acquire_content` (`PluginCapability.ACQUIRE_CONTENT`) | EP `library.sources@1` (A2); `invoke{action:search}` → `search`, `startJob{action:download}` → `acquire` | `provide:library.sources`, `library.folders.write` (the destination only), `net.any` | `AcquireContentSources` → Get games (system settings, gamelist Options) |
-| `metadata_source` | EP `library.metadata@1` (A3) | `provide:library.metadata`, `net.any` | the scrape job (`PluginMetadataSources`) |
-| `library_action` | EP `ui.context_action@1` (C4) with `targets: [game]` | `provide:ui.context_action`, `library.read` | **none**: declared, never called |
-| `status_tile` | EP `ui.status_tile@1` (C3); also rendered as a read-only C2 quick tile | — | `PluginStatusWidgetProvider`, the Plugins screen's debug row |
-| `settings_rows` | EP `ui.settings@1` (C1), `target=global` → `plugin`, `system:<id>` unchanged | — | `PluginSettingsRows` |
-| `app_status` | EP `apps.bridge@1` (F1); `action:status` → `status`, `action:launch` → `action{id:launch}`, the text-entry job hint → C14 `text` + job | `provide:apps.bridge`, `apps.check`, `apps.launch` | `PluginAppStatus` (Plugins screen, Player choice screen) |
-| `startJob` / `cancelJob` / `PluginJobsCenter` | J1, unchanged | — | Get games, app_status jobs, event reactions |
-| `PluginEvent.DEFAULT_PLAYER_CHANGED` | event `library.default_player_changed@2`; `default_player_changed` remains a legacy alias translated to this id | `library.read` | `PluginEventBus` |
-| `onEvent` → `{startJob, job, ...}` reaction | unchanged; an event reply may return `{job: {...}}` in v2 | — | `PluginEventBus` |
-| `requestsRoot` + `PluginRecord.rootApproved` + `PluginContext.hasRootApproval()` | an optional `requires priv.shell (minLevel root)` + `priv.shell.root` | `host.full_trust`, `priv.shell.root` (the existing tick, carried over as the grant) | the approval screen's root tick |
-| `PluginContext.hasShizukuAccess()` | `plugins.available{api:"priv.shell"}` with `level=adb`, served by the Shizuku provider | — (the check itself is harmless) | plugins |
-| `boundServiceTargets` | permission `apps.bind` with those packages | `apps.bind(<targets>)` | shown on the approval screen |
-| `PluginContext.isAppInstalled` | F4 `apps.check` | `apps.check(*)`: for v1 not scoped, because v1 declared no list | plugins |
-| `PluginContext.launchApp` / `launchAppWithExtras` | F2 `apps.launch` / `apps.intent` | `apps.launch`, `apps.intents.out` (any; v1 declared no list) | plugins |
-| `PluginContext.libraryFolderPath` | the `destination` arg of A2 `acquire` | — | acquire plugins |
-| `PluginContext.privateDataDir` | H1 | — | all |
-| `PLUGIN_CONTRACT_VERSION = 1` | contract 2 = this envelope + manifest fields; the host serves 1 and 2 | — | — |
-| `PluginRunner.CALL_TIMEOUT_MS` 15 s, `MAX_RESULT_BYTES` 256 KiB | unchanged defaults; per-EP budgets (§8) tighter where UI waits | — | — |
+**The capability labels that remain.** The call envelope (§1.3) is how droidtop calls a point. Four paths still
+travel the older capability call (`PluginCapability`, `invoke`, `startJob(capability)`, `PluginResult`), and a
+contract 2 plugin reaches them through the capability its point maps to (`LegacyManifest.CAPABILITY_POINTS`):
 
-**The legacy shim for root and Shizuku.**
+| Capability label | Point | Still used by |
+| --- | --- | --- |
+| `app_status` | `apps.bridge@1` (F1) | `PluginAppStatus` (status, launch, the text-entry job), the RetroArch core download job |
+| `status_tile` | `ui.status_tile@1` (C3) | `PluginStatusWidgetProvider`, the Plugins screen's debug row |
+| `library_action` | `ui.context_action@1` (C4) | a context action declared `"job": true` |
+| `acquire_content`, `metadata_source`, `settings_rows` | `library.sources@1`, `library.metadata@1`, `ui.settings@1` | a job's label only (`jobCapabilityFor`); calls go through the envelope |
 
-- **While no root provider is installed,** `hasRootApproval()` is false:
-  droidtop never probes with `su` (removed 2026-10-09, owner rule: root only
-  through a provider plugin).
-- **Once a `priv.shell@root` provider is installed and resolved,** the
-  shim answers from the provider's status instead. v1 code keeps calling
-  `su` itself (it is full-trust), and the audit log marks it "direct
-  (older plugin)".
-- **The shim is deleted** together with contract 1 support. A later
-  contract bump is announced in advance (§7).
-
-**As built (P0-2, #54).** `PLUGIN_CONTRACT_VERSION` is 2 and means "the
-highest manifest contract this build reads"; the v2 call envelope is not
-served yet, so a v2 plugin is reached through the v1 capability its
-`provides` maps to (`LegacyManifest.CAPABILITY_POINTS`), and a v2 plugin
-whose points map to none installs and is simply not called. Every v1
-plugin is derived `host.full_trust`, `apps.check(*)`, `apps.launch` and
-`apps.intents.out(any)` on top of the table's rows, because
-`PluginContext` and its own sockets give it all of that today, and that is
-what makes the approval screen say "Full access (older plugin)". A v1
-record re-derives its v2 set on every read; a v2 record stores the five
-arrays under the manifest's own keys (`V2Declarations`).
+Events (`onEvent`) travel the same older path. Moving these four onto the envelope is its own item; until then
+`DroidtopPlugin.invoke` stays part of the interface a plugin implements.
 
 **As built (P1-1, P1-2, P1-3, P1-5 in part, P1-6, P1-7, P1-9; #57, #58,
 #59, #62, #63, #65).**
@@ -4809,9 +4769,7 @@ arrays under the manifest's own keys (`V2Declarations`).
   - Host ops built: `host.info`, `plugins.available`,
     `plugins.job_status`, `apps.check`, `apps.launch` and `apps.intent`.
     The last three are the old `isAppInstalled`, `launchApp` and
-    `launchAppWithExtras`, which are now broker calls, so a contract 1
-    plugin is served by the same code and holds the grants it was
-    derived (no new prompts).
+    `launchAppWithExtras`, which are now broker calls.
   - Not moved onto the broker: `privateDataDir`, `libraryFolderPath`,
     `hasRootApproval` and `hasShizukuAccess` are local answers with no host
     effect. `hasShizukuAccess` asks Shizuku's own client (its binder has
@@ -4829,9 +4787,7 @@ arrays under the manifest's own keys (`V2Declarations`).
     permission id, plus `provide:<point>` for a high-risk point and
     `export:<api>` for an export. Approval writes it from the ticked
     subset (a ticked item is granted; an unticked dangerous permission the
-    plugin declares `required` is `ask`, any other unticked item `denied`); a contract 1 plugin keeps the
-    permissions it could already do, its points follow the ticks, and its
-    root tick is the `priv.shell.root` grant. A file that cannot be read is `ask` for
+    plugin declares `required` is `ask`, any other unticked item `denied`). A file that cannot be read is `ask` for
     everything, never `granted`. The approval screen's tick boxes are
     `ConsentView` lines with a grant key; the box state is kept until
     Approve writes it through `PluginStore.setApproval`.
@@ -4843,13 +4799,8 @@ arrays under the manifest's own keys (`V2Declarations`).
     does not.
 - **The v2 envelope.**
   - `DroidtopPlugin.handle(PluginCall): PluginReply` and the AIDL method
-    `IPluginRuntime.handle` carry the envelope of §1.3. A plugin that only
-    implements `invoke` is served by `LegacyHandle`: the point maps to its
-    contract 1 capability (`LegacyManifest.capabilityForPoint`), the op
-    travels as an `op` argument. A plugin compiled before `handle` existed
-    has no such method on its class and the JVM throws
-    `AbstractMethodError`; `LegacyHandle.dispatch` treats that as "use the
-    translation", never as a crash.
+    `IPluginRuntime.handle` carry the envelope of §1.3. A plugin that does not
+    implement `handle` answers UNSUPPORTED (the interface's default).
   - `PluginCrashPolicy.handle` is the host's one way in. A miss of the
     default 15 s budget is a crash; a shorter budget passed by a caller is
     the UI declining to wait (`crashOnTimeout = false`). The wait runs on
@@ -4885,7 +4836,6 @@ arrays under the manifest's own keys (`V2Declarations`).
 - **Updates.** A same-key update keeps the grants it effectively had
   (written out first for a plugin that had no file), and
   `PermissionDiff` puts each new permission, point and export at `ask`
-  (for a contract 1 plugin only the dangerous and high-risk ones),
   remembered as "fresh" until answered: that is "Wants new access", and
   `PluginGrants.answerNew` records the answer from the same list.
 - **Activity.** `PluginAudit` is the ring of §4.6 (2,000 entries, 30 days,
@@ -4929,8 +4879,7 @@ arrays under the manifest's own keys (`V2Declarations`).
     permission left unticked is asked on first use or granted on the
     Permissions screen.
 - **Extension points wired** (#67, #73). All three are asked from the host's
-  own code through `PluginCrashPolicy.handle`, so a plugin that only
-  implements `invoke` answers them through `LegacyHandle`; the wire shapes
+  own code through `PluginCrashPolicy.handle`, ; the wire shapes
   are read in one place (`ExtensionProtocols.kt`).
   - **Context actions (C4).** `PluginContextActions` reads the static
     filter of each `ui.context_action` entry (`targets`, default `game`;
@@ -4938,7 +4887,7 @@ arrays under the manifest's own keys (`V2Declarations`).
     visibility. `enabled` is asked once when a game's or app's detail screen
     opens (500 ms, not a crash), and a disabled action is not offered; a
     miss or failure keeps it offered. `run` is a quick call, or a job when
-    the entry says `"job": true` (the contract 1 `startJob` path). A game
+    the entry says `"job": true` (the capability `startJob` path, §6). A game
     target carries its id, title and system only when the plugin holds
     `library.read`. Built on the detail screen of console ROMs and apps and
     the PC game page; on Standard's long-press app menu and Desktop's Start
@@ -4980,8 +4929,7 @@ arrays under the manifest's own keys (`V2Declarations`).
     exists only when there is one. The state is asked once per opening (5 s,
     a miss keeps the last value and is not a crash), a status tile is
     read-only, and a quick tile's A is `toggle` when its state has `on` and
-    `action` otherwise. A contract 1 `status_tile` appears as a read-only
-    tile through the same path. The Standard and Desktop surfaces of C2 and
+    `action` otherwise. The Standard and Desktop surfaces of C2 and
     C3 are not built.
 
 **As built (P1-16 in part, #72, and #82's real fix).**
@@ -5190,17 +5138,6 @@ arrays under the manifest's own keys (`V2Declarations`).
   folder by path through the file broker, and the rest through `data` over
   `hostCall`.
 
-**Compatibility promises:**
-
-1. Every v1 bundle that installs and runs today installs and runs after
-   contract 2 lands.
-2. Its grants are derived from what it could already do. There are no
-   new prompts for existing behaviour, and the root tick carries over.
-3. It is shown as "Full access (older plugin)".
-4. The `PluginRecord` JSON round trip carries every new field, with a
-   round-trip test (the `subscribedEvents` loss in 12a is the bug this
-   prevents).
-
 ---
 
 ## 7. Versioning and deprecation
@@ -5255,7 +5192,7 @@ gets `UNSUPPORTED` like any op droidtop does not serve.
 A plugin whose manifest says `"contractVersion": 3` needs facets: a droidtop built before them refuses to install it
 ("contractVersion 3 is newer than this build of droidtop understands (2)") and keeps the version it has, so a plugin
 that moved its settings or panel to facets is never installed where they cannot be drawn. droidtop installs contract
-1 to 3 (`PLUGIN_MANIFEST_CONTRACT_VERSION`). The call envelope does not change in 3: a call's `contract` stays 2, so
+2 and 3 (`PLUGIN_MANIFEST_MIN_CONTRACT_VERSION` to `PLUGIN_MANIFEST_CONTRACT_VERSION`; contract 1 went 2026-10-29, §6). The call envelope does not change in 3: a call's `contract` stays 2, so
 a plugin's check for it holds whichever contract its manifest says. `minDroidtop` is documentation only; no droidtop
 reads it.
 Facets (§1.10): small, typed pieces of UI and information that any

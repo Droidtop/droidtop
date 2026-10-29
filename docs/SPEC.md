@@ -13776,8 +13776,7 @@ reconciliation, a file read and the paths named, never a walk.
   walked). Only with no games folder (so no PC part to hold the rows) does
   it fall back to `LibraryRescan.requestInBackground`.
 - A source plugin's `acquire` job that wrote the file itself: the job's reply
-  names what it wrote (`placed`, a JSON list of paths inside `destination`;
-  `filePath` for contract 1), or the plugin reports it with the host call
+  names what it wrote (`placed`, a JSON list of paths inside `destination`), or the plugin reports it with the host call
   below. Only a plugin that does neither is still followed by a background
   rescan, because droidtop cannot name a file it was not told. The detail
   page no longer rescans; it only refreshes.
@@ -23416,8 +23415,7 @@ Advanced.
   plugin needs.
 - **Full trust** is only the critical `host.full_trust` grant, which a
   plugin that needs UID-level privilege must declare
-  (`apps.bind`, the `priv.*`/`root.*` providers), and every contract 1
-  plugin. Flutter plugins and native libraries run contained through
+  (`apps.bind`, the `priv.*`/`root.*` providers). Flutter plugins and native libraries run contained through
   droidtop's guarded hooks (`docs/plugin-api.md` §5.3, decided 2026-10-09). **For full-trust plugins the earlier decision stands:
   the process is for compatibility and stability, not security.** Such a
   plugin runs as droidtop's UID, in a process of its own (one of eight
@@ -23638,11 +23636,15 @@ of what is built. The decisions, briefly:
   declared by the plugin and held and asked for by droidtop (Android's own
   prompt on first use during a call the person started); one droidtop's
   manifest does not request is refused at install. Every surface shows
-  "Contained", "Full access" or "Full access (older plugin)", and each
+  "Contained" or "Full access", and each
   plugin has an Activity screen and a Containment check.
-- **Compatibility.** Contract 1 bundles keep working unchanged. One
-  translation maps each existing capability, event and `PluginContext`
-  method onto the new model (`docs/plugin-api.md` §6).
+- **Contract 1 is gone (owner, 2026-10-29, Droidtop/tracker#766:
+  "contract-1 plugin support goes NOW, and we fix what breaks").** A
+  contract 1 bundle is refused at install, and one already installed is
+  never called and says "Needs an update". Every official plugin was on
+  contract 2 or 3. What still travels the older capability call (apps
+  bridges, the status widget, events, jobs without an envelope) is listed
+  in `docs/plugin-api.md` §6.
 - **Decisions made while building the broker** (`docs/plugin-api.md` §6,
   "As built"):
   - a call in `ask` state prompts only during a user-initiated call, and
@@ -23651,9 +23653,8 @@ of what is built. The decisions, briefly:
   - A grant file that cannot be read means `ask`, never `granted`.
   - A plugin whose required API has no runnable provider is Waiting: it is
     not called and not disabled, and it resumes by itself.
-  - A plugin compiled before `handle` existed is served through its
-    contract 1 capability. `AbstractMethodError` from that missing method
-    is not a crash.
+  - A plugin that does not implement `handle` answers every call
+    UNSUPPORTED.
   - A metadata plugin never replaces a value a built-in scraper found. It
     fills the gaps, and each field records the plugin's name. ES-DE's model
     of one selected scraper source is not changed by it. The ROM pass and the
@@ -23702,11 +23703,11 @@ of what is built. The decisions, briefly:
     acquire job), and as an optional reply of `ui.context_action` `run` and
     `ui.quick_tile` `action`.
   - Contract 2 jobs keep `startJob`'s signature: the capability is the
-    point's contract 1 capability and the args carry the whole envelope as
+    label the point maps to (`docs/plugin-api.md` §6) and the args carry the whole envelope as
     `call`.
   - `handle` now reaches `python` and `flutter_embed` plugins whose
     manifest is contract 2 (each kind's own `handle` function or channel
-    method); before, both only had the contract 1 translation.
+    method).
   - Three contracts from the 2026-10-01 design review (#179): a plugin
     never binds a button (A runs a node's one action, B is Back, Y is
     droidtop's Info; X, Select and shoulders are never plugin buttons), so
@@ -23795,8 +23796,8 @@ take.
   `context.game` only with `library.read`, and Home shelves get the library
   only with `library.read` and play times only with `library.history`.
 - **Panels run jobs and plugins hear events by either manifest field**
-  (Droidtop/tracker#316, #317). A job action on a point with no contract 1
-  capability (a panel, a game's rows) used to be refused with "This page
+  (Droidtop/tracker#316, #317). A job action on a point with no capability
+  label (a panel, a game's rows) used to be refused with "This page
   cannot run long tasks yet", which left a panel unable to start a download;
   it now starts like any job, under `LegacyManifest.jobCapabilityFor`, and
   `PluginGrants.jobRefusal` judges it by the point its envelope names.
@@ -25281,7 +25282,7 @@ what the index says is display data, never a trust decision.
 
 **Full access asks in red (owner 2026-10-10, Droidtop/tracker#481; built 2026-10-14 with the notice work, Droidtop/tracker#485).** Owner, verbatim: "Running plugins unsandboxed should be possible, but big red warnings and a recommendation that users not install unsandboxed plugins". Every moment a plugin would run without droidtop's protection is asked in the danger dialog (7k, "Asking before a change"), once, at the moment it changes, and running it stays possible:
 
-- **D1, allowing full access**: approving a plugin with "Full access" (`host.full_trust`) ticked or an older contract 1 plugin ("Install anyway"), saving an update's new items when they include full access ("Update anyway"), choosing Allowed for full access on its Permissions screen, the page's "Needs full access to work" notice (Allow), and the first call of a plugin whose full access is still unanswered. Cancel leaves it unanswered; it is never Never.
+- **D1, allowing full access**: approving a plugin with "Full access" (`host.full_trust`) ticked ("Install anyway"), saving an update's new items when they include full access ("Update anyway"), choosing Allowed for full access on its Permissions screen, the page's "Needs full access to work" notice (Allow), and the first call of a plugin whose full access is still unanswered. Cancel leaves it unanswered; it is never Never.
 - **D2, protection didn't start**: a contained plugin whose system-call filter (the sandbox library's lockdown) cannot be installed is no longer run silently. Its process refuses the load with `protection-failed: <report>`; during a call the person started droidtop asks ("Run anyway"), and the answer holds for this run of droidtop only, so protection is tried again next time. The mark that lets the load through is added by :app to the manifest it hands the process and stripped from the plugin's own file, so a plugin cannot set it.
 - **D4, several at once**: plugins held back in the background are listed on the Plugins page as a caution notice ("Protection didn't start", Review), which asks for all of them in one dialog ("Run all anyway", this run only).
 - **D3, a different maker**: an update verified under a different trust anchor than the approved version starts pending as before, and now remembers what it replaced (`PluginRecord.replacedKeySha256`/`replacedOrigin`); its page shows "Update made by someone else" with both fingerprints in groups of four in Info, and approving it asks "Update anyway" before anything else.
@@ -25540,7 +25541,7 @@ folderScreen`, :app) and Gaming's gamelist Select-button options menu
 `CatalogNavigator` its own Settings section already uses, so the query
 field gets real controller/touch text entry for free). A JSON source
 keeps its original one-way shape (a text field or button that fires an
-`am start` and never hears back); a plugin source opens its own search screen, then a result detail; the per-system screen and the shared search's detail now come from the source's own views (contract 2) or droidtop's defaults (contract 1). No installed source at
+`am start` and never hears back); a plugin source opens its own search screen, then a result detail; the per-system screen and the shared search's detail now come from the source's own views. No installed source at
 all shows a plain row saying so, rather than hiding the whole "Get games"
 entry.
 
