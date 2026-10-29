@@ -18421,6 +18421,10 @@ whatever the mode (with Gaming off, Desktop or nothing). Now:
   place when Gaming is the mode in use (`Place.opensInGaming`: the last mode
   is Gaming and Gaming is on), else the host. Message notifications and the
   plugin-repository update notification use it.
+- **Updates** is the Quick Menu's Downloads tab in every mode (owner, 2026-10-29, Droidtop/tracker#749). In Gaming the
+  section redirects there; outside it the host, asked for the Updates place by any link (a notification with Gaming
+  not in use, droidtop's icon shortcut), opens `QuickMenuActivity` on Downloads (`QuickMenuActivity.intent`, the tab
+  named by `QuickSection`) instead of a page of its own.
 
 ### Social: one place for every provider (decided 2026-10-08, Droidtop/tracker#327)
 
