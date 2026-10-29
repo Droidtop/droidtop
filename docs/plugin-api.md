@@ -885,7 +885,17 @@ no destination, such as the PC library). Ops:
   rows, its files), its pickers (`choice` nodes for version, region,
   format, mirror) and its actions, at least one `job` action with op
   `acquire`. Optional: droidtop's default detail shows the result's title
-  and a Download job.
+  and a Download job. Contract 3 (2026-10-29, Droidtop/tracker#737): the
+  reply may instead be the result's facets (`{facets: [...]}`, or `items:
+  [{id, facets}]` with the result's `id`): its `item.page` bundles
+  (`metadata`, `description`, `image`, `download`, `links`) and `link`s are
+  drawn as droidtop draws a record (docs/SPEC.md 7g, "Facets in place"), and
+  its other facets as any view. A `download` entry with a `url` (or a part
+  with one) opens in droidtop's web view; an entry or part with only a
+  `link` is fetched by `acquire {ref, values: {link, version?}, context}`,
+  the token in `values.link` and the item's `metadata.version` in
+  `values.version`, answered as any `acquire` is. A release in `parts` is
+  gathered part by part and placed as one job.
 - `acquire {ref, values, context}` → a **job**. It writes only into
   `context.destination`. Results become games only when droidtop's own
   detection finds the files (12a, A10), and droidtop looks at exactly the
@@ -1357,7 +1367,9 @@ a target switched off is not asked for; the plugin's own page and settings have 
 source's record page is drawn from the item's bundles (`metadata`, `description`, `image`, `download`, `links`)
 through the guards, from `ui.facets get {target: "item.page", subject: {type: "item", source, id}}` when the source
 declares that target, or from facets on its `record` reply (`items: [{id, facets}]`, which counts as declaring the item
-page); a contract 2 `record` is read as before (`ItemPageFacets`). Hiding one facet is a switch per facet under the
+page); a contract 2 `record` is read as before (`ItemPageFacets`). A source result's page is the item page too
+(Droidtop/tracker#737): a `library.sources` `detail` reply of facets about the result is drawn from its bundles the
+same way, through the same guards (`SourceItemPage`). Hiding one facet is a switch per facet under the
 plugin's "What it shows", beside "Where it appears": droidtop remembers what each plugin last showed on each target
 (`PluginFacets.Seen`), a facet switched off is not drawn there (`FacetGuards.unhidden`, kept under
 `facet:<target>/<id>`), and it is listed there to show again. Not built yet: "Hide this", "Move up" and "Move down" on

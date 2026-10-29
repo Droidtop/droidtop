@@ -663,26 +663,16 @@ class PluginUpdateSources(context: Context) : dev.droidtop.library.UpdateSources
         val (record, entry) = providers().firstOrNull { (_, e) -> e.id == source } ?: return "The source $source is not installed or not running"
         val label = entry.label ?: record.manifest.label
         val (placement, name) = placementFor(label, gameName, version, newest).getOrElse { return it.message ?: "The update has nowhere to go" }
-        val gathered = mutableListOf<dev.droidtop.pluginhost.AcquireDownloadDescriptor>()
-        for ((index, part) in parts.withIndex()) {
-            val which = "Part ${index + 1} of ${parts.size}"
-            val url = part.url
-            val got = if (url != null) {
-                onStatus("$which: start the download on the page that opens")
-                UpdateLinks.descriptorsFor(dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(app, record, url, 1))
-            } else {
-                onStatus("$which: asking $label")
-                val args = JSONObject().put("source", source).put("id", externalId).put("link", part.link.orEmpty()).apply { version?.let { put("version", it) } }
-                val result = PluginViews.runJob(app, record, POINT, "download", args, "Download $name ($which)", onStatus)
-                if (result.ok) dev.droidtop.pluginhost.AcquireDownloads.parse(result.values).orEmpty() else emptyList()
-            }
-            if (got.isEmpty()) {
-                Log.w(TAG, "update $source/$externalId: $which (${part.label}) brought nothing")
-                return "$which (${part.label}) was not downloaded, so nothing was added"
-            }
-            gathered += got
+        val gathered = UpdateLinks.gatherParts(app, record, parts, onStatus) { link, which ->
+            onStatus("$which: asking $label")
+            val args = JSONObject().put("source", source).put("id", externalId).put("link", link).apply { version?.let { put("version", it) } }
+            val result = PluginViews.runJob(app, record, POINT, "download", args, "Download $name ($which)", onStatus)
+            if (result.ok) dev.droidtop.pluginhost.AcquireDownloads.parse(result.values).orEmpty() else emptyList()
+        }.getOrElse {
+            Log.w(TAG, "update $source/$externalId: ${it.message}")
+            return it.message ?: "A part was not downloaded, so nothing was added"
         }
-        val done = AcquireDownload.run(app, record, "Download $name", JSONObject(), emptyMap(), UpdateLinks.joined(gathered), onStatus, update = placement)
+        val done = AcquireDownload.run(app, record, "Download $name", JSONObject(), emptyMap(), gathered, onStatus, update = placement)
         if (!done.ok) Log.w(TAG, "update $source/$externalId: the download in ${parts.size} parts failed: ${done.error}")
         return if (done.ok) done.values["summary"] ?: "Added $name" else "${record.manifest.label}: ${done.error ?: "the download failed"}"
     }

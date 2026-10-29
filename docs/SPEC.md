@@ -12843,6 +12843,19 @@ it over the screen it is on and never navigates away to reach it:
   details. Its rows are the record page's own (`recordRows`, `downloadRows`) and a download is the record page's one
   sequence (`getDownload`). A game with no source page says so; it does not open anything. Change link is the game
   page's, where its sources are.
+- **A source's item page** (Droidtop/tracker#737, handed over from the plugins lane on #602: four source plugins'
+  moves wait on it, Nyaa, LewdCorner, Repacks and BIOS). A source result's detail (`library.sources` `detail`) whose
+  reply is the item's facets is drawn the way the update screen draws a record, not as a plugin view
+  (`SourceItemPage`): the reply goes through the item page's guards (`ItemPageFacets.admitted`), then Overview (the
+  `metadata` facts and the `description`), Downloads (the record page's own rows, `downloadRows`, now in
+  `library-core`'s `RecordRows`, with the System choice when the links differ by system), Changelog when the source
+  gives one, and Links (the `links` bundle and every `link`). A release in `parts` is one row ("2 parts, 5 MB") and is
+  fetched as one set through the same code the update screen uses (`UpdateLinks.gatherParts`). A link or a download
+  with an address opens in droidtop's web view with the source's session, never another browser, and whatever the
+  person starts there is placed; a download with only a token goes to the source's `acquire` with that token
+  (docs/plugin-api.md, `detail`). Everything lands in the page's destination, as the source's own Download does. The
+  rest of the reply's facets (a switch, a button, a notice) are drawn under them by the one renderer. A reply with
+  none of the bundles is read as any view.
 - **A job row** for a game opens the game's page over the jobs list, inside Gaming (`GameSurfaces.showPage`,
   `GameInPlace`, `JobOpener`).
 - **A Get new games result** opens the one search on its title in place, as it already did.

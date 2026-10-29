@@ -31,6 +31,36 @@ object UpdateLinks {
     }
 
     /**
+     * Every one of [parts], a release in parts, gathered as one set to place as one Downloads job (docs/plugin-api.md
+     * 1.10, `download` `parts`): a part with a page opens in droidtop's web view, where the person starts it as for any
+     * link (#599), and a part with a token goes to [byToken], the source's own job, given the token and which part it is.
+     * The one path the update record page and a source's item page both take. Nothing is placed until every part is in
+     * hand: one that brings nothing fails it all, saying which. The files come back joined ([joined]).
+     */
+    suspend fun gatherParts(
+        context: android.content.Context,
+        record: dev.droidtop.pluginhost.PluginRecord,
+        parts: List<dev.droidtop.library.UpdateSources.Download.Part>,
+        onStatus: (String) -> Unit,
+        byToken: suspend (link: String, which: String) -> List<AcquireDownloadDescriptor>,
+    ): Result<List<AcquireDownloadDescriptor>> {
+        val gathered = mutableListOf<AcquireDownloadDescriptor>()
+        for ((index, part) in parts.withIndex()) {
+            val which = "Part ${index + 1} of ${parts.size}"
+            val url = part.url
+            val got = if (url != null) {
+                onStatus("$which: start the download on the page that opens")
+                descriptorsFor(dev.droidtop.pluginhost.PluginWebAccount.openForDownloads(context, record, url, 1))
+            } else {
+                byToken(part.link.orEmpty(), which)
+            }
+            if (got.isEmpty()) return Result.failure(IllegalStateException("$which (${part.label}) was not downloaded, so nothing was added"))
+            gathered += got
+        }
+        return Result.success(joined(gathered))
+    }
+
+    /**
      * What the web view captured as the downloads droidtop runs: each file under the name the site gave it (made safe for
      * a file system), with the cookies, user agent and referrer the page used, held in memory by Downloads. A zip, 7z or
      * rar, or the numbered parts of one split archive, is unpacked into the new version's folder. Pure, for the tests.

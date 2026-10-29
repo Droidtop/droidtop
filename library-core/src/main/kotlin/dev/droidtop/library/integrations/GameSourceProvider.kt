@@ -215,6 +215,8 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
             extraWhenFailed = {
                 listOf(AcquireContentSources.pluginPageRow("source_detail_page_${source.record.manifest.id}", "Open $label's page", source.record.manifest.id))
             },
+            // A reply of the item's bundles is its item page, drawn as droidtop draws a record (Droidtop/tracker#737).
+            itemPage = { ctx, data, messages -> SourceItemPage.read(ctx, source.record, result.id, ref, context, data, messages) },
         )
     }
 

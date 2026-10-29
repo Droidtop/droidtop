@@ -76,6 +76,8 @@ object PluginViews {
      * [extraWhenFailed] adds rows under a load failure, for a way out the host knows.
      * [extraGroups] appends host data built from committed page values (source results).
      * [leadGroups] puts host rows above the plugin's own (a Quick Menu panel's tiles).
+     * [itemPage] reads a reply that is an item's page (a source result's `detail`, [SourceItemPage]): its groups lead the
+     * page and the rest of its facets are the view; a reply it does not take is read as any view.
      */
     fun screen(
         record: PluginRecord,
@@ -95,7 +97,8 @@ object PluginViews {
         iconFile: String? = null,
         // Told of each input value the person commits, for a page whose values droidtop keeps (a source's search options).
         onCommit: ((Context, ViewNode, String) -> Unit)? = null,
-    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups, onCommit).screen(id, title, panel, iconFile)
+        itemPage: ((Context, JSONObject, MutableList<String>) -> SourceItemPage.Page?)? = null,
+    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups, onCommit, itemPage).screen(id, title, panel, iconFile)
 
     /**
      * What running one view action came to: the sentence to show, a view the reply carried, whether the page should be
@@ -324,8 +327,12 @@ private class PluginPage(
     private val extraGroups: suspend (Context, Map<String, String>) -> List<CatalogGroup> = { _, _ -> emptyList() },
     private val leadGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() },
     private val onCommit: ((Context, ViewNode, String) -> Unit)? = null,
+    private val itemPage: ((Context, JSONObject, MutableList<String>) -> SourceItemPage.Page?)? = null,
 ) {
     @Volatile private var view: PluginView? = initial
+
+    /** The item page's own groups ([itemPage]), drawn before the plugin's view; empty for any other reply. */
+    @Volatile private var itemGroups: List<CatalogGroup> = emptyList()
     @Volatile private var error: String? = null
 
     /** The call was refused because the user did not allow this point: shown as "not allowed", with the way to change it, never as a plugin failure. */
@@ -395,10 +402,15 @@ private class PluginPage(
         // An error naming a permission the plugin declared is about that grant, not the whole point.
         denied = !reply.ok && reply.code == PluginErrorCode.PERMISSION_DENIED && reply.permission == null
         errorReply = if (reply.ok) null else reply
+        itemGroups = emptyList()
         if (reply.ok) {
             val messages = mutableListOf<String>()
-            // A target's facets go through the guards for that target (docs/plugin-api.md 1.10); any other reply is a view.
-            val parsed = (if (point == PluginFacets.POINT && op == PluginFacets.OP_GET) PluginFacets.view(record, args, reply.data, messages, context) else null)
+            // An item's page goes through the item page's guards, a target's facets through that target's
+            // (docs/plugin-api.md 1.10); any other reply is a view.
+            val item = itemPage?.invoke(context, reply.data, messages)
+            item?.let { itemGroups = it.groups }
+            val parsed = item?.rest
+                ?: (if (point == PluginFacets.POINT && op == PluginFacets.OP_GET) PluginFacets.view(record, args, reply.data, messages, context) else null)
                 ?: PluginView.parse(reply.data, messages)
             PluginMessages.record(context, record.manifest.id, "$point/$op", messages)
             if (parsed == null) {
@@ -456,7 +468,7 @@ private class PluginPage(
             view?.subtitle?.let { add(ActionItem(id = "pv_${screenId}_about", title = it)) }
             // The empty-state contract (docs/plugin-api.md 1.6, #179; #521 item 6): never a blank page, and droidtop's own
             // notice, not a plugin's row: "Nothing here yet" from the plugin, its one sentence if it gave one, and Refresh.
-            if (error == null && view?.sections?.all { it.nodes.isEmpty() } != false) {
+            if (error == null && itemGroups.isEmpty() && view?.sections?.all { it.nodes.isEmpty() } != false) {
                 add(
                     NoticeItem(
                         id = "pv_${screenId}_empty",
@@ -475,7 +487,7 @@ private class PluginPage(
         val body = if (error != null || current == null) {
             emptyList()
         } else {
-            current.sections.map { section ->
+            itemGroups + current.sections.filter { it.nodes.isNotEmpty() || itemGroups.isEmpty() }.map { section ->
                 CatalogGroup(
                     id = "pv_${screenId}_${section.id}",
                     title = section.title,
