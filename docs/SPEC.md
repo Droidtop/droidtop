@@ -15105,8 +15105,12 @@ own page also asks two kinds of public source about the game, once when the page
 - **HowLongToBeat** (`HowLongToBeat.lookup`): the community's times, "Main 12 h, extras 14 h, all of it 24 h", only the
   times that exist, as a row "How long to beat" that opens the game's page on howlongtobeat.com. The site has no
   published API; the request is the shape the public client libraries document (howlongtobeatpy): a token from
-  `api/s/init`, then the search POSTed to `api/s/` with the token, the key and the value as headers and in the body, so
-  two requests for a title nothing is cached for, sent with an honest user agent and only the title's words. The
+  `<search path>/init`, then the search POSTed to the search path with the token, the key and the value as headers and
+  in the body, sent with an honest user agent and only the title's words. The search path is not fixed (the site has
+  renamed it, and the same "HTTP 0" showed on the rig on 2026-10-09, before droidtop's own HTTP code was moved): the
+  client reads it, once per run of the app, from the site's home page and its `/_next/static/chunks/` scripts, as the
+  `fetch("/api/...", {method: "POST"})` the library looks for, and tries `api/s/` only when the scripts name none. A
+  failure with no HTTP status (no token) reads "did not give a way to search", never "HTTP 0". The
   answer is accepted only when a title or alias normalises to the library's title (the first, most popular such game);
   a title with the same words and numbers in another order is offered as "Closest match: X" and says so. Cached per
   title: a game found for thirty days, "not on HowLongToBeat" for a week, a failure for an hour. If the site changes the

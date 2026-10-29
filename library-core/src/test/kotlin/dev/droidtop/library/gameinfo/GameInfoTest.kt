@@ -95,6 +95,31 @@ class GameInfoTest {
     }
 
     @Test
+    fun `the search path is read from the script that posts the search`() {
+        val script = """a.get=function(){return fetch("/api/other/x",{method:"GET"})};fetch("/api/finder/v2?q=1",{method:"POST",body:b})"""
+        assertEquals("api/finder/v2", HltbClient.searchPathIn(script))
+        assertEquals("api/search/site", HltbClient.searchPathIn("""fetch('/api/search/site/', { method: 'POST' })"""))
+        assertNull(HltbClient.searchPathIn("""fetch("/api/other/x",{method:"GET"})"""))
+    }
+
+    @Test
+    fun `only the page's own chunk scripts are read for the path`() {
+        val html = """<script src="/_next/static/chunks/main-1.js"></script><script src="https://howlongtobeat.com/_next/static/chunks/a.js"></script>""" +
+            """<script src="https://elsewhere.example/_next/static/chunks/b.js"></script><script src="//cdn.example/_next/static/chunks/c.js"></script>""" +
+            """<script src="/other.js"></script><script src="/_next/static/chunks/main-1.js"></script>"""
+        assertEquals(
+            listOf("https://howlongtobeat.com/_next/static/chunks/main-1.js", "https://howlongtobeat.com/_next/static/chunks/a.js"),
+            HltbClient.scriptSources(html),
+        )
+    }
+
+    @Test
+    fun `a failure with no status does not show a number`() {
+        assertEquals("HowLongToBeat did not answer the search (HTTP 403)", HowLongToBeat.refusalMessage(403))
+        assertEquals("HowLongToBeat did not give a way to search", HowLongToBeat.refusalMessage(0))
+    }
+
+    @Test
     fun `the search body carries the title's words and the key and value`() {
         val body = JSONObject(HltbClient.payload("Super  Metroid", HltbClient.Auth("t", "ign_k", "v1")))
         assertEquals("games", body.getString("searchType"))

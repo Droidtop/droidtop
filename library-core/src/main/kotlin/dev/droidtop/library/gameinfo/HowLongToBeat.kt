@@ -39,23 +39,40 @@ sealed interface HltbResult {
  * HowLongToBeat's public site search (docs/SPEC.md 7h, "Game info"). The site has no published API; the request
  * shape is the one the public client libraries document (howlongtobeatpy, MIT): a GET of `api/s/init?t=<ms>`
  * answers a token and a key/value pair, then a POST of the search to `api/s/` carries them as the `x-auth-token`,
- * `x-hp-key` and `x-hp-val` headers and again as a field of the body. Two requests, sent only when a game's own
- * page opens and nothing is cached for its title, with an honest user agent; if the site changes the shape the
- * row says it could not be reached and nothing else is affected.
+ * `x-hp-key` and `x-hp-val` headers and again as a field of the body. Sent only when a game's own page opens and
+ * nothing is cached for its title, with an honest user agent; if the site changes the shape the row says it could
+ * not be reached and nothing else is affected.
+ *
+ * The search path is not fixed: the site has renamed it (`api/s`, `api/search/site`, `api/finder/v2`), and the
+ * library above reads it from the site's own script, where the search is the one `fetch` that POSTs. So the path
+ * is found the same way, once per run of the app, and `api/s/` is only what is tried when the script says nothing.
  */
 internal object HltbClient {
     const val SOURCE = "HowLongToBeat"
     private const val BASE = "https://howlongtobeat.com/"
-    private const val SEARCH_PATH = "api/s/"
+    private const val FALLBACK_PATH = "api/s/"
     private const val TIMEOUT_MS = 20_000
     private const val USER_AGENT = "droidtop (Android game launcher; https://github.com/Droidtop/droidtop)"
+
+    /** At most this many of the home page's scripts are read for the search path. */
+    private const val MAX_SCRIPTS = 24
+    private const val MAX_SCRIPT_BYTES = 4L * 1024 * 1024
+
+    @Volatile
+    private var foundPath: String? = null
 
     class Auth(val token: String, val key: String, val value: String)
 
     fun search(title: String): ScrapeLookup<List<HltbGame>> {
-        val auth = token() ?: return ScrapeLookup.Refused(SOURCE, 0, "no search token")
+        val path = foundPath ?: discoverPath()?.also { foundPath = it } ?: FALLBACK_PATH
+        val auth = token(path)
+        if (auth == null) {
+            // The path may have moved since it was found: look again next time.
+            foundPath = null
+            return ScrapeLookup.Refused(SOURCE, 0, "no search token")
+        }
         val answer = send(
-            BASE + SEARCH_PATH,
+            BASE + path,
             "POST",
             mapOf(
                 "content-type" to "application/json",
@@ -72,13 +89,33 @@ internal object HltbClient {
         }
     }
 
-    private fun token(): Auth? {
-        val answer = send(BASE + SEARCH_PATH + "init?t=" + System.currentTimeMillis(), "GET", emptyMap(), null)
-        return if (answer.status != 200) null else parseToken(answer.text())
+    private fun token(path: String): Auth? {
+        val answer = send(BASE + path.trimEnd('/') + "/init?t=" + System.currentTimeMillis(), "GET", emptyMap(), null)
+        val auth = if (answer.status != 200) null else parseToken(answer.text())
+        if (auth == null) {
+            android.util.Log.w("droidtop.Scraper", "$SOURCE gave no search token from $path/init: HTTP ${answer.status}")
+        }
+        return auth
+    }
+
+    /** The search path the site's own scripts use, or null when the home page or its scripts do not say. */
+    private fun discoverPath(): String? {
+        val home = send(BASE, "GET", emptyMap(), null)
+        if (home.status != 200) {
+            android.util.Log.w("droidtop.Scraper", "$SOURCE home page for the search path: HTTP ${home.status}")
+            return null
+        }
+        for (script in scriptSources(home.text()).take(MAX_SCRIPTS)) {
+            val text = runCatching { send(script, "GET", emptyMap(), null, MAX_SCRIPT_BYTES) }.getOrNull()
+                ?.takeIf { it.status == 200 }?.text() ?: continue
+            searchPathIn(text)?.let { return it }
+        }
+        android.util.Log.w("droidtop.Scraper", "$SOURCE scripts do not name a search path; trying $FALLBACK_PATH")
+        return null
     }
 
     /** HowLongToBeat wants an honest user agent of ours and the site's own Referer and Origin. */
-    private fun send(address: String, method: String, headers: Map<String, String>, body: ByteArray?): Http.Response =
+    private fun send(address: String, method: String, headers: Map<String, String>, body: ByteArray?, maxBytes: Long = MAX_BYTES): Http.Response =
         Http.request(
             address,
             method = method,
@@ -90,8 +127,24 @@ internal object HltbClient {
             ) + headers,
             body = body,
             timeouts = Http.Timeouts(connectMs = TIMEOUT_MS, readMs = TIMEOUT_MS),
-            maxBytes = MAX_BYTES,
+            maxBytes = maxBytes,
         )
+
+    private val SCRIPT_TAG = Regex("""<script[^>]+src=["']([^"']*/_next/static/chunks/[^"']*)["']""", RegexOption.IGNORE_CASE)
+    private val SEARCH_FETCH = Regex("""fetch\s*\(\s*["']/(api/[a-zA-Z0-9_/]+)[^"']*["']\s*,\s*\{[^}]*method:\s*["']POST["']""", RegexOption.IGNORE_CASE)
+
+    /** Pure, for the JVM tests: the addresses of the page's chunk scripts, on howlongtobeat.com only. */
+    fun scriptSources(html: String): List<String> =
+        SCRIPT_TAG.findAll(html).map { it.groupValues[1] }.mapNotNull { src ->
+            when {
+                src.startsWith(BASE) -> src
+                src.startsWith("/") && !src.startsWith("//") -> BASE + src.removePrefix("/")
+                else -> null
+            }
+        }.distinct().toList()
+
+    /** Pure, for the JVM tests: the path of the first `fetch("/api/...", {method: "POST", ...})`, such as `api/finder/v2`. */
+    fun searchPathIn(script: String): String? = SEARCH_FETCH.find(script)?.groupValues?.get(1)?.trimEnd('/')
 
     /** Pure, for the JVM tests: the token answer carries `token` and one field with "key" and one with "val" in its name. */
     fun parseToken(text: String): Auth? {
@@ -216,12 +269,16 @@ object HowLongToBeat {
                     result
                 }
                 ScrapeLookup.NoMatch -> HltbResult.NotFound
-                is ScrapeLookup.Refused -> failed(file, now, "HowLongToBeat did not answer the search (HTTP ${answer.httpStatus})")
+                is ScrapeLookup.Refused -> failed(file, now, refusalMessage(answer.httpStatus))
             }
         } catch (e: IOException) {
             failed(file, now, "No connection to HowLongToBeat")
         }
     }
+
+    /** Status 0 is no answer at all (no search token), which has no number to show a person. */
+    internal fun refusalMessage(httpStatus: Int): String =
+        if (httpStatus > 0) "HowLongToBeat did not answer the search (HTTP $httpStatus)" else "HowLongToBeat did not give a way to search"
 
     private fun failed(file: File, now: Long, message: String): HltbResult {
         val result = HltbResult.Failed(message)
