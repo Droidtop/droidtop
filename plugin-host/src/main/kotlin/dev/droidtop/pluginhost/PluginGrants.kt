@@ -1,7 +1,6 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
-import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.util.UUID
 import org.json.JSONArray
@@ -84,15 +83,19 @@ class PluginGrants(private val dir: File) {
         val wantsNewAccess: Boolean get() = fresh.any { states[it] == GrantState.ASK }
     }
 
-    private fun fileFor(pluginId: String) = File(dir, "$pluginId.json")
+    private val store = PerPluginJsonStore(dir)
 
     fun read(pluginId: String): Snapshot = synchronized(LOCK) { readLocked(pluginId) }
 
+    // A corrupt file is never set aside or read as empty here: it would fall back to the defaults, which allow every
+    // normal permission. It reads as "ask about everything" until the person answers again.
     private fun readLocked(pluginId: String): Snapshot {
-        val file = fileFor(pluginId)
-        if (!file.isFile) return Snapshot()
+        val json = when (val read = store.read(pluginId)) {
+            PerPluginJsonStore.Read.Absent -> return Snapshot()
+            is PerPluginJsonStore.Read.Corrupt -> return Snapshot(corrupt = true)
+            is PerPluginJsonStore.Read.Found -> read.json
+        }
         return try {
-            val json = JSONObject(file.readText())
             val states = json.optJSONObject("states") ?: JSONObject()
             Snapshot(
                 states = buildMap { states.keys().forEach { k -> GrantState.fromId(states.optString(k))?.let { put(k, it) } } },
@@ -111,7 +114,7 @@ class PluginGrants(private val dir: File) {
         json.put("states", JSONObject().also { o -> snapshot.states.toSortedMap().forEach { (k, v) -> o.put(k, v.name) } })
         json.put("wanted", JSONArray(snapshot.wanted.sorted()))
         json.put("fresh", JSONArray(snapshot.fresh.sorted()))
-        AtomicWrite.text(fileFor(pluginId), json.toString())
+        store.write(pluginId, json)
         changed()
         PluginEpoch.bump()
     }
@@ -261,8 +264,7 @@ class PluginGrants(private val dir: File) {
 
     /** Uninstall: the grants and the install id go with the plugin. */
     fun delete(pluginId: String) = synchronized(LOCK) {
-        fileFor(pluginId).delete()
-        File(dir, "$pluginId.json.tmp").delete()
+        store.delete(pluginId)
         File(dir, "$pluginId.installid").delete()
         PluginEpoch.bump()
     }

@@ -1,7 +1,6 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
-import dev.droidtop.net.AtomicWrite
 import dev.droidtop.net.KeystoreSecretCipher
 import dev.droidtop.net.SecretCipher
 import java.io.File
@@ -26,17 +25,12 @@ class PluginVault(
 ) {
     class Refused(message: String) : Exception(message)
 
-    private fun file(pluginId: String) = File(dir, "$pluginId.json")
+    private val store = PerPluginJsonStore(dir)
 
-    private fun read(pluginId: String): JSONObject {
-        val file = file(pluginId)
-        if (!file.isFile) return JSONObject()
-        return runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())
-    }
+    // A vault file that does not parse is set aside, not read as empty and then written over (Droidtop/tracker#766).
+    private fun read(pluginId: String): JSONObject = store.readOrSetAside(pluginId) ?: JSONObject()
 
-    private fun write(pluginId: String, json: JSONObject) {
-        AtomicWrite.text(file(pluginId), json.toString())
-    }
+    private fun write(pluginId: String, json: JSONObject) = store.write(pluginId, json)
 
     @Synchronized
     fun put(pluginId: String, key: String, value: String) {
@@ -91,8 +85,7 @@ class PluginVault(
     /** Uninstall: the values and the key go with the plugin. */
     @Synchronized
     fun clear(pluginId: String) {
-        file(pluginId).delete()
-        File(dir, "$pluginId.json.tmp").delete()
+        store.delete(pluginId)
         runCatching { dropKey(pluginId) }
     }
 
