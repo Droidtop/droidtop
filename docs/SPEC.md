@@ -2951,7 +2951,8 @@ the `ContainerRuntime` interface that already exists (§3):
   `restart`, `kill` (TERM, KILL or INT: a program is ended, not signalled; another signal is not built),
   `DELETE /containers/{id}` (409 for a running one without `force`, and for the desktop's own), `images/create`
   (a pull; its progress lines all at once after it), `containers/{id}/logs` (Docker's multiplexed frames, the
-  program's log as stdout; `follow`, `timestamps`, `since` and `until` not built) and `containers/{id}/wait`
+  program's log as stdout; with `follow`, the tail and then what the program writes, until it ends, read as attach
+  reads it (Droidtop/tracker#715); `timestamps`, `since` and `until` not built) and `containers/{id}/wait`
   (until the program is over, or for a program not started yet its start and end: "Wait before a start", below; its
   exit code, 125 when it could not start). `version` gives every field of Docker's own reply (GitCommit and GoVersion
   name droidtop's engine, which has neither), the Engine component's Details all strings, as Docker's CLI reads them

@@ -287,7 +287,21 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.Pull -> pull(app, libpod, call)
             is DockerApi.Call.Logs -> withContainer(libpod, runtime, call.id) { _, info ->
-                EngineHttp.Response(200, "application/vnd.docker.multiplexed-stream", DockerApi.logFrames(EngineActions.logs(app, info, call.tail)))
+                val tail = DockerApi.logFrames(EngineActions.logs(app, info, call.tail))
+                val id = info.container.id
+                // follow (Droidtop/tracker#715): the tail, then what the program writes next, until it ends, as
+                // Docker's follow ends with its container. A program not running has nothing more to follow.
+                if (call.follow && ContainerPrograms.isRunning(id)) {
+                    val log = dev.droidtop.runtime.ContainerProgram.hostLogFile(app.filesDir, id)
+                    EngineHttp.Response(
+                        status = 200,
+                        contentType = "application/vnd.docker.multiplexed-stream",
+                        body = tail,
+                        stream = { out -> followLog(log, id, fromStart = false, live = true, out) },
+                    )
+                } else {
+                    EngineHttp.Response(200, "application/vnd.docker.multiplexed-stream", tail)
+                }
             }
             is DockerApi.Call.Wait -> withContainer(libpod, runtime, call.id) { _, info ->
                 val id = info.container.id
@@ -580,7 +594,7 @@ internal object EngineApiServer {
     private val execScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
-     * Attach's stream (docs/SPEC.md 3d, "Attach"): a program's output goes to its log, so attach follows that file and
+     * Attach's stream (docs/SPEC.md 3d, "Attach"), and logs' with follow: a program's output goes to its log, so attach follows that file and
      * sends what is added as stdout frames, from where it ends now (or from the start with [fromStart]). With [live]
      * it goes on until the program has run and ended: attach comes before start, so it waits for the start, giving up
      * after [ATTACH_START_WAIT_MS] if none comes. The log may be trimmed under it, which starts it from the top.

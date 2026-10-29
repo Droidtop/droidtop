@@ -145,7 +145,11 @@ class DockerApiTest {
         assertEquals(DockerApi.Call.Pull("ghcr.io/x/y:2"), DockerApi.route("POST", "/images/create", mapOf("fromImage" to "ghcr.io/x/y:2", "tag" to "latest")))
         assertTrue(DockerApi.route("POST", "/images/create", mapOf("fromImage" to "a;b")) is DockerApi.Call.Refused)
         assertEquals(DockerApi.Call.Logs("web", 20, stdout = true, stderr = true), DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "stderr" to "1", "tail" to "20")))
-        assertTrue(DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "follow" to "1")) is DockerApi.Call.NotBuilt)
+        assertEquals(
+            DockerApi.Call.Logs("web", EngineCli.MAX_TAIL, stdout = true, stderr = false, follow = true),
+            DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "follow" to "1")),
+        )
+        assertTrue(DockerApi.route("GET", "/containers/web/logs", mapOf("stdout" to "1", "timestamps" to "1")) is DockerApi.Call.NotBuilt)
         assertEquals(DockerApi.Call.Refused(400, "You must choose at least one stream"), DockerApi.route("GET", "/containers/web/logs", emptyMap()))
         assertEquals(DockerApi.Call.Wait("web", "not-running"), DockerApi.route("POST", "/containers/web/wait", emptyMap()))
         assertEquals(DockerApi.Call.Wait("web", "removed"), DockerApi.route("POST", "/containers/web/wait", mapOf("condition" to "removed")))

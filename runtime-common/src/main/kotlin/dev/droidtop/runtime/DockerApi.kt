@@ -50,7 +50,7 @@ object DockerApi {
         data class Remove(val id: String, val force: Boolean, val ignoreMissing: Boolean = false) : Call
         /** [policy]: libpod's pull policy, always, missing, newer or never; Docker's pull is always. */
         data class Pull(val reference: String, val policy: String = "always") : Call
-        data class Logs(val id: String, val tail: Int, val stdout: Boolean, val stderr: Boolean) : Call
+        data class Logs(val id: String, val tail: Int, val stdout: Boolean, val stderr: Boolean, val follow: Boolean = false) : Call
         data class Wait(val id: String, val condition: String) : Call
 
         data class Networks(val filters: Map<String, List<String>>) : Call
@@ -179,13 +179,12 @@ object DockerApi {
     }
 
     private fun logs(id: String, query: Map<String, String>): Call = when {
-        flag(query["follow"]) -> Call.NotBuilt("logs?follow")
         flag(query["timestamps"]) -> Call.NotBuilt("logs?timestamps")
         (query["since"] ?: "0") != "0" || (query["until"] ?: "0") != "0" -> Call.NotBuilt("logs?since and until")
         !flag(query["stdout"]) && !flag(query["stderr"]) -> Call.Refused(400, "You must choose at least one stream")
         else -> {
             val tail = query["tail"].let { t -> if (t == null || t == "all") EngineCli.MAX_TAIL else t.toIntOrNull() }
-            if (tail == null || tail < 0) Call.Refused(400, "tail is not a number of lines") else Call.Logs(id, tail.coerceAtMost(EngineCli.MAX_TAIL), flag(query["stdout"]), flag(query["stderr"]))
+            if (tail == null || tail < 0) Call.Refused(400, "tail is not a number of lines") else Call.Logs(id, tail.coerceAtMost(EngineCli.MAX_TAIL), flag(query["stdout"]), flag(query["stderr"]), flag(query["follow"]))
         }
     }
 
