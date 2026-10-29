@@ -11823,7 +11823,7 @@ own Appearance step:
 1. The step starts downloading Art Book Next (`art-book-next-es-de`) through the real theme
    downloader (`ThemeDownloader`, `runtime-common/.../theme/ThemeDownloader.kt` — the same
    mechanism "Browse themes" uses, not a second one) the moment it is shown
-   (`OnboardingThemeDownload.ensureStarted`, `app/.../OnboardingActivity.kt`), on its own
+   (`OnboardingThemeDownload.ensureStarted`, `app/.../OnboardingAppearanceStep.kt`), on its own
    `CoroutineScope` that outlives the step's own composition — leaving the step (Next, Back) does
    not cancel the download.
 2. Progress is shown inline in the step (a status line above the theme list: downloading / failed)
