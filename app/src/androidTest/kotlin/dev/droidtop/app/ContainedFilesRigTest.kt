@@ -68,10 +68,20 @@ class ContainedFilesRigTest {
             // The plugin's own folder by path; "files" is where Android's getFilesDir would put a plugin's files.
             val files = File(context.privateDataDir(), "files")
             val dir = File(files, "rig")
+            // One level at a time, so the checks below never depend on mkdirs (checked on its own).
+            fun makeDir() {
+                files.mkdir()
+                dir.mkdir()
+            }
             when (call.op) {
                 "files" -> {
+                    // Several levels at once: File.mkdirs falls back on the canonical path, which a broker's alias must survive.
+                    check("mkdirs") {
+                        val deep = File(files, "deep/er")
+                        require(deep.mkdirs() || deep.isDirectory) { "mkdirs of ${deep.path} failed; canonical ${runCatching { deep.canonicalPath }.getOrElse { it.toString() }}" }
+                    }
                     check("write") {
-                        dir.mkdirs()
+                        makeDir()
                         File(dir, "a.txt").writeText("hello")
                         require(File(dir, "a.txt").readText() == "hello") { "read back differs" }
                     }
@@ -107,7 +117,7 @@ class ContainedFilesRigTest {
                     check("sqlite-wal") { sqlite("rig-wal.db", wal = true) }
                 }
                 "quota" -> {
-                    dir.mkdirs()
+                    makeDir()
                     // The file "existing" opens below, made while there is room: each test starts from an empty folder.
                     check("before") { File(dir, "a.txt").writeText("hello") }
                     val limit = call.args.getLong("limit")
