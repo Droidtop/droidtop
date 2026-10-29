@@ -30,6 +30,8 @@ android {
         // baseline (every other module targets 26) rather than carrying
         // a decade of pre-26 compatibility code paths we'll never run.
         minSdk = 26
+        // The downloaded speech engine's JNI library finds its Kotlin classes and their fields by name.
+        consumerProguardFiles("consumer-rules.pro")
         ndk {
             abiFilters += "arm64-v8a"
             abiFilters += "x86_64"
@@ -73,6 +75,8 @@ dependencies {
     // Inline autofill suggestions in the keyboard (Android 11+, Droidtop/tracker#342).
     implementation(libs.androidx.autofill)
     implementation(libs.androidx.core.ktx)
+    // Offline voice typing's English model arrives as a .tar.bz2, unpacked as it downloads (Droidtop/tracker#343).
+    implementation(libs.commons.compress)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

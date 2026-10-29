@@ -174,6 +174,8 @@ public class LatinIME extends InputMethodService implements
     });
     private String mGlideWord;
     static final String PREF_GLIDE = "pref_glide";
+    // droidtop: the strip says offline voice typing is listening, and a tap on it stops (Droidtop/tracker#343).
+    private boolean mShowingVoiceHint;
 
     private UserDictionary mUserDictionary;
     private UserBigramDictionary mUserBigramDictionary;
@@ -371,6 +373,8 @@ public class LatinIME extends InputMethodService implements
         KeyboardSwitcher.init(this);
         super.onCreate();
         sInstance = this;
+        // droidtop: whether offline voice typing's download is in place, read off the main thread (Droidtop/tracker#343).
+        OfflineVoice.refresh(this);
         // setStatusIcon(R.drawable.ime_qwerty);
         mResources = getResources();
         final Configuration conf = mResources.getConfiguration();
@@ -1065,6 +1069,9 @@ public class LatinIME extends InputMethodService implements
     @Override
     public void onFinishInputView(boolean finishingInput) {
         super.onFinishInputView(finishingInput);
+        // droidtop: dictation belongs to the field it started in (Droidtop/tracker#343).
+        OfflineVoiceTyping.finishInput();
+        mShowingVoiceHint = false;
         mPadKeys.clear();
         SecondScreenKeyboard.onShowEnded();
         if (mToolsDeck != null) {
@@ -2623,6 +2630,8 @@ public class LatinIME extends InputMethodService implements
         }
 
         if (mCandidateView != null) {
+            // droidtop: other suggestions replace offline voice typing's line, so a tap on them is a pick again.
+            mShowingVoiceHint = false;
             mCandidateView.setSuggestions(suggestions, completions,
                     typedWordValid, haveMinimalSuggestion);
         }
@@ -2727,7 +2736,28 @@ public class LatinIME extends InputMethodService implements
         return false;
     }
 
+    /** droidtop: offline voice typing's line in the suggestion strip (Droidtop/tracker#343). */
+    void showVoiceHint(CharSequence text) {
+        if (mCandidateView == null) return;
+        setCandidatesViewShown(true);
+        java.util.ArrayList<CharSequence> line = new java.util.ArrayList<>();
+        line.add(text);
+        mCandidateView.setSuggestions(line, false, false, false);
+        mShowingVoiceHint = true;
+    }
+
+    void clearVoiceHint() {
+        if (!mShowingVoiceHint) return;
+        mShowingVoiceHint = false;
+        if (mCandidateView != null) mCandidateView.clear();
+    }
+
     public void pickSuggestionManually(int index, CharSequence suggestion) {
+        // droidtop: a tap on "Listening" stops offline voice typing (Droidtop/tracker#343).
+        if (mShowingVoiceHint) {
+            OfflineVoiceTyping.stop();
+            return;
+        }
         // droidtop: one of a glide's other words replaces the word it typed (Droidtop/tracker#341).
         if (replaceGlideWord(suggestion)) return;
         List<CharSequence> suggestions = mCandidateView.getSuggestions();

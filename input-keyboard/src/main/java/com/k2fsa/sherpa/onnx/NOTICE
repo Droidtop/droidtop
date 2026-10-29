@@ -1,0 +1,11 @@
+The Kotlin files in this directory are from sherpa-onnx v1.13.8,
+https://github.com/k2-fsa/sherpa-onnx, sherpa-onnx/kotlin-api/,
+Copyright (c) 2022-2026 Xiaomi Corporation and the sherpa-onnx authors,
+licensed under the Apache License, Version 2.0
+(http://www.apache.org/licenses/LICENSE-2.0).
+
+They are the Kotlin side of the engine's JNI library, which the keyboard
+downloads on request (the same release's sherpa-onnx-1.13.8.aar); the native
+code finds these classes and their fields by name, so they must match that
+release exactly. Changes: the loadLibrary calls are removed (the downloaded
+library is loaded by path) and OnlineRecognizer.kt keeps only its classes.

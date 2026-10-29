@@ -719,4 +719,16 @@
     <string name="notification_channel_name">Hacker\'s Keyboard</string>
     <string name="notification_channel_description">Hacker\'s Keyboard</string>
     <string name="notification_action_settings">Settings</string>
+    <!-- droidtop: offline voice typing, downloaded on request (Droidtop/tracker#343). -->
+    <string name="title_offline_voice">Offline voice typing</string>
+    <string name="summary_offline_voice">Dictation on this device, with nothing sent anywhere. Downloads the speech engine and an English model first</string>
+    <string name="offline_voice_on">On: the voice key types what you say, offline (%1$d MB on this device)</string>
+    <string name="offline_voice_download">Download</string>
+    <string name="offline_voice_download_body">Downloads about %1$d MB from the sherpa-onnx project on GitHub and keeps %2$d MB on this device. Each file is checked before it is used. The voice key then types what you say, without a connection. Android asks once for the microphone.</string>
+    <string name="offline_voice_starting">Starting the download</string>
+    <string name="offline_voice_remove">Remove</string>
+    <string name="offline_voice_remove_body">Removes the speech engine and model (%1$d MB). The voice key goes back to another keyboard\'s voice typing, if one is on.</string>
+    <string name="offline_voice_removing">Removing</string>
+    <string name="offline_voice_listening">Listening… tap here or the voice key to stop</string>
+    <string name="offline_voice_failed">Offline voice typing stopped: %1$s</string>
 </resources>

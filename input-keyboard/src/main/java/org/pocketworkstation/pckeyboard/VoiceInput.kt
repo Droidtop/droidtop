@@ -9,8 +9,8 @@ import android.view.inputmethod.InputMethodSubtype
 
 /**
  * Where the voice key's dictation comes from (Droidtop/tracker#343). One provider answers at a time: the first in
- * [providers] that is available when the key is pressed. Today that is [SystemVoiceKeyboard]; the offline engine the
- * issue asks for joins this list as another provider, ahead of it.
+ * [providers] that is available when the key is pressed: [OfflineVoiceTyping] once its download is in place and the
+ * microphone is allowed, else [SystemVoiceKeyboard].
  */
 interface VoiceProvider {
     /** Whether this provider can dictate now. Cheap: asked on every press of the voice key. */
@@ -21,7 +21,7 @@ interface VoiceProvider {
 }
 
 object VoiceInput {
-    val providers: List<VoiceProvider> = listOf(SystemVoiceKeyboard)
+    val providers: List<VoiceProvider> = listOf(OfflineVoiceTyping, SystemVoiceKeyboard)
 
     /** The provider the voice key uses now, or null when none can dictate (the key then does nothing). */
     @JvmStatic

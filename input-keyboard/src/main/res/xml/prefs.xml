@@ -102,6 +102,13 @@
             android:defaultValue="@string/voice_mode_symbols"
             />
 
+    <!-- droidtop: offline voice typing, downloaded on request (Droidtop/tracker#343). -->
+    <Preference
+            android:key="pref_offline_voice"
+            android:title="@string/title_offline_voice"
+            android:summary="@string/summary_offline_voice"
+            />
+
     <PreferenceScreen
             android:title="@string/language_selection_title"
             android:summary="@string/language_selection_summary">

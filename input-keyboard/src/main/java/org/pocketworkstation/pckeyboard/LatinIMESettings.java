@@ -89,6 +89,16 @@ public class LatinIMESettings extends PreferenceActivity
             });
         }
 
+        // droidtop: offline voice typing's download (Droidtop/tracker#343).
+        Preference offlineVoice = findPreference(OfflineVoiceRow.KEY);
+        if (offlineVoice != null) {
+            offlineVoice.setOnPreferenceClickListener(p -> {
+                OfflineVoiceRow.open(this, p);
+                return true;
+            });
+            OfflineVoice.refresh(this, () -> runOnUiThread(() -> offlineVoice.setSummary(OfflineVoiceRow.summary(this))));
+        }
+
         SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
         prefs.registerOnSharedPreferenceChangeListener(this);
 
@@ -121,6 +131,8 @@ public class LatinIMESettings extends PreferenceActivity
         }
         
         updateSummaries();
+        Preference offlineVoice = findPreference(OfflineVoiceRow.KEY);
+        if (offlineVoice != null) offlineVoice.setSummary(OfflineVoiceRow.summary(this));
 
         String version = "";
         try {
