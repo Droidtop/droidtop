@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.settings.NoticeTone
 import dev.droidtop.library.settings.Notice
@@ -150,8 +151,8 @@ class StoreSignInActivity : AppCompatActivity() {
                                 color = if (failed) LocalNoticePalette.current.ink(NoticeTone.Caution) else MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        if (failed) TextButton(onClick = { retry(signIn) }) { Text("Try again") }
-                        TextButton(onClick = { finish() }) { Text("Close") }
+                        if (failed) TextButton(onClick = { retry(signIn) }) { Text(stringResource(R.string.store_sign_in_try_again)) }
+                        TextButton(onClick = { finish() }) { Text(stringResource(R.string.store_sign_in_close)) }
                     }
                     AndroidView(
                         modifier = Modifier.fillMaxSize(),
@@ -300,8 +301,8 @@ private fun AccountSignIn(label: String, session: StoreAccountSignIn, onDone: ()
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Sign in to $label", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = onClose) { Text("Close") }
+            Text(stringResource(R.string.store_sign_in_sign_in_to, label), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = onClose) { Text(stringResource(R.string.store_sign_in_close)) }
         }
         when (val current = step) {
             AccountSignInStep.Connecting -> Busy("Connecting to $label")
@@ -339,15 +340,15 @@ private fun Choices(label: String, failure: String?, session: StoreAccountSignIn
     // The primary action is selected on open, so a pad starts there.
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
     failure?.let { NoticeCard(Notice(NoticeTone.Caution, "Not signed in", body = it.take(Notice.BODY_MAX), details = it), NoticePlacement.Row) }
-    Text("With a QR code", style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.store_sign_in_with_a_qr_code), style = MaterialTheme.typography.titleMedium)
     Text(
         "Scan it with the $label app on your phone and approve. Nothing is typed here.",
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-    Button(onClick = { session.showQrCode() }, modifier = Modifier.focusRequester(first)) { Text("Show a QR code") }
+    Button(onClick = { session.showQrCode() }, modifier = Modifier.focusRequester(first)) { Text(stringResource(R.string.store_sign_in_show_a_qr_code)) }
     HorizontalDivider()
-    Text("With your account name and password", style = MaterialTheme.typography.titleMedium)
+    Text(stringResource(R.string.store_sign_in_with_your_account_name_and), style = MaterialTheme.typography.titleMedium)
     Text(
         "They go to $label to sign in and are not kept on this device. $label may then ask for a code from its phone app or your e-mail.",
         style = MaterialTheme.typography.bodyMedium,
@@ -356,14 +357,14 @@ private fun Choices(label: String, failure: String?, session: StoreAccountSignIn
     OutlinedTextField(
         value = accountName,
         onValueChange = { accountName = it },
-        label = { Text("Account name") },
+        label = { Text(stringResource(R.string.store_sign_in_account_name)) },
         singleLine = true,
         modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
     )
     OutlinedTextField(
         value = password,
         onValueChange = { password = it },
-        label = { Text("Password") },
+        label = { Text(stringResource(R.string.store_sign_in_password)) },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
@@ -374,13 +375,13 @@ private fun Choices(label: String, failure: String?, session: StoreAccountSignIn
             session.signInWithPassword(accountName, password)
             password = ""
         },
-    ) { Text("Sign in") }
+    ) { Text(stringResource(R.string.store_sign_in_sign_in)) }
 }
 
 @Composable
 private fun QrStep(label: String, url: String, session: StoreAccountSignIn) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    Text("Scan this with the $label app on your phone, then approve the sign-in there.", style = MaterialTheme.typography.bodyLarge)
+    Text(stringResource(R.string.store_sign_in_scan_this_with_the_app, label), style = MaterialTheme.typography.bodyLarge)
     QrCode(content = url, size = 240.dp)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         // The code is Steam's own s.team address; the Steam app on this
@@ -389,8 +390,8 @@ private fun QrStep(label: String, url: String, session: StoreAccountSignIn) {
             runCatching {
                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-        }) { Text("Open in the $label app on this device") }
-        OutlinedButton(onClick = { session.backToChoices() }) { Text("Back") }
+        }) { Text(stringResource(R.string.store_sign_in_open_in_the_app_on, label)) }
+        OutlinedButton(onClick = { session.backToChoices() }) { Text(stringResource(R.string.store_sign_in_back)) }
     }
 }
 
@@ -402,9 +403,9 @@ private fun CodeStep(label: String, step: AccountSignInStep.Code, session: Store
         style = MaterialTheme.typography.titleMedium,
     )
     if (step.wrongBefore) NoticeCard(Notice(NoticeTone.Caution, "That code wasn't right", body = "Type the code exactly as it is shown."), NoticePlacement.Row)
-    OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text("Code") }, singleLine = true)
+    OutlinedTextField(value = code, onValueChange = { code = it }, label = { Text(stringResource(R.string.store_sign_in_code)) }, singleLine = true)
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Button(enabled = code.isNotBlank(), onClick = { session.submitCode(code) }) { Text("Submit") }
-        OutlinedButton(onClick = { session.backToChoices() }) { Text("Back") }
+        Button(enabled = code.isNotBlank(), onClick = { session.submitCode(code) }) { Text(stringResource(R.string.store_sign_in_submit)) }
+        OutlinedButton(onClick = { session.backToChoices() }) { Text(stringResource(R.string.store_sign_in_back)) }
     }
 }

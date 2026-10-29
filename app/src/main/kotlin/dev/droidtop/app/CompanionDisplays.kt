@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -137,7 +138,7 @@ private fun MainBrightness() {
         return
     }
     var value by remember(current) { mutableIntStateOf(current ?: 128) }
-    Text("Brightness", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+    Text(stringResource(R.string.companion_displays_brightness), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
     Slider(
         value = value.toFloat(),
         onValueChange = { value = it.toInt(); DisplayControls.setBrightness(context, value) },
@@ -150,7 +151,7 @@ private fun MainBrightness() {
 @Composable
 private fun CompanionBrightness() {
     val level by DisplayControls.companionLevel.collectAsState()
-    Text("Brightness", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+    Text(stringResource(R.string.companion_displays_brightness), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         CompanionPill("−") { DisplayControls.setCompanionLevel(level - 0.1f) }
         Slider(

@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -175,9 +176,9 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
         modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text("Pair a $other", style = MaterialTheme.typography.headlineSmall)
+        Text(stringResource(R.string.pair_computer_pair_a, other), style = MaterialTheme.typography.headlineSmall)
         when (val s = state) {
-            PairState.Starting -> Text("Getting a code…", style = MaterialTheme.typography.bodyLarge)
+            PairState.Starting -> Text(stringResource(R.string.pair_computer_getting_a_code), style = MaterialTheme.typography.bodyLarge)
             is PairState.Showing -> Row(horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     if (handheld) {
@@ -187,9 +188,9 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
                         )
                         Text(s.at ?: "This device is on no network", style = MaterialTheme.typography.titleLarge, fontFamily = FontFamily.Monospace)
                         Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
-                        Text("Keep this screen open until the other handheld says it is paired. Both have to be on the same network.", style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.pair_computer_keep_this_screen_open_until), style = MaterialTheme.typography.bodyMedium)
                     } else {
-                        Text("On the computer, open droidtop-agent, choose Pair a handheld and type:", style = MaterialTheme.typography.bodyLarge)
+                        Text(stringResource(R.string.pair_computer_on_the_computer_open_droidtop), style = MaterialTheme.typography.bodyLarge)
                         Text(s.code.chunked(3).joinToString(" "), fontSize = 56.sp, fontFamily = FontFamily.Monospace)
                         Text("(or at a command line: droidtop-agent pair ${s.code})", style = MaterialTheme.typography.bodyMedium)
                         Text(
@@ -204,13 +205,13 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
             is PairState.Paired -> if (s.computer.handheld) PairedHandheld(s.computer, onDone) else PairedChoices(s.computer, onDone)
             is PairState.Failed -> {
                 Text(s.reason, style = MaterialTheme.typography.bodyLarge)
-                Button(onClick = { attempt++ }, modifier = Modifier.fillMaxWidth()) { Text("Get a new code") }
+                Button(onClick = { attempt++ }, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pair_computer_get_a_new_code)) }
             }
         }
         // The other way round, for a computer that cannot reach this device (an emulator, a guest network):
         // `droidtop-agent pair` on the computer shows its address and a code, and this device connects.
         if (state !is PairState.Paired) {
-            Text("Use a code from the other $other", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.pair_computer_use_a_code_from_the, other), style = MaterialTheme.typography.titleMedium)
             Text(
                 if (handheld) {
                     "Or the other way round: open Pair a handheld on the other handheld, and type the address and code it shows."
@@ -222,14 +223,14 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
             OutlinedTextField(
                 value = address,
                 onValueChange = { address = it.trim() },
-                label = { Text("The $other's address, such as 192.168.1.20:47612") },
+                label = { Text(stringResource(R.string.pair_computer_the_s_address_such_as, other)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
                 value = typed,
                 onValueChange = { typed = it.filter { c -> c.isDigit() }.take(6) },
-                label = { Text("Code") },
+                label = { Text(stringResource(R.string.pair_computer_code)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -257,7 +258,7 @@ private fun PairScreen(handheld: Boolean, onDone: () -> Unit, holdMulticast: () 
                 },
                 enabled = connecting != "Pairing…" && address.isNotBlank() && typed.length == 6,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("Pair with this $other") }
+            ) { Text(stringResource(R.string.pair_computer_pair_with_this, other)) }
         }
     }
 }
@@ -288,12 +289,12 @@ private fun keep(context: Context, reply: JSONObject): Computer {
 @Composable
 private fun PairedHandheld(device: Computer, onDone: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Paired with ${device.name}.", style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.pair_computer_paired_with, device.name), style = MaterialTheme.typography.titleLarge)
         Text(
             "Plugins that work with your devices, such as Syncthing, can now find it, once you allow them to see your paired devices.",
             style = MaterialTheme.typography.bodyLarge,
         )
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pair_computer_done)) }
     }
 }
 
@@ -317,24 +318,24 @@ private fun PairedChoices(computer: Computer, onDone: () -> Unit) {
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Paired with ${computer.name}.", style = MaterialTheme.typography.titleLarge)
-        Text("Saves sync with it when a game starts and ends. Should its games and programs also show here?", style = MaterialTheme.typography.bodyLarge)
+        Text(stringResource(R.string.pair_computer_paired_with_2, computer.name), style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.pair_computer_saves_sync_with_it_when), style = MaterialTheme.typography.bodyLarge)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Show its games in my library (the ones not on this device)", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.pair_computer_show_its_games_in_my), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = games, onCheckedChange = {
                 games = it
                 save()
             })
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Show its programs in Apps", Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            Text(stringResource(R.string.pair_computer_show_its_programs_in_apps), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
             Switch(checked = apps, onCheckedChange = {
                 apps = it
                 save()
             })
         }
-        Text("You can change both later in Settings > Computers > ${computer.name}.", style = MaterialTheme.typography.bodyMedium)
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        Text(stringResource(R.string.pair_computer_you_can_change_both_later, computer.name), style = MaterialTheme.typography.bodyMedium)
+        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.pair_computer_done)) }
     }
 }
 

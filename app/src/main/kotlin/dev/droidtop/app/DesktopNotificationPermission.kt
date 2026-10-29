@@ -8,6 +8,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 
 /**
  * The notification permission, asked for the desktop the first time it
@@ -44,7 +45,7 @@ object DesktopNotificationPermission {
     fun Dialog(onAllow: () -> Unit, onDecline: () -> Unit) {
         AlertDialog(
             onDismissRequest = onDecline,
-            title = { Text("Show the desktop's notification?") },
+            title = { Text(stringResource(R.string.desktop_notification_permission_show_the_desktop_s_notification)) },
             text = {
                 Text(
                     "The desktop keeps running while you use other apps. Android shows that with a " +
@@ -53,8 +54,8 @@ object DesktopNotificationPermission {
                         "in Containers.",
                 )
             },
-            confirmButton = { TextButton(onClick = onAllow) { Text("Allow") } },
-            dismissButton = { TextButton(onClick = onDecline) { Text("Don't allow") } },
+            confirmButton = { TextButton(onClick = onAllow) { Text(stringResource(R.string.desktop_notification_permission_allow)) } },
+            dismissButton = { TextButton(onClick = onDecline) { Text(stringResource(R.string.desktop_notification_permission_don_t_allow)) } },
         )
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -124,7 +125,7 @@ internal fun CompanionRetroArchSetup(entry: LibraryEntry, panelsRunning: List<de
     var asking by remember { mutableStateOf(false) }
     val colors = MaterialTheme.colorScheme
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-        Text("Save and load from here", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(stringResource(R.string.companion_retro_arch_setup_save_and_load_from_here), style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, modifier = Modifier.weight(1f))
         CompanionPill(if (open) "Close" else "Set up", selected = !open) { open = !open }
     }
     if (!open) return
@@ -132,13 +133,13 @@ internal fun CompanionRetroArchSetup(entry: LibraryEntry, panelsRunning: List<de
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(colors.surface).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Save and load from here", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+        Text(stringResource(R.string.companion_retro_arch_setup_save_and_load_from_here), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
         Text(
             "The RetroArch manager plugin adds Save state, Load state, the slot, fast-forward and shaders to this tab. " +
                 "It needs RetroArch's Network Commands, on this device only.",
             style = MaterialTheme.typography.bodyMedium, color = colors.onSurface,
         )
-        if (steps.approve) Text("Approve the RetroArch manager under Plugins.", style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
+        if (steps.approve) Text(stringResource(R.string.companion_retro_arch_setup_approve_the_retroarch_manager_under), style = MaterialTheme.typography.bodyMedium, color = colors.onSurface)
         status?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.primary, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         if (asking) {
             Text(

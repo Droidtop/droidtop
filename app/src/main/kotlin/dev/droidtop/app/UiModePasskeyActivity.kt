@@ -35,6 +35,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
@@ -129,7 +130,7 @@ private fun PasskeyEntry(onDone: () -> Unit) {
                 UiMode.GUEST -> "Guest"
                 else -> "this mode"
             }
-            Text("Passkey to leave $modeLabel", style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
+            Text(stringResource(R.string.ui_mode_passkey_passkey_to_leave, modeLabel), style = MaterialTheme.typography.titleMedium, color = colors.onSurface)
             Text(
                 if (entered.isEmpty()) "–" else "●".repeat(entered.length),
                 style = MaterialTheme.typography.headlineSmall,

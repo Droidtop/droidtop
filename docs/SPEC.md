@@ -17190,8 +17190,8 @@ the vendored trees excluded by path, as the API gate's baseline excludes them. B
 `check-ui-rules.sh`'s `literal-text` rule (Droidtop/tracker#177, owner 2026-10-14: "do it"): a Compose `Text` given a
 capitalised literal fails `--check`. It is on, with the modules not yet cleared on its allowlist; a module leaves the
 allowlist in the commit that moves its words into resources. `:shell-gamepad` is the first cleared
-(`shell-gamepad/src/main/res/values/strings.xml`), then `:shell-desktop` and `:ui-shared`, whose names carry the
-module (`desktop_`, `ui_shared_`) because Android merges every module's strings into one set and a second module's
+(`shell-gamepad/src/main/res/values/strings.xml`), then `:shell-desktop`, `:ui-shared` and `:app`, whose names carry the
+module or screen (`desktop_`, `ui_shared_`, `pair_computer_`, `companion_power_`) because Android merges every module's strings into one set and a second module's
 `close` would silently replace the first's. Catalog titles and lines (`title = "..."`) are the next step, with
 the rule widened to them module by module.
 

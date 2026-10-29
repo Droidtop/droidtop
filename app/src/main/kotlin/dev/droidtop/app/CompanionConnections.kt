@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -129,7 +130,7 @@ internal fun CompanionConnections() {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         detail?.let { d -> networkLines(d).forEach { Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurface) } }
             ?: CompanionNote("Reading…")
-        Text("Bluetooth devices", style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
+        Text(stringResource(R.string.companion_connections_bluetooth_devices), style = MaterialTheme.typography.titleSmall, color = colors.onSurface)
         val list = devices
         when {
             list == null -> {

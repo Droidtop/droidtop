@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
@@ -61,14 +62,14 @@ class QuickLaunchConfigureActivity : ComponentActivity() {
                         OutlinedTextField(
                             value = filter,
                             onValueChange = { filter = it },
-                            label = { Text("Filter") },
+                            label = { Text(stringResource(R.string.quick_launch_configure_filter)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
                         val list = games
                         when {
-                            list == null -> Text("Reading your library", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            list.isEmpty() -> Text("No games in your library yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            list == null -> Text(stringResource(R.string.quick_launch_configure_reading_your_library), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            list.isEmpty() -> Text(stringResource(R.string.quick_launch_configure_no_games_in_your_library), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             else -> {
                                 val shown = remember(list, filter) {
                                     val words = filter.trim().lowercase().split(' ').filter { it.isNotEmpty() }

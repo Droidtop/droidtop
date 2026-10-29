@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.labelCase
 import android.content.Context
 import android.util.LruCache
@@ -299,7 +300,7 @@ private fun PickerRow(row: AppPicker.Row, onHere: () -> Unit, onMain: () -> Unit
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(row.app.label, style = MaterialTheme.typography.bodyLarge, color = colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (row.app.game) Text("Game", style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
+                if (row.app.game) Text(stringResource(R.string.companion_app_picker_game), style = MaterialTheme.typography.labelSmall, color = colors.onSurfaceVariant)
             }
             CompanionPill("Main screen", onClick = onMain)
             CompanionPill(if (row.pinned) "Unpin" else "Pin", selected = row.pinned, onClick = onPin)
