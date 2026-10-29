@@ -814,21 +814,6 @@ private fun recentTime(atMillis: Long): String {
 
 
 /**
- * One row the Game section can show. Deliberately the same shape a plugin's
- * `ui.quick_tile@1` op (`state -> {label, value, on?, icon}` plus
- * `toggle`/`action`, docs/plugin-api.md C2) hands over -- [dangerAction]
- * is this list's `danger` styling, not a fourth quick-tile kind. Only
- * droidtop's own core rows are here: plugin tiles are in their plugin's
- * panel under the Plugins section ([PluginsTab]).
- */
-private data class GameQuickTile(
-    val title: String,
-    val subtitle: String?,
-    val dangerAction: Boolean = false,
-    val action: () -> Unit,
-)
-
-/**
  * The Plugins section (docs/plugin-api.md C17, Droidtop/tracker#316): Decky Loader's list and panels as one catalog
  * navigator. A on a plugin pushes its panel, B pops back to the list and from the list closes the sheet. The last
  * row, Manage plugins, pushes the Plugins screen here too: Gaming's plugins live in this section, not in the
@@ -924,15 +909,15 @@ private fun GameTab(
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
 
     val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse) {
-        fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = GameQuickTile(
+        fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = ActionRow(
             title = title,
-            subtitle = when {
+            detail = when {
                 armed == kind -> PressWords.againSentence
                 lastEnding == kind && quitOutcome != null -> quitOutcome.message
                 else -> idle
             },
-            dangerAction = true,
-            action = {
+            danger = true,
+            onSelect = {
                 if (secondPress(if (restart) dev.droidtop.library.settings.GameRow.RESTART else dev.droidtop.library.settings.GameRow.QUIT, armed == kind)) {
                     armed = kind
                 } else {
@@ -944,10 +929,9 @@ private fun GameTab(
         )
         buildList {
             add(
-                GameQuickTile(
+                ActionRow(
                     title = "Resume",
-                    subtitle = null,
-                    action = { onResume(entry) },
+                    onSelect = { onResume(entry) },
                 ),
             )
             // Only for a console game with something installed to choose from. A cycles Follow the
@@ -957,10 +941,10 @@ private fun GameTab(
                 dev.droidtop.library.settings.ControlAccess.shows(uiMode, dev.droidtop.library.settings.ControlRow.GAME_EMULATOR)
             ) {
                 add(
-                    GameQuickTile(
+                    ActionRow(
                         title = "Emulator",
-                        subtitle = dev.droidtop.library.consoles.GameEmulatorChoice.summary(emulators, emulatorChoice),
-                        action = {
+                        detail = dev.droidtop.library.consoles.GameEmulatorChoice.summary(emulators, emulatorChoice),
+                        onSelect = {
                             val next = dev.droidtop.library.consoles.GameEmulatorChoice.next(emulators, emulatorChoice)
                             scope.launch {
                                 if (dev.droidtop.library.consoles.GameEmulatorChoice.save(library, entry, next)) emulatorChoice = next
@@ -971,10 +955,10 @@ private fun GameTab(
             }
             padMouse?.let { on ->
                 add(
-                    GameQuickTile(
+                    ActionRow(
                         title = "Mouse mode",
-                        subtitle = if (on) "On. Both stick clicks held also turn it off" else "Off",
-                        action = {
+                        detail = if (on) "On. Both stick clicks held also turn it off" else "Off",
+                        onSelect = {
                             ownScreen?.setPadMouse(!on)
                             padMouse = !on
                         },
@@ -985,10 +969,9 @@ private fun GameTab(
             // and the sources that serve it, a download landing in its folder, as Search SNES in its list does.
             emulators?.system?.takeIf { entry.kind == dev.droidtop.library.LibraryEntryKind.CONSOLE_ROM }?.let { system ->
                 add(
-                    GameQuickTile(
+                    ActionRow(
                         title = dev.droidtop.shell.gamepad.query.SearchEntry.systemLabel(system.displayName),
-                        subtitle = null,
-                        action = { onSearchSystem(system.id, system.displayName) },
+                        onSelect = { onSearchSystem(system.id, system.displayName) },
                     ),
                 )
             }
@@ -1004,7 +987,7 @@ private fun GameTab(
     // without restarting it, with the same second press as the rows.
     // Kill force-stops at once, not the gentler Quit (Droidtop/tracker#571 row 16; the owner: "kill should
     // immediately force-stop it"); its second press asks Kill's own question.
-    val stop = GameQuickTile(title = "Kill", subtitle = null, dangerAction = true) {
+    val stop = ActionRow(title = "Kill", danger = true) {
         if (secondPress(dev.droidtop.library.settings.GameRow.KILL, armed == GameEnding.KILL)) {
             armed = GameEnding.KILL
         } else {
@@ -1033,7 +1016,7 @@ private fun GameTab(
                         focusIndex = if (focusIndex == STOP_PILL) 0 else menuStep(focusIndex, tiles.size, 1)
                     }
                     GamepadAction.B -> onDismiss()
-                    GamepadAction.A -> if (focusIndex == STOP_PILL) stop.action() else tiles.getOrNull(focusIndex)?.action?.invoke()
+                    GamepadAction.A -> if (focusIndex == STOP_PILL) stop.onSelect?.invoke() else tiles.getOrNull(focusIndex)?.onSelect?.invoke()
                     else -> Unit
                 }
                 true
@@ -1073,8 +1056,8 @@ private fun GameTab(
             tiles.forEachIndexed { index, tile ->
                 MenuRow(
                     title = tile.title,
-                    subtitle = tile.subtitle,
-                    danger = tile.dangerAction,
+                    subtitle = tile.detail,
+                    danger = tile.danger,
                     selected = index == focusIndex,
                     onClick = {
                         focusIndex = index

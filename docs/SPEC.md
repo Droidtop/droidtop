@@ -23908,11 +23908,16 @@ listed only when it has a row that can be pressed and saying its first rows ("Sc
 
 **The one sheet of choices (Droidtop/tracker#610, "a shared ActionSheet and row model").** A thing's short menu in
 Gaming is `ActionSheet` over `ActionRow` (a title, a line under it, the danger look, what A does): the app menu
-(`AppOptionsMenu`), a collection tile's menu and the imported-collections prompt are built on it, and their own row
-types and panels are gone. Up and Down move, A chooses, B, Select or L2 closes, and the sheet holds the pad. A row
-that has a choice of its own opens a page or a task, never a second sheet. The game menu's categories, the Quick
-Menu and the other shells' menus move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left
-(`raw-dialog`, off until its last site is moved).
+(`AppOptionsMenu`), a collection tile's menu, the imported-collections prompt and the game menu (`PcGameMenu`, every
+page of it) are built on it, and their own row types and panels are gone (`PcActionRow`, `PcMenuEntry`). Between rows
+a sheet can hold a heading (`ActionHeading`) and a line of text (`ActionNote`) that the cursor passes over, and a line
+under its title (the game menu's source, engine and size). Up and Down move, A chooses, Select or L2 closes, and B and
+the system Back go back: out of a page first where the sheet has pages (the game menu's categories), else they close
+it. The sheet holds the pad and keeps the system bars hidden. A row that has a choice of its own opens a page or a
+task, never a second sheet. The Quick Menu's Game section is a pane of the Quick Menu, not a sheet, but its rows are
+`ActionRow`s too (its `GameQuickTile` is gone). Desktop's window and taskbar menus and Standard's dialogs move onto
+it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left (`raw-dialog`, off until its last site is
+moved).
 
 **Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's
 translation updater under Wine while Enginehost plays the game: "We can set the game type. We can probably also do a

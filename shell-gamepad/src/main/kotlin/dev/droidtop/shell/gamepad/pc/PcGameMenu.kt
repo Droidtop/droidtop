@@ -3,19 +3,16 @@ package dev.droidtop.shell.gamepad.pc
 import dev.droidtop.runtime.FailureText
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.library.friendlyLocation
-import dev.droidtop.shell.gamepad.menuMove
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -69,12 +66,13 @@ import dev.droidtop.library.scraper.kindAndDate
 import dev.droidtop.library.scraper.line
 import dev.droidtop.shell.gamepad.CollectionMembershipEditor
 import dev.droidtop.shell.gamepad.ManualMatchPicker
-import dev.droidtop.shell.gamepad.MenuTokens
-import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.TextEditDialog
+import dev.droidtop.shell.gamepad.ActionHeading
+import dev.droidtop.shell.gamepad.ActionNote
+import dev.droidtop.shell.gamepad.ActionRow
+import dev.droidtop.shell.gamepad.ActionSheet
+import dev.droidtop.shell.gamepad.ActionSheetItem
 import dev.droidtop.shell.gamepad.MediaViewer
-import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -190,7 +188,8 @@ internal fun PcGameMenu(
     // on (docs/SPEC.md 7i): the short top page, or one of the two longer
     // lists it opens. A sub-page's B goes back to the top, never out.
     var page by remember(entry) { mutableStateOf(PcMenuPage.Root) }
-    var focusIndex by remember(entry) { mutableStateOf(0) }
+    val focus = remember(entry) { mutableIntStateOf(0) }
+    var focusIndex by focus
     // Uninstall is a two-step press (the design language's confirm): moving
     // to another row disarms it.
     var removeArmed by remember(entry) { mutableStateOf(false) }
@@ -585,24 +584,24 @@ internal fun PcGameMenu(
         ?.firstOrNull { segment -> segment.versions.any { version -> version.copies.any { it.path == entry.id } } }
     val finishedHere = grouping?.finished?.contains(entry.id) == true
     val titleRows = listOfNotNull(
-        PcActionRow(
+        ActionRow(
             "Title",
             if (entry.gameName.isNullOrBlank()) {
                 "From the folder name"
             } else {
                 "Your own title"
             },
-            { renaming = true },
+            onSelect = { renaming = true },
         ),
         partOf?.let { part ->
-            PcActionRow(
+            ActionRow(
                 if (finishedHere) "Not finished with ${part.label}" else "Finished with ${part.label}",
                 if (finishedHere) {
                     "Play returns to this part"
                 } else {
                     "Play moves to the next part"
                 },
-                {
+                onSelect = {
                     scope.launch {
                         withContext(Dispatchers.IO) { PartProgress.setFinished(context, entry.id, !finishedHere) }
                         progressToken++
@@ -612,10 +611,10 @@ internal fun PcGameMenu(
             )
         },
         partOf?.let { part ->
-            PcActionRow(
+            ActionRow(
                 "Make ${part.label} its own game",
                 "Lists it on its own",
-                {
+                onSelect = {
                     scope.launch {
                         library.renameGame(listOf(entry.id), "$gameName ${part.label}")
                         status = "${part.label} is a game of its own now."
@@ -647,13 +646,13 @@ internal fun PcGameMenu(
         val key = entry.pcInfo?.storeId ?: entry.id
         val gameId = key.substringAfter(':')
         val installed = entry.pcInfo?.installed == true
-        val play = mutableListOf<PcActionRow>()
-        val install = mutableListOf<PcActionRow>()
-        val saves = mutableListOf<PcActionRow>()
+        val play = mutableListOf<ActionRow>()
+        val install = mutableListOf<ActionRow>()
+        val saves = mutableListOf<ActionRow>()
         run {
             playOptions.forEach { option ->
                 play.add(
-                    PcActionRow(option.title, option.detail, {
+                    ActionRow(option.title, option.detail, onSelect = {
                         scope.launch {
                             status = "Working…"
                             status = store.playWith(context, gameId, option.id, GameNaming.displayName(entry.title))
@@ -662,17 +661,17 @@ internal fun PcGameMenu(
                 )
             }
             if (hasContent) {
-                install.add(PcActionRow("DLC and versions", "Which DLC to have and which version to follow", { contentOpen = true }))
+                install.add(ActionRow("DLC and versions", "Which DLC to have and which version to follow", onSelect = { contentOpen = true }))
             }
             downloads[key]?.let { job ->
-                install.add(PcActionRow("Downloads", dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job), {
+                install.add(ActionRow("Downloads", dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job), onSelect = {
                     onClose()
                     onOpenDownloads()
                 }))
             }
             if (installed && store.hasCloudSaves) {
                 saves.add(
-                    PcActionRow("Sync cloud saves", "Brings this game's saves and ${store.label}'s cloud to the same state", {
+                    ActionRow("Sync cloud saves", "Brings this game's saves and ${store.label}'s cloud to the same state", onSelect = {
                         scope.launch {
                             status = "Syncing saves…"
                             status = dev.droidtop.library.stores.StoreSaves
@@ -686,20 +685,20 @@ internal fun PcGameMenu(
                 val choice = autoUpdateChoices[key] ?: dev.droidtop.net.AutoUpdate.FOLLOW
                 val next = dev.droidtop.net.AutoUpdate.values()[(choice.ordinal + 1) % dev.droidtop.net.AutoUpdate.values().size]
                 install.add(
-                    PcActionRow(
+                    ActionRow(
                         "Keep up to date",
                         when (choice) {
                             dev.droidtop.net.AutoUpdate.FOLLOW -> "Follows the default, which is ${if (downloadRules.autoUpdateDefault) "on" else "off"}"
                             dev.droidtop.net.AutoUpdate.ON -> "On: installs a newer build when ${store.label} has one"
                             dev.droidtop.net.AutoUpdate.OFF -> "Off: never updates by itself"
                         },
-                        { scope.launch(Dispatchers.IO) { dev.droidtop.net.DownloadPolicy.setGame(context, key, next) } },
+                        onSelect = { scope.launch(Dispatchers.IO) { dev.droidtop.net.DownloadPolicy.setGame(context, key, next) } },
                     ),
                 )
             }
             if (installed && store.canVerify) {
                 install.add(
-                    PcActionRow("Verify files", "Checks every file against ${store.label}'s list", {
+                    ActionRow("Verify files", "Checks every file against ${store.label}'s list", onSelect = {
                         scope.launch {
                             status = "Checking files…"
                             status = store.verify(context, gameId).fold({ it }, { "Could not check: ${userFacingErrorMessage(it)}" })
@@ -710,10 +709,10 @@ internal fun PcGameMenu(
             if (installed) {
                 val where = entry.pcInfo?.installPath?.let { friendlyLocation(it) }
                 install.add(
-                    PcActionRow(
+                    ActionRow(
                         "Uninstall",
                         if (removeArmed) "Press again: deletes ${where ?: "its files"}" else "Deletes ${where ?: "its files"}. ${store.label} still lists it",
-                        {
+                        onSelect = {
                             if (!removeArmed) {
                                 removeArmed = true
                             } else {
@@ -749,10 +748,10 @@ internal fun PcGameMenu(
         replacements = replacements.size,
         onReplace = { pickingReplacement = true },
         sameGameRow = names.similar.size.takeIf { it > 0 }?.let { count ->
-            PcActionRow(
+            ActionRow(
                 "The same game as...",
                 "$count with a similar name",
-                { pickingSameGame = true },
+                onSelect = { pickingSameGame = true },
             )
         },
         updateRows = if (!isFolder) {
@@ -761,10 +760,10 @@ internal fun PcGameMenu(
             updateSources.flatMap { source ->
                 val link = links?.link(source.key)
                 listOfNotNull(
-                    PcActionRow(
+                    ActionRow(
                         source.label,
                         sourceLine(link, available, versions),
-                        {
+                        onSelect = {
                             if (link != null) {
                                 viewingRecord = Triple(source, link.externalId, if (available != null) RecordTab.DOWNLOADS else RecordTab.OVERVIEW)
                             } else {
@@ -773,12 +772,12 @@ internal fun PcGameMenu(
                         },
                     ),
                     link?.let {
-                        PcActionRow(
+                        ActionRow(
                             if (updateSources.size > 1) "Check ${source.label} now" else "Check for an update now",
                             it.answer?.takeIf { a -> a.checkedAtEpochMs > 0 }
                                 ?.let { a -> "Last checked " + dev.droidtop.library.format.ValueFormat.ago(System.currentTimeMillis(), a.checkedAtEpochMs).replaceFirstChar { c -> c.lowercase() } }
                                 ?: "Not checked yet",
-                            {
+                            onSelect = {
                                 scope.launch {
                                     status = "Checking ${source.label}..."
                                     status = checkSourceAndSay(library, gameIds, it.key, versions, entry.latestKnown)
@@ -810,14 +809,14 @@ internal fun PcGameMenu(
             if (engineChoice.folder == null || !loaded) {
                 null
             } else {
-                PcActionRow(
+                ActionRow(
                     "Engine",
                     when {
                         engine == null -> "Not identified as an engine game; pick one if it is"
                         engineChoice.pinned -> "${engine.displayName()} - your choice"
                         else -> "${engine.displayName()} - identified; pick another if that is wrong"
                     },
-                    { pickingEngine = true },
+                    onSelect = { pickingEngine = true },
                 )
             }
         },
@@ -852,7 +851,7 @@ internal fun PcGameMenu(
                     null
                 },
             ).map { tool ->
-                PcActionRow(tool.title, tool.detail) {
+                ActionRow(tool.title, tool.detail) {
                     val screen = dev.droidtop.library.settings.SettingsScreenRegistry.get(
                         tool.screenId,
                         dev.droidtop.library.LinuxToolsScreen.argument(entry.id, gameName, folder),
@@ -881,7 +880,7 @@ internal fun PcGameMenu(
         },
     )
 
-    var pageInfo: List<PcMenuEntry> = emptyList()
+    var pageInfo: List<ActionSheetItem> = emptyList()
     val isReady = runner?.option?.state == RunnerState.READY
     val setupAction = runner?.option?.action
     val playState = if (loaded) {
@@ -894,7 +893,7 @@ internal fun PcGameMenu(
     // draws and what Up/Down/A navigate: a section header (never
     // selectable), an info line (never selectable, e.g. a status message
     // or the compatibility summary), or a row (selectable, the same
-    // PcActionRow the sections produce). The rows sit under the three
+    // ActionRow the sections produce). The rows sit under the three
     // headers of docs/SPEC.md 13, "Gaming mode" -- Play, About, Fix and
     // advanced -- so one list, one focus index, the same shape
     // GamelistOptionsMenu's own Select-button menu already uses, still
@@ -905,7 +904,7 @@ internal fun PcGameMenu(
     var storeLinksHidden by remember(entry) { mutableStateOf(dev.droidtop.library.StoreLinkPrefs.hidden(context, gameIds)) }
     // Runs with -- WHICH runner, and how to change it: the first row of How it runs.
     val runsWithRow = if (!entry.missing && (!loaded || runners.options.isNotEmpty())) {
-        PcActionRow(
+        ActionRow(
             title = "Runs with",
             detail = when {
                 !loaded -> "Working out what can run this…"
@@ -919,71 +918,69 @@ internal fun PcGameMenu(
     }
     // Run once with… -- another runner for one launch, the saved one kept: offered when there is a choice to make.
     val runOnceRow = if (!entry.missing && loaded && runners.options.count { it.selectable } > 1) {
-        PcActionRow("Run once with…", "Start it one time with another runner; Runs with stays as it is", { pickingOnce = true })
+        ActionRow("Run once with…", "Start it one time with another runner; Runs with stays as it is", onSelect = { pickingOnce = true })
     } else {
         null
     }
-    val playEntries = buildList {
+    val playEntries = buildList<ActionSheetItem> {
         // Play, or the one action that makes Play possible -- the
         // gamelist's own A makes this exact decision on its own
         // (docs/SPEC.md 7i, PcRunnerOptions.resolveAndPlay), and the
         // library's hero and the game page draw the same [PcPlayState],
         // so this row is a second way to reach the very same thing.
         if (entry.missing) {
-            add(PcMenuEntry.Row(PcActionRow("The folder is not there", missingFolderLine(entry), null)))
+            add(ActionRow("The folder is not there", missingFolderLine(entry), onSelect = null))
         } else {
             add(
-                PcMenuEntry.Row(
-                    PcActionRow(
-                        title = playState.verb,
-                        detail = playState.detail,
-                        onSelect = if (loaded && playState.pressable) {
-                            {
-                                val store = if (playState.chooseEngine) null else playState.store
-                                when (store) {
-                                    // Install and Update stop on the free-space
-                                    // offer first: the size and the room the
-                                    // chosen volume has are named before the
-                                    // store's screen opens (Droidtop/tracker#227).
-                                    StoreStage.INSTALL, StoreStage.UPDATE ->
-                                        storeOffer = StoreInstallOffer(entry, checkNotNull(store))
-                                    StoreStage.WISHLIST -> status = openOnStore(context, entry)
-                                    // Downloading, Paused: the download is already
-                                    // in flight; a paused one resumes, a running one
-                                    // is in Downloads.
-                                    null -> Unit
-                                    else -> status = continueStoreDownload(context, entry, store) {
-                                        onClose()
-                                        onOpenDownloads()
-                                    }
+                ActionRow(
+                    title = playState.verb,
+                    detail = playState.detail,
+                    onSelect = if (loaded && playState.pressable) {
+                        {
+                            val store = if (playState.chooseEngine) null else playState.store
+                            when (store) {
+                                // Install and Update stop on the free-space
+                                // offer first: the size and the room the
+                                // chosen volume has are named before the
+                                // store's screen opens (Droidtop/tracker#227).
+                                StoreStage.INSTALL, StoreStage.UPDATE ->
+                                    storeOffer = StoreInstallOffer(entry, checkNotNull(store))
+                                StoreStage.WISHLIST -> status = openOnStore(context, entry)
+                                // Downloading, Paused: the download is already
+                                // in flight; a paused one resumes, a running one
+                                // is in Downloads.
+                                null -> Unit
+                                else -> status = continueStoreDownload(context, entry, store) {
+                                    onClose()
+                                    onOpenDownloads()
                                 }
-                                if (store == null) {
-                                    if (playState.chooseEngine) {
-                                        if (engineChoice.folder != null) pickingEngine = true else status = "No game folder to pick an engine for"
-                                    } else if (isReady) {
-                                        onClose()
-                                        onLaunch()
-                                    } else if (setupAction != null) {
-                                        scope.launch {
-                                            status = "Working…"
-                                            val failure = PcRunnerOptions.runAction(context, entry, setupAction) { status = it }
-                                            status = failure
-                                            reloadToken++
-                                        }
+                            }
+                            if (store == null) {
+                                if (playState.chooseEngine) {
+                                    if (engineChoice.folder != null) pickingEngine = true else status = "No game folder to pick an engine for"
+                                } else if (isReady) {
+                                    onClose()
+                                    onLaunch()
+                                } else if (setupAction != null) {
+                                    scope.launch {
+                                        status = "Working…"
+                                        val failure = PcRunnerOptions.runAction(context, entry, setupAction) { status = it }
+                                        status = failure
+                                        reloadToken++
                                     }
                                 }
                             }
-                        } else {
-                            null
-                        },
-                    ),
+                        }
+                    } else {
+                        null
+                    },
                 ),
             )
         }
         if (playState.store == StoreStage.UPDATE && isReady) {
-            add(PcMenuEntry.Row(PcActionRow("Play without updating", "Starts the installed build as it is", { onClose(); onLaunch() })))
+            add(ActionRow("Play without updating", "Starts the installed build as it is", onSelect = { onClose(); onLaunch() }))
         }
-        actions.play.forEach { add(PcMenuEntry.Row(it)) }
+        actions.play.forEach { add(it) }
     }
 
     run {
@@ -1026,61 +1023,55 @@ internal fun PcGameMenu(
         // looked up only when asked.
         val compat = entry.pcInfo?.compatibility
         val offersProtonDb = !entry.missing && (hasWindowsRoute || entry.pcInfo?.storeId != null)
-        val aboutEntries = buildList {
-            if (ownedOn.isNotEmpty()) add(PcMenuEntry.Info(ownedOn))
-            plainLinks.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
+        val aboutEntries = buildList<ActionSheetItem> {
+            if (ownedOn.isNotEmpty()) add(ActionNote(ownedOn))
+            plainLinks.forEach { link -> add(ActionRow(link.label, link.url) { openLink(link.url) }) }
             if (pointers.isNotEmpty()) {
-                pointers.forEach { link -> add(PcMenuEntry.Row(PcActionRow(link.label, link.url) { openLink(link.url) })) }
+                pointers.forEach { link -> add(ActionRow(link.label, link.url) { openLink(link.url) }) }
                 add(
-                    PcMenuEntry.Row(
-                        PcActionRow("Hide these for this game", "") {
-                            dev.droidtop.library.StoreLinkPrefs.hide(context, gameIds)
-                            storeLinksHidden = true
-                        },
-                    ),
+                    ActionRow("Hide these for this game", "") {
+                        dev.droidtop.library.StoreLinkPrefs.hide(context, gameIds)
+                        storeLinksHidden = true
+                    },
                 )
                 add(
-                    PcMenuEntry.Row(
-                        PcActionRow("Hide these for every game", "Brought back under Stores") {
-                            dev.droidtop.library.StoreLinkPrefs.setHiddenEverywhere(context, true)
-                            storeLinksHidden = true
-                        },
-                    ),
+                    ActionRow("Hide these for every game", "Brought back under Stores") {
+                        dev.droidtop.library.StoreLinkPrefs.setHiddenEverywhere(context, true)
+                        storeLinksHidden = true
+                    },
                 )
             }
-            actions.info.forEach { add(PcMenuEntry.Row(it)) }
+            actions.info.forEach { add(it) }
             compat?.let {
-                add(PcMenuEntry.Info(it.summary() + "\nOther people's results on other hardware."))
+                add(ActionNote(it.summary() + "\nOther people's results on other hardware."))
             }
             if (offersProtonDb) {
                 val state = protonDb
                 add(
-                    PcMenuEntry.Row(
-                        PcActionRow(
-                            title = if (state is ProtonDbState.Found) state.summary.line() else "ProtonDB",
-                            detail = state.detail(),
-                            onSelect = if (state !is ProtonDbState.Looking) {
-                                {
-                                    when (state) {
-                                        is ProtonDbState.Found -> status = runCatching {
-                                            context.startActivity(
-                                                android.content.Intent(
-                                                    android.content.Intent.ACTION_VIEW,
-                                                    android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
-                                                ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                            )
-                                            null
-                                        }.getOrElse { "There is no browser on this device to open ProtonDB in." }
-                                        else -> {
-                                            protonDb = ProtonDbState.Looking
-                                            scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
-                                        }
+                    ActionRow(
+                        title = if (state is ProtonDbState.Found) state.summary.line() else "ProtonDB",
+                        detail = state.detail(),
+                        onSelect = if (state !is ProtonDbState.Looking) {
+                            {
+                                when (state) {
+                                    is ProtonDbState.Found -> status = runCatching {
+                                        context.startActivity(
+                                            android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(ProtonDbClient.pageUrl(state.appId)),
+                                            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                        )
+                                        null
+                                    }.getOrElse { "There is no browser on this device to open ProtonDB in." }
+                                    else -> {
+                                        protonDb = ProtonDbState.Looking
+                                        scope.launch { protonDb = lookUpProtonDb(entry, gameName) }
                                     }
                                 }
-                            } else {
-                                null
-                            },
-                        ),
+                            }
+                        } else {
+                            null
+                        },
                     ),
                 )
             }
@@ -1089,31 +1080,29 @@ internal fun PcGameMenu(
         val newsAppId = steamAppIdOf(entry)
         val newsRow = newsAppId?.let {
             val state = steamNews
-            PcMenuEntry.Row(
-                PcActionRow(
-                    title = if (state is SteamNewsState.Found) state.item.title else "What's new",
-                    detail = state.detail(),
-                    onSelect = if (state !is SteamNewsState.Looking) {
-                        {
-                            if (state is SteamNewsState.Found) {
-                                status = runCatching {
-                                    context.startActivity(
-                                        android.content.Intent(
-                                            android.content.Intent.ACTION_VIEW,
-                                            android.net.Uri.parse(SteamNewsClient.pageUrl(newsAppId)),
-                                        ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-                                    )
-                                    null
-                                }.getOrElse { "There is no browser on this device to open Steam's news in." }
-                            } else {
-                                steamNews = SteamNewsState.Looking
-                                scope.launch { steamNews = lookUpSteamNews(newsAppId) }
-                            }
+            ActionRow(
+                title = if (state is SteamNewsState.Found) state.item.title else "What's new",
+                detail = state.detail(),
+                onSelect = if (state !is SteamNewsState.Looking) {
+                    {
+                        if (state is SteamNewsState.Found) {
+                            status = runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(SteamNewsClient.pageUrl(newsAppId)),
+                                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                                )
+                                null
+                            }.getOrElse { "There is no browser on this device to open Steam's news in." }
+                        } else {
+                            steamNews = SteamNewsState.Looking
+                            scope.launch { steamNews = lookUpSteamNews(newsAppId) }
                         }
-                    } else {
-                        null
-                    },
-                ),
+                    }
+                } else {
+                    null
+                },
             )
         }
         pageInfo = aboutEntries + listOfNotNull(newsRow)
@@ -1122,61 +1111,57 @@ internal fun PcGameMenu(
     // The categories (docs/SPEC.md 7i, "The game menu", owner 2026-10-23: "No more than one nested menu deep, and
     // fairly short categories"): each opens one page and nothing deeper, and a category with nothing in it is not
     // offered, because a row opening an empty page is a category claiming to exist.
-    val pages: Map<PcMenuPage, List<PcMenuEntry>> = mapOf(
+    val pages: Map<PcMenuPage, List<ActionSheetItem>> = mapOf(
         PcMenuPage.Info to pageInfo,
-        PcMenuPage.Organise to actions.organise.map { PcMenuEntry.Row(it) },
-        PcMenuPage.Install to actions.install.map { PcMenuEntry.Row(it) },
-        PcMenuPage.Updates to actions.updates.map { PcMenuEntry.Row(it) },
-        PcMenuPage.Runs to (listOfNotNull(runsWithRow, runOnceRow) + actions.runs).map { PcMenuEntry.Row(it) },
-        PcMenuPage.Saves to actions.saves.map { PcMenuEntry.Row(it) },
-        PcMenuPage.Manage to actions.manage.map { PcMenuEntry.Row(it) },
+        PcMenuPage.Organise to actions.organise,
+        PcMenuPage.Install to actions.install,
+        PcMenuPage.Updates to actions.updates,
+        PcMenuPage.Runs to (listOfNotNull(runsWithRow, runOnceRow) + actions.runs),
+        PcMenuPage.Saves to actions.saves,
+        PcMenuPage.Manage to actions.manage,
     )
-    val entries = buildList {
+    val entries = buildList<ActionSheetItem> {
         when (page) {
             PcMenuPage.Root -> {
                 addAll(playEntries)
-                status?.let { add(PcMenuEntry.Info(it)) }
+                status?.let { add(ActionNote(it)) }
                 PcMenuPage.categories.forEach { category ->
-                    val rows = pages[category].orEmpty().filterIsInstance<PcMenuEntry.Row>()
-                    if (rows.any { it.row.onSelect != null }) {
+                    val rows = pages[category].orEmpty().filterIsInstance<ActionRow>()
+                    if (rows.any { it.onSelect != null }) {
                         add(
-                            PcMenuEntry.Row(
-                                PcActionRow(category.title, categoryLine(rows.map { it.row.title })) {
-                                    page = category
-                                    focusIndex = 0
-                                },
-                            ),
+                            ActionRow(category.title, categoryLine(rows.map { it.title })) {
+                                page = category
+                                focusIndex = 0
+                            },
                         )
                     }
                 }
                 if (hasPluginActions) {
                     add(
-                        PcMenuEntry.Row(
-                            PcActionRow(dev.droidtop.shell.gamepad.PLUGIN_ACTIONS_LABEL, "What your plugins can do with this game") {
-                                pluginScreen = dev.droidtop.shell.gamepad.pluginActionsScreen(
-                                    entry,
-                                    dev.droidtop.pluginhost.PluginModes.Surfaces.GAMING_GAME_MENU,
-                                ) { reply -> pluginScreen = reply }
-                            },
-                        ),
+                        ActionRow(dev.droidtop.shell.gamepad.PLUGIN_ACTIONS_LABEL, "What your plugins can do with this game") {
+                            pluginScreen = dev.droidtop.shell.gamepad.pluginActionsScreen(
+                                entry,
+                                dev.droidtop.pluginhost.PluginModes.Surfaces.GAMING_GAME_MENU,
+                            ) { reply -> pluginScreen = reply }
+                        },
                     )
                 }
-                add(PcMenuEntry.Row(PcActionRow("Close", "", onClose)))
+                add(ActionRow("Close", "", onSelect = onClose))
             }
             else -> {
-                add(PcMenuEntry.Header(page.title))
-                status?.let { add(PcMenuEntry.Info(it)) }
+                add(ActionHeading(page.title))
+                status?.let { add(ActionNote(it)) }
                 addAll(pages[page].orEmpty())
-                add(PcMenuEntry.Row(PcActionRow("Back", "") { page = PcMenuPage.Root; focusIndex = 0 }))
+                add(ActionRow("Back", "") { page = PcMenuPage.Root; focusIndex = 0 })
             }
         }
     }
 
-    val rowEntries = entries.filterIsInstance<PcMenuEntry.Row>()
+    val rowCount = entries.count { it is ActionRow }
     // The row list changes under the cursor (a page opens, a row goes
     // away); it never points past the end it is drawn against.
-    LaunchedEffect(rowEntries.size, page) {
-        focusIndex = focusIndex.coerceIn(0, (rowEntries.size - 1).coerceAtLeast(0))
+    LaunchedEffect(rowCount, page) {
+        focusIndex = focusIndex.coerceIn(0, (rowCount - 1).coerceAtLeast(0))
     }
     // B and the system Back step out of a sub-page before they close the
     // menu; both reach the same function (the Dialog's own dismiss is Back).
@@ -1195,56 +1180,19 @@ internal fun PcGameMenu(
     // (console, build 1519, Droidtop/tracker#371).
     val childOpen = (contentOpen && ownStore != null) || storeOffer != null || pickingMatch ||
         pickingReplacement || (pickingSameGame && grouping != null) || renaming || editingSource != null
-    if (!childOpen) Dialog(onDismissRequest = goBack) {
-        GatePadInThisDialog()
-        HideSystemBarsInThisDialog()
-        MenuPanel(
-            modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
+    if (!childOpen) {
+        ActionSheet(
+            title = gameName,
+            subtitle = entry.identityLine(available),
+            rows = entries,
+            // B and the system Back step out of a page before they close the menu; L2, the button that opened it,
+            // or Select on the game page close it from any page (proposal 6.E, Droidtop/tracker#644 slice 4).
+            onBack = goBack,
+            onDismiss = onClose,
+            focus = focus,
+            width = 560.dp,
             focusLabel = "Game options",
-            onPad = { press ->
-                when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rowEntries.size, press)
-                    GamepadAction.A -> rowEntries.getOrNull(focusIndex)?.row?.onSelect?.invoke()
-                    // B steps out of a page before it closes the menu, like
-                    // the system back key (the dialog's own dismiss); the
-                    // release of the same press can no longer step out a
-                    // second time, it belongs to this press (SPEC 6e).
-                    GamepadAction.B -> goBack()
-                    // The button that opened the menu closes it: L2, or Select on the page (proposal 6.E,
-                    // Droidtop/tracker#644 slice 4).
-                    GamepadAction.SELECT, GamepadAction.L2 -> onClose()
-                    else -> Unit
-                }
-                true
-            },
-        ) {
-            Text(
-                gameName,
-                style = MaterialTheme.typography.titleLarge,
-                color = MenuTokens.OnSurface,
-                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-            )
-            Text(entry.identityLine(available), color = MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodySmall)
-            var rowCounter = 0
-            entries.forEach { menuEntry ->
-                when (menuEntry) {
-                    is PcMenuEntry.Header -> dev.droidtop.shell.gamepad.MenuSectionLabel(menuEntry.title)
-                    is PcMenuEntry.Info -> Text(menuEntry.text, color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall)
-                    is PcMenuEntry.Row -> {
-                        val index = rowCounter++
-                        dev.droidtop.shell.gamepad.MenuRow(
-                            title = menuEntry.row.title,
-                            subtitle = menuEntry.row.detail.ifBlank { null },
-                            selected = index == focusIndex,
-                            onClick = {
-                                focusIndex = index
-                                menuEntry.row.onSelect?.invoke()
-                            },
-                        )
-                    }
-                }
-            }
-        }
+        )
     }
     if (contentOpen && ownStore != null) {
         StoreContentSheet(
@@ -1314,12 +1262,6 @@ internal enum class PcMenuPage(val title: String) {
 internal fun categoryLine(titles: List<String>): String =
     titles.take(3).joinToString(", ") + if (titles.size > 3) ", and more" else ""
 
-/** One entry in [PcGameMenu]'s flattened list: a section header, an info line, or a selectable row. */
-private sealed interface PcMenuEntry {
-    data class Header(val title: String) : PcMenuEntry
-    data class Info(val text: String) : PcMenuEntry
-    data class Row(val row: PcActionRow) : PcMenuEntry
-}
 /**
  * One line under the title: where it came from, what engine it is, how
  * big it is -- or, for a game the walk no longer finds, the one fact
@@ -1346,31 +1288,28 @@ private fun LibraryEntry.identityLine(update: String?): String = if (missing) "b
  * list per category ([PcMenuPage.categories]).
  */
 private data class PcMenuSections(
-    val play: List<PcActionRow>,
-    val info: List<PcActionRow>,
-    val organise: List<PcActionRow>,
-    val install: List<PcActionRow>,
-    val updates: List<PcActionRow>,
-    val runs: List<PcActionRow>,
-    val saves: List<PcActionRow>,
-    val manage: List<PcActionRow>,
+    val play: List<ActionRow>,
+    val info: List<ActionRow>,
+    val organise: List<ActionRow>,
+    val install: List<ActionRow>,
+    val updates: List<ActionRow>,
+    val runs: List<ActionRow>,
+    val saves: List<ActionRow>,
+    val manage: List<ActionRow>,
 )
 
 /** One screen of the Manage section: the registered screen it opens and its row's words. */
 private class ManageTool(val screenId: String, val title: String, val detail: String)
 
 /** A store game's own rows, filed by what they are for: other ways to play, the install, and its cloud saves. */
-private data class StoreRows(val play: List<PcActionRow>, val install: List<PcActionRow>, val saves: List<PcActionRow>)
+private data class StoreRows(val play: List<ActionRow>, val install: List<ActionRow>, val saves: List<ActionRow>)
 
 /** The rows of the runner this game uses: how it runs, and where its controls and saves are. */
-private data class RunnerRows(val runs: List<PcActionRow>, val saves: List<PcActionRow>) {
+private data class RunnerRows(val runs: List<ActionRow>, val saves: List<ActionRow>) {
     companion object {
         val NONE = RunnerRows(emptyList(), emptyList())
     }
 }
-
-/** [onSelect] null means the row is shown disabled, with [detail] saying why. */
-private data class PcActionRow(val title: String, val detail: String, val onSelect: (() -> Unit)?)
 
 /** What the Engine row needs: the pin's folder key, whether it is set, and the engines it can name. */
 private data class EngineChoice(val folder: String?, val pinned: Boolean, val engines: List<Pair<String, GameEngine>>) {
@@ -1387,7 +1326,7 @@ private data class EngineChoice(val folder: String?, val pinned: Boolean, val en
  */
 @Composable
 private fun rememberPcActions(
-    titleRows: List<PcActionRow>,
+    titleRows: List<ActionRow>,
     // A store game: its store's rows. Null for a game no store owns.
     storeRows: StoreRows?,
     group: dev.droidtop.library.LibraryGameGroup?,
@@ -1395,8 +1334,8 @@ private fun rememberPcActions(
     onOpenOther: (LibraryEntry) -> Unit,
     replacements: Int,
     onReplace: () -> Unit,
-    sameGameRow: PcActionRow?,
-    updateRows: List<PcActionRow>,
+    sameGameRow: ActionRow?,
+    updateRows: List<ActionRow>,
     entry: LibraryEntry,
     runner: ResolvedRunner?,
     media: Int,
@@ -1408,10 +1347,10 @@ private fun rememberPcActions(
     favorite: Boolean,
     onToggleFavorite: () -> Unit,
     onOpenPage: (() -> Unit)?,
-    engineRow: PcActionRow?,
+    engineRow: ActionRow?,
     onEnginehost: (android.content.Intent) -> Unit,
     hasWindowsRoute: Boolean,
-    manageTools: List<PcActionRow>,
+    manageTools: List<ActionRow>,
     onOpenWineSettings: () -> Unit,
     wineSettings: WineGameSettings?,
     onImportLutris: () -> Unit,
@@ -1436,23 +1375,23 @@ private fun rememberPcActions(
         // The top: the store's other ways to play (Steam Link), the page, and the favourite. The primary action and
         // Play without updating are added where the play state is known.
         play = storeRows?.play.orEmpty() + listOfNotNull(
-            onOpenPage?.let { PcActionRow("Game page", "Its artwork, facts and the one Play button", it) },
-            PcActionRow(
+            onOpenPage?.let { ActionRow("Game page", "Its artwork, facts and the one Play button", onSelect = it) },
+            ActionRow(
                 if (favorite) "Remove from favourites" else "Add to favourites",
                 if (favorite) "It is in your Favourites collection" else "Puts it in your Favourites collection",
-                onToggleFavorite,
+                onSelect = onToggleFavorite,
             ),
         ),
         // Info and art: what is known about the game and where it came from. The links, compatibility and news rows are
         // added where their state lives.
         info = listOfNotNull(
-            PcActionRow("Scrape", "Looks this game up in the PC sources", onScrape),
-            PcActionRow("Rescrape with…", "Looks it up again in a source you pick, this game only", onRescrapeWith),
-            PcActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onChooseMatch),
-            if (media > 1) PcActionRow("View media", "$media images and videos scraped for this game", onViewMedia) else null,
+            ActionRow("Scrape", "Looks this game up in the PC sources", onSelect = onScrape),
+            ActionRow("Rescrape with…", "Looks it up again in a source you pick, this game only", onSelect = onRescrapeWith),
+            ActionRow("Choose match", "Pick the right game by hand when the scraper guessed wrong", onSelect = onChooseMatch),
+            if (media > 1) ActionRow("View media", "$media images and videos scraped for this game", onSelect = onViewMedia) else null,
         ) + titleRows.take(1),
         // Organise: where the game sits in the library, its parts, and the other folders that are the same game.
-        organise = listOf(PcActionRow("Collections", "Which of your collections this game is in", onCollections)) +
+        organise = listOf(ActionRow("Collections", "Which of your collections this game is in", onSelect = onCollections)) +
             titleRows.drop(1) +
             listOfNotNull(
                 // The fold, from whichever side the user is standing on (docs/SPEC.md 7g). On the game that is not
@@ -1460,12 +1399,12 @@ private fun rememberPcActions(
                 // says so when there is nothing to offer yet. On a game that IS here it appears only when something
                 // is actually missing that it could be: an action with nothing behind it is not an action.
                 when {
-                    entry.missing -> PcActionRow(
+                    entry.missing -> ActionRow(
                         "Find its replacement",
                         if (replacements == 0) "None found" else "$replacements found",
-                        if (replacements == 0) null else onReplace,
+                        onSelect = if (replacements == 0) null else onReplace,
                     )
-                    replacements > 0 -> PcActionRow("This replaces a missing game", "$replacements missing", onReplace)
+                    replacements > 0 -> ActionRow("This replaces a missing game", "$replacements missing", onSelect = onReplace)
                     else -> null
                 },
                 // Two games here that are one game (docs/SPEC.md 7m): offered only when another game's name is alike enough.
@@ -1474,7 +1413,7 @@ private fun rememberPcActions(
             // The game's other folders, when it has any: its parts, and the versions of each.
             group?.let { versionsRows(it, currentId, onOpenOther) }.orEmpty(),
         // Install and files: a store game's install, or the plain fact that droidtop does not manage a folder game's.
-        install = storeRows?.install ?: listOf(PcActionRow("Manage install", "A folder on this device", null)),
+        install = storeRows?.install ?: listOf(ActionRow("Manage install", "A folder on this device", onSelect = null)),
         updates = updateRows,
         // How it runs: which runner, which engine, and ONE runner's own settings, for the runner this game uses.
         // Until build 540 every game got both: a Ren'Py game running on enginehost carried a Wine section it can do
@@ -1498,8 +1437,8 @@ private fun versionsRows(
     group: dev.droidtop.library.LibraryGameGroup,
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
-): List<PcActionRow>? {
-    val rows = mutableListOf<PcActionRow>()
+): List<ActionRow>? {
+    val rows = mutableListOf<ActionRow>()
     val game = group.game
     for (segment in game.segments) {
         for (version in segment.versions) {
@@ -1527,14 +1466,14 @@ private fun storeCopyRow(
     copy: dev.droidtop.library.GameCopy,
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
-): PcActionRow {
+): ActionRow {
     val target = group.entryFor(copy)
     val store = target?.ownership()?.label ?: copy.source ?: copy.path
     val detail = buildString {
         append(if (target?.id == currentId) "Open now" else "Open this one")
         append(" - ").append(if (copy.installed) "installed" else "not installed")
     }
-    return PcActionRow(store, detail, if (target == null || target.id == currentId) null else ({ onOpenOther(target) }))
+    return ActionRow(store, detail, onSelect = if (target == null || target.id == currentId) null else ({ onOpenOther(target) }))
 }
 
 private fun row(
@@ -1543,7 +1482,7 @@ private fun row(
     currentId: String,
     onOpenOther: (LibraryEntry) -> Unit,
     label: String?,
-): PcActionRow {
+): ActionRow {
     val copy = version.playable
     val target = copy?.let { group.entryFor(it) }
     // A row is named by what it IS: its part, its version, or -- when the
@@ -1560,7 +1499,7 @@ private fun row(
         if (copy?.mods?.isNotEmpty() == true) append(" - ").append(copy.mods.joinToString(" "))
         version.latestKnown?.let { append(" - ").append(GameUpdates.line(it)) }
     }
-    return PcActionRow(title, detail, if (target == null || target.id == currentId) null else ({ onOpenOther(target) }))
+    return ActionRow(title, detail, onSelect = if (target == null || target.id == currentId) null else ({ onOpenOther(target) }))
 }
 
 /**
@@ -1602,25 +1541,25 @@ private fun runnerRows(
     runsOnEnginehost -> RunnerRows(
         runs = listOfNotNull(
             if (isEngineGame) {
-                PcActionRow("Engine settings", "Opens Enginehost's settings", { onEnginehost(EngineHost.settingsIntent()) })
+                ActionRow("Engine settings", "Opens Enginehost's settings", onSelect = { onEnginehost(EngineHost.settingsIntent()) })
             } else {
                 null
             },
         ),
         saves = listOf(
-            PcActionRow(
+            ActionRow(
                 "Controls",
                 "Opens Enginehost's controls for this game",
-                { onEnginehost(EngineHost.settingsIntent()) },
+                onSelect = { onEnginehost(EngineHost.settingsIntent()) },
             ),
-            PcActionRow("Saves", "Opens Enginehost's save settings", { onEnginehost(EngineHost.savesSettingsIntent()) }),
+            ActionRow("Saves", "Opens Enginehost's save settings", onSelect = { onEnginehost(EngineHost.savesSettingsIntent()) }),
         ),
     )
     hasWindowsRoute -> RunnerRows(runs = listOfNotNull(
-        PcActionRow("Wine and graphics", wineRowDetail(android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"), onOpenPrefix),
+        ActionRow("Wine and graphics", wineRowDetail(android.os.Build.SUPPORTED_ABIS.firstOrNull() == "x86_64"), onSelect = onOpenPrefix),
         // Which program the game runs: the person's choice (or an
         // import's), else the one droidtop picks (docs/SPEC.md 7i).
-        PcActionRow(
+        ActionRow(
             "Program",
             wineSettings?.executable?.let { exe ->
                 listOfNotNull(
@@ -1629,22 +1568,22 @@ private fun runnerRows(
                     wineSettings.source?.let { "from $it" },
                 ).joinToString(" - ")
             } ?: "The one droidtop picks; choose another",
-            onChooseProgram,
+            onSelect = onChooseProgram,
         ),
         // Launch options and environment variables for this game (docs/SPEC.md 7i, "Game properties").
-        PcActionRow(
+        ActionRow(
             "Game properties",
             "Launch options, environment variables, and what will run",
-            onOpenProperties,
+            onSelect = onOpenProperties,
         ),
-        PcActionRow(
+        ActionRow(
             "Import a Lutris install script",
             "Review every change first",
-            onImportLutris,
+            onSelect = onImportLutris,
         ),
     ), saves = listOf(
-        PcActionRow("Controls", "In its prefix's controller tab", null),
-        PcActionRow("Saves", "Inside its Windows prefix", null),
+        ActionRow("Controls", "In its prefix's controller tab", onSelect = null),
+        ActionRow("Saves", "Inside its Windows prefix", onSelect = null),
     ))
     // A native Linux build's tools are in Manage, with the Wine ones (docs/SPEC.md 7i, "Manage").
     else -> RunnerRows.NONE
