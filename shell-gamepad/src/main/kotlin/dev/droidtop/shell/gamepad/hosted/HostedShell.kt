@@ -58,6 +58,8 @@ import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.menuMove
 import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.ShellDialog
+import dev.droidtop.library.itemName
+import dev.droidtop.library.message
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import androidx.compose.ui.window.DialogProperties
@@ -338,36 +340,16 @@ fun QuickMenuStandalone(
     library: Library,
     onOpenStartMenu: () -> Unit,
     onDismiss: () -> Unit,
-    // The game running under an in-game overlay (Droidtop/tracker#740): its Game section, where Resume is closing the
-    // overlay (the game never left), Quit and Kill end it as the shell's do, and Restart starts it again once it ended.
-    runningEntry: dev.droidtop.library.LibraryEntry? = null,
 ) {
     val context = LocalContext.current
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
-    var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         QuickMenu(
-            runningEntry = runningEntry,
+            runningEntry = null,
             library = library,
-            onResume = { onDismiss() },
-            onQuit = { entry, restart ->
-                scope.launch {
-                    val outcome = library.quitRunning(context, entry)
-                    quitOutcome = outcome
-                    if (outcome is dev.droidtop.library.QuitResult.Ended) {
-                        onDismiss()
-                        if (restart) library.launch(entry)
-                    }
-                }
-            },
-            onKill = { entry ->
-                scope.launch {
-                    val outcome = library.killRunning(context, entry)
-                    quitOutcome = outcome
-                    if (outcome is dev.droidtop.library.QuitResult.Ended) onDismiss()
-                }
-            },
-            quitOutcome = quitOutcome,
+            onResume = {},
+            onQuit = { _, _ -> },
+            onKill = { },
+            quitOutcome = null,
             onOpenLeftMenu = onOpenStartMenu,
             openPlace = { screenId ->
                 context.startActivity(CatalogScreenLink.intent(context, screenId))
@@ -425,10 +407,14 @@ fun LeftMenuStandalone(
 }
 
 /**
- * The running game's own menu over it (HOME + L2, docs/SPEC.md "In-game overlays: HOME chords",
- * Droidtop/tracker#740): what L2 opens on that game in Gaming. A PC or engine game's is [PcGameMenu], its Game
- * page drawn over the game too; a console game's is the game menu ([AppOptionsMenu]), whose details are Gaming's
- * detail screen. Play is Resume here: the game never left, so it closes the overlay ([onResume]).
+ * The running game's own overlay (HOME + L2, docs/SPEC.md "In-game overlays: HOME chords", Droidtop/tracker#740): its
+ * own surface, not the Quick Menu (the owner, 2026-10-29: "You shouldn't be adding to tbe quick menu. The pause goes in
+ * the overlay, which is supposed to be different"). The game's name and what runs it, then Resume (the game never left,
+ * so it closes the overlay), **Pause the game** for a console game (RetroArch's PAUSE_TOGGLE over its command port,
+ * sent only on this press; the overlay itself never pauses or signals the game), Game options (what L2 opens on the
+ * game in Gaming: [dev.droidtop.shell.gamepad.pc.PcGameMenu] with its page for a PC or engine game, the game menu
+ * with Gaming's detail screen for a console game), and Quit and Kill, each on a second press, ending it the shell's
+ * way and closing the overlay once it has ended.
  */
 @Composable
 fun GameOptionsStandalone(
@@ -438,61 +424,135 @@ fun GameOptionsStandalone(
     onOpenDownloads: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var optionsOpen by remember(entry.id) { mutableStateOf(false) }
     var pageOpen by remember(entry.id) { mutableStateOf(false) }
     var detailOpen by remember(entry.id) { mutableStateOf(false) }
+    var armed by remember(entry.id) { mutableStateOf<String?>(null) }
+    var said by remember(entry.id) { mutableStateOf<Pair<String, String>?>(null) }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
-        if (entry.isPcOrEngineGame) {
-            if (pageOpen) {
-                dev.droidtop.shell.gamepad.pc.PcGameStandalone(
-                    library = library,
-                    entryId = entry.id,
-                    onLaunch = { onResume() },
-                    onOpenDownloads = onOpenDownloads,
-                    onClose = { pageOpen = false },
-                )
-            } else {
-                dev.droidtop.shell.gamepad.pc.PcGameMenu(
-                    entry = entry,
-                    library = library,
-                    onLaunch = onResume,
-                    onClose = onDismiss,
-                    onOpenPage = { pageOpen = true },
-                    onOpenDownloads = onOpenDownloads,
-                )
-            }
+        if (optionsOpen) {
+            GameOptions(library, entry, onResume, onOpenDownloads, onClose = { optionsOpen = false; pageOpen = false; detailOpen = false }, pageOpen, { pageOpen = it }, detailOpen, { detailOpen = it })
             return@CompositionLocalProvider
         }
-        if (detailOpen) {
-            ShellDialog(
-                onDismissRequest = { detailOpen = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-            ) {
-                GatePadInThisDialog()
-                HideSystemBarsInThisDialog()
-                Box(Modifier.fillMaxSize().groundBackground()) {
-                    dev.droidtop.shell.gamepad.EntryDetailScreen(
-                        entry = entry,
-                        library = library,
-                        onLaunch = onResume,
-                        onClose = { detailOpen = false },
-                    )
-                }
-            }
-            return@CompositionLocalProvider
-        }
-        dev.droidtop.shell.gamepad.AppOptionsMenu(
-            entry = entry,
-            detailsLabel = "Game details",
-            onDetails = { detailOpen = true },
-            onToggleFavorite = {
-                // Closed once it is written: the overlay's scope ends with it.
-                scope.launch {
-                    library.toggleFavorite(entry)
-                    onDismiss()
+        fun ending(key: String, title: String, idle: String, end: suspend () -> dev.droidtop.library.QuitResult) = dev.droidtop.shell.gamepad.ActionRow(
+            title = title,
+            detail = when {
+                said?.first == key -> said?.second
+                armed == key -> dev.droidtop.shell.gamepad.input.PressWords.againSentence
+                else -> idle
+            },
+            danger = key == "kill",
+            onSelect = {
+                if (armed != key) {
+                    armed = key
+                } else {
+                    armed = null
+                    scope.launch {
+                        val outcome = end()
+                        said = key to outcome.message
+                        if (outcome is dev.droidtop.library.QuitResult.Ended) onDismiss()
+                    }
                 }
             },
+        )
+        val rows = buildList<dev.droidtop.shell.gamepad.ActionSheetItem> {
+            add(dev.droidtop.shell.gamepad.ActionRow("Resume", "Back to the game; it never stopped") { onResume() })
+            // Only on this press, never when the overlay opens or closes (the owner, 2026-10-29: "unless we want to tie a
+            // specific button to 'tell a game it was backgrounded, even if it wasn't'").
+            if (entry.systemId != null) {
+                add(
+                    dev.droidtop.shell.gamepad.ActionRow(
+                        title = "Pause the game",
+                        detail = said?.takeIf { it.first == "pause" }?.second ?: "Tells RetroArch to pause or carry on",
+                    ) {
+                        scope.launch {
+                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                runCatching { dev.droidtop.pluginhost.RetroArchCommands.send("PAUSE_TOGGLE", 0) }
+                            }
+                            said = "pause" to "Sent to RetroArch. Press again to carry on"
+                        }
+                    },
+                )
+            }
+            add(dev.droidtop.shell.gamepad.ActionRow("Game options", "This game's own menu, as L2 opens it in Gaming") { optionsOpen = true })
+            add(ending("quit", "Quit", "Ends the game the way it ends itself") { library.quitRunning(context, entry) })
+            add(ending("kill", "Kill", "Force-stops it; unsaved progress is lost") { library.killRunning(context, entry) })
+        }
+        dev.droidtop.shell.gamepad.ActionSheet(
+            title = dev.droidtop.library.GameNaming.displayName(entry.title),
+            subtitle = entry.kind.itemName(),
+            rows = rows,
             onDismiss = onDismiss,
         )
     }
+}
+
+/** What L2 opens on [entry] in Gaming, drawn over the game: [onClose] goes back to the running game's overlay. */
+@Composable
+private fun GameOptions(
+    library: Library,
+    entry: dev.droidtop.library.LibraryEntry,
+    onResume: () -> Unit,
+    onOpenDownloads: () -> Unit,
+    onClose: () -> Unit,
+    pageOpen: Boolean,
+    setPageOpen: (Boolean) -> Unit,
+    detailOpen: Boolean,
+    setDetailOpen: (Boolean) -> Unit,
+) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    if (entry.isPcOrEngineGame) {
+        if (pageOpen) {
+            dev.droidtop.shell.gamepad.pc.PcGameStandalone(
+                library = library,
+                entryId = entry.id,
+                onLaunch = { onResume() },
+                onOpenDownloads = onOpenDownloads,
+                onClose = { setPageOpen(false) },
+            )
+        } else {
+            dev.droidtop.shell.gamepad.pc.PcGameMenu(
+                entry = entry,
+                library = library,
+                onLaunch = onResume,
+                onClose = onClose,
+                onOpenPage = { setPageOpen(true) },
+                onOpenDownloads = onOpenDownloads,
+            )
+        }
+        return
+    }
+    if (detailOpen) {
+        ShellDialog(
+            onDismissRequest = { setDetailOpen(false) },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+        ) {
+            GatePadInThisDialog()
+            HideSystemBarsInThisDialog()
+            Box(Modifier.fillMaxSize().groundBackground()) {
+                dev.droidtop.shell.gamepad.EntryDetailScreen(
+                    entry = entry,
+                    library = library,
+                    onLaunch = onResume,
+                    onClose = { setDetailOpen(false) },
+                )
+            }
+        }
+        return
+    }
+    dev.droidtop.shell.gamepad.AppOptionsMenu(
+        entry = entry,
+        detailsLabel = "Game details",
+        onDetails = { setDetailOpen(true) },
+        onToggleFavorite = {
+            // Back to the overlay once it is written: the scope ends with this menu.
+            scope.launch {
+                library.toggleFavorite(entry)
+                onClose()
+            }
+        },
+        onDismiss = onClose,
+    )
 }

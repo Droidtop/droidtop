@@ -45,9 +45,10 @@ import kotlinx.coroutines.launch
  * it, and to a sheet it opens, by Android's own focus (as [LaunchAlertOverlay]'s card takes them); B, or the same chord
  * again, closes it. Main process only.
  *
- * Built: the Quick Menu (HOME + R2), on the running game's Game section, whose "Pause the game" is the one explicit
- * way to pause it; the running game's own menu (HOME + L2, [GameOptionsStandalone]), what L2 opens on it in Gaming;
- * and the left menu's launcher content (HOME + Start, [LeftMenuStandalone]), whose destinations open droidtop.
+ * Built: the Quick Menu (HOME + R2), the shell's own and unchanged; the running game's own overlay (HOME + L2,
+ * [GameOptionsStandalone]): its name, Resume, "Pause the game" (the one explicit way to pause it), the game's own
+ * options as L2 opens them in Gaming, Quit and Kill; and the left menu's launcher content (HOME + Start,
+ * [LeftMenuStandalone]), whose destinations open droidtop.
  */
 internal object InGameOverlays {
     private const val TAG = "droidtop.InGameOverlay"
@@ -121,7 +122,6 @@ internal object InGameOverlays {
                                 // Start swaps to the left menu, as it does in Gaming.
                                 onOpenStartMenu = { swap(OverlayRequest.Kind.LEFT_MENU, request.displayId) },
                                 onDismiss = { close() },
-                                runningEntry = runningEntry,
                             )
                             OverlayRequest.Kind.CONTEXT_MENU -> runningEntry?.let { entry ->
                                 GameOptionsStandalone(

@@ -3796,15 +3796,17 @@ the `ContainerRuntime` interface that already exists (§3):
   - The overlay window is focusable, so the pad reaches it, and the sheet it opens, by Android's own focus (as the
     launch watchdog's card does), rather than through `OverlayRequests.keys`, which delivers to one view and not to a
     sub-window; the input half keeps that route for a host that wants it.
-  - Over a game droidtop launched, HOME + R2's Quick Menu opens on that game's Game section (`QuickMenuStandalone`
-    with the running entry): Resume closes the overlay (the game never left), Quit and Kill end it the shell's way, and
-    Restart starts it again once it ended. **Pause the game** is a row there, only in an overlay and for a console
-    game: it sends RetroArch's `PAUSE_TOGGLE` to its command port (`RetroArchCommands`) when pressed, and pressed
-    again carries on. Nothing else ever pauses the game.
-  - HOME + L2 is the running game's own menu (`GameOptionsStandalone`), what L2 opens on it in Gaming: a PC or engine
-    game's `PcGameMenu`, whose Game page is drawn over the game too, and a console game's game menu (`AppOptionsMenu`),
-    whose Game details is Gaming's detail screen. Play there is Resume, closing the overlay. With no game droidtop
-    started in front, HOME + L2 does nothing (it logs so).
+  - HOME + R2 draws the Quick Menu over the app, unchanged: the shell's own (`QuickMenuStandalone`), with nothing
+    added for the game (the owner, 2026-10-29: "Your 'home + r2' implementation is wrong. You shouldn't be adding to
+    tbe quick menu. The pause goes in the overlay, which is supposed to be different").
+  - HOME + L2 is the running game's own overlay (`GameOptionsStandalone`), a surface of its own: the game's name and
+    what runs it, then **Resume** (closes the overlay; the game never left), **Pause the game** for a console game
+    (sends RetroArch's `PAUSE_TOGGLE` to its command port, `RetroArchCommands`, when pressed; pressed again carries
+    on), **Game options** (what L2 opens on the game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is
+    drawn over the game too, or a console game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail
+    screen; B there comes back to the overlay), and **Quit** and **Kill**, each on a second press, ending it the
+    shell's way (`Library.quitRunning`, `killRunning`) and closing the overlay once it has ended. Nothing else ever
+    pauses the game. With no game droidtop started in front, HOME + L2 does nothing (it logs so).
   - HOME + Start is the left menu's launcher content (`LeftMenuStandalone`): the shell's own `LeftMenu` with the
     destinations the UI mode allows (read from storage before it draws, so Kiosk and Kid never show the places), Resume
     first and the cursor on it while a game runs, then Search (`LauncherSearchActivity`, droidtop's one search). A
