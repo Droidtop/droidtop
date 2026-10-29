@@ -389,6 +389,8 @@ object GamingSettingsCatalog {
                 ))
                 add(displayShellTargetItem(context))
                 add(displayGameLaunchTargetItem(context))
+                add(interfaceSizeItem(context, dev.droidtop.runtime.DisplayRole.MAIN))
+                add(interfaceSizeItem(context, dev.droidtop.runtime.DisplayRole.COMPANION))
                 addAll(screenNameItems(context))
             },
         ),
@@ -1826,3 +1828,21 @@ private fun hasCompanionScreen(context: android.content.Context): Boolean =
 
 /** The companion Home sections that always draw when turned on; every other one hides itself while empty. */
 private val ALWAYS_SHOWN_HOME = setOf(CompanionHomeSection.NOTIFICATIONS, CompanionHomeSection.SYSTEM)
+
+/**
+ * Interface size for one screen role (owner, 2026-10-29, Droidtop/tracker#656 point 3): Auto, then 75 to 150 percent
+ * of the canvas the display's own report gives. The main screen and the companion screen each have one, since they are
+ * scaled separately. Six choices, so Left/Right step it in place; the screen redraws at the new size.
+ */
+private fun interfaceSizeItem(context: Context, role: dev.droidtop.runtime.DisplayRole): ChoiceItem {
+    val size = dev.droidtop.runtime.InterfaceSize
+    val main = role == dev.droidtop.runtime.DisplayRole.MAIN
+    return ChoiceItem(
+        id = size.key(role),
+        title = if (main) "Interface size, main screen" else "Interface size, companion screen",
+        subtitle = "Text and layout together. Auto fits what the screen reports",
+        options = listOf(ChoiceOption(size.AUTO, "Auto")) + size.PERCENTS.map { ChoiceOption(it.toString(), "$it%") },
+        current = size.value(context, role),
+        onSelect = { ctx, value -> size.set(ctx, role, value) },
+    )
+}

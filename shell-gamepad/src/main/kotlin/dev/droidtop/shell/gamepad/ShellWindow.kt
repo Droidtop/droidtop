@@ -4,11 +4,14 @@ import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -321,6 +324,24 @@ fun canvasDensity(density: Float, widthDp: Int, heightDp: Int, xdpi: Float): Flo
     return (shortSidePx / CANVAS_SHORT_SIDE_DP).coerceIn(floor, density)
 }
 
+/**
+ * The density a window [widthPx] by [heightPx] lays out at with the Interface size [factor] (Droidtop/tracker#656):
+ * [canvasDensity] from the display's own [systemDensity], then times [factor], so 125 percent draws everything a
+ * quarter bigger and 75 percent a quarter smaller, layout and text together, whatever density the window's
+ * configuration already carries. Pure.
+ */
+fun scaledCanvasDensity(systemDensity: Float, widthPx: Float, heightPx: Float, xdpi: Float, factor: Float): Float =
+    canvasDensity(systemDensity, (widthPx / systemDensity).roundToInt(), (heightPx / systemDensity).roundToInt(), xdpi) * factor
+
+/** The density Android gives [displayId], from its real metrics; [fallback] when the display cannot be read. */
+@Suppress("DEPRECATION")
+private fun displaySystemDensity(context: android.content.Context, displayId: Int, fallback: Float): Float {
+    val manager = context.getSystemService(android.hardware.display.DisplayManager::class.java) ?: return fallback
+    val display = manager.getDisplay(displayId) ?: return fallback
+    val metrics = android.util.DisplayMetrics().also { display.getRealMetrics(it) }
+    return if (metrics.densityDpi > 0) metrics.densityDpi / 160f else fallback
+}
+
 /** A finger's target, 48dp at Android's reference 160dpi: 0.3 inch, about 7.6 mm. */
 const val TOUCH_TARGET_INCHES = 0.3f
 
@@ -349,13 +370,22 @@ val LocalTouchTarget = staticCompositionLocalOf { 48.dp }
 fun ProvideShellCanvas(content: @Composable () -> Unit) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
-    val xdpi = LocalContext.current.resources.displayMetrics.xdpi
+    val context = LocalContext.current
+    val xdpi = context.resources.displayMetrics.xdpi
     // The window's pixels, from the configuration's own dp size and dpi (a consistent pair even when the Resources
     // under it were already moved to the canvas, as droidtop's activities are).
     val configDensity = configuration.densityDpi / 160f
     val widthPx = configuration.screenWidthDp * configDensity
     val heightPx = configuration.screenHeightDp * configDensity
-    val target = canvasDensity(configDensity, configuration.screenWidthDp, configuration.screenHeightDp, xdpi)
+    // The canvas is bounded by the display's own density, not the configuration's, which droidtop's activities have
+    // already moved to the canvas: with the Interface size factor on top, bounding by the moved density would apply
+    // the factor twice. The factor is the setting for the screen this window is on (Droidtop/tracker#656).
+    val displayId = LocalView.current.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
+    val sizeTick by dev.droidtop.runtime.InterfaceSize.changed.collectAsState()
+    val (systemDensity, factor) = remember(configuration, displayId, sizeTick) {
+        displaySystemDensity(context, displayId, configDensity) to dev.droidtop.runtime.InterfaceSize.factorFor(context, displayId)
+    }
+    val target = scaledCanvasDensity(systemDensity, widthPx, heightPx, xdpi, factor)
     val touchTarget = touchTargetDp(xdpi, configDensity, target).dp
     if (kotlin.math.abs(target - configDensity) < 0.01f && kotlin.math.abs(target - density.density) < 0.01f) {
         CompositionLocalProvider(LocalTouchTarget provides touchTarget, content = content)

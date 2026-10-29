@@ -58,6 +58,14 @@ class ShellWindowTest {
     }
 
     @Test
+    fun `Interface size multiplies the canvas, once, whatever density the window already carries`() {
+        // The Retroid Pocket 5's 1080x1920 panel: 1.5 on Auto, 1.875 at 125 percent, 1.125 at 75 percent.
+        assertEquals(1.5f, scaledCanvasDensity(2.25f, 1920f, 1080f, xdpi = 300f, factor = 1f), 0.001f)
+        assertEquals(1.875f, scaledCanvasDensity(2.25f, 1920f, 1080f, xdpi = 300f, factor = 1.25f), 0.001f)
+        assertEquals(1.125f, scaledCanvasDensity(2.25f, 1920f, 1080f, xdpi = 300f, factor = 0.75f), 0.001f)
+    }
+
+    @Test
     fun `a window already at the canvas keeps its own density`() {
         // The 1080p DP screen at 1.5x, and a 4K television at 2x (1920x1080dp).
         assertEquals(1.5f, canvasDensity(1.5f, 1280, 720, xdpi = 92f), 0.001f)

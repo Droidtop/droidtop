@@ -13,7 +13,8 @@ import android.os.Bundle
 import android.util.DisplayMetrics
 import android.view.View
 import dev.droidtop.library.settings.CatalogPrefs
-import dev.droidtop.shell.gamepad.canvasDensity
+import dev.droidtop.runtime.InterfaceSize
+import dev.droidtop.shell.gamepad.scaledCanvasDensity
 import kotlin.math.roundToInt
 
 /**
@@ -131,8 +132,8 @@ object AccessibilityPrefs {
             val a = resumed ?: return@OnSharedPreferenceChangeListener
             when (key) {
                 KEY_COLOR_VISION -> applyColorFilter(a)
-                // Already-composed text keeps its old density: rebuild the screen.
-                KEY_TEXT_SCALE -> a.recreate()
+                // Already-composed text keeps its old density: rebuild the screen. The same for an Interface size.
+                KEY_TEXT_SCALE, InterfaceSize.KEY_MAIN, InterfaceSize.KEY_COMPANION -> a.recreate()
             }
         }
         listener = l
@@ -140,7 +141,7 @@ object AccessibilityPrefs {
     }
 
     /**
-     * Applies the text scale and the display's canvas density ([canvasDensity], docs/SPEC.md 7k) to [activity]'s
+     * Applies the text scale and the display's canvas density ([scaledCanvasDensity], docs/SPEC.md 7k) to [activity]'s
      * Resources, so every window it opens follows: its own content, and the dialogs and popups that create Compose
      * views of their own (the Quick Menu among them) and read their density from these Resources. Called on create,
      * on resume and from an activity that handles its own configuration changes, since a new configuration from the
@@ -174,11 +175,14 @@ object AccessibilityPrefs {
         val metrics = DisplayMetrics().also { display.getRealMetrics(it) }
         if (metrics.densityDpi <= 0 || metrics.widthPixels <= 0) return null
         val density = metrics.densityDpi / 160f
-        val target = canvasDensity(
+        // The Interface size of the screen this activity is on (Droidtop/tracker#656), on the canvas worked out from
+        // the display's own density: the one rule ProvideShellCanvas applies too, so the two agree.
+        val target = scaledCanvasDensity(
             density,
-            (metrics.widthPixels / density).roundToInt(),
-            (metrics.heightPixels / density).roundToInt(),
+            metrics.widthPixels.toFloat(),
+            metrics.heightPixels.toFloat(),
             metrics.xdpi,
+            InterfaceSize.factorFor(activity, display.displayId),
         )
         return (target * 160f).roundToInt()
     }

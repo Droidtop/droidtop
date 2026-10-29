@@ -17230,8 +17230,14 @@ information?"). It reads the display alone, never what input is attached: a wind
 Android's density is drawn at the density that makes its short side 720dp, in either orientation, but never denser
 than 250 dp to the inch of the panel the display reports (Android's density stands in when it reports no believable
 dpi), so a small sharp panel stays legible. Each window works this out from its own display, so the main screen and a
-companion screen are scaled separately, and each will take its own Interface size adjustment (Settings > Displays,
-Auto and 75 to 150 percent, layout and text together; owner, 2026-10-29: "Sounds good"). The pixels do not
+companion screen are scaled separately, and each takes its own **Interface size** (Settings > Displays: "Interface
+size, main screen" and "Interface size, companion screen"; Auto, 75, 90, 110, 125 or 150 percent; owner, 2026-10-29:
+"Sounds good"; Droidtop/tracker#656 point 3). It multiplies that display's canvas density (`InterfaceSize`,
+`scaledCanvasDensity`), so layout and text scale together; Auto is the canvas as reported, never a size picked from the
+device model. The role is the screen's, not the surface's: the main screen is the second screen when one is present
+and Main screen says so, else the built-in one (`InterfaceSize.roleOf`). The canvas is always worked out from the
+display's own density, so the factor is applied once, both to an activity's Resources (`AccessibilityPrefs`) and to a
+Compose window (`ProvideShellCanvas`); a change redraws the screen. The pixels do not
 change, only how many a dp is: a Retroid Pocket 5's 5.5" 1080p panel reports 360dpi (2.25 pixels a dp, 853x480dp), so
 it and a 1080p phone are drawn at 1.5, as the 1080p DP screen is, and show the same layout and proportions instead of
 1.5 times the text and spacing. A window already at the canvas keeps its own density. Touch targets do not shrink with
