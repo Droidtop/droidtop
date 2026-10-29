@@ -23,10 +23,9 @@ enum class PluginTier {
 }
 
 /**
- * The tier rules (docs/plugin-api.md 5.3). Contained is the default for a contract 2 plugin. Full trust is only ever
- * the `host.full_trust` grant (critical, so the person ticks it or answers the sheet), plus every contract 1 plugin,
- * which was written before permissions existed. What cannot run contained is said once, here, and both the installer
- * (a plugin that needs full access must declare it) and the call path (it runs only once allowed) ask it.
+ * The tier rules (docs/plugin-api.md 5.3). Contained is the default. Full trust is only ever the `host.full_trust`
+ * grant (critical, so the person ticks it or answers the sheet). What cannot run contained is said once, here, and both
+ * the installer (a plugin that needs full access must declare it) and the call path (it runs only once allowed) ask it.
  */
 object PluginTiers {
     const val FULL_TRUST = "host.full_trust"
@@ -63,12 +62,11 @@ object PluginTiers {
     }.getOrDefault(false)
 
     /**
-     * True when [record], allowed full access, runs in an isolated process with [switchOn]: a contract 2 plugin on
-     * Android 11 (API 30) or later, where its sockets can be the broker's. A contract 1 plugin predates the API and
-     * stays in droidtop's UID, an open hole the 5.6 table lists.
+     * True when a plugin allowed full access runs in an isolated process with [switchOn]: on Android 11 (API 30) or
+     * later, where its sockets can be the broker's.
      */
-    fun fullAccessRunsIsolated(record: PluginRecord, switchOn: Boolean, sdk: Int = android.os.Build.VERSION.SDK_INT): Boolean =
-        switchOn && record.manifest.contractVersion >= 2 && sdk >= 30
+    fun fullAccessRunsIsolated(switchOn: Boolean, sdk: Int = android.os.Build.VERSION.SDK_INT): Boolean =
+        switchOn && sdk >= 30
 
     fun declaresFullTrust(manifest: PluginManifest): Boolean = manifest.v2.permissions.any { it.id == FULL_TRUST }
 
@@ -78,7 +76,6 @@ object PluginTiers {
      * privilege an isolated UID never has: binding another app's service, or giving other plugins system-level access.
      */
     fun containmentBlocker(manifest: PluginManifest): String? = when {
-        manifest.contractVersion < 2 -> "it was written before permissions existed"
         manifest.v2.permissions.any { it.id == "apps.bind" } -> "it binds other apps' services"
         manifest.v2.exports.any { it.api.startsWith("priv.") || it.api.startsWith("root.") } -> "it gives other plugins system-level access"
         else -> null
@@ -100,7 +97,6 @@ object PluginTiers {
      * Empty for a plugin that runs contained or with full access, where none applies.
      */
     fun holes(record: PluginRecord, grants: PluginGrants.Snapshot): Set<String> = when {
-        record.manifest.contractVersion < 2 -> emptySet()
         declaresFullTrust(record.manifest) && PluginGrants.stateOf(record, grants, FULL_TRUST) == GrantState.GRANTED -> emptySet()
         containmentBlocker(record.manifest) != null -> emptySet()
         else -> HOLES.filterTo(LinkedHashSet()) { hole ->
@@ -116,7 +112,6 @@ object PluginTiers {
      * allowed full access; a hole permission never substitutes for the privilege such a plugin needs.
      */
     fun of(record: PluginRecord, grants: PluginGrants.Snapshot): PluginTier = when {
-        record.manifest.contractVersion < 2 -> PluginTier.FULL_TRUST
         declaresFullTrust(record.manifest) && PluginGrants.stateOf(record, grants, FULL_TRUST) == GrantState.GRANTED -> PluginTier.FULL_TRUST
         containmentBlocker(record.manifest) != null -> PluginTier.CONTAINED
         holes(record, grants).isNotEmpty() -> PluginTier.OPEN
@@ -124,10 +119,14 @@ object PluginTiers {
     }
 
     /**
-     * Why [record] cannot run in the tier its grants put it in, or null: a plugin that can only run with full access and
-     * has not been allowed it. It is not called and not disabled; its page says what to allow.
+     * Why [record] cannot run in the tier its grants put it in, or null: a contract 1 plugin, which this build no longer
+     * runs ([PLUGIN_MANIFEST_MIN_CONTRACT_VERSION]), or a plugin that can only run with full access and has not been
+     * allowed it. It is not called and not disabled; its page says it needs an update, or what to allow.
      */
     fun refusal(record: PluginRecord, grants: PluginGrants.Snapshot): String? {
+        if (record.manifest.contractVersion < PLUGIN_MANIFEST_MIN_CONTRACT_VERSION) {
+            return "${record.manifest.label} was written for an older droidtop and needs an update"
+        }
         if (of(record, grants) != PluginTier.CONTAINED) return null
         val blocker = containmentBlocker(record.manifest) ?: return null
         if (!declaresFullTrust(record.manifest)) {
@@ -156,9 +155,6 @@ object PluginTiers {
         }.distinct().joinToString(" ").ifEmpty { null }
     }
 
-    fun badge(record: PluginRecord, grants: PluginGrants.Snapshot): String? = when {
-        record.manifest.contractVersion < 2 -> "Full access (older plugin)"
-        of(record, grants) == PluginTier.FULL_TRUST -> "Full access"
-        else -> null
-    }
+    fun badge(record: PluginRecord, grants: PluginGrants.Snapshot): String? =
+        if (of(record, grants) == PluginTier.FULL_TRUST) "Full access" else null
 }

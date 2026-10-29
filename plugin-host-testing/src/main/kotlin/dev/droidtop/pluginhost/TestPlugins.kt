@@ -14,7 +14,6 @@ object TestPlugins {
     fun manifest(id: String = "acme.tool", origin: String = "acme", contract: Int = 2, label: String = id, build: (JSONObject) -> Unit = {}): PluginManifest {
         val json = JSONObject().apply {
             put("id", id); put("origin", origin); put("label", label); put("kind", "native_bundle")
-            put("capabilities", JSONArray(if (contract == 1) listOf("status_tile") else emptyList<String>()))
             put("contractVersion", contract)
             put("abis", JSONArray(listOf("arm64-v8a", "x86_64"))); put("entryClass", "acme.Tool")
             put("payload", JSONArray(listOf(JSONObject().put("path", "classes.jar").put("sha256", "a".repeat(64)))))

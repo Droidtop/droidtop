@@ -9,16 +9,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PluginEnvelopeTest {
-    /** A plugin that only implements the contract 1 call. */
-    private class OldPlugin(val result: PluginResult) : DroidtopPlugin {
-        var seen: Pair<PluginCapability, Map<String, String>>? = null
-
-        override fun invoke(capability: PluginCapability, args: PluginArgs): PluginResult {
-            seen = capability to args.keys().associateWith { args.string(it)!! }
-            return result
-        }
-    }
-
     private fun call(point: String, op: String = "state", args: JSONObject = JSONObject()) =
         PluginCall("c-1", 15_000, point, 1, op, args = args)
 
@@ -81,41 +71,13 @@ class PluginEnvelopeTest {
     }
 
     @Test
-    fun `an old plugin answers a v2 call through the capability its point replaced`() {
-        val plugin = OldPlugin(PluginResult.success(mapOf("label" to "VPN", "value" to "on")))
-        val reply = LegacyHandle.translate(plugin, call("ui.status_tile", "state", TestPlugins.obj("query" to "q")))
-        assertTrue(reply.ok)
-        assertEquals("VPN", reply.data.getString("label"))
-        val (capability, args) = plugin.seen!!
-        assertEquals(PluginCapability.STATUS_TILE, capability)
-        assertEquals("state", args["op"])
-        assertEquals("q", args["query"])
-    }
-
-    @Test
-    fun `a failed old capability call is a FAILED reply`() {
-        val reply = LegacyHandle.translate(OldPlugin(PluginResult.failure("no network")), call("ui.status_tile"))
-        assertEquals(PluginErrorCode.FAILED, reply.code)
-        assertEquals("no network", reply.message)
-    }
-
-    @Test
-    fun `a point with no old capability is UNSUPPORTED`() {
-        val reply = LegacyHandle.translate(OldPlugin(PluginResult.success()), call("ui.quick_tile"))
-        assertEquals(PluginErrorCode.UNSUPPORTED, reply.code)
-    }
-
-    @Test
-    fun `a plugin compiled before handle existed is served through the translation, not treated as a crash`() {
-        val old = object : DroidtopPlugin {
+    fun `a plugin that does not implement handle answers UNSUPPORTED`() {
+        val plugin = object : DroidtopPlugin {
             override fun invoke(capability: PluginCapability, args: PluginArgs) = PluginResult.success(mapOf("k" to "v"))
-
-            // What the JVM does for a class compiled before this method was added to the interface.
-            override fun handle(call: PluginCall): PluginReply = throw AbstractMethodError("handle")
         }
-        val reply = LegacyHandle.dispatch(old, call("ui.status_tile"))
-        assertTrue(reply.ok)
-        assertEquals("v", reply.data.getString("k"))
+        val reply = plugin.handle(call("ui.status_tile"))
+        assertEquals(PluginErrorCode.UNSUPPORTED, reply.code)
+        assertEquals("this plugin does not answer ui.status_tile", reply.message)
     }
 
     @Test
@@ -125,7 +87,7 @@ class PluginEnvelopeTest {
 
             override fun handle(call: PluginCall) = PluginReply.ok(TestPlugins.obj("op" to call.op))
         }
-        val reply = LegacyHandle.dispatch(plugin, call("ui.quick_tile", "toggle"))
+        val reply = plugin.handle(call("ui.quick_tile", "toggle"))
         assertNotNull(reply)
         assertEquals("toggle", reply.data.getString("op"))
     }

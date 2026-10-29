@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Jobs from points that have no contract 1 capability, and events under either manifest field or id. */
+/** Jobs from points that have no capability, and events under either manifest field. */
 class PluginJobAndEventRoutingTest {
     private fun envelope(point: String): Map<String, String> =
         mapOf("call" to PluginCall(callId = "c-1", deadlineMs = 1000L, point = point, version = 1, op = "install", caller = org.json.JSONObject().put("kind", "host"), surface = org.json.JSONObject(), args = org.json.JSONObject()).toJson().toString())
@@ -18,7 +18,7 @@ class PluginJobAndEventRoutingTest {
     )
 
     @Test
-    fun `a point with no contract 1 capability still gets a job capability`() {
+    fun `a point with no capability still gets a job capability`() {
         assertEquals(PluginCapability.SETTINGS_ROWS, LegacyManifest.jobCapabilityFor("ui.panel"))
         assertEquals(PluginCapability.SETTINGS_ROWS, LegacyManifest.jobCapabilityFor("ui.game_section"))
         assertEquals(PluginCapability.ACQUIRE_CONTENT, LegacyManifest.jobCapabilityFor("library.sources"))
@@ -34,18 +34,17 @@ class PluginJobAndEventRoutingTest {
     }
 
     @Test
-    fun `a contract 1 job without an envelope is checked as its capability's point`() {
-        val record = TestPlugins.record(TestPlugins.manifest(id = "acme.old", contract = 1))
+    fun `a job without an envelope is checked as its capability's point`() {
+        val record = TestPlugins.record(TestPlugins.manifest(id = "acme.tile"))
         assertNull(PluginGrants.jobRefusal(record, PluginGrants.Snapshot(), PluginCapability.STATUS_TILE, emptyMap()))
+        assertTrue(PluginGrants.jobRefusal(record, PluginGrants.Snapshot(), PluginCapability.SETTINGS_ROWS, emptyMap())!!.contains("does not offer"))
     }
 
     @Test
-    fun `a plugin hears an event it subscribed to through subscribes, subscribedEvents or the old id`() {
-        val bare = TestPlugins.manifest(id = "acme.a", contract = 1) { it.put("subscribedEvents", TestPlugins.strings("default_player_changed")) }
+    fun `a plugin hears an event it subscribed to through subscribes or subscribedEvents`() {
         val renamed = TestPlugins.manifest(id = "acme.b") { it.put("subscribedEvents", TestPlugins.strings("library.default_player_changed")) }
         val v2Only = TestPlugins.manifest(id = "acme.c") { it.put("subscribes", arr(obj("event" to "library.default_player_changed", "version" to 2))) }
         val none = TestPlugins.manifest(id = "acme.d")
-        assertTrue(bare.subscribesTo(PluginEvent.DEFAULT_PLAYER_CHANGED))
         assertTrue(renamed.subscribesTo(PluginEvent.DEFAULT_PLAYER_CHANGED))
         assertTrue(v2Only.subscribesTo(PluginEvent.DEFAULT_PLAYER_CHANGED))
         assertFalse(none.subscribesTo(PluginEvent.DEFAULT_PLAYER_CHANGED))

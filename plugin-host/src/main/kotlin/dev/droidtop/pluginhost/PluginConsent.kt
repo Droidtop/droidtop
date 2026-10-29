@@ -36,9 +36,7 @@ data class ConsentView(
     val offers: List<ConsentLine>,
     val uses: List<ConsentUse>,
     val unsupported: List<String>,
-    /** A contract 1 plugin holds `host.full_trust`: shown as "Full access (older plugin)". */
-    val olderPluginFullAccess: Boolean,
-    /** A contract 2 plugin that asks for `host.full_trust` (docs/plugin-api.md 5.3); without it, it runs contained. */
+    /** A plugin that asks for `host.full_trust` (docs/plugin-api.md 5.3); without it, it runs contained. */
     val asksFullAccess: Boolean = false,
 ) {
     /** Every tick box on the list, in the order shown. */
@@ -78,7 +76,6 @@ object PluginConsent {
      */
     fun of(manifest: PluginManifest, installed: List<PluginRecord>, badgeFor: (String) -> String): ConsentView {
         val v2 = manifest.v2
-        val newContract = manifest.contractVersion >= 2
         val adds = linkedMapOf<String, MutableList<ConsentLine>>()
         val seenPoints = mutableSetOf<String>()
         for (entry in v2.provides) {
@@ -92,7 +89,7 @@ object PluginConsent {
                 detail = point.lets.ifEmpty { null },
                 id = PluginPermissions.PROVIDE_PREFIX + entry.point,
                 highRisk = point.risk.needsConsent,
-                ticked = !newContract || !point.risk.needsConsent,
+                ticked = !point.risk.needsConsent,
             )
             adds.getOrPut(mode) { mutableListOf() }.add(line)
         }
@@ -113,7 +110,7 @@ object PluginConsent {
             val line = ConsentLine(
                 title = label,
                 detail = sentences(PluginPermissions.find(declared.id)?.caution, scope, declared.reason, androidNote),
-                id = if (newContract) declared.id else null,
+                id = declared.id,
                 highRisk = risky,
                 ticked = !risky,
             )
@@ -144,8 +141,7 @@ object PluginConsent {
             offers = offers,
             uses = uses,
             unsupported = manifest.unsupportedDeclarations(),
-            olderPluginFullAccess = manifest.contractVersion < 2,
-            asksFullAccess = newContract && PluginTiers.declaresFullTrust(manifest),
+            asksFullAccess = PluginTiers.declaresFullTrust(manifest),
         )
     }
 

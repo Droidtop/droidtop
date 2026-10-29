@@ -120,7 +120,7 @@ class NativePluginRunner(
         val isolatedNet = tier == PluginTier.OPEN && PluginTiers.runsIsolated(PluginTiers.holes(record, grants))
         // Full access isolated, behind its switch until every plugin has passed (5.6, "Every plugin is isolated, full
         // access included"): the contained loader with the network, and droidtop's relays for the system services it was allowed.
-        val isolatedFull = tier == PluginTier.FULL_TRUST && PluginTiers.fullAccessRunsIsolated(record, PluginTiers.fullAccessIsolated())
+        val isolatedFull = tier == PluginTier.FULL_TRUST && PluginTiers.fullAccessRunsIsolated(PluginTiers.fullAccessIsolated())
         val isolated = isolatedNet || isolatedFull
         // Each start's phases on one line (Droidtop/tracker#848): the process, then the plugin's own load in it.
         val startedAt = android.os.SystemClock.elapsedRealtime()

@@ -71,9 +71,6 @@ class PluginCall(
         .put("args", args)
         .put("host", host)
 
-    /** The arguments as the flat string map a contract 1 capability call takes; nested values keep their JSON text. */
-    fun argsAsStrings(): Map<String, String> = buildMap { args.keys().forEach { put(it, args.optString(it)) } }
-
     companion object {
         fun fromJson(text: String): PluginCall? = runCatching {
             val json = JSONObject(text)
@@ -199,39 +196,5 @@ class PluginReply private constructor(
                 error(PluginErrorCode.FAILED, "malformed reply from plugin")
             }
         }
-    }
-}
-
-/**
- * How a plugin that predates the v2 envelope answers it: the point maps to
- * the contract 1 capability it replaced ([LegacyManifest.CAPABILITY_POINTS]),
- * the op travels as an `op` argument, and the values of the old result
- * become the reply's data. A plugin with no such capability answers
- * UNSUPPORTED.
- */
-object LegacyHandle {
-    fun translate(plugin: DroidtopPlugin, call: PluginCall): PluginReply {
-        val capability = LegacyManifest.capabilityForPoint(call.point)
-            ?: return PluginReply.error(PluginErrorCode.UNSUPPORTED, "no handler for ${call.point}")
-        val args = LinkedHashMap<String, String>()
-        args["op"] = call.op
-        args.putAll(call.argsAsStrings())
-        val result = plugin.invoke(capability, PluginArgs(args))
-        return if (result.ok) {
-            PluginReply.ok(JSONObject().also { data -> result.values.forEach { (k, v) -> data.put(k, v) } })
-        } else {
-            PluginReply.error(PluginErrorCode.FAILED, result.error ?: "the plugin reported a failure")
-        }
-    }
-
-    /**
-     * Calls [DroidtopPlugin.handle], or translates when the plugin was
-     * compiled before it existed: such a class has no `handle` to call and
-     * the JVM throws AbstractMethodError, which is not a crash of the plugin.
-     */
-    fun dispatch(plugin: DroidtopPlugin, call: PluginCall): PluginReply = try {
-        plugin.handle(call)
-    } catch (e: AbstractMethodError) {
-        translate(plugin, call)
     }
 }

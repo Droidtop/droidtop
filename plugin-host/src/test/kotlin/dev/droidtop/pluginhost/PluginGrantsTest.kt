@@ -18,7 +18,7 @@ class PluginGrantsTest {
     private fun plugin(contract: Int = 2, id: String = "acme.tool", vararg perms: org.json.JSONObject, build: (org.json.JSONObject) -> Unit = {}) =
         TestPlugins.record(
             TestPlugins.manifest(id = id, contract = contract) {
-                if (contract >= 2) it.put("permissions", arr(*perms))
+                it.put("permissions", arr(*perms))
                 build(it)
             },
         )
@@ -74,24 +74,6 @@ class PluginGrantsTest {
     }
 
     @Test
-    fun `a contract 1 plugin holds what it could already do and its root tick becomes the grant`() {
-        val v1 = TestPlugins.record(TestPlugins.manifest(contract = 1) { it.put("requestsRoot", true) }, rootApproved = true)
-        grants.initialiseOnApproval(v1)
-        val snap = grants.read("acme.tool")
-        assertEquals(GrantState.GRANTED, PluginGrants.stateOf(v1, snap, "host.full_trust"))
-        assertEquals(GrantState.GRANTED, PluginGrants.stateOf(v1, snap, "apps.launch"))
-        assertEquals(GrantState.GRANTED, PluginGrants.stateOf(v1, snap, "priv.shell.root"))
-        val noRoot = TestPlugins.record(TestPlugins.manifest(contract = 1) { it.put("requestsRoot", true) }, rootApproved = false)
-        assertEquals(GrantState.ASK, PluginGrants.stateOf(noRoot, PluginGrants.Snapshot(), "priv.shell.root"))
-    }
-
-    @Test
-    fun `an approved contract 1 plugin with no file is granted by default`() {
-        val v1 = TestPlugins.record(TestPlugins.manifest(contract = 1))
-        assertEquals(GrantState.GRANTED, PluginGrants.stateOf(v1, grants.read("acme.tool"), "apps.check"))
-    }
-
-    @Test
     fun `the list starts ticked except dangerous permissions and high-risk points`() {
         val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "net.any", "required" to true)) {
             it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.status_tile")))
@@ -111,7 +93,7 @@ class PluginGrantsTest {
         val record = plugin(2, "acme.tool", obj("id" to "net.state"), obj("id" to "vibrate")) {
             it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.status_tile"), obj("point" to "ui.settings")))
         }
-        // Before approval (no file), a high-risk point of a contract 2 plugin is not granted.
+        // Before approval (no file), a high-risk point is not granted.
         assertEquals(GrantState.ASK, PluginGrants.provideState(record, grants.read("acme.tool"), "library.sources"))
         grants.initialiseOnApproval(record, ticked = setOf("provide:library.sources", "provide:ui.settings", "net.state"))
         val snap = grants.read("acme.tool")
@@ -141,16 +123,6 @@ class PluginGrantsTest {
     }
 
     @Test
-    fun `a contract 1 plugin's points can be unticked too`() {
-        val v1 = TestPlugins.record(TestPlugins.manifest(contract = 1))
-        assertEquals(setOf("provide:ui.status_tile"), PluginGrants.defaultTicked(v1))
-        grants.initialiseOnApproval(v1, ticked = emptySet())
-        val snap = grants.read("acme.tool")
-        assertEquals(GrantState.DENIED, PluginGrants.provideState(v1, snap, "ui.status_tile"))
-        assertEquals("what it could always do is unchanged", GrantState.GRANTED, PluginGrants.stateOf(v1, snap, "apps.launch"))
-    }
-
-    @Test
     fun `delete removes the grants and the install id`() {
         grants.set("acme.tool", "net.any", GrantState.GRANTED)
         val id = grants.installIdFor("acme.tool")
@@ -170,9 +142,7 @@ class PluginGrantsTest {
         assertTrue(snap.corrupt)
         assertEquals(GrantState.ASK, PluginGrants.stateOf(record, snap, "net.state"))
         assertEquals(GrantState.ASK, PluginGrants.stateOf(record, snap, "net.any"))
-        val v1 = TestPlugins.record(TestPlugins.manifest(contract = 1))
-        assertEquals(GrantState.ASK, PluginGrants.stateOf(v1, snap, "apps.launch"))
-        assertEquals(GrantState.ASK, PluginGrants.provideState(v1, snap, "ui.status_tile"))
+        assertEquals("even a low-risk point", GrantState.ASK, PluginGrants.provideState(record, snap, "ui.status_tile"))
     }
 
     @Test
@@ -218,17 +188,6 @@ class PluginGrantsTest {
         val snap = grants.read("acme.tool")
         assertEquals("still ask, not silently granted", GrantState.ASK, PluginGrants.stateOf(new, snap, "net.any"))
         assertFalse(snap.wantsNewAccess)
-    }
-
-    @Test
-    fun `an old plugin with no grants file is written out before the update so defaults cannot change under it`() {
-        val v1 = TestPlugins.record(TestPlugins.manifest(contract = 1))
-        val v2 = plugin(2, "acme.tool", obj("id" to "apps.launch"), obj("id" to "containers.exec"))
-        val diff = grants.applyUpdate(v1, v2)
-        assertEquals(listOf("containers.exec"), diff.permissions)
-        val snap = grants.read("acme.tool")
-        assertEquals(GrantState.GRANTED, snap.states["apps.launch"])
-        assertEquals(GrantState.ASK, snap.states["containers.exec"])
     }
 
     @Test
