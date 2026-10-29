@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.view.SurfaceHolder
-import android.view.SurfaceView
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.foundation.background
@@ -442,8 +441,9 @@ private fun BoxScope.DesktopViewport(
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
-                SurfaceView(ctx).apply {
+                dev.droidtop.input.DesktopSurfaceView(ctx, router).apply {
                     router.attachTo(this)
+                    DesktopKeyboardTarget.surface = java.lang.ref.WeakReference(this)
                     holder.addCallback(object : SurfaceHolder.Callback {
                         override fun surfaceCreated(holder: SurfaceHolder) {
                             presentFailed = !hostBridge.presentOutput(primaryOutput, holder.surface)
@@ -637,6 +637,7 @@ private fun BoxScope.Taskbar(
             TaskbarButton(onClick = { openModes(context) }) {
                 Text(stringResource(R.string.desktop_modes))
             }
+            KeyboardTaskbarItem()
             PluginTaskbarItems()
             CompanionTaskbarItem()
             ClipboardNotice()
@@ -1215,6 +1216,27 @@ private fun CompanionTaskbarItem() {
     }
     if (offered) {
         TaskbarButton(onClick = { dev.droidtop.runtime.CompanionSheet.open(context, true) }) { Text(stringResource(R.string.desktop_companion)) }
+    }
+}
+
+/** The desktop's surface, for the bar's Keyboard button (Droidtop/tracker#685). Main thread. */
+internal object DesktopKeyboardTarget {
+    var surface: java.lang.ref.WeakReference<dev.droidtop.input.DesktopSurfaceView>? = null
+}
+
+/**
+ * "Keyboard" on the bar (docs/SPEC.md 6b "The on-screen keyboard", Droidtop/tracker#685): shows the on-screen keyboard
+ * over the desktop, or hides it, and what is typed goes to the program with the focus. Absent while a hardware keyboard
+ * is attached, since that keyboard already types into the desktop.
+ */
+@Composable
+private fun KeyboardTaskbarItem() {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val hardware = configuration.keyboard == android.content.res.Configuration.KEYBOARD_QWERTY &&
+        configuration.hardKeyboardHidden == android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO
+    if (hardware) return
+    TaskbarButton(onClick = { DesktopKeyboardTarget.surface?.get()?.toggleKeyboard() }) {
+        Text(stringResource(R.string.desktop_keyboard))
     }
 }
 

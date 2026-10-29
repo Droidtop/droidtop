@@ -7897,6 +7897,15 @@ constants. The laptop-style `TrackpadGestureEngine` (6c) is not used here: there
 travel without pressing, and dragging is tap-then-drag, while on the surface the pointer jumps to the finger and
 press-and-move must drag.
 
+**The on-screen keyboard** (Droidtop/tracker#685, the coordinator's Desktop review: on a console with no keyboard,
+typing into a URL bar or a terminal meant a trip to the companion's Keys tab). The bar has a Keyboard button, absent
+while a hardware keyboard is attached. It shows Android's keyboard (droidtop's own, when it is the one chosen) over
+the desktop, or hides it. The surface is an editor for it (`DesktopSurfaceView`) with a terminal's attributes, so no
+suggestions or composing. Committed text becomes key presses through Android's virtual key map, and keys the keyboard
+sends as keys (Enter, Backspace, arrows, Ctrl, Esc) go as they are; both take the router's typed-text path. The
+keyboard shows when asked for, not when a Linux text field takes focus: that needs host-bridge to speak Wayland's
+text-input and input-method protocols, the next step on #685.
+
 The second-screen trackpad surface of §6 is built on top of this router's relative-motion path; see §6c.
 
 ### Keyboard layout (decided 2026-10-09, Droidtop/tracker#387)

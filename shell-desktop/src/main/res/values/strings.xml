@@ -16,6 +16,8 @@
     <string name="desktop_start">Start the desktop</string>
     <string name="desktop_start_menu">Start</string>
     <string name="desktop_modes">Modes</string>
+    <!-- The bar's on-screen keyboard button (Droidtop/tracker#685). -->
+    <string name="desktop_keyboard">Keyboard</string>
     <string name="desktop_close">Close</string>
     <string name="desktop_unpin">Unpin</string>
     <string name="desktop_clipboard_on_focus">Clipboard: on focus</string>
