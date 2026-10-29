@@ -201,12 +201,11 @@ val LocalEsDeThemedAreaSize = compositionLocalOf<androidx.compose.ui.unit.DpSize
  * which is the only way a portrait layout written by the theme's author
  * can keep its proportions when the long axis grows.
  *
- * droidtop scaled by the height always. On a 1080x1920 phone that is
- * every themed font about half again too large: Slate's portrait
- * gamelist had metadata labels clipped mid-word ("RELEASE", "DEVELOP")
- * and titles that no longer fit their list (rig, build 546). The official
- * ES-DE render of the same theme at the same size has all of them whole
- * (reference/es-de-render, Slate 1080x1920).
+ * Scaling by the height on a 1080x1920 phone makes every themed font
+ * about half again too large, clipping Slate's portrait metadata labels
+ * mid-word (rig, build 546). The official ES-DE render of the same theme
+ * at the same size has them whole (reference/es-de-render, Slate
+ * 1080x1920).
  *
  * "Screen" here is the themed area, for the reason [LocalEsDeThemedAreaSize]
  * gives -- droidtop's own tab bar is not part of any theme's coordinate
@@ -236,15 +235,11 @@ data class EsDeSystemContext(
  * Renders a parsed [EsDeThemeView] as ONE coherent screen -- every
  * positioned element (background/video/info text/carousel/help/...)
  * composited together by real z-index, the theme itself driving the
- * layout. This replaces an earlier, real bug: [EsDeSystemListView] used
- * to be rendered separately, in droidtop's own hardcoded Column, ignoring
- * the theme's actual `pos`/`size`/`origin` for the carousel/grid/textlist
- * element entirely (DEcaffe positions it centered near the BOTTOM of the
- * screen; droidtop's own layout put system cards crowding the TOP,
- * nothing like the real theme). The primary list element is now just
- * another themed element type in this same dispatcher, positioned exactly
- * like every other one -- [items]/[firstItemFocus] are threaded through
- * only for that one case.
+ * layout. The primary list element ([EsDeSystemListView]) is one more
+ * themed element type in this same dispatcher, placed at the theme's own
+ * `pos`/`size`/`origin` like every other one (DEcaffe, for one, centres
+ * it near the BOTTOM of the screen). [items]/[firstItemFocus] are
+ * threaded through only for that one case.
  */
 @Composable
 fun EsDeThemedView(
@@ -497,8 +492,7 @@ fun EsDeThemedView(
                 // all, e.g. a mosaic tile).
                 "video" -> EsDeThemedVideo(element, viewWidth, viewHeight, gameSelection)
                 // Real GIF/APNG frame-animation playback (see
-                // EsDeThemedAnimation's own doc comment) -- no longer the
-                // static-image fallback this used to be.
+                // EsDeThemedAnimation's own doc comment).
                 "animation" -> EsDeThemedAnimation(element, viewWidth, viewHeight)
                 // Not a visual element at all in real ES-DE -- `<sound>`
                 // declarations feed NavigationSounds, not the render tree
@@ -516,38 +510,31 @@ fun EsDeThemedView(
                 "clock" -> if (esDeScopeAllows(element, backgroundDimmed)) {
                     EsDeThemedClock(element, viewWidth, viewHeight)
                 }
-                // Real, now-unblocked: LibraryEntry.releaseDate exists
-                // (see that field's own doc comment -- real per-game
-                // metadata, scraped via ScreenScraper/TheGamesDB), so a
-                // theme's own real <datetime metadata="releasedate"> can
-                // finally bind to real data instead of parsing-but-never-
-                // rendering. Genuinely different from "clock": this reads
+                // LibraryEntry.releaseDate (see that field's own doc
+                // comment: per-game metadata, scraped via
+                // ScreenScraper/TheGamesDB) is what a theme's own
+                // <datetime metadata="releasedate"> binds to. Different from "clock": this reads
                 // one static value once, not a live-ticking wall clock.
                 "datetime" -> EsDeThemedDateTime(element, viewWidth, viewHeight, gameSelection)
-                // Real, now-unblocked the same way: LibraryEntry.rating
-                // exists (0.0-1.0, same real convention real ES-DE's own
-                // MD_RATING uses).
+                // Bound the same way to LibraryEntry.rating (0.0-1.0, the
+                // convention ES-DE's own MD_RATING uses).
                 "rating" -> EsDeThemedRating(element, viewWidth, viewHeight, gameSelection)
-                // The real fix described above: positioned/sized exactly
-                // like any other themed element, using the SAME EsDeCarousel/
-                // EsDeGrid/EsDeTextList composables that already read the
-                // theme's own itemSize/colors -- only the outer placement
-                // was ever wrong.
+                // Positioned/sized like any other themed element (see
+                // EsDeThemedView's doc comment), using the EsDeCarousel/
+                // EsDeGrid/EsDeTextList composables that read the theme's
+                // own itemSize/colors.
                 "carousel", "grid", "textlist" -> EsDeThemedListElement(
                     element, items, firstItemFocus, viewWidth, viewHeight, onFocusedIndexChanged,
                     gamelist, onCamOffsetChanged, initialFocusIndex,
                 )
                 // helpsystem is deliberately NOT dispatched per element --
-                // see the singleton merge/render after this loop. Real,
-                // confirmed-live bug the per-element dispatch caused: Art
-                // Book Next declares MANY named <helpsystem> blocks
-                // (help-system-view/help-gamelist-view/help-menu-view,
-                // scope-gated), and real ES-DE's HelpComponent is a
-                // SINGLETON the theme merely styles -- every declaration
-                // configures the one component, with `scope` choosing
-                // which config applies where. Rendering one bar per
-                // element drew the help bar three times at once on a real
-                // device.
+                // see the singleton merge/render after this loop. ES-DE's
+                // HelpComponent is a SINGLETON the theme only styles: every
+                // declaration configures the one component, with `scope`
+                // choosing which config applies where. A theme can declare
+                // many named <helpsystem> blocks (Art Book Next:
+                // help-system-view/help-gamelist-view/help-menu-view,
+                // scope-gated), and they still draw one bar.
                 "helpsystem" -> Unit
                 // Real, honestly PARTIAL -- see EsDeThemedBadges' own doc
                 // comment for exactly which of real ES-DE's nine real
@@ -578,11 +565,9 @@ fun EsDeThemedView(
         // while one of droidtop's own menus is over the view, a `scope=menu`
         // block is the one that styles the bar and a `scope=view` block is
         // skipped; with no menu open it is the other way round. `none` never
-        // applies. Previously `menu` blocks were dropped unconditionally and
-        // `none` was treated as "always", so a theme that styles its menu
-        // help bar separately -- Art Book Next does -- got its view styling
-        // over a dimmed menu, and a theme that switched the bar off got it
-        // anyway. Remaining declarations merge in document order
+        // applies, so a theme that styles its menu help bar separately (Art
+        // Book Next does) gets that styling over a dimmed menu, and a theme
+        // that switches the bar off gets none. Remaining declarations merge in document order
         // (LinkedHashMap preserves parse order; later wins per property),
         // matching real ES-DE's own last-applied-wins theme application.
         // Rendered after the element loop -- help draws on top, real ES-DE's
@@ -663,11 +648,9 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     if (esDeHiddenByMetadataFlag(element, selected)) return
     // Real ImageComponent size group -- `size` / `maxSize` / `cropSize` as
     // one first-match chain, each with its OWN scaling verb. See
-    // [dev.droidtop.library.theme.esDeImageArea]; the previous `sizeOf`
-    // call here read only the first two and always drew with
-    // ContentScale.Fit, so a full-screen `<size>1 1</size>` background
-    // rendered as a centred square and a `cropSize`-only element fell
-    // through to the 0.2 x 0.2 default box.
+    // [dev.droidtop.library.theme.esDeImageArea]. A full-screen
+    // `<size>1 1</size>` background stretches to the screen and a
+    // `cropSize`-only element fills its declared box.
     val imageArea = esDeImageArea(
         size = element.pairOrNull("size"),
         maxSize = element.pairOrNull("maxSize"),
@@ -687,10 +670,9 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
 
     // Real gradient-band rendering (DEcaffe's own leftband/rightband
     // elements: a thin vertical divider fading from `color` to
-    // `colorEnd`) -- previously fell through to the plain path-image
-    // branch below, which only ever applies ONE static tint color via
-    // ColorFilter.tint, producing a solid flat-colored bar instead of a
-    // real fade. `path` is deliberately ignored here: real ES-DE's own
+    // `colorEnd`). The plain path-image branch below applies only ONE
+    // static tint, which would draw a flat bar instead of a fade. `path`
+    // is deliberately ignored here: real ES-DE's own
     // technique tints a plain filler image with the gradient, which for
     // this renderer is simplest to reproduce as a plain gradient-filled
     // box at the same real pos/size -- visually equivalent, no image
@@ -714,11 +696,9 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // Real ES-DE semantics (ImageComponent setColorShift/-End): the
         // gradient is a color SHIFT ACROSS THE ELEMENT'S OWN IMAGE — a
         // per-vertex multiply of the gradient into the texture — not a
-        // replacement for it. The previous approximation dropped the
-        // image entirely and drew a flat gradient box, which erased
-        // DEcaffe's decorative side-band art (background.png tinted by
-        // the scheme's bgColor gradient): the bands rendered as plain
-        // dark boxes instead of art. Compose equivalent: draw the image,
+        // replacement for it: DEcaffe's decorative side bands are
+        // background.png tinted by the scheme's bgColor gradient.
+        // Compose equivalent: draw the image,
         // then modulate the gradient over the drawn content. Elements
         // with a gradient but NO existing image file keep the flat
         // gradient box (that is what they really are).
@@ -751,9 +731,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // WHICH media of that game is the element's own real `imageType`
     // (ImageComponent.cpp:612-647 parses it; GamelistView.cpp:1255-1330
     // resolves it): the theme's own declared order, first type that
-    // exists wins. This used to be unimplementable -- a LibraryEntry
-    // carried one already-resolved artworkUri and nothing to choose
-    // between -- and is now resolved through LibraryEntry.mediaLocator.
+    // exists wins, resolved through LibraryEntry.mediaLocator.
     // The walk ends where ES-DE's does: at the element's own `default`.
     val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt()
     val imageTypes = remember(element) {
@@ -773,8 +751,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // element's own `default` is what remains (GamelistView.cpp:1331
         // -1334). `path` is deliberately NOT consulted -- a game-driven
         // element's static path is not a fallback in real ES-DE -- and
-        // neither is the entry's pre-resolved artwork, which used to be
-        // tried here first. Same removal, same reason, as the primary
+        // neither is the entry's pre-resolved artwork, as in the primary
         // components' own chain: a theme asking for a marquee and getting
         // the cover back is not the theme.
             ?: element.existingPathOrNull("default")
@@ -871,11 +848,9 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // mRenderer->getScreenWidth()), the one axis-exception also found for
     // help-bar entrySpacing (see EsDeThemedHelpSystem's own comment).
     val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
-    // Real properties, previously not applied at all -- see this file's
-    // own EsDeThemedImage doc comment for the real, confirmed carousel
-    // outline/fade misalignment this caused (one real source image meant
-    // to be mirrored twice around the carousel, both instances rendering
-    // in the same orientation without these). Rotation applies around the
+    // Flip and rotation: see this file's own EsDeThemedImage doc comment
+    // (one source image mirrored twice around the carousel needs both
+    // to line up its outline/fade). Rotation applies around the
     // element's own real `origin` point (same anchor `pos` already uses),
     // not Compose's center-of-box default.
     val placement = Modifier
@@ -965,15 +940,11 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // (ImageComponent::setColorShift, real default 0xFFFFFFFF = a
         // true no-op multiply), not a full replace. Compose's default
         // ColorFilter.tint blend mode is SrcIn, which REPLACES every
-        // opaque source pixel with a flat, uniform color -- any real,
-        // detailed background/decorative art tinted this way rendered as
-        // a flat, featureless silhouette instead of its own real
-        // shape/gradient/texture tinted through, a real, confirmed-live
-        // bug found by diffing an on-device screenshot against the
-        // theme's own bundled reference render. The colorShift is now the
-        // multiply ROW of esDeColorMatrix instead of a separate
-        // BlendMode.Modulate tint, so it composes with the element's own
-        // real brightness/saturation in one filter.
+        // opaque source pixel with a flat color and turns detailed art into
+        // a silhouette (checked against the theme's bundled reference
+        // render). The colorShift is the multiply ROW of esDeColorMatrix,
+        // so it composes with the element's own brightness/saturation in
+        // one filter.
         colorFilter = imageColorFilter,
         alpha = opacity,
         filterQuality = filterQuality,
@@ -985,7 +956,7 @@ private fun EsDeThemedImage(element: EsDeThemeElement, viewWidth: Dp, viewHeight
         // symmetrically, and this renderer decodes no `cropPos`.
         // Real `cropPos` -- which part of the texture a `cropSize` crop keeps
         // (see esDeCropBias). Compose's own Crop is centred, which is ES-DE's
-        // default and was previously the only thing droidtop could express.
+        // default.
         alignment = esDeCropAlignment(element, "cropPos"),
         contentScale = when (imageArea.fit) {
             EsDeImageFit.STRETCH -> ContentScale.FillBounds
@@ -1022,8 +993,8 @@ private fun rememberGameMedia(entry: LibraryEntry?, imageTypes: List<String>): S
  * A per-game file question ([resolve]) answered on [Dispatchers.IO],
  * never in composition. The media folders are listed and re-checked by
  * [dev.droidtop.library.EsDeArtwork] (a listing, then a `stat` every
- * two seconds), and a themed element used to ask on every
- * recomposition, on the main thread. Keyed on [key1] and [key2] and on
+ * two seconds), so a themed element never asks on the main thread or on
+ * every recomposition. Keyed on [key1] and [key2] and on
  * the media folders' generation, so media written or found later is
  * picked up. Until the first answer lands the element draws what a miss
  * draws; after that, moving to another game keeps the previous answer
@@ -1047,8 +1018,7 @@ private fun rememberOffMain(key1: Any?, key2: Any?, resolve: () -> String?): Str
  *
  * Null for a path that is absent or that BitmapFactory cannot read the
  * bounds of -- notably SVG, the same honest gap [rememberTileBitmap]
- * already has. The caller then keeps the declared box, which is what
- * droidtop did for every image before this.
+ * already has. The caller then keeps the declared box.
  */
 @Composable
 private fun rememberIntrinsicImageSize(path: String?): kotlin.Pair<Float, Float>? {
@@ -1129,27 +1099,21 @@ internal fun esDeTileSize(
 }
 
 /**
- * Real ES-DE `TextComponent` behavior, ported properly -- the previous
- * version only read `text`/`color`/`pos`, ignoring every other property
- * the parser already extracts correctly (`fontSize`, `horizontalAlignment`,
- * `verticalAlignment`, `letterCase`, `backgroundColor`, `opacity`,
- * `lineSpacing`). That gap mattered far more than it looks: `text`
- * elements are how a theme renders every plain label (headers, info-panel
- * fields, ...), and rendering them at Compose's default ~14sp regardless
- * of the theme's own real `fontSize` (a fraction of screen height, same
- * convention already ported for textlist rows) made a lot of real theme
- * content either invisibly small or wildly mis-scaled relative to the
- * rest of the screen -- a real, likely explanation for content that
- * "looked wrong" without an obvious crash or missing element.
+ * ES-DE `TextComponent` behavior: `text`, `color` and `pos`, plus
+ * `fontSize`, `horizontalAlignment`, `verticalAlignment`, `letterCase`,
+ * `backgroundColor`, `opacity` and `lineSpacing`. `text` elements are how
+ * a theme renders every plain label (headers, info-panel fields, ...), so
+ * they take the theme's own `fontSize` (a fraction of the font reference
+ * size, the same convention as textlist rows), never Compose's default.
  *
  * `size`, when the theme declares one, becomes both a real wrap width
  * (`fillMaxWidth` + `TextAlign`) and a real box for `verticalAlignment`
  * to position within (`Box`'s own `contentAlignment`) -- matching real
  * ES-DE's own "mSize.y acts as a bounding box the text centers/aligns
  * within" behavior (`TextComponent::onTextUpdated`). An element with no
- * `size` at all (common for a single short label) keeps the old
- * point-anchored `pos`-only placement, since there's no real box to
- * align within.
+ * `size` at all (common for a single short label) is placed from `pos`
+ * and `origin` against its measured size ([EsDeAutoOriginBox]), since
+ * there is no declared box to align within.
  */
 @Composable
 private fun EsDeThemedText(
@@ -1167,35 +1131,27 @@ private fun EsDeThemedText(
     // case where a theme wants its per-game labels to disappear.
     if (esDeHiddenByMetadataFlag(element, gameSelection.getOrNull(0))) return
     // Real gameselector-bound title text (DEcaffe's own `text name="game"`,
-    // `metadata=name`): previously fell through the plain `?: return`
-    // below every single time, since a metadata-bound element has no
-    // static `text` property of its own at all -- silently rendering
-    // nothing despite being a real, positioned "text" element, not one of
-    // the deferred badges/rating/gamelistinfo types. Real ES-DE convention
-    // when `gameselectorEntry` is omitted on a metadata-bound element:
+    // `metadata=name`): a metadata-bound element has no static `text`
+    // property of its own, so it is resolved here before the plain
+    // `?: return` below. ES-DE convention when `gameselectorEntry` is omitted on a metadata-bound element:
     // implicitly entry 0 of whichever gameselector is in scope (matches
     // DEcaffe's own pairing of this element with `screen2`'s explicit
     // `gameselectorEntry=0` poster -- same featured game, paired caption).
-    // Real, extended beyond just "name" now that LibraryEntry actually
-    // models the rest of real ES-DE's own MetaData fields (description/
-    // developer/publisher/genre/players -- see that field's own doc
-    // comment): every metadata-bound `text` element real ES-DE themes use
-    // for these keys now resolves to real scraped data instead of always
-    // falling through to `defaultValue`.
+    // Beyond "name", LibraryEntry models the rest of ES-DE's own MetaData
+    // fields (description/developer/publisher/genre/players: see that
+    // field's own doc comment), so every metadata-bound `text` element for
+    // these keys resolves to scraped data, falling back to `defaultValue`
+    // only when there is none.
     val metadata = element.valueOrNull<EsDeThemeValue.Str>("metadata")?.value
     val gameselectorEntry = element.valueOrNull<EsDeThemeValue.UInt>("gameselectorEntry")?.value?.toInt() ?: 0
     val selectedGame = gameSelection.getOrNull(gameselectorEntry)
-    // Real, confirmed-live bug this fixes: `metadata="description"` is the
-    // real THEME key (confirmed against GamelistView::getMetadataValue,
-    // GamelistView.cpp:1007-1008 -- `if (metadata == "description") return
-    // file->metadata.get("desc")`, i.e. the theme key "description" maps
-    // to the FILE's own internal "desc" field, they are NOT the same
-    // string). droidtop matched on "desc" instead of "description" --
-    // decaffe's own theme.xml declares `<metadata>description</metadata>`
-    // (its own real per-game description panel), which never matched
-    // either branch, silently falling through to defaultValue every
-    // single time regardless of real scraped data. Real per-game text
-    // metadata keys ES-DE themes actually use, transcribed from the same
+    // `metadata="description"` is the THEME key (GamelistView::getMetadataValue,
+    // GamelistView.cpp:1007-1008: `if (metadata == "description") return
+    // file->metadata.get("desc")`), so the theme key "description" maps to
+    // the FILE's internal "desc" field; they are NOT the same string, and
+    // the match here is on "description" (decaffe's theme.xml declares
+    // `<metadata>description</metadata>`). Per-game text metadata keys ES-DE themes actually use, transcribed from the
+    // same
     // function (GamelistView.cpp:1005-1040): description/developer/
     // publisher/genre/players/favorite/completed/kidgame/broken/manual/
     // playtime/altemulator.
@@ -1228,7 +1184,7 @@ private fun EsDeThemedText(
     // behavior (SystemView.cpp:926/:1028 both setValue the raw string),
     // not a droidtop fallback invention. decaffe's own bottom info strip
     // ("10 GAMES (2 FAVORITES)" in its reference render) is
-    // systemdata=gamecount -- unrendered entirely before this.
+    // systemdata=gamecount.
     val systemdata = element.valueOrNull<EsDeThemeValue.Str>("systemdata")?.value
     fun plural(count: Int, singular: String, pluralForm: String) = if (count == 1) singular else pluralForm
     val systemdataText: String? = if (systemdata == null || systemContext == null) {
@@ -1260,18 +1216,15 @@ private fun EsDeThemedText(
     } ?: return
     // Real ES-DE convention: ":space:" renders as blank (reserves the
     // element's own position/size, shows no visible text) rather than the
-    // literal string. Case-insensitive -- decaffe's own theme.xml writes
-    // it as ":SPACE:" in at least one real variant block, which rendered
-    // the literal token on-device under an exact-case check.
+    // literal string. Case-insensitive: decaffe's own theme.xml writes
+    // it as ":SPACE:" in at least one variant block.
     val rawText = if (resolvedText.equals(":space:", ignoreCase = true)) "" else resolvedText
     // Real `letterCase`: ES-DE accepts FOUR values here, not one --
     // uppercase, lowercase, capitalize and the default none
     // (TextComponent.cpp:643-658), anything else warns and keeps none.
-    // droidtop matched only "uppercase", so decaffe's own metadata values
-    // (playtime1, publisher1, developer1, genre1, players1 all declare
-    // `capitalize`) rendered in the raw case of the scraped string.
-    // The four-value mapping already existed for the list widgets;
-    // this is the same one, not a second copy.
+    // decaffe's own metadata values (playtime1, publisher1, developer1,
+    // genre1, players1) all declare `capitalize`. This is the same
+    // four-value mapping the list widgets use, not a second copy.
     // Real `systemNameSuffix` on a `text` element, which is NOT the same
     // property the three primary components carry even though it is
     // spelled the same: TextComponent.cpp:597-602 only reads it for
@@ -1423,14 +1376,12 @@ private fun esDeVerticalBoxAlignment(element: EsDeThemeElement): Alignment =
  *   so it overflows equally above and below. The `verticalAlignment`
  *   switch only runs in the opposite case, `mSize.y > textHeight` (:283).
  *
- * droidtop laid the text out INSIDE the box instead, so a line taller
- * than its box was pushed down by the whole difference rather than
- * centred on it. Slate's vertical gamelist is exactly that shape -- its
- * metadata labels and values are `0.155 0.02` boxes with a `0.026` font
- * and the two rows sit `0.023` apart -- and the labels were drawn on top
- * of the values beneath them ("RELEASED DEVELOPE PUBLISHE" over
- * "UNKNOWN", portrait capture 2026-09-11). The same arithmetic applies
- * to every themed text box, which is why this is one helper used by both
+ * Laying the line out INSIDE such a box would push it down by the whole
+ * difference. Slate's vertical gamelist is that shape: its metadata
+ * labels and values are `0.155 0.02` boxes with a `0.026` font and the two
+ * rows sit `0.023` apart, so the labels would land on the values beneath
+ * them (portrait capture 2026-09-11). The same arithmetic applies to every
+ * themed text box, which is why this is one helper used by both
  * text-bearing paths rather than a Slate special case.
  */
 internal data class EsDeTextBoxFit(
@@ -1465,14 +1416,11 @@ private fun Modifier.esDeTextOverflow(fit: EsDeTextBoxFit): Modifier =
  * One text-bearing element drawn the way real ES-DE's own `TextComponent`
  * draws one: inside the element's OWN box, aligned on both axes.
  *
- * Shared by `clock`, `datetime` and `gamelistinfo`, all three of which
- * previously drew a bare `Text` at `pos` with no box at all, so
- * `horizontalAlignment`/`verticalAlignment` had nothing to align inside
- * and were silently dropped -- decaffe declares `horizontalAlignment` on
- * four of its own `datetime` elements and on both its clocks, and a
- * right-aligned date in a left-anchored box lands at the wrong end of the
- * row. `text` shares the same two resolvers (and so the same corrected
- * centre default) but keeps its own body, because its `container*`
+ * Shared by `clock`, `datetime` and `gamelistinfo`: the box is what gives
+ * `horizontalAlignment`/`verticalAlignment` something to align inside
+ * (decaffe declares `horizontalAlignment` on four of its own `datetime`
+ * elements and on both its clocks). `text` shares the same two resolvers
+ * (and so the same centre default) but keeps its own body, because its `container*`
  * scrolling branch and its `backgroundMargins` handling have no
  * equivalent on these three.
  *
@@ -1485,13 +1433,12 @@ private fun Modifier.esDeTextOverflow(fit: EsDeTextBoxFit): Modifier =
  *   (TextComponent.cpp:772, :797-801) -- alignment inside a box that
  *   tightly fits the text is a no-op, but `origin` is then applied
  *   against that real measured size, which is what [EsDeAutoOriginBox]
- *   exists for. Passing a zero size to [positionOf] instead -- what these
- *   three did -- silently ignored `origin` entirely.
+ *   exists for. A zero size passed to [positionOf] would ignore `origin`.
  *
  * `lineSpacing` is read here too (TextComponent.cpp:673-674, clamped
- * 0.5-3.0, applied as `mFont->getHeight(mLineSpacing)`): a `datetime` with
- * a box taller than one line had no way to space its lines before, and
- * decaffe declares it on one.
+ * 0.5-3.0, applied as `mFont->getHeight(mLineSpacing)`), so a `datetime`
+ * with a box taller than one line spaces its lines as declared (decaffe
+ * declares it on one).
  */
 @Composable
 private fun EsDeAlignedTextBlock(
@@ -1537,8 +1484,8 @@ private fun EsDeAlignedTextBlock(
                 // Real ES-DE abbreviates rather than cutting: whatever
                 // does not fit the box loses glyphs until the ellipsis
                 // glyph fits (Font.cpp:1074-1078). Compose's own default
-                // is a hard clip, which is what drew "RELEASE" for
-                // "RELEASED:" on the rig.
+                // is a hard clip, which would cut "RELEASED:" to
+                // "RELEASE".
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth().esDeTextOverflow(fit),
             )
@@ -1569,9 +1516,8 @@ private fun EsDeAlignedTextBlock(
 }
 
 /**
- * Real origin-correction for an auto-sized element -- see
- * [EsDeThemedText]'s own doc comment for the real, confirmed bug this
- * fixes. Measures [content] against loose constraints (bounded only by
+ * Origin-correction for an auto-sized element (see [EsDeThemedText]'s
+ * own doc comment). Measures [content] against loose constraints (bounded only by
  * the themed area itself, so a long string still wraps rather than
  * overflowing unbounded), THEN computes `pos*view - measuredSize*origin`
  * using that REAL measured size, then places it there -- the standard
@@ -1619,9 +1565,8 @@ private fun EsDeAutoOriginBox(
  * stream while `playCount < iterationCount`; once the count is reached
  * `render()` returns before drawing anything at all (:200-203), except
  * that `onIterationsDone=image` draws the element's own static image
- * instead. Both branches are ported here; droidtop previously pinned
- * `REPEAT_MODE_ONE` unconditionally, so a theme asking for a single play
- * got an endless loop.
+ * instead. Both branches are ported here, so a theme asking for a single
+ * play gets one play, not an endless `REPEAT_MODE_ONE` loop.
  *
  * Real `audio` (VideoComponent.cpp:254-255, default true): the theme
  * decides whether the preview has sound. Playback is additionally tied to
@@ -1689,9 +1634,9 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // `cropSize` as one first-match chain with its own verb
     // (VideoComponent.cpp:179-211), see
     // [dev.droidtop.library.theme.esDeVideoArea]. The generic element
-    // helper this used to call reads only `size`/`maxSize`, so decaffe's
-    // own `cropSize`-only system-view preview fell through to a 0.2 x 0.2
-    // box instead of filling its declared 0.58 x 0.77 one.
+    // helper reads only `size`/`maxSize`, so it is not used here:
+    // decaffe's own `cropSize`-only system-view preview fills its declared
+    // 0.58 x 0.77 box.
     val videoArea = esDeVideoArea(
         videoSize = element.pairOrNull("size"),
         videoMaxSize = element.pairOrNull("maxSize"),
@@ -1706,10 +1651,8 @@ private fun EsDeThemedVideo(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // surface's own radius. `imageCornerRadius` (VideoComponent.cpp:287-
     // 289) is a separate real property belonging to this element's static
     // image, which is why it stays where it is, in
-    // EsDeThemedFallbackImage. droidtop previously read imageCornerRadius
-    // here, so a theme that rounded only its static poster also rounded
-    // its playing video and one that rounded only the video rounded
-    // neither.
+    // EsDeThemedFallbackImage. A theme can round its static poster and its
+    // playing video independently.
     val cornerRadiusFraction = (element.valueOrNull<EsDeThemeValue.FloatValue>("videoCornerRadius")?.value ?: 0f)
         .coerceIn(0f, 0.5f)
     val cornerRadius = (cornerRadiusFraction * viewWidth.value).dp
@@ -2326,8 +2269,7 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
     // STATIC image has its own size group, separate from the playing
     // surface's `size`/`maxSize`/`cropSize`, and only inherits the video's
     // box when it declares none of its own. See
-    // [dev.droidtop.library.theme.esDeVideoStaticImageArea]. droidtop read
-    // only the video group before, so `imageMaxSize` did nothing.
+    // [dev.droidtop.library.theme.esDeVideoStaticImageArea].
     val staticArea = esDeVideoStaticImageArea(
         imageSize = element.pairOrNull("imageSize"),
         imageMaxSize = element.pairOrNull("imageMaxSize"),
@@ -2378,12 +2320,9 @@ private fun EsDeThemedFallbackImage(element: EsDeThemeElement, viewWidth: Dp, vi
         // (ImageComponent::setColorShift, real default 0xFFFFFFFF = a
         // true no-op multiply), not a full replace. Compose's default
         // ColorFilter.tint blend mode is SrcIn, which REPLACES every
-        // opaque source pixel with a flat, uniform color -- any real,
-        // detailed background/decorative art tinted this way rendered as
-        // a flat, featureless silhouette instead of its own real
-        // shape/gradient/texture tinted through, a real, confirmed-live
-        // bug found by diffing an on-device screenshot against the
-        // theme's own bundled reference render. BlendMode.Modulate is
+        // opaque source pixel with a flat color and turns detailed art into
+        // a silhouette (checked against the theme's bundled reference
+        // render). BlendMode.Modulate is
         // Compose's real multiply-blend equivalent.
         colorFilter = tint?.let { ColorFilter.tint(it, BlendMode.Modulate) },
         alpha = opacity,
@@ -2442,16 +2381,14 @@ private fun EsDeThemedClock(element: EsDeThemeElement, viewWidth: Dp, viewHeight
     // Same real scaling axis as EsDeThemedText/textlist rows, but a
     // different real default: DateTimeComponent.cpp's own real default is
     // FONT_SIZE_SMALL (0.035), not TextComponent's FONT_SIZE_MEDIUM
-    // (0.045) -- droidtop previously borrowed the wrong component's
-    // default for this element type, confirmed against real ES-DE source.
+    // (0.045), checked against ES-DE source.
     val fontSizeFraction = element.valueOrNull<EsDeThemeValue.FloatValue>("fontSize")?.value ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(viewWidth, viewHeight).value).dp.toSp() }
     // Real clock background box (DateTimeComponent.cpp:163-175, guarded on
     // `backgroundColor` exactly as ES-DE guards on mClockBgColor) -- see
     // EsDeBackgroundBox. Five of the ten themes measured for this pass set
-    // its padding, and a clock with a declared backgroundColor previously
-    // drew no box at all, so the time floated over whatever art was behind
-    // it.
+    // its padding, and a clock with a declared backgroundColor draws its
+    // box behind the time.
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
     EsDeAlignedTextBlock(
         element = element,
@@ -2545,9 +2482,8 @@ private fun EsDeThemedDateTime(element: EsDeThemeElement, viewWidth: Dp, viewHei
     // Real background box. A `datetime` is NOT in clock mode, so it takes
     // `backgroundMargins` and never the clock's own padding pair
     // (DateTimeComponent.cpp:289 gates one on `!mClockMode` and :294 the
-    // other on `mClockMode`) -- droidtop had it reading the clock's group,
-    // so a theme's declared margins did nothing and its clock padding
-    // applied to dates it was never meant for.
+    // other on `mClockMode`), so a theme's clock padding never applies to
+    // a date.
     val background = backgroundMarginsBoxOf(element, viewWidth, opacity)
     EsDeAlignedTextBlock(
         element = element,
@@ -2716,7 +2652,7 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
         element.valueOrNull<EsDeThemeValue.Color>("controllerIconColorEnd")?.let { colorOf(it) } ?: controllerColor
     val controllerGradientHorizontal = element.strOrNull("controllerIconGradientType") != "vertical"
     // BadgeComponent.cpp:312-325 -- `badges` takes `interpolation` like
-    // every other textured element; the badge path used to ignore it.
+    // every other textured element.
     val filterQuality = esDeFilterQuality(element) ?: FilterQuality.Low
     val density = LocalDensity.current
 
@@ -3074,9 +3010,8 @@ private fun EsDeThemedRating(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
         // identical block at :160-163): the icons are ONE tiled image row
         // spanning the element's whole width, and the rating clips the
         // filled row at round(width * value) -- a CONTINUOUS clip, so a
-        // 0.7 rating really does render three and a half stars. droidtop
-        // previously rounded to whole stars, which showed the wrong count
-        // for most real scraped ratings.
+        // 0.7 rating renders three and a half stars, never a count
+        // rounded to whole stars.
         //
         // Real `overlay` (RatingComponent.cpp:294-295, default true at
         // :24): with overlay ON the unfilled row is drawn full width and
@@ -3251,49 +3186,42 @@ private fun EsDeThemedHelpSystem(
     val helpDefaultPos = dev.droidtop.shell.gamepad.EsDeHelpRowSlot.esDeDefault(vertical = viewHeight > viewWidth)
     val offsetX = viewWidth * (pos?.x ?: 0.012f)
     val offsetY = viewHeight * (pos?.y ?: helpDefaultPos.posY)
-    // `origin` says which point of the bar `pos` names, and it was being
-    // ignored here -- the ONE element type that read pos without it.
-    // decaffe declares `<origin>0 0.5</origin>`, so ES-DE centres the bar
-    // vertically on pos while droidtop hung its TOP there: half a row
-    // lower, and with decaffe's pos near the bottom edge the landscape
-    // gamelist drew its help row clipped in half off the window (capture,
-    // 2026-09-11). Every other element goes through `positionOf`, which
-    // has always subtracted origin * size; this one cannot, because the
-    // bar's size is whatever its hints measure to -- so it is applied
-    // after measurement instead.
+    // `origin` says which point of the bar `pos` names. decaffe declares
+    // `<origin>0 0.5</origin>`, so ES-DE centres the bar vertically on pos;
+    // with decaffe's pos near the bottom edge, hanging the bar's TOP there
+    // would clip it off the window (capture, 2026-09-11). Every other
+    // element goes through `positionOf`, which subtracts origin * size;
+    // this one cannot, because the bar's size is whatever its hints
+    // measure to, so origin is applied after measurement instead.
     val origin = element.pairOrNull("origin")
     val originX = origin?.x ?: 0f
     val originY = origin?.y ?: helpDefaultPos.originY
-    // Real HelpComponent.cpp defaults (0x777777FF, gray) for BOTH colors --
-    // droidtop previously guessed White/Black, confirmed wrong against real
-    // ES-DE source: a theme that sets only one of textColor/iconColor would
-    // have paired it with an arbitrary, wrong color for the other.
+    // HelpComponent.cpp defaults (0x777777FF, gray) for BOTH colors, so a
+    // theme that sets only one of textColor/iconColor gets ES-DE's gray
+    // for the other.
     val defaultHelpColor = Color(0xFF777777)
     val textColor = dimmedColor("textColor") ?: defaultHelpColor
     val iconColor = dimmedColor("iconColor") ?: defaultHelpColor
     // HelpComponent.cpp:288-294 -- BOTH `opacity` and `opacityDimmed`
     // clamp to 0.2..1.0 on this element, not 0..1: real ES-DE refuses to
-    // let a theme make the help bar invisible. droidtop clamped the
-    // undimmed one to 0..1, so a theme asking for 0 really did erase its
-    // own help bar where ES-DE would have shown it at 20%.
+    // let a theme make the help bar invisible: a theme asking for 0 gets
+    // it at 20%.
     val opacity = (dimmedFloat("opacity") ?: 1f).coerceIn(0.2f, 1f)
     // Real default: HelpComponent constructs with FONT_SIZE_SMALL (0.035),
     // not 0.025 -- confirmed against real ES-DE source (Font.h/HelpComponent.h).
     val fontSizeFraction = dimmedFloat("fontSize") ?: 0.035f
     val fontSizeSp = with(LocalDensity.current) { (fontSizeFraction * esDeFontScreenSize(viewWidth, viewHeight).value).dp.toSp() }
-    // Real ES-DE HelpComponent.cpp: entrySpacing is a fraction of screen
-    // WIDTH, not height (droidtop previously used height, matching every
-    // other element's own real height-based convention, but help-bar
-    // spacing is confirmed real-source to be the one exception) -- real
-    // default is 0.00833, not 0.02 (droidtop's own earlier guess was
-    // ~2.4x too large). HelpComponent.cpp:272-275 gives the dimmed variant
-    // the same 0..0.04 clamp.
+    // ES-DE HelpComponent.cpp: entrySpacing is a fraction of screen
+    // WIDTH, not height (help-bar spacing is the one exception to the
+    // height-based convention), with a default of 0.00833.
+    // HelpComponent.cpp:272-275 gives the dimmed variant the same 0..0.04
+    // clamp.
     val entrySpacing = (dimmedFloat("entrySpacing") ?: 0.00833f).coerceIn(0f, 0.04f) * viewWidth.value
     // Real `iconTextSpacing` (HelpComponent.cpp:277-278) -- the gap
     // between one entry's own button glyph and its label, clamped to
     // 0..0.04 and, like entrySpacing, a fraction of screen WIDTH
     // (HelpComponent.cpp:687). Real default 0.00416
-    // (HelpComponent.cpp:47); droidtop previously hardcoded 6dp.
+    // (HelpComponent.cpp:47).
     val iconTextSpacing = (dimmedFloat("iconTextSpacing") ?: 0.00416f)
         .coerceIn(0f, 0.04f) * viewWidth.value
     // Real `entryRelativeScale` (HelpComponent.cpp:182-183), clamped to
@@ -3308,8 +3236,7 @@ private fun EsDeThemedHelpSystem(
     val labelFontSizeSp = if (entryRelativeScale < 1f) fontSizeSp * entryRelativeScale else fontSizeSp
     val iconFontSizeSp = if (entryRelativeScale < 1f) fontSizeSp else fontSizeSp / entryRelativeScale
     // Real background box -- same group, same geometry, same source as
-    // clock/systemstatus (HelpComponent.cpp:133-180). droidtop previously
-    // drew backgroundColor as a bare, padding-less fill.
+    // clock/systemstatus (HelpComponent.cpp:133-180), padding included.
     val background = backgroundBoxOf(element, viewWidth, viewHeight, opacity)
     // HelpComponent.cpp:51 and :674-678 -- the help bar's own letterCase
     // default is UPPERCASE, unlike every other element's NONE.
@@ -3351,13 +3278,10 @@ private fun EsDeThemedHelpSystem(
         hints.forEach { (action, label) ->
             // Real ES-DE HelpComponent draws an icon glyph in `iconColor`
             // beside a text label in `textColor` -- no pill/background
-            // behind the glyph at all. Real, confirmed-live bug this
-            // fixes: droidtop drew the glyph IN iconColor ON a pill
-            // filled with textColor -- decaffe keys both colors to the
-            // same real palette family (see colors.xml's own
-            // mainFontColor-driven scheme), so the glyph text and its own
-            // background were the same color, rendering as a blank,
-            // illegible circle on every real device screenshot.
+            // behind the glyph at all. A pill filled with textColor would
+            // be illegible: decaffe keys both colors to the same palette
+            // family (see colors.xml's own mainFontColor-driven scheme),
+            // so glyph and pill would be the same color.
             val fontFamily = themeFontFamily(element)
             Row(
                 horizontalArrangement = Arrangement.spacedBy(iconTextSpacing.dp),
@@ -3434,11 +3358,9 @@ private fun EsDeThemedHelpSystem(
 /**
  * ES-DE's real `datetime`/`clock` `format` property uses C strftime-style
  * `%`-specifiers (its own renderer calls through to strftime under the
- * hood), not Java's SimpleDateFormat letters -- feeding one straight into
- * SimpleDateFormat produced real garbage (e.g. a real theme's "%H:%M"-style
- * default rendered as literal "%2026", since SimpleDateFormat treats '%' as
- * a literal character and 'Y'/'H'/etc. as its OWN unrelated pattern
- * letters). Covers the common specifiers ES-DE's own themes actually use;
+ * hood), not Java's SimpleDateFormat letters: SimpleDateFormat treats '%'
+ * as a literal character and 'Y'/'H'/etc. as its OWN unrelated pattern
+ * letters, so the format is translated here. Covers the common specifiers ES-DE's own themes actually use;
  * anything else passes through as a SimpleDateFormat literal (quoted), the
  * same honest-fallback approach used elsewhere in this renderer.
  */
@@ -3588,14 +3510,11 @@ internal fun EsDeThemeView.helpRowSlot(vertical: Boolean, dimmed: Boolean = fals
  * textlist -- 50 (GamelistView.cpp:176, :193, :209, :403;
  * SystemView.cpp:596, :819).
  *
- * droidtop defaulted all of them to 0, which is why decaffe's gamelist
- * metadata column was invisible: every one of its labels (`playtime2`,
+ * These defaults matter: decaffe's gamelist metadata labels (`playtime2`,
  * `publisher2`, `developer2`, `genre2`, `players2`, `release2`, `rating`)
- * declares no `zIndex`, so they sorted at 0 -- BELOW the same view's
+ * declare no `zIndex`, and at 40/45 they land above the same view's
  * `back`/`back2` (1), `backart3` (2) and `gamedisplay` (3) art, which do
- * declare one. In ES-DE they default to 40/45 and land above all of it.
- * The elements that did draw (`text name="game"`, the side bands) are
- * exactly the ones with an explicit `zIndex`.
+ * declare one. A default of 0 would hide them all behind that art.
  */
 internal fun defaultZIndexOf(type: String): Float = when (type) {
     "image", "video" -> 30f
@@ -3609,7 +3528,11 @@ internal fun defaultZIndexOf(type: String): Float = when (type) {
 private fun zIndexOf(element: EsDeThemeElement): Float =
     element.valueOrNull<EsDeThemeValue.FloatValue>("zIndex")?.value ?: defaultZIndexOf(element.type)
 
-/** [EsDeThemeValue.Color.argbLikeRgba] is packed RRGGBBAA (same layout as ES-DE's own getHexColor) -- Compose's Color wants ARGB, so the channels need reordering, not just a straight reinterpret. Internal: EsDeSystemListView shares this exact conversion (it used to keep its own private copy -- one job, one implementation). */
+/**
+ * [EsDeThemeValue.Color.argbLikeRgba] is packed RRGGBBAA (same layout as ES-DE's own getHexColor). Compose's Color
+ * wants ARGB, so the channels need reordering, not just a straight reinterpret. Internal: EsDeSystemListView shares
+ * this exact conversion (one job, one implementation).
+ */
 internal fun colorOf(value: EsDeThemeValue.Color): Color {
     val rgba = value.argbLikeRgba
     val r = (rgba shr 24) and 0xFF
@@ -3619,14 +3542,11 @@ internal fun colorOf(value: EsDeThemeValue.Color): Color {
     return Color(red = r.toInt(), green = g.toInt(), blue = b.toInt(), alpha = a.toInt())
 }
 
-// Real, confirmed-live gap this fixes: `fontPath` is a real, correctly-
-// parsed property (every text-bearing element type declares it -- see
-// EsDeTheme.kt's own real schema) that no renderer here ever actually
-// LOADED and applied -- every themed screen rendered in Compose's plain
-// system default font regardless of what real font file a theme bundles
-// and points `fontPath` at (decaffe alone ships 8 real .otf/.ttf files,
-// referenced by ~40 separate `fontPath` declarations across its own
-// theme.xml). Cached by resolved file path -- `Font(File)` decodes the
+// `fontPath` (every text-bearing element type declares it: see
+// EsDeTheme.kt's own schema) is loaded and applied here, so a themed
+// screen draws in the font file the theme bundles (decaffe alone ships 8
+// .otf/.ttf files, referenced by ~40 `fontPath` declarations across its
+// own theme.xml). Cached by resolved file path: `Font(File)` decodes the
 // real font file from disk, not free to redo on every recomposition.
 // Not `@Composable`: a plain memoization map is enough here, no Compose
 // state/recomposition scoping needed for a value keyed purely off the
@@ -3782,15 +3702,14 @@ private data class EsDeBackgroundBox(
 
 /**
  * Real `backgroundMargins`, the `text`/`datetime` sibling of the clock's
- * padding group -- and a genuinely different shape from it, which is what
- * droidtop had wrong twice over.
+ * padding group, and a different shape from it.
  *
  * It is a (LEADING, TRAILING) pair on the X AXIS ONLY: ES-DE translates by
  * `-margins.x` and draws the rect `mSize.x + margins.x + margins.y` wide by
  * `mSize.y` tall -- the height is never touched (TextComponent.cpp:263-274).
  * BOTH components scale against screen WIDTH and clamp to 0-0.5
  * (TextComponent.cpp:616, DateTimeComponent.cpp:289-291). So reading the
- * pair as (horizontal, vertical) -- which the `text` path did -- pads the
+ * pair as (horizontal, vertical) would pad the
  * wrong axis with the wrong number, and a `datetime` never takes the
  * clock's own `backgroundHorizontalPadding`/`backgroundVerticalPadding` at
  * all: DateTimeComponent gates those on `mClockMode` and this one on

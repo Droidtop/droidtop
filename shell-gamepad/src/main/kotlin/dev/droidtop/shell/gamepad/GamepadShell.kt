@@ -308,17 +308,15 @@ private fun GamepadShellBody(
     // Bumped by the real, user-facing "Rescan library" Settings action --
     // included in both LaunchedEffect keys below so bumping it restarts
     // both collections against Library.rescanKindsProgressive instead of
-    // the plain (cache-trusting) scanKindsProgressive. Previously the
-    // only way to force a fresh scan was clearing app data by hand over
-    // adb; a real user has no such option.
+    // the plain (cache-trusting) scanKindsProgressive. It is the user's
+    // way to force a fresh scan without clearing app data.
     var rescanTrigger by remember { mutableStateOf(0) }
     // ONE answer to "where is the shell" (see ShellBackStack): the
     // section, the group drilled into inside Games, the open detail, and
     // what was focused in each. Held out here, outside the screens that
     // draw them, because a screen that owns its own place in the tree
-    // loses it the moment something else is drawn instead -- which is
-    // exactly what build 542's "B from a game detail does not return to
-    // the PC grid" was. Saveable rather than plain remember so the
+    // loses it the moment something else is drawn instead (build 542:
+    // "B from a game detail does not return to the PC grid"). Saveable rather than plain remember so the
     // Activity recreate the Text size setting triggers
     // (AccessibilityPrefs, Droidtop/tracker#87) restores this whole
     // place instead of dropping the user on the default section.
@@ -372,12 +370,10 @@ private fun GamepadShellBody(
     // [HelpRowClaim]), and WHICH screen said so. A screen key rather than
     // a bare flag, because the screens cross over during the Crossfade
     // below and the one that is leaving must not answer for the one
-    // arriving: with a flag, leaving Settings for Games put the answer
-    // back to "nothing of its own" AFTER the Games screen had already
-    // said otherwise, and it stayed wrong until the section changed again
-    // -- droidtop's bar and Slate's own row then drew at once, the
-    // theme's sliced in half by the bar on top of it (rig, build 546,
-    // landscape).
+    // arriving. A flag would let leaving Settings for Games reset the
+    // answer to "nothing of its own" after the Games screen has claimed
+    // the row, and droidtop's bar and the theme's own row would then draw
+    // at once (rig, build 546, landscape).
     var helpRowClaimant by remember { mutableStateOf<Pair<String, HelpRowClaim>?>(null) }
     // Where a themed screen wants the one help row (see [EsDeHelpRowSlot]),
     // carried with the key of the screen that said so for exactly the
@@ -436,8 +432,8 @@ private fun GamepadShellBody(
     // bumps this, and the timer below restarts from it. A launch counts
     // as activity too (the shell is not idle, it is behind a game).
     // A flow, not Compose state: only the timer observes it, so a key
-    // press no longer recomposes the whole shell body (it was a
-    // LaunchedEffect key here). See SPEC "Performance on the console".
+    // press does not recompose the whole shell body. See SPEC
+    // "Performance on the console".
     val lastInputMs = remember {
         kotlinx.coroutines.flow.MutableStateFlow(android.os.SystemClock.elapsedRealtime())
     }
@@ -473,18 +469,17 @@ private fun GamepadShellBody(
     // below. Installed only while this composition is live.
     // Quick Menu (hold SELECT) -- see QuickMenu.kt for the paradigm.
     var quickMenuOpen by remember { mutableStateOf(false) }
-    // The section the Quick Menu opens on when something asked for one (Downloads, for a link to Updates); cleared on close.
+    // The section the Quick Menu opens on when something asked for one (Downloads, for a link to Updates); cleared on
+    // close.
     var quickMenuStart by remember { mutableStateOf<QuickSection?>(null) }
     LaunchedEffect(quickMenuOpen) { if (!quickMenuOpen) quickMenuStart = null }
     // A quick menu left open when this shell lost the foreground (the
     // Switch-mode dialog's own "Android"/"Desktop" rows, or Home) must not
     // still be showing when a fresh, real deep-link brings this same
-    // singleTask composition back -- rig, dq-modefix-01 steps 3-4:
-    // MainActivity/GamepadShell is never destroyed by a mode round trip,
-    // so quickMenuOpen stayed true from before, and picking "Gaming" from
-    // the Switch-mode dialog resumed the SAME composition with the old
-    // Quick Menu still stacked on top, which read as "Gaming never
-    // appears" even though mode had actually already resolved correctly.
+    // singleTask composition back (rig, dq-modefix-01 steps 3-4).
+    // MainActivity/GamepadShell is not destroyed by a mode round trip,
+    // so without this reset the same composition resumes with the old
+    // Quick Menu stacked on top of Gaming.
     // The left menu (Start; docs/SPEC.md 7j "Gaming controls") closes for
     // the same reason.
     var leftMenuOpen by remember { mutableStateOf(false) }
@@ -952,14 +947,12 @@ private fun GamepadShellBody(
     // RENPY/RPG_MAKER_*/KIRIKIRI, and GAME_KINDS is a subset missing
     // KIRIKIRI) could otherwise leak an entry into the wrong section.
     //
-    // scanKindsProgressive, not scanKinds: real, reported UX request --
-    // this screen used to show nothing but its spinner until the entire
-    // scan (every root, every system folder) finished, even though most
-    // folders individually are fast. Each collected emission is already a
-    // growing snapshot (see Library.scanKindsProgressive's own doc
-    // comment), so just assigning it directly here is enough to make the
-    // screen fill in gradually as real results arrive, without this file
-    // needing to know anything about how the underlying scan is chunked.
+    // scanKindsProgressive, not scanKinds: the screen fills in as each
+    // folder is scanned instead of waiting for the whole scan. Each
+    // collected emission is already a growing snapshot (see
+    // Library.scanKindsProgressive's own doc comment), so assigning it
+    // directly is enough, and this file needs to know nothing about how
+    // the scan is chunked.
     LaunchedEffect(library, rescanTrigger) {
         // Collected for as long as this shell is composed: see
         // scanFollowingGamesRoots for why a changed root set is a walk.
@@ -978,16 +971,13 @@ private fun GamepadShellBody(
     LaunchedEffect(processAppEntries) {
         processAppEntries?.let { entries -> appEntries = entries.filter { it.kind in APP_KINDS } }
     }
-    // Real bug this fixes, reported directly: nulling gameEntries/appEntries
-    // here made the entire already-known library disappear the instant
-    // "Rescan library" was pressed, showing the loading spinner for
-    // however long the fresh walk took -- a rescan should never make a
-    // user's existing library vanish. Bumping rescanTrigger alone is
-    // enough: it restarts the LaunchedEffects above against
-    // rescanKindsProgressive, whose own first emission is the real,
-    // already-known cached data (see ConsoleRomProvider.rescanProgressive's
-    // own doc comment), not an empty list. "Rescan library" itself now
-    // lives in SettingsGamingFragment (see MainActivity's own
+    // A rescan never clears gameEntries/appEntries: the known library
+    // stays on screen while the fresh walk runs. Bumping rescanTrigger
+    // alone restarts the LaunchedEffects above against
+    // rescanKindsProgressive, whose first emission is the already-known
+    // cached data (see ConsoleRomProvider.rescanProgressive's own doc
+    // comment), not an empty list. "Rescan library" itself lives in
+    // SettingsGamingFragment (see MainActivity's own
     // EXTRA_GAMING_RESCAN, read once above into rescanTrigger's initial
     // value) -- nothing left in this composition needs to bump it again.
     // Real, immediate in-memory update -- Library.toggleFavorite already
@@ -1006,19 +996,14 @@ private fun GamepadShellBody(
             gameEntries = gameEntries?.map { if (it.id == entry.id) it.copy(favorite = newFavorite) else it }
         }
     }
-    // Real bug this fixes: onKeyEvent modifiers (L1/R1 section-switching
-    // below, GamesSection's Left/Right sibling-system switching) only ever
-    // see a key event by it bubbling up from whatever's currently focused
-    // -- if literally nothing has focus yet (the initial frame before
-    // `entries` loads, or an empty section with no focusable card at all),
-    // there is no focused node to bubble from, so those handlers silently
-    // never fire. Confirmed as the real cause of a reported "L1/R1 doesn't
-    // do anything" -- landing on the default Games tab with an empty
-    // library left nothing focused. Grabbing focus onto the invisible
-    // anchor Spacer in the content Box (never the tab bar -- see its own
-    // comment, owner 2026-09-27) on first composition guarantees a valid
-    // focus target always exists; GamesSection/AppsSection still steal
-    // focus onto real content once it loads, same as before.
+    // onKeyEvent modifiers (L1/R1 section-switching below, GamesSection's
+    // Left/Right sibling-system switching) only see a key event that
+    // bubbles up from the focused node, so something must always have
+    // focus, including on the first frame before `entries` loads and in
+    // an empty section. Focus goes to the invisible anchor Spacer in the
+    // content Box (never the tab bar: see its own comment, owner
+    // 2026-09-27) on first composition; GamesSection/AppsSection move
+    // focus onto real content once it loads.
     LaunchedEffect(Unit) { requestFocusWhenAttached(tabBarFocus, "Shell anchor") }
 
     // Outermost back swallow: droidtop is the HOME surface -- system back
@@ -1082,9 +1067,8 @@ private fun GamepadShellBody(
             // screen's own Back handling, individual card key handlers,
             // etc. all take priority since they're closer to the focused
             // node in the bubbling chain).
-            // Touch counts as activity too: only key events reset the
-            // idle timer before this, so the screensaver could appear
-            // while somebody was actively tapping. Initial pass, so it
+            // Touch counts as activity too, so the screensaver never
+            // appears while somebody is tapping. Initial pass, so it
             // observes without consuming anything.
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -1231,7 +1215,7 @@ private fun GamepadShellBody(
         }
         programScreen?.let { screen -> CatalogSheet(root = screen, onExit = { programScreen = null }) }
         // A launch that never answered or left at once (LaunchWatchdog, docs/SPEC.md "The launch
-        // watchdog"): plain words and the three ways out, where a black screen used to be.
+        // watchdog"): plain words and the three ways out, never a black screen.
         val watchAlert by dev.droidtop.library.LaunchWatchdog.alert.collectAsState()
         watchAlert?.let { alert ->
             LaunchFailureDialog(
@@ -1251,7 +1235,8 @@ private fun GamepadShellBody(
                         dev.droidtop.library.LaunchWatchdog.dismiss()
                     },
                 ).let { ways ->
-                    // A stuck RetroArch whose core is not confirmed installed: getting the core is the likely fix, so it comes first.
+                    // A stuck RetroArch whose core is not confirmed installed: getting the core is the likely fix, so
+                    // it comes first.
                     val core = alert.retroArchCore?.let {
                         LaunchFailureAction("Get the core") {
                             scope.launch {
@@ -1271,16 +1256,14 @@ private fun GamepadShellBody(
         // HelpComponent ON the view at the theme's own <helpsystem>
         // position (Window.cpp:126, :884); droidtop's own bar takes that
         // same place rather than a strip of its own below a canvas
-        // shortened to make room for it -- which is what left DEcaffe's
-        // own help plate drawn empty above the bar in portrait, and gave
-        // a theme a different canvas in portrait than in landscape (rig,
-        // build 547).
+        // shortened to make room for it, so a theme's own help plate is
+        // never drawn empty above the bar and a theme gets the same canvas
+        // in portrait as in landscape (rig, build 547).
         // A screen drawn over the group -- a game's detail, the group's
         // own options screen -- takes A and B and nothing else: Info,
         // Options, the system jump and the section switch all act on the
-        // group UNDER it, and the bar promised every one of them over
-        // "Stores and folders" while none dispatched there (rig, build
-        // 550). The hint row promises only what dispatches (SPEC 7j).
+        // group UNDER it, so the bar does not promise them there (rig,
+        // build 550). The hint row promises only what dispatches (SPEC 7j).
         val overlayScreen = detailEntry != null || nav.optionsOpen
         // Y/Info is bound only where Y acts on something focused (SPEC
         // 7j: a hint row promises only what dispatches; UI pass
@@ -1337,11 +1320,9 @@ private fun GamepadShellBody(
             // where nothing else has focus yet to bubble the key
             // event up from (see tabBarFocus's own comment).
             Spacer(Modifier.size(0.dp).focusRequester(tabBarFocus).focusable())
-            // ONE transition for every screen the shell itself draws.
-            // Opening a game's detail out of a themed gamelist used to be
-            // a cut straight into droidtop's own chrome, while moving
-            // between the theme's own views faded (research/ui-polish item
-            // 18). The theme's own inter-view transitions stay the
+            // ONE transition for every screen the shell itself draws,
+            // including a game's detail opened out of a themed gamelist
+            // (research/ui-polish item 18). The theme's own inter-view transitions stay the
             // theme's: this is keyed on the section and the open detail,
             // not on the group, so a move between systems is still ES-DE's
             // own animation and not two animations at once.
@@ -1376,14 +1357,11 @@ private fun GamepadShellBody(
                             }
                             androidx.activity.compose.BackHandler(enabled = true) { screensaverOn = false }
                         }
-                        // Real bug this fixes: the loading spinner used to gate this
-                        // entire content area unconditionally, before `section` was
-                        // ever checked -- Settings (which needs zero scan data) was
-                        // stuck behind the same load state as Games/Apps, showing as
-                        // "empty" even though it's a plain static list with nothing
-                        // to wait for. detailEntry is also section-independent, so
-                        // it stays checked before the loading gate too.
-                        // A PC or engine game no longer opens a detail screen of
+                        // The loading spinner gates only the sections that need scan
+                        // data: Settings is a static list and never waits on a scan.
+                        // detailEntry is section-independent, so it is checked
+                        // before the loading gate too.
+                        // A PC or engine game does not open a detail screen of
                         // its own (docs/SPEC.md 7i, redecided 2026-09-26): its
                         // metadata is the theme's own gamelist elements and its
                         // actions are PcGameMenu, an in-context overlay opened
@@ -1398,13 +1376,15 @@ private fun GamepadShellBody(
                             onPrimaryFocus = { detailPrimaryLabel = it },
                         )
                         // Get new games (Droidtop/tracker#612, #621): a page of Updates that opens on what is
-                        // new for the person, with Search first, never on a blank search bar; leaving it goes back to Updates.
+                        // new for the person, with Search first, never on a blank search bar; leaving it goes back to
+                        // Updates.
                         shownSection == GamingSection.NEW_GAMES -> {
                             canGoBack = true
                             GetNewGamesPage(
                                 entries = foldedGameEntries.orEmpty(),
                                 onOpenUpdates = { nav.openSection(GamingSection.UPDATES) },
-                                // Get new games is a row of Downloads and Updates' Get games now (Droidtop/tracker#749).
+                                // Get new games is a row of Downloads and Updates' Get games now
+                                // (Droidtop/tracker#749).
                                 onBack = { nav.openSection(GamingSection.DOWNLOADS) },
                             )
                         }
@@ -1446,18 +1426,19 @@ private fun GamepadShellBody(
                         shownSection == GamingSection.SETTINGS -> {
                             // Back always does something in Settings: it pops a
                             // nested screen, or leaves Settings for the default
-                            // section. Saying otherwise took the B hint out of
-                            // the footer -- and that hint IS the touch route to B
-                            // (design language: "the help/hint row is the touch
-                            // route to pad buttons"), so on the rig a nested
-                            // settings screen had no way out that a finger could
-                            // reach at all.
+                            // section. So the footer always shows the B hint, which
+                            // is the touch route to B (design language: "the
+                            // help/hint row is the touch route to pad buttons"):
+                            // without it a nested settings screen has no way out
+                            // that a finger can reach.
                             canGoBack = true
                             SettingsCatalogView(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                                 browseThemesToken = browseThemesRequest,
-                                // The places the left menu leads to, and their pages (Updates, of Downloads and Updates):
-                                // the menu is their way in. A place off the left menu (Plugins, Social, Game sources) keeps
+                                // The places the left menu leads to, and their pages (Updates, of Downloads and
+                                // Updates):
+                                // the menu is their way in. A place off the left menu (Plugins, Social, Game sources)
+                                // keeps
                                 // its Settings row, or it had none (Droidtop/tracker#759: Plugins, and with it every
                                 // plugin's Approve, could not be found).
                                 placeScreenIds = settingsHiddenPlaceScreens(uiMode),
@@ -1588,7 +1569,8 @@ private fun GamepadShellBody(
             if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && retroView in GamingTheme.palette.ownStatusViews)) {
                 FloatingStatusCluster(
                     onClick = { quickMenuOpen = true },
-                    // The activity spot opens where the jobs are: the Quick Menu's Downloads tab (Droidtop/tracker#742).
+                    // The activity spot opens where the jobs are: the Quick Menu's Downloads tab
+                    // (Droidtop/tracker#742).
                     onActivity = {
                         quickMenuStart = QuickSection.DOWNLOADS
                         quickMenuOpen = true
@@ -1610,14 +1592,12 @@ private fun GamepadShellBody(
             }
             // Over the themed canvas, at the place the theme itself laid
             // out for a help row, rather than under a canvas shortened to
-            // make room for it. Two things were still wrong in portrait
-            // (rig, build 548): the bar sat at the bottom EDGE rather than
-            // at the theme's own help position, and it painted its own
-            // opaque plate over the theme's art, which read as a separate
-            // strip below a canvas that had in fact stopped there. Real
-            // ES-DE's HelpComponent draws text on the view and no plate at
-            // all, so neither does droidtop's bar when it is the one on a
-            // themed view.
+            // make room for it (rig, build 548): the bar sits at the
+            // theme's own help position, not the bottom edge, and paints
+            // no plate of its own over the theme's art. ES-DE's
+            // HelpComponent draws text on the view and no plate at all, so
+            // neither does droidtop's bar when it is the one on a themed
+            // view.
             if (helpRowOwner == HelpRowOwner.SHELL && helpRowClaim == HelpRowClaim.THEME) {
                 Box(
                     modifier = Modifier
@@ -1792,10 +1772,9 @@ internal fun EntryDetailScreen(
     }
 
     // Console ROMs and native apps only: a PC or engine game never
-    // reaches this screen any more (see the PC branch at the call site),
-    // so the launch-strategy picker, the PC scrape action and the PC
-    // "choose match" branch that used to live here moved wholesale to
-    // PcGameMenu rather than being duplicated across two screens.
+    // reaches this screen (see the PC branch at the call site). Its
+    // launch-strategy picker, scrape action and "choose match" live in
+    // PcGameMenu alone.
     val isRomEntry = entry.kind == LibraryEntryKind.CONSOLE_ROM
     // Achievements, play time and an emulator's compatibility, asked for once when the page opens (docs/SPEC.md 7h,
     // "Game info"); a console game only, an app has none of them.
@@ -1938,7 +1917,8 @@ internal fun EntryDetailScreen(
             if (isRomEntry) {
                 ShellChip("Choose match", onClick = { pickingMatch = true })
             }
-            // A Switch game with an update or DLC beside it: opens its emulator and names the files to pick (SwitchContentHandoff).
+            // A Switch game with an update or DLC beside it: opens its emulator and names the files to pick
+            // (SwitchContentHandoff).
             if (dev.droidtop.library.consoles.SwitchContentHandoff.applies(entry)) {
                 ShellChip(
                     "Add update and DLC",
@@ -2068,7 +2048,8 @@ internal fun EntryDetailScreen(
     }
     pluginActionScreen?.let { screen ->
         val close = { pluginActionScreen = null }
-        // The one sheet with the ground painted (CatalogSheet): a bare Dialog let the screen behind show through (rig, 0.2.0-dev.2070).
+        // The one sheet with the ground painted (CatalogSheet), so the screen behind never shows through (rig,
+        // 0.2.0-dev.2070).
         CatalogSheet(root = screen, onExit = close)
     }
 }
@@ -2269,32 +2250,25 @@ internal fun GamingSection.displayName(): String = when (this) {
 /**
  * One browsable group in Games' system list -- either a non-ROM engine
  * ([LibraryEntryKind] like RENPY) or a real console system (an NES/GBA/PSX
- * ROM folder, keyed by [LibraryEntry.systemId]). Splitting these out is
- * the real fix for CONSOLE_ROM entries previously all bucketing under one
- * flat "Consoles" card regardless of which actual system they were --
- * losing exactly the System → Game structure ES-DE (and every other real
- * emulation frontend) uses, which was the whole point of adopting that
- * model in the first place.
+ * ROM folder, keyed by [LibraryEntry.systemId]). Each console system is
+ * its own group, giving the System → Game structure ES-DE (and every other
+ * emulation frontend) uses.
  */
 /**
  * Requests focus once the [androidx.compose.ui.focus.FocusRequester]'s
  * node actually exists. A themed view composes its list widget through
  * several nested layout passes, so the focusable node attaches a LATER
- * frame than a LaunchedEffect's first dispatch -- a single requestFocus
- * reliably threw "FocusRequester is not initialized" (caught, so no
- * crash, but the screen then had NO focus at all and every D-pad key
- * went nowhere -- confirmed live on-device via logcat). Retries across
- * frames until the node exists; gives up quietly after ~1s of frames
- * rather than looping forever on a theme whose view genuinely never
- * attaches one (ES-DWEE's widgetless system view is the real case).
+ * frame than a LaunchedEffect's first dispatch, and a single request on
+ * that first dispatch leaves the screen with no focus at all (seen on
+ * device via logcat). Retries across frames until the node exists; gives
+ * up quietly after ~1s of frames rather than looping forever on a theme
+ * whose view never attaches one (ES-DWEE's widgetless system view).
  *
- * The Compose droidtop ships (1.9) no longer throws for an unattached
+ * The Compose droidtop ships (1.9) does not throw for an unattached
  * requester: requestFocus() prints a warning and does nothing, and only
- * requestFocus(FocusDirection) says whether focus was taken. Reading "did
- * not throw" as "taken" ended the retries on the first frame, before a
- * dialog's field existed, so the search opened with no field focused and
- * typed keys went nowhere until a tap (console, 0.2.0-dev.2127). Success is
- * now what Compose returns.
+ * requestFocus(FocusDirection) says whether focus was taken. Success is
+ * what Compose returns, never "did not throw", so the retries continue
+ * until a dialog's field exists (console, 0.2.0-dev.2127).
  */
 internal suspend fun requestFocusWhenAttached(
     focusRequester: androidx.compose.ui.focus.FocusRequester,
@@ -2419,9 +2393,8 @@ private fun GameGroup.themeKey() = GroupThemeKey(
  * [group]'s theme parse, read in composition but parsed off it.
  *
  * A parse is XML and file reads (includes, `${system.*}` substitution),
- * and these used to run inside `remember` on the main thread, once per
- * carousel system, before the first frame. Now composition only reads
- * the parse cache. On a miss it keeps drawing the theme this call site
+ * so composition only reads the parse cache and never parses on the
+ * main thread. On a miss it keeps drawing the theme this call site
  * last drew (a neighbouring system's, for the moment a parse takes)
  * while [Dispatchers.Default] parses the new one. The one exception is a
  * call site that has drawn nothing yet: it parses in place, once,
@@ -2486,7 +2459,10 @@ private fun rememberEsDeSystemSlot(
     )
 }
 
-/** Real ES-DE auto-collection ids/theme-folder names, confirmed against `CollectionSystemsManager.cpp`'s own real declaration table -- not guessed. */
+/**
+ * Real ES-DE auto-collection ids/theme-folder names, confirmed against `CollectionSystemsManager.cpp`'s own real
+ * declaration table -- not guessed.
+ */
 private object AutoCollections {
     const val ALL_GAMES_ID = "all"
     const val FAVORITES_ID = "favorites"
@@ -2856,9 +2832,8 @@ private fun GamesSection(
         // list widget -- a widget's onFocusedIndexChanged (wired at the
         // render call site below) updates the exact same focusedGameIndex
         // state the headless case's own Up/Down handling uses.
-        // PC and engine games now go through this same themed gamelist
-        // (docs/SPEC.md 7i, revised 2026-09-26) -- no more carve-out for a
-        // screen that drew its own grid and reported its own focus.
+        // PC and engine games go through this same themed gamelist
+        // (docs/SPEC.md 7i, revised 2026-09-26).
         if (hasThemedGamelist) {
             val focused = systemGamesForGroup.getOrNull(focusedGameIndex)
             onFocusedEntryChanged(focused)
@@ -2877,7 +2852,7 @@ private fun GamesSection(
             // styles it or not (HelpComponent.cpp:23-27). So the claim is
             // about the canvas, not about the element: it is what stops the
             // shell putting its bar in a strip BELOW a themed canvas and
-            // shortening the canvas to fit (rig, build 548). The OLD
+            // shortening the canvas to fit (rig, build 548). The
             // hand-built grid (the fallback for "no active theme" / "theme
             // has no real gamelist view at all") is not a themed canvas and
             // keeps the shell's bar in the column.
@@ -2896,12 +2871,12 @@ private fun GamesSection(
         }
     }
 
-    // Real system-back route for the drill-up: on this hardware B doubles
-    // as KEYCODE_BACK, which Android delivers through the back DISPATCHER
-    // (Activity back), not as a key event any composable sees -- so the
-    // onKeyEvent branch below never fired for it and the Activity finished
-    // instead, kicking the user out of droidtop entirely (confirmed live,
-    // per report). BackHandler registers on the real dispatcher; composed
+    // System-back route for the drill-up: on this hardware B doubles as
+    // KEYCODE_BACK, which Android delivers through the back DISPATCHER
+    // (Activity back), not as a key event any composable sees, so the
+    // onKeyEvent branch below never receives it. BackHandler registers on
+    // the dispatcher so B drills up instead of finishing the Activity;
+    // composed
     // deeper than GamepadShell's own root swallow, so it wins while a
     // group is open.
     androidx.activity.compose.BackHandler(enabled = selectedGroup != null) {
@@ -2919,8 +2894,8 @@ private fun GamesSection(
             .fillMaxSize()
             // The shoulders mean "switch system" at this level and "switch
             // section" above it; inside a screen opened from the group they
-            // mean nothing, and letting them through tore that screen down
-            // and changed the tab under it (rig, build 549). Taken before
+            // mean nothing, so they never reach the group or tab under that
+            // screen (rig, build 549). Taken before
             // anything below sees them.
             .onPad(preview = true) { press ->
                 nav.optionsOpen && (press.action == GamepadAction.L || press.action == GamepadAction.R)
@@ -3037,15 +3012,11 @@ private fun GamesSection(
             )
             if (group == null) {
                 val continuePlaying = entries.filter { it.lastPlayedEpochMs != null }.sortedByDescending { it.lastPlayedEpochMs }
-                // NOTE: the focus request for this screen now lives INSIDE the
+                // NOTE: the focus request for this screen lives INSIDE the
                 // render branch below, where whether firstFocus will actually
-                // ATTACH to anything is knowable -- see its own doc comment.
-                // Requesting up here (the old shape) crashed the whole app
-                // ("FocusRequester is not initialized") for any real theme
-                // whose system view declares no carousel/grid/textlist for the
-                // requester to attach to -- confirmed live with a real
-                // downloaded community theme (ES-DWEE), and the same crash
-                // signature was already in the device's older crash logs.
+                // ATTACH to anything is knowable (see its own comment). A
+                // theme whose system view declares no carousel/grid/textlist
+                // (ES-DWEE) gives the requester nothing to attach to.
                 if (entries.isEmpty()) {
                     // An empty library offers the one thing that fills it,
                     // never a sentence with nothing to press
@@ -3141,10 +3112,8 @@ private fun GamesSection(
                         LaunchedEffect(theme) { EsDeNavigationSounds.load(theme) }
                         val listElement = remember(theme) { theme?.views?.get("system")?.primaryListElement() }
                         // Every group's theme parse, and the carousel logo
-                        // read out of it, worked out in the background: a
-                        // parse per carousel system used to run in
-                        // composition, all of them before the first frame,
-                        // and the logo's file checks again on every library
+                        // read out of it, worked out in the background, never
+                        // in composition and never again on every library
                         // publish. Keyed on the groups' theme keys, not on
                         // the group list, which is a new list on every
                         // publish of a walk. Each logo lands as its group is
@@ -3190,21 +3159,16 @@ private fun GamesSection(
                                 )
                             }
                         }
-                        // Real fix: the theme now drives this whole screen's
-                        // layout, not just a decorative background behind
-                        // droidtop's own hardcoded system-list Column. The
+                        // The theme drives this whole screen's layout. The
                         // carousel/grid/textlist is positioned at the theme's
-                        // own real pos/size (see EsDeThemedView's own doc
-                        // comment) alongside every other themed element
-                        // (background art, info text, help icons), composited
-                        // together by real z-index -- fillMaxSize (not the
-                        // fillMaxWidth this used to be) is what actually lets a
-                        // full-bleed background image cover the real screen
-                        // instead of just whatever height droidtop's own
-                        // content happened to wrap to. No separate "Systems"
-                        // label anymore -- the theme's own carousel title
-                        // treatment is the real visual identity for "what's
-                        // selected," matching the reference theme.
+                        // own pos/size (see EsDeThemedView's own doc comment)
+                        // alongside every other themed element (background
+                        // art, info text, help icons), composited together by
+                        // z-index. fillMaxSize lets a full-bleed background
+                        // image cover the whole screen. There is no separate
+                        // "Systems" label: the theme's own carousel title
+                        // treatment says what is selected, matching the
+                        // reference theme.
                         // The real games backing whichever system the carousel
                         // currently has focus on -- feeds EsDeThemedView's own
                         // gameselector-driven elements (screen2's game-preview
@@ -3254,18 +3218,15 @@ private fun GamesSection(
                         LaunchedEffect(themedSystemView) {
                             onHelpRowClaim(if (themedSystemView) HelpRowClaim.THEME else HelpRowClaim.NONE)
                         }
-                        // Real crash boundary (confirmed live with a real
-                        // downloaded community theme, ES-DWEE): firstFocus only
-                        // ATTACHES when a real list widget composes with at
-                        // least one item -- the themed path only does that when
-                        // the theme's own system view actually declares a
-                        // carousel/grid/textlist; the fallback path always
+                        // Crash boundary (a downloaded community theme,
+                        // ES-DWEE): firstFocus only ATTACHES when a list widget
+                        // composes with at least one item. The themed path
+                        // does that only when the theme's system view declares
+                        // a carousel/grid/textlist; the fallback path always
                         // does. Requesting focus on an unattached
-                        // FocusRequester is a hard IllegalStateException that
-                        // killed the whole app. Belt AND braces: gate on the
-                        // real attachment condition, and never let a focus
-                        // request crash droidtop over a theme's own structure
-                        // regardless -- a theme must never be able to kill the
+                        // FocusRequester can throw IllegalStateException, so
+                        // the request is gated on the attachment condition and
+                        // also guarded: a theme must never be able to kill the
                         // app.
                         val willAttachFocus = items.isNotEmpty() &&
                             (systemView == null || systemView.primaryListElement() != null)
@@ -3528,37 +3489,24 @@ private fun GamesSection(
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(
                             bottom = MenuTokens.HintBarRoom,
                         ),
-                        // Real bug fix, reported directly: arrow keys couldn't
-                        // actually move focus between games at all -- GameCard
-                        // only ever handles A/Center/Enter/Y, never Up/Down/
-                        // Left/Right, and Compose has no automatic arrow-key
-                        // focus movement in a grid by default. Without this,
-                        // every directional keypress bubbled straight past this
-                        // grid to the outer Box's sibling-system switcher (see
-                        // GamesSection's own onKeyEvent above), which
-                        // unconditionally treated Left/Right as "switch system"
-                        // on *every* press, not just at a real grid edge.
-                        // FocusManager.moveFocus's own real return value (true =
-                        // moved, false = no further focusable target that
-                        // direction) is exactly what onKeyEvent needs: false
-                        // lets Left/Right correctly bubble up to that outer
-                        // handler only once focus genuinely can't move further
-                        // right/left within the grid, matching ES-DE's real
-                        // "switch system at the edge" convention instead of
-                        // hijacking every keypress.
+                        // Arrow keys move focus between games here: GameCard
+                        // handles only A/Center/Enter/Y, and Compose has no
+                        // automatic arrow-key focus movement in a grid.
+                        // FocusManager.moveFocus's return value (true = moved,
+                        // false = no further focusable target that direction)
+                        // is what onKeyEvent needs: false lets Left/Right
+                        // bubble up to the outer Box's sibling-system switcher
+                        // (see GamesSection's own onKeyEvent above) only at a
+                        // grid edge, matching ES-DE's "switch system at the
+                        // edge" convention.
                         //
-                        // Up at the TOP row no longer answers true either:
-                        // it leaves on both edges exactly like Left/
-                        // Right at a real edge, so Compose's own focus
-                        // search runs. That search once walked straight
-                        // out of the grid into shell chrome above it,
-                        // which is why Up was swallowed here. The
-                        // swallow protected nothing while cutting the
-                        // pad off from the real rows above this grid:
-                        // the filter chips first, and in safe mode the
-                        // banner's action behind them (docs/SPEC.md
-                        // 10c). Destinations are chosen in the left
-                        // menu, never through focus traversal.
+                        // Up at the TOP row does not answer true either: it
+                        // leaves like Left/Right at an edge, so Compose's own
+                        // focus search reaches the rows above this grid: the
+                        // filter chips first, and in safe mode the banner's
+                        // action behind them (docs/SPEC.md 10c). Destinations
+                        // are chosen in the left menu, never through focus
+                        // traversal.
                         modifier = Modifier.fillMaxSize().padding(horizontal = LocalShellWindow.current.edgePadding)
                             .onPad { press ->
                                 val direction = gridDirection(press.action) ?: return@onPad false
@@ -4077,18 +4025,15 @@ private fun AppIconTile(
             }
             .declaresHints(APP_TILE_HINTS)
             .focusable()
-            // Same real touch-input fix as GameCard -- see its own
-            // comment. A long press opens the app's menu, as a long press
-            // does on every thing (owner, 2026-10-23, Droidtop/tracker#610);
-            // Mark as game is a row of that menu. It used to mark the app at
-            // once, with nothing on screen saying so.
+            // Taps work the same way as on GameCard (see its own comment).
+            // A long press opens the app's menu, as a long press does on
+            // every thing (owner, 2026-10-23, Droidtop/tracker#610); Mark as
+            // game is a row of that menu.
             .padRow(onClick = onLaunch, onLongClick = onOptions)
             // The shell's ONE selection idiom, the same one [GameCard]
             // and the menus draw: the accent ring over a brightened
-            // surface. This tile kept a third one -- a thin white
-            // rectangle over an unchanged card -- after the cards were
-            // fixed (rig, build 546), which is two answers to "what does
-            // selected look like" on two grids of the same shell.
+            // surface, so both grids of the shell give one answer to "what
+            // does selected look like" (rig, build 546).
             .selectionFrame(
                 selected = focused,
                 shape = Corners.Plate,
@@ -4114,16 +4059,13 @@ private fun AppIconTile(
         }
         // The tile's own anatomy, the same one every card in this shell
         // has: the name, then the one line that says what the thing IS.
-        // The second line was dropped outright when the labels were
-        // fixed (rig, build 546), which left a grid of names with no
-        // statement of kind -- and this grid does hold more than one
-        // (`REMOTE_STREAM` is an Apps kind too).
+        // This grid holds more than one kind (`REMOTE_STREAM` is an Apps
+        // kind too), so the second line matters (rig, build 546).
         //
         // It says what the TILE is, never the heading it sits under: the
         // app's own declared category when it has one, and what one entry
-        // of its kind is called when it does not. It read "Apps" on every
-        // tile -- the name of the tab, two lines below a heading that
-        // already said it (rig, build 547).
+        // of its kind is called when it does not. Never the tab's name,
+        // which the heading above already says (rig, build 547).
         Text(
             entry.title,
             color = MenuTokens.OnSurface,
@@ -4284,11 +4226,8 @@ internal fun GameCard(
                         onOptions()
                         true
                     }
-                    // Real, previously-dead action -- LibraryEntry.favorite
-                    // existed and even rendered as a real theme badge, but
-                    // nothing anywhere ever actually set it true (confirmed
-                    // by grep before wiring this). X was already mapped to
-                    // a real GamepadAction but unused in this whole shell.
+                    // X toggles LibraryEntry.favorite, which themes draw as
+                    // a badge. This is the shell's one place that sets it.
                     GamepadAction.X -> {
                         onToggleFavorite()
                         true
@@ -4297,13 +4236,11 @@ internal fun GameCard(
                 }
             }
             .focusable()
-            // Real bug fix, reported directly: touch input didn't work
-            // anywhere in Gaming mode -- a click handler was never actually
-            // applied here (an older comment claimed it was, but it wasn't;
-            // .focusable() alone doesn't respond to taps, only to real
-            // focus + the onKeyEvent below). This also gives DPAD_CENTER/
-            // Enter clickable's own default key handling on a focused node
-            // "for free" — a controller's face button (A / cross) still
+            // The click handler is what makes the card respond to touch:
+            // .focusable() alone does not respond to taps, only to focus
+            // and the onKeyEvent below. It also gives DPAD_CENTER/Enter
+            // clickable's own default key handling on a focused node. A
+            // controller's face button (A / cross) still
             // reports as a distinct keycode on most Android gamepad
             // mappings, so it's still handled explicitly below rather than
             // relying on clickable() to cover it. Y opens the detail screen
@@ -4313,9 +4250,8 @@ internal fun GameCard(
             .padRow(onClick = onActivate, onLongClick = onOptions)
             // ONE selection idiom across the shell: the menus' own
             // accent border over a brightened surface (MenuTokens), not a
-            // third one. The rig counted three at once -- this card's 1px
-            // white rectangle, the menus' brightened card, and the
-            // theme's own highlight.
+            // third one beside the menus' brightened card and the theme's
+            // own highlight.
             // The card rises with its ring at its own edge; its art grows inside that edge (focusZoom).
             .focusRise(lift, Corners.Tile)
             .selectionFrame(
@@ -4344,10 +4280,9 @@ internal fun GameCard(
                     .padding(12.dp),
             ) {
                 Column {
-                    // Constrained to the tile: a long name (and an app
+                    // Constrained to the tile, so a long name (an app
                     // named after its own class is the longest of all)
-                    // used to run past the card and nearly collide with
-                    // its neighbour's.
+                    // never runs past the card into its neighbour's.
                     Text(
                         dev.droidtop.library.GameNaming.displayName(entry.title),
                         color = MenuTokens.OnSurface,

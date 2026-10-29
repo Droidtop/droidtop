@@ -240,12 +240,10 @@ private const val RESOLVE_CHUNK = 256
 /**
  * Renders [items] using whichever real shape the loaded theme's
  * [element] actually declares (carousel/grid/textlist), or a sensible
- * built-in carousel fallback when no theme/element is loaded -- this is
- * the real fix for droidtop previously hardcoding a LazyRow carousel
- * unconditionally: the *shape itself* is theme data (ES-DE's own real
- * convention, confirmed by reading a theme.xml directly: a view declares
- * exactly one of `<carousel>`/`<grid>`/`<textlist>`), not an app-level
- * choice.
+ * built-in carousel fallback when no theme/element is loaded. The
+ * *shape itself* is theme data (ES-DE's own convention, checked against a
+ * theme.xml: a view declares exactly one of
+ * `<carousel>`/`<grid>`/`<textlist>`), not an app-level choice.
  */
 @Composable
 fun EsDeSystemListView(
@@ -421,11 +419,9 @@ internal fun shortestCamOffsetStep(from: Float, toIndex: Int, entryCount: Int): 
 }
 
 /**
- * Real ES-DE carousel rendering. All FOUR real carousel types --
- * `horizontal`, `vertical`, `horizontalWheel`, `verticalWheel` -- now
- * render with their own real geometry; before this pass droidtop
- * implemented only `horizontal` and silently drew every wheel- or
- * vertical-typed theme with horizontal geometry.
+ * Real ES-DE carousel rendering. All FOUR carousel types (`horizontal`,
+ * `vertical`, `horizontalWheel`, `verticalWheel`) render with their own
+ * geometry.
  *
  * The geometry itself lives in [layoutEsDeCarousel]
  * (runtime-common's own `EsDeCarouselLayout.kt`), a literal, unit-tested
@@ -433,7 +429,7 @@ internal fun shortestCamOffsetStep(from: Float, toIndex: Int, entryCount: Int): 
  * the drawing half -- it asks where each item goes and paints it. That
  * split is deliberate: the maths is the part that can be verified
  * against the real source without a device, and it is where the
- * previously-unimplemented properties live (`type`, `itemStacking`,
+ * layout properties live (`type`, `itemStacking`,
  * `itemsBeforeCenter`/`itemsAfterCenter`, `itemRotation`/
  * `itemRotationOrigin`/`itemAxisHorizontal`/`itemAxisRotation`,
  * `itemHorizontalAlignment`/`itemVerticalAlignment`,
@@ -512,17 +508,12 @@ private fun EsDeCarousel(
     val carouselColor = element?.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: Color(0xFF, 0xFF, 0xFF, 0xD8)
     val carouselColorEnd = element?.valueOrNull<EsDeThemeValue.Color>("colorEnd")?.let { colorOf(it) } ?: carouselColor
     // Real `gradientType` (CarouselComponent.h:1414-1429), which is what
-    // the schema actually calls this -- the previous code read a
-    // `colorGradientHorizontal` property that exists nowhere in real
-    // ES-DE's schema, so a theme could never influence it at all.
+    // the schema calls this property.
     val colorGradientHorizontal =
         element?.valueOrNull<EsDeThemeValue.Str>("gradientType")?.value != "vertical"
-    // Real, confirmed bug this fixes: the text-fallback item renderer
-    // never read this element's own real `fontSize` at all, silently
-    // defaulting to Compose's ~14sp Text() default -- on a real device
-    // this rendered carousel item labels as "practically invisible" tiny
-    // text, confirmed via a direct on-device screenshot diffed against
-    // the bundled theme's own reference sys.png. Real ES-DE's own default
+    // The text-fallback item renderer takes this element's own `fontSize`,
+    // never Compose's ~14sp Text() default (checked against the bundled
+    // theme's own reference sys.png). Real ES-DE's own default
     // (`Font::getFromTheme`'s fallback, `FONT_SIZE_LARGE_FIXED`) is a
     // fixed absolute size, not a screen-height fraction -- but every real
     // theme declares its own real `fontSize`, so the 0.045f fallback here
@@ -614,8 +605,7 @@ private fun EsDeCarousel(
     // render entries with no input identity of their own. Which axis
     // moves the cursor is real, type-dependent behavior
     // (CarouselComponent.h:588-622): the vertical types step on UP/DOWN,
-    // the horizontal ones on LEFT/RIGHT. Before this pass a vertical
-    // carousel could not be navigated at all. The cross-axis keys are
+    // the horizontal ones on LEFT/RIGHT. The cross-axis keys are
     // consumed as no-ops so a stray press cannot escape the carousel and
     // land Compose focus on droidtop's own chrome, after which every
     // arrow key would move the wrong surface.
@@ -661,9 +651,9 @@ private fun EsDeCarousel(
             .focusable()
             // Swipe moves the cursor the way the D-pad steps it. These
             // widgets own their cursor and move in whole entries rather
-            // than scrolling, so Compose's own scroll gestures never
-            // applied to them: before this, a themed system view or
-            // gamelist could only be moved by a pad.
+            // than scrolling, so Compose's own scroll gestures do not
+            // apply to them; this is how a finger moves a themed system
+            // view or gamelist.
             .esDeSwipeSteps(
                 horizontal = if (verticalType) 0 else 1,
                 vertical = if (verticalType) 1 else 0,
@@ -862,12 +852,9 @@ private fun Modifier.reflectionFalloff(falloff: Float): Modifier {
  * Real ES-DE carousel item rendering (`CarouselComponent::addEntry`/
  * `updateEntry`) -- an item is EITHER its own image (a real system logo/
  * marquee) OR a text-label fallback, never both, and never wrapped in a
- * card/border/background box -- droidtop used to draw one here, and the
- * grid used to draw its own; both are gone, because a real ES-DE list
- * widget's only per-item chrome is the background/selector layers the
- * THEME asks for. Real default text colors are black text on a fully
- * transparent background, not white-on-a-dark-rounded-rect, which was a
- * fabricated droidtop-only look with no real ES-DE basis.
+ * card/border/background box: an ES-DE list widget's only per-item chrome
+ * is the background/selector layers the THEME asks for. Default text
+ * colors are black text on a fully transparent background.
  */
 /**
  * Everything about a carousel item's FALLBACK TEXT -- the label ES-DE
@@ -880,7 +867,7 @@ private fun Modifier.reflectionFalloff(falloff: Float): Modifier {
  * [backgroundCornerRadius] is set on it right after (:395). ES-DE passes
  * the carousel's own `itemHorizontalAlignment`/`itemVerticalAlignment`
  * as the text's alignment (:387), so the label follows the item alignment
- * rather than being unconditionally centred the way droidtop drew it.
+ * rather than being unconditionally centred.
  */
 private data class EsDeCarouselItemText(
     val color: Color,
@@ -934,8 +921,7 @@ private fun EsDeCarouselItem(
     modifier: Modifier,
     // A tap on this item. Null for the mirrored REFLECTION copy, which is
     // decoration drawn below the item and must not be a second, invisible
-    // hit target for it -- tapping the reflection of the entry above the
-    // cursor used to enter that entry.
+    // hit target for it.
     onSelect: (() -> Unit)?,
 ) {
     // No focusable()/onKeyEvent here: the carousel CONTAINER owns focus
@@ -1214,13 +1200,11 @@ internal fun esDeLetterCaseOf(value: String?): EsDeLetterCase = when (value) {
  * [layoutEsDeTextList]/[esDeTextListConfig] (runtime-common's own
  * `EsDeTextListLayout.kt`) so it can be unit tested off-device.
  *
- * This replaces a `LazyColumn` of individually-focusable rows, which was
- * the wrong model in a way that made most of the element's real schema
- * unimplementable: real ES-DE draws a FIXED window of rows (its own
- * `startEntry`/`screenCount` arithmetic) with ONE selector bar
- * positioned at `(cursor - startEntry) * entrySize + selectorVerticalOffset`,
- * not a scrolling list where the highlight is a per-row background. With
- * the real model in place, the real selector (`selectorWidth`/
+ * ES-DE draws a FIXED window of rows (its own `startEntry`/`screenCount`
+ * arithmetic) with ONE selector bar positioned at
+ * `(cursor - startEntry) * entrySize + selectorVerticalOffset`, not a
+ * scrolling list where the highlight is a per-row background, and so does
+ * this. With that model, the real selector (`selectorWidth`/
  * `selectorHeight`/`selectorHorizontalOffset`/`selectorVerticalOffset`/
  * `selectorColor`/`selectorColorEnd`/`selectorGradientType`/
  * `selectorImagePath`), the real primary/secondary and selected/
@@ -1230,9 +1214,8 @@ internal fun esDeLetterCaseOf(value: String?): EsDeLetterCase = when (value) {
  * `horizontalMargin`, the full real `letterCase` set and the real
  * `indicators` prefix all render.
  *
- * Also a real behavioral correction: droidtop hardcoded a 48dp
- * horizontal row padding that exists nowhere in ES-DE. The real property
- * is `horizontalMargin`, and its real default is zero.
+ * Horizontal row padding is ES-DE's `horizontalMargin`, whose default is
+ * zero.
  *
  * Honestly still unimplemented, and NOT faked: the four
  * `textHorizontalScroll*` properties (real ES-DE scrolls a too-long row
@@ -1257,10 +1240,8 @@ private fun EsDeTextList(
     // edge already have -- never "move within this list" (a vertical
     // textlist has no horizontal movement of its own to begin with). A
     // SYSTEM-level textlist (a theme that lists systems as text rather
-    // than a carousel) is left at its previous behaviour -- swallowed,
-    // since droidtop has no established meaning for Left/Right there and
-    // changing it without a theme to verify against risks a regression
-    // nobody asked for.
+    // than a carousel) swallows Left/Right: droidtop has no established
+    // meaning for them there, and no theme to verify one against.
     gamelist: Boolean = false,
     initialFocusIndex: Int = 0,
 ) {
@@ -1444,9 +1425,8 @@ private fun EsDeTextListRow(
             // Real ES-DE TextListComponent rows are strictly single-line
             // -- a long title is abbreviated (or horizontally scrolls,
             // its `textHorizontalScrolling` feature, not built here yet),
-            // never wrapped. Real, confirmed-live bug this fixes: without
-            // maxLines, long real titles wrapped to two lines inside a
-            // one-line-tall row, painting over the next row.
+            // never wrapped, so a long title never paints over the next
+            // row.
             // The row is built with a maxLength of the list's own width
             // (TextListComponent.h:209-213), and text that exceeds it
             // loses glyphs until an ellipsis fits (Font.cpp:1074-1078) --
@@ -1491,31 +1471,24 @@ private fun EsDeTextListRow(
  * [esDeGridScrollRow] (runtime-common's own `EsDeGridLayout.kt`) so it
  * can be unit tested off-device.
  *
- * This replaces a `LazyVerticalGrid` of individually-focusable tiles.
- * Two things made that model unable to express the element's real
- * schema. First, the tile itself was invented: a dark rounded card with
- * an accent border and an "N items" line, none of which exists in ES-DE
- * -- and it occupied exactly the surface a theme's own real
- * `backgroundColor`/`backgroundImage` and `selectorColor`/`selectorImage`
- * layers are supposed to own. Second, the item spacing was a hardcoded
- * 16dp, where real ES-DE AUTO-CALCULATES spacing from `itemScale` when a
- * theme doesn't declare it. A grid entry in real ES-DE is up to three
- * stacked layers -- a background, the item image or its name as text,
- * and the selector, which the theme places above, between or below them
- * via `selectorLayer` -- and that is what this now draws, in that real
- * order.
+ * A grid entry in ES-DE is up to three stacked layers: a background, the
+ * item image or its name as text, and the selector, which the theme
+ * places above, between or below them via `selectorLayer`. That is what
+ * this draws, in that order, with no tile chrome of its own: the surface
+ * belongs to the theme's `backgroundColor`/`backgroundImage` and
+ * `selectorColor`/`selectorImage` layers. Item spacing is AUTO-CALCULATED
+ * from `itemScale` when a theme doesn't declare it, as in ES-DE.
  *
- * The item count that used to appear on each tile is gone with the card,
- * and no information is lost: real ES-DE's own mechanism for it is a
- * `systemdata` text element the theme places where it wants, which
- * droidtop already renders.
+ * A system's item count is not drawn on the tile: ES-DE's mechanism for
+ * it is a `systemdata` text element the theme places where it wants,
+ * which droidtop renders.
  *
- * `imageType` IS now honored, through the same [esDePrimaryImage] the
+ * `imageType` is honored, through the same [esDePrimaryImage] the
  * carousel uses.
  *
  * `defaultImage`, `textBackgroundCornerRadius` and the
  * `imageColorEnd`/`imageGradientType`/`imageSelectedColorEnd`/
- * `imageSelectedGradientType` positional gradients ARE now honored -- see
+ * `imageSelectedGradientType` positional gradients are honored: see
  * [esDePrimaryImage] and [esDeColorShiftGradient].
  *
  * Honestly still unimplemented, and NOT faked: `imageCropPos`, the four
