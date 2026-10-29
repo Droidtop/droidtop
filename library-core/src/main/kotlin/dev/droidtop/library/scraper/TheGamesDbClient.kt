@@ -1,9 +1,8 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -58,14 +57,16 @@ data class TheGamesDbMetadata(
 object TheGamesDbClient {
     private const val BASE_URL = "https://api.thegamesdb.net/v1"
 
+    /** The reference lists (developers, publishers, genres) are the largest answers this API gives. */
+    private const val LIST_MAX_BYTES = 32L * 1024 * 1024
+
     /** The name a refusal is reported under (docs/SPEC.md section 7h). */
     private const val SOURCE = "TheGamesDB"
 
     private fun fetchReferenceList(apiKey: String, endpoint: String, resourceName: String): Map<Int, String> {
-        val url = URL("$BASE_URL$endpoint?apikey=${URLEncoder.encode(apiKey, "UTF-8")}")
-        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (connection.responseCode != 200) return emptyMap()
-        val response = JSONObject(connection.inputStream.bufferedReader().readText())
+        val answer = Http.request("$BASE_URL$endpoint?apikey=${URLEncoder.encode(apiKey, "UTF-8")}", maxBytes = LIST_MAX_BYTES)
+        if (answer.status != 200) return emptyMap()
+        val response = JSONObject(answer.text())
         val listObj = response.optJSONObject("data")?.optJSONObject(resourceName) ?: return emptyMap()
         val out = mutableMapOf<Int, String>()
         for (idKey in listObj.keys()) {
@@ -157,16 +158,14 @@ object TheGamesDbClient {
         gameTitle: String,
         limit: Int = 12,
     ): ScrapeLookup<List<Candidate>> {
-        val searchUrl = URL(
+        val answer = Http.request(
             "$BASE_URL/Games/ByGameName?apikey=${URLEncoder.encode(apiKey, "UTF-8")}" +
                 "&fields=release_date" +
                 "&name=${URLEncoder.encode(cleanSearchName(gameTitle), "UTF-8")}" +
                 "&filter%5Bplatform%5D=${URLEncoder.encode(thegamesdbSystemId, "UTF-8")}",
         )
-        val connection = (searchUrl.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        val status = connection.responseCode
-        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, listOf(apiKey), gameTitle)
-        val response = JSONObject(connection.inputStream.bufferedReader().readText())
+        if (answer.status != 200) return ScrapeRefusals.refused(SOURCE, answer, listOf(apiKey), gameTitle)
+        val response = JSONObject(answer.text())
         val games = response.optJSONObject("data")?.optJSONArray("games") ?: return ScrapeLookup.NoMatch
         val candidates = (0 until minOf(games.length(), limit)).mapNotNull { index ->
             val game = games.optJSONObject(index) ?: return@mapNotNull null
@@ -185,14 +184,12 @@ object TheGamesDbClient {
         val developers = cachedReferenceList(apiKey, "/Developers", "developers", File(cacheDir, "thegamesdb_developers.json"))
         val publishers = cachedReferenceList(apiKey, "/Publishers", "publishers", File(cacheDir, "thegamesdb_publishers.json"))
         val genres = cachedReferenceList(apiKey, "/Genres", "genres", File(cacheDir, "thegamesdb_genres.json"))
-        val url = URL(
+        val answer = Http.request(
             "$BASE_URL/Games/ByGameID?apikey=${URLEncoder.encode(apiKey, "UTF-8")}" +
                 "&fields=players,publishers,genres,overview,release_date&id=$gameId",
         )
-        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        val status = connection.responseCode
-        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, listOf(apiKey), "game $gameId")
-        val response = JSONObject(connection.inputStream.bufferedReader().readText())
+        if (answer.status != 200) return ScrapeRefusals.refused(SOURCE, answer, listOf(apiKey), "game $gameId")
+        val response = JSONObject(answer.text())
         val game = response.optJSONObject("data")?.optJSONArray("games")?.optJSONObject(0) ?: return ScrapeLookup.NoMatch
         return ScrapeLookup.Found(TheGamesDbMetadata(
             name = game.optString("game_title", "").ifBlank { null },
@@ -262,18 +259,16 @@ object TheGamesDbClient {
         val publishers = cachedReferenceList(apiKey, "/Publishers", "publishers", File(cacheDir, "thegamesdb_publishers.json"))
         val genres = cachedReferenceList(apiKey, "/Genres", "genres", File(cacheDir, "thegamesdb_genres.json"))
 
-        val searchUrl = URL(
+        val searchAnswer = Http.request(
             "$BASE_URL/Games/ByGameName?apikey=${URLEncoder.encode(apiKey, "UTF-8")}" +
                 "&fields=players,publishers,genres,overview,release_date" +
                 "&name=${URLEncoder.encode(gameTitle, "UTF-8")}" +
                 "&filter%5Bplatform%5D=${URLEncoder.encode(thegamesdbSystemId, "UTF-8")}",
         )
-        val searchConnection = (searchUrl.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        val searchStatus = searchConnection.responseCode
-        if (searchStatus != 200) {
-            return ScrapeRefusals.refused(SOURCE, searchConnection, searchStatus, listOf(apiKey), gameTitle)
+        if (searchAnswer.status != 200) {
+            return ScrapeRefusals.refused(SOURCE, searchAnswer, listOf(apiKey), gameTitle)
         }
-        val searchResponse = JSONObject(searchConnection.inputStream.bufferedReader().readText())
+        val searchResponse = JSONObject(searchAnswer.text())
         val games = searchResponse.optJSONObject("data")?.optJSONArray("games") ?: return ScrapeLookup.NoMatch
         if (games.length() == 0) return ScrapeLookup.NoMatch
         // The API's fuzzy ordering puts unrelated games (a fan game) first, and
@@ -329,10 +324,9 @@ object TheGamesDbClient {
      * ES-DE's own front-cover selection.
      */
     private fun fetchCoverUrl(apiKey: String, gameId: Int): String? {
-        val url = URL("$BASE_URL/Games/Images?apikey=${URLEncoder.encode(apiKey, "UTF-8")}&games_id=$gameId")
-        val connection = (url.openConnection() as HttpURLConnection).apply { requestMethod = "GET" }
-        if (connection.responseCode != 200) return null
-        val response = JSONObject(connection.inputStream.bufferedReader().readText())
+        val answer = Http.request("$BASE_URL/Games/Images?apikey=${URLEncoder.encode(apiKey, "UTF-8")}&games_id=$gameId")
+        if (answer.status != 200) return null
+        val response = JSONObject(answer.text())
         val data = response.optJSONObject("data") ?: return null
         val baseUrl = data.optJSONObject("base_url")?.optString("large", "")?.ifBlank { null } ?: return null
         val images = data.optJSONObject("images")?.optJSONArray(gameId.toString()) ?: return null

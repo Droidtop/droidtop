@@ -3,12 +3,11 @@ package dev.droidtop.library.gameinfo
 import android.content.Context
 import dev.droidtop.library.scraper.ScrapeLookup
 import dev.droidtop.library.scraper.ScrapeRefusals
+import dev.droidtop.net.Http
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /** One game of HowLongToBeat, with the community's times in seconds (0 where nobody has reported one). */
 data class HltbGame(
@@ -55,45 +54,44 @@ internal object HltbClient {
 
     fun search(title: String): ScrapeLookup<List<HltbGame>> {
         val auth = token() ?: return ScrapeLookup.Refused(SOURCE, 0, "no search token")
-        val connection = open(BASE + SEARCH_PATH, "POST").apply {
-            setRequestProperty("content-type", "application/json")
-            setRequestProperty("x-auth-token", auth.token)
-            setRequestProperty("x-hp-key", auth.key)
-            setRequestProperty("x-hp-val", auth.value)
-            doOutput = true
-        }
-        return try {
-            connection.outputStream.use { it.write(payload(title, auth).toByteArray(Charsets.UTF_8)) }
-            val status = connection.responseCode
-            if (status == 200) {
-                ScrapeLookup.Found(parseResults(connection.inputStream.bufferedReader().use { it.readText().take(MAX_CHARS) }))
-            } else {
-                ScrapeRefusals.refused(SOURCE, connection, status, emptyList(), "search")
-            }
-        } finally {
-            connection.disconnect()
+        val answer = send(
+            BASE + SEARCH_PATH,
+            "POST",
+            mapOf(
+                "content-type" to "application/json",
+                "x-auth-token" to auth.token,
+                "x-hp-key" to auth.key,
+                "x-hp-val" to auth.value,
+            ),
+            payload(title, auth).toByteArray(Charsets.UTF_8),
+        )
+        return if (answer.status == 200) {
+            ScrapeLookup.Found(parseResults(answer.text()))
+        } else {
+            ScrapeRefusals.refused(SOURCE, answer, emptyList(), "search")
         }
     }
 
     private fun token(): Auth? {
-        val connection = open(BASE + SEARCH_PATH + "init?t=" + System.currentTimeMillis(), "GET")
-        return try {
-            if (connection.responseCode != 200) null else parseToken(connection.inputStream.bufferedReader().use { it.readText().take(MAX_CHARS) })
-        } finally {
-            connection.disconnect()
-        }
+        val answer = send(BASE + SEARCH_PATH + "init?t=" + System.currentTimeMillis(), "GET", emptyMap(), null)
+        return if (answer.status != 200) null else parseToken(answer.text())
     }
 
-    private fun open(address: String, method: String): HttpURLConnection =
-        (URL(address).openConnection() as HttpURLConnection).apply {
-            requestMethod = method
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
-            setRequestProperty("User-Agent", USER_AGENT)
-            setRequestProperty("Referer", BASE)
-            setRequestProperty("Origin", BASE.trimEnd('/'))
-            setRequestProperty("accept", "*/*")
-        }
+    /** HowLongToBeat wants an honest user agent of ours and the site's own Referer and Origin. */
+    private fun send(address: String, method: String, headers: Map<String, String>, body: ByteArray?): Http.Response =
+        Http.request(
+            address,
+            method = method,
+            headers = mapOf(
+                "User-Agent" to USER_AGENT,
+                "Referer" to BASE,
+                "Origin" to BASE.trimEnd('/'),
+                "accept" to "*/*",
+            ) + headers,
+            body = body,
+            timeouts = Http.Timeouts(connectMs = TIMEOUT_MS, readMs = TIMEOUT_MS),
+            maxBytes = MAX_BYTES,
+        )
 
     /** Pure, for the JVM tests: the token answer carries `token` and one field with "key" and one with "val" in its name. */
     fun parseToken(text: String): Auth? {
@@ -159,7 +157,7 @@ internal object HltbClient {
         )
     }
 
-    private const val MAX_CHARS = 2 * 1024 * 1024
+    private const val MAX_BYTES = 2L * 1024 * 1024
 }
 
 /** Choosing the game among a search's answers: the title, or its alias, must be the library's title. */

@@ -1,8 +1,8 @@
 package dev.droidtop.library.scraper
 
 import android.util.Xml
+import dev.droidtop.net.Http
 import org.xmlpull.v1.XmlPullParser
-import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.io.File
@@ -138,11 +138,11 @@ object ScreenScraperClient {
         }
         val cached = cacheFile?.takeIf { it.isFile }?.let { runCatching { org.json.JSONObject(it.readText()) }.getOrNull() }
             ?.takeIf { System.currentTimeMillis() - it.optLong("at") < cacheTtlMs(it.optInt("status"), it.optString("body")) }
-        val connection: HttpURLConnection?
+        val answer: Http.Response?
         val status: Int
         var responseBody: String
         if (cached != null) {
-            connection = null
+            answer = null
             status = cached.optInt("status")
             responseBody = cached.optString("body")
         } else {
@@ -150,12 +150,8 @@ object ScreenScraperClient {
                 val delay = anonymousPacing.delayBeforeRequest(System.currentTimeMillis())
                 if (delay > 0) Thread.sleep(delay)
                 anonymousPacing.requestStarted(System.currentTimeMillis())
-                connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 10_000
-                    readTimeout = 20_000
-                }
-                status = connection.responseCode
+                answer = Http.request(url.toString(), timeouts = Http.Timeouts(connectMs = 10_000, readMs = 20_000))
+                status = answer.status
             }
             responseBody = ""
         }
@@ -168,21 +164,20 @@ object ScreenScraperClient {
             // answer to "why did this fail". It used to be dropped on the
             // floor, which is what turned the 2026-09-01 outage into an
             // overnight investigation instead of one log line.
-            val refusal = if (connection == null) {
+            val refusal = if (answer == null) {
                 ScrapeLookup.Refused("ScreenScraper", status, responseBody.ifBlank { null })
             } else ScrapeRefusals.refused(
                 source = "ScreenScraper",
-                connection = connection,
-                status = status,
+                response = answer,
                 secrets = emptyList(),
                 subject = romName,
             )
             responseBody = refusal.reason.orEmpty()
-            if (connection != null) anonymousPacing.response(status, responseBody, System.currentTimeMillis())
+            if (answer != null) anonymousPacing.response(status, responseBody, System.currentTimeMillis())
             cacheFile?.let { writeCached(it, status, responseBody) }
             return refusal
         }
-        val xmlText = if (connection == null) responseBody else connection.inputStream.bufferedReader().readText().also {
+        val xmlText = if (answer == null) responseBody else answer.text().also {
             anonymousPacing.response(status, it, System.currentTimeMillis())
             cacheFile?.let { file -> writeCached(file, status, it) }
         }

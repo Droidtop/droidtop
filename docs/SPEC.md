@@ -21920,6 +21920,26 @@ the secondary path for sources that publish no key.
   A request with a GitHub token goes through `GitHubAuth.open` with all its
   headers, since that connects before it returns (Droidtop/tracker#189). The ES-DE theme repository itself remains a JGit
   clone; installer files continue through `DownloadJobs`, which uses it.
+  **No module opens an `HttpURLConnection` of its own any more (2026-10-29,
+  Droidtop/tracker#189): its requests go through `Http.request`.** (The store clients keep
+  their OkHttp client, `StoreHttp`; they are the stores' own and are not part of this.) The scraper
+  and game-info clients (TheGamesDB, ScreenScraper, IGDB with its Twitch sign-in,
+  SteamGridDB, RetroAchievements, HowLongToBeat, the emulator compatibility lists), the
+  theme list, the self-update checks, the Wine link check, a plugin source's key file and
+  the debrid services all use it, with the timeouts and the bound they had, one
+  User-Agent unless a service asks for its own (HowLongToBeat, the compatibility lists),
+  and now a bound on every body (earlier some had none, and none had a timeout). Three
+  options exist for the callers that need them: `followRedirects = false` for a request
+  that carries a credential in a header (the debrid services never follow a redirect with
+  the person's key), `watch` (an `Http.Watch`: progress, cancellation between reads, and
+  a body that must be whole) for a long read someone is waiting on (the theme list, kept
+  fed to the stall watchdog), and `Http.peek` for the first bytes of what a link serves
+  (the Wine link check) without fetching the rest. A picture a scrape saves is read whole
+  to a 32 MiB bound and written (a request, like the others); files stay on the engine.
+  A refusal's reason comes from the answer's body (`ScrapeRefusals.refused(source,
+  response, secrets, subject)`), cut to 512 characters with every credential of the
+  request redacted first, as before. `Http.downloadTo` is not built: downloads are the
+  engine's (12a, "One download engine").
 - **The key file format plugin authors publish** — the whole contract,
   deliberately two fields (since 2026-10-15, Droidtop/tracker#550):
   `{ "origin": "acme", "certificate": "<the origin's X.509 certificate, PEM or base64 DER>" }`

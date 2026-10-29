@@ -76,4 +76,54 @@ class HttpTest {
         assertEquals(Http.USER_AGENT, agent)
         assertNull(authorization)
     }
+
+    @Test fun aRedirectIsNotFollowedWhenAskedNotTo() {
+        server.createContext("/moved") { exchange ->
+            exchange.responseHeaders.add("Location", "$base/ok"); exchange.sendResponseHeaders(302, -1); exchange.close()
+        }
+        assertEquals(302, Http.request(base + "/moved", followRedirects = false).status)
+        assertEquals(body, Http.request(base + "/moved").text())
+    }
+
+    @Test fun aWatchedReadReportsProgressAndChecksTheWholeBody() {
+        val seen = mutableListOf<Pair<Long, Long>>()
+        val answer = Http.request(base + "/ok", watch = Http.Watch(onProgress = { read, total -> seen += read to total }))
+        assertEquals(body, answer.text())
+        assertEquals(0L to body.length.toLong(), seen.first())
+        assertEquals(body.length.toLong() to body.length.toLong(), seen.last())
+    }
+
+    @Test fun aWatchedReadStopsWhenCancelled() {
+        try {
+            Http.request(base + "/ok", watch = Http.Watch(isCancelled = { true }))
+            fail("expected cancellation")
+        } catch (e: java.io.IOException) {
+            assertEquals("cancelled", e.message)
+        }
+    }
+
+    @Test fun aWatchedReadIsBounded() {
+        try { Http.request(base + "/ok", maxBytes = 2, watch = Http.Watch()); fail("expected bound failure") }
+        catch (e: Http.TooLarge) { assertEquals(2L, e.limit) }
+    }
+
+    @Test fun peekTakesOnlyTheFirstBytesWhenTheServerIgnoresRange() {
+        var range: String? = null
+        server.createContext("/whole") { exchange ->
+            range = exchange.requestHeaders.getFirst("Range")
+            val big = ByteArray(1_000_000) { it.toByte() }
+            exchange.sendResponseHeaders(200, big.size.toLong())
+            try { exchange.responseBody.use { it.write(big) } } catch (_: java.io.IOException) { /* the reader left */ }
+        }
+        val (status, head) = Http.peek(base + "/whole", 8)
+        assertEquals(200, status)
+        assertEquals("bytes=0-7", range)
+        assertArrayEquals(ByteArray(8) { it.toByte() }, head)
+    }
+
+    @Test fun peekReportsARefusalWithNoBytes() {
+        val (status, head) = Http.peek(base + "/missing", 8)
+        assertEquals(429, status)
+        assertEquals(0, head.size)
+    }
 }

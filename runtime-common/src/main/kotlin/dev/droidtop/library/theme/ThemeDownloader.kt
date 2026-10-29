@@ -6,13 +6,11 @@ import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.api.errors.GitAPIException
 import org.eclipse.jgit.api.MergeResult
 import org.eclipse.jgit.lib.ProgressMonitor
+import dev.droidtop.net.Http
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.URI
-import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.Dispatchers
@@ -249,55 +247,35 @@ object ThemeDownloader {
     private const val MAX_THEMES_LIST_BYTES = 8L * 1024 * 1024
 
     /**
-     * One plain [HttpURLConnection] GET, the plugin catalog's own
-     * download shape: 64 KiB at a time, real byte counts into [progress]
-     * on every read (what keeps [withStallWatchdog] fed), [isCancelled]
-     * honoured between reads, and the full length checked against
-     * Content-Length so a cut connection is a failure, not a silently
-     * short list.
+     * One GET through [Http.request], read under a [Http.Watch]: real byte counts into [progress]
+     * on every read (what keeps [withStallWatchdog] fed), [isCancelled] honoured between reads, and
+     * the full length checked against Content-Length so a cut connection is a failure, not a
+     * silently short list.
      */
     private fun downloadThemesListBytes(
         progress: ThemeSyncProgress? = null,
         isCancelled: () -> Boolean = { false },
     ): ByteArray {
-        val connection = (URL(themesListFileUrl(THEMES_LIST_FILE)).openConnection() as HttpURLConnection).apply {
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = READ_TIMEOUT_MS
+        val watch = Http.Watch(
+            onProgress = { read, total ->
+                progress?.onUpdate(RECEIVING_THE_THEME_LIST, read.toInt(), total.coerceAtLeast(0L).toInt())
+            },
+            isCancelled = isCancelled,
+        )
+        val answer = try {
+            Http.request(
+                themesListFileUrl(THEMES_LIST_FILE),
+                timeouts = Http.Timeouts(connectMs = CONNECT_TIMEOUT_MS, readMs = READ_TIMEOUT_MS),
+                maxBytes = MAX_THEMES_LIST_BYTES,
+                watch = watch,
+            )
+        } catch (e: Http.TooLarge) {
+            throw IOException("the theme list is larger than droidtop reads (over ${e.limit} bytes)")
         }
-        return try {
-            when (val code = connection.responseCode) {
-                200 -> {
-                    val total = connection.contentLengthLong
-                    if (total > MAX_THEMES_LIST_BYTES) {
-                        throw IOException("the theme list is larger than droidtop reads ($total bytes)")
-                    }
-                    val out = ByteArrayOutputStream(if (total > 0) total.toInt() else 64 * 1024)
-                    connection.inputStream.use { input ->
-                        val buffer = ByteArray(64 * 1024)
-                        var written = 0L
-                        progress?.onUpdate(RECEIVING_THE_THEME_LIST, 0, total.coerceAtLeast(0L).toInt())
-                        while (true) {
-                            if (isCancelled()) throw IOException("cancelled")
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            written += read
-                            if (written > MAX_THEMES_LIST_BYTES) {
-                                throw IOException("the theme list grew past $MAX_THEMES_LIST_BYTES bytes mid-download")
-                            }
-                            out.write(buffer, 0, read)
-                            progress?.onUpdate(RECEIVING_THE_THEME_LIST, written.toInt(), total.coerceAtLeast(0L).toInt())
-                        }
-                        if (total > 0 && written != total) {
-                            throw IOException("the download was interrupted ($written of $total bytes)")
-                        }
-                        out.toByteArray()
-                    }
-                }
-                404, 410 -> throw IOException("the theme list is not there (HTTP $code)")
-                else -> throw IOException("the server answered HTTP $code")
-            }
-        } finally {
-            connection.disconnect()
+        return when (val code = answer.status) {
+            200 -> answer.body
+            404, 410 -> throw IOException("the theme list is not there (HTTP $code)")
+            else -> throw IOException("the server answered HTTP $code")
         }
     }
 

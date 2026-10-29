@@ -24,13 +24,22 @@ object Http {
 
     const val USER_AGENT = "droidtop/${BuildConfig.VERSION_NAME}"
 
+    /**
+     * A long read someone is watching: [onProgress] gets the bytes so far and the length announced (-1 when it was not),
+     * [isCancelled] is asked between reads (a cancelled read throws [IOException]), and the body must be whole: fewer
+     * bytes than announced is an [IOException], not a silently short answer.
+     */
+    class Watch(val onProgress: (read: Long, total: Long) -> Unit = { _, _ -> }, val isCancelled: () -> Boolean = { false })
+
     /** How much of a refusal's body [request] keeps, for the caller's error line. */
     const val ERROR_BODY_MAX_BYTES = 64L * 1024
 
     /**
      * One request answered with whatever status the server gave: a 2xx body read to [maxBytes] ([TooLarge] past it),
      * any other status's body read to [ERROR_BODY_MAX_BYTES]. With a [token], [GitHubAuth.open] follows the redirects
-     * and decides per hop whether the token goes on; without one, HttpURLConnection follows them.
+     * and decides per hop whether the token goes on; without one, HttpURLConnection follows them unless [followRedirects]
+     * is false (a request that carries a credential in a header must not be sent on to wherever a redirect points).
+     * With a [watch] the 2xx body is read under it.
      */
     fun request(
         url: String,
@@ -40,6 +49,8 @@ object Http {
         timeouts: Timeouts = Api.timeouts,
         maxBytes: Long = 8L * 1024 * 1024,
         token: String? = null,
+        followRedirects: Boolean = true,
+        watch: Watch? = null,
     ): Response {
         val sent = mapOf("User-Agent" to USER_AGENT) + headers
         val c = if (token != null) {
@@ -50,6 +61,7 @@ object Http {
             (URL(url).openConnection() as HttpURLConnection).apply {
                 connectTimeout = timeouts.connectMs
                 readTimeout = timeouts.readMs
+                instanceFollowRedirects = followRedirects
                 requestMethod = method
                 sent.forEach(::setRequestProperty)
                 if (body != null) {
@@ -69,7 +81,53 @@ object Http {
                 return Response(status, error ?: ByteArray(0), hs)
             }
             if (c.contentLengthLong > maxBytes) throw TooLarge(maxBytes)
-            return Response(status, c.inputStream.use { readTo(it, maxBytes, truncate = false) }, hs)
+            val total = c.contentLengthLong
+            val whole = c.inputStream.use { if (watch == null) readTo(it, maxBytes, truncate = false) else readWatched(it, maxBytes, total, watch) }
+            return Response(status, whole, hs)
+        } finally { c.disconnect() }
+    }
+
+    private fun readWatched(input: java.io.InputStream, limit: Long, total: Long, watch: Watch): ByteArray {
+        val out = java.io.ByteArrayOutputStream(if (total in 1..limit) total.toInt() else 64 * 1024)
+        val buf = ByteArray(64 * 1024)
+        watch.onProgress(0, total)
+        while (true) {
+            if (watch.isCancelled()) throw IOException("cancelled")
+            val n = input.read(buf)
+            if (n < 0) break
+            if (out.size().toLong() + n > limit) throw TooLarge(limit)
+            out.write(buf, 0, n)
+            watch.onProgress(out.size().toLong(), total)
+        }
+        if (total >= 0 && out.size().toLong() != total) throw IOException("the download was interrupted (${out.size()} of $total bytes)")
+        return out.toByteArray()
+    }
+
+    /**
+     * The status [url] answers with and the first [count] bytes of its body, for a look at what a link serves
+     * without fetching it: a `Range` for those bytes is asked, and a server that ignores it and answers the whole
+     * file costs only the bytes read here (the connection is dropped, not drained).
+     */
+    fun peek(url: String, count: Int, headers: Map<String, String> = emptyMap(), timeouts: Timeouts = Api.timeouts): Pair<Int, ByteArray> {
+        val sent = mapOf("User-Agent" to USER_AGENT, "Range" to "bytes=0-${count - 1}") + headers
+        val c = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = timeouts.connectMs
+            readTimeout = timeouts.readMs
+            sent.forEach(::setRequestProperty)
+        }
+        try {
+            val status = c.responseCode
+            if (status !in 200..299) return status to ByteArray(0)
+            return status to c.inputStream.use { input ->
+                val head = ByteArray(count)
+                var n = 0
+                while (n < count) {
+                    val read = input.read(head, n, count - n)
+                    if (read < 0) break
+                    n += read
+                }
+                head.copyOf(n)
+            }
         } finally { c.disconnect() }
     }
 

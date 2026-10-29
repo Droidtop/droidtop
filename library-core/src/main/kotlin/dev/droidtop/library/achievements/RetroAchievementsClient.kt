@@ -2,10 +2,9 @@ package dev.droidtop.library.achievements
 
 import dev.droidtop.library.scraper.ScrapeLookup
 import dev.droidtop.library.scraper.ScrapeRefusals
+import dev.droidtop.net.Http
 import org.json.JSONArray
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 
 /** One game of RetroAchievements' list for a console, with the file hashes it is known by. */
@@ -55,7 +54,7 @@ object RetroAchievementsClient {
     const val SOURCE = "RetroAchievements"
     private const val BASE = "https://retroachievements.org/API/"
     private const val TIMEOUT_MS = 20_000
-    private const val MAX_CHARS = 24 * 1024 * 1024
+    private const val MAX_BYTES = 24L * 1024 * 1024
 
     /** The key test: the person's own profile. Found when the username and key are accepted. */
     fun profile(user: String, apiKey: String): ScrapeLookup<String> {
@@ -144,21 +143,16 @@ object RetroAchievementsClient {
 
     private fun get(endpoint: String, apiKey: String, vararg query: Pair<String, String>): Answer {
         val params = (query.toList() + ("y" to apiKey)).joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
-        val connection = (URL("$BASE$endpoint?$params").openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
-            setRequestProperty("Accept", "application/json")
-        }
-        return try {
-            val status = connection.responseCode
-            if (status == 200) {
-                Answer.Body(connection.inputStream.bufferedReader().use { it.readText().take(MAX_CHARS) })
-            } else {
-                Answer.Failed(ScrapeRefusals.refused(SOURCE, connection, status, listOf(apiKey), endpoint))
-            }
-        } finally {
-            connection.disconnect()
+        val answer = Http.request(
+            "$BASE$endpoint?$params",
+            headers = mapOf("Accept" to "application/json"),
+            timeouts = Http.Timeouts(connectMs = TIMEOUT_MS, readMs = TIMEOUT_MS),
+            maxBytes = MAX_BYTES,
+        )
+        return if (answer.status == 200) {
+            Answer.Body(answer.text())
+        } else {
+            Answer.Failed(ScrapeRefusals.refused(SOURCE, answer, listOf(apiKey), endpoint))
         }
     }
 }

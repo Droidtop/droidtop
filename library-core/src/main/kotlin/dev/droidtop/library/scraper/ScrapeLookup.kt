@@ -1,7 +1,6 @@
 package dev.droidtop.library.scraper
 
 import dev.droidtop.net.Http
-import java.net.HttpURLConnection
 
 /**
  * The three real, distinct outcomes of asking ANY scraper source about one
@@ -75,21 +74,12 @@ object ScrapeRefusals {
     private val JSON_REASON = Regex("\"(status|message|error|error_description|reason|errors)\"\\s*:\\s*\\[?\\s*\"([^\"]{3,})\"")
 
     /**
-     * Builds the [ScrapeLookup.Refused] for a connection that answered
-     * [status] (anything but 200), logging it under `droidtop.Scraper` with
+     * Builds the [ScrapeLookup.Refused] for an answer with the status
+     * [response]'s status (anything but 200), logging it under `droidtop.Scraper` with
      * the server's reason. [secrets] is every credential the request
      * carried: each is redacted out of the body before anything else reads
      * it. [subject] names what was asked for, for the log line only.
      */
-    fun refused(
-        source: String,
-        connection: HttpURLConnection,
-        status: Int,
-        secrets: List<String>,
-        subject: String,
-    ): ScrapeLookup.Refused = refused(source, status, readBoundedErrorBody(connection), secrets, subject)
-
-    /** The same refusal for an answer [Http.request] returned. */
     fun refused(source: String, response: Http.Response, secrets: List<String>, subject: String): ScrapeLookup.Refused =
         refused(source, response.status, response.text().take(ERROR_BODY_MAX_CHARS), secrets, subject)
 
@@ -101,21 +91,6 @@ object ScrapeRefusals {
                 (reason?.let { " — server said: $it" } ?: " (server sent no error body)"),
         )
         return ScrapeLookup.Refused(source, status, reason)
-    }
-
-    private fun readBoundedErrorBody(connection: HttpURLConnection): String = try {
-        connection.errorStream?.bufferedReader()?.use { reader ->
-            val buffer = CharArray(ERROR_BODY_MAX_CHARS)
-            var filled = 0
-            while (filled < ERROR_BODY_MAX_CHARS) {
-                val read = reader.read(buffer, filled, ERROR_BODY_MAX_CHARS - filled)
-                if (read < 0) break
-                filled += read
-            }
-            String(buffer, 0, filled)
-        }.orEmpty()
-    } catch (t: Throwable) {
-        ""
     }
 
     /**

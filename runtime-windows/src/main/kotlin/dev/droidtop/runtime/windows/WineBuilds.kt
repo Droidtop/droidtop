@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import com.winlator.contents.ContentProfile
 import com.winlator.contents.ContentsManager
+import dev.droidtop.net.Http
 import dev.droidtop.runtime.windows.utils.ManifestInstaller
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import java.io.File
@@ -130,25 +131,8 @@ object WineBuilds {
 
     /** The first bytes [url] serves, or null when it cannot be asked (the download then says why). Network. */
     private fun linkHead(url: String): ByteArray? = runCatching {
-        val c = java.net.URL(url).openConnection() as java.net.HttpURLConnection
-        try {
-            c.connectTimeout = 20_000
-            c.readTimeout = 30_000
-            c.setRequestProperty("Range", "bytes=0-7")
-            if (c.responseCode !in 200..299) return@runCatching null
-            c.inputStream.use { input ->
-                val head = ByteArray(8)
-                var n = 0
-                while (n < head.size) {
-                    val read = input.read(head, n, head.size - n)
-                    if (read < 0) break
-                    n += read
-                }
-                head.copyOf(n)
-            }
-        } finally {
-            c.disconnect()
-        }
+        val (status, head) = Http.peek(url, 8, timeouts = Http.Timeouts(connectMs = 20_000, readMs = 30_000))
+        if (status in 200..299) head else null
     }.getOrNull()?.takeIf { it.isNotEmpty() }
 
     /** What a Wine-build download is called in Downloads: the link's file name, else its site. Pure. */

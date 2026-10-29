@@ -1,8 +1,7 @@
 package dev.droidtop.pluginhost.debrid
 
+import dev.droidtop.net.Http
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 import org.json.JSONArray
 import org.json.JSONObject
@@ -119,42 +118,24 @@ fun interface DebridTransport {
 
         /** One request: [body] is the content type and the text to send, or null for none. */
         private fun exchange(method: String, url: String, headers: Map<String, String>, body: Pair<String, String>?): Pair<Int, String> {
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-                requestMethod = method
-                connectTimeout = 15_000
-                readTimeout = 30_000
-                instanceFollowRedirects = false
-                headers.forEach { (name, value) -> setRequestProperty(name, value) }
-            }
             try {
-                if (body != null) {
-                    connection.doOutput = true
-                    connection.setRequestProperty("Content-Type", body.first)
-                    connection.outputStream.use { it.write(body.second.toByteArray()) }
-                }
-                val status = connection.responseCode
-                val stream = if (status >= 400) connection.errorStream else connection.inputStream
-                val text = stream?.use { input -> readBounded(input) }.orEmpty()
-                return status to text
+                // Never followed on: these requests carry the person's debrid key in a header.
+                val answer = Http.request(
+                    url,
+                    method = method,
+                    headers = headers + (body?.let { mapOf("Content-Type" to it.first) } ?: emptyMap()),
+                    body = body?.second?.toByteArray(),
+                    timeouts = Http.Timeouts(connectMs = 15_000, readMs = 30_000),
+                    maxBytes = MAX_BODY,
+                    followRedirects = false,
+                )
+                return answer.status to answer.text()
             } catch (e: IOException) {
                 throw IOException("The service could not be reached", e)
-            } finally {
-                connection.disconnect()
             }
         }
 
-        private const val MAX_BODY = 4 * 1024 * 1024
-
-        private fun readBounded(input: java.io.InputStream): String {
-            val out = java.io.ByteArrayOutputStream()
-            val buffer = ByteArray(16 * 1024)
-            while (out.size() < MAX_BODY) {
-                val read = input.read(buffer, 0, minOf(buffer.size, MAX_BODY - out.size()))
-                if (read < 0) break
-                out.write(buffer, 0, read)
-            }
-            return out.toString(Charsets.UTF_8.name())
-        }
+        private const val MAX_BODY = 4L * 1024 * 1024
     }
 }
 

@@ -1,10 +1,8 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.OutputStreamWriter
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 
 /**
@@ -99,30 +97,26 @@ object IgdbScraperClient {
     private fun token(clientId: String, clientSecret: String): ScrapeLookup<String> {
         val now = System.currentTimeMillis()
         cached?.let { if (it.clientId == clientId && it.expiresAtMs > now) return ScrapeLookup.Found(it.token) }
-        val url = URL("https://id.twitch.tv/oauth2/token")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            doOutput = true
-            connectTimeout = 10_000
-            readTimeout = 20_000
-        }
         val body = "client_id=${URLEncoder.encode(clientId, "UTF-8")}" +
             "&client_secret=${URLEncoder.encode(clientSecret, "UTF-8")}" +
             "&grant_type=client_credentials"
-        OutputStreamWriter(connection.outputStream).use { it.write(body) }
-        val status = connection.responseCode
-        if (status != 200) {
+        val answer = Http.request(
+            "https://id.twitch.tv/oauth2/token",
+            method = "POST",
+            body = body.toByteArray(),
+            timeouts = Http.Timeouts(connectMs = 10_000, readMs = 20_000),
+        )
+        if (answer.status != 200) {
             // Named as what the user configured, so the summary reads
             // "IGDB (Twitch sign-in) refused ... invalid client secret".
             return ScrapeRefusals.refused(
                 SIGNIN_SOURCE,
-                connection,
-                status,
+                answer,
                 listOf(clientId, clientSecret),
                 "the configured Client ID and Secret",
             )
         }
-        val response = JSONObject(connection.inputStream.bufferedReader().readText())
+        val response = JSONObject(answer.text())
         val accessToken = response.getString("access_token")
         val lifetimeMs = response.optLong("expires_in", 0L) * 1000
         cached = CachedToken(clientId, accessToken, now + lifetimeMs - TOKEN_EXPIRY_MARGIN_MS)
@@ -234,21 +228,17 @@ object IgdbScraperClient {
             is ScrapeLookup.Refused -> return token
             ScrapeLookup.NoMatch -> return ScrapeLookup.NoMatch
         }
-        val url = URL("https://api.igdb.com/v4/$endpoint")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            doOutput = true
-            connectTimeout = 10_000
-            readTimeout = 20_000
-            setRequestProperty("Client-ID", clientId)
-            setRequestProperty("Authorization", "Bearer $bearer")
+        val answer = Http.request(
+            "https://api.igdb.com/v4/$endpoint",
+            method = "POST",
+            headers = mapOf("Client-ID" to clientId, "Authorization" to "Bearer $bearer"),
+            body = body.toByteArray(),
+            timeouts = Http.Timeouts(connectMs = 10_000, readMs = 20_000),
+        )
+        if (answer.status != 200) {
+            return ScrapeRefusals.refused("IGDB", answer, listOf(clientId, clientSecret, bearer), subject)
         }
-        OutputStreamWriter(connection.outputStream).use { it.write(body) }
-        val status = connection.responseCode
-        if (status != 200) {
-            return ScrapeRefusals.refused("IGDB", connection, status, listOf(clientId, clientSecret, bearer), subject)
-        }
-        val rows = JSONArray(connection.inputStream.bufferedReader().readText())
+        val rows = JSONArray(answer.text())
         return if (rows.length() == 0) ScrapeLookup.NoMatch else ScrapeLookup.Found(rows)
     }
 

@@ -5,8 +5,7 @@ import android.content.Intent
 import androidx.core.content.pm.PackageInfoCompat
 import org.json.JSONObject
 import java.io.File
-import java.net.HttpURLConnection
-import java.net.URL
+import dev.droidtop.net.Http
 import dev.droidtop.runtime.util.Sha256
 import dev.droidtop.app.apps.ApkInstaller
 
@@ -302,33 +301,15 @@ object AppSelfUpdate {
         )
     }
 
-    private fun openJson(url: String): JSONObject {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", "droidtop")
-        try {
-            require(connection.responseCode in 200..299) { "$url returned HTTP ${connection.responseCode}" }
-            return JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
-        } finally {
-            connection.disconnect()
-        }
-    }
+    private fun openJson(url: String): JSONObject = JSONObject(fetchText(url, emptyMap()))
 
-    private fun openJsonArray(url: String): org.json.JSONArray {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", "droidtop")
-        connection.setRequestProperty("Accept", "application/vnd.github+json")
-        try {
-            require(connection.responseCode in 200..299) { "$url returned HTTP ${connection.responseCode}" }
-            return org.json.JSONArray(connection.inputStream.bufferedReader().use { it.readText() })
-        } finally {
-            connection.disconnect()
-        }
+    private fun openJsonArray(url: String): org.json.JSONArray =
+        org.json.JSONArray(fetchText(url, mapOf("Accept" to "application/vnd.github+json")))
+
+    private fun fetchText(url: String, headers: Map<String, String>): String {
+        val answer = Http.request(url, headers = headers)
+        require(answer.status in 200..299) { "$url returned HTTP ${answer.status}" }
+        return answer.text()
     }
 
     /** A thin, allocation-free view over a JSONArray of JSONObjects so callers can use firstOrNull. */

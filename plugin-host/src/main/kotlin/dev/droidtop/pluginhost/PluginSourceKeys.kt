@@ -1,9 +1,7 @@
 package dev.droidtop.pluginhost
 
-import dev.droidtop.net.GitHubAuth
+import dev.droidtop.net.Http
 
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
 import java.net.URI
 
 /**
@@ -131,20 +129,10 @@ object PluginSourceKeys {
         )
     }
 
-    /** The one real network leg: [GitHubAuth.open] (the user's GitHub token, on GitHub hosts only), capped at 64 KiB (a key file is well under 1 KiB). */
+    /** The one real network leg: `Http.request` with the user's GitHub token (the GitHub opener, which sends it to GitHub hosts only), capped at 64 KiB (a key file is well under 1 KiB). */
     private fun fetchBytes(url: String, token: String?): ByteArray? = runCatching {
-        val connection = GitHubAuth.open(url, token, 30_000, 30_000)
-        if (connection.responseCode != HttpURLConnection.HTTP_OK) return@runCatching null
-        connection.inputStream.use { input ->
-            val out = ByteArrayOutputStream()
-            val buffer = ByteArray(4 * 1024)
-            while (true) {
-                val n = input.read(buffer)
-                if (n < 0) break
-                out.write(buffer, 0, n)
-                if (out.size() > 64 * 1024) return@runCatching null
-            }
-            out.toByteArray()
-        }
+        // A token (even an empty one) takes the GitHub opener: redirects by hand, https only, the header decided per hop.
+        val answer = Http.request(url, token = token.orEmpty(), timeouts = Http.Timeouts(30_000, 30_000), maxBytes = 64L * 1024)
+        if (answer.status == 200) answer.body else null
     }.getOrNull()
 }

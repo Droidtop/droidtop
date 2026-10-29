@@ -667,13 +667,17 @@ suspend fun applyManualMatch(
     "Matched ${entry.title} to ${metadata.name ?: "that entry"}."
 }
 
+/** The largest picture a scrape will take: bigger than any cover, hero or screenshot, small enough to hold in memory. */
+private const val IMAGE_MAX_BYTES = 32L * 1024 * 1024
+
 /** Downloads [imageUrl] straight to [destination], creating parent directories as needed -- a plain generic helper, not tied to any one scraper source, and the single one in this package (the PC/engine scrape in PcScrape.kt shares it rather than carrying a second copy). */
 internal fun downloadImage(imageUrl: String, destination: File) {
     destination.parentFile?.mkdirs()
-    val connection = (java.net.URL(imageUrl).openConnection() as java.net.HttpURLConnection)
-    if (connection.responseCode != 200) {
-        throw java.io.IOException("Image download failed: HTTP ${connection.responseCode}")
+    // A picture is a request, not a download job (docs/SPEC.md 12a): read whole, bounded, then written.
+    val answer = dev.droidtop.net.Http.request(imageUrl, timeouts = dev.droidtop.net.Http.Media.timeouts, maxBytes = IMAGE_MAX_BYTES)
+    if (answer.status != 200) {
+        throw java.io.IOException("Image download failed: HTTP ${answer.status}")
     }
-    connection.inputStream.use { input -> destination.outputStream().use { output -> input.copyTo(output) } }
+    destination.writeBytes(answer.body)
     EsDeArtwork.mediaWritten(destination)
 }

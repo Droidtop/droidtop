@@ -5,8 +5,8 @@ import android.content.Context
 /**
  * User-driven refresh of the player database from the droidtop platform-db
  * repository (docs/SPEC.md §7h) — the separately-updatable half of
- * [KnownPlayers]' two-source model. Plain [HttpURLConnection], the same
- * real pattern every scraper client in this module already uses.
+ * [KnownPlayers]' two-source model. Through [PlatformDatabaseTransport] and
+ * so `:net-core`'s `Http`, like every scraper client in this module.
  *
  * The download is validated as a real database (parses, has a `players`
  * array) BEFORE it replaces anything, and written atomically

@@ -93,6 +93,7 @@ android {
 
 dependencies {
     implementation(project(":runtime-common"))
+    implementation(project(":net-core"))
     // PcGameProvider's LibraryProvider and the store rows of PcLibrary.
     implementation(project(":library-core"))
     implementation(project(":input-mapping"))

@@ -1,8 +1,7 @@
 package dev.droidtop.library.scraper
 
+import dev.droidtop.net.Http
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
 
 /** One game SteamGridDB's search returned: its own id, its name, and the year when it has one. */
@@ -119,19 +118,18 @@ object SteamGridDbScraperClient {
      * body says `"success": false`.
      */
     private fun get(apiKey: String, path: String, subject: String): ScrapeLookup<JSONObject> {
-        val connection = (URL(BASE_URL + path).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 10_000
-            readTimeout = 20_000
-            setRequestProperty("Authorization", "Bearer $apiKey")
-        }
-        val status = connection.responseCode
+        val answer = Http.request(
+            BASE_URL + path,
+            headers = mapOf("Authorization" to "Bearer $apiKey"),
+            timeouts = Http.Timeouts(connectMs = 10_000, readMs = 20_000),
+        )
+        val status = answer.status
         if (status == 404) {
             android.util.Log.i("droidtop.Scraper", "$SOURCE has nothing under $subject (HTTP 404)")
             return ScrapeLookup.NoMatch
         }
-        if (status != 200) return ScrapeRefusals.refused(SOURCE, connection, status, listOf(apiKey), subject)
-        val body = JSONObject(connection.inputStream.bufferedReader().readText())
+        if (status != 200) return ScrapeRefusals.refused(SOURCE, answer, listOf(apiKey), subject)
+        val body = JSONObject(answer.text())
         return unwrap(body)
     }
 

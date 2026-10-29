@@ -3,12 +3,11 @@ package dev.droidtop.library.gameinfo
 import android.content.Context
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.achievements.hash.DiscSerials
+import dev.droidtop.net.Http
 import org.json.JSONArray
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
-import java.net.HttpURLConnection
-import java.net.URL
 
 /** One game's entry in an emulator's own public compatibility list. */
 data class CompatInfo(val emulator: String, val rating: String, val listUrl: String)
@@ -37,6 +36,9 @@ sealed interface CompatResult {
 object EmulatorCompat {
     private const val TTL_MS = 30L * 24 * 60 * 60 * 1000
     private const val TIMEOUT_MS = 30_000
+
+    /** DuckStation's game database is a YAML file of every serial it rates: several megabytes. */
+    private const val DUCKSTATION_MAX_BYTES = 32L * 1024 * 1024
 
     private const val DUCKSTATION = "DuckStation"
     private const val DUCKSTATION_URL = "https://raw.githubusercontent.com/stenzek/duckstation/master/data/resources/gamedb.yaml"
@@ -82,33 +84,21 @@ object EmulatorCompat {
         runCatching { file.writeText(rows.entries.joinToString("\n") { "${it.key}\t${it.value}" }) }
     }
 
-    private fun get(address: String): HttpURLConnection =
-        (URL(address).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = TIMEOUT_MS
-            readTimeout = TIMEOUT_MS
-            setRequestProperty("User-Agent", "droidtop (Android game launcher; https://github.com/Droidtop/droidtop)")
-        }
-
-    private fun downloadDuckStation(): Map<String, String> {
-        val connection = get(DUCKSTATION_URL)
-        try {
-            if (connection.responseCode != 200) throw IOException("HTTP ${connection.responseCode}")
-            return connection.inputStream.bufferedReader().use { parseDuckStation(it.lineSequence()) }
-        } finally {
-            connection.disconnect()
-        }
+    private fun get(address: String, maxBytes: Long): String {
+        val answer = Http.request(
+            address,
+            headers = mapOf("User-Agent" to "droidtop (Android game launcher; https://github.com/Droidtop/droidtop)"),
+            timeouts = Http.Timeouts(connectMs = TIMEOUT_MS, readMs = TIMEOUT_MS),
+            maxBytes = maxBytes,
+        )
+        if (answer.status != 200) throw IOException("HTTP ${answer.status}")
+        return answer.text()
     }
 
-    private fun downloadAzahar(): Map<String, String> {
-        val connection = get(AZAHAR_URL)
-        try {
-            if (connection.responseCode != 200) throw IOException("HTTP ${connection.responseCode}")
-            return parseAzahar(connection.inputStream.bufferedReader().use { it.readText().take(8 * 1024 * 1024) })
-        } finally {
-            connection.disconnect()
-        }
-    }
+    private fun downloadDuckStation(): Map<String, String> =
+        parseDuckStation(get(DUCKSTATION_URL, DUCKSTATION_MAX_BYTES).lineSequence())
+
+    private fun downloadAzahar(): Map<String, String> = parseAzahar(get(AZAHAR_URL, 8L * 1024 * 1024))
 
     /**
      * Pure, for the JVM tests. DuckStation's game database is a YAML file of serial keys; the rows it rates carry
