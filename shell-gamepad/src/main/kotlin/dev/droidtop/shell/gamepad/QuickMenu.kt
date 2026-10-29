@@ -924,12 +924,8 @@ private fun GameTab(
     // row says while the report is made and after.
     var reportLine by remember(entry.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(entry.id) { emulatorChoice = library.getMetadataForEditing(entry)?.altEmulator }
-    // Over a running game (an in-game overlay, Droidtop/tracker#740) the overlay never pauses it; this row is the one
-    // explicit way to, for an emulator that listens (RetroArch's command port). What it last did, for its line.
-    val inGameOverlay = LocalInGameOverlay.current
-    var pauseLine by remember(entry.id) { mutableStateOf<String?>(null) }
 
-    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, controls, reportLine, pauseLine) {
+    val tiles = remember(entry.id, quitOutcome, armed, lastEnding, emulators, emulatorChoice, companionSettings, uiMode, padMouse, controls, reportLine) {
         fun ending(kind: GameEnding, title: String, idle: String?, restart: Boolean) = ActionRow(
             title = title,
             detail = when {
@@ -955,24 +951,6 @@ private fun GameTab(
                     onSelect = { onResume(entry) },
                 ),
             )
-            // "Pause the game" (the owner, 2026-10-29: "unless we want to tie a specific button to 'tell a game it was
-            // backgrounded, even if it wasn't'"): only on this press, never when the overlay opens or closes.
-            if (inGameOverlay && entry.systemId != null) {
-                add(
-                    ActionRow(
-                        title = "Pause the game",
-                        detail = pauseLine ?: "Tells RetroArch to pause or carry on. The game keeps running otherwise",
-                        onSelect = {
-                            scope.launch {
-                                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                    runCatching { dev.droidtop.pluginhost.RetroArchCommands.send("PAUSE_TOGGLE", 0) }
-                                }
-                                pauseLine = "Sent to RetroArch. Press again to carry on"
-                            }
-                        },
-                    ),
-                )
-            }
             // Only for a console game with something installed to choose from. A cycles Follow the
             // system, then each installed emulator; the launch reads it, so it applies from the next start.
             // The model is GameEmulatorChoice, which the companion's Game tab draws too.
