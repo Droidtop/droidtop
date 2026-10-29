@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.DesktopWindows
@@ -275,9 +276,22 @@ fun DesktopShell(
     // read the same palette Gaming does, through MaterialTheme and MenuTokens alike, instead of stock Material.
     dev.droidtop.shell.gamepad.GamingTheme {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup)
+        // The bar takes its height from the desktop rather than covering it (Droidtop/tracker#682): the viewport is
+        // laid out in the rest, so the compositor's output is exactly what shows and no window's edge is under the bar.
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        var barHeightPx by remember { mutableStateOf(0) }
+        val barHeight = with(density) { barHeightPx.toDp() }
+        val barAtTop = DesktopPrefs.taskbarAtTop(LocalContext.current)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = if (barAtTop) barHeight else 0.dp, bottom = if (barAtTop) 0.dp else barHeight),
+        ) {
+            DesktopViewport(hostBridge, primaryOutput, sessionMessage, onStartSession, onOpenSetup)
+        }
 
         Taskbar(
+            onHeight = { barHeightPx = it },
             hostBridge = hostBridge,
             toplevels = toplevels,
             androidApps = androidApps,
@@ -451,7 +465,7 @@ private fun BoxScope.DesktopViewport(
 
                         // The only place the view's real size is known:
                         // width/height here are the surface's, which is not
-                        // the panel size (the taskbar takes 48dp). The
+                        // the panel size (the bar's height is laid out beside it, #682). The
                         // compositor is asked to make its output exactly
                         // this size, so a frame lands 1:1 on the view rather
                         // than being stretched, and the input transform is
@@ -580,6 +594,7 @@ private fun BoxScope.DesktopViewport(
 
 @Composable
 private fun BoxScope.Taskbar(
+    onHeight: (Int) -> Unit,
     hostBridge: HostBridge?,
     toplevels: List<Toplevel>,
     androidApps: List<RunningApp>,
@@ -615,7 +630,12 @@ private fun BoxScope.Taskbar(
         }
     }
 
-    Column(modifier = Modifier.align(if (atTop) Alignment.TopStart else Alignment.BottomStart).fillMaxWidth()) {
+    Column(
+        modifier = Modifier
+            .align(if (atTop) Alignment.TopStart else Alignment.BottomStart)
+            .fillMaxWidth()
+            .onSizeChanged { onHeight(it.height) },
+    ) {
         if (!atTop) legend()
         Row(
             modifier = Modifier

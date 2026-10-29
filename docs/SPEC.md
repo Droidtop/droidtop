@@ -7716,8 +7716,11 @@ physical devices are attached.
 pixel space, and handed to `zwlr_virtual_pointer_v1.motion_absolute` together
 with the extent they were scaled against. The transform is rebuilt in
 `surfaceChanged`, because the surface's size is the only geometry that can be
-read honestly there: it is not the panel size (the taskbar takes 48dp of it)
-and it is not the output size.
+read honestly there: it is not the panel size (the taskbar, and with a pad its
+legend strip, take their height from it) and it is not the output size. The
+viewport is laid out beside the bar, not under it (Droidtop/tracker#682: it
+filled the screen and the bar covered the bottom 48 dp of every window, or
+Waybar when the bar was at the top), so the output is exactly what shows.
 
 The output is sized to the view. In `surfaceChanged` the viewport asks the
 compositor, through `HostBridge.setOutputSize`, to give its headless output
