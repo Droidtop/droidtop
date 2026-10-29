@@ -67,9 +67,12 @@ sealed interface FacetSubject {
         }
 }
 
-/** An action a facet sends back to the plugin that gave it: a quick call, a job, or a page of facets. */
+/**
+ * An action a facet sends back to the plugin that gave it: a quick call, a job, or a page of facets. A [Kind.GRANT]
+ * goes to droidtop instead: [op] is one of the plugin's declared permissions, and droidtop asks the person for it.
+ */
 data class FacetCall(val op: String, val argsJson: String = "{}", val kind: Kind = Kind.CALL) {
-    enum class Kind { CALL, JOB, PAGE }
+    enum class Kind { CALL, JOB, PAGE, GRANT }
 
     fun args(): JSONObject = runCatching { JSONObject(argsJson) }.getOrDefault(JSONObject())
 }
@@ -261,6 +264,8 @@ object Facets {
 
     fun callOf(json: JSONObject?): FacetCall? {
         if (json == null) return null
+        // A grant action opens droidtop's own prompt for one permission: it has no op and no args (docs/plugin-api.md 1.10).
+        if (json.optString("kind") == "grant") return json.text("permission")?.let { FacetCall(it, "{}", FacetCall.Kind.GRANT) }
         val op = json.text("op") ?: return null
         val kind = when (json.optString("kind", "call")) {
             "call" -> FacetCall.Kind.CALL

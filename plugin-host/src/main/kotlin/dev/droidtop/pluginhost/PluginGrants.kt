@@ -431,6 +431,32 @@ class PluginGrants(private val dir: File) {
         }
 
         /**
+         * Asks the person on the first-use sheet whether [record] may use [permission], one it declares, because they
+         * pressed a facet's grant action (docs/plugin-api.md 1.10, "Interaction"): the sheet shows the manifest's reason,
+         * and the plugin cannot word it. Asked even when it was turned off before, since the person asked for it. Allow
+         * grants it, Never turns it off, Not now changes nothing. True when it is granted afterwards. Blocks until
+         * answered: off the main thread, and only for something the person just did.
+         */
+        fun askPermission(context: Context, record: PluginRecord, permission: String): Boolean {
+            val declared = record.manifest.v2.permissions.firstOrNull { it.id == permission } ?: return false
+            val known = PluginPermissions.find(permission) ?: return false
+            val id = record.manifest.id
+            val store = forContext(context)
+            if (stateOf(record, store.read(id), permission) == GrantState.GRANTED) return true
+            return when (PluginGrantPrompts.ask(GrantPromptRequest(id, record.manifest.label, permission, known.label, declared.reason, known.tier))) {
+                GrantAnswer.ALLOW -> {
+                    store.set(id, permission, GrantState.GRANTED)
+                    true
+                }
+                GrantAnswer.NEVER -> {
+                    store.set(id, permission, GrantState.DENIED)
+                    false
+                }
+                GrantAnswer.NOT_NOW -> false
+            }
+        }
+
+        /**
          * Why a job must not start, or null when it may. A contract 2 job names its point in the envelope it carries
          * (`args["call"]`) and is checked as that point; a contract 1 job has no envelope and is checked as the point
          * its [capability] replaced.

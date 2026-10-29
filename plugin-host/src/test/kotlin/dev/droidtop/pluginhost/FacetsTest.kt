@@ -206,4 +206,17 @@ class FacetsTest {
         assertTrue(FacetGuards.unhidden(facets, "status.area", hid).any { it.id == "vpn.state" })
         assertEquals(facets, FacetGuards.unhidden(facets, "quickmenu", PluginGrants.Snapshot()))
     }
+
+    @Test
+    fun `a grant action may ask only for a permission the plugin declares`() {
+        val facets = read("""{"facets": [
+            {"id": "mine", "kind": "action", "targets": ["quickmenu"], "label": "Allow access", "call": {"kind": "grant", "permission": "files.shared"}},
+            {"id": "other", "kind": "action", "targets": ["quickmenu"], "label": "Allow more", "call": {"kind": "grant", "permission": "priv.packages"}}
+        ]}""").facets
+        val messages = mutableListOf<String>()
+        val shown = FacetGuards.admit(facets, "quickmenu", plugin.copy(permissions = setOf("files.shared")), messages)
+        assertEquals(listOf("mine"), shown.map { it.id })
+        assertTrue(messages.single().contains("priv.packages"))
+    }
+
 }

@@ -133,4 +133,18 @@ class FacetViewsTest {
         assertEquals(listOf("b"), group.facets.map { it.id })
         assertTrue(reading.messages.any { "without a valid submit" in it })
     }
+
+    @Test
+    fun `a grant action is droidtop's own prompt for one permission`() {
+        val facets = Facets.read(JSONObject("""{"facets": [
+            {"id": "allow", "kind": "notice", "title": "Syncthing cannot see your folders", "call": {"kind": "grant", "permission": "files.shared"}},
+            {"id": "bad", "kind": "action", "label": "No permission named", "call": {"kind": "grant"}}
+        ]}""")).facets
+        assertEquals(listOf("allow"), facets.map { it.id })
+        val notice = FacetViews.toView(facets).sections.single().nodes.single() as ViewNode.Notice
+        assertEquals(ViewAction.Kind.GRANT, notice.action!!.kind)
+        assertEquals("files.shared", notice.action!!.op)
+        assertEquals("{}", notice.action!!.argsJson)
+    }
+
 }

@@ -113,6 +113,7 @@ object FacetViews {
             FacetCall.Kind.CALL -> ViewAction.Kind.CALL
             FacetCall.Kind.JOB -> ViewAction.Kind.JOB
             FacetCall.Kind.PAGE -> ViewAction.Kind.VIEW
+            FacetCall.Kind.GRANT -> ViewAction.Kind.GRANT
         }
         return ViewAction(kind, call.op, args.toString())
     }

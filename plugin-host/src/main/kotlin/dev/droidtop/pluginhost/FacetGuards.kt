@@ -151,8 +151,15 @@ object FacetGuards {
         // A link opens only on the person's press; it never carries the plugin's session, so any https address is fine.
         is FacetBody.Link -> NetScope.isHttps(body.url) || drop(messages, facet, "a link must be https")
         is FacetBody.Account -> "web.session" in plugin.permissions || drop(messages, facet, "an account facet needs web.session")
+        is FacetBody.Action -> grantGuard(facet, body.call, plugin, messages)
+        is FacetBody.Notice -> body.call == null || grantGuard(facet, body.call, plugin, messages)
         else -> true
     }
+
+    /** A grant action may only ask for one of the plugin's own declared permissions (docs/plugin-api.md 1.10, "Interaction"). */
+    private fun grantGuard(facet: Facet, call: FacetCall, plugin: Plugin, messages: MutableList<String>): Boolean =
+        call.kind != FacetCall.Kind.GRANT || call.op in plugin.permissions ||
+            drop(messages, facet, "its grant action asks for ${call.op}, which the plugin does not declare")
 
     /** "Store information: who may give it, and its guards". The facet is kept, less what it may not claim. */
     private fun storeGuard(facet: Facet, body: FacetBody.Store, plugin: Plugin, messages: MutableList<String>): Boolean {

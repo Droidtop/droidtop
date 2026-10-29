@@ -151,6 +151,12 @@ object PluginViews {
         val messages = mutableListOf<String>()
         val outcome = when (action.kind) {
             ViewAction.Kind.VIEW -> ActionOutcome("", null, refetch = false)
+            // droidtop's own prompt, in place; the page is asked again whatever the answer, so its facets show the new state.
+            ViewAction.Kind.GRANT -> {
+                val allowed = withContext(Dispatchers.IO) { dev.droidtop.pluginhost.PluginGrants.askPermission(context, record, action.op) }
+                val label = dev.droidtop.pluginhost.PluginPermissions.labelFor(action.op) ?: action.op
+                ActionOutcome(if (allowed) "Allowed: $label" else "Not allowed: $label", null, refetch = true)
+            }
             ViewAction.Kind.CALL -> {
                 val reply = call(context, record, point, action.op, callArgs)
                 if (!reply.ok) {
@@ -640,7 +646,7 @@ private class PluginPage(
             inline = PluginPage(record, point, action.op, action.args(), hostContext, HashMap(values), null, null, onJobDone, extraWhenFailed, extraGroups)
                 .screen("${screenId}_${action.op}_${itemId.hashCode()}", action.title ?: title),
         )
-        ViewAction.Kind.CALL, ViewAction.Kind.JOB -> AsyncActionItem(
+        ViewAction.Kind.CALL, ViewAction.Kind.JOB, ViewAction.Kind.GRANT -> AsyncActionItem(
             id = itemId,
             title = title,
             subtitle = subtitle,
