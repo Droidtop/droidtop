@@ -26,8 +26,6 @@ android {
             java.srcDir("../vendor/droidtop-shared/trust/src/main/kotlin")
             // The names droidtop and Enginehost agree on to start each other (docs/SPEC.md 7d, Droidtop/tracker#204).
             java.srcDir("../vendor/droidtop-shared/launch-contract/src/main/kotlin")
-            // How a browser check is recognised and what passing one earns (docs/SPEC.md 12a, Droidtop/tracker#751).
-            java.srcDir("../vendor/droidtop-shared/sitecheck/src/main/kotlin")
         }
         getByName("test") {
             resources.srcDirs("src/main/assets")

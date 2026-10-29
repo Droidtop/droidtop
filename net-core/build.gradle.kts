@@ -25,6 +25,9 @@ android {
             // released by Droidtop/droidtop-agent and fetched against
             // agent-lib.pin (build-scripts/fetch-agent-lib.sh).
             jniLibs.srcDir("agent/jniLibs")
+            // How a browser check is recognised and what passing one earns, shared with Enginehost (vendor/droidtop-shared,
+            // docs/SPEC.md 12a, Droidtop/tracker#751): here and not in :runtime-common, which depends on this module.
+            java.srcDir("../vendor/droidtop-shared/sitecheck/src/main/kotlin")
         }
     }
 }

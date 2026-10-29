@@ -1,5 +1,6 @@
 package dev.droidtop.net
 
+import dev.droidtop.net.sitecheck.SiteGates
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -52,6 +53,23 @@ object Http {
         followRedirects: Boolean = true,
         watch: Watch? = null,
     ): Response {
+        // A site that checks the browser is dealt with in one place for every request (Droidtop/tracker#751): the
+        // site's clearance goes on the request, and a check in the answer is passed and the request made once more.
+        val gate = SiteGates.current ?: return requestOnce(url, method, headers, body, timeouts, maxBytes, token, followRedirects, watch)
+        return gate.run(url, headers) { withClearance -> requestOnce(url, method, withClearance, body, timeouts, maxBytes, token, followRedirects, watch) }
+    }
+
+    private fun requestOnce(
+        url: String,
+        method: String,
+        headers: Map<String, String>,
+        body: ByteArray?,
+        timeouts: Timeouts,
+        maxBytes: Long,
+        token: String?,
+        followRedirects: Boolean,
+        watch: Watch?,
+    ): Response {
         val sent = mapOf("User-Agent" to USER_AGENT) + headers
         val c = if (token != null) {
             require(method == "GET" && body == null) { "a token is sent on GET requests only" }
@@ -73,8 +91,10 @@ object Http {
         }
         try {
             val status = c.responseCode
+            // The rate-limit headers, and Cloudflare's own word that the answer is a browser check.
             val hs = c.headerFields.entries.mapNotNull { (name, values) ->
-                name?.takeIf { it.startsWith("X-RateLimit-", ignoreCase = true) }?.lowercase()?.let { it to values.firstOrNull() }
+                name?.takeIf { it.startsWith("X-RateLimit-", ignoreCase = true) || it.equals("cf-mitigated", ignoreCase = true) }
+                    ?.lowercase()?.let { it to values.firstOrNull() }
             }.toMap()
             if (status !in 200..299) {
                 val error = runCatching { c.errorStream?.use { readTo(it, ERROR_BODY_MAX_BYTES, truncate = true) } }.getOrNull()

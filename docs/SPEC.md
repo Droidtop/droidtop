@@ -18464,6 +18464,23 @@ A condition the person should know about (an unofficial plugin, a feature that i
     makes: one `SiteGate` and one shared clearance store in `:net-core` (the owner: "cloudflare approvals figured out for
     droidtop for EVERYTHING"; "don't force past a cloudflare approval, but do let the browser try to solve the captcha
     itself if it's an option"). This section is replaced by one for all requests when the gate lands.
+  - **One gate for every request (2026-10-29, Droidtop/tracker#751 slice 2).** `SiteGate` and `SiteClearanceStore`
+    (`:net-core`, `dev.droidtop.net.sitecheck`) are the mechanism for the requests droidtop makes, and `Http.request` goes
+    through the installed gate (`SiteGates.current`): the host's clearance (cookies, merged with the request's own, and the
+    web view's user agent, which the clearance is bound to) goes on the request; an answer that is a check
+    (`SiteCheck.isChallenge`; `Http.Response` now keeps `cf-mitigated`) is dealt with once, and the request is made once
+    more. **Order:** the browser's own try first (`SiteSolver`, up to 15 s, nothing clicked), the person only if that does not
+    pass (`SiteAsker`, in place when the request is theirs and droidtop is in front, else behind a notice).
+    **One check per site:** requests to a host queue behind one; the ones that waited find the clearance the first
+    earned and do not ask again, and a clearance the site refused is forgotten when the first request that sent it
+    reaches the front. **A check nobody passes** fails the request with `SiteCheckRequired` (the site named), and is
+    remembered for five minutes so a burst asks once; a request the person started (`SiteGate.asUser`) asks again at once.
+    A pass the site refuses again is forgotten and not retried in a loop. **One store for all of droidtop**, in a file, per
+    site with the date and the one user agent: Settings > Privacy lists it with Forget (UI lane, a later slice); a plugin's
+    account cookies stay in its vault. Built and tested (queueing, one check for eight concurrent requests, two sites
+    independent, the pending time, the forget-and-do-not-loop rule) but not installed: nothing sets `SiteGates.current`
+    yet, so no request changes until the next slices install it with the plugins' path moved onto it, the hidden web view
+    as the solver, and the person's ask and notice.
   - **Passed by the person** in droidtop's web view (`PluginWebAccount`, mode `CHECK`), on the site the check was met at, for a plugin with or without `web.session`. The view closes by itself once the pass is real (the owner, 2026-10-24: "Can we have it autoclose when we detect the cloudflare pass?"): the view shows the site's own page, its title no longer a check's ("Just a moment…", "Attention Required! | Cloudflare", DDoS-Guard's), and the site holds a pass cookie for it (`cf_clearance`, DDoS-Guard's `__ddg2_`). Never on a timer or the first page, and never on `__cf_bm` alone, which Cloudflare sets on the challenge itself; a clearance still good from before passes at once. Done ends it too. A source's search and a view page offer it as before ("The site checks the browser first", Open the site, then ask again); a game's update page starts with "Open <source> to pass its check", and pressing a download there opens the check first.
   - **The web view is itself.** It sends its own user agent, never one kept from before: a check compares the user agent with the engine running it, and a kept one from an older WebView made the check come back again and again, which is the F95zone sign-in loop.
   - **The clearance is reused.** The site's clearance cookies (`cf_clearance`, `__cf*`, `cf_chl*`, `__ddg*`; never an account's cookie) and the web view's user agent are kept for that plugin (its vault, `@web.clearance`) and added to its requests to that site and its subdomains, `net.request` and `web.session fetch` alike; the views droidtop opens for the plugin start with them. A sign-in or an opened link that passes a check keeps its clearance too, so signing in through a check is one visit: the person passes the check and signs in on the same page.
