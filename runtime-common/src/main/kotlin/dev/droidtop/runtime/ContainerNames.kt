@@ -92,6 +92,19 @@ class ContainerNames(private val file: File) {
         }
 
         /**
+         * What a copy of [source] is called before anyone renames it (Droidtop/tracker#757): "Debian copy", numbered
+         * when that is taken ("Debian copy 2"), cut so it stays within [MAX_LENGTH].
+         */
+        fun copyName(source: String, others: Collection<String>): String {
+            val taken = others.map { it.lowercase() }.toSet()
+            fun named(suffix: String) = source.take(MAX_LENGTH - suffix.length).trimEnd() + suffix
+            if (named(" copy").lowercase() !in taken) return named(" copy")
+            var n = 2
+            while (named(" copy $n").lowercase() in taken) n++
+            return named(" copy $n")
+        }
+
+        /**
          * Why [name] cannot be used, or null when it can: not empty, at
          * most [MAX_LENGTH] characters, one line, and not another
          * container's name ([others], compared ignoring case).

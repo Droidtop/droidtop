@@ -250,6 +250,21 @@ interface ContainerRuntime {
         error(dataBackupUnavailableReason ?: "not supported")
 
     /**
+     * Why this backend cannot copy a container; null when it can (Droidtop/tracker#757). Like backup, only the
+     * proot backend's plain rootfs directory is copied here; droidspaces' rootfs is an image mounted as root.
+     */
+    val cloneUnavailableReason: String?
+        get() = "Only the non-root desktop can copy a container yet"
+
+    /**
+     * A new sibling named [name] holding a copy of [container]'s filesystem and its settings (image, run settings,
+     * home and folders, sockets), made while [container] is stopped. The copy is a container of its own from then on:
+     * nothing in one reaches the other.
+     */
+    suspend fun clone(container: Container, name: String): Container =
+        error(cloneUnavailableReason ?: "not supported")
+
+    /**
      * How [container]'s image says its own program runs (Entrypoint, Cmd, Env, WorkingDir, User), kept from
      * when it was created (docs/SPEC.md 3, "The image's own program"); null for a container made before this
      * was kept, or a backend that does not keep it.

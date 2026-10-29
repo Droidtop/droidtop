@@ -358,6 +358,36 @@ class ProotRuntime(
         log.line("restored ${container.id}")
     }
 
+    override val cloneUnavailableReason: String? = null
+
+    override suspend fun clone(container: Container, name: String): Container {
+        val existing = listContainers()
+        val source = existing.firstOrNull { it.container.id == container.id } ?: error("${container.id} no longer exists")
+        // The desktop's own carries the desktop's provisioning and session; a second one is not a sibling.
+        check(source.container.role == ContainerRole.SIBLING) { "the desktop's own container is not copied" }
+        check(!source.running) { "${source.displayName} is running: stop it to copy it" }
+        val chosen = name.trim()
+        ContainerNames.problemWith(chosen, existing.map { it.displayName })?.let { error(it) }
+        val id = "droidtop-sibling-${UUID.randomUUID().toString().take(8)}"
+        log.line("copying ${container.id} as $id")
+        withContext(Dispatchers.IO) {
+            try {
+                check(containerDir(id).mkdirs()) { "could not make a place for the copy" }
+                ContainerArchive.copy(rootfsOf(container.id), rootfsOf(id), backupLog())
+                // Its image, sockets, run settings, home and folders: what makes it the same container.
+                for (file in listOf(::configOf, ::runConfigOf, ::mountsFile)) {
+                    file(container.id).takeIf { it.isFile }?.copyTo(file(id))
+                }
+                names.set(id, chosen)
+            } catch (e: Throwable) {
+                TreeDelete.delete(containerDir(id), containersDir)
+                throw e
+            }
+        }
+        log.line("copied ${container.id} as $id")
+        return Container(id = id, role = ContainerRole.SIBLING, backend = backend, rootfsPath = rootfsOf(id).absolutePath)
+    }
+
     /** Where tar's own complaints go, read back into the error the person sees. */
     private fun backupLog(): File = File(context.cacheDir, "container-backup.log")
 

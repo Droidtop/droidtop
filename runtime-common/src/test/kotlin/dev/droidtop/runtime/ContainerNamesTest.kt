@@ -50,4 +50,13 @@ class ContainerNamesTest {
         names.remove("a")
         assertNull(names.get("a"))
     }
+
+    @Test
+    fun `a copy is named after its container, numbered when taken, and fits`() {
+        assertEquals("Debian copy", ContainerNames.copyName("Debian", listOf("Debian")))
+        assertEquals("Debian copy 2", ContainerNames.copyName("Debian", listOf("Debian", "debian COPY")))
+        val long = ContainerNames.copyName("x".repeat(ContainerNames.MAX_LENGTH), emptyList())
+        assertEquals(ContainerNames.MAX_LENGTH, long.length)
+        assertNull(ContainerNames.problemWith(long, emptyList()))
+    }
 }

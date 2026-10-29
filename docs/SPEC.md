@@ -3323,6 +3323,24 @@ the `ContainerRuntime` interface that already exists (§3):
   outside the rootfs and stay. Proot backend only: the droidspaces rootfs is
   an image mounted as root, which shows "not available here". Scheduled or
   incremental backups are later, once the manual path is proven.
+  **Copy (Droidtop/tracker#757, #750 part 1).** A sibling's page has a Copy
+  group: a Name, defaulting to "<name> copy" and numbered when that is taken
+  (`ContainerNames.copyName`), and "Make a copy". The container must be
+  stopped, as for Delete and Backup.
+  - **What is copied.** `ContainerRuntime.clone` copies the tree through
+    the backup's own tar, piped straight from export into import
+    (`ContainerArchive.copy`), so it keeps what a backup keeps and needs no
+    room for an archive in between. It also copies the container's
+    settings: its image and digest, sockets, the image's run settings, and
+    its home and folders. droidtop's run settings for its program come too
+    (`ContainerClone`).
+  - **What is not copied:** its exports to the desktop's menus and
+    terminal, start with the desktop, pods and networks. The copy is a new
+    container, and those are the person's choice for it.
+  - **Failure:** a copy that fails part-way is deleted whole.
+  - **Scope:** the desktop's own container is not copied, since a second
+    one would not be a sibling. Proot backend only, as backup is;
+    droidspaces shows why on the row (`cloneUnavailableReason`).
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend

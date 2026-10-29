@@ -68,6 +68,31 @@ internal object ContainerArchive {
     }
 
     /**
+     * Copies [rootfs] into [into], which must not exist yet: [export] piped straight into [import], so the copy keeps
+     * what a backup keeps (symlinks, modes, empty directories) and needs no room for an archive in between
+     * (Droidtop/tracker#757, Clone).
+     */
+    fun copy(rootfs: File, into: File, errorLog: File) {
+        val reader = java.io.PipedInputStream(1 shl 16)
+        val writer = java.io.PipedOutputStream(reader)
+        var exportFailure: Throwable? = null
+        val exporter = Thread({
+            try {
+                writer.use { export(rootfs, it, File(errorLog.path + ".export")) }
+            } catch (t: Throwable) {
+                exportFailure = t
+            }
+        }, "container-copy")
+        exporter.start()
+        try {
+            reader.use { import(it, into, errorLog) }
+        } finally {
+            exporter.join()
+        }
+        exportFailure?.let { throw it }
+    }
+
+    /**
      * What stops toybox tar finishing over a proot rootfs, all of it found
      * in one walk of [dir] (Droidtop/tracker#81; rig, emulator, the whole
      * message of tar's stderr):

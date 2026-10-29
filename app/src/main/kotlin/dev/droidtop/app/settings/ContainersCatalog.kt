@@ -414,6 +414,10 @@ object ContainersCatalog {
             groups += CatalogGroup(id = "commands", title = "Commands in the desktop's terminal", items = commandItems(context, info))
         }
         groups += CatalogGroup(id = "backup", title = "Backup", items = backupItems(runtime, info, running))
+        if (info.container.role == ContainerRole.SIBLING) {
+            val others = runCatching { runtime.listContainers() }.getOrDefault(emptyList()).map { it.displayName }
+            groups += CatalogGroup(id = "copy", title = "Copy", items = copyItems(runtime, info, running, others))
+        }
         groups += CatalogGroup(id = "delete", title = null, items = listOf(deleteItem(info, runtime, running)))
         return groups
     }
@@ -909,6 +913,50 @@ object ContainersCatalog {
                 // On the desktop, where it is; this row does not switch modes (Droidtop/tracker#639).
                 "Opened on the desktop. Switch to Desktop to use it."
             },
+        )
+    }
+
+    // ---- copy (Droidtop/tracker#757) ----
+
+    /** The name typed for a container's copy (by container id), until the copy is made. */
+    private val copyNames = ConcurrentHashMap<String, String>()
+
+    /** Make a copy: a new container with this one's files and settings, made while it is stopped, as Delete is. */
+    private fun copyItems(runtime: ContainerRuntime, info: ContainerInfo, running: Boolean, others: List<String>): List<CatalogItem> {
+        runtime.cloneUnavailableReason?.let {
+            return listOf(ActionItem(id = "container_copy", title = "Make a copy", subtitle = it))
+        }
+        if (running) {
+            return listOf(ActionItem(id = "container_copy", title = "Make a copy", subtitle = "Running: stop it to copy it"))
+        }
+        val id = info.container.id
+        val name = copyNames[id] ?: ContainerNames.copyName(info.displayName, others)
+        return listOf(
+            TextInputItem(
+                id = "container_copy_name",
+                title = "Name",
+                subtitle = "What the copy is called; you can rename it later",
+                value = name,
+                onChange = { _, value ->
+                    val typed = value.trim()
+                    if (typed.isEmpty()) {
+                        copyNames.remove(id)
+                    } else {
+                        copyNames[id] = typed
+                    }
+                },
+            ),
+            AsyncActionItem(
+                id = "container_copy",
+                title = "Make a copy",
+                subtitle = "\"$name\" with everything installed in ${info.displayName}, its home and folders",
+                run = { ctx, onStatus ->
+                    onStatus("Copying ${info.displayName}...")
+                    dev.droidtop.app.ContainerClone.clone(ctx, runtime, info, name)
+                    copyNames.remove(id)
+                    "Made \"$name\". It is in Containers."
+                },
+            ),
         )
     }
 
