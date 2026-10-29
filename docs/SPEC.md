@@ -17181,7 +17181,11 @@ tall at least. The shell is laid out on one canvas, the console's landscape 1280
 type size and spacing was tuned at (`ProvideShellCanvas`, `canvasDensity`, decided 2026-10-29 with the owner: "We need
 responsive design and intelligent scaling", and "Phones can have controllers. Can't we look at device-reported display
 information?"). It reads the display alone, never what input is attached: a window whose short side is under 720dp at
-Android's density is drawn at the density that makes its short side 720dp, in either orientation. The pixels do not
+Android's density is drawn at the density that makes its short side 720dp, in either orientation, but never denser
+than 250 dp to the inch of the panel the display reports (Android's density stands in when it reports no believable
+dpi), so a small sharp panel stays legible. Each window works this out from its own display, so the main screen and a
+companion screen are scaled separately, and each will take its own Interface size adjustment (Settings > Displays,
+Auto and 75 to 150 percent, layout and text together; owner, 2026-10-29: "Sounds good"). The pixels do not
 change, only how many a dp is: a Retroid Pocket 5's 5.5" 1080p panel reports 360dpi (2.25 pixels a dp, 853x480dp), so
 it and a 1080p phone are drawn at 1.5, as the 1080p DP screen is, and show the same layout and proportions instead of
 1.5 times the text and spacing. A window already at the canvas keeps its own density. Touch targets do not shrink with

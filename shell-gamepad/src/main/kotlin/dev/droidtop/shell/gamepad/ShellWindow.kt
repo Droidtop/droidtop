@@ -293,8 +293,18 @@ val LocalShellWindow = staticCompositionLocalOf {
 const val CANVAS_SHORT_SIDE_DP = 720
 
 /**
- * The density a window [widthDp] by [heightDp] at [density] lays the shell out at: the one that makes its short side
- * [CANVAS_SHORT_SIDE_DP], never above Android's own. It reads the display alone, never what input is attached (owner,
+ * The smallest a dp may be on a panel, as a fraction of an inch: 1/250. Android's own reference is 1/160; this lets the
+ * canvas draw denser than that, and no denser, so text on a small, sharp panel stays legible.
+ */
+const val MIN_DP_INCHES = 1f / 250f
+
+/**
+ * The density a window [widthDp] by [heightDp] at [density], on a panel that reports [xdpi] pixels per inch, lays the
+ * shell out at: the one that makes its short side [CANVAS_SHORT_SIDE_DP], bounded by the display's own report. Never
+ * above Android's density, so a big screen is not blown up; never below [MIN_DP_INCHES] of the reported panel, so a
+ * small sharp one is not shrunk past legible. A display that reports no believable dpi (outside 80 to 1000) is taken
+ * at Android's density as its physical one. Each window works this out from its own display, so the main screen and a
+ * companion screen are scaled separately. It reads the display alone, never what input is attached (owner,
  * 2026-10-29: "Phones can have controllers. Can't we look at device-reported display information?"). The pixels do not
  * change, only how many of them a dp is: a Retroid Pocket 5's 5.5" 1080p panel reports 360dpi, so Android counts a dp
  * as 2.25 pixels and gives the shell 853x480dp, where the 1080p DP screen counts 1.5 and gives 1280x720dp. Drawn at 1.5
@@ -304,9 +314,11 @@ const val CANVAS_SHORT_SIDE_DP = 720
  * own density, so a big screen is never shrunk below Android's size. Touch targets do not shrink with it:
  * [touchTargetDp] sizes them from the panel's own reported dpi. Pure.
  */
-fun canvasDensity(density: Float, widthDp: Int, heightDp: Int): Float {
+fun canvasDensity(density: Float, widthDp: Int, heightDp: Int, xdpi: Float): Float {
     val shortSidePx = minOf(widthDp, heightDp) * density
-    return minOf(density, shortSidePx / CANVAS_SHORT_SIDE_DP)
+    val panelDpi = if (xdpi in 80f..1000f) xdpi else density * 160f
+    val floor = minOf(density, panelDpi * MIN_DP_INCHES)
+    return (shortSidePx / CANVAS_SHORT_SIDE_DP).coerceIn(floor, density)
 }
 
 /** A finger's target, 48dp at Android's reference 160dpi: 0.3 inch, about 7.6 mm. */
@@ -338,7 +350,7 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
     val xdpi = LocalContext.current.resources.displayMetrics.xdpi
-    val target = canvasDensity(density.density, configuration.screenWidthDp, configuration.screenHeightDp)
+    val target = canvasDensity(density.density, configuration.screenWidthDp, configuration.screenHeightDp, xdpi)
     if (target >= density.density * 0.99f) {
         CompositionLocalProvider(
             LocalTouchTarget provides touchTargetDp(xdpi, density.density, density.density).dp,

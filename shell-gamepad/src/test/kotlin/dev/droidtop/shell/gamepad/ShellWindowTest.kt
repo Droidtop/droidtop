@@ -47,17 +47,21 @@ class ShellWindowTest {
 
     @Test
     fun `a Retroid Pocket 5 panel lays out at the 1080p canvas`() {
-        // 1080x1920 at 360dpi, landscape: 853x480dp at 2.25, drawn at 1.5 so it is 1280x720dp like the DP screen.
-        assertEquals(1.5f, canvasDensity(2.25f, 853, 480), 0.001f)
+        // 1080x1920 at 360dpi on a panel reporting 300 ppi: 853x480dp at 2.25, drawn at 1.5 (1280x720dp).
+        assertEquals(1.5f, canvasDensity(2.25f, 853, 480, xdpi = 300f), 0.001f)
         // Held upright, the same.
-        assertEquals(1.5f, canvasDensity(2.25f, 480, 853), 0.001f)
+        assertEquals(1.5f, canvasDensity(2.25f, 480, 853, xdpi = 300f), 0.001f)
+        // The same pixels on a sharper 401 ppi panel stop at the legibility floor, 401/250.
+        assertEquals(1.604f, canvasDensity(2.25f, 853, 480, xdpi = 401f), 0.001f)
+        // No believable dpi: Android's 2.25 stands for the panel (360/250 = 1.44), so the canvas's 1.5 holds.
+        assertEquals(1.5f, canvasDensity(2.25f, 853, 480, xdpi = 0f), 0.001f)
     }
 
     @Test
     fun `a window already at the canvas keeps its own density`() {
         // The 1080p DP screen at 1.5x, and a 4K television at 2x (1920x1080dp).
-        assertEquals(1.5f, canvasDensity(1.5f, 1280, 720), 0.001f)
-        assertEquals(2f, canvasDensity(2f, 1920, 1080), 0.001f)
+        assertEquals(1.5f, canvasDensity(1.5f, 1280, 720, xdpi = 92f), 0.001f)
+        assertEquals(2f, canvasDensity(2f, 1920, 1080, xdpi = 80f), 0.001f)
     }
 
     @Test
