@@ -171,7 +171,7 @@ object ContainerLayout {
      * clocks and file times inside the desktop are local time rather than
      * a stock image's UTC.
      */
-    fun clientEnvironment(waylandSocketName: String?, audioShared: Boolean = true): Map<String, String> = buildMap {
+    fun clientEnvironment(waylandSocketName: String?, audioShared: Boolean = true, swaySocketName: String? = null): Map<String, String> = buildMap {
         put("XDG_RUNTIME_DIR", SOCKET_DIR)
         put("TZ", posixTimeZone(ZoneId.systemDefault()))
         put("XDG_DATA_DIRS", "/usr/local/share:/usr/share:${ContainerLauncher.DATA_DIR}")
@@ -185,6 +185,10 @@ object ContainerLayout {
         // listens there, which to a program is the same as no CUPS.
         put("CUPS_SERVER", "$SOCKET_DIR/$CUPS_SOCKET")
         waylandSocketName?.let { put("WAYLAND_DISPLAY", it) }
+        // sway's IPC socket ([findSwayIpcSocket]), so `swaymsg` works from any program droidtop starts, as from
+        // the ones sway starts itself (console 2026-10-29: "Unable to retrieve socket path" in Foot). It is in the
+        // same shared folder as the Wayland socket, so it is passed with it and nothing more is reached.
+        swaySocketName?.let { put("SWAYSOCK", "$SOCKET_DIR/$it") }
         // droidtop's Docker Engine API (docs/SPEC.md 3d, D14): a docker client a container installed talks to
         // droidtop's engine. With the desktop down nothing listens, which to a client is the same as no daemon.
         put("DOCKER_HOST", DockerApi.DOCKER_HOST)

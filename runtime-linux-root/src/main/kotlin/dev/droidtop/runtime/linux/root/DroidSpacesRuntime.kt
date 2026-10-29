@@ -358,14 +358,12 @@ class DroidSpacesRuntime(
             }
             name
         }
-        val waylandSocketName = if (readSockets(container.id).waylandShared) {
-            ContainerLayout.findWaylandSocket(socketsDir)?.name
-        } else {
-            null
-        }
+        val waylandShared = readSockets(container.id).waylandShared
+        val waylandSocketName = if (waylandShared) ContainerLayout.findWaylandSocket(socketsDir)?.name else null
+        val swaySocketName = if (waylandShared) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
         // Same reasoning as writeConfig: PULSE_SERVER is droidspaces' own
         // to set, not ContainerLayout's.
-        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false) + env +
+        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false, swaySocketName = swaySocketName) + env +
             (switchTo?.let { mapOf(ContainerUser.SWITCH_ENV to it) } ?: emptyMap())
         val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }

@@ -2054,7 +2054,10 @@ process of it is alive, which is what the container manager shows.
 **One layout, both backends** (`ContainerLayout`, `runtime-common`): the
 host socket directory at `/run/droidtop-sockets` (`XDG_RUNTIME_DIR`), the
 app's storage at `/run/droidtop-app-storage`, `WAYLAND_DISPLAY` set to the
-compositor's own socket name for every client, and the PRIMARY's boot
+compositor's own socket name for every client, `SWAYSOCK` set to sway's
+IPC socket beside it when the container shares the Wayland socket (so
+`swaymsg` works from programs droidtop starts, not only from sway's own;
+console 2026-10-29), and the PRIMARY's boot
 script. The socket is found in the socket directory, never assumed: sway
 deliberately skips `wayland-0` (`sway/server.c` starts at `wayland-1`), and
 every compositor names its own. The script provisions

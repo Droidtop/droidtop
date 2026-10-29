@@ -47,6 +47,9 @@ class ContainerLayoutTest {
         assertEquals(ContainerLayout.SOCKET_DIR, env["XDG_RUNTIME_DIR"])
         assertEquals("wayland-1", env["WAYLAND_DISPLAY"])
         assertEquals(null, ContainerLayout.clientEnvironment(null)["WAYLAND_DISPLAY"])
+        // sway's IPC socket goes with the Wayland one (console 2026-10-29: swaymsg in Foot found no socket).
+        assertEquals("/run/droidtop-sockets/sway-ipc.0.12.sock", ContainerLayout.clientEnvironment("wayland-1", swaySocketName = "sway-ipc.0.12.sock")["SWAYSOCK"])
+        assertEquals(null, ContainerLayout.clientEnvironment("wayland-1")["SWAYSOCK"])
     }
 
     @Test

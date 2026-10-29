@@ -553,7 +553,8 @@ class ProotRuntime(
         }
         val guestEnvironment = LinkedHashMap<String, String>().apply {
             putAll(baseGuestEnvironment)
-            putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared))
+            val swaySocketName = if (sessionSockets.waylandShared) ContainerLayout.findSwayIpcSocket(socketsDir)?.name else null
+            putAll(ContainerLayout.clientEnvironment(waylandSocketName, sessionSockets.audioShared, swaySocketName))
             putAll(env)
             putAll(marker)
         }
