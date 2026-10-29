@@ -68,7 +68,14 @@ class ContainedFilesRigTest {
                         require(File(dir, "a.txt").readText() == "hello") { "read back differs" }
                     }
                     check("list") {
-                        require(app.filesDir.list()?.contains("rig") == true) { "filesDir lists ${app.filesDir.list()?.toList()}" }
+                        // Which half fails, when one does: opening the folder (File.list answers null) or reading it.
+                        val opened = runCatching {
+                            android.system.Os.open(app.filesDir.path, android.system.OsConstants.O_RDONLY or android.system.OsConstants.O_DIRECTORY, 0)
+                        }
+                        opened.getOrNull()?.let { android.system.Os.close(it) }
+                        require(app.filesDir.list()?.contains("rig") == true) {
+                            "filesDir lists ${app.filesDir.list()?.toList()}; opening it: ${opened.exceptionOrNull()?.message ?: "ok"}"
+                        }
                         require(dir.listFiles()?.any { it.name == "a.txt" } == true) { "rig lists ${dir.list()?.toList()}" }
                     }
                     check("chmod") {
@@ -91,6 +98,8 @@ class ContainedFilesRigTest {
                 }
                 "quota" -> {
                     dir.mkdirs()
+                    // The file "existing" opens below, made while there is room: each test starts from an empty folder.
+                    check("before") { File(dir, "a.txt").writeText("hello") }
                     val limit = call.args.getLong("limit")
                     check("efbig") {
                         val failed = runCatching { RandomAccessFile(File(dir, "big0"), "rw").use { it.setLength(limit + 1) } }.isFailure
