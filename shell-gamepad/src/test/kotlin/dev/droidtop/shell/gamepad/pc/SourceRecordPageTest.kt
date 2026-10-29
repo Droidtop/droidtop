@@ -135,7 +135,7 @@ class SourceRecordPageTest {
 
     @Test
     fun aReleaseInPartsIsOneRowThatCountsItsParts() {
-        val gb = 1024L * 1024 * 1024
+        val gb = 1_000_000_000L // ValueFormat counts decimal gigabytes
         val parts = (1..4).map { UpdateSources.Download.Part("Part $it", "https://mega.nz/$it", null, 3 * gb) }
         val split = UpdateSources.Download("Win", "MEGA", "MEGA", "", parts = parts)
         assertEquals("4 parts, 12.0 GB", partsLine(split))
