@@ -70,6 +70,32 @@ class MappingEngineTest {
     }
 
     @Test
+    fun `one held button can shift several sources at once`() {
+        // The desktop's chords (Droidtop/tracker#383): L2 puts both the face buttons and the D-pad on chord groups.
+        val layout = ControllerLayout.parse(
+            """
+            "controller_mappings" {
+              ${group(0, "trigger", input("click", press("Full_Press", "mode_shift button_diamond 1", "mode_shift dpad 2")))}
+              ${group(1, "four_buttons", input("button_a", press("Full_Press", "key_press LEFT_CONTROL", "key_press C")))}
+              ${group(2, "dpad", input("dpad_north", press("Full_Press", "key_press UP_ARROW")))}
+              "preset" { "id" "0" "name" "Default" "group_source_bindings" {
+                "0" "left_trigger active" "1" "button_diamond active modeshift" "2" "dpad active modeshift" } }
+            }
+            """.trimIndent(),
+        )
+        val e = MappingEngine(layout)
+        assertEquals(null, e.groupOn("button_diamond"))
+        e.press("left_trigger", "click", 0)
+        assertEquals(1, e.groupOn("button_diamond")!!.id)
+        assertEquals(2, e.groupOn("dpad")!!.id)
+        assertEquals(listOf(Output.KeyDown("LEFT_CONTROL"), Output.KeyDown("C")), e.press("button_diamond", "button_a", 10))
+        assertEquals(listOf(Output.KeyUp("C"), Output.KeyUp("LEFT_CONTROL")), e.release("button_diamond", "button_a", 20))
+        e.release("left_trigger", "click", 30)
+        assertEquals(null, e.groupOn("button_diamond"))
+        assertEquals(null, e.groupOn("dpad"))
+    }
+
+    @Test
     fun `changing preset lets go of what the old one held`() {
         val e = engine()
         e.press("button_diamond", "button_a", 0)

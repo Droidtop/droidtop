@@ -57,8 +57,8 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
     var presetId: Int = presetId ?: layout.presets.firstOrNull()?.id ?: 0
         private set
 
-    /** Held mode shifts: the source and the group the holder put on it. */
-    private val shifts = LinkedHashMap<Physical, Pair<String, Int>>()
+    /** Held mode shifts: for each holder, every source it shifts and the group it put there (one button may shift several). */
+    private val shifts = LinkedHashMap<Physical, MutableList<Pair<String, Int>>>()
 
     /** Each held physical input: what it pressed, and how it began. */
     private class Held(val since: Long, val activators: List<ControllerLayout.Activator>) {
@@ -186,7 +186,7 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
 
     /** The group on [source] now: a held mode shift's, else the active preset's. */
     fun groupOn(source: String): ControllerLayout.Group? {
-        shifts.values.lastOrNull { it.first.equals(source, true) }?.let { return layout.group(it.second) }
+        shifts.values.flatten().lastOrNull { it.first.equals(source, true) }?.let { return layout.group(it.second) }
         val preset = layout.presets.firstOrNull { it.id == presetId } ?: return null
         val binding = preset.sources.firstOrNull { it.source.equals(source, true) && it.active && !it.modeShift } ?: return null
         return layout.group(binding.groupId)
@@ -199,7 +199,7 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
             is Binding.XinputButton -> out += Output.PadDown(binding.button)
             is Binding.GameAction -> out += Output.ActionDown(binding.set, binding.action)
             is Binding.MouseWheel -> out += Output.Wheel(binding.direction)
-            is Binding.ModeShift -> shifts[physical] = binding.source to binding.groupId
+            is Binding.ModeShift -> shifts.getOrPut(physical) { ArrayList() } += binding.source to binding.groupId
             is Binding.ControllerAction -> changePreset(binding, out)
             is Binding.Other -> Unit
         }
