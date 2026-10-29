@@ -17,12 +17,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,6 +45,8 @@ import coil3.compose.AsyncImage
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.ProgressLook
+import dev.droidtop.shell.gamepad.ShellLoading
 import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
@@ -203,7 +203,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 fetchStatus?.let { status ->
                     Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
                         if (fetchRunning) {
-                            CircularProgressIndicator(color = MenuTokens.OnSurfaceMuted, modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                            ShellLoading(Modifier.width(ProgressLook.InlineLoadingWidth))
                             androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
                         }
                         Text(status, color = MenuTokens.OnSurfaceMuted)
@@ -228,7 +228,7 @@ fun ThemeBrowserScreen(onDismiss: () -> Unit) {
                 ) {
                     if (fetchRunning) {
                         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                            CircularProgressIndicator(color = MenuTokens.OnSurfaceMuted, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            ShellLoading(Modifier.width(ProgressLook.InlineLoadingWidth))
                             androidx.compose.foundation.layout.Spacer(Modifier.width(8.dp))
                             Text(fetchStatus ?: "Fetching the theme list…", color = MenuTokens.OnSurfaceMuted)
                         }

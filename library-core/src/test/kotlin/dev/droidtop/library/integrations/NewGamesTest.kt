@@ -74,5 +74,9 @@ class NewGamesTest {
         val featured = NewGames.Featured("F95zone", listOf(find("New Game")))
         assertEquals(false, NewGames.Loaded(listOf(featured), emptyList(), emptyList(), sources = 1).empty)
         assertEquals(true, NewGames.Loaded(emptyList(), emptyList(), emptyList(), sources = 1).empty)
+        // Sources that all failed are "could not reach", not "nothing new"; no source at all is neither.
+        assertEquals(true, NewGames.Loaded(emptyList(), emptyList(), emptyList(), sources = 2, answered = 0).unreachable)
+        assertEquals(false, NewGames.Loaded(emptyList(), emptyList(), emptyList(), sources = 2, answered = 1).unreachable)
+        assertEquals(false, NewGames.Loaded(emptyList(), emptyList(), emptyList(), sources = 0, answered = 0).unreachable)
     }
 }

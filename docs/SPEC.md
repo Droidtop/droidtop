@@ -24357,8 +24357,10 @@ without its runtime said "Running". Decisions:
     (else their developer) asked of every source, the games the library already has left out, six at most each.
     Picking one opens the search on its title, where getting it works as it always does.
   - With **no source**, it says so and offers Plugins, where sources are added; with sources that found nothing
-    (no featured list, no update, no answer), it says that and points at the search. The Search row shows at once;
-    the rest joins as the sources answer. It is not a row of the left menu (owner, the same day: "THe "get new games" menu needs to be
+    (no featured list, no update, no answer), it says that and points at the search. When not one source answered
+    (each failed or ran out of time) it says "Could not reach your sources" with **Try again**, rather than "nothing
+    new" (Droidtop/tracker#671). The Search row shows at once; under it "Asking your sources…" with the shell's
+    loading bar, and the rest joins as the sources answer. It is not a row of the left menu (owner, the same day: "THe "get new games" menu needs to be
   UNDER Updates. The left menu is growing really large, we need to review that"; the review is #621). Kid and Kiosk
   hide it with Updates. Outside Gaming the row opens Gaming on the search, the only place it is drawn, and is left
   out when Gaming is switched off. The "Get games" rows of the game menu,

@@ -34,7 +34,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -1456,8 +1455,8 @@ private fun GamepadShellBody(
                         // longer has anything to do with whether Apps is ready, and
                         // vice versa.
                         (shownSection == GamingSection.GAMES || shownSection == GamingSection.PC_GAMES || shownSection == GamingSection.HOME) &&
-                            (gameEntries == null || foldedGameEntries == null) -> CircularProgressIndicator(color = MenuTokens.OnSurface)
-                        shownSection == GamingSection.APPS && appEntries == null -> CircularProgressIndicator(color = MenuTokens.OnSurface)
+                            (gameEntries == null || foldedGameEntries == null) -> ShellLoading()
+                        shownSection == GamingSection.APPS && appEntries == null -> ShellLoading()
                         else -> when (shownSection) {
                             // Retro Games: the console systems, themed.
                             // Every PC and engine game is on the PC Games
@@ -3711,7 +3710,7 @@ private fun AppsSection(
     val list = shown
     if (list == null || !queryLoaded) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MenuTokens.OnSurface)
+            ShellLoading()
         }
         return
     }

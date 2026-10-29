@@ -20,7 +20,9 @@ what it learned last.
 - Ship no unbound controls, no empty states without a next action, no status shown
   without its reason.
 - Status is shown, not read: a job's state is its bar's motion (one `JobProgress` everywhere), and text explains on
-  demand; no figure on a row changes with every report (owner, 2026-10-24, Droidtop/tracker#643).
+  demand; no figure on a row changes with every report (owner, 2026-10-24, Droidtop/tracker#643). Waiting with no
+  measure (a list being built, a source being asked) is that bar's checking shimmer (`ShellLoading`), never a stock
+  spinner (Droidtop/tracker#671). The one ring is Home's Downloads button, a job's progress drawn in a 32 dp button.
 
 ## Layout
 - Never a single narrow centred column with large margins; content fills the window

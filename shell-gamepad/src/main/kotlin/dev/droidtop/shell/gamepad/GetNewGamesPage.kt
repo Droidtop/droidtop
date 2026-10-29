@@ -3,6 +3,7 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -34,7 +35,12 @@ internal fun GetNewGamesPage(entries: List<LibraryEntry>, onOpenUpdates: () -> U
     val context = LocalContext.current
     // Null while the sources are asked; the page is drawn again when the answer arrives.
     val loaded = remember { MutableStateFlow<NewGames.Loaded?>(null) }
-    LaunchedEffect(entries) { loaded.value = NewGames.load(context, entries) }
+    // Try again asks once more: the list goes back to asking, then to the answer.
+    var attempt by remember { mutableIntStateOf(0) }
+    LaunchedEffect(entries, attempt) {
+        loaded.value = null
+        loaded.value = NewGames.load(context, entries)
+    }
     // The search over the sources: null while it is closed; its text, and whether the person chose to type.
     var search by remember { mutableStateOf<Pair<String, Boolean>?>(null) }
     val screen = remember(entries) {
@@ -42,7 +48,9 @@ internal fun GetNewGamesPage(entries: List<LibraryEntry>, onOpenUpdates: () -> U
             id = "get_new_games",
             title = GetGamesEntry.NEW_GAMES,
             subtitle = "From the sources you have, for the games you play",
-            groups = { _ -> newGamesGroups(loaded.value, onSearch = { text, typing -> search = text to typing }, onOpenUpdates) },
+            groups = { _ ->
+                newGamesGroups(loaded.value, onSearch = { text, typing -> search = text to typing }, onOpenUpdates, onRetry = { attempt++ })
+            },
             live = loaded,
         )
     }
@@ -54,6 +62,7 @@ private fun newGamesGroups(
     loaded: NewGames.Loaded?,
     onSearch: (text: String, typing: Boolean) -> Unit,
     onOpenUpdates: () -> Unit,
+    onRetry: () -> Unit,
 ): List<CatalogGroup> = buildList {
     add(
         CatalogGroup(
@@ -71,8 +80,21 @@ private fun newGamesGroups(
         ),
     )
     if (loaded == null) {
-        add(CatalogGroup(id = "new_games_asking", title = null, items = listOf(TextBlockItem(id = "new_games_asking_text", text = "Asking your sources…"))))
+        add(CatalogGroup(id = "new_games_asking", title = null, items = listOf(TextBlockItem(id = "new_games_asking_text", text = "Asking your sources…", busy = true))))
         return@buildList
+    }
+    // Not one source answered (all failed or ran out of time): say so and offer to ask again, rather than "nothing new".
+    if (loaded.unreachable) {
+        add(
+            CatalogGroup(
+                id = "new_games_unreachable",
+                title = null,
+                items = listOf(
+                    TextBlockItem(id = "new_games_unreachable_text", text = "Could not reach your sources. Check the connection, then try again."),
+                    ActionItem(id = "new_games_retry", title = "Try again", run = { onRetry() }),
+                ),
+            ),
+        )
     }
     // What each source features now (docs/plugin-api.md 1.8 "featured"), under the source's name.
     loaded.featured.forEachIndexed { index, featured ->
@@ -144,7 +166,7 @@ private fun newGamesGroups(
                 ),
             ),
         )
-        loaded.empty -> add(
+        loaded.empty && !loaded.unreachable -> add(
             CatalogGroup(
                 id = "new_games_nothing",
                 title = null,

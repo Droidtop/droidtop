@@ -209,6 +209,10 @@ object SettingsLayout {
  */
 object ProgressLook {
     val Height: Dp = 4.dp
+
+    /** How wide the shell's loading bar is ([ShellLoading]): where a page waits on its content, and beside a line saying what runs. */
+    val LoadingWidth: Dp = 160.dp
+    val InlineLoadingWidth: Dp = 40.dp
 }
 
 /**

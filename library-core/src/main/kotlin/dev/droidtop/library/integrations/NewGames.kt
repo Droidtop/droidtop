@@ -38,9 +38,19 @@ object NewGames {
     data class Featured(val sourceLabel: String, val finds: List<Find>)
 
     /** What the page shows: what the sources feature, the person's games with a newer version, and the lists the sources answered. */
-    data class Loaded(val featured: List<Featured>, val updates: List<LibraryEntry>, val shelves: List<Shelf>, val sources: Int) {
+    data class Loaded(
+        val featured: List<Featured>,
+        val updates: List<LibraryEntry>,
+        val shelves: List<Shelf>,
+        val sources: Int,
+        /** How many of the [sources] gave any answer, even an empty one, rather than failing or running out of time. */
+        val answered: Int = sources,
+    ) {
         /** Nothing to show from the sources or the library: the page says so, under Search. */
         val empty: Boolean get() = featured.isEmpty() && updates.isEmpty() && shelves.isEmpty()
+
+        /** There are sources and not one of them answered: the page says it could not reach them, with Try again. */
+        val unreachable: Boolean get() = sources > 0 && answered == 0
     }
 
     /** The person's games a source names a newer version of, by title. Pure. */
@@ -80,23 +90,25 @@ object NewGames {
         val sources = GameSources.plugins(context)
         val asks = asks(entries)
         if (sources.isEmpty()) return@withContext Loaded(emptyList(), updates(entries), emptyList(), 0)
+        // Which sources answered at all (an empty list counts), to tell "nothing new" from "could not reach them".
+        val answered = java.util.concurrent.ConcurrentHashMap.newKeySet<Int>()
         coroutineScope {
             // Each source's own list, in the order the sources are listed; a source without one features nothing.
-            val featured = sources.map { source ->
+            val featured = sources.mapIndexed { at, source ->
                 async {
                     val finds = withTimeoutOrNull(PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS) {
                         source.featured(context, null, FEATURED).getOrNull()
-                    }.orEmpty().map { Find(source.label, it) }
+                    }?.also { answered.add(at) }.orEmpty().map { Find(source.label, it) }
                     Featured(source.label, fresh(finds, entries, FEATURED))
                 }
             }
             val shelves = asks.map { ask ->
                 async {
-                    val finds = sources.map { source ->
+                    val finds = sources.mapIndexed { at, source ->
                         async {
                             withTimeoutOrNull(PluginSearchAggregator.PER_SOURCE_TIMEOUT_MS) {
                                 source.search(context, ask.query, null).getOrNull()
-                            }.orEmpty().map { Find(source.label, it) }
+                            }?.also { answered.add(at) }.orEmpty().map { Find(source.label, it) }
                         }
                     }.awaitAll().flatten()
                     Shelf(ask, fresh(finds, entries))
@@ -107,6 +119,7 @@ object NewGames {
                 updates(entries),
                 shelves.awaitAll().filter { it.finds.isNotEmpty() },
                 sources.size,
+                answered.size,
             )
         }
     }

@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,6 +60,7 @@ import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.GamingSection
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
+import dev.droidtop.shell.gamepad.ShellLoading
 import dev.droidtop.shell.gamepad.rise
 import dev.droidtop.shell.gamepad.OwnShoulders
 import dev.droidtop.shell.gamepad.StatusClusterRoom
@@ -1150,7 +1150,7 @@ internal fun PcGamesSection(
             )
             when {
                 games == null -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = MenuTokens.OnSurface)
+                    ShellLoading()
                 }
                 onTiles -> PcCollectionsView(
                     groups = collectionGroupList,

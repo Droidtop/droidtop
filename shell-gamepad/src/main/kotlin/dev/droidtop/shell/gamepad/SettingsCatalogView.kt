@@ -1664,6 +1664,7 @@ private fun TextBlockRow(block: TextBlockItem, selected: Boolean, onShown: () ->
             Text(block.title, color = MenuTokens.OnSurface, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyLarge)
         }
         Text(block.text, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyMedium)
+        if (block.busy) ShellLoading(Modifier.padding(top = Space.Sm).width(ProgressLook.LoadingWidth))
     }
 }
 

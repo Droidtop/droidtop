@@ -829,6 +829,16 @@ internal fun ShellProgressBar(
     dev.droidtop.ui.shared.JobProgress(fraction, look, shellJobColors(), modifier, height = ProgressLook.Height)
 }
 
+/**
+ * The shell's one loading indicator (Droidtop/tracker#671): [ShellProgressBar]'s checking shimmer, for something
+ * under way with no measure (a list being built, a source being asked). Every waiting place draws this, never a
+ * stock spinner; [modifier] may give another width ([ProgressLook.InlineLoadingWidth] beside a line of text).
+ */
+@Composable
+internal fun ShellLoading(modifier: Modifier = Modifier.width(ProgressLook.LoadingWidth)) {
+    ShellProgressBar(-1f, modifier)
+}
+
 /** Gaming's colours for a job's bar and mark. */
 @Composable
 internal fun shellJobColors(): dev.droidtop.ui.shared.JobProgressColors {

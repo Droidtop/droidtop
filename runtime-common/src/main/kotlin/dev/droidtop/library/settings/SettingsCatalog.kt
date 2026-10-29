@@ -255,6 +255,8 @@ class TextBlockItem(
     override val title: String = "",
     val gate: String? = null,
     val last: Boolean = false,
+    /** Something runs while this is shown ("Asking your sources…"): the renderer draws its loading indicator under the text. */
+    val busy: Boolean = false,
 ) : CatalogItem {
     override val subtitle: String? get() = null
 }
