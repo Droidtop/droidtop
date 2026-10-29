@@ -10,6 +10,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import dev.droidtop.runtime.tasks.TaskManager
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -80,6 +81,24 @@ object Capture {
         if (bytes == null || bytes.isEmpty()) return@withContext Shot(null, "Android did not take the screenshot")
         val uri = save(context, name, bytes) ?: return@withContext Shot(null, "Could not save the screenshot")
         Shot(uri, "Saved to Pictures/Screenshots")
+    }
+
+    /** How long a screenshot from a menu over the game waits for the menu to close (Droidtop/tracker#626). */
+    const val AFTER_MENU_MS = 700L
+
+    private val later = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
+
+    /**
+     * A screenshot of [displayId] taken [afterMs] from now, for a control drawn over the game that closes first (the
+     * Quick Menu's Screenshot, Droidtop/tracker#626): the shot shows the game, not the menu. [done] gets the result,
+     * on a background thread.
+     */
+    fun takeSoon(context: Context, displayId: Int, afterMs: Long = AFTER_MENU_MS, done: (Shot) -> Unit) {
+        val app = context.applicationContext
+        later.launch {
+            kotlinx.coroutines.delay(afterMs)
+            done(take(app, displayId))
+        }
     }
 
     /** Saves [bytes] as Pictures/Screenshots/[name] (MediaStore on Android 10 and later, else droidtop's own folder). */

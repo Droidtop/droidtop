@@ -998,6 +998,23 @@ private fun GameTab(
                 add(ending(GameEnding.QUIT, "Quit", null, restart = false))
             }
             add(ending(GameEnding.RESTART, "Restart", null, restart = true))
+            // One press during play (Droidtop/tracker#626): the menu closes first so the shot is of the game, on the
+            // screen the game runs on; the line says where it went.
+            if (dev.droidtop.library.settings.ControlAccess.shows(uiMode, dev.droidtop.library.settings.ControlRow.GAME_SCREENSHOT)) {
+                add(
+                    GameQuickTile(
+                        title = "Screenshot",
+                        subtitle = "Closes this menu and saves a picture of the game",
+                        action = {
+                            onDismiss()
+                            val display = dev.droidtop.library.LaunchDisplay.parkedDisplayId ?: android.view.Display.DEFAULT_DISPLAY
+                            dev.droidtop.runtime.Capture.takeSoon(gameContext, display) { shot ->
+                                dev.droidtop.library.settings.Notices.flash(shot.message, context = gameContext.applicationContext)
+                            }
+                        },
+                    ),
+                )
+            }
         }
     }
     // The Stop pill in the header (DroidDeck's red Stop, Steam's destructive red): ending the game
