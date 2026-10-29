@@ -20845,6 +20845,16 @@ the lint report) and then filtered down to the vendored paths before being
 committed -- it is never hand-written, and it never grows to cover our own
 code.
 
+**Lint beyond the minSdk question (Droidtop/tracker#734, 2026-10-29).** The review that opened #734 said the 111
+baselined findings hide real minSdk crashes in droidtop's code. They do not: all 111 are in the vendored trees above
+(`wm_shared` 100 in source and 3 in resources, `msdllib` 3, `shared` resources 3, the Winlator runtime 2), and none is
+in code droidtop writes, which stays out of the baseline as this section says. What the gate did not ask is the rest of
+lint's catalogue. `ContentDescription` (a control a screen reader cannot name) and `UnsafeIntentLaunch` (an exported
+component that starts the Intent it is given) are on as warnings, so the gate does not fail on code nobody has
+looked at; the Lint summary step of `android-checks.yml` prints what they find (`scripts/lint-summary.py`), and each
+becomes an error, with a baseline of what is accepted, in the commit that clears or accepts its findings. Compose's
+own checks are the next question and are not on yet.
+
 **Update check (droidtop and enginehost APKs).** On a schedule the user
 sets -- never, every day, every week or every month (day is the default)
 -- at process start, the app downloads that one small file unauthenticated

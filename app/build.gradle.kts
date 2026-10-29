@@ -191,6 +191,13 @@ android {
      */
     lint {
         checkOnly += listOf("NewApi", "InlinedApi")
+        // Droidtop/tracker#734: two more questions, asked as warnings first so that the gate does not fail on code
+        // nobody has looked at yet. ContentDescription is a control a screen reader cannot name, UnsafeIntentLaunch an
+        // exported component that starts whatever Intent it is handed. .github/workflows/android-checks.yml prints
+        // what they find (scripts/lint-summary.py); each becomes an error, with a baseline for what is accepted, in
+        // the commit that clears or accepts its findings.
+        checkOnly += listOf("ContentDescription", "UnsafeIntentLaunch")
+        warning += listOf("ContentDescription", "UnsafeIntentLaunch")
         checkDependencies = true
         abortOnError = true
         warningsAsErrors = false

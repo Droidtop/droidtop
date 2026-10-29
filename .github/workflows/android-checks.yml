@@ -92,6 +92,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: ./gradlew :app:lintDebug --stacktrace
 
+      - name: Lint summary
+        # The lint report is an artifact; this is what it holds, as lines a log can show (Droidtop/tracker#734):
+        # the findings per id and source tree, and where the ones in code droidtop writes are.
+        if: ${{ !cancelled() }}
+        run: python3 -I scripts/lint-summary.py app/build/reports/lint-results-debug.xml
+
       - name: One Compose version across modules
         # A module compiled against another Compose than the app ships dies at runtime with NoSuchMethodError
         # (Droidtop/tracker#566: the plugin page's FlowRow). The root build's checkComposeVersions compares every
