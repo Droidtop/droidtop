@@ -40,6 +40,32 @@ internal class EpicManager(
         val country: String?,
     )
 
+    // Custom Attributes from the payload.
+    data class EpicCustomAttributes(
+        val canRunOffline: Boolean = false,
+        val ownershipToken: Boolean = false,
+        val cloudSaveFolder: String? = null,
+        val cloudIncludeList: String? = null,
+        val neverUpdate: Boolean = false,
+        val folderName: String? = null,
+        val presenceId: String? = null,
+        val monitorPresence: Boolean = false,
+        val useAccessControl: Boolean = false,
+        val canSkipKoreanIdVerification: Boolean = true,
+        val partnerLinkType: String? = null, // Ubisoft
+        val thirdPartyManagedProvider: String? = null, // UbisoftConnect
+        val thirdPartyManagedApp: String? = null, // The EA App | Origin
+        val partnerLinkId: String? = null,
+        val backgroundProcessName: String? = null,
+        val registryPath: String? = null,
+        val registryLocation: String? = null,
+        val registryKey: String? = null,
+        val additionalCommandline: String? = null,
+        val processNames: String? = null,
+        val gameId: String? = null,
+        val executableName: String? = null,
+    )
+
     /**
      * Refresh the entire library (called manually by user or after login)
      * Fetches all games from Epic via Legendary and updates the database
