@@ -3,6 +3,8 @@ package dev.droidtop.shell.gamepad.pc
 import dev.droidtop.shell.gamepad.Corners
 import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -21,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GameNaming
@@ -39,6 +42,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.droidtop.shell.gamepad.ShellDialog
+import dev.droidtop.shell.gamepad.ShellProgressBar
 
 /**
  * The offer droidtop stops on before a store install or update
@@ -202,6 +206,7 @@ internal fun StoreInstallOfferSheet(
                         text = "${folder.name} · ${formatSize(folder.freeBytes)} free$marker",
                         selected = selected == index,
                         action = { pick(index) },
+                        used = usedFraction(folder),
                     )
                 }
             }
@@ -225,15 +230,14 @@ internal fun StoreInstallOfferSheet(
  * One row of the offer: a button, the way [dev.droidtop.shell.gamepad.WindowsSetupOfferDialog]'s
  * rows are, at least as big as a finger on a screen without a pad. A tap
  * presses the row's own action; the pad's cursor answers the same press.
+ * A folder's row also draws how full its partition is ([used], show, then
+ * say: Droidtop/tracker#738) under its words, which keep saying the free
+ * space; the bar is a drawing only, so a screen reader hears the words once.
  */
 @Composable
-private fun volumeRow(text: String, selected: Boolean, action: () -> Unit) {
+private fun volumeRow(text: String, selected: Boolean, action: () -> Unit, used: Float? = null) {
     val window = LocalShellWindow.current
-    Text(
-        text,
-        color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
-        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        style = MaterialTheme.typography.bodyLarge,
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
@@ -241,5 +245,22 @@ private fun volumeRow(text: String, selected: Boolean, action: () -> Unit) {
             .selectionFrame(selected, Corners.Crisp, rest = Color.Transparent)
             .padRow(onClick = action)
             .padding(horizontal = 14.dp, vertical = 10.dp),
-    )
+    ) {
+        Text(
+            text,
+            color = if (selected) MenuTokens.OnSurface else MenuTokens.Value,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            style = MaterialTheme.typography.bodyLarge,
+        )
+        if (used != null) {
+            Box(Modifier.fillMaxWidth().padding(top = 6.dp).clearAndSetSemantics { }) {
+                ShellProgressBar(fraction = used, modifier = Modifier.fillMaxWidth())
+            }
+        }
+    }
 }
+
+/** How full [volume]'s partition is, 0 to 1; null when it reports no size. */
+internal fun usedFraction(volume: InstallVolume): Float? =
+    if (volume.totalBytes <= 0L) null
+    else ((volume.totalBytes - volume.freeBytes.coerceIn(0L, volume.totalBytes)).toDouble() / volume.totalBytes).toFloat()

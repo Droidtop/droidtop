@@ -17781,8 +17781,9 @@ a flip that A does not do. Sign-in and sync are glyphs beside their words (`Stat
 SYNCED and OFFLINE, each its own shape: a circle with a check, a crossed-out person, a cloud with a check, a crossed-out
 cloud): the stores' rows, the GitHub account row, the download sites' rows (an expired sign-in is ATTENTION), and the
 PC game page's Cloud saves row (`cloudSavesMark`: syncing turns, offline, a failed sync waits for the person, synced).
-A capsule's state badge is its glyph, the word its accessible label (7i). The rest of the shell moves one surface at
-a time.
+A capsule's state badge is its glyph, the word its accessible label (7i). Free space is a bar: the store install
+offer's game folder rows draw how full each partition is under their "free" words (`usedFraction`), as the companion's
+Storage card does; the bar is a drawing only, so a screen reader hears the words once.
 
 **Colour.** One source per surface family, and the families are named so a screen cannot pick
 the wrong one. The shell's palette (`MenuTokens`) is absolute against its own grounds, so any
