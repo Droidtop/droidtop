@@ -35,6 +35,16 @@ class NoticeDialogsTest {
     }
 
     @Test
+    fun `waiting for a host ends when one attaches, and gives up without one`() = runBlocking {
+        assertFalse(NoticeDialogs.awaitHost(50))
+        val waiting = async { NoticeDialogs.awaitHost(5_000) }
+        yield()
+        attach()
+        assertTrue(waiting.await())
+        assertTrue(NoticeDialogs.awaitHost(0))
+    }
+
+    @Test
     fun `the last host attached draws, and its answer comes back`() = runBlocking {
         val first = attach()
         val second = attach()

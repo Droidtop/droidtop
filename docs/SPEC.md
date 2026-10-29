@@ -2055,7 +2055,15 @@ in the mode they land in, through the one confirm (`NoticeDialogs.confirm`,
 7k): "Keep it running" or "Stop it". The desktop runs until the answer, the
 answer is stored as the Settings switch (which counts as an answer itself),
 and Stop, a dismissal or no surface to ask on stops it as before, unless the
-person is back in Desktop by then. The rule is `DesktopSetupPrefs.leaveAction`,
+person is back in Desktop by then. The offer waits up to five seconds for a
+surface: Desktop has no dialog host and the mode switched to attaches its own
+only once it composes, so asking at once was answered Cancel unseen, stopped
+the desktop and was stored as the answer (rig, Android 13, v0.2.0-dev.2398:
+no question, sway gone). No surface stops the desktop without storing
+anything, and the answer lives under a new key
+(`droidtop_desktop_keep_running_chosen`), so a choice stored by that bug is
+not one: the coordinator asked on 2026-10-29 to "make sure the offer appears
+whenever the choice was never made in this build's terms". The rule is `DesktopSetupPrefs.leaveAction`,
 tested), when Desktop mode is switched off (`ModePiece.DESKTOP_SESSION`,
 through `ModeStartup`), when the PRIMARY is stopped in Containers, and
 from the notification's Stop. Ending it stops the PRIMARY with everything

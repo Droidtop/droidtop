@@ -21,7 +21,12 @@ object DesktopSetupPrefs {
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
     private const val KEY_PANEL = "droidtop_desktop_panel"
     private const val KEY_KEEP_RUNNING = "droidtop_desktop_keep_running"
-    private const val KEY_KEEP_RUNNING_ANSWERED = "droidtop_desktop_keep_running_answered"
+    /**
+     * Whether the person chose. Not "droidtop_desktop_keep_running_answered": up to 0.2.0-dev.2398 the offer, asked
+     * before any surface could show it, stored an instant Cancel under that key as an answer nobody gave
+     * (Droidtop/tracker#389), so it is ignored and everyone is asked once more.
+     */
+    private const val KEY_KEEP_RUNNING_ANSWERED = "droidtop_desktop_keep_running_chosen"
 
     /**
      * Whether leaving Desktop for another mode keeps the desktop running in

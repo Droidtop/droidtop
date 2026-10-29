@@ -4,6 +4,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 
 /**
@@ -56,6 +57,14 @@ object NoticeDialogs {
     fun attachHost(token: Any) = hosts.update { it - token + token }
 
     fun detachHost(token: Any) = hosts.update { it - token }
+
+    /**
+     * Waits up to [timeoutMs] for a surface to attach; true once one is. For a question asked during a switch, when
+     * the screen just left has no host and the one arriving attaches only once it composes (Droidtop/tracker#389:
+     * the keep-running offer was answered Cancel before Gaming could draw it).
+     */
+    suspend fun awaitHost(timeoutMs: Long): Boolean =
+        kotlinx.coroutines.withTimeoutOrNull(timeoutMs) { hosts.first { it.isNotEmpty() } } != null
 
     /** Asks the danger question; suspends until it is answered. Cancel when no surface can ask. */
     suspend fun confirmDanger(confirm: DangerConfirm): ConfirmAnswer =

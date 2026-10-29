@@ -563,6 +563,13 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     private fun offerKeepRunning() {
         if (keepRunningOffer?.isActive == true) return
         keepRunningOffer = lifecycleScope.launch {
+            // The mode just switched to attaches its dialog host once it composes, and Desktop has none, so asking
+            // at once came back Cancel unseen, stopped the desktop and was stored as the person's answer (rig 2398,
+            // Droidtop/tracker#389). Wait for the host; with none, stop as before and keep the question for next time.
+            if (!dev.droidtop.library.settings.NoticeDialogs.awaitHost(KEEP_RUNNING_HOST_WAIT_MS)) {
+                if (mode != Mode.DESKTOP) DesktopSessionService.stop(this@MainActivity)
+                return@launch
+            }
             val answer = dev.droidtop.library.settings.NoticeDialogs.confirm(
                 dev.droidtop.library.settings.Notice(
                     tone = dev.droidtop.library.settings.NoticeTone.Info,
@@ -993,6 +1000,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     }
 
     private companion object {
+        /** How long the keep-running offer waits for the mode switched to to be able to ask. */
+        const val KEEP_RUNNING_HOST_WAIT_MS = 5_000L
+
         /** The shell instance created last; an older one still alive is the one a relocation left behind. */
         var live: java.lang.ref.WeakReference<MainActivity>? = null
     }
