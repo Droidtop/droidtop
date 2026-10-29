@@ -142,10 +142,10 @@ object RomScanWalk {
     fun walk(
         systemFolder: File,
         extensions: Set<String>? = null,
-        newBudget: () -> dev.droidtop.library.ScanBudget? = { null },
         // File names (lower case) that are never games wherever they sit: the BIOS images the database knows, which
         // carry a system's own ROM extension (Droidtop/tracker#665). A BIOS folder is already skipped by name.
         notGames: Set<String> = BiosDatabase.fileNames,
+        newBudget: () -> dev.droidtop.library.ScanBudget? = { null },
     ): RomScanResult {
         val files = mutableListOf<File>()
         val skipped = mutableListOf<Pair<File, String>>()
