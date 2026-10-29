@@ -418,7 +418,10 @@ nothing else of this section exists:
   view, not into the compositor (§5b), and an emulator is an Android
   Activity (the section below). A Windows program as a window INSIDE the
   container's desktop is Wine-in-the-container, §11's open risk, and no
-  launch path assumes it. Placing a window on another output would apply
+  launch path assumes it. So Start's Windows rows say "Opens fullscreen over
+  the desktop" under each name (Droidtop/tracker#698): the heading alone
+  promised a window. Once running, the game is on the bar beside the
+  container's windows (#352). Placing a window on another output would apply
   to container windows and compositor outputs, not to Activities, and is
   not built (§4c "Per-window placement").
   A PC or engine game's tap takes Gaming's primary-action rule, and its

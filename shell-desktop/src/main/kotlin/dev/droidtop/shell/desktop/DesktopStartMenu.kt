@@ -294,8 +294,12 @@ internal fun StartMenu(
             )
         } else {
             StartSection.entries.forEach { section ->
+                // A Wine shortcut is a fullscreen Activity over the desktop, not a window on it: Wine draws into its own
+                // X server view, and a Windows program as a desktop window waits on Wine in the container (SPEC 2b,
+                // §11). The row says so, so the Windows heading does not promise a window (Droidtop/tracker#698).
+                val subtitle = if (section == StartSection.WINDOWS) OPENS_FULLSCREEN else null
                 sections[section].orEmpty().forEach { item ->
-                    out.add(rowFor(targetOf(item.entry, item.label), key = "entry:" + item.entry.id, section = section.title, art = true))
+                    out.add(rowFor(targetOf(item.entry, item.label), key = "entry:" + item.entry.id, section = section.title, subtitle = subtitle, art = true))
                 }
             }
         }
@@ -403,3 +407,6 @@ internal fun StartMenu(
         )
     }
 }
+
+/** What a Windows row in Start says about how it opens (Droidtop/tracker#698). */
+private const val OPENS_FULLSCREEN = "Opens fullscreen over the desktop"
