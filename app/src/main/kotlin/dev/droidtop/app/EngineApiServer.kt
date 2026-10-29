@@ -16,6 +16,7 @@ import dev.droidtop.runtime.EngineHttp
 import dev.droidtop.runtime.EngineIds
 import dev.droidtop.runtime.LibpodApi
 import dev.droidtop.runtime.OciImageStore
+import dev.droidtop.runtime.util.runCatchingCancellable
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
@@ -162,7 +163,7 @@ internal object EngineApiServer {
                 } catch (e: java.io.IOException) {
                     return
                 }
-                val response = runCatching { answer(app, request) }.getOrElse {
+                val response = runCatchingCancellable { answer(app, request) }.getOrElse {
                     Log.w(TAG, "${request.method} ${request.path} failed", it)
                     DockerApi.error(500, it.message ?: it.javaClass.simpleName)
                 }
@@ -173,7 +174,7 @@ internal object EngineApiServer {
                 }.onFailure { return }
                 // A streamed body (attach) is written as it comes, until it ends or the client goes.
                 response.stream?.let { stream ->
-                    runCatching { stream(output) }
+                    runCatchingCancellable { stream(output) }
                     // End the stream for the client as well as closing: a relay into the container (the socket its
                     // docker reaches) passes the end on when the writing half is shut, and the client waits for that
                     // end before it reads the exit (`docker run --rm` hung there, rig, build 2011).
@@ -188,6 +189,14 @@ internal object EngineApiServer {
         }
     }
 
+    /** The engine features droidtop recorded, or null when probing them failed (logged once here). */
+    private suspend fun features(app: Context): dev.droidtop.runtime.EngineFeatures? =
+        runCatchingCancellable { EngineFeatureProbe.current(app) }.onFailure { Log.w(TAG, "engine features", it) }.getOrNull()
+
+    /** [runtime]'s containers; none with no session, or when listing them failed (logged once here). */
+    private suspend fun containers(runtime: dev.droidtop.runtime.ContainerRuntime?): List<ContainerInfo> =
+        runtime?.let { live -> runCatchingCancellable { live.listContainers() }.onFailure { Log.w(TAG, "list containers", it) }.getOrNull() }.orEmpty()
+
     /** What [request] asks, answered from droidtop's own state. */
     private suspend fun answer(app: Context, request: EngineHttp.Request): EngineHttp.Response {
         // A libpod path is read by LibpodApi into the same calls, and answered in its version's shapes.
@@ -198,7 +207,7 @@ internal object EngineApiServer {
             DockerApi.Call.Ping -> EngineHttp.Response.text(200, "OK")
             DockerApi.Call.Version -> EngineHttp.Response.json(200, libpod?.let { LibpodApi.version(it, arch(), kernel()) } ?: DockerApi.version(arch(), kernel()))
             DockerApi.Call.Info -> {
-                val containers = runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty()
+                val containers = containers(runtime)
                 val memory = ActivityManager.MemoryInfo().also { app.getSystemService(ActivityManager::class.java)?.getMemoryInfo(it) }
                 val facts = DockerApi.InfoFacts(
                     containers = containers.size,
@@ -208,7 +217,7 @@ internal object EngineApiServer {
                     kernel = kernel(),
                     cpus = Runtime.getRuntime().availableProcessors(),
                     memoryBytes = memory.totalMem,
-                    features = runCatching { EngineFeatureProbe.current(app) }.getOrNull(),
+                    features = features(app),
                 )
                 EngineHttp.Response.json(200, libpod?.let { LibpodApi.info(facts, it) } ?: DockerApi.info(facts))
             }
@@ -236,7 +245,7 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.Create -> {
                 runtime ?: return DockerApi.error(500, "the desktop is not running")
-                val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
+                val features = features(app)
                 val networks = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
                 val body = String(request.body, Charsets.UTF_8)
                 val (create, refused) = if (libpod != null) LibpodApi.createRequest(body, features, networks)
@@ -327,7 +336,7 @@ internal object EngineApiServer {
                     if (call.condition == "removed") {
                         val giveUp = System.currentTimeMillis() + REMOVED_WAIT_MS
                         while (System.currentTimeMillis() < giveUp &&
-                            runCatching { runtime?.listContainers() }.getOrNull().orEmpty().any { it.container.id == id }
+                            containers(runtime).any { it.container.id == id }
                         ) {
                             delay(WAIT_LOOK_MS)
                         }
@@ -360,7 +369,7 @@ internal object EngineApiServer {
             }
             is DockerApi.Call.NetworkCreate -> EngineActions.networksLock.withLock {
                 val existing = withContext(Dispatchers.IO) { ContainerNetworks.read(app.filesDir) }
-                val features = runCatching { EngineFeatureProbe.current(app) }.getOrNull()
+                val features = features(app)
                 val body = String(request.body, Charsets.UTF_8)
                 if (libpod == null) {
                     val (network, refused) = DockerApi.networkRequest(body, existing, features)
@@ -422,7 +431,7 @@ internal object EngineApiServer {
                 val run: suspend () -> dev.droidtop.runtime.ContainerExecResult? = {
                     try {
                         if (runtime.siblingsNeedStart && !info.running) runtime.start(info.container)
-                        runCatching {
+                        runCatchingCancellable {
                             runtime.exec(
                                 info.container,
                                 dev.droidtop.runtime.ContainerEnter.directCommand(exec.spec.command),
@@ -470,7 +479,7 @@ internal object EngineApiServer {
                 EngineHttp.Response.json(200, DockerApi.execInspect(call.execId, EngineIds.of(exec.containerId), exec.spec, exec.running, exec.exitCode))
             }
             DockerApi.Call.PodCreate -> {
-                val (name, labels, refused) = LibpodApi.podRequest(String(request.body, Charsets.UTF_8), runCatching { EngineFeatureProbe.current(app) }.getOrNull())
+                val (name, labels, refused) = LibpodApi.podRequest(String(request.body, Charsets.UTF_8), features(app))
                 refused?.let { return it }
                 EngineActions.makePod(app, name, labels).fold(
                     onSuccess = { EngineHttp.Response.json(201, LibpodApi.podCreated(it.id)) },
@@ -656,7 +665,7 @@ internal object EngineApiServer {
 
     /** Every container's name by its id, for a network's members; empty with the desktop down. */
     private suspend fun containerNames(runtime: dev.droidtop.runtime.ContainerRuntime?): Map<String, String> =
-        runtime?.let { runCatching { it.listContainers() }.getOrNull() }.orEmpty().associate { it.container.id to it.displayName }
+        containers(runtime).associate { it.container.id to it.displayName }
 
     /** [block] with the running desktop's runtime and the container [ref] names; 500 or 404 otherwise. */
     private suspend fun withContainer(

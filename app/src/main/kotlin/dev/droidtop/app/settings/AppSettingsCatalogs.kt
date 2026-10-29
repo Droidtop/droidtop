@@ -2562,7 +2562,7 @@ object AppSettingsCatalogs {
         /** Runs a page action that waits on dialogs or the network off the button, then says what happened. */
         fun later(action: suspend (Context) -> String?) {
             noticeScope.launch {
-                val said = runCatching { action(app) }.getOrElse { it.message ?: "That did not work" }
+                val said = dev.droidtop.runtime.util.runCatchingCancellable { action(app) }.getOrElse { it.message ?: "That did not work" }
                 said?.let { Notices.flash(it, source = m.label, context = app) }
                 pluginsChanged(app)
             }
