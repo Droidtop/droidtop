@@ -72,17 +72,13 @@ internal object HltbClient {
             foundPath = null
             return ScrapeLookup.Refused(SOURCE, 0, listOf(note, why).filter { it.isNotBlank() }.joinToString("; "))
         }
-        val answer = send(
-            BASE + path,
-            "POST",
-            mapOf(
-                "content-type" to "application/json",
-                "x-auth-token" to auth.token,
-                "x-hp-key" to auth.key,
-                "x-hp-val" to auth.value,
-            ),
-            payload(title, auth).toByteArray(Charsets.UTF_8),
-        )
+        var answer = post(path, title, auth)
+        if (answer.status == 403) {
+            // A token the site no longer takes (it expires): one new token and one more try, no more.
+            val (fresh, freshWhy) = token(path)
+            if (fresh == null) return ScrapeLookup.Refused(SOURCE, 0, "the search answered HTTP 403 and a new token failed: $freshWhy")
+            answer = post(path, title, fresh)
+        }
         return if (answer.status == 200) {
             ScrapeLookup.Found(parseResults(answer.text()))
         } else {
@@ -90,14 +86,45 @@ internal object HltbClient {
         }
     }
 
+    /** The search, with the token in `x-auth-token` and its key and value as headers and in the body. */
+    private fun post(path: String, title: String, auth: Auth): Http.Response = send(
+        BASE + path,
+        "POST",
+        mapOf(
+            "content-type" to "application/json",
+            "x-auth-token" to auth.token,
+            "x-hp-key" to auth.key,
+            "x-hp-val" to auth.value,
+        ),
+        payload(title, auth).toByteArray(Charsets.UTF_8),
+    )
+
     /** The token, or why there is none: the address asked and what it answered, for the row and the log. */
     private fun token(path: String): Pair<Auth?, String> {
         val address = path.trimEnd('/') + "/init"
+        // As the page's own script asks it: ?t=<epoch ms>, with the site's Referer (and Origin) that send() adds.
         val answer = send(BASE + address + "?t=" + System.currentTimeMillis(), "GET", emptyMap(), null)
-        val auth = if (answer.status != 200) null else parseToken(answer.text())
-        val why = if (auth != null) "" else if (answer.status != 200) "$address answered HTTP ${answer.status}" else "$address gave no token"
-        if (auth == null) android.util.Log.w("droidtop.Scraper", "$SOURCE search token: $why")
-        return auth to why
+        val body = answer.text()
+        val auth = if (answer.status != 200) null else parseToken(body)
+        if (auth != null) return auth to ""
+        val why = tokenFailure(address, answer.status, body)
+        android.util.Log.w("droidtop.Scraper", "$SOURCE search token: $why")
+        return null to why
+    }
+
+    /**
+     * Pure, for the JVM tests: why a token request gave none, with its HTTP status always in it. A refusal carries the
+     * server's own sentence (bounded and with markup stripped); a 200 that holds no token names the fields it did hold,
+     * never their values.
+     */
+    fun tokenFailure(address: String, status: Int, body: String): String {
+        if (status != 200) {
+            val said = ScrapeRefusals.summarizeErrorBody(body.take(512), emptyList())
+            return "$address answered HTTP $status" + (said?.let { ": $it" } ?: "")
+        }
+        val fields = runCatching { JSONObject(body).keys().asSequence().toList() }.getOrNull()
+        return "$address answered HTTP 200 but gave no token (" +
+            (if (fields == null) "not JSON" else "fields: " + fields.joinToString().ifEmpty { "none" }) + ")"
     }
 
     /**
@@ -319,7 +346,7 @@ object HowLongToBeat {
      * row instead, because a log line is not always read.
      */
     internal fun refusalMessage(httpStatus: Int, reason: String? = null): String =
-        if (httpStatus > 0) "HowLongToBeat did not answer the search (HTTP $httpStatus)"
+        if (httpStatus > 0) "HowLongToBeat did not answer the search (HTTP $httpStatus" + (reason?.takeIf { it.isNotBlank() }?.let { ": ${it.take(120)}" } ?: "") + ")"
         else "HowLongToBeat did not give a way to search" + (reason?.takeIf { it.isNotBlank() }?.let { " (${it.take(160)})" } ?: "")
 
     private fun failed(file: File, now: Long, message: String): HltbResult {

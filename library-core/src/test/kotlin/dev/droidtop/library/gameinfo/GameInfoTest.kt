@@ -126,8 +126,20 @@ class GameInfoTest {
     }
 
     @Test
+    fun `a token that did not come says its status, the server's own words or the fields it did send`() {
+        assertEquals("api/search/site/init answered HTTP 403: Access Denied", HltbClient.tokenFailure("api/search/site/init", 403, """{"error":"Access Denied"}"""))
+        assertEquals("api/search/site/init answered HTTP 500", HltbClient.tokenFailure("api/search/site/init", 500, ""))
+        assertEquals(
+            "api/search/site/init answered HTTP 200 but gave no token (fields: tok)",
+            HltbClient.tokenFailure("api/search/site/init", 200, """{"tok":"secretvalue"}"""),
+        )
+        assertEquals("api/search/site/init answered HTTP 200 but gave no token (not JSON)", HltbClient.tokenFailure("api/search/site/init", 200, "<html>"))
+    }
+
+    @Test
     fun `a failure with no status does not show a number`() {
         assertEquals("HowLongToBeat did not answer the search (HTTP 403)", HowLongToBeat.refusalMessage(403))
+        assertEquals("HowLongToBeat did not answer the search (HTTP 403: Access Denied)", HowLongToBeat.refusalMessage(403, "Access Denied"))
         assertEquals("HowLongToBeat did not give a way to search", HowLongToBeat.refusalMessage(0))
         assertEquals(
             "HowLongToBeat did not give a way to search (api/search/site/init answered HTTP 404)",

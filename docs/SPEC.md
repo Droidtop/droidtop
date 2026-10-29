@@ -15229,10 +15229,12 @@ own page also asks two kinds of public source about the game, once when the page
   `fetch("/api/...", {method: "POST"})` in them is listed, and the search is the first whose path names a search (`s`,
   `search`, `find`, `finder`, `lookup`, `query`) and nothing else (`error`, `user`, `logout`, `login` and the like are
   skipped: the site's bundle posts its error reports before it posts the search), read across the scripts until one
-  holds it. `api/s/` is tried only when none does. The token is then asked of `<search path>/init`, as the library asks
-  it. A failure with no HTTP status (no way to the search, or no token) reads "did not give a way to search" with what
-  failed in brackets (the address and its answer, or the POSTs the scripts held), in the row and not only in the log,
-  never "HTTP 0". The
+  holds it. `api/s/` is tried only when none does. The token is then asked of `<search path>/init?t=<epoch ms>` with the
+  site's Referer and Origin on it, as the page's own script asks it (the site answers 403 `{"error":"Access Denied"}`
+  without them). The search carries the token as `x-auth-token`; a 403 from the search gets one new token and one more
+  try. A failure with no HTTP status (no way to the search, or no token) reads "did not give a way to search" with what
+  failed in brackets (the address and its HTTP status with the server's own sentence, a 200 that held no token with the
+  names of the fields it did hold, or the POSTs the scripts held), in the row and not only in the log, never "HTTP 0". The
   answer is accepted only when a title or alias normalises to the library's title (the first, most popular such game);
   a title with the same words and numbers in another order is offered as "Closest match: X" and says so. Cached per
   title: a game found for thirty days, "not on HowLongToBeat" for a week, a failure for an hour. If the site changes the
