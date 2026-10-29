@@ -485,7 +485,7 @@ private fun BoxScope.DesktopViewport(
                             height: Int,
                         ) {
                             val metrics = context.resources.displayMetrics
-                            val scale = DesktopScale.resolve(DesktopPrefs.scale(context), metrics.xdpi, metrics.densityDpi)
+                            val scale = DesktopScale.resolve(DesktopPrefs.scale(context), metrics.densityDpi)
                             // Below full resolution the output is asked for fewer pixels than the view
                             // has and SurfaceFlinger scales the buffer up (Droidtop/tracker#426); the
                             // scale shrinks with it so the layout keeps its size.

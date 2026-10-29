@@ -9,11 +9,15 @@ import kotlin.math.roundToInt
  * nothing is lost to it; only text and controls grow.
  *
  * The person picks it in Desktop settings ([KEY]); [AUTOMATIC], the
- * default, follows the screen's physical density: one logical pixel per
- * 1/200 inch, rounded to a quarter and never below 1. That is 2 on the
- * Retroid Pocket 5 (5.5 inches, 1920x1080, about 400 dpi), and 1 on a
- * desktop monitor (a 24 inch 1080p one is about 92 dpi), where a laptop's
- * desktop would sit.
+ * default, follows Android's own density for the screen
+ * (`DisplayMetrics.densityDpi`, what Android's UI is scaled by: one
+ * logical pixel per 1/160 inch of it), rounded to a quarter and never
+ * below 1, so the desktop's text is the size of Android's own there.
+ * That is 2.25 on the Retroid Pocket 5 (5.5 inches, 1920x1080, densityDpi
+ * 360, a real 319 dpi), 1.5 on a 240-dpi screen and 1 on a desktop
+ * monitor. The physical density (xdpi) is not used: it takes no account
+ * of how close a handheld is held (console 2026-10-29: 1/200 inch of it
+ * gave the console 1.5x, too small to read; Android uses 2.25 there).
  */
 object DesktopScale {
     /** The SharedPreferences key, in the launcher prefs file every surface reads. */
@@ -24,22 +28,17 @@ object DesktopScale {
     /** The fixed choices besides [AUTOMATIC], as stored. */
     val CHOICES: List<String> = listOf("1", "1.25", "1.5", "1.75", "2", "2.5", "3")
 
-    private const val DOTS_PER_LOGICAL_INCH = 200f
+    /** Android's baseline density: `DisplayMetrics.DENSITY_DEFAULT`, its 1x. */
+    private const val BASELINE_DPI = 160f
 
-    /**
-     * The scale for [setting] (a stored [KEY] value, null for none) on a
-     * screen of [xdpi] physical dots per inch, falling back to [densityDpi]
-     * when [xdpi] is not a believable figure (some devices report 0 or
-     * Android's density bucket instead).
-     */
-    fun resolve(setting: String?, xdpi: Float, densityDpi: Int): Double {
+    /** The scale for [setting] (a stored [KEY] value, null for none) on a screen of Android density [densityDpi]. */
+    fun resolve(setting: String?, densityDpi: Int): Double {
         setting?.takeIf { it != AUTOMATIC }?.toDoubleOrNull()?.takeIf { it in 1.0..4.0 }?.let { return it }
-        return automatic(xdpi, densityDpi)
+        return automatic(densityDpi)
     }
 
-    fun automatic(xdpi: Float, densityDpi: Int): Double {
-        val dpi = if (xdpi in 72f..1000f) xdpi else densityDpi.toFloat()
-        val quarters = (dpi / DOTS_PER_LOGICAL_INCH * 4).roundToInt()
+    fun automatic(densityDpi: Int): Double {
+        val quarters = (densityDpi / BASELINE_DPI * 4).roundToInt()
         return (quarters / 4.0).coerceAtLeast(1.0)
     }
 

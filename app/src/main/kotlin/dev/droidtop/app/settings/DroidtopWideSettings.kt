@@ -409,7 +409,7 @@ object DroidtopWideSettings {
      */
     private fun desktopScaleChoice(context: Context): ChoiceItem {
         val metrics = context.resources.displayMetrics
-        val automatic = dev.droidtop.runtime.DesktopScale.automatic(metrics.xdpi, metrics.densityDpi)
+        val automatic = dev.droidtop.runtime.DesktopScale.automatic(metrics.densityDpi)
         return ChoiceItem(
             id = dev.droidtop.runtime.DesktopScale.KEY,
             title = "Desktop scale",

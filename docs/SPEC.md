@@ -7849,10 +7849,16 @@ unchanged; the scale only sets how many pixels a logical pixel is. At scale
 1 the console's 5.5-inch 1080p screen (about 400 dpi) drew the desktop at a
 quarter of a laptop's area, too small to read. Desktop settings has
 "Desktop scale": Automatic (default) or 1x to 3x (`DesktopScale`).
-Automatic is one logical pixel per 1/200 inch of the screen's physical
-density (`DisplayMetrics.xdpi`, the density bucket when xdpi is not
-believable), rounded to a quarter and never below 1: 2x on the console, 1x
-on a desktop monitor. The viewport sends it with every size, so a change
+Automatic follows Android's own density for the screen
+(`DisplayMetrics.densityDpi` / 160, what Android scales its own UI by),
+rounded to a quarter and never below 1, so the desktop's text is the size
+of Android's there: 2.25x on the console (densityDpi 360), 1.5x at 240 dpi,
+1x on a desktop monitor. **Corrected 2026-10-29** (console readings on
+Droidtop/tracker#386): it was one logical pixel per 1/200 inch of the
+physical density (xdpi); the console's panel is 319 dpi, not the 400 first
+assumed, so that gave 1.5x, and Linux text was still too small to read.
+Physical density takes no account of how close a handheld is held;
+Android's density does. The viewport sends it with every size, so a change
 applies the next time the desktop is shown.
 
 **Desktop resolution (decided 2026-10-14, Droidtop/tracker#426).** Beside the

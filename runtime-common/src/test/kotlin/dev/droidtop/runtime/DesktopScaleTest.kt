@@ -5,26 +5,22 @@ import org.junit.Test
 
 class DesktopScaleTest {
     @Test
-    fun `automatic follows the physical density, a quarter at a time, never below 1`() {
-        assertEquals(2.0, DesktopScale.automatic(401f, 440), 0.0)
-        assertEquals(1.0, DesktopScale.automatic(92f, 160), 0.0)
-        assertEquals(1.0, DesktopScale.automatic(150f, 240), 0.0)
-        assertEquals(1.5, DesktopScale.automatic(300f, 320), 0.0)
-    }
-
-    @Test
-    fun `an unbelievable xdpi falls back to the density bucket`() {
-        assertEquals(2.25, DesktopScale.automatic(0f, 440), 0.0)
-        assertEquals(2.25, DesktopScale.automatic(5000f, 440), 0.0)
+    fun `automatic follows Android's density for the screen, a quarter at a time, never below 1`() {
+        // The Retroid Pocket 5 (console 2026-10-29: densityDpi 360, xdpi 319): Android's own 2.25.
+        assertEquals(2.25, DesktopScale.automatic(360), 0.0)
+        assertEquals(1.5, DesktopScale.automatic(240), 0.0)
+        assertEquals(1.0, DesktopScale.automatic(160), 0.0)
+        assertEquals(2.75, DesktopScale.automatic(440), 0.0)
+        assertEquals(1.0, DesktopScale.automatic(120), 0.0)
     }
 
     @Test
     fun `a stored choice wins, anything else is automatic`() {
-        assertEquals(1.5, DesktopScale.resolve("1.5", 401f, 440), 0.0)
-        assertEquals(2.0, DesktopScale.resolve(DesktopScale.AUTOMATIC, 401f, 440), 0.0)
-        assertEquals(2.0, DesktopScale.resolve(null, 401f, 440), 0.0)
-        assertEquals(2.0, DesktopScale.resolve("banana", 401f, 440), 0.0)
-        assertEquals(2.0, DesktopScale.resolve("9", 401f, 440), 0.0)
+        assertEquals(1.5, DesktopScale.resolve("1.5", 360), 0.0)
+        assertEquals(2.25, DesktopScale.resolve(DesktopScale.AUTOMATIC, 360), 0.0)
+        assertEquals(2.25, DesktopScale.resolve(null, 360), 0.0)
+        assertEquals(2.25, DesktopScale.resolve("banana", 360), 0.0)
+        assertEquals(2.25, DesktopScale.resolve("9", 360), 0.0)
     }
 
     @Test
