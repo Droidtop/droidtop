@@ -31,6 +31,16 @@ class SaveLinesTest {
     }
 
     @Test
+    fun `a removable volume is named, never its raw id, and a long path is shortened in the middle under a row`() {
+        val path = "/storage/7EF7-E477/Droidtop-games/Steam/Lovely Game/saves"
+        assertEquals("SD card/Droidtop-games/Steam/Lovely Game/saves", SaveLines.folder(path))
+        assertEquals("SanDisk/Droidtop-games/Steam/Lovely Game/saves", SaveLines.folder(path, mapOf("7EF7-E477" to "SanDisk")))
+        assertEquals("SD card/\u2026/Lovely Game/saves", SaveLines.folder(path, short = true))
+        assertEquals("Internal storage/Enginehost/saves", SaveLines.folder("/storage/emulated/0/Enginehost/saves"))
+        assertEquals("/data/local/tmp/x", SaveLines.folder("/data/local/tmp/x"))
+    }
+
+    @Test
     fun `where and when are in the line under a find`() {
         val place = FoundPlace("Enginehost's save folder", "/storage/emulated/0/Enginehost/saves/Demo-1", 3, 2048, now - 3_600_000L)
         val line = SaveLines.subtitle(SaveReport(found(place), "renpy.py path_to_saves", "a Ren'Py game"), now)

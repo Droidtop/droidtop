@@ -19566,7 +19566,10 @@ to be able to sync between handhelds." And the same day, for this part: "Let's a
     could not be read (a Ren'Py `config.save_directory` inside an archive, a Godot project inside a `.pck`, an AGS
     game's folder name), or the emulator keeps its saves in a folder droidtop may not list. Never shown as "none".
   - **None found**: the places searched are named.
-  - **Found**: how many files, in which folder, and how long ago the newest was written.
+  - **Found**: how many files, in which folder, and how long ago the newest was written. A folder is said the way a
+    person names it (`SaveLines.folder`): "Internal storage/…", and a removable volume by Android's own name for it
+    (`StorageVolumeNames`) or "SD card", never its raw `/storage/7EF7-E477/` id; under the row a long path keeps its
+    first folder and last two with "…" between, and the details page shows it whole (Droidtop/tracker#672).
 - **Rules come from data, not code.** Engines carry a `saves` object in droidtop-platforms' engines database, and
   emulators one on their players-database rows, in the form `docs/FORMAT.md` of that repository describes. A rule
   names its source (the engine's or emulator's own code, or a shipped game) and the generator refuses one that does

@@ -114,29 +114,30 @@ internal fun rememberGameInfoRows(entry: LibraryEntry, enabled: Boolean = true):
 internal suspend fun saveRows(context: Context, entry: LibraryEntry): List<GameInfoRow> {
     val report = SaveDetector.report(context, entry) ?: return emptyList()
     val now = System.currentTimeMillis()
+    val volumes = dev.droidtop.library.saves.StorageVolumeNames.of(context)
     return listOf(
         GameInfoRow(
             title = "Saves",
             value = SaveLines.value(report.status, now),
-            subtitle = SaveLines.subtitle(report, now),
-            screen = savesScreen(entry, report, now),
+            subtitle = SaveLines.subtitle(report, now, volumes),
+            screen = savesScreen(entry, report, now, volumes),
             chip = "Saves",
         ),
     )
 }
 
 /** The details of a game's saves, and the two ways the person corrects droidtop. */
-internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long): CatalogScreen = CatalogScreen(
+internal fun savesScreen(entry: LibraryEntry, report: SaveReport, nowMs: Long, volumes: Map<String, String> = emptyMap()): CatalogScreen = CatalogScreen(
     id = "saves_${entry.id}",
     title = GameNaming.displayName(entry.title),
     subtitle = SaveLines.value(report.status, nowMs),
     groups = {
-        val facts = SaveLines.details(report, nowMs).mapIndexed { index, (name, value) ->
+        val facts = SaveLines.details(report, nowMs, volumes).mapIndexed { index, (name, value) ->
             ActionItem(id = "saves_fact_$index", title = name, subtitle = value)
         }
         val turnedOff = report.status is SaveStatus.TurnedOff
         listOfNotNull(
-            CatalogGroup("saves_about", null, listOf(ActionItem(id = "saves_summary", title = SaveLines.value(report.status, nowMs), subtitle = SaveLines.subtitle(report, nowMs)))),
+            CatalogGroup("saves_about", null, listOf(ActionItem(id = "saves_summary", title = SaveLines.value(report.status, nowMs), subtitle = SaveLines.subtitle(report, nowMs, volumes)))),
             CatalogGroup("saves_facts", "Where droidtop looked", facts).takeIf { facts.isNotEmpty() },
             CatalogGroup(
                 "saves_fix",
