@@ -20,4 +20,11 @@ class UpdateLinksPartsTest {
         assertEquals(true, UpdateLinks.unpackFor(listOf("Game.zip")))
         assertEquals(false, UpdateLinks.unpackFor(emptyList()))
     }
+
+    @Test
+    fun `rar volumes are one split set and unpacked together`() {
+        // FitGirl's releases come as Name.part1.rar, Name.part2.rar: placeSplitSet unpacks them into one folder.
+        val joined = UpdateLinks.joined(listOf(file("Sample_Game.part1.rar"), file("Sample_Game.part2.rar")))
+        assertEquals(listOf(true, true), joined.map { it.unpack })
+    }
 }

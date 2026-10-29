@@ -14,11 +14,14 @@ import org.json.JSONObject
  * them. The user can start the download, and it'll be kicked over automatically."
  */
 object UpdateLinks {
-    /** Whether files of [names] are unpacked: one archive, or the numbered parts of one split archive. Pure. */
+    /**
+     * Whether files of [names] are unpacked: one archive, or every part of one split archive, numbered parts or RAR
+     * volumes alike (DownloadJobs.placeSplitSet unpacks both since a3a51932). Pure.
+     */
     fun unpackFor(names: List<String>): Boolean = when {
         names.isEmpty() -> false
         names.size == 1 -> DownloadJobs.archiveStem(names.single()) != null
-        else -> SplitArchives.detect(names)?.let { !it.volumes } == true
+        else -> SplitArchives.detect(names) != null
     }
 
     /** The files of a release in parts, gathered from wherever each came, unpacked by the one rule over all their names. */
