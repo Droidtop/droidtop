@@ -111,6 +111,9 @@ public class KeyboardShortcutsDelegate {
      * @see android.view.KeyEvent
      */
     public Boolean onKeyDown(int keyCode, KeyEvent event) {
+        // droidtop: the pad's own buttons on Standard's home (Droidtop/tracker#699).
+        Boolean pad = dev.droidtop.shell.standard.StandardPad.onKeyDown(mLauncher, keyCode, event);
+        if (pad != null) return pad;
         // Ignore escape if pressed in conjunction with any modifier keys.
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && event.hasNoModifiers()) {
             AbstractFloatingView topView = AbstractFloatingView.getTopOpenView(mLauncher);

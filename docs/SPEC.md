@@ -1629,7 +1629,13 @@ must work by controller AND touch, pointer and focus as one selection (§7j),
 same as the rest of droidtop's chrome — Murine's stock pages already satisfy
 this by inheriting Launcher3's own d-pad/keyboard navigation, and
 `ContinuePlayingWidgetProvider`'s rows are ordinary focusable/clickable
-widget views, reachable the same way any home-screen widget is. Root stays
+widget views, reachable the same way any home-screen widget is. The pad's
+other buttons have a Standard meaning of their own (`StandardPad`,
+Droidtop/tracker#699): L1/R1 turn the home pages, X opens the focused item's
+own menu (what a long press opens), Y opens the one search, Start opens the
+mode switcher, and B is Android's Back (it closes the drawer, a folder or a
+menu). Not yet: a hint row naming them, and the face-button swap, which
+lives in the Gaming shell's `ControllerLayouts`. Root stays
 what it has always been for the launcher: never used, never required: none
 of Launcher mode's rows above touch `runtime-linux-root`.
 
