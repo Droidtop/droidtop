@@ -14,14 +14,14 @@
     <string name="desktop_start">Start the desktop</string>
     <string name="desktop_start_menu">Start</string>
     <string name="desktop_modes">Modes</string>
-    <string name="desktop_maximize">Maximize</string>
-    <string name="desktop_snap_left">Snap left</string>
-    <string name="desktop_snap_right">Snap right</string>
-    <string name="desktop_restore_size">Restore size</string>
     <string name="desktop_close">Close</string>
     <string name="desktop_unpin">Unpin</string>
     <string name="desktop_clipboard_on_focus">Clipboard: on focus</string>
     <string name="desktop_switch_keyboard">Switch keyboard…</string>
     <string name="desktop_companion">Companion</string>
     <string name="desktop_plugins">Plugins</string>
+    <string name="desktop_maximize">Maximize</string>
+    <string name="desktop_snap_left">Snap left</string>
+    <string name="desktop_snap_right">Snap right</string>
+    <string name="desktop_restore_size">Restore size</string>
 </resources>
