@@ -96,6 +96,34 @@ class MappingEngineTest {
     }
 
     @Test
+    fun `a stick in scrollwheel mode turns the wheel, faster the further it is pushed`() {
+        val layout = ControllerLayout.parse(
+            """
+            "controller_mappings" {
+              ${group(0, "joystick_mouse", input("click", press("Full_Press", "mode_shift right_joystick 1")))}
+              ${settingsGroup(1, "scrollwheel", "")}
+              "preset" { "id" "0" "name" "Default" "group_source_bindings" {
+                "0" "right_joystick active" "1" "right_joystick active modeshift" } }
+            }
+            """.trimIndent(),
+        )
+        val e = MappingEngine(layout)
+        e.press("right_joystick", "click", 0)
+        e.stick("right_joystick", 0f, 1f, 0)
+        // Full push: 12 steps a second, so one second is 12 steps down.
+        val down = e.tick(1000)
+        assertEquals(12, down.count { it == Output.Wheel(MappingEngine.SCROLL_DOWN) })
+        e.stick("right_joystick", 0f, -1f, 1000)
+        assertTrue(e.tick(1500).all { it == Output.Wheel(MappingEngine.SCROLL_UP) })
+        // Released, the click no longer shifts: the stick is the pointer again.
+        e.release("right_joystick", "click", 1500)
+        e.stick("right_joystick", 1f, 0f, 1500)
+        assertTrue(e.tick(1600).single() is Output.MouseMove)
+        assertEquals(0f, MappingEngine.scrollRate(0.1f), 0f)
+        assertEquals(-MappingEngine.SCROLL_STEPS_PER_S, MappingEngine.scrollRate(-1f), 0.001f)
+    }
+
+    @Test
     fun `changing preset lets go of what the old one held`() {
         val e = engine()
         e.press("button_diamond", "button_a", 0)

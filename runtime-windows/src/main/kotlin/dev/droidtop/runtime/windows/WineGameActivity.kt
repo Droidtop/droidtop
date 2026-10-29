@@ -14,9 +14,7 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.TextView
 import dev.droidtop.library.OwnGameScreens
-import dev.droidtop.library.PadMouse
 import dev.droidtop.mapping.ControllerLayout
-import dev.droidtop.library.PadMousePrefs
 import dev.droidtop.library.diagnostics.RunRecords
 import dev.droidtop.runtime.windows.data.TouchGestureConfig
 import com.winlator.container.Container
@@ -115,10 +113,11 @@ class WineGameActivity : Activity() {
     /** What the Quick Menu's Game section reaches this screen through (Resume is a relaunch, Stop is [stop]). */
     private val ownScreen = object : OwnGameScreens.Screen {
         override val entryId: String? get() = this@WineGameActivity.entryId
-        override val padMouse: Boolean? get() = this@WineGameActivity.padMouse?.settings?.on
+        override val padMouse: Boolean?
+            get() = if (this@WineGameActivity.layoutDriver == null || mouseLayout == null) null else mouseMode
         override val pointer: OwnGameScreens.Pointer? get() = this@WineGameActivity.gamePointer
         override fun setPadMouse(on: Boolean) {
-            runOnUiThread { this@WineGameActivity.padMouse?.let { it.set(it.settings.copy(on = on)) } }
+            runOnUiThread { setMouseMode(on) }
         }
         override val controls: String?
             get() = if (this@WineGameActivity.layoutDriver == null) null else controlsChoice?.line ?: WineControls.GAMEPAD_LINE
@@ -261,33 +260,29 @@ class WineGameActivity : Activity() {
         }
         touchMouse = TouchMouse(xServer)
         keyboard = Keyboard(xServer)
-        // Controller mouse mode (docs/SPEC.md 5b, Droidtop/tracker#565): off until the game's remembered choice is read.
-        // The game's one pointer: mouse mode and the companion's trackpad both drive it (Droidtop/tracker#565).
+        // The game's one pointer: mouse mode, the layouts and the companion's trackpad all drive it (Droidtop/tracker#565).
         val pointer = XServerPointer(xServer) { window?.decorView?.display?.displayId }
         gamePointer = pointer
-        val mouseMode = PadMouseDriver(pointer, PadMouse.Settings()) { settings -> padMouseChanged(settings) }
-        padMouse = mouseMode
-        entryId?.let { id ->
-            startupExecutor.execute {
-                val initial = PadMouse.initial(PadMousePrefs.stored(applicationContext, id), runnerNeedsMouse = false)
-                runOnUiThread { mouseMode.settings = initial; showPadMouse(initial.on, announce = false) }
-            }
-        }
 
-        // The pad's layouts (Droidtop/tracker#618): read and parsed off the main thread; the one this game was left
-        // with is played.
+        // The pad's layouts (Droidtop/tracker#618), mouse mode's among them (C4): read and parsed off the main thread;
+        // the one this game was left with is played, and mouse mode, when the game was left in it, over it.
         startupExecutor.execute {
-            val parsed = WineControls.entries.mapNotNull { choice ->
-                runCatching {
-                    choice to resources.openRawResource(choice.raw).bufferedReader().use { ControllerLayout.parse(it.readText()) }
-                }.getOrNull()
-            }.toMap()
+            fun read(raw: Int) = runCatching {
+                resources.openRawResource(raw).bufferedReader().use { ControllerLayout.parse(it.readText()) }
+            }.getOrNull()
+            val parsed = WineControls.entries.mapNotNull { choice -> read(choice.raw)?.let { choice to it } }.toMap()
+            val mouse = read(R.raw.controls_mouse_mode)
             val chosen = entryId?.let { WineControlsPrefs.layout(applicationContext, it) }
+            val mouseOn = entryId?.let { WineControlsPrefs.mouseMode(applicationContext, it) } ?: false
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 controlLayouts = parsed
+                mouseLayout = mouse
                 layoutDriver = LayoutDriver(xServer, pointer)
-                useControls(chosen)
+                controlsChoice = chosen?.takeIf { it in parsed }
+                mouseMode = mouseOn && mouse != null
+                playControls()
+                showPadMouse(mouseMode, announce = false)
             }
         }
 
@@ -580,10 +575,10 @@ class WineGameActivity : Activity() {
             if (event.action == KeyEvent.ACTION_UP) it.hide()
             return true
         }
-        // A keyboard-and-mouse layout, when on, plays the pad buttons it binds; mouse mode then sees none of them.
+        // Mouse mode's on/off combination is watched first, whatever the pad is playing; it takes nothing.
+        watchMouseToggle(event)
+        // The layout being played (a keyboard-and-mouse one, or mouse mode) takes the pad buttons it binds.
         if (layoutDriver?.onKey(event) == true) return true
-        // Mouse mode takes its clicks and scroll hold first, and always watches for its on/off combination.
-        if (padMouse?.onKey(event) == true) return true
         if (winHandler?.onKeyEvent(event) == true) return true
         if (keyboard?.onKeyEvent(event) == true) return true
         // Only a back press nothing else wanted leaves the game, and it does not end it: the shell
@@ -607,8 +602,8 @@ class WineGameActivity : Activity() {
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        if (mouseToggle.due(event.eventTime)) toggleMouseMode()
         if (layoutDriver?.onMotion(event) == true) return true
-        if (padMouse?.onMotion(event) == true) return true
         if (winHandler?.onGenericMotionEvent(event) == true) return true
         if (touchMouse?.onExternalMouseEvent(event) == true) return true
         return super.onGenericMotionEvent(event)
@@ -616,18 +611,56 @@ class WineGameActivity : Activity() {
 
     // ---- controller mouse mode ----------------------------------------
 
-    private var padMouse: PadMouseDriver? = null
-
     /** The layouts' driver, once they are read; Gamepad unless the game was left with a layout. */
     private var layoutDriver: LayoutDriver? = null
     private var controlLayouts: Map<WineControls, ControllerLayout> = emptyMap()
     private var controlsChoice: WineControls? = null
 
-    /** Plays [choice]'s layout (null: Gamepad). Main thread. */
+    /** Mouse mode's own layout (res/raw/controls_mouse_mode.vdf) and whether it is played over the chosen one. */
+    private var mouseLayout: ControllerLayout? = null
+    private var mouseMode = false
+
+    /** Both stick clicks held 0.6 s turn mouse mode on or off at any time. */
+    private val mouseToggle = dev.droidtop.mapping.HoldCombo.stickClicks()
+    private val toggleHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /** Plays [choice]'s layout (null: Gamepad), unless mouse mode is on. Main thread. */
     private fun useControls(choice: WineControls?) {
-        val layout = choice?.let { controlLayouts[it] }
-        controlsChoice = if (layout != null) choice else null
-        layoutDriver?.use(layout)
+        controlsChoice = choice?.takeIf { it in controlLayouts }
+        playControls()
+    }
+
+    /** What the pad plays now: mouse mode's layout while it is on, else the chosen one, else nothing (Gamepad). */
+    private fun playControls() {
+        layoutDriver?.use(if (mouseMode) mouseLayout else controlsChoice?.let { controlLayouts[it] })
+    }
+
+    private fun watchMouseToggle(event: KeyEvent) {
+        val code = event.keyCode
+        if (code != KeyEvent.KEYCODE_BUTTON_THUMBL && code != KeyEvent.KEYCODE_BUTTON_THUMBR) return
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> if (event.repeatCount == 0) {
+                mouseToggle.press(code, event.eventTime)
+                // A held key sends nothing more: look again once the hold could be long enough.
+                toggleHandler.postDelayed({
+                    if (mouseToggle.due(android.os.SystemClock.uptimeMillis())) toggleMouseMode()
+                }, mouseToggle.holdMs + 10)
+            }
+            KeyEvent.ACTION_UP -> mouseToggle.release(code)
+        }
+        if (mouseToggle.due(event.eventTime)) toggleMouseMode()
+    }
+
+    private fun toggleMouseMode() = setMouseMode(!mouseMode)
+
+    /** On or off, from the combination or the Quick Menu: played at once, shown, and kept for this game. Main thread. */
+    private fun setMouseMode(on: Boolean) {
+        if (layoutDriver == null || mouseLayout == null || on == mouseMode) return
+        mouseMode = on
+        playControls()
+        showPadMouse(on, announce = true)
+        val id = entryId ?: return
+        startupExecutor.execute { WineControlsPrefs.setMouseMode(applicationContext, id, on) }
     }
 
     /** The visible sign that the pad is a mouse: a small badge in the top corner while it is on. */
@@ -650,12 +683,6 @@ class WineGameActivity : Activity() {
         if (announce) padMouseBadge.announceForAccessibility(if (on) "Mouse mode on" else "Mouse mode off")
     }
 
-    /** Turned on or off (the combination, the Quick Menu): shown at once, and kept for this game. */
-    private fun padMouseChanged(settings: PadMouse.Settings) {
-        showPadMouse(settings.on, announce = true)
-        val id = entryId ?: return
-        startupExecutor.execute { PadMousePrefs.set(applicationContext, id, settings) }
-    }
 
     // ---- lifecycle ---------------------------------------------------
 
@@ -677,7 +704,9 @@ class WineGameActivity : Activity() {
     override fun onDestroy() {
         // The game is over for good (not a rotation): its cloud saves go up.
         OwnGameScreens.unregister(ownScreen)
+        toggleHandler.removeCallbacksAndMessages(null)
         layoutDriver?.close()
+        layoutDriver = null
         if (isFinishing) entryId?.let { dev.droidtop.library.stores.StoreSaves.afterExit(applicationContext, it) }
         session?.stop()
         session = null

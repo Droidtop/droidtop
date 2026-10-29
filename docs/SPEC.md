@@ -8304,19 +8304,31 @@ simulate mouse input. ... Perhaps something like GPD's solution, where they can 
 and "The screen maps to a trackpad, which is standard for wine on android. I'm just complaining that that's not the
 ideal solution"). The touchscreen stays the trackpad it is. With mouse mode on, the pad is the mouse, so a game's
 pointer (a Unity configuration window, say) works without touching the screen:
-- the right stick (or the left, per game) moves the pointer; a push under 15% is rest, and the speed rises with the
-  square of the push to 1.5 screen widths a second at full, so a small push places it and a full one crosses quickly;
-- R1 clicks and L1 right-clicks (or, per game, A and B), held for a drag;
-- the moving stick's own click held turns that stick into a wheel (up to 12 steps a second);
-- the other buttons and the other stick still reach the game; the stick that moves the pointer does not;
+- the right stick moves the pointer; a push under 15% is rest, and the speed rises with the square of the push to
+  1.5 screen widths a second at full, so a small push places it and a full one crosses quickly;
+- R1 clicks and L1 right-clicks, held for a drag;
+- the right stick's own click held turns that stick into a wheel (up to 12 steps a second);
+- the other buttons and the left stick still reach the game; the right stick does not;
 - both stick clicks held 0.6 s turn it on or off at any time, and the running game's L2 sheet has a Mouse mode row;
   a "Mouse mode" badge in the top corner shows while it is on, and TalkBack hears the change;
-- remembered per game (`PadMousePrefs`); off by default, unless the game's runner says it needs a mouse (none says so
-  yet; `PadMouse.initial`).
+- remembered per game (`WineControlsPrefs.mouseMode`, which still reads what `PadMousePrefs` kept); off by default.
+
+Since Droidtop/tracker#618 C4 it is a controller layout like any other (5b "Controller layouts"): droidtop's own
+`res/raw/controls_mouse_mode.vdf`, in Steam's format, played by the one `MappingEngine` through the Wine sink
+(`LayoutDriver`). The pointer is a `joystick_mouse` group on the right stick, with the curve above
+(`MappingEngine.mouseVelocity`). The wheel is the stick's click held as a mode shift onto a `scrollwheel` group
+(`MappingEngine.scrollRate`). The clicks are `mouse_button` bindings on the shoulders. While mouse mode is on, its
+layout is played instead of the game's chosen Controls layout; turned off, the chosen one comes back. The on/off
+combination is the host's (`HoldCombo`, watched ahead of the layout whatever is playing); C14 makes such combos a
+"system" layer. `PadMouse` and `PadMouseDriver` are gone. Their per-game "left stick" and "A and B click" variants had
+no screen that set them, so none was ever stored; they return as layout variants once the editor (C6) can pick a
+layout's variants. `ShooterModeConfig` stays for now: the Winlator touch overlay (`InputControlsView`) still reads
+its joystick and mouse acceleration settings, until the on-screen controls move onto the engine.
+
 It is the pointer path the screen's touch trackpad already uses (`XServer.injectPointerMoveDelta`, button presses,
 the wheel as scroll-button presses), not a second one: the screen offers it as `OwnGameScreens.Screen.pointer`
-(`XServerPointer`), and both `PadMouseDriver` (in `WineGameActivity`, ahead of the XInput bridge; `PadMouse`, pure and
-tested) and the companion drive that. The Quick Menu row reaches the screen through `OwnGameScreens.Screen.padMouse`.
+(`XServerPointer`), and both `LayoutDriver` (in `WineGameActivity`, ahead of the XInput bridge) and the companion
+drive that. The Quick Menu row reaches the screen through `OwnGameScreens.Screen.padMouse`.
 **The companion's Keys trackpad is the game's mouse** while droidtop's own game screen is on the screen the companion
 types to (`TrackpadRoute.GAME`, ahead of the accessibility pointer, after the shell's own selection when the Quick Menu
 is up): finger travel is scaled to the game's width, with the trackpad's acceleration and speed setting, tap to click,
@@ -8343,9 +8355,9 @@ on a quicker release; a Double_Press is held from a second press within `double_
 release, and makes the Full_Press wait the window out and tap when no second press comes. A stick in `dpad` mode presses up to two directions past half deflection; in `joystick_mouse`
 mode it moves the pointer at each tick by Controller mouse mode's curve (above) times the group's `sensitivity`
 percent, in screen widths the sink scales; in `joystick_move` mode it is passed through as the pad's stick
-(`output_joystick` 0 left, 1 right, else the stick it came from). Pure; time is passed in. Chords, turbo, joystick
-camera, scroll wheel, menus and layers come next, then the Wine sink and the defaults; until then
-Controller mouse mode above is the pad's only pointer. **The Wine sink** (`LayoutDriver`): a Windows
+(`output_joystick` 0 left, 1 right, else the stick it came from); in `scrollwheel` mode it turns the wheel, up to 12
+steps a second times `sensitivity`. One held input may mode-shift several sources at once. Pure; time is passed in.
+Chords, turbo, joystick camera, menus and layers come next. **The Wine sink** (`LayoutDriver`): a Windows
 game's L2 sheet has a Controls row that steps through Gamepad (no layout, the default), "Keyboard
 and mouse" and "Mouse only", kept per game (`WineControls`, `WineControlsPrefs`). "Mouse only" is for point-and-click
 games: left stick the pointer, A click, B right-click, the bumpers scroll, the d-pad the arrows, X Enter, Y Space, Start

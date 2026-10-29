@@ -26,9 +26,11 @@ import kotlin.math.sqrt
  * - a stick in `joystick_mouse` mode moves the pointer at each [tick], by today's controller mouse curve (a push under
  *   [MOUSE_DEADZONE] is rest, then the square of the push up to [MOUSE_FULL_WIDTHS_PER_S] screen widths a second),
  *   scaled by the group's `sensitivity` (percent, 100 by default);
+ * - a stick in `scrollwheel` mode turns the mouse wheel, faster the further it is pushed ([scrollRate]), scaled by
+ *   the group's `sensitivity`; the stick's own click held as a mode shift onto such a group is mouse mode's wheel;
  * - a stick in `joystick_move` mode is passed through as the pad's stick, its group's `output_joystick` choosing which
  *   (0 left, 1 right; by default the stick it came from).
- * Not yet: chords, turbo, joystick camera, scroll wheel, radial and touch menus, and action layers.
+ * Not yet: chords, turbo, joystick camera, radial and touch menus, and action layers.
  */
 class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null) {
 
@@ -79,6 +81,9 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
 
     /** Each stick's last deflection, by source, for the pointer it moves between ticks. */
     private val deflection = HashMap<String, Pair<Float, Float>>()
+
+    /** A scrolling stick's wheel travel below one step, carried to the next tick, by source. */
+    private val scrollCarry = HashMap<String, Float>()
     private var lastTick: Long? = null
 
     fun press(source: String, input: String, now: Long): List<Output> {
@@ -139,6 +144,14 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
             val seconds = (now - since) / 1000f
             for ((source, xy) in deflection) {
                 val group = groupOn(source) ?: continue
+                if (group.mode.equals("scrollwheel", true)) {
+                    val gain = (group.settings["sensitivity"]?.toFloatOrNull() ?: 100f) / 100f
+                    var carry = (scrollCarry[source] ?: 0f) + scrollRate(xy.second) * gain * seconds
+                    while (carry >= 1f) { out += Output.Wheel(SCROLL_DOWN); carry -= 1f }
+                    while (carry <= -1f) { out += Output.Wheel(SCROLL_UP); carry += 1f }
+                    scrollCarry[source] = carry
+                    continue
+                }
                 if (!group.mode.equals("joystick_mouse", true)) continue
                 val gain = (group.settings["sensitivity"]?.toFloatOrNull() ?: 100f) / 100f
                 val (vx, vy) = mouseVelocity(xy.first, xy.second)
@@ -243,6 +256,11 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
         const val STICK_DPAD_THRESHOLD = 0.5f
         const val MOUSE_DEADZONE = 0.15f
         const val MOUSE_FULL_WIDTHS_PER_S = 1.5f
+
+        /** Wheel steps a second at full deflection of a stick in `scrollwheel` mode. */
+        const val SCROLL_STEPS_PER_S = 12f
+        const val SCROLL_DOWN = "SCROLL_DOWN"
+        const val SCROLL_UP = "SCROLL_UP"
         private const val FULL = "Full_Press"
         private const val LONG = "Long_Press"
         private const val DOUBLE = "Double_Press"
@@ -259,6 +277,17 @@ class MappingEngine(private val layout: ControllerLayout, presetId: Int? = null)
             val scaled = (magnitude - MOUSE_DEADZONE) / (1f - MOUSE_DEADZONE)
             val speed = scaled * scaled * MOUSE_FULL_WIDTHS_PER_S
             return speed * x / magnitude to speed * y / magnitude
+        }
+
+        /**
+         * Wheel steps a second for a stick pushed to [y] (down positive, scrolling down): nothing under [MOUSE_DEADZONE],
+         * then in proportion up to [SCROLL_STEPS_PER_S]. Controller mouse mode's wheel (docs/SPEC.md 5b). Pure.
+         */
+        fun scrollRate(y: Float): Float {
+            val a = abs(y)
+            if (a <= MOUSE_DEADZONE) return 0f
+            val scaled = ((a - MOUSE_DEADZONE) / (1f - MOUSE_DEADZONE)).coerceAtMost(1f)
+            return if (y > 0) scaled * SCROLL_STEPS_PER_S else -scaled * SCROLL_STEPS_PER_S
         }
 
         /** The dpad inputs a stick at ([x], [y]) holds: one or two, 8-way, past the threshold on each axis. Pure. */
