@@ -1,5 +1,6 @@
 package dev.droidtop.runtime.windows.utils
 
+import dev.droidtop.library.GameLanguage
 import dev.droidtop.library.stores.StorePlayer
 import java.io.File
 import java.util.Locale
@@ -107,10 +108,16 @@ class SteamworksShimTest {
 
     @Test
     fun `the device language becomes Steam's language code`() {
-        assertEquals("german", SteamworksShim.language(Locale.GERMANY))
-        assertEquals("brazilian", SteamworksShim.language(Locale("pt", "BR")))
-        assertEquals("tchinese", SteamworksShim.language(Locale.TAIWAN))
-        assertEquals("schinese", SteamworksShim.language(Locale.CHINA))
-        assertEquals("english", SteamworksShim.language(Locale("xx")))
+        assertEquals("german", SteamworksShim.language(locale = Locale.GERMANY))
+        assertEquals("brazilian", SteamworksShim.language(locale = Locale("pt", "BR")))
+        assertEquals("tchinese", SteamworksShim.language(locale = Locale.TAIWAN))
+        assertEquals("schinese", SteamworksShim.language(locale = Locale.CHINA))
+        assertEquals("english", SteamworksShim.language(locale = Locale("xx")))
+    }
+
+    @Test
+    fun `a game's own language wins over the device's`() {
+        assertEquals("japanese", SteamworksShim.language(GameLanguage.JAPANESE, Locale.GERMANY))
+        assertEquals("german", SteamworksShim.language(null, Locale.GERMANY))
     }
 }
