@@ -1070,9 +1070,12 @@ private fun CatalogPane(
     // what changes (a status, an armed confirmation); the screen's own explanation is the line's fallback.
     val context = LocalContext.current
     val underRows = remember(rows) { dev.droidtop.library.settings.ReadingPrefs.infoUnderRows(context) }
-    val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id, explanation = !underRows) }
+    // In a narrow pane (the Quick Menu) the focused row's sentence opens under that row, and the strip at the foot
+    // keeps only what changes, so the footer is the pane's hints, not a paragraph (Droidtop/tracker#739).
+    val narrow = LocalNarrowPane.current
+    val tip = tipRow?.let { catalogTip(it.item, statusById[it.item.id], confirmArmedId == it.item.id, explanation = !underRows && !narrow) }
         ?: hint?.takeIf { active }
-    val reserveTip = hint != null || statusById.isNotEmpty() || rows.any { (!underRows && it.item.subtitle != null) || it.item.confirmText != null }
+    val reserveTip = hint != null || statusById.isNotEmpty() || rows.any { (!underRows && !narrow && it.item.subtitle != null) || it.item.confirmText != null }
     Column(modifier) {
         if (title != null) MenuHeader(title, iconFile = titleIcon)
         LazyColumn(
@@ -1156,7 +1159,7 @@ private fun CatalogPane(
                     } else {
                         CatalogRowView(
                             row = row,
-                            infoUnderRow = underRows,
+                            infoUnderRow = underRows || (narrow && isSelected),
                             oneLineSummary = panel,
                             locked = (row.item as? AsyncActionItem)?.gate?.let { readGates[it] != true } ?: false,
                             isSelected = isSelected,
@@ -1631,6 +1634,7 @@ private fun CatalogRowView(
         sliderFraction = slider?.let { if (it.max > it.min) (it.current - it.min).toFloat() / (it.max - it.min) else 0f },
         progress = item.progress,
         progressLook = item.progressLook,
+        progressParts = item.progressParts,
         statusMark = item.statusMark,
     )
 }

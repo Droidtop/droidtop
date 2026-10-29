@@ -286,6 +286,9 @@ object PluginJobsScreen {
         JobState.RUNNING -> if (entry.percent >= 0) JobLook.ACTIVE else JobLook.CHECKING
     }
 
+    /** How many parts [entry] is counted in, for a segmented bar: its things to do when it counts 2 or more, else 0. Pure. */
+    fun partsOf(entry: PluginJobsCenter.Entry): Int = entry.numbers?.itemsTotal?.takeIf { it >= 2 } ?: 0
+
     /**
      * A job said in one line, for a place with room for one: a game's button and its menu row (docs/SPEC.md 12a,
      * "Jobs and their results"). The same words as the job's row here ([progressLine]), joined, so the game page cannot
@@ -296,8 +299,13 @@ object PluginJobsScreen {
 
     /**
      * One job as one row, wherever a list of jobs is drawn (this screen, a store's page): a running
-     * or paused job is its name, its progress bar and [progressLine], and A opens its page; a
-     * finished one is its name and how it ended.
+     * or paused job is its name, its progress bar and [progressLine] under it, and A opens its page; a
+     * finished one is its name, its mark (a check or a cross) and how it ended under it.
+     *
+     * Show, then say (owner, 2026-10-29, Droidtop/tracker#738: "we need to use visual indicators instead of words
+     * whenever possible. Numbers and words can be in ADDITION to them"): the bar and the mark are the state; the words
+     * are the line under the title, never a value column, which took the title's width in a narrow pane and broke it
+     * mid-word ("Synct / hing", Droidtop/tracker#739).
      */
     fun jobRow(entry: PluginJobsCenter.Entry, nowMs: Long = System.currentTimeMillis()): CatalogItem {
         if (entry.done) {
@@ -308,19 +316,20 @@ object PluginJobsScreen {
                 title = entry.title,
                 subtitle = "${jobSource(entry)} · $said",
                 inline = jobPage(entry.jobId, jobTitle(entry)),
-                valueLabel = { if (entry.state == JobState.FAILED) "Failed" else "Done" },
                 progressLook = lookOf(entry),
+                summaryShown = true,
             )
         }
-        val line = progressLine(entry, JobPace.line(entry, nowMs))
+        val line = progressLine(entry, JobPace.line(entry, nowMs)).replace("\n", " · ")
         return NestedScreenItem(
             id = "plugin_job_${entry.jobId}",
             title = entry.title,
-            subtitle = jobSource(entry),
+            subtitle = listOf(line, jobSource(entry)).filter { it.isNotBlank() }.joinToString(" · "),
             inline = jobPage(entry.jobId, jobTitle(entry)),
-            valueLabel = { line },
             progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
             progressLook = lookOf(entry),
+            progressParts = partsOf(entry),
+            summaryShown = true,
         )
     }
 
@@ -366,6 +375,7 @@ object PluginJobsScreen {
                     value = progressLine(entry, JobPace.line(entry, System.currentTimeMillis())),
                     progress = if (entry.percent >= 0) entry.percent / 100f else -1f,
                     progressLook = lookOf(entry),
+                    progressParts = partsOf(entry),
                 ),
             )
             // A native job with no checkpoint yet pauses to a fresh start, so it may always be paused.

@@ -26,8 +26,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -46,9 +49,13 @@ data class JobProgressColors(val track: Color, val fill: Color, val done: Color,
  * shimmer along the track, paused stands dimmed, done fills, failed turns the track to the danger colour and shakes
  * once. Every moving value is read while drawing, so a list of jobs is drawn again, never laid out again, as they
  * move; with motion off ([Motion.enabled]) it is the same bar standing still.
+ *
+ * [parts] from 2 to [JobLook.MAX_PARTS] draws the segmented form (Droidtop/tracker#738): a release in parts or several
+ * files, one segment each, filled part by part. A screen reader hears the state's words ([JobLook.words]) and, while
+ * it moves, the percent.
  */
 @Composable
-fun JobProgress(fraction: Float, look: JobLook, colors: JobProgressColors, modifier: Modifier = Modifier, height: Dp = 4.dp) {
+fun JobProgress(fraction: Float, look: JobLook, colors: JobProgressColors, modifier: Modifier = Modifier, height: Dp = 4.dp, parts: Int = 0) {
     val target = when (look) {
         JobLook.DONE -> 1f
         JobLook.CHECKING -> 0f
@@ -58,12 +65,19 @@ fun JobProgress(fraction: Float, look: JobLook, colors: JobProgressColors, modif
     val pulse = pulseOf(look == JobLook.QUEUED)
     val shimmer = shimmerOf(look == JobLook.CHECKING)
     val shake = shakeOf(look == JobLook.FAILED)
+    val segments = parts.takeIf { it in 2..JobLook.MAX_PARTS } ?: 1
+    val said = JobLook.words(look) + if (look == JobLook.ACTIVE) ", ${(target * 100).toInt()} percent" else ""
     Canvas(
         modifier
             .height(height)
+            .semantics { contentDescription = said }
             .graphicsLayer { translationX = shake.value * density },
     ) {
         val track = if (look == JobLook.FAILED) colors.failed.copy(alpha = 0.35f) else colors.track
+        if (segments > 1) {
+            drawSegments(segments, fill.value, track, if (look == JobLook.DONE) colors.done else if (look == JobLook.FAILED) colors.failed else colors.fill, if (look == JobLook.QUEUED) pulse.value else if (look == JobLook.PAUSED) 0.5f else 1f)
+            return@Canvas
+        }
         drawRect(track)
         val ink = when (look) {
             JobLook.DONE -> colors.done
@@ -100,7 +114,8 @@ fun JobMark(look: JobLook, colors: JobProgressColors, modifier: Modifier = Modif
     val drawn = remember(look) { Animatable(if (Motion.enabled) 0f else 1f) }
     LaunchedEffect(look) { drawn.animateTo(1f, Motion.tw(Motion.DoneMs, easing = Motion.Glide)) }
     val shake = shakeOf(look == JobLook.FAILED)
-    Canvas(modifier.size(size).graphicsLayer { translationX = shake.value * density }) {
+    val said = JobLook.words(look)
+    Canvas(modifier.size(size).semantics { contentDescription = said }.graphicsLayer { translationX = shake.value * density }) {
         val stroke = Stroke(width = this.size.minDimension * 0.14f, cap = StrokeCap.Round)
         val w = this.size.width
         val h = this.size.height
@@ -145,6 +160,22 @@ fun JobRing(fraction: Float, look: JobLook, colors: JobProgressColors, modifier:
         drawArc(colors.track, 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = stroke)
         val start = if (look == JobLook.CHECKING) 360f * turn.value - 90f else -90f
         drawArc(colors.fill, start, 360f * sweep.value, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = stroke)
+    }
+}
+
+/**
+ * The segmented bar: [count] segments with a gap between, the first ones full and the one under way filled as far as
+ * [fill] (0 to 1 of the whole) reaches into it. [alpha] dims the fill as the plain bar's does.
+ */
+private fun DrawScope.drawSegments(count: Int, fill: Float, track: Color, ink: Color, alpha: Float) {
+    val gap = minOf(2.dp.toPx(), size.width / (count * 4f))
+    val each = (size.width - gap * (count - 1)) / count
+    val filled = fill.coerceIn(0f, 1f) * count
+    for (i in 0 until count) {
+        val x = i * (each + gap)
+        drawRect(track, topLeft = Offset(x, 0f), size = Size(each, size.height))
+        val part = (filled - i).coerceIn(0f, 1f)
+        if (part > 0f) drawRect(ink.copy(alpha = ink.alpha * alpha), topLeft = Offset(x, 0f), size = Size(each * part, size.height))
     }
 }
 

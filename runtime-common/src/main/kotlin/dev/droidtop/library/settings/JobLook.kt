@@ -32,5 +32,21 @@ enum class JobLook {
             progress < 0f -> CHECKING
             else -> ACTIVE
         }
+
+        /** The most segments a bar is drawn in ([CatalogItem.progressParts]); a job in more parts is one plain bar. */
+        const val MAX_PARTS = 32
+
+        /**
+         * What [look] is in words, for a screen reader and beside the drawing (show, then say: owner, 2026-10-29,
+         * Droidtop/tracker#738); the bar or the mark is never the only way the state is told.
+         */
+        fun words(look: JobLook): String = when (look) {
+            QUEUED -> "Waiting"
+            ACTIVE -> "In progress"
+            CHECKING -> "Working"
+            PAUSED -> "Paused"
+            DONE -> "Done"
+            FAILED -> "Failed"
+        }
     }
 }

@@ -17532,6 +17532,27 @@ same job. Body text is capped to a readable measure regardless of how wide the w
 full-bleed line on a 1280dp screen is a defect. One line of text that cannot fit is truncated
 with an ellipsis and is reachable in full somewhere.
 
+**Narrow panes read the compact ladder** (owner, 2026-10-29, Droidtop/tracker#739: "text in the QAM is still really
+big on the internal screen"). A sheet or side panel whose pane is under 600dp wide (`NarrowPane`, keyed on the
+pane's own width, never the device, so it holds on any display and the companion and follows Interface size) steps
+the scale one rung down: row titles and body at Label 15, supporting lines and values at Caption 13, the pane's
+title stays Title 24. The Quick Menu's pane is one (about 400dp on the console's internal screen). In such a pane
+the focused row's sentence opens under that row, and the strip at the foot keeps only what changes (a status, an
+armed confirmation), so the footer is the hints, not a paragraph.
+
+**Show, then say** (owner, 2026-10-29, Droidtop/tracker#738: "we need to use visual indicators instead of words
+whenever possible. Numbers and words can be in ADDITION to them, but intuitive display should take priority").
+Wherever a state or a quantity can be drawn, it is drawn, and words or numbers sit beside the drawing, never in its
+place: progress is a bar, a ring or a segmented bar (`JobProgress`, `JobRing`; `parts` draws one segment per part
+of a release in parts or of several files), a job's state is its mark (a check, a cross) and its bar's look, not
+"Done" or "Failed" in a value column; quantities are meters or sliders with the number beside them; on and off is a
+switch; connection and sync are glyphs; droidtop's own badges are glyphs whose word is their accessible label (an
+ES-DE theme's own badges stay the theme's). Every drawing has its words for a screen reader (`JobLook.words`), and
+colour is never the only signal. A job row is its title, its bar or mark, and one short line under the title (where
+it stands, who runs it); it has no value column, which in a narrow pane took the title's width and broke it mid-word
+("Synct / hing"). Moved so far: the jobs list (Downloads, the Quick Menu's Downloads, Settings' "Downloads and
+installs"); the rest of the shell moves one surface at a time.
+
 **Colour.** One source per surface family, and the families are named so a screen cannot pick
 the wrong one. The shell's palette (`MenuTokens`) is absolute against its own grounds, so any
 panel that hosts it is painted from that same palette — a platform scheme underneath a

@@ -107,11 +107,24 @@ class PluginJobsScreenTest {
     fun `a row leads with the job's own name, and who runs it is the second line`() {
         val running = PluginJobsScreen.jobRow(job("a", 42).copy(title = "Love and Corruption"), nowMs = 0L)
         assertEquals("Love and Corruption", running.title)
-        assertEquals("GOG", running.subtitle)
+        // Where it stands, then who runs it, under the title: never a value column (Droidtop/tracker#739).
+        assertTrue(running.subtitle!!.endsWith("GOG"))
+        assertNull((running as NestedScreenItem).valueLabel)
+        assertTrue(running.summaryShown)
         val done = PluginJobsScreen.jobRow(job("d", 100, done = true).copy(title = "Theme pack"), nowMs = 0L)
         assertEquals("Theme pack", done.title)
         // A finished job with no error is done; only an error makes it a failure.
         assertEquals("GOG · Done", done.subtitle)
+        assertNull((done as NestedScreenItem).valueLabel)
+    }
+
+    @Test
+    fun `a job counted in parts draws a segment per part`() {
+        val parts = job("p", 40).copy(numbers = dev.droidtop.pluginhost.JobNumbers(itemsDone = 1, itemsTotal = 4))
+        assertEquals(4, PluginJobsScreen.partsOf(parts))
+        assertEquals(4, PluginJobsScreen.jobRow(parts, nowMs = 0L).progressParts)
+        assertEquals(0, PluginJobsScreen.partsOf(job("a", 40)))
+        assertEquals(0, PluginJobsScreen.partsOf(job("one", 40).copy(numbers = dev.droidtop.pluginhost.JobNumbers(itemsTotal = 1))))
     }
 
     @Test

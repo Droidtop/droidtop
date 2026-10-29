@@ -6,7 +6,9 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
@@ -271,9 +273,10 @@ object TypeRole {
     val supporting: TextStyle
         @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodySmall
 
-    /** What a setting is set to, in the value column. */
+    /** What a setting is set to, in the value column: Caption in a narrow pane ([NarrowPane]). */
     val value: TextStyle
-        @Composable @ReadOnlyComposable get() = MaterialTheme.typography.bodyMedium
+        @Composable @ReadOnlyComposable get() =
+            if (LocalNarrowPane.current) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium
 
     /** A group marker above a run of rows. Drawn uppercase, tracked out 4 percent, in the secondary colour. */
     val sectionLabel: TextStyle
@@ -318,6 +321,49 @@ val DroidtopTypography: Typography = Typography().let { stock ->
         labelMedium = stock.labelMedium.copy(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium),
         labelSmall = stock.labelSmall.copy(fontSize = 13.sp, lineHeight = 16.sp, fontWeight = FontWeight.Normal),
     )
+}
+
+/**
+ * The compact ladder (owner, 2026-10-29, Droidtop/tracker#739: "text in the QAM is still really big on the internal
+ * screen"): the scale one rung down, for a pane narrower than [NarrowPane.WIDTH_DP]. Row titles and body are Label
+ * 15, supporting lines and labels Caption 13 (the floor), and a pane's own title stays Title 24; the families are the
+ * theme's, untouched.
+ */
+fun Typography.compact(): Typography = copy(
+    headlineMedium = headlineMedium.copy(fontSize = 24.sp, lineHeight = 30.sp),
+    titleMedium = titleMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
+    titleSmall = titleSmall.copy(fontSize = 13.sp, lineHeight = 16.sp, letterSpacing = 0.4.sp),
+    bodyLarge = bodyLarge.copy(fontSize = 15.sp, lineHeight = 20.sp),
+    bodyMedium = bodyMedium.copy(fontSize = 15.sp, lineHeight = 20.sp),
+    bodySmall = bodySmall.copy(fontSize = 13.sp, lineHeight = 16.sp),
+    labelLarge = labelLarge.copy(fontSize = 13.sp, lineHeight = 16.sp),
+)
+
+/** True inside a pane narrower than [NarrowPane.WIDTH_DP]: its rows read the compact ladder and keep their sentence on the row. */
+val LocalNarrowPane = staticCompositionLocalOf { false }
+
+/**
+ * A sheet's or a side panel's pane (docs/SPEC.md 7k, "Type"): under [WIDTH_DP] wide, what is drawn in it reads the
+ * compact ladder ([compact]). Keyed on the pane's own width, never the device, so it holds on any display and on the
+ * companion and follows Interface size (#656), which already sizes the dp.
+ */
+object NarrowPane {
+    const val WIDTH_DP = 600
+
+    fun isNarrow(widthDp: Int): Boolean = widthDp in 1 until WIDTH_DP
+
+    @Composable
+    operator fun invoke(widthDp: Int, content: @Composable () -> Unit) {
+        if (!isNarrow(widthDp)) return content()
+        CompositionLocalProvider(LocalNarrowPane provides true) {
+            MaterialTheme(
+                colorScheme = MaterialTheme.colorScheme,
+                shapes = MaterialTheme.shapes,
+                typography = MaterialTheme.typography.compact(),
+                content = content,
+            )
+        }
+    }
 }
 
 /**

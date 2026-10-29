@@ -127,11 +127,21 @@ chips. 8 dp grid, 32 dp safe margin, 16 dp between tiles.
 | Section | 13 Medium, uppercase, +4% tracking, secondary colour | group headers |
 | Caption | 13 Regular | provenance, units; nothing important |
 
+In a pane under 600dp wide (a sheet, a side panel, the Quick Menu) the ladder steps one rung down: row titles and
+body Label 15, supporting lines and values Caption 13, the pane's title Title 24 (2026-10-29, #739).
+
 One sans family (a theme may supply its fonts); tabular figures wherever numbers change; at most two lines in a row,
 then an ellipsis. Focus has two styles, never mixed on one surface: art gets a 3 dp accent ring and a 6% lift; a row
 gets the accent at 22% behind it and a 4 dp accent bar at its leading edge. Focus never gets lost (a list that updates
 keeps the item; a removed item passes focus to the next), the ring shows with pad input and hides with touch, and
 returning to a screen restores its item.
+
+### Show, then say
+Owner, 2026-10-29 (#738): "we need to use visual indicators instead of words whenever possible. Numbers and words can
+be in ADDITION to them, but intuitive display should take priority". A state or quantity that can be drawn is drawn:
+progress as a bar, ring or segmented bar; a job's state as its mark; quantities as meters; on/off as a switch;
+connection and sync as glyphs; droidtop's badges as glyphs. Words and numbers go beside the drawing, never instead of
+it, every drawing keeps its words for a screen reader, and colour is never the only signal.
 
 ### One component set
 Page frame, sheet (left, right, bottom), anchored menu, work panel, dialog, row (nav, action, toggle, choice, slider,

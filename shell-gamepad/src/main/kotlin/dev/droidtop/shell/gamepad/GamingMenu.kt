@@ -482,6 +482,8 @@ internal fun MenuRow(
     // How that job's bar moves (CatalogItem.progressLook, Droidtop/tracker#643); a finished job's row, which has no
     // bar, draws its check or cross beside the title.
     progressLook: dev.droidtop.library.settings.JobLook? = dev.droidtop.library.settings.JobLook.of(progress),
+    // A job counted in parts (CatalogItem.progressParts): its bar in that many segments (Droidtop/tracker#738).
+    progressParts: Int = 0,
     // One status glyph beside the title (CatalogItem.statusMark, Droidtop/tracker#644): a plugin that needs you.
     statusMark: dev.droidtop.library.settings.StatusMark? = null,
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
@@ -599,7 +601,7 @@ internal fun MenuRow(
             }
             if (progress != null) {
                 Row(Modifier.padding(top = Space.Sm), verticalAlignment = Alignment.CenterVertically) {
-                    ShellProgressBar(progress, Modifier.weight(1f), progressLook ?: dev.droidtop.library.settings.JobLook.of(progress)!!)
+                    ShellProgressBar(progress, Modifier.weight(1f), progressLook ?: dev.droidtop.library.settings.JobLook.of(progress)!!, parts = progressParts)
                     // The percent only where the cursor is, in figures that keep their width (Droidtop/tracker#643:
                     // "Percent only on focus, in tabular figures").
                     if (selected && progress >= 0f && progressLook == dev.droidtop.library.settings.JobLook.ACTIVE) {
@@ -655,7 +657,7 @@ internal fun MenuRow(
                         Text(
                             value,
                             color = valueColor,
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = TypeRole.value,
                             textAlign = if (columnWidth != null) TextAlign.Center else TextAlign.Unspecified,
                             maxLines = valueLines,
                             overflow = TextOverflow.Ellipsis,
@@ -680,15 +682,15 @@ internal fun MenuRow(
                         },
                     ),
                 ) {
-                    if (selected && adjustable) Text("‹ ", color = valueColor, style = MaterialTheme.typography.bodyMedium)
+                    if (selected && adjustable) Text("‹ ", color = valueColor, style = TypeRole.value)
                     ValueChip(value, valueTone)
-                    if (selected && adjustable) Text(" ›", color = valueColor, style = MaterialTheme.typography.bodyMedium)
+                    if (selected && adjustable) Text(" ›", color = valueColor, style = TypeRole.value)
                 }
             } else {
                 Text(
                     if (selected && adjustable) "‹ $value ›" else value,
                     color = valueColor,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = TypeRole.value,
                     textAlign = TextAlign.End,
                     maxLines = valueLines,
                     overflow = TextOverflow.Ellipsis,
@@ -820,8 +822,9 @@ internal fun ShellProgressBar(
     fraction: Float,
     modifier: Modifier = Modifier,
     look: dev.droidtop.library.settings.JobLook = dev.droidtop.library.settings.JobLook.of(fraction)!!,
+    parts: Int = 0,
 ) {
-    dev.droidtop.ui.shared.JobProgress(fraction, look, shellJobColors(), modifier, height = ProgressLook.Height)
+    dev.droidtop.ui.shared.JobProgress(fraction, look, shellJobColors(), modifier, height = ProgressLook.Height, parts = parts)
 }
 
 /**

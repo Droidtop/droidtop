@@ -240,56 +240,60 @@ internal fun QuickMenu(
         val pane: @Composable (Modifier) -> Unit = { paneModifier ->
             // Top and bottom only: the heading and the drawn sections take the sheet's 16dp side gutter themselves, and a
             // catalog section takes it from its own gutter, sized to the pane (Droidtop/tracker#649).
-            Column(modifier = paneModifier.padding(vertical = 16.dp)) {
-                // L1/R1 step the rail; the glyphs beside the section's
-                // name say so instead of a "Switch tab" hint-bar pill
-                // (owner, 2026-09-25).
-                // The section's name in the heading role, as Steam's panels head
-                // theirs (it was a small label, ui-compare pair 10).
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
-                    ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
-                    Text(
-                        section.label,
-                        style = TypeRole.screenTitle,
-                        color = MenuTokens.OnSurface,
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    ShoulderGlyph("R1", modifier = Modifier.padding(start = 8.dp))
-                }
-                // Closing's touch route is the hint row's own "B Close"
-                // pill, which dispatches a real B into this window.
-                // key(): sections share one composable (the tile
-                // grids), and a cursor must not carry from one to
-                // the next.
-                key(section) {
-                    when (section) {
-                        // Catalog pages (Social, Downloads, Plugins and every plugin's page) pad their rows by the
-                        // window's content gutter. Under the window's own size that was 2.8 percent of the whole
-                        // screen inside a sheet a third as wide, on top of the pane's 16dp: 36dp + 16dp a side at
-                        // 1280dp, 54dp + 16dp at 1920dp (owner: "The plugin pages have margins that are ridiculously
-                        // large", Droidtop/tracker#649). They now see the pane as their window, so the gutter is the
-                        // scale's floor, 16dp, and it is the only one.
-                        QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS ->
-                            CompositionLocalProvider(LocalShellWindow provides window.copy(widthDp = paneWidthDp)) {
+            // A pane under 600dp reads the compact ladder (Droidtop/tracker#739): the sheet is about 400dp on the
+            // console's internal screen, where the full-screen roles wrapped a notification to four lines.
+            NarrowPane(paneWidthDp) {
+                Column(modifier = paneModifier.padding(vertical = 16.dp)) {
+                    // L1/R1 step the rail; the glyphs beside the section's
+                    // name say so instead of a "Switch tab" hint-bar pill
+                    // (owner, 2026-09-25).
+                    // The section's name in the heading role, as Steam's panels head
+                    // theirs (it was a small label, ui-compare pair 10).
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 8.dp)) {
+                        ShoulderGlyph("L1", modifier = Modifier.padding(end = 8.dp))
+                        Text(
+                            section.label,
+                            style = TypeRole.screenTitle,
+                            color = MenuTokens.OnSurface,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false),
+                        )
+                        ShoulderGlyph("R1", modifier = Modifier.padding(start = 8.dp))
+                    }
+                    // Closing's touch route is the hint row's own "B Close"
+                    // pill, which dispatches a real B into this window.
+                    // key(): sections share one composable (the tile
+                    // grids), and a cursor must not carry from one to
+                    // the next.
+                    key(section) {
+                        when (section) {
+                            // Catalog pages (Social, Downloads, Plugins and every plugin's page) pad their rows by the
+                            // window's content gutter. Under the window's own size that was 2.8 percent of the whole
+                            // screen inside a sheet a third as wide, on top of the pane's 16dp: 36dp + 16dp a side at
+                            // 1280dp, 54dp + 16dp at 1920dp (owner: "The plugin pages have margins that are ridiculously
+                            // large", Droidtop/tracker#649). They now see the pane as their window, so the gutter is the
+                            // scale's floor, 16dp, and it is the only one.
+                            QuickSection.SOCIAL, QuickSection.DOWNLOADS, QuickSection.PLUGINS ->
+                                CompositionLocalProvider(LocalShellWindow provides window.copy(widthDp = paneWidthDp)) {
+                                    when (section) {
+                                        QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
+                                        QuickSection.DOWNLOADS -> DownloadsSection(close)
+                                        else -> PluginsTab(runningEntry, placeAvailable, close)
+                                    }
+                                }
+                            else -> Box(Modifier.padding(horizontal = 16.dp)) {
                                 when (section) {
-                                    QuickSection.SOCIAL -> PlaceCatalogView(PLACE_SOCIAL_SCREEN_ID, onBack = close)
-                                    QuickSection.DOWNLOADS -> DownloadsSection(close)
-                                    else -> PluginsTab(runningEntry, placeAvailable, close)
+                                    QuickSection.GAME -> runningEntry?.let {
+                                        GameTab(it, library, onResume, onQuit, onKill, quitOutcome, close, onSearchSystem)
+                                    }
+                                    QuickSection.APPS -> AppsTab(close)
+                                    QuickSection.NOTIFICATIONS -> NotificationsTab(close)
+                                    QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
+                                        QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
+                                    QuickSection.PERFORMANCE -> PerformanceSection(close)
+                                    else -> Unit
                                 }
-                            }
-                        else -> Box(Modifier.padding(horizontal = 16.dp)) {
-                            when (section) {
-                                QuickSection.GAME -> runningEntry?.let {
-                                    GameTab(it, library, onResume, onQuit, onKill, quitOutcome, close, onSearchSystem)
-                                }
-                                QuickSection.APPS -> AppsTab(close)
-                                QuickSection.NOTIFICATIONS -> NotificationsTab(close)
-                                QuickSection.CONNECTIONS, QuickSection.SYSTEM, QuickSection.AUDIO, QuickSection.DISPLAY ->
-                                    QuickSettingsPanel(section, sheetWidth.value.toInt() - RailWidthDp, openPlace, close)
-                                QuickSection.PERFORMANCE -> PerformanceSection(close)
-                                else -> Unit
                             }
                         }
                     }

@@ -113,6 +113,12 @@ sealed interface CatalogItem {
      */
     val progressLook: JobLook? get() = JobLook.of(progress)
 
+    /**
+     * How many parts that job is counted in (a release in parts, several files, Droidtop/tracker#738): its bar is drawn
+     * as that many segments, filled part by part. 0 or 1 is one plain bar; more than [JobLook.MAX_PARTS] is one bar too.
+     */
+    val progressParts: Int get() = 0
+
     /** One status glyph beside the name ([StatusMark]); null for a row that is fine or has no status. */
     val statusMark: StatusMark? get() = null
 
@@ -230,6 +236,7 @@ class ActionItem(
     val state: Boolean? = null,
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
+    override val progressParts: Int = 0,
     override val statusMark: StatusMark? = null,
     override val chip: RowTag? = null,
     override val iconFile: String? = null,
@@ -440,6 +447,7 @@ class NestedScreenItem(
     override val icon: CatalogIcon? = null,
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
+    override val progressParts: Int = 0,
     override val statusMark: StatusMark? = null,
     override val chip: RowTag? = null,
     override val iconFile: String? = null,
