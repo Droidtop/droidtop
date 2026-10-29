@@ -8,7 +8,7 @@
     <string name="desktop_output_failed_hint">Restart it from Start, under System.</string>
     <string name="desktop_starting_detail">The first start downloads a Linux system and sets up the desktop in it, which takes several minutes.</string>
     <string name="desktop_starting">Starting the desktop…</string>
-    <string name="desktop_start_failed">The desktop didn\'t start</string>
+    <string name="desktop_start_failed">Desktop session failed to start</string>
     <string name="desktop_try_again">Try again</string>
     <string name="desktop_setup">Desktop setup</string>
     <string name="desktop_set_up">Set up the desktop</string>
