@@ -1709,7 +1709,8 @@ private fun EntryDetailScreen(
             val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
                 .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }
             val systemId = entry.systemId
-            if (gamesRoot != null && systemId != null) {
+            // The person's own shots of it come first (Droidtop/tracker#596).
+            dev.droidtop.library.GameScreenshots.of(context, entry.id) + if (gamesRoot != null && systemId != null) {
                 dev.droidtop.library.EsDeArtwork.allMedia(gamesRoot, systemId, romFile.nameWithoutExtension)
             } else {
                 emptyList()

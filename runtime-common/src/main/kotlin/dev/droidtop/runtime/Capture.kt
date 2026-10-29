@@ -23,10 +23,18 @@ import kotlin.coroutines.resume
  *   `screencap -d` wants a physical display id that apps are not given);
  * - else droidtop's accessibility service takes it (`AccessibilityService.takeScreenshot`, Android 11 and later, any
  *   screen): that service's second job beside typing, registered as [accessibility] while it is connected.
- * The picture is saved to Pictures/Screenshots like Android's own, and handed back for Share.
+ * The picture is saved to Pictures/Screenshots like Android's own, and handed back for Share. While a game droidtop
+ * started is running, it is also filed under that game ([fileUnderGame], Droidtop/tracker#596).
  */
 object Capture {
     enum class Route { PROVIDER, ACCESSIBILITY, NONE }
+
+    /**
+     * Files a saved shot under the running game too (the library's `GameScreenshots.save`, set by the app, which
+     * knows the running game): true when it did, false when no game is running.
+     */
+    @Volatile
+    var fileUnderGame: ((context: Context, name: String, bytes: ByteArray) -> Boolean)? = null
 
     /** Takes a screenshot of a display and hands the picture back (null when Android refused). */
     fun interface Shooter {
@@ -79,7 +87,8 @@ object Capture {
         }
         if (bytes == null || bytes.isEmpty()) return@withContext Shot(null, "Android did not take the screenshot")
         val uri = save(context, name, bytes) ?: return@withContext Shot(null, "Could not save the screenshot")
-        Shot(uri, "Saved to Pictures/Screenshots")
+        val filed = runCatching { fileUnderGame?.invoke(context, name, bytes) }.getOrNull() == true
+        Shot(uri, if (filed) "Saved to Pictures/Screenshots and to the game's page" else "Saved to Pictures/Screenshots")
     }
 
     /** Saves [bytes] as Pictures/Screenshots/[name] (MediaStore on Android 10 and later, else droidtop's own folder). */

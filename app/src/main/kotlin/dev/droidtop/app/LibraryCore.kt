@@ -75,6 +75,8 @@ object LibraryCore {
             )
         // Where a store game's Wine prefix is, for its cloud saves (docs/SPEC.md 7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.locator = dev.droidtop.runtime.windows.DroidtopWinePrefixLocator
+        // A screenshot taken during a game is filed under it too (Droidtop/tracker#596).
+        dev.droidtop.runtime.Capture.fileUnderGame = { context, name, bytes -> dev.droidtop.library.GameScreenshots.save(context, name, bytes) }
         return Library(
             listOf(
                 NativeAppProvider(app),
