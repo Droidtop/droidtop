@@ -2,11 +2,15 @@ package dev.droidtop.app.update
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 
 /**
  * The forced update pass: check the release feed right now, and install
@@ -63,7 +67,7 @@ object UpdateNow {
     }
 
     /**
-     * Starts a pass on a thread of its own and returns at once; a pass already running is joined, not
+     * Starts a pass in the background ([passScope]) and returns at once; a pass already running is joined, not
      * doubled. [onHandedOff] runs once this caller no longer needs droidtop's process for it: when the
      * pass ends, or at once when an earlier pass is joined. The UPDATE_NOW receiver finishes its broadcast there
      * (or at its own hold limit, [broadcastHoldMs]); the download job goes on in Downloads either way and is
@@ -76,23 +80,26 @@ object UpdateNow {
 
     /** [start]'s bookkeeping, apart from the context so it can be tested. False when an earlier pass was joined. */
     internal fun launch(
-        work: () -> Unit,
+        work: suspend () -> Unit,
         onHandedOff: () -> Unit,
-        spawn: (Runnable) -> Unit = { Thread(it, "UpdateNow").start() },
+        spawn: (suspend () -> Unit) -> Unit = { body -> passScope.launch { body() } },
     ): Boolean {
         if (!begin()) {
             onHandedOff()
             return false
         }
-        spawn(Runnable {
+        spawn {
             try {
                 work()
             } finally {
                 onHandedOff()
             }
-        })
+        }
         return true
     }
+
+    /** Where a pass runs: off the caller, on IO, outliving the screen or broadcast that asked for it. */
+    private val passScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** Starts a pass (or joins the one running) and waits for it, narrating through [onStatus]: the Check now row. */
     suspend fun startAndAwait(context: Context, onStatus: (String) -> Unit): String {
@@ -107,7 +114,7 @@ object UpdateNow {
      * [runNow] as the pass that [start] began: its narration kept in [pass], and always ending with [pass]
      * not running and the outcome set.
      */
-    private fun runPass(context: Context): String {
+    private suspend fun runPass(context: Context): String {
         val outcome = try {
             runNow(context) { line -> passState.update { it.copy(line = line) } }
         } catch (error: Throwable) {
@@ -118,15 +125,14 @@ object UpdateNow {
     }
 
     /**
-     * Checks now and installs if newer. Blocking: call from a worker
-     * thread. Returns the one-line outcome, which is also logged under
+     * Checks now and installs if newer, on [passScope]'s IO thread. Returns the one-line outcome, which is also logged under
      * [TAG] so the adb path can be read back with logcat. Throws nothing;
      * a failed check or download comes back as its message.
      *
      * The APK comes from droidtop's own downloader ([UpdateDownload]); the pass stays with the download job to its
      * end, which is the installer's answer.
      */
-    private fun runNow(context: Context, onStatus: (String) -> Unit): String {
+    private suspend fun runNow(context: Context, onStatus: (String) -> Unit): String {
         val application = context.applicationContext
         val installed = AppSelfUpdate.installedVersionCode(application)
         onStatus("Checking for a newer build...")
@@ -169,7 +175,7 @@ object UpdateNow {
                 }
                 UpdateDownload.Found.Missing -> {
                     onStatus("Downloading ${info.versionName}...")
-                    log(kotlinx.coroutines.runBlocking { UpdateDownload.download(application, info, onStatus) })
+                    log(UpdateDownload.download(application, info, onStatus))
                 }
             }
         } catch (error: Exception) {

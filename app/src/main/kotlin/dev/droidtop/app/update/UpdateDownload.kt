@@ -9,6 +9,8 @@ import dev.droidtop.pluginhost.PluginResult
 import dev.droidtop.shared.trust.Sha256
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.withContext
 
 /**
@@ -113,14 +115,17 @@ internal object UpdateDownload {
         return line(result)
     }
 
-    /** Waits for the running job [jobId] to end and returns the line to report. Blocking. */
-    fun await(jobId: String, onStatus: (String) -> Unit): String {
-        while (true) {
-            val entry = PluginJobsCenter.entries().value.firstOrNull { it.jobId == jobId } ?: return "the update download is no longer listed"
-            if (entry.done) return entry.result?.let(::line) ?: entry.statusLine
-            onStatus(if (entry.percent in 0..99) "${entry.statusLine} (${entry.percent}%)" else entry.statusLine)
-            Thread.sleep(1_000L)
-        }
+    /** Waits for the running job [jobId] to end, narrating its progress through [onStatus], and returns the line to report. */
+    suspend fun await(jobId: String, onStatus: (String) -> Unit): String {
+        val ended = PluginJobsCenter.entries()
+            .onEach { entries ->
+                entries.firstOrNull { it.jobId == jobId }?.takeIf { !it.done }?.let { entry ->
+                    onStatus(if (entry.percent in 0..99) "${entry.statusLine} (${entry.percent}%)" else entry.statusLine)
+                }
+            }
+            .first { entries -> entries.firstOrNull { it.jobId == jobId }?.done != false }
+            .firstOrNull { it.jobId == jobId } ?: return "the update download is no longer listed"
+        return ended.result?.let(::line) ?: ended.statusLine
     }
 
     private fun line(result: PluginResult): String =

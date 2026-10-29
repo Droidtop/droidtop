@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 
 /**
  * The two things the UPDATE_NOW trigger promises: only shell, root, the
@@ -81,14 +82,14 @@ class UpdateNowTest {
 
     @Test
     fun `a started pass runs off the caller and hands off only once it has run`() {
-        val spawned = mutableListOf<Runnable>()
+        val spawned = mutableListOf<suspend () -> Unit>()
         var ran = false
         var handedOff = 0
         assertTrue(UpdateNow.launch({ ran = true }, { handedOff++ }) { spawned += it })
         assertFalse(ran)
         assertEquals(0, handedOff)
         assertEquals(1, spawned.size)
-        spawned.single().run()
+        runBlocking { spawned.single()() }
         assertTrue(ran)
         assertEquals(1, handedOff)
         UpdateNow.finish("done")
@@ -97,7 +98,7 @@ class UpdateNowTest {
     @Test
     fun `joining a running pass hands off at once and starts nothing`() {
         assertTrue(UpdateNow.begin())
-        val spawned = mutableListOf<Runnable>()
+        val spawned = mutableListOf<suspend () -> Unit>()
         var handedOff = 0
         assertFalse(UpdateNow.launch({ error("must not run") }, { handedOff++ }) { spawned += it })
         assertEquals(1, handedOff)
@@ -107,10 +108,10 @@ class UpdateNowTest {
 
     @Test
     fun `the hand off still happens when the pass throws`() {
-        val spawned = mutableListOf<Runnable>()
+        val spawned = mutableListOf<suspend () -> Unit>()
         var handedOff = 0
         UpdateNow.launch({ error("boom") }, { handedOff++ }) { spawned += it }
-        runCatching { spawned.single().run() }
+        runCatching { runBlocking { spawned.single()() } }
         assertEquals(1, handedOff)
         UpdateNow.finish("done")
     }
