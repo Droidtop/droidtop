@@ -6,7 +6,10 @@ import dev.droidtop.pluginhost.PluginJobsCenter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 
 /**
@@ -46,7 +49,15 @@ object LibraryRescanJob {
      * Starts the rescan job, or follows the one already running, telling [onStatus] its line until it ends; returns
      * how it ended. A job cancelled from Downloads ends with "Rescan cancelled.".
      */
-    private suspend fun runAsJob(context: Context, pcOnly: Boolean, onStatus: (String) -> Unit): String {
+    private suspend fun runAsJob(context: Context, pcOnly: Boolean, onStatus: (String) -> Unit): String =
+        try {
+            runJob(context, pcOnly, onStatus)
+        } finally {
+            // The scan's lines are on disk when it is over, whoever reads the file next.
+            withContext(NonCancellable + Dispatchers.IO) { ScanLog.flush() }
+        }
+
+    private suspend fun runJob(context: Context, pcOnly: Boolean, onStatus: (String) -> Unit): String {
         val jobId = running().firstOrNull()?.jobId
             // The jobs center is attached at start (SettingsCatalogInitProvider), so no context is passed to attach it again.
             ?: PluginJobsCenter.startNative(

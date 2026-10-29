@@ -21182,8 +21182,13 @@ whose stack holds droidtop's own code as `droidtop.StrictMode` with the first su
 StrictMode's own log, unfiltered). Libraries' own work is not reported. A rig run fails on a `droidtop.StrictMode`
 line. The classes that block the main thread on purpose (`UpdateRelaunch` and `CrashRecovery`, both `commit()`, the
 value having to be on disk before the process goes) are listed in `DebugStrictMode` with their reasons; a violation
-that is intended gets the same entry, one that is not gets fixed. The list starts with those two because they are
-the ones known today: the first rig run is what shows the rest.
+that is intended gets the same entry, one that is not gets fixed. An entry is a class or `class#method`. The first
+emulator run (Droidtop/tracker#735) showed the rest at start-up, decided on 2026-10-29: `DroidtopBackup#finishPendingRestore`
+(two existence checks that must finish before a database opens, #625) is an entry; the scan log's file writes were
+fixed. `ScanLog` hands each line to `OrderedFileWriter`, one background thread that appends in the order the lines
+were written and rotates the file, so no caller waits on the disk; `ScanLog.flush` waits (bounded) for the lines
+handed over so far, and is called at the end of a library rescan and first thing in the crash handler, whose note
+reads the last lines of the file.
 
 A handheld is used away from a computer, so the evidence for a defect has
 to be gathered on the device, by the person holding it, and handed over

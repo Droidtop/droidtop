@@ -14,7 +14,7 @@ import java.util.concurrent.Executors
  * of ours it points at. A rig run fails on a [TAG] line, so a regression shows up there and not as a handheld that
  * feels slow. Code of the libraries droidtop is built on is not reported: it is not ours to fix here.
  *
- * Nothing is reported for the [ALLOWED] classes, which block the main thread on purpose. Add a class there only
+ * Nothing is reported for the [ALLOWED] classes and methods, which block the main thread on purpose. Add a class there only
  * with the reason beside it.
  */
 object DebugStrictMode {
@@ -25,12 +25,22 @@ object DebugStrictMode {
         "dev.droidtop.app.update.UpdateRelaunch",
         // commit(): the crash count has to survive the crash that is about to happen.
         "dev.droidtop.library.diagnostics.CrashRecovery",
+        // Two existence checks, first thing in Application.onCreate: a restore the person staged must be in place before
+        // anything opens a database (Droidtop/tracker#625), so this one cannot move off the main thread.
+        "dev.droidtop.app.settings.DroidtopBackup#finishPendingRestore",
     )
+
+    /** An entry is a class (every method of it) or `class#method` (that method only). */
+    private fun allows(entry: String, frame: StackTraceElement): Boolean {
+        val className = entry.substringBefore('#')
+        val method = entry.substringAfter('#', "")
+        return frame.className.startsWith(className) && (method.isEmpty() || frame.methodName == method)
+    }
 
     /** The frame of droidtop's own code a violation points at, or null when it is not ours or is allowed. */
     internal fun reportedFrame(stack: Array<StackTraceElement>): StackTraceElement? {
         val own = stack.firstOrNull { it.className.startsWith("dev.droidtop.") } ?: return null
-        return if (ALLOWED.any { own.className.startsWith(it) }) null else own
+        return if (ALLOWED.any { allows(it, own) }) null else own
     }
 
     fun install(app: Application) {

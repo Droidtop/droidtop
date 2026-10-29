@@ -240,10 +240,11 @@ object ScanLog {
     /** Rotated at a quarter megabyte: two files, never unbounded growth. */
     private const val MAX_LOG_BYTES = 256L * 1024L
 
-    @Volatile
-    private var logFile: File? = null
-
-    private val fileLock = Any()
+    /**
+     * The file is written by one background thread, in order ([OrderedFileWriter]), because a line written on the main
+     * thread at start-up was a disk write there (the StrictMode watch of Droidtop/tracker#729 reported it).
+     */
+    private val writer = OrderedFileWriter(MAX_LOG_BYTES)
 
     /**
      * The storage root of everything droidtop records about itself: the
@@ -266,16 +267,29 @@ object ScanLog {
      * belongs to the shared core, not to a mode.
      */
     fun install(context: Context) {
-        val dir = logsDir(context)
-        runCatching { dir.mkdirs() }
-        logFile = File(dir, LOG_NAME)
-        // The version NAME carries the build number ("0.2.0-dev.539"),
-        // so one line says which build produced everything under it.
-        val version = runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "unknown build"
-        write("droidtop $version started; this log is also at ${logFile?.absolutePath}")
+        val app = context.applicationContext
+        // All of it on the writer's thread: finding the folder is disk work, and the lines written after this call
+        // are queued behind it, so they find the file set.
+        writer.run {
+            val dir = logsDir(app)
+            runCatching { dir.mkdirs() }
+            writer.file = File(dir, LOG_NAME)
+            // The version NAME carries the build number ("0.2.0-dev.539"),
+            // so one line says which build produced everything under it.
+            val version = runCatching {
+                app.packageManager.getPackageInfo(app.packageName, 0).versionName
+            }.getOrNull() ?: "unknown build"
+            val line = "droidtop $version started; this log is also at ${writer.file?.absolutePath}"
+            android.util.Log.i(TAG, line)
+            writer.appendNow(timestamp() + " " + line + System.lineSeparator())
+        }
     }
+
+    /**
+     * Waits, for at most [timeoutMs], until every line written so far is in the file: at the end of a scan, and in the
+     * crash handler before it reads the log for its note. False when the time ran out.
+     */
+    fun flush(timeoutMs: Long = 2_000L): Boolean = writer.flush(timeoutMs)
 
     /**
      * One scan line, to logcat and to droidtop's own copy of the log.
@@ -284,17 +298,7 @@ object ScanLog {
      */
     fun write(line: String) {
         android.util.Log.i(TAG, line)
-        val file = logFile ?: return
-        synchronized(fileLock) {
-            runCatching {
-                if (file.length() > MAX_LOG_BYTES) {
-                    val previous = File(file.parentFile, "$LOG_NAME.1")
-                    previous.delete()
-                    file.renameTo(previous)
-                }
-                file.appendText(timestamp() + " " + line + System.lineSeparator())
-            }
-        }
+        writer.append(timestamp() + " " + line + System.lineSeparator())
     }
 
     /** [summary]'s line, emitted. */

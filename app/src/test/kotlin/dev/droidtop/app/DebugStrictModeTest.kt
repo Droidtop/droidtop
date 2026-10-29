@@ -24,4 +24,12 @@ class DebugStrictModeTest {
         assertNull(DebugStrictMode.reportedFrame(arrayOf(frame("android.os.StrictMode"), frame("dev.droidtop.app.update.UpdateRelaunch", "arm"))))
         assertNull(DebugStrictMode.reportedFrame(arrayOf(frame("dev.droidtop.library.diagnostics.CrashRecovery\$install\$1"))))
     }
+
+    @Test
+    fun anAllowedMethodIsNotReportedButItsClassesOtherMethodsAre() {
+        val restore = arrayOf(frame("android.os.StrictMode"), frame("dev.droidtop.app.settings.DroidtopBackup", "finishPendingRestore"))
+        assertNull(DebugStrictMode.reportedFrame(restore))
+        val export = arrayOf(frame("android.os.StrictMode"), frame("dev.droidtop.app.settings.DroidtopBackup", "export"))
+        assertEquals("export", DebugStrictMode.reportedFrame(export)!!.methodName)
+    }
 }

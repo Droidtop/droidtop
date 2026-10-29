@@ -79,7 +79,9 @@ object CrashRecovery {
 
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            // Synchronous, before anything else: the process is about to die.
+            // Synchronous, before anything else: the process is about to die. The scan log's last lines are queued for
+            // its writer thread, and the note below reads them from the file, so they go first (a second at most).
+            runCatching { ScanLog.flush(1_000L) }
             runCatching { writeNote(app, thread, error) }
             runCatching {
                 val next = countAfterCrash(prefs(app).getInt(KEY_COUNT, 0), SystemClock.elapsedRealtime() - started)
