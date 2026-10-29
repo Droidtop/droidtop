@@ -3753,10 +3753,10 @@ the `ContainerRuntime` interface that already exists (§3):
   shortcut: we only care about it working when droidtop is the home, so can we use home + something else?" and
   "Home + r2 gets the quick menu, and home +l2 gives the local contextual menu/companion-style overlay. This gives us
   something much more steam-like. Also, home + whatever opens our left menu can give us a left menu overlay, maybe
-  we can draw just the launcher stuff into the overlay. Not backgrounding the game, just drawing over it". While
-  another app is in front, **HOME + R2** opens the Quick Menu, **HOME + L2** the context menu (what L2 Options shows
-  for the current game, as the companion draws it) and **HOME + Start** the left menu's launcher content, drawn over
-  the app without backgrounding it; **HOME alone** is HOME, as before. The input half (built 2026-10-29):
+  we can draw just the launcher stuff into the overlay. Not backgrounding the game, just drawing over it". Over
+  whatever is on screen (widened 2026-10-29: "home+ r2 draws over the screen, too. On steanos, the qam can always be
+  called up"), **HOME + R2** opens the Quick Menu, **HOME + L2** the menu of what is in front and **HOME + Start** the
+  left menu's launcher content, drawn over the screen without backgrounding it; **HOME alone** is HOME, as before. The input half (built 2026-10-29):
   - Even the home app never receives HOME, so the chord is read by droidtop's accessibility service ("droidtop
     keyboard and pointer", `TypingAccessibilityService`), whose key filter (`canRequestFilterKeyEvents`) is asked for
     only while droidtop is the default home (`HomeOverlayKeys`, read again when a window changes, at most every 2 s).
@@ -3793,24 +3793,36 @@ the `ContainerRuntime` interface that already exists (§3):
   - The overlay window is focusable, so the pad reaches it, and the sheet it opens, by Android's own focus (as the
     launch watchdog's card does), rather than through `OverlayRequests.keys`, which delivers to one view and not to a
     sub-window; the input half keeps that route for a host that wants it.
-  - HOME + R2 draws the Quick Menu over the app, unchanged: the shell's own (`QuickMenuStandalone`), with nothing
-    added for the game (the owner, 2026-10-29: "Your 'home + r2' implementation is wrong. You shouldn't be adding to
-    tbe quick menu. The pause goes in the overlay, which is supposed to be different").
-  - HOME + L2 is the running game's own overlay (`GameOptionsStandalone`), a surface of its own: the game's name and
-    what runs it, then **Resume** (closes the overlay; the game never left), **Pause the game** for a console game
-    (sends RetroArch's `PAUSE_TOGGLE` to its command port, `RetroArchCommands`, when pressed; pressed again carries
-    on), **Game options** (what L2 opens on the game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is
-    drawn over the game too, or a console game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail
-    screen; B there comes back to the overlay), and **Quit** and **Kill**, each on a second press, ending it the
-    shell's way (`Library.quitRunning`, `killRunning`) and closing the overlay once it has ended. Nothing else ever
-    pauses the game. With no game droidtop started in front, HOME + L2 does nothing (it logs so).
+  - **Over whatever is on screen** (the owner, 2026-10-29: "home+ r2 draws over the screen, too. On steanos, the qam
+    can always be called up"): any app or game, droidtop's own screens in every mode (Gaming, Standard, Desktop,
+    Settings), and Android's own screens (Settings, dialogs; the accessibility overlay draws over them, "Display over
+    other apps" only over apps). Drawn over, never backgrounding what is there; B, or the same chord again, closes it
+    and leaves everything as it was. The one limit is the earlier one: the chords exist while droidtop is the default
+    home. The key filter keeps the app whose window was in front when the chord came (`OverlayRequest.frontPackage`;
+    an overlay's own window is not counted, `OverlayRequests.open`).
+  - HOME + R2 draws the Quick Menu over the screen, unchanged: the shell's own (`QuickMenuStandalone`), the one R2 opens
+    in Gaming, with nothing added for a game (the owner, 2026-10-29: "Your 'home + r2' implementation is wrong. You
+    shouldn't be adding to tbe quick menu. The pause goes in the overlay, which is supposed to be different").
+  - HOME + L2 is the menu of what is in front, contextual like L2 itself:
+    - the game droidtop launched (in front, or with nothing else known to be): its own overlay
+      (`GameOptionsStandalone`), a surface of its own: the game's name and what runs it, **Resume** (closes the
+      overlay; the game never left), **Pause the game** for a console game (RetroArch's `PAUSE_TOGGLE` over its
+      command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Game options** (what L2
+      opens on the game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is drawn over the game too, or
+      a console game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail screen; B there comes back),
+      and **Quit** and **Kill**, each on a second press, ending it the shell's way (`Library.quitRunning`,
+      `killRunning`) and closing the overlay once it has ended. Nothing else ever pauses the game;
+    - another app, Android's Settings included (`AppInFrontStandalone`): its name, **Resume**, **Close the app** on a
+      second press (`TaskManager.close`, its outcome on the row) and **App info** (Android's page for it);
+    - droidtop's own screen: that screen's own context menu, the one L2 opens there (droidtop's foreground screen is
+      handed the L2 press the chord took); nothing is drawn by the overlay.
   - HOME + Start is the left menu's launcher content (`LeftMenuStandalone`): the shell's own `LeftMenu` with the
     destinations the UI mode allows (read from storage before it draws, so Kiosk and Kid never show the places), Resume
     first and the cursor on it while a game runs, then Search (`LauncherSearchActivity`, droidtop's one search). A
-    destination leaves the game for droidtop: a place through `PlaceLinks` (Gaming on it when Gaming is the mode in
-    use, else the screen host), any other section in Gaming. It is drawn only while Gaming is the mode in use
-    (`Place.opensInGaming`), so a row never switches the person into a mode they are not using; otherwise HOME + Start
-    does nothing. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
+    destination leaves the screen for droidtop: a place through `PlaceLinks` (Gaming on it when Gaming is the mode in
+    use, else the screen host), any other section in Gaming. Available in every mode: Gaming's own sections (Home, the
+    libraries, Apps, Settings) are offered only while Gaming is the mode in use (`Place.opensInGaming`), so a row never
+    switches the person into a mode they are not using; in Standard and Desktop it lists Search and the places. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a

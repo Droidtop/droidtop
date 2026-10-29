@@ -6,11 +6,12 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 
 /**
- * One of the in-game overlays droidtop draws over the app in front without backgrounding it (docs/SPEC.md "In-game
- * overlays", Droidtop/tracker#740), on [displayId], the display that app is on. The input lane raises it; the UI lane
- * draws it, and a second request of the same [kind] while it is open closes it.
+ * One of the overlays droidtop draws over whatever is on screen without backgrounding it (docs/SPEC.md "In-game
+ * overlays", Droidtop/tracker#740), on [displayId], the display in front. [frontPackage] is the app whose window was
+ * in front when the chord was pressed (droidtop's own included), for the overlays that depend on it; null when unknown.
+ * The input lane raises it; the UI lane draws it, and a second request of the same [kind] while it is open closes it.
  */
-data class OverlayRequest(val kind: Kind, val displayId: Int) {
+data class OverlayRequest(val kind: Kind, val displayId: Int, val frontPackage: String? = null) {
     enum class Kind {
         /** HOME + R2. */
         QUICK_MENU,
@@ -31,6 +32,13 @@ object OverlayRequests {
     val requests: SharedFlow<OverlayRequest> = flow.asSharedFlow()
 
     fun raise(request: OverlayRequest): Boolean = flow.tryEmit(request)
+
+    /**
+     * True while an overlay is drawn. Its own window coming to the front is not what the person was looking at, so the
+     * key filter keeps the app in front from before it.
+     */
+    @Volatile
+    var open: Boolean = false
 
     /**
      * Set by the overlay while it is open, null otherwise: the pad's keys go here and none reach the app. Called on

@@ -15,7 +15,8 @@ import dev.droidtop.runtime.overlay.OverlayRequests
 
 /**
  * The HOME chords through droidtop's accessibility service (docs/SPEC.md "In-game overlays", Droidtop/tracker#740):
- * HOME + R2, L2 or Start opens an overlay over the app in front ([OverlayRequests]); HOME alone is HOME. Even the
+ * HOME + R2, L2 or Start opens an overlay over whatever is on screen, any app, droidtop's own screens and Android's
+ * ([OverlayRequests]); HOME alone is HOME. Even the
  * home app never receives HOME itself, so only the service's key filter can see the chord.
  *
  * The filter is asked for only while droidtop is the default home, read again when a window changes (at most every
@@ -31,6 +32,10 @@ object HomeOverlayKeys {
     @Volatile
     private var frontDisplay = Display.DEFAULT_DISPLAY
 
+    /** The app whose window last came to the front, droidtop's own included: what HOME + L2's menu is about. */
+    @Volatile
+    private var frontPackage: String? = null
+
     fun connect(s: AccessibilityService) {
         checkedAt = 0L
         refresh(s)
@@ -38,7 +43,11 @@ object HomeOverlayKeys {
 
     fun onEvent(s: AccessibilityService, event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        if (android.os.Build.VERSION.SDK_INT >= 30) event.source?.window?.displayId?.let { frontDisplay = it }
+        // droidtop's own overlay coming to the front is not what the person was looking at.
+        if (!OverlayRequests.open) {
+            event.packageName?.toString()?.let { frontPackage = it }
+            if (android.os.Build.VERSION.SDK_INT >= 30) event.source?.window?.displayId?.let { frontDisplay = it }
+        }
         refresh(s)
     }
 
@@ -47,7 +56,7 @@ object HomeOverlayKeys {
         val fromPad = event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK)
         val sink = OverlayRequests.keys
         val decision = chords.onKey(event.keyCode, event.action == KeyEvent.ACTION_DOWN, event.repeatCount, fromPad, sink != null)
-        decision.open?.let { OverlayRequests.raise(OverlayRequest(it, frontDisplay)) }
+        decision.open?.let { OverlayRequests.raise(OverlayRequest(it, frontDisplay, frontPackage)) }
         if (decision.home) s.performGlobalAction(AccessibilityService.GLOBAL_ACTION_HOME)
         if (decision.toOverlay) sink?.invoke(event)
         return decision.consume
