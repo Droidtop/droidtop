@@ -11004,7 +11004,12 @@ pass implemented, all ported from cited real ES-DE source:
 - `systemstatus`: `customIcon` (4) -- themes ship a full wifi/cellular/
   battery icon set and droidtop drew unicode glyphs over the top of it.
   Real ES-DE's own defaults are Qt-resource SVGs droidtop cannot
-  redistribute, so the glyphs remain the fallback.
+  redistribute, so the fallback is the shell's own drawn network and
+  battery glyphs, in the element's colour and at its height, never emoji
+  from the device's font. The element reads the shell's one status source
+  (`SystemStatus.flow`), not a poll of its own, so it shows the same states
+  as the header: Wi-Fi without internet, wired, mobile, none
+  (Droidtop/tracker#659).
 - `rating`: `overlay` (4) and `interpolation` (4) -- and with them real
   ES-DE's CONTINUOUS clip geometry, so a 0.7 rating renders three and a
   half stars rather than droidtop's previous rounding to four.
@@ -11884,8 +11889,8 @@ rows too, by id (`QuickTiles.CONFIGURATION_IDS`), as the same items.
 
 **Battery tile (Droidtop/tracker#84).** The System tab's Battery row shows the
 live level, "charging" and Android's Battery Saver state ("83%, charging",
-"12%, saver on"), from the same `BatteryManager` sticky broadcast the themed
-`systemstatus` element reads, plus `PowerManager.isPowerSaveMode` (no
+"12%, saver on"), from the same `BatteryManager` sticky broadcast `SystemStatus`
+reads for the header and the themed `systemstatus` element, plus `PowerManager.isPowerSaveMode` (no
 permission). Pressing it opens the system's own Battery Saver screen, the same
 way Network and Bluetooth open theirs: an app cannot switch power-save mode
 (`setPowerSaveModeEnabled` is signature-only), so droidtop does not fake a

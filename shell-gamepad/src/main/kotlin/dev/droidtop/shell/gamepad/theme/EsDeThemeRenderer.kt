@@ -1,13 +1,7 @@
 package dev.droidtop.shell.gamepad.theme
 
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.os.BatteryManager
 import android.widget.ImageView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -138,6 +132,12 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.flowOn
+import dev.droidtop.runtime.systemstatus.NetworkKind
+import dev.droidtop.runtime.systemstatus.SystemStatus
+import dev.droidtop.runtime.systemstatus.SystemStatusSnapshot
+import dev.droidtop.shell.gamepad.BatteryGlyph
+import dev.droidtop.shell.gamepad.NetworkGlyph
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -2923,30 +2923,25 @@ private fun EsDeThemedBadges(element: EsDeThemeElement, viewWidth: Dp, viewHeigh
 
 /**
  * Real, honestly PARTIAL `systemstatus` rendering. Real ES-DE's own
- * `SystemStatusComponent` shows up to four real entry types (wifi/
- * cellular/bluetooth/battery, confirmed from `SystemStatusComponent.cpp`'s
- * own real `entries` handling). droidtop genuinely IS the host device
- * (unlike ES-DE's own desktop OS-status queries, this is real, live
- * on-device status, not fabricated) -- wifi/cellular via
- * `ConnectivityManager.getNetworkCapabilities` (real `ACCESS_NETWORK_STATE`,
- * declared in :app's own manifest), and
- * battery percent/charging via the real sticky `ACTION_BATTERY_CHANGED`
- * broadcast (no permission needed at all). Bluetooth is a real, deliberate
- * gap: reading adapter state needs `BLUETOOTH_CONNECT`, a dangerous
- * Android 12+ runtime permission -- not worth requesting for one
- * decorative status icon without checking with the user first, so it's
- * simply never included regardless of what a theme's own `entries`
- * property requests.
+ * `SystemStatusComponent` shows up to four entry types (wifi/cellular/
+ * bluetooth/battery, from `SystemStatusComponent.cpp`'s `entries`
+ * handling). droidtop is the host device, so the facts are live: they come
+ * from the one status source the header, the Quick Menu and the companion
+ * read (`SystemStatus.flow`, docs/SPEC.md 7j; Droidtop/tracker#659), so a
+ * theme says what the shell says, Wi-Fi without internet and a wired
+ * connection included. Bluetooth is a deliberate gap: reading adapter state
+ * needs `BLUETOOTH_CONNECT`, a dangerous Android 12+ runtime permission, not
+ * worth requesting for one decorative icon, so it is never included whatever
+ * a theme's `entries` asks for.
  *
- * Polled every 3s (matching [EsDeThemedClock]'s own live-tick pattern) --
- * real device status genuinely changes over time, unlike per-game data.
- * Icons come from the theme's own real `customIcon` declarations when it
- * ships them (real ES-DE's per-entry-type `icon_wifi`/`icon_cellular`/
- * `icon_battery_*`/`icon_bluetooth` attribute scheme, four of the ten
- * themes measured for this pass ship a full set), falling back to plain
- * unicode glyphs otherwise -- real ES-DE's OWN defaults are bundled
- * Qt-resource SVGs droidtop has no copy of, the same real licensing/IP
- * reason [EsDeThemedBadges] documents.
+ * Icons come from the theme's own `customIcon` declarations when it ships
+ * them (ES-DE's per-entry `icon_wifi`/`icon_cellular`/`icon_battery_*`/
+ * `icon_bluetooth` scheme; four of the ten themes measured ship a full set).
+ * Without them the shell's own drawn glyphs stand in ([NetworkGlyph],
+ * [BatteryGlyph]) in the element's colour and at its height, never an emoji
+ * from the device's font: ES-DE's own defaults are bundled Qt-resource SVGs
+ * droidtop has no copy of, the same licensing reason [EsDeThemedBadges]
+ * documents.
  */
 @Composable
 private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, viewHeight: Dp) {
@@ -2956,28 +2951,14 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
         ?: listOf("wifi", "cellular", "battery")
     val showAll = entries.contains("all")
 
-    var wifiConnected by remember { mutableStateOf(false) }
-    var cellularConnected by remember { mutableStateOf(false) }
-    var batteryPercent by remember { mutableStateOf<Int?>(null) }
-    var batteryCharging by remember { mutableStateOf(false) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-            val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
-            wifiConnected = caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
-            cellularConnected = caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true
-
-            val batteryStatus = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
-            val scale = batteryStatus?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
-            batteryPercent = if (level >= 0 && scale > 0) (level * 100 / scale) else null
-            val status = batteryStatus?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-            batteryCharging = status == BatteryManager.BATTERY_STATUS_CHARGING || status == BatteryManager.BATTERY_STATUS_FULL
-
-            delay(3000)
-        }
+    // The one status source the header, the Quick Menu and the companion read (docs/SPEC.md 7j, Droidtop/tracker#659),
+    // so a theme's status says what the shell's says: Wi-Fi without internet, wired, mobile, none.
+    val status by produceState<SystemStatusSnapshot?>(null, context) {
+        SystemStatus.flow(context).flowOn(Dispatchers.IO).collect { value = it }
     }
+    val snapshot = status ?: return
+    val batteryPercent = snapshot.batteryPercent
+    val batteryCharging = snapshot.charging
 
     val opacity = (element.valueOrNull<EsDeThemeValue.FloatValue>("opacity")?.value ?: 1f).coerceIn(0f, 1f)
     val color = element.valueOrNull<EsDeThemeValue.Color>("color")?.let { colorOf(it) } ?: inkOver(element)
@@ -3014,16 +2995,28 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
         else -> "battery_full"
     }
 
-    // Each real entry is either the theme's own icon file or the unicode
-    // fallback glyph droidtop has always used.
-    val parts = buildList<kotlin.Pair<String?, String>> {
-        if (showAll || entries.contains("wifi")) { if (wifiConnected) add(customIcon("wifi") to "📶") }
-        if (showAll || entries.contains("cellular")) { if (cellularConnected) add(customIcon("cellular") to "📱") }
-        if (showAll || entries.contains("battery")) {
-            batteryPercent?.let {
-                add(customIcon(batteryIconName()) to ((if (batteryCharging) "⚡" else "🔋") + "$it%"))
-            }
-        }
+    // Each entry is the theme's own icon file, or the shell's own drawn glyph in the element's colour at its height,
+    // never an emoji from the device's font (the glyphs differed by phone, Droidtop/tracker#659). The network entry
+    // is the one connection: Wi-Fi or wired under "wifi", mobile under "cellular"; with no connection a theme's icon
+    // set shows nothing, as ES-DE does, and the shell's glyph shows it crossed.
+    val network = snapshot.network
+    val wantsWifi = showAll || entries.contains("wifi")
+    val wantsCellular = showAll || entries.contains("cellular")
+    val networkIcon = when (network) {
+        NetworkKind.WIFI, NetworkKind.ETHERNET -> customIcon("wifi").takeIf { wantsWifi }
+        NetworkKind.CELLULAR -> customIcon("cellular").takeIf { wantsCellular }
+        NetworkKind.NONE -> null
+    }
+    val showsNetwork = when (network) {
+        NetworkKind.WIFI, NetworkKind.ETHERNET -> wantsWifi
+        NetworkKind.CELLULAR -> wantsCellular
+        NetworkKind.NONE -> wantsWifi && customIcon("wifi") == null
+    }
+    val showsBattery = (showAll || entries.contains("battery")) && batteryPercent != null
+    // (icon file, or null for the shell's glyph; whether it is the battery entry)
+    val parts = buildList<kotlin.Pair<String?, Boolean>> {
+        if (showsNetwork) add(networkIcon to false)
+        if (showsBattery) add(customIcon(batteryIconName()) to true)
     }
     if (parts.isEmpty()) return
 
@@ -3057,7 +3050,7 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
         horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        parts.forEach { (iconPath, glyph) ->
+        parts.forEach { (iconPath, isBattery) ->
             if (iconPath != null) {
                 AsyncImage(
                     model = iconPath,
@@ -3071,13 +3064,20 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.height(heightDp),
                 )
+            } else if (isBattery) {
+                // The shell's battery glyph at the element's height, and its percent in the theme's font.
+                val ink = color.copy(alpha = color.alpha * opacity)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp)) {
+                    BatteryGlyph(batteryPercent, batteryCharging, normal = ink, height = heightDp * 0.8f)
+                    Text(
+                        text = "$batteryPercent%",
+                        color = ink,
+                        fontSize = with(LocalDensity.current) { (heightDp * textRelativeScale).toSp() },
+                        fontFamily = themeFontFamily(element),
+                    )
+                }
             } else {
-                Text(
-                    text = glyph,
-                    color = color.copy(alpha = color.alpha * opacity),
-                    fontSize = with(LocalDensity.current) { (heightDp * textRelativeScale).toSp() },
-                    fontFamily = themeFontFamily(element),
-                )
+                NetworkGlyph(snapshot, normal = color.copy(alpha = color.alpha * opacity), height = heightDp)
             }
         }
     }

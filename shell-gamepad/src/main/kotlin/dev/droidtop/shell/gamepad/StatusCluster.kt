@@ -22,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -160,11 +161,15 @@ private fun statusDescription(clock: String, status: SystemStatusSnapshot?): Str
     return parts.joinToString(", ")
 }
 
+/**
+ * The connection as a drawn glyph: Wi-Fi arcs by signal, bars for wired and mobile, crossed when there is none, in the
+ * danger ink without internet. [normal] is its quiet ink and [height] its size (14dp in the header); a theme's status
+ * element without icons of its own draws this too, in its colour and at its height (Droidtop/tracker#659).
+ */
 @Composable
-private fun NetworkGlyph(status: SystemStatusSnapshot) {
+internal fun NetworkGlyph(status: SystemStatusSnapshot, normal: Color = MenuTokens.OnSurfaceMuted, height: Dp = 14.dp) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val stroke = remember(density) { Stroke(width = with(density) { 1.6.dp.toPx() }, cap = StrokeCap.Round) }
-    val normal = MenuTokens.OnSurfaceMuted
     val attention = MenuTokens.NoticeDanger
     val kind = status.network
     val level = status.wifiLevel
@@ -174,7 +179,7 @@ private fun NetworkGlyph(status: SystemStatusSnapshot) {
         else -> ((level * 3 + 3) / 4).coerceIn(1, 3)
     }
     val tint = if (kind == NetworkKind.NONE || !status.validated) attention else normal
-    Canvas(Modifier.size(width = 18.dp, height = 14.dp)) {
+    Canvas(Modifier.size(width = height * 18f / 14f, height = height)) {
         val dim = normal.copy(alpha = 0.3f)
         if (kind == NetworkKind.WIFI || kind == NetworkKind.NONE) {
             // Three arcs over a dot, centred on the bottom middle.
@@ -219,16 +224,17 @@ private fun NetworkGlyph(status: SystemStatusSnapshot) {
     }
 }
 
+/** The battery as a drawn glyph, filled to [percent]; green while charging, the danger ink when low. See [NetworkGlyph]. */
 @Composable
-private fun BatteryGlyph(percent: Int?, charging: Boolean) {
+internal fun BatteryGlyph(percent: Int?, charging: Boolean, normal: Color = MenuTokens.OnSurfaceMuted, height: Dp = 12.dp) {
     val density = androidx.compose.ui.platform.LocalDensity.current
     val stroke = remember(density) { Stroke(width = with(density) { 1.4.dp.toPx() }) }
     val tint = when {
         charging -> MenuTokens.Affirmative
         percent != null && percent <= LOW_BATTERY_PERCENT -> MenuTokens.NoticeDanger
-        else -> MenuTokens.OnSurfaceMuted
+        else -> normal
     }
-    Canvas(Modifier.size(width = 24.dp, height = 12.dp)) {
+    Canvas(Modifier.size(width = height * 2f, height = height)) {
         val nubW = 2.dp.toPx()
         val bodyW = size.width - nubW
         val half = stroke.width / 2f
