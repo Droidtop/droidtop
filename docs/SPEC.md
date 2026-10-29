@@ -22086,6 +22086,18 @@ configuration from a root task.
 
 ## 10b. Releases and updates (directed 2026-09-02)
 
+**Migrations to delete at the next release (owner, 2026-10-29,
+Droidtop/tracker#766).** A one-shot migration moves something an older
+build left behind, and runs on every start until it is deleted. Each one
+here is deleted in the first build after 0.2.0 is released, in one commit
+with its code, its test and this line:
+- `OciImageStore`: the old `image-cache` folder (`legacyCacheDir`).
+- `GameFolderIds`: reading a game's `.gamenative` id file (`legacyRead`).
+- `CredentialVault.migrateFrom`: the sign-ins kept in plain preferences.
+- `IntegrationStore`: the old `filesDir/integrations` folder.
+- `ShooterModeConfig`: the `legacyJoystick*` defaults.
+A migration added later names its own release here when it lands.
+
 Distribution is three different problems wearing one word, and each gets the
 strongest mechanism that is actually available to it -- nothing pretends to a
 capability Android does not grant.
@@ -24537,7 +24549,14 @@ implements the same format against its own root.
   (`PluginOriginKeys.sameTrustAnchor`). That legacy file, its test and the
   two old stored list files are deleted in the first droidtop release after
   every official plugin repository has published a certificate-format
-  release in the catalog. People who trust gamegrab's old organisation
+  release in the catalog. **Pending: none (checked 2026-10-29,
+  Droidtop/tracker#766).** The latest release of each official plugin
+  in droidtop's catalog carries `manifest.jws`: droidtop.fdroid 0.1.3,
+  droidtop.github-apps 0.1.3, droidtop.mmrl-modules 1.0.0,
+  droidtop.retroarch 1.7.0, droidtop.shizuku-bridge 1.5.0 and
+  droidtop.syncthing 1.0.0, so the deletion goes in the next release.
+  A new official plugin repository is added to this list until its first
+  certificate-format release. People who trust gamegrab's old organisation
   master see the changed-key warning once in Keys you trust when gamegrab
   publishes its new root; their legacy plugins stop when the person
   replaces the key, and their updates then install under gamegrab's root.
