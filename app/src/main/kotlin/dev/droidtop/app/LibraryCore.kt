@@ -75,6 +75,10 @@ object LibraryCore {
             )
         // Where a store game's Wine prefix is, for its cloud saves (docs/SPEC.md 7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.locator = dev.droidtop.runtime.windows.DroidtopWinePrefixLocator
+        // Install on a GOG installer's row (docs/SPEC.md 7g, "Installers in a games folder"): the one install door.
+        dev.droidtop.library.FolderInstalls.runner = { context, installer, title, onStatus ->
+            dev.droidtop.runtime.windows.WindowsInstalls.install(context, installer, null, title, onStatus)
+        }
         return Library(
             listOf(
                 NativeAppProvider(app),

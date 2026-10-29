@@ -226,7 +226,8 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
     /**
      * The ids of the entries that are on disk at or under [path], in any part.
      * A store row that is not installed is not on disk, even where its
-     * install path says it would go.
+     * install path says it would go; a GOG installer's row is, since its
+     * folder is the installer ([PcInfo.installer]).
      */
     fun idsUnder(path: String): List<String> =
         segments.flatMap { segment -> segment.entries.filter { it.isOnDiskUnder(path) }.map { it.id } }.distinct()
@@ -235,7 +236,7 @@ data class LibrarySlice(val segments: List<ScanStep.Segment> = emptyList()) {
     fun withoutUnder(path: String): LibrarySlice =
         copy(segments = segments.map { segment -> segment.copy(entries = segment.entries.filterNot { it.isOnDiskUnder(path) }) })
 
-    private fun LibraryEntry.isOnDiskUnder(path: String): Boolean = isUnder(path) && pcInfo?.installed != false
+    private fun LibraryEntry.isOnDiskUnder(path: String): Boolean = isUnder(path) && (pcInfo?.installed != false || pcInfo?.installer != null)
 
     private fun LibraryEntry.asMissing(): LibraryEntry = if (missing) this else copy(missing = true)
 }

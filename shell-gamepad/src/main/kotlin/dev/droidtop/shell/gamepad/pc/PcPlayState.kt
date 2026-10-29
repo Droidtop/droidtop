@@ -183,6 +183,8 @@ internal fun playStateOf(
         return PcPlayState("Folder is missing", missingFolderLine(entry), pressable = false, ready = false)
     }
     storeStageOf(entry, download)?.let { return storePlayState(it, entry, download) }
+    // A GOG installer in a games folder: A installs it, whatever runs the game afterwards (docs/SPEC.md 7g).
+    entry.pcInfo?.installer?.let { return installerPlayState(it) }
     val option = runner?.option
     val label = runner?.label.orEmpty()
     return when {
@@ -203,6 +205,18 @@ internal fun playStateOf(
             PcPlayState("Choose a runner", option?.reason ?: noRunnerLine, pressable = true, ready = false, chooseEngine = true)
     }
 }
+
+/**
+ * The button on a GOG installer's row ([dev.droidtop.library.PcInfo.installer]): Install, which takes the game out
+ * of the installer without running it ([dev.droidtop.library.FolderInstalls]). Not [PcPlayState.ready]: nothing
+ * launches.
+ */
+internal fun installerPlayState(installer: dev.droidtop.library.FolderInstaller): PcPlayState = PcPlayState(
+    "Install",
+    "Takes the game out of ${installer.file} without running it" + (installer.version?.let { ". Version $it" } ?: ""),
+    pressable = true,
+    ready = false,
+)
 
 /** The verb used by both the primary control and the shell's A hint. */
 internal fun primaryActionLabel(action: RunnerAction?): String = when (action) {
@@ -240,8 +254,8 @@ internal fun rememberPcPlayState(entry: LibraryEntry): Pair<PcPlayState, Resolve
         value = Triple(true, runner, line)
     }
     val (loaded, runner, noRunnerLine) = resolved
-    // A store stage needs no runner, so it is never held back by the lookup.
-    val state = if (loaded || storeStageOf(entry, download) != null) {
+    // A store stage or an installer needs no runner, so neither is held back by the lookup.
+    val state = if (loaded || storeStageOf(entry, download) != null || entry.pcInfo?.installer != null) {
         if (noRunnerLine != null) {
             playStateOf(runner, entry, download, noRunnerLine, windowsSetup)
         } else {

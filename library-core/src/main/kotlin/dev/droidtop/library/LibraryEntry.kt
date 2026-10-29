@@ -363,6 +363,13 @@ data class PcInfo(
      * store's own row and for a folder with no marker.
      */
     val marker: StoreMarker? = null,
+    /**
+     * The GOG offline installer a folder row is (docs/SPEC.md 7g, "Installers
+     * in a games folder", Droidtop/tracker#405): the row is not installed and
+     * its primary action takes the game out of the installer. Null for every
+     * other row.
+     */
+    val installer: FolderInstaller? = null,
 )
 
 /**

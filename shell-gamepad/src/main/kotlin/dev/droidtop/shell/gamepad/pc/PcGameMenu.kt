@@ -956,7 +956,12 @@ internal fun PcGameMenu(
                                 }
                             }
                             if (store == null) {
-                                if (playState.chooseEngine) {
+                                if (entry.pcInfo?.installer != null) {
+                                    scope.launch {
+                                        status = "Working…"
+                                        status = dev.droidtop.library.FolderInstalls.install(context, entry) { status = it }
+                                    }
+                                } else if (playState.chooseEngine) {
                                     if (engineChoice.folder != null) pickingEngine = true else status = "No game folder to pick an engine for"
                                 } else if (isReady) {
                                     onClose()

@@ -14042,6 +14042,28 @@ did not install. The DLC row of a marker copy counts the DLC `.info` files in
 its folder. An answer reaches the folder game's row when its folder is walked
 again (a Rescan or a change to the folder).
 
+**Installers in a games folder (2026-10-29, Droidtop/tracker#405).** A GOG
+offline installer kept in a games folder (`setup_<slug>_<version>_(<build>).exe`
+and its `-<n>.bin` parts) is a game to install. An installer is no program to
+the walk (`PcFolderClassifier` collapses it), so its folder used to be dropped as
+holding nothing; now a folder holding a GOG installer, no program of its own and
+no game below it is listed (`PcFolderScan` rule 8), and so is each such folder
+below a folder of loose files. The installer is read off the walk's own listing
+(`GogInstallers.baseOf`, `PcFolderScan.installerOf`): several installers are
+one game and its DLC only when they share the game's first two words, the
+shortest name being the game; installers of different games in one folder are
+none. The row (`PcInfo.installer`) is not installed, is named as the file names
+it (the slug, its words capitalised), and its page says the installer's file,
+version and GOG build. Its button is Install: the game is taken out of the
+installer without running it through the one door Install a Windows game uses
+(`WindowsInstalls.install` via `FolderInstalls`, Wine only when unpacking cannot
+be done), into droidtop's own storage, in a folder named as the row is, so the
+new game folds onto the same card. The installer is never copied, moved or
+changed. Its version is not a version of the game here (nothing is installed),
+so it is no Update row and no installed build. Not done yet: folding the row
+onto the signed-in GOG account's row by title, and a choice of where to
+install.
+
 **A folder game keeps its identity across a version bump.** A folder game's id
 is `GameFolderIds`' (droidtop's own file, never one in the folder). Besides a
 rename (same device and inode) and a move (same content shape), a folder that

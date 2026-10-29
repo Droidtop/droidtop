@@ -72,6 +72,8 @@ object PcLibrary {
         val holding: dev.droidtop.library.stores.StoreHolding = dev.droidtop.library.stores.StoreHolding.OWNED,
         /** A folder game's store marker ([PcInfo.marker]), read by the folder scan; null for a store row. */
         val marker: StoreMarker? = null,
+        /** The GOG installer a folder row is ([PcInfo.installer]); null for everything else. */
+        val installer: dev.droidtop.library.FolderInstaller? = null,
     ) {
         val installDir: File? get() = installPath?.takeIf { it.isNotBlank() }?.let(::File)?.takeIf { it.isDirectory }
     }
@@ -760,14 +762,17 @@ object PcLibrary {
         val title = folderPath?.let { GameTitleParser.parse(it, root).title }?.takeIf { it.isNotBlank() } ?: name
         // A store's marker in the folder (docs/SPEC.md 7g, "Store markers"), off the listing the walk just read.
         val marker = folderPath?.let { path -> runCatching { PcFolderScan.storeMarkerOf(File(path), listingCache) }.getOrNull() }
+        // A GOG offline installer and no game (docs/SPEC.md 7g, "Installers in a games folder"): not installed, named
+        // as the installer names it.
+        val installer = folderPath?.let { path -> runCatching { PcFolderScan.installerOf(File(path), listingCache) }.getOrNull() }
         return Game(
             id = "folder:$appId",
             // The game folder it was found under; a folder the person gave the
             // vendored scanner outside them has none.
             source = PcSource.Folder(root.orEmpty()),
             nativeId = appId,
-            title = title,
-            installed = true,
+            title = installer?.title ?: title,
+            installed = installer == null,
             installPath = folderPath,
             // The scanner never measured a folder (GameNative left it 0 too).
             sizeBytes = 0L,
@@ -775,6 +780,7 @@ object PcLibrary {
             // The build a store's marker names is the installed version; a folder name never beats it.
             installedVersion = marker?.buildId,
             marker = marker,
+            installer = installer,
         )
     }
 }
@@ -809,6 +815,7 @@ fun PcLibrary.Game.toPcInfo(): PcInfo = PcInfo(
     installedVersion = installedVersion,
     externalIds = externalIds,
     marker = marker,
+    installer = installer,
     latestVersion = StoreUpdates.resultFor(id)?.latest,
     update = StoreUpdates.resultFor(id)?.update ?: StoreUpdate.UNKNOWN,
 )

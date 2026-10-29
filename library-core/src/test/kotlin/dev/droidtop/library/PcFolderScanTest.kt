@@ -567,4 +567,27 @@ class PcFolderScanTest {
         // Readable again, it is walked as before.
         assertEquals(1, PcFolderScan.scanTopLevel(studio, defs).games.size)
     }
+
+    @Test
+    fun `a folder holding a GOG installer and no game is that game to install (Droidtop tracker 405)`() {
+        file("Installers/Celeste/setup_celeste_1.4.0.0_(20669).exe", "MZ")
+        file("Installers/Witcher/setup_the_witcher_3_wild_hunt_goty_1.32_(a)_(10709).exe", "MZ")
+        file("Installers/Witcher/setup_the_witcher_3_wild_hunt_goty_1.32_(a)_(10709)-1.bin")
+        // A readme beside the installer folders: rule 4 must still list them, not drop the tree.
+        file("Installers/readme.txt")
+        game("Played/Stardew Valley")
+        assertEquals(listOf("Installers/Celeste", "Installers/Witcher", "Played/Stardew Valley"), found())
+        val witcher = PcFolderScan.installerOf(File(temp.root, "Installers/Witcher"))
+        assertEquals("The Witcher 3 Wild Hunt Goty", witcher?.title)
+        assertEquals("10709", witcher?.build)
+        assertNull(PcFolderScan.installerOf(File(temp.root, "Played/Stardew Valley")))
+    }
+
+    @Test
+    fun `an installer beside the game it installed is not an install row`() {
+        file("Celeste/setup_celeste_1.4.0.0_(20669).exe", "MZ")
+        file("Celeste/Celeste.exe", "MZ")
+        assertEquals(listOf("Celeste"), found())
+        assertNull(PcFolderScan.installerOf(File(temp.root, "Celeste")))
+    }
 }

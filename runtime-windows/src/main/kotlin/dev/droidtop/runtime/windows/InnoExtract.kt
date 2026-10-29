@@ -80,13 +80,20 @@ object InnoExtract {
 
     /**
      * Takes the files out of [installer] into a new folder in [parent] and returns that folder, or a
-     * line saying why not. The installer is only read. A failed unpack removes the folder it made.
+     * line saying why not. The folder is named [name], else for the installer. The installer is only
+     * read. A failed unpack removes the folder it made.
      */
-    suspend fun unpack(context: Context, installer: File, parent: File, onStatus: (String) -> Unit): Pair<File?, String> = withContext(Dispatchers.IO) {
+    suspend fun unpack(
+        context: Context,
+        installer: File,
+        parent: File,
+        onStatus: (String) -> Unit,
+        name: String? = null,
+    ): Pair<File?, String> = withContext(Dispatchers.IO) {
         if (!installer.isFile) return@withContext null to "${installer.name} is not a file on this device"
         val binary = runCatching { ensure(context, onStatus) }.getOrElse { return@withContext null to (it.message ?: it.toString()) }
         parent.mkdirs()
-        val out = freshFolder(parent, installer.nameWithoutExtension)
+        val out = freshFolder(parent, name ?: installer.nameWithoutExtension)
         if (!out.mkdirs()) return@withContext null to "Couldn't make the folder ${out.path}"
         onStatus("Unpacking ${installer.name}…")
         val result = runProcess(command(binary, unpackArguments(installer, out)), context.filesDir) { line -> onStatus("Unpacking ${installer.name}: $line") }

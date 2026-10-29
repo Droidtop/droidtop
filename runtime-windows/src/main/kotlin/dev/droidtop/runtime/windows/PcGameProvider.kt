@@ -445,6 +445,13 @@ class PcGameProvider(
      * no runtime, or an executable that could not be identified.
      */
     private suspend fun launchStoreGame(entry: LibraryEntry) {
+        // A GOG installer's row (docs/SPEC.md 7g, "Installers in a games folder"): a surface that launches rows
+        // directly installs it here, the same as A does through PcRunnerOptions.resolveAndPlay.
+        if (entry.pcInfo?.installer != null) {
+            val line = dev.droidtop.library.FolderInstalls.install(context, entry) { Log.i("droidtop.PcGameProvider", it) }
+            dev.droidtop.library.settings.Notices.flash(line, context = context)
+            return
+        }
         val installPath = entry.pcInfo?.installPath?.takeIf { it.isNotBlank() }
             ?: error("Can't launch ${entry.title}: it isn't installed yet.")
         val gameRoot = File(installPath)

@@ -156,6 +156,9 @@ object PcRunnerOptions {
      * (Droidtop/tracker#140); the default keeps them together for any
      * caller that has one slot.
      *
+     * A GOG installer's row ([PcInfo.installer]) has nothing to launch:
+     * A installs it ([FolderInstalls]), and its last line goes to [onDone].
+     *
      * Touches the filesystem/PM ([forEntry]), so callers already call
      * this off the main thread or from a coroutine that does.
      */
@@ -165,7 +168,12 @@ object PcRunnerOptions {
         onLaunch: () -> Unit,
         onStatus: (String) -> Unit = {},
         onFailure: (String) -> Unit = onStatus,
+        onDone: (String) -> Unit = onStatus,
     ) {
+        if (entry.pcInfo?.installer != null) {
+            onDone(FolderInstalls.install(context, entry, onStatus))
+            return
+        }
         val (runners, runner) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val measured = forEntry(context, entry)
             measured to resolvedFor(context, entry, measured)

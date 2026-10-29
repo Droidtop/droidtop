@@ -146,8 +146,10 @@ object LibraryGrouping {
                     installed = entry.pcInfo?.installed != false,
                     latestKnown = entry.latestKnown,
                     // A store install's folder is named after the store's title with characters dropped; the store's
-                    // own name is the game's (StoreInstall.title), where the person has not named it themselves.
-                    name = entry.gameName ?: entry.title.takeIf { PcSource.of(entry) is PcSource.Store },
+                    // own name is the game's (StoreInstall.title), where the person has not named it themselves. A GOG
+                    // installer's row is named as its file names it, which is the folder Install unpacks it into, so
+                    // the game it installs is the same card (docs/SPEC.md 7g, "Installers in a games folder").
+                    name = entry.gameName ?: entry.title.takeIf { PcSource.of(entry) is PcSource.Store || entry.pcInfo?.installer != null },
                     namePath = roots.firstNotNullOfOrNull { root -> GameNaming.relativeTo(root, path).takeIf { it != path } } ?: path,
                 )
             },

@@ -103,7 +103,7 @@ object WindowsInstallCatalog {
                                     if (typedInstaller.isEmpty()) {
                                         "Type the path first"
                                     } else {
-                                        WindowsInstalls.install(ctx, File(typedInstaller), target, onStatus).also { if (it.startsWith("Unpacked") || it.contains("Started ")) typedInstaller = "" }
+                                        WindowsInstalls.install(ctx, File(typedInstaller), target, onStatus = onStatus).also { if (it.startsWith("Unpacked") || it.contains("Started ")) typedInstaller = "" }
                                     }
                                 },
                             ),

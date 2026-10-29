@@ -723,6 +723,8 @@ private fun GamepadShellBody(
                         launchProgress = null
                         launchError = message
                     },
+                    // An installer's row installed (or said why not): a flash, not a failure.
+                    onDone = { message -> dev.droidtop.library.settings.Notices.flash(message, context = context) },
                 )
                 launchProgress = null
             }

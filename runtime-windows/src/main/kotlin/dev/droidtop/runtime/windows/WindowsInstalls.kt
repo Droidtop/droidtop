@@ -63,13 +63,14 @@ object WindowsInstalls {
      * droidtop's own storage) and the folder becomes a library game in the shared prefix; only when that cannot be
      * done, because it is not an Inno Setup installer or the unpacker could not be had, is it run in a new prefix of
      * its own ([begin]). Returns the line the settings row shows; a fallback says why the unpack did not do.
+     * [name] names the unpacked folder (a GOG installer's row gives its game's name), else the installer does.
      */
-    suspend fun install(context: Context, installer: File, target: File?, onStatus: (String) -> Unit): String {
+    suspend fun install(context: Context, installer: File, target: File?, name: String? = null, onStatus: (String) -> Unit): String {
         if (!unpackable(installer)) return begin(context, installer, target, onStatus)
         val parent = withContext(Dispatchers.IO) {
             target ?: context.getExternalFilesDir("Unpacked") ?: File(context.filesDir, "unpacked")
         }
-        val (folder, line) = InnoExtract.unpack(context, installer, parent, onStatus)
+        val (folder, line) = InnoExtract.unpack(context, installer, parent, onStatus, name = name)
         if (folder != null) return line + ". " + addFolderGame(context, folder)
         return "$line. Running it in Windows instead. " + begin(context, installer, target, onStatus)
     }

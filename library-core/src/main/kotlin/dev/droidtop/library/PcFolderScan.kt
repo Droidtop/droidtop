@@ -75,6 +75,13 @@ import java.util.concurrent.ConcurrentHashMap
  *     what it finds outside the manifests' folders is kept (a game folder
  *     with no manifest), and a result inside a manifest's folder is that
  *     folder. The desktop agent reads the same manifests.
+ *  8. **A folder holding a GOG offline installer and no program is that
+ *     game, not installed** ([GogInstallers], Droidtop/tracker#405): an
+ *     installer is no program (rule 2 never sees `setup_*.exe`), so such
+ *     a folder used to be dropped by rule 5. When nothing below it is a
+ *     game, it is listed, and its row is an Install row
+ *     ([installerOf]). Only asked where rule 4 is, never inside a store's
+ *     tree.
  *
  * Engine games are NOT this scan's business: [GameEngineDetector] finds
  * them, and `PcGameProvider` already drops a PC entry for any folder
@@ -344,6 +351,8 @@ object PcFolderScan {
         internal val entryCount: Int,
         /** The store markers among its entries ([StoreMarkers.isMarkerName]), read off the same listing. */
         internal val markerNames: List<String> = emptyList(),
+        /** The GOG installer it holds ([GogInstallers.baseOf]) when it holds no program: an installer folder (rule 8). */
+        internal val installer: FolderInstaller? = null,
     ) {
         /** The folder's [StoreMarker], read the first time it is asked for and kept with the listing. */
         @Volatile
@@ -596,7 +605,12 @@ object PcFolderScan {
             val structural = GameNaming.isStructuralFolderName(folder.name)
             if (listing.hasOwnFile && !insideStoreTree && !structural) {
                 // Rule 4 only needs to know THAT a game is below.
-                if (!hasGameBelow(listing, depth)) return emptyList()
+                if (!hasGameBelow(listing, depth)) {
+                    // Rule 8: no game below, but a GOG installer here, or in a folder below, is a game to install.
+                    if (listing.installer != null) return listOf(folder)
+                    if (!installerBelow) return emptyList()
+                    return childrenOf(listing, depth).flatMap { (child, childDepth) -> walk(child, childDepth) }
+                }
                 if (!holdsEngineGames(folder, listing)) return listOf(folder)
             }
             return childrenOf(listing, depth).flatMap { (child, childDepth) -> walk(child, childDepth) }
@@ -607,15 +621,22 @@ object PcFolderScan {
          * folder under it, one level at a time, shallowest first, stopping
          * at the first that answers yes. Same answer as walking every child
          * and asking whether anything came back, at the cost of the levels
-         * above the first game.
+         * above the first game. When it answers no, [installerBelow] says
+         * whether it met a GOG installer folder on the way (rule 8), so only
+         * then is the tree walked again to list it.
          */
+        /** Set by [hasGameBelow]: it met an installer folder ([Listing.installer]) below. Per walk, on its own thread. */
+        private var installerBelow = false
+
         private fun hasGameBelow(listing: Listing, depth: Int): Boolean {
+            installerBelow = false
             var level = childrenOf(listing, depth)
             while (level.isNotEmpty()) {
                 val next = ArrayList<Pair<File, Int>>()
                 for ((child, childDepth) in level) {
                     if (!walkable(child, childDepth)) continue
                     val below = listingOf(child)
+                    if (below.installer != null) installerBelow = true
                     if (ScanPrune.storeRootOwner(child) == null && below.hasProgram && !holdsEngineGames(child, below)) return true
                     next += childrenOf(below, childDepth)
                 }
@@ -730,6 +751,7 @@ object PcFolderScan {
     private fun readListing(folder: File, mtime: Long): Listing? {
         val folders = ArrayList<File>()
         val markers = ArrayList<String>(0)
+        val setups = ArrayList<String>(0)
         var hasProgram = false
         var hasOwnFile = false
         val entries = folder.listFiles() ?: return null
@@ -740,10 +762,12 @@ object PcFolderScan {
                 continue
             }
             if (!entry.name.startsWith(".")) hasOwnFile = true
+            if (GogInstallers.isSetupName(entry.name)) setups += entry.name
             if (!hasProgram && GameExecutableResolver.isProgram(entry)) hasProgram = true
         }
         folders.sortBy { it.name.lowercase() }
-        return Listing(mtime, folders, hasProgram, hasOwnFile, entries.size, markers)
+        val installer = if (hasProgram || setups.isEmpty()) null else GogInstallers.baseOf(setups)
+        return Listing(mtime, folders, hasProgram, hasOwnFile, entries.size, markers, installer)
     }
 
     /**
@@ -756,13 +780,24 @@ object PcFolderScan {
      * no marker. On the caller's thread: the walk's IO.
      */
     fun storeMarkerOf(folder: File, cache: ListingCache? = null): StoreMarker? {
-        val mtime = folder.lastModified()
-        val listing = cache?.takeIf { mtime != 0L }?.get(folder, mtime)
-            ?: (readListing(folder, mtime) ?: return null).also { if (cache != null && mtime != 0L) cache.put(folder, it) }
+        val listing = listingFor(folder, cache) ?: return null
         if (listing.markerRead) return listing.marker
         val marker = StoreMarkers.read(folder, listing.markerNames)
         listing.marker = marker
         listing.markerRead = true
         return marker
+    }
+
+    /**
+     * The GOG installer a game folder the walk found is (rule 8): the row is
+     * an Install row, not a game to play. Off the same listing as
+     * [storeMarkerOf]; null for a folder holding a program or no installer.
+     */
+    fun installerOf(folder: File, cache: ListingCache? = null): FolderInstaller? = listingFor(folder, cache)?.installer
+
+    private fun listingFor(folder: File, cache: ListingCache?): Listing? {
+        val mtime = folder.lastModified()
+        return cache?.takeIf { mtime != 0L }?.get(folder, mtime)
+            ?: (readListing(folder, mtime) ?: return null).also { if (cache != null && mtime != 0L) cache.put(folder, it) }
     }
 }

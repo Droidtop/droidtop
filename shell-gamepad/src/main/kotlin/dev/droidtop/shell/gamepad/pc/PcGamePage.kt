@@ -1407,6 +1407,10 @@ private fun pageRows(
         )
     }
     if (entry.pcInfo?.installed == false) add(PageFact("Install state", "Not installed"))
+    // A GOG installer's row: what the installer file says it holds (docs/SPEC.md 7g, "Installers in a games folder").
+    entry.pcInfo?.installer?.let { installer ->
+        add(PageFact("Installer", installer.file, subtitle = listOfNotNull(installer.version?.let { "Version $it" }, installer.build?.let { "GOG build $it" }).joinToString(". ").ifEmpty { null }))
+    }
     if (entry.playCount > 0) add(PageFact("Times played", entry.playCount.toString()))
     entry.pcInfo?.compatibility?.let { add(PageFact("Compatibility", subtitle = it.summary() + ". Other people's results on other hardware, not a verdict.")) }
 
@@ -1613,7 +1617,7 @@ internal enum class PageTab(val label: String, val emptyLine: String) {
  * ([pageRows]) stay a plain list. What is not named is a detail.
  */
 internal fun pageTabOf(title: String): PageTab = when (title) {
-    "About", "Not scraped yet", "Compatibility", "Install state", "Times played" -> PageTab.OVERVIEW
+    "About", "Not scraped yet", "Compatibility", "Install state", "Installer", "Times played" -> PageTab.OVERVIEW
     "Version", "Latest", "Update", OPEN_SOURCE_ROW, CLEAR_VERSION_ROW -> PageTab.VERSIONS
     "Manual", "Video", "Where these facts came from" -> PageTab.EXTRAS
     else -> PageTab.DETAILS
