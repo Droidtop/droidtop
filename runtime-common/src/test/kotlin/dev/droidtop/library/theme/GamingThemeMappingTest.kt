@@ -335,19 +335,32 @@ class GamingThemeMappingTest {
 
     @Test
     fun aThemeThatDrawsItsOwnClockOrStatusIsSaid() {
-        assertFalse(GamingThemeMapping.drawsOwnStatus(null))
-        assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(element("image", "logo", *fullScreen)))))
-        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(element("clock", "clock")))))
-        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(gamelist = listOf(element("systemstatus", "status")))))
+        assertFalse(GamingThemeMapping.drawsOwnStatus(null, "system"))
+        assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(element("image", "logo", *fullScreen))), "system"))
+        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(element("clock", "clock"))), "system"))
+        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(gamelist = listOf(element("systemstatus", "status"))), "gamelist"))
+    }
+
+    @Test
+    fun eachViewIsDecidedApart() {
+        // A clock on the system view only leaves the gamelist to droidtop's cluster (Droidtop/tracker#658, t18).
+        val systemClock = theme(
+            system = listOf(element("clock", "clock")),
+            gamelist = listOf(element("image", "logo", *fullScreen)),
+        )
+        assertEquals(setOf("system"), GamingThemeMapping.ownStatusViews(systemClock))
+        assertFalse(GamingThemeMapping.drawsOwnStatus(systemClock, "gamelist"))
+        // A view the theme does not draw has no theme status, whatever its other views do.
+        assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(element("clock", "clock"))), "gamelist"))
     }
 
     @Test
     fun aClockThatNeverShowsInAViewDoesNotCountAsDrawn() {
         val menuOnly = element("clock", "clock", "scope" to EsDeThemeValue.Str("menu"))
         val never = element("systemstatus", "status", "scope" to EsDeThemeValue.Str("none"))
-        assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(menuOnly, never))))
+        assertFalse(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(menuOnly, never)), "system"))
         val inView = element("clock", "clock", "scope" to EsDeThemeValue.Str("view"))
-        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(inView))))
+        assertTrue(GamingThemeMapping.drawsOwnStatus(theme(system = listOf(inView)), "system"))
     }
 
     @Test

@@ -16819,9 +16819,13 @@ out) is the one the Quick Menu uses on the other edge (`SidePanelFrame`, with it
 The status cluster (clock, connectivity and battery) floats at the top right
 over Gaming content on a soft token-based scrim. It is not focusable and a tap
 opens the Quick Menu. On Retro Games it yields to a theme that draws its own
-`clock` or `systemstatus` in a view it shows (`GamingThemeMapping.drawsOwnStatus`,
-read once with the palette; an element whose `scope` keeps it out of a plain view
-does not count), so the two never overlap. Both clocks are one clock: droidtop's pill and an ES-DE
+`clock` or `systemstatus` in the view on screen (`GamingThemeMapping.drawsOwnStatus`,
+read once with the palette as `ownStatusViews`; an element whose `scope` keeps it out of a plain view
+does not count), so the two never overlap. The system list and a gamelist are decided apart: a theme whose
+clock is only on its system view leaves the gamelist with droidtop's cluster, and a view the theme does not
+draw has no theme status (Droidtop/tracker#658). A theme's `systemstatus` row is placed by its `pos` and its
+`origin` against its measured width, and kept inside the view, so a right-anchored one never runs off the
+edge. Both clocks are one clock: droidtop's pill and an ES-DE
 theme's `clock` follow Android's own 12/24-hour setting (`DateFormat.getTimeFormat`), and a theme's `format`
 is honoured only where the theme declares one (Droidtop/tracker#492). Home's shelves scroll up under the
 cluster, so a strip of their own (`StatusScrim`: the page fades out through the cluster's band) keeps art

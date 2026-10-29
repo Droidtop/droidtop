@@ -82,8 +82,11 @@ class GamingPalette internal constructor(
     internal val textureBrush: Brush?,
     /** The theme's UI font has no lower case (its small letters are drawn as capitals): see [withFamilies]. */
     internal val bodyFamilyCapsOnly: Boolean = false,
-    /** The theme draws its own clock or system status, so the shell's floating cluster yields (docs/SPEC.md 7k2). */
-    internal val drawsOwnStatus: Boolean = false,
+    /**
+     * The theme's views (`system`, `gamelist`) that draw their own clock or system status: on those the shell's
+     * floating cluster yields (docs/SPEC.md 7k2, Droidtop/tracker#658).
+     */
+    internal val ownStatusViews: Set<String> = emptySet(),
     /**
      * High contrast is on (droidtop's own Accessibility setting, or Android's high-contrast text): text and the
      * notice colours hold 7:1, the ring is 4dp, there is no texture or art behind text (docs/SPEC.md 7k).
@@ -322,10 +325,10 @@ object GamingTheme {
         // matching the appearance, and a theme with none gets its palette derived for it (docs/SPEC.md 7k, "Light and dark").
         val mapped = GamingThemeMapping.map(theme, light = key.light.takeIf { key.colorScheme == null })
         val colors = if (highContrast) GamingThemeMapping.highContrast(mapped) else mapped
-        val drawsOwnStatus = GamingThemeMapping.drawsOwnStatus(theme)
+        val ownStatusViews = GamingThemeMapping.ownStatusViews(theme)
         val palette = when {
-            !colors.declared && !drawsOwnStatus && !highContrast && !sentenceCase -> GamingPalette.defaultFor(key.light)
-            !colors.declared -> GamingPalette(colors, null, null, null, drawsOwnStatus = drawsOwnStatus, highContrast = highContrast, sentenceCase = sentenceCase)
+            !colors.declared && ownStatusViews.isEmpty() && !highContrast && !sentenceCase -> GamingPalette.defaultFor(key.light)
+            !colors.declared -> GamingPalette(colors, null, null, null, ownStatusViews = ownStatusViews, highContrast = highContrast, sentenceCase = sentenceCase)
             else -> {
                 val bodyFace = loadTypeface(colors.bodyFontPath)
                 GamingPalette(
@@ -338,7 +341,7 @@ object GamingTheme {
                         val paint = android.graphics.Paint().apply { typeface = face }
                         isCapsOnlyFont { paint.measureText(it.toString()) }
                     } == true,
-                    drawsOwnStatus = drawsOwnStatus,
+                    ownStatusViews = ownStatusViews,
                     highContrast = highContrast,
                     sentenceCase = sentenceCase,
                 )

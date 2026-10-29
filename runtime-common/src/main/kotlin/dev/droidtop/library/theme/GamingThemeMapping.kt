@@ -160,20 +160,24 @@ object GamingThemeMapping {
     }
 
     /**
-     * Whether the theme draws its own clock or system status in a view the
-     * Gaming shell shows (docs/SPEC.md 7k2, "Gaming theming"). The shell's own
-     * floating status cluster yields to it, so the two never overlap. A
-     * `scope` that keeps the element out of a plain view (`menu`, `none`)
-     * does not count: it would not be on screen to overlap.
+     * Whether the theme draws its own clock or system status in [view] (`system` or `gamelist`), docs/SPEC.md 7k2,
+     * "Gaming theming". The shell's own floating status cluster yields to it there, so the two never overlap, and shows
+     * on every other view: a theme with a clock only on its system view leaves the gamelist with droidtop's
+     * (Droidtop/tracker#658). The `all` view's elements count for a view the theme draws; a view it does not draw
+     * (droidtop's own gamelist then) has no theme status. A `scope` that keeps the element out of a plain view
+     * (`menu`, `none`) does not count: it would not be on screen to overlap.
      */
-    fun drawsOwnStatus(theme: EsDeTheme?): Boolean {
-        if (theme == null) return false
-        return listOfNotNull(theme.views["system"], theme.views["all"], theme.views["gamelist"]).any { view ->
-            view.elements.values.any {
+    fun drawsOwnStatus(theme: EsDeTheme?, view: String): Boolean {
+        val own = theme?.views?.get(view) ?: return false
+        return listOfNotNull(own, theme.views["all"]).any { v ->
+            v.elements.values.any {
                 (it.type == "clock" || it.type == "systemstatus") && esDeScopeAllows(it, menuOpen = false)
             }
         }
     }
+
+    /** The views of [theme] that draw their own clock or status ([drawsOwnStatus]). */
+    fun ownStatusViews(theme: EsDeTheme?): Set<String> = setOf("system", "gamelist").filterTo(HashSet()) { drawsOwnStatus(theme, it) }
 
     /** Body text under High contrast (docs/SPEC.md 7k, "High contrast"): WCAG AAA. */
     const val HIGH_CONTRAST_FLOOR = 7.0

@@ -3040,9 +3040,18 @@ private fun EsDeThemedSystemStatus(element: EsDeThemeElement, viewWidth: Dp, vie
     // it, and without it a theme that sized its bar for icons got oversized
     // text beside them.
     val textRelativeScale = (element.floatOrNull("textRelativeScale") ?: 1f).coerceIn(0.5f, 1f)
+    // The row's width is only known once measured, so its horizontal origin is applied here, and the row is kept
+    // inside the view: a theme that right-anchors it (pos near 1, origin 1) ran it off the right edge, leaving half a
+    // wifi glyph and no battery (Droidtop/tracker#658).
+    val originX = element.valueOrNull<EsDeThemeValue.Pair>("origin")?.x ?: 0f
     Row(
         modifier = Modifier
-            .absoluteOffset(x = offsetX, y = offsetY)
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints.copy(minWidth = 0, minHeight = 0))
+                val room = (viewWidth.roundToPx() - placeable.width).coerceAtLeast(0)
+                val x = (offsetX.roundToPx() - (placeable.width * originX).roundToInt()).coerceIn(0, room)
+                layout(placeable.width, placeable.height) { placeable.place(x, offsetY.roundToPx()) }
+            }
             .esDeRotation(element)
             .esDeBackgroundBox(background),
         horizontalArrangement = Arrangement.spacedBy(entrySpacing.dp),

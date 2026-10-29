@@ -1562,10 +1562,13 @@ private fun GamepadShellBody(
             // Float status over the page rather than reserving a header
             // band; it is a readout and the tap route to the Quick Menu.
             // On Retro Games it yields to a theme that draws its own clock
-            // or system status (docs/SPEC.md 7k2), so the two never overlap.
+            // or system status in the view on screen (docs/SPEC.md 7k2), so
+            // the two never overlap; the system list and a gamelist are
+            // decided apart (Droidtop/tracker#658).
+            val retroView = if (canGoBack) "gamelist" else "system"
             // Home's top band draws the status facts itself (docs/SPEC.md 7i, "Home"; Droidtop/tracker#494, #485 F7a).
             val homeBand = section == GamingSection.HOME && nav.place is ShellPlace.Section
-            if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && GamingTheme.palette.drawsOwnStatus)) {
+            if (!screensaverOn && !homeBand && !(section == GamingSection.GAMES && retroView in GamingTheme.palette.ownStatusViews)) {
                 FloatingStatusCluster(onClick = { quickMenuOpen = true }, modifier = Modifier.align(Alignment.TopEnd))
             }
             // A theme that draws its own help legend (a pad is attached, so
