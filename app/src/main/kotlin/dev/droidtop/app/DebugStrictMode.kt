@@ -38,13 +38,23 @@ object DebugStrictMode {
         val policy = StrictMode.ThreadPolicy.Builder().detectDiskReads().detectDiskWrites().detectNetwork()
         if (Build.VERSION.SDK_INT >= 28) {
             val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "droidtop-strictmode").apply { isDaemon = true } }
-            policy.penaltyListener(executor) { violation ->
-                reportedFrame(violation.stackTrace)?.let { Log.w(TAG, "${violation.javaClass.simpleName} on the main thread at $it") }
-            }
+            policy.penaltyListener(executor, StrictModeViolationListener())
         } else {
             // No way to tell ours from a library's before API 28: everything is logged.
             policy.penaltyLog()
         }
         StrictMode.setThreadPolicy(policy.build())
+    }
+}
+
+/**
+ * The listener as a class of its own because its interface is Android 9's and droidtop's minSdk is 26: built only under
+ * the SDK_INT >= 28 check in [DebugStrictMode.install] (build-scripts/class_load_api_allowlist.txt). A lambda there is
+ * compiled into a class that implements the interface, which the class-load API gate refuses.
+ */
+@androidx.annotation.RequiresApi(Build.VERSION_CODES.P)
+internal class StrictModeViolationListener : StrictMode.OnThreadViolationListener {
+    override fun onThreadViolation(v: android.os.strictmode.Violation) {
+        DebugStrictMode.reportedFrame(v.stackTrace)?.let { Log.w(DebugStrictMode.TAG, "${v.javaClass.simpleName} on the main thread at $it") }
     }
 }
