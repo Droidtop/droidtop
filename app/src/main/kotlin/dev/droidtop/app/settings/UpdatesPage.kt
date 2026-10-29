@@ -351,7 +351,7 @@ object UpdatesPage {
                             ),
                             ToggleItem(
                                 id = "updates_unmetered_only",
-                                title = "Only on Wi-Fi and other unmetered networks",
+                                title = "Only on Wi-Fi or unmetered networks",
                                 subtitle = "Skips the scheduled check while on mobile data or a metered connection",
                                 current = update.unmeteredOnly(context),
                                 onToggle = { ctx, value ->

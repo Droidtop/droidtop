@@ -304,7 +304,7 @@ object GitHubAccountCatalog {
                     items = listOf(
                         ToggleItem(
                             id = "repos_auto",
-                            title = "Update plugins from these repositories automatically",
+                            title = "Update these plugins automatically",
                             subtitle = "Unmetered only",
                             current = read.auto,
                             onToggle = { c, value -> PluginRepoUpdates.setAutoUpdate(c, value) },

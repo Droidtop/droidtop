@@ -232,7 +232,7 @@ object ManualDownloads {
             add(
                 AsyncActionItem(
                     id = "downloads_add_to_saved",
-                    title = "Download into droidtop's Downloads folder",
+                    title = "Download to droidtop's Downloads folder",
                     subtitle = "Only saved, not added to the library. ${savedFolder().absolutePath}",
                     run = { ctx, _ -> start(ctx, offer, savedFolder(), toGames = false) },
                 ),

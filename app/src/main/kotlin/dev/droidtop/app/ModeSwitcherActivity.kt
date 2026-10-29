@@ -21,8 +21,8 @@ import dev.droidtop.shell.standard.HomeRolePrefs
  * whatever is on screen, in the Gaming theme when Gaming was the last mode and droidtop's own look
  * otherwise. The rows and what they do are [BackButtonMenu.choices]. The activity goes when the sheet does.
  *
- * "Android" while droidtop's launcher is on but not Android's Home app does not switch: it asks, "Make droidtop
- * your Home app to use Android mode", and Set requests the Home role (Droidtop/tracker#522). Another launcher
+ * "Android" while droidtop's launcher is on but not Android's Home app does not switch: it asks, "Android mode
+ * needs droidtop as Home", and Set requests the Home role (Droidtop/tracker#522). Another launcher
  * would take a screen of a dual-screen device and leave droidtop's surfaces behind.
  */
 /** A mode's glyph in the switcher: the same marks Global settings' mode rows use. */
@@ -61,7 +61,7 @@ class ModeSwitcherActivity : ComponentActivity() {
                     }
                     ModeSwitcherSheet(
                         choices = answers,
-                        title = "Make droidtop your Home app to use Android mode",
+                        title = "Android mode needs droidtop as Home",
                         onDismiss = { if (!requesting) finish() },
                     )
                 } else {

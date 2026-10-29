@@ -1227,7 +1227,7 @@ object GamingSettingsCatalog {
                 ),
                 ToggleItem(
                     id = "companion_pip",
-                    title = "Move picture-in-picture video to the companion",
+                    title = "Picture-in-picture on the companion",
                     subtitle = "A video that goes small on the main screen plays on the companion instead. Needs More controls",
                     current = settings.pipToCompanion,
                     onToggle = { c, on -> CompanionPrefs.setPipToCompanion(c, on) },
@@ -1586,7 +1586,7 @@ object GamingSettingsCatalog {
         add(
             ActionItem(
                 id = ID_DISPLAY_KEYBOARD_ACCESSIBILITY,
-                title = "Keyboard and pointer through accessibility",
+                title = "Accessibility keyboard and pointer",
                 value = if (accessibility) "On" else "Off",
                 run = { ctx -> dev.droidtop.runtime.keyboard.AccessibilityKeyboard.openSettings(ctx) },
             ),

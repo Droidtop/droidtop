@@ -15,6 +15,7 @@ set -eu
 mode=""
 all=0
 root="$(cd "$(dirname "$0")/.." && pwd)"
+self="$root"
 while [ $# -gt 0 ]; do
     case "$1" in
         --check|--inventory) mode="$1" ;;
@@ -81,5 +82,31 @@ for rule in "${RULES[@]}"; do
     [ -n "$sites" ] && count="$(printf '%s\n' "$sites" | wc -l | tr -d ' ')"
     report "$name" "$on" "$count" "$sites" "$what"
 done
+
+# Copy budgets (Droidtop/tracker#485 F2c): a row title longer than the title budget, or a subtitle longer than the
+# body budget, written as a literal. The budgets are the limits file's copyWarnings, so no number is restated here.
+# Today's copy is over in places, so this is a ratchet, not a rule: COPY_CEILING is the count at the last copy pass
+# and only comes down. --check fails when the count rises above it; the commit that shortens copy lowers it to the
+# new count. --all (the fixture test) allows none.
+COPY_CEILING=75
+budget() { sed -n '/"copyWarnings"/,/}/p' "$self/docs/view-limits/plugin-view-limits.json" | sed -n "s/.*\"$1\": *\([0-9]*\).*/\1/p"; }
+title_max="$(budget title)"
+body_max="$(budget body)"
+copy_pattern="\btitle = \"[^\"\$]{$((title_max + 1)),}\"|\bsubtitle = \"[^\"\$]{$((body_max + 1)),}\""
+copy_sites=""
+[ -n "$files" ] && copy_sites="$(printf '%s\n' "$files" | xargs -d '\n' -r grep -EnH -- "$copy_pattern" 2>/dev/null || true)"
+copy_count=0
+[ -n "$copy_sites" ] && copy_count="$(printf '%s\n' "$copy_sites" | wc -l | tr -d ' ')"
+ceiling="$COPY_CEILING"
+[ "$all" = 1 ] && ceiling=0
+copy_what="titles at most $title_max characters, subtitles at most $body_max (ceiling $ceiling: shorten copy, never raise it)"
+if [ "$mode" = "--inventory" ]; then
+    printf 'copy-budget [ratchet] %s site(s): %s\n' "$copy_count" "$copy_what"
+    [ -n "$copy_sites" ] && printf '%s\n' "$copy_sites" | sed 's/^/    /'
+elif [ "$copy_count" -gt "$ceiling" ]; then
+    printf 'UI rule copy-budget: %s site(s), over %s\n' "$copy_count" "$copy_what"
+    printf '%s\n' "$copy_sites" | sed 's/^/    /'
+    failed=1
+fi
 
 exit "$failed"

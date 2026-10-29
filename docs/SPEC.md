@@ -946,7 +946,7 @@ window has no shell footer.
 Droidtop/tracker#522).** With droidtop's launcher on but another app holding Android's Home role, "Android" in
 the switcher would start that launcher, which on a dual-screen device takes the companion's screen while the
 shell stays up, with no word (rig, review D1). `ModeGate.androidAsksForHome` (droidtop's launcher on, not Home)
-makes that row ask instead, in the same sheet: "Make droidtop your Home app to use Android mode", Set (Android's own
+makes that row ask instead, in the same sheet: "Android mode needs droidtop as Home", Set (Android's own
 Home role request, then Android mode if it was granted) or Cancel. With no droidtop launcher there is nothing to
 ask for and "Android" is the other launcher as chosen. And coming back works without "Reinitialize displays":
 the switcher's Gaming and Desktop rows carry `EXTRA_DISPLAYS_BACK`, `MainActivity.onNewIntent` calls
@@ -4371,7 +4371,7 @@ droidtop 0.2.0-dev.1931).
   display the shell is drawn on, else Android's default) to the companion's display through the helper app's shell
   (`am display move-stack <task> <display>`; the task list's `mode=pinned`), and moves what it moved back to the main
   screen when the companion stops; a companion display that goes away hands its tasks back to the default display
-  by itself. "Move picture-in-picture video to the companion" in the Companion group, on by default; without a
+  by itself. "Picture-in-picture on the companion" in the Companion group, on by default; without a
   `priv.shell` provider nothing happens, since an app cannot move another app's task. It looks when droidtop's
   accessibility service reports a window change (`typeWindowsChanged`, that service's second job beside typing),
   else every five seconds while the companion shows; never while no companion shows. The video stays a
@@ -5266,8 +5266,8 @@ rig check in the commit message.
 - **Guidance is a value, not prose.** Displays has "Keyboard for apps on second screen", whose value
   is the state (`AddonKeyboardRules.appsKeyboard`: "Android keyboard", "droidtop keyboard",
   "Accessibility", "Needs display over apps", "Off") and whose action is the one missing step (the
-  overlay grant for "Needs display over apps", else Android's keyboard picker); then "Keyboard
-  through accessibility" (On or Off), which opens Android's accessibility settings, the only place
+  overlay grant for "Needs display over apps", else Android's keyboard picker); then "Accessibility
+  keyboard and pointer" (On or Off), which opens Android's accessibility settings, the only place
   the service can be turned on. The Keys panel shows "Typing" with a "Use droidtop keyboard" chip
   when it has no route, and "No text field" when a key found no editor.
 - **Focus goes back to the app, not only the shell.** When a touch-only surface becomes the top
@@ -6054,10 +6054,10 @@ one:
   - **Where it applies.** A native job kind registers with `registerNative(..., download = true)` and is then governed: single-file downloads (`download`), store installs and updates (`store_install`) and the desktop's font pack (`desktop_fonts`; its private "download on mobile data" switch is deleted, the font pack is a download like the others). `PluginJobsCenter.admission` holds a new job before a byte moves (it starts paused, the reason is its status line and `Entry.hold`); `DownloadGate` (`:plugin-host`) re-decides every job when Android's default network, the clock tick (a minute), the rules or the set of live downloads change, pausing a running job the policy now holds and resuming a held one when the verdict turns to go. The job's size and whether it is automatic ride in its arguments (`bytes`, `automatic`). Store installs keep what is on disk (each store resumes from its files), and a single-file download keeps its `.part` file, so pausing either loses nothing; a server that cannot resume restarts the file from zero and the row says so.
   - **The person's word wins over the policy, except over the connection.** A held job says why in the Downloads place, and its page offers **Download now** (the page's Resume). The owner, 2026-10-23: "'download now' stays. It moves something to the top of the queue, and starts downloading if it isn't blocked by metering". The job is flagged (`policyOverride`): it takes a slot ahead of the pool's order and the update window and a running game no longer hold it, for the rest of its life. A hold on the connection still holds it (below); it is then first in line, and starts as soon as the connection allows. A job the person paused is theirs; the policy never resumes it and never pauses what is already paused. Pause, Resume and Cancel are the jobs list's own for every job.
   - **A metered connection is allowed, never a job (owner, 2026-10-23).** "for a metered connection, the user can't enable A SINGLE download. The user can disable the metered flag, or they can allow downloads while connected to this metered connection once, or always. I don't want the user to be able to enable downloads for a single game, because that can be deceptive." So `policyOverride` no longer passes a hold on the connection ("Waiting for Wi-Fi", "Waiting for a network"; `DownloadPolicy.isNetworkHold`, `DownloadGate.plan`): Download now on such a job only puts it first in line. A job held for Wi-Fi opens **Downloads on this connection** (`MeteredConnectionCatalog`), whose every choice is for the connection and so for every download on it (`MeteredGrants`, read into the policy as `Conditions.meteredAllowed`):
-    - **Allow downloads until this connection ends** (once): kept by the connection's Android network handle, which a reconnect replaces.
+    - **Allow downloads until you disconnect** (once): kept by the connection's Android network handle, which a reconnect replaces.
     - On a Wi-Fi network, **This network is not metered** opens Android's Wi-Fi settings, where the person sets it themselves. Android's metered flag is the person's: droidtop never changes it, not even through the helper (owner: "The USER can change that. We won't fuck with it. The last thing we'll fuck around with is something that can cost the user money."). It is the recommended way to say "always" for a Wi-Fi network.
     - On mobile data, **Always allow downloads on <the SIM's data>**: kept by the default data SIM's subscription id, which needs no permission.
-    - On a Wi-Fi network, **Always allow on this Wi-Fi (not recommended)**: Android tells an app the network's name only with the location permission, so this row asks for it (`WifiNamePermissionActivity`) and says why. The owner: "make it explicit that it is only for overriding bandwidth usage on a metered connection, and we explicitly DO NOT recommend they do that. It is a permission we do not recommend they grant." It is the last row and never the focused one; the name is read for this alone. Before this, droidtop never read a Wi-Fi name.
+    - On a Wi-Fi network, **Always allow on this Wi-Fi** (its line says it is not recommended): Android tells an app the network's name only with the location permission, so this row asks for it (`WifiNamePermissionActivity`) and says why. The owner: "make it explicit that it is only for overriding bandwidth usage on a metered connection, and we explicitly DO NOT recommend they do that. It is a permission we do not recommend they grant." It is the last row and never the focused one; the name is read for this alone. Before this, droidtop never read a Wi-Fi name.
     - Download rules lists the always grants under "Metered connections you allowed", each taken back with one press.
     Held with no network, a job offers nothing to press: it goes when a network comes back.
   - **Not while a game is running** has only the signal Android gives: a game droidtop launched less than four hours ago (`LaunchLedger`, the Game tab's limit: no liveness query for another app exists). A game closed from inside itself therefore stops holding automatic downloads after four hours at most, and a restart forgets it at once.
@@ -9113,7 +9113,7 @@ Two concrete references to build from rather than design blind:
   - **Stop its processes.** A script run in the container (`LinuxGameHome.STOP_SCRIPT`) ends every
     process whose command line mentions the game's folder. The folder travels in the environment, not
     the command line, so the script and the exec wrapper never match themselves.
-  - **A home of its own, off by default.** "Keep this game's saves and settings in a home of its own"
+  - **A home of its own, off by default.** "Give this game its own home folder"
     (`LinuxGameOptionsPrefs`): when on, the game starts with `HOME` and the XDG folders pointing into
     a folder in app storage named for the game (`LinuxGameHome`), made when needed. When off, which is
     every existing game, nothing changes: a game's saves are where it has always put them (a save
@@ -17912,7 +17912,7 @@ Not in this step, and why: a success tone (it needs its colours in Droidtop/noti
 9. In a modal the safe choice comes first (left) and has the focus.
 10. Never tell a person to do something they cannot do from where they are; give them the action.
 
-**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`; and byte, duration and relative-time formatting outside `ValueFormat` ("Values" below). Each rule is switched on in the commit that clears its last site. **A row with nothing to do is inert (Droidtop/tracker#587, `empty-run` on since 2026-10-28).** An `ActionItem` given no `run` is a fact, a state or an empty line (`ActionItem.inert`, `CatalogItem.isInert`, true for a `TextBlockItem` too): the Gaming renderer shows no A hint on it and A does nothing, as plugin-api promises for an inert node. `run = {}`, which drew "A Select" on 219 such rows, is gone and may not come back.
+**Enforcement** (`scripts/check-ui-rules.sh`, run by `android-checks.yml`): `--check` fails on a site of a switched-on rule, `--inventory` lists every rule's remaining sites, and `scripts/test-check-ui-rules.sh` proves each rule catches its fixture. The rules: `Toast.makeText` outside `Notices`; `colorScheme.error` outside `:ui-shared`; `run = {}`; a `TextBlockItem` starting "WARNING" or a "(high risk)" suffix; hex colours in screens; the names the notice and text-entry work deletes (`MenuHint`, `SafeModeBanner`, `ReinitPill`, `MenuTokens.Danger`/`DangerPlate`, `OwnFieldKeyboard`); banned words in `Notice(` strings and in permission titles; `TextField`/`OutlinedTextField`/`BasicTextField` outside `TextEntry`; and byte, duration and relative-time formatting outside `ValueFormat` ("Values" below). Each rule is switched on in the commit that clears its last site. **Copy budgets are a ratchet (Droidtop/tracker#485 F2c).** A row title written as a literal longer than the limits file's `copyWarnings.title` (40 characters), or a subtitle longer than `copyWarnings.body` (90), counts against `copy-budget`; `COPY_CEILING` is the count at the last copy pass, `--check` fails when the count goes above it, and the commit that shortens copy lowers it to the new count. The first pass brought the long titles to none and the count from 90 to 75, all subtitles. **A row with nothing to do is inert (Droidtop/tracker#587, `empty-run` on since 2026-10-28).** An `ActionItem` given no `run` is a fact, a state or an empty line (`ActionItem.inert`, `CatalogItem.isInert`, true for a `TextBlockItem` too): the Gaming renderer shows no A hint on it and A does nothing, as plugin-api promises for an inert node. `run = {}`, which drew "A Select" on 219 such rows, is gone and may not come back.
 
 ### Values: one formatter (decided 2026-10-14, Droidtop/tracker#485 F2a)
 
@@ -21861,7 +21861,7 @@ the secondary path for sources that publish no key.
   `PluginRepoUpdates.runDue` rides on the Software updates pass
   (`AppSelfUpdate.maybeCheck`: its frequency, its off switch, its process-start
   trigger), off the main thread, and has its own switch under Plugin
-  repositories ("Update plugins from these repositories automatically", on by
+  repositories ("Update these plugins automatically", on by
   default). Per repository it makes one conditional request for the release list
   (`ETag`/`If-None-Match`, so an unchanged repository answers 304, which costs no
   request allowance; the person's token raises the limit) and remembers the

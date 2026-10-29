@@ -1814,7 +1814,7 @@ private fun ControllerStep(
             }
         } else if (ready && controllers.isNotEmpty()) {
             SelectableRow(
-                title = "Not right? Press the button labelled A instead",
+                title = "Not right? Press the button marked A",
                 selected = false,
                 onClick = { recapturing = true },
             )

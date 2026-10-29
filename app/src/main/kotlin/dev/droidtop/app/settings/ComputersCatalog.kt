@@ -71,7 +71,7 @@ object ComputersCatalog {
                     title = null,
                     items = buildList {
                         if (!AgentNative.available) {
-                            add(ActionItem(id = "computers_missing", title = "This build of droidtop has no computer sync library"))
+                            add(ActionItem(id = "computers_missing", title = "Computer sync isn't in this build"))
                         }
                         add(
                             ActionItem(

@@ -54,7 +54,7 @@ object MeteredConnectionCatalog {
                 add(
                     ActionItem(
                         id = "metered_once",
-                        title = "Allow downloads until this connection ends",
+                        title = "Allow downloads until you disconnect",
                         subtitle = "Every waiting download starts now. When you disconnect, downloads wait again",
                         run = { MeteredGrants.allowOnce(connection) },
                     ),
@@ -107,7 +107,7 @@ object MeteredConnectionCatalog {
         } else {
             ActionItem(
                 id = "metered_always_wifi_permission",
-                title = "Always allow on this Wi-Fi (not recommended)",
+                title = "Always allow on this Wi-Fi",
                 subtitle = "Needs the location permission: Android tells an app which Wi-Fi it is on only with it. droidtop " +
                     "would use it for this alone, to remember this network for downloads. We do not recommend granting it; " +
                     "\"This network is not metered\" above does the same without it",

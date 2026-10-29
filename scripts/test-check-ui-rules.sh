@@ -26,6 +26,7 @@ fixture formatters app/src/main/kotlin/A.kt 'val s = String.format("%.1f GB", b 
 fixture hint-tip shell-gamepad/src/main/kotlin/A.kt 'HintTip("Why") { Text("Row") }'
 fixture permission-titles plugin-host/src/main/kotlin/A.kt 'PluginPermission("x", PermissionTier.DANGEROUS, "Run adb commands")'
 fixture raw-dialog shell-gamepad/src/main/kotlin/A.kt 'Dialog(onDismissRequest = onDismiss) { Text("Pick") }'
+fixture copy-budget app/src/main/kotlin/A.kt 'ActionItem(id = "x", title = "A title that runs well past the forty character budget")'
 
 status=0
 for dir in "$tmp"/*/; do

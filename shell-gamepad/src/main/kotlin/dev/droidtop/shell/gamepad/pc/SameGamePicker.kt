@@ -118,7 +118,7 @@ internal fun SameGamePicker(
                 fontWeight = FontWeight.SemiBold,
             )
             if (choices.isEmpty()) {
-                MenuRow(title = "No game here is named anything like this one")
+                MenuRow(title = "No game here has a name like this one")
             } else {
                 choices.forEachIndexed { index, choice ->
                     MenuRow(

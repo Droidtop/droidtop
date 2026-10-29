@@ -129,7 +129,7 @@ object WindowsInstallCatalog {
                     id = "windows_install_started",
                     title = "Installs started",
                     items = if (started.isEmpty()) {
-                        listOf(ActionItem(id = "windows_install_none", title = "No install is waiting for its game to be added"))
+                        listOf(ActionItem(id = "windows_install_none", title = "No install is waiting for its game"))
                     } else {
                         started.map { pending ->
                             NestedScreenItem(

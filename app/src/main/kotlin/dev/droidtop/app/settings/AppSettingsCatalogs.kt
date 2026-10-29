@@ -3184,7 +3184,7 @@ object AppSettingsCatalogs {
                 proposal?.let { proposedKeyGroup(it) },
                 CatalogGroup(
                     id = "plugin_keys_manual",
-                    title = "Add a key by hand (for sources that publish no key)",
+                    title = "Add a key by hand",
                     items = listOf(
                         TextInputItem(
                             id = "plugin_keys_manual_origin",
