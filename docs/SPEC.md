@@ -438,7 +438,8 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   6b has it. Start opens the Start menu (Gaming's left menu), R2 the Quick Menu (Gaming's R2; Select stays the
   container's, coordinator, 2026-10-08), L1 the list of windows, R1 the search.
   `DesktopPadRoutes` (`:shell-desktop`) claims them in `MainActivity.dispatchKeyEvent`, before any view,
-  and only from a gamepad: a keyboard's keys are the container's. With no live session (a desktop still to
+  and only from a gamepad: a keyboard's keys are the container's, apart from four shortcuts (a Super tap,
+  Super+S, Alt+Tab, Ctrl+Esc; 6b, Droidtop/tracker#697). With no live session (a desktop still to
   be set up or started) there is no container to give them to, so the four are taken from any source
   (rig 2026-10-15). `DesktopShell` collects them. A screen droidtop opens from Desktop (the Switch mode
   sheet, a plugin's permission sheet, a settings page of its own) takes the Gaming theme as Desktop's chrome
@@ -7843,6 +7844,25 @@ is in front, Standard's taskbar key filter leaves Meta alone
 so the session got only the meta state on the next key. Android's own Meta
 shortcuts (Meta+Enter as Home, a Meta+letter app launch, depending on the
 version) act before any app sees the key, and droidtop cannot stop them.
+
+**droidtop's four keyboard shortcuts (decided 2026-10-29, Droidtop/tracker#697).**
+A person on a keyboard (a lapdock, a monitor with a keyboard, 4c's canonical
+Desktop case) had no key that opened Start, the search or the window list. The
+pad has Start, R1 and L1 for them; a keyboard now has four shortcuts, read
+before any view sees the key (`DesktopPadRoutes.KeyShortcuts`, raising the same
+routes the pad does):
+- A tap of Super, pressed and let go with no other key or modifier, opens
+  Start. Super itself still goes to the container, and sway does nothing with
+  Super alone, so every Super combination above is unchanged.
+- Super+S opens the one search. This takes the place of the stock
+  `$mod+s` (stacking layout), which the floating desktop (2b "Window
+  controls") has little use for.
+- Alt+Tab opens the list of windows.
+- Ctrl+Esc opens Start, as on Windows.
+droidtop takes the S, Tab or Esc, both its press and its release, so the
+container never sees half of it. The modifier has already gone to the
+container on its own, which does nothing there. Every other key is the
+container's, as before.
 
 **Keys reach the surface in order, and a lost release is let go (follow-up rig
 2026-10-16).** After `input keycombination CTRL_LEFT B`, foot read the next
