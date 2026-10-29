@@ -112,6 +112,15 @@ internal class AppCaller(val isolated: Boolean, private val appUid: Int, private
         return true
     }
 
+    companion object {
+        /**
+         * A one-way call (no caller pid) is droidtop's when it comes from droidtop's UID and carries [secret], the token
+         * only droidtop's checked call could fetch (Droidtop/tracker#511). Pure, so it is unit-tested.
+         */
+        fun tokenAllows(callingUid: Int, appUid: Int, token: Long, secret: Long): Boolean =
+            callingUid == appUid && secret != 0L && token == secret
+    }
+
     /** Droidtop's process [deadPid] died: the next caller is asked about again. */
     @Synchronized
     fun forget(deadPid: Int) {

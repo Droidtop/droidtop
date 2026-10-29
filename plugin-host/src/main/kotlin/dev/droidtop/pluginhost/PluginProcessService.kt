@@ -109,6 +109,27 @@ abstract class PluginProcessService : Service() {
         }
     }
 
+    /** The secret droidtop's one-way screen calls carry ([requireAppToken]); made once per process. */
+    private val inputSecret: Long by lazy {
+        val random = java.security.SecureRandom()
+        var value = 0L
+        while (value == 0L) value = random.nextLong()
+        value
+    }
+
+    /**
+     * [requireApp] for a one-way call, which has no caller pid (Binder.getCallingPid is 0 on a oneway transaction, so
+     * every touch and key was refused, Droidtop/tracker#511): the call must come from droidtop's UID and carry the
+     * secret only droidtop could have asked for ([IPluginRuntime.inputToken], itself checked by pid).
+     */
+    private fun requireAppToken(token: Long) {
+        val uid = android.os.Binder.getCallingUid()
+        if (!AppCaller.tokenAllows(uid, applicationInfo.uid, token, inputSecret)) {
+            Log.w("droidtop.plugin", "refused a one-way call from uid $uid: only droidtop drives a plugin process")
+            throw SecurityException("only droidtop drives a plugin process")
+        }
+    }
+
     private fun requireApp() {
         val uid = android.os.Binder.getCallingUid()
         val pid = android.os.Binder.getCallingPid()
@@ -310,13 +331,18 @@ abstract class PluginProcessService : Service() {
             (loaded[pluginId] as? HostedScreen)?.resizeScreen(width, height)
         }
 
-        override fun screenTouch(pluginId: String, event: android.view.MotionEvent) {
+        override fun inputToken(): Long {
             requireApp()
+            return inputSecret
+        }
+
+        override fun screenTouch(token: Long, pluginId: String, event: android.view.MotionEvent) {
+            requireAppToken(token)
             (loaded[pluginId] as? HostedScreen)?.screenTouch(event)
         }
 
-        override fun screenKey(pluginId: String, event: android.view.KeyEvent) {
-            requireApp()
+        override fun screenKey(token: Long, pluginId: String, event: android.view.KeyEvent) {
+            requireAppToken(token)
             (loaded[pluginId] as? HostedScreen)?.screenKey(event)
         }
 

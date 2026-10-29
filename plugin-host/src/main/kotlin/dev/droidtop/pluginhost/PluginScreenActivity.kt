@@ -41,6 +41,10 @@ class PluginScreenActivity : Activity(), SurfaceHolder.Callback {
     private lateinit var view: SurfaceView
     private var surfaceReady = false
     private var attached = false
+
+    /** The token the one-way touch and key calls carry, from the plugin process once the screen is attached. */
+    @Volatile
+    private var inputToken = 0L
     private var width = 0
     private var height = 0
 
@@ -102,6 +106,8 @@ class PluginScreenActivity : Activity(), SurfaceHolder.Callback {
                 try {
                     runCatching {
                         process.attachScreen(pluginId, entrypoint, library, surface, shared?.first, if (shared != null) capacity else 0L, width, height, density)
+                            // Touch and keys go one-way and carry the token this checked call returns (Droidtop/tracker#511).
+                            ?: run { inputToken = process.inputToken(); null }
                     }.getOrElse { it.message ?: "the plugin's process did not answer" }
                 } finally {
                     // The plugin's process holds its own descriptor now; the mapping here stays until the screen closes.
@@ -140,7 +146,7 @@ class PluginScreenActivity : Activity(), SurfaceHolder.Callback {
         if (attached && process != null) {
             val copy = MotionEvent.obtain(event)
             try {
-                runCatching { process.screenTouch(pluginId, copy) }
+                runCatching { process.screenTouch(inputToken, pluginId, copy) }
             } finally {
                 copy.recycle()
             }
@@ -151,7 +157,7 @@ class PluginScreenActivity : Activity(), SurfaceHolder.Callback {
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val process = runtime
         if (attached && process != null) {
-            runCatching { process.screenKey(pluginId, event) }
+            runCatching { process.screenKey(inputToken, pluginId, event) }
             return true
         }
         return super.dispatchKeyEvent(event)

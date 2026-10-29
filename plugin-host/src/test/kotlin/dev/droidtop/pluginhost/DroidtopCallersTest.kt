@@ -61,6 +61,18 @@ class DroidtopCallersTest {
     }
 
     @Test
+    fun `a one-way call has no pid, so it is droidtop's only by its uid and the token (Droidtop tracker 511)`() {
+        val caller = AppCaller(isolated = true, appUid = app) { error("an isolated process cannot ask the system") }
+        assertTrue(caller.allows(app, 100))
+        assertFalse("a one-way call's pid is 0, whoever made it", caller.allows(app, 0))
+        val secret = 0x5eed_1234_abcdL
+        assertTrue(AppCaller.tokenAllows(app, app, secret, secret))
+        assertFalse("droidtop's uid without the token: another plugin of that uid", AppCaller.tokenAllows(app, app, 7L, secret))
+        assertFalse("another uid with the token", AppCaller.tokenAllows(10_999, app, secret, secret))
+        assertFalse("no token made yet", AppCaller.tokenAllows(app, app, 0L, 0L))
+    }
+
+    @Test
     fun `a process reports only about the plugins that run in it`() {
         val first = Any()
         val second = Any()
