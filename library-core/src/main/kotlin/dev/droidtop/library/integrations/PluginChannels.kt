@@ -57,9 +57,11 @@ class PluginChannels private constructor(private val prefs: android.content.Shar
         @Volatile
         internal var resolver: (sourceId: String?, pluginId: String) -> PluginChannel = { _, _ -> PluginChannel.STABLE }
 
+        /** Points [resolver] at the person's choices; the preferences file is opened on first use, off droidtop's start (Droidtop/tracker#775). */
         fun install(context: Context) {
-            val store = forContext(context)
-            resolver = store::effective
+            val app = context.applicationContext
+            val store by lazy { forContext(app) }
+            resolver = { sourceId, pluginId -> store.effective(sourceId, pluginId) }
         }
     }
 }

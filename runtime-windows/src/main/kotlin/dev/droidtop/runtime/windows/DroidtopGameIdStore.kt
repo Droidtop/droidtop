@@ -18,18 +18,32 @@ object DroidtopGameIdStore {
     private val APP_ID = Regex("${'"'}appId${'"'}[ ]*:[ ]*([0-9]+)")
 
     @Volatile
-    private var ids: GameFolderIds? = null
+    private var appContext: Context? = null
+
+    @Volatile
+    private var made: GameFolderIds? = null
+
+    /**
+     * The store, made on first use: its file is found under droidtop's files folder, a disk lookup that must not run
+     * on the main thread at droidtop's start (Droidtop/tracker#775). Null before [install].
+     */
+    private val ids: GameFolderIds?
+        get() = made ?: synchronized(this) {
+            made ?: appContext?.let { context ->
+                GameFolderIds(
+                    store = File(context.filesDir, "pc-game-ids.tsv"),
+                    legacyRead = ::readLegacyFile,
+                    stat = ::statOf,
+                ).also { made = it }
+            }
+        }
 
     /** Idempotent; called before anything can reach the scanner. */
     fun install(context: Context) {
-        if (ids != null) return
+        if (appContext != null) return
         synchronized(this) {
-            if (ids != null) return
-            ids = GameFolderIds(
-                store = File(context.applicationContext.filesDir, "pc-game-ids.tsv"),
-                legacyRead = ::readLegacyFile,
-                stat = ::statOf,
-            )
+            if (appContext != null) return
+            appContext = context.applicationContext
             dev.droidtop.runtime.windows.utils.CustomGameCache.invalidate()
         }
     }

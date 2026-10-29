@@ -4192,8 +4192,11 @@ companion's controls; its capability snapshot names listing tasks, force-stop, s
 holds, forwards to the backend the user picked in Settings > Accounts and sources > Elevated access (Auto,
 Shizuku app, Shizuku plugin, Off). The **Shizuku app** backend (`SystemShizukuOps`) uses the official Shizuku
 app, or Sui (the Magisk module, same API), through the Shizuku API in droidtop's own process: the binder
-arrives in `:pluginhost` and `ShizukuTransport` shares it with the main process through Shizuku's built-in
-multi-process support (Sui is asked directly); droidtop asks Shizuku for permission with
+arrives in the main process's provider (`DroidtopShizukuProvider`) and `ShizukuTransport` shares it with the
+full-trust slots through Shizuku's built-in multi-process support (Sui is asked directly). The provider was in
+`:pluginhost`, and the main process asked it for the binder at start: on a slow device `:pluginhost` missed
+Android's ten seconds to publish and Android killed the main process with it (Droidtop/tracker#775), so the
+provider lives where droidtop always runs; droidtop asks Shizuku for permission with
 `Shizuku.requestPermission`, and commands run through `Shizuku.newProcess` (private since Shizuku 13, reached
 by reflection as the plugin does). A command is waited for by `RemoteProcessWait`, never `Process.waitFor(timeout)`:
 Java's default wait takes only `IllegalThreadStateException` as "still running", and Shizuku's remote process

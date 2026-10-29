@@ -155,10 +155,13 @@
           Where Shizuku hands droidtop its binder. Shizuku's server looks for a
           provider named "applicationId.shizuku" in every app the user allowed
           and calls sendBinder on it, so the provider has to exist for the
-          Shizuku provider plugin to work at all. It lives in :pluginhost, the
-          first full-trust slot; every other droidtop process, the other slots
-          and droidtop's own main process included, shares the binder through
-          Shizuku's multi-process support (ShizukuTransport, SystemShizukuOps).
+          Shizuku provider plugin to work at all. It lives in droidtop's main
+          process; every other droidtop process (the full-trust slots) shares
+          the binder through Shizuku's multi-process support (ShizukuTransport,
+          SystemShizukuOps). It was in :pluginhost, so the main process asked
+          another process for it at start: on a slow device :pluginhost missed
+          Android's ten seconds to publish, and Android killed the main process
+          with it, waiting on the provider (Droidtop/tracker#775).
           Every other plugin reaches privilege through the priv.* APIs.
           The permission is the one Shizuku's own documentation asks for: only
           the Shizuku server (the shell or root) holds it.
@@ -166,7 +169,6 @@
         <provider
             android:name="dev.droidtop.pluginhost.DroidtopShizukuProvider"
             android:authorities="${applicationId}.shizuku"
-            android:process=":pluginhost"
             android:multiprocess="false"
             android:enabled="true"
             android:exported="true"

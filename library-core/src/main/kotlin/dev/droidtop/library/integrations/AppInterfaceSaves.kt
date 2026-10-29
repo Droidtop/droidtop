@@ -39,7 +39,8 @@ import org.json.JSONObject
 class AppInterfaceSaves(
     private val context: Context,
     private val library: () -> Library,
-    private val records: GameRecordStore,
+    // Built on first use: its folder is looked up on disk, and this object is made at droidtop's start (Droidtop/tracker#775).
+    private val records: () -> GameRecordStore,
 ) : SavesExchange {
 
     /** An engine game Enginehost can run, with its record's launch facts. */
@@ -92,7 +93,7 @@ class AppInterfaceSaves(
     override fun engineGames(args: JSONObject): JSONObject = runBlocking {
         val entries = entries() ?: return@runBlocking JSONObject().put("ready", false).put("games", JSONArray()).put("complete", false)
         val engines = args.optJSONArray("engines")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() }
-        val games = cached(entries) { engineGamesOf(entries) { records.get(it.id)?.launch as? LaunchFacts.Engine } }
+        val games = cached(entries) { engineGamesOf(entries) { records().get(it.id)?.launch as? LaunchFacts.Engine } }
         toJson(games, engines) { game -> File(game.path).lastModified().takeIf { it > 0 } ?: game.entry.firstSeenEpochMs }
     }
 
@@ -109,7 +110,7 @@ class AppInterfaceSaves(
     /** The engine game at [path], reading only the records of entries whose folder could hold it. */
     private fun find(entries: List<LibraryEntry>, path: String): EngineGame? {
         val candidates = entries.filter { it.kind in ENGINE_KINDS && !it.missing && related(it.id, path) }
-        return match(engineGamesOf(candidates) { records.get(it.id)?.launch as? LaunchFacts.Engine }, path)
+        return match(engineGamesOf(candidates) { records().get(it.id)?.launch as? LaunchFacts.Engine }, path)
     }
 
     @Volatile private var cache: Pair<List<LibraryEntry>, List<EngineGame>>? = null

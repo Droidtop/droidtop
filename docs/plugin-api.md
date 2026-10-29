@@ -4316,8 +4316,10 @@ opens that one hole:
   is shared), so no plugin can reach another in-process (T8). It is needed
   for:
   - the Shizuku and root providers (their privilege is granted per UID;
-    the Shizuku binder arrives in `:pluginhost` and the other slots ask
-    for it through Shizuku's multi-process support);
+    the Shizuku binder arrives in droidtop's main process, whose provider
+    hands it on, and the slots ask for it through Shizuku's multi-process
+    support; the provider is not in a slot, so droidtop's start never waits
+    on another process to publish it, Droidtop/tracker#775);
   - plugins that bind other apps' services (`apps.bind`: an isolated
     process cannot bind);
   - contract 1 plugins, which keep running full-trust with the badge

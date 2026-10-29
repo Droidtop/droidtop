@@ -5,7 +5,8 @@ import android.util.Log
 import rikka.shizuku.ShizukuProvider
 
 /**
- * Shizuku's provider, which hands the Shizuku binder to droidtop's processes (docs/plugin-api.md 5.6, the OS rule): a
+ * Shizuku's provider, in droidtop's main process (Droidtop/tracker#775), which hands the Shizuku binder to droidtop's
+ * processes (docs/plugin-api.md 5.6, the OS rule): a
  * full-access plugin may use the OS directly, so `:pluginhost*` and droidtop itself get it as before, and the Shizuku
  * server (another UID: the shell or root) still delivers it. An open plugin's process runs as droidtop's UID too, and
  * without full access the sandbox must keep it from the OS, so it and a contained plugin are refused.

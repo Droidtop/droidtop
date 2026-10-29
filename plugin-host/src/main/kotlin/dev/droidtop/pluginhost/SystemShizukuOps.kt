@@ -267,15 +267,14 @@ class SystemShizukuOps : ElevatedBackend {
 }
 
 /**
- * How the system Shizuku's binder reaches droidtop's main process. Shizuku's server pushes it to the one provider
- * named `<applicationId>.shizuku`, which lives in `:pluginhost` (plugin-host's manifest, docs/plugin-api.md 2.7).
- * Shizuku's built-in multi-process support then shares it: the provider process rebroadcasts the binder, and any
- * other process asks the provider for it. Sui needs no provider: it hands the binder to any process that asks, so
+ * How the system Shizuku's binder reaches droidtop's processes. Shizuku's server pushes it to the one provider named
+ * `<applicationId>.shizuku`, which lives in droidtop's main process (plugin-host's manifest, docs/plugin-api.md 2.7),
+ * so a cold start never waits on another process to publish it (Droidtop/tracker#775). Shizuku's built-in
+ * multi-process support then shares it: the main process rebroadcasts the binder, and the full-trust slots ask the
+ * provider for it. Sui needs no provider: it hands the binder to any process that asks, so
  * each process asks once. Everything here is idempotent and safe to call from any process.
  */
 object ShizukuTransport {
-    private const val PROVIDER_PROCESS_SUFFIX = ":pluginhost"
-
     @Volatile
     private var started = false
 
@@ -287,7 +286,8 @@ object ShizukuTransport {
     fun install(context: Context) {
         appContext = context.applicationContext
         val name = if (Build.VERSION.SDK_INT >= 28) Application.getProcessName() else legacyProcessName()
-        providerProcess = name?.endsWith(PROVIDER_PROCESS_SUFFIX) == true
+        // The provider's process is droidtop's main one: the process named after the package itself.
+        providerProcess = name == context.packageName
         ShizukuProvider.enableMultiProcessSupport(providerProcess)
     }
 
@@ -295,7 +295,7 @@ object ShizukuTransport {
     private var providerProcess = false
 
     /**
-     * Asks the `:pluginhost` provider for the binder it holds, as [ShizukuProvider.requestBinderForNonProviderProcess]
+     * Asks the main process's provider for the binder it holds, as [ShizukuProvider.requestBinderForNonProviderProcess]
      * does, but without registering another broadcast receiver each time. For a process whose one request at start
      * found the provider empty and whose broadcast never came. Blocks on the provider: background only.
      */
@@ -343,7 +343,7 @@ object ShizukuTransport {
         }
         Thread {
             runCatching { if (!Sui.isSui()) Sui.init(context.packageName) }
-            runCatching { ShizukuProvider.requestBinderForNonProviderProcess(context) }
+            if (!providerProcess) runCatching { ShizukuProvider.requestBinderForNonProviderProcess(context) }
         }.apply {
             name = "droidtop-shizuku-binder"
             isDaemon = true

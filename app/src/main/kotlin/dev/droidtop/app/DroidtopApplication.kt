@@ -145,7 +145,7 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         dev.droidtop.pluginhost.PluginBrokers.saves = dev.droidtop.library.integrations.AppInterfaceSaves(
             this,
             library = { LibraryCore.library(this) },
-            records = LibraryCore.records(this),
+            records = { LibraryCore.records(this) },
         )
         // A source's engine hint (docs/plugin-api.md 1.6, acquire reply `engine`) pins the placed download to that
         // engine before the library indexes it, and an update's saves are copied into its new version folder
