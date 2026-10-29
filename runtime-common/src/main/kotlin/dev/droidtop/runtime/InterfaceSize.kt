@@ -1,7 +1,6 @@
 package dev.droidtop.runtime
 
 import android.content.Context
-import android.view.Display
 import dev.droidtop.library.settings.CatalogPrefs
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,22 +48,15 @@ object InterfaceSize {
     fun factorFor(context: Context, displayId: Int): Float = factor(context, roleOf(context, displayId))
 
     /**
-     * The role of [displayId]: the main screen is the second screen when one is present and the person's choice
-     * says so ([MainScreen]), else the built-in one; every other display is the companion. Reads the displays now.
+     * The role of [displayId]: the main screen is the one droidtop's menus are on ([ScreenRoles.arrangement], the
+     * screen the person answered "Main screen" for, else the one droidtop started on); every other display is the
+     * companion's for sizing. Reads the displays and preferences now: off the main thread.
      */
     fun roleOf(context: Context, displayId: Int): DisplayRole {
         val outputs = runCatching { DisplayOutputRepository(context).currentOutputsSnapshot() }.getOrDefault(emptyList())
-        return roleOf(displayId, secondDisplayId(outputs), MainScreen.choice(context))
+        return roleOf(displayId, ScreenRoles.arrangement(context, outputs).mainId)
     }
 
-    /** The second screen among [outputs]: a second built-in panel first, else an external display. Pure. */
-    fun secondDisplayId(outputs: List<DisplayOutput>): Int? =
-        (outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN } ?: outputs.firstOrNull { it.kind == DisplayOutputKind.EXTERNAL })
-            ?.androidDisplayId
-
-    /** Pure: [displayId]'s role when the second screen is [secondId] (null for none) and the main-screen choice is [choice]. */
-    fun roleOf(displayId: Int, secondId: Int?, choice: MainScreenChoice): DisplayRole {
-        val mainId = if (secondId != null && choice == MainScreenChoice.SECOND_WHEN_PRESENT) secondId else Display.DEFAULT_DISPLAY
-        return if (displayId == mainId) DisplayRole.MAIN else DisplayRole.COMPANION
-    }
+    /** Pure: [displayId]'s role when droidtop's menus are on [mainId]. */
+    fun roleOf(displayId: Int, mainId: Int): DisplayRole = if (displayId == mainId) DisplayRole.MAIN else DisplayRole.COMPANION
 }

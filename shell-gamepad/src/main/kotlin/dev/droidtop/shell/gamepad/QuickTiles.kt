@@ -127,7 +127,6 @@ object QuickTiles {
         GamingSettingsCatalog.ID_ORIENTATION_HERE,
         dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_FONT,
         dev.droidtop.runtime.systemstatus.AccessibilityControls.ID_DISPLAY_SIZE,
-        GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET,
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET,
         GamingSettingsCatalog.ID_DISPLAY_SWAP,
         GamingSettingsCatalog.ID_DISPLAY_REINIT,
@@ -288,7 +287,6 @@ object QuickTiles {
         GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS -> QuickGlyph.ANDROID
         GamingSettingsCatalog.ID_SYSTEM_LEAVE_UI_MODE -> QuickGlyph.EXIT
         GamingSettingsCatalog.ID_SYSTEM_SWITCH_MODE -> QuickGlyph.SWAP
-        GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET -> QuickGlyph.DISPLAY
         GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET -> QuickGlyph.GAMEPAD
         GamingSettingsCatalog.ID_DISPLAY_SWAP -> QuickGlyph.SWAP
         GamingSettingsCatalog.ID_DISPLAY_REINIT -> QuickGlyph.DISPLAY

@@ -14,7 +14,7 @@ import dev.droidtop.library.settings.LAUNCHER_PREFS_FILE_NAME
  * reader of [gameLaunchTarget] (docs/SPEC.md §4/§4c).
  *
  * Which panel the shell itself renders on is not here: that is
- * [dev.droidtop.runtime.MainScreen], the one role model both Gaming and
+ * [dev.droidtop.runtime.ScreenRoles], the one role model both Gaming and
  * Desktop read. Desktop mode deliberately ignores [gameLaunchTarget]: its
  * windows are the compositor's job (§4), not per-launch display targets.
  */

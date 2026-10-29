@@ -140,7 +140,7 @@ class QuickTilesTest {
                 listOf(
                     toggle(GamingSettingsCatalog.ID_SHOW_HINTS, true),
                     choice(GamingSettingsCatalog.ID_DISPLAY_GAME_LAUNCH_TARGET, 4),
-                    choice(GamingSettingsCatalog.ID_DISPLAY_SHELL_TARGET, 2),
+                    choice(GamingSettingsCatalog.ID_SCREEN_ROLE_PREFIX + "u9", 4),
                     toggle(GamingSettingsCatalog.ID_SYSTEM_ANDROID_LINKS, false),
                 ),
             ),

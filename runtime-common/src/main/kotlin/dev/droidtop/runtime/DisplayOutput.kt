@@ -41,6 +41,9 @@ data class DisplayOutput(
     val uniqueId: String = id,
     /** Android's display type (`Display.getType`: 1 internal, 2 external, 3 Wi-Fi, 4 overlay, 5 virtual); null when unreadable. */
     val androidType: Int? = null,
+    /** The panel's pixels per inch as it reports them (`DisplayMetrics.xdpi`, `ydpi`); 0 when it reports none. */
+    val xdpi: Float = 0f,
+    val ydpi: Float = 0f,
 ) {
     /** See [DisplayModes.isFallback]. */
     val isInFallbackMode: Boolean

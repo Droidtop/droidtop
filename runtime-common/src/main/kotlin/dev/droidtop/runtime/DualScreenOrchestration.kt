@@ -167,11 +167,12 @@ object DualScreenOrchestration {
         }
     }
     /**
-     * Chooser candidates in priority order: the addon/second screen FIRST,
-     * so the default-highlighted row is the better surface (per direction:
-     * when the add-on is attached it is the preferred screen, not an
-     * afterthought), then the default display, every connected screen
-     * once, so a device with three or more screens offers each of them.
+     * Chooser candidates ordered by role (docs/SPEC.md 4c, "What each
+     * screen is for", Droidtop/tracker#776): the main screen first, so the
+     * default-highlighted row is the screen the person made main, then the
+     * companion's screen, then every other connected screen once by id, so
+     * a device with three or more screens offers each of them. No screen is
+     * first for being an add-on.
      * Each label is the screen's name ([ScreenNames]: the person's own, a
      * position from the device profile, "Built-in screen" or the display's
      * own name) and says which one the person is looking at: "(this one)"
@@ -189,9 +190,11 @@ object DualScreenOrchestration {
         names: Map<Int, String>,
         shellDisplayId: Int,
         secondDisplayId: Int?,
+        mainDisplayId: Int,
+        companionDisplayId: Int?,
     ): List<ChooserCandidate> {
-        val ordered = displayIds.distinct().filter { it != DEFAULT_DISPLAY_ID }.sorted() +
-            listOfNotNull(DEFAULT_DISPLAY_ID.takeIf { it in displayIds })
+        val present = displayIds.distinct()
+        val ordered = (listOfNotNull(mainDisplayId, companionDisplayId) + present.sorted()).distinct().filter { it in present }
         return ordered.map { id ->
             val name = names[id] ?: if (id == DEFAULT_DISPLAY_ID) ScreenNames.BUILT_IN else ScreenNames.EXTERNAL
             val relation = when {

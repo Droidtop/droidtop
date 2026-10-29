@@ -209,6 +209,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The in-game overlays (SPEC "In-game overlays: HOME chords", tracker#740): the Quick Menu over the app in front on
         // HOME + R2, without backgrounding it. Main process only.
         InGameOverlays.install(this)
+        // A screen connected for the first time is asked about once (docs/SPEC.md 4c, "What each screen is for",
+        // Droidtop/tracker#776). Main process only.
+        ScreenRoleAsk.install(this)
         // The download policy (docs/SPEC.md "Download rules", tracker#226): every download job is held or let run by
         // the person's rules, and games set to keep themselves up to date are checked a little after start.
         // Main process only: the jobs registry lives there.

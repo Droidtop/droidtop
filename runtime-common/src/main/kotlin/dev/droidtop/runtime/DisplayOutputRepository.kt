@@ -21,7 +21,7 @@ import kotlinx.coroutines.flow.callbackFlow
  * from "an external lapdock monitor" among non-default displays; both are
  * folded into SECOND_SCREEN until real hardware differentiates them,
  * `DisplayOutputKind.EXTERNAL` stays unused). This is deliberately just
- * *enumeration*, not physical position — see [MainScreen] for
+ * *enumeration*, not physical position — see [ScreenRoles] for
  * why `DisplayOutputKind` is only ever a starting guess, never trusted as
  * "which one is physically upper/lower" (§4).
  */
@@ -94,6 +94,8 @@ class DisplayOutputRepository(private val context: Context) {
             val native = display.supportedModes
                 .maxByOrNull { it.physicalWidth.toLong() * it.physicalHeight }
             val type = hiddenInt(display, "getType")
+            @Suppress("DEPRECATION") // as getRealSize above: no Window for a Presentation display yet
+            val metrics = android.util.DisplayMetrics().also { display.getRealMetrics(it) }
             DisplayOutput(
                 uniqueId = hiddenString(display, "getUniqueId")?.takeIf { it.isNotBlank() }
                     ?: "display:${type ?: "?"}:${display.name.orEmpty()}:${native?.physicalWidth ?: point.x}x${native?.physicalHeight ?: point.y}",
@@ -111,6 +113,8 @@ class DisplayOutputRepository(private val context: Context) {
                 isPresentation = presentation,
                 nativeWidthPx = native?.physicalWidth ?: point.x,
                 nativeHeightPx = native?.physicalHeight ?: point.y,
+                xdpi = metrics.xdpi,
+                ydpi = metrics.ydpi,
             )
         }
     }

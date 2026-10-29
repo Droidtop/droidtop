@@ -8,13 +8,11 @@ import android.view.Display
 import android.util.Log
 import dev.droidtop.library.settings.Mode
 import dev.droidtop.runtime.CompanionScreenGuard
-import dev.droidtop.runtime.CompanionScreens
 import dev.droidtop.runtime.DisplayArrangement
 import dev.droidtop.runtime.DisplayOutputKind
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.runtime.DualScreenOrchestration
-import dev.droidtop.runtime.MainScreen
-import dev.droidtop.runtime.MainScreenChoice
+import dev.droidtop.runtime.ScreenRoles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -99,10 +97,13 @@ class SecondScreenOrchestrator(
 
     private var lastDisplayIds: Set<Int> = emptySet()
     private var lastArrangementSeq: Int = -1
-    private var lastMainScreen: MainScreenChoice? = null
+    private var lastMainId: Int? = null
 
-    /** The companion's screen as the last pass chose it (CompanionScreens), for placing the idle cover first there. */
+    /** The companion's screen as the last pass arranged it (ScreenRoles), for placing the idle cover first there. */
     @Volatile private var companionDisplayId: Int? = null
+
+    /** The screens the person left to Android (ScreenRole.MIRROR): droidtop never covers them. */
+    @Volatile private var mirroredIds: Set<Int> = emptySet()
     private var secondScreenPresentation: SecondScreenPresentation? = null
     private var healthCheckJob: Job? = null
 
@@ -232,9 +233,9 @@ class SecondScreenOrchestrator(
     fun coverVacatedDisplays(launchTargetDisplayId: Int?) {
         val outputs = displayOutputs.currentOutputsSnapshot()
         val secondaryIds = outputs
-            .filter { it.kind == DisplayOutputKind.SECOND_SCREEN }
+            .filter { it.kind == DisplayOutputKind.SECOND_SCREEN && it.androidDisplayId !in mirroredIds }
             .map { it.androidDisplayId }
-            // The companion's chosen screen first (Show the companion on, CompanionScreens).
+            // The companion's screen first (ScreenRoles).
             .sortedBy { if (it == companionDisplayId) 0 else 1 }
         DualScreenOrchestration
             .displaysNeedingIdleCover(
@@ -290,13 +291,16 @@ class SecondScreenOrchestrator(
                     return@collectLatest
                 }
 
-                // The companion's screen: the one chosen for this set of displays under "Show the companion on",
-                // else the screen that is not the main one (CompanionScreens.pick; slice C14).
-                val chosenId = withContext(Dispatchers.IO) { CompanionScreens.companionDisplay(context, outputs) }
-                companionDisplayId = chosenId
-                val second = outputs.firstOrNull { it.androidDisplayId == chosenId && it.kind == DisplayOutputKind.SECOND_SCREEN }
-                    ?: outputs.firstOrNull { it.kind == DisplayOutputKind.SECOND_SCREEN }
-                val showCompanion = DualScreenOrchestration.shouldShowSecondScreenCompanion(outputs.size)
+                // What each screen is for, as the person answered (docs/SPEC.md 4c, ScreenRoles; Droidtop/tracker#776): no
+                // screen is assumed better. The one screen paired with the built-in one is the main screen when the
+                // menus are elsewhere, else the companion's; a screen nobody answered for gets nothing of droidtop's.
+                val arrangement = withContext(Dispatchers.IO) { ScreenRoles.arrangement(context, outputs) }
+                companionDisplayId = arrangement.companionId
+                val pairedId = if (arrangement.mainId != Display.DEFAULT_DISPLAY) arrangement.mainId else arrangement.companionId
+                val second = outputs.firstOrNull { it.androidDisplayId == pairedId && it.kind == DisplayOutputKind.SECOND_SCREEN }
+                val mainElsewhere = second != null && second.androidDisplayId == arrangement.mainId
+                val showCompanion = arrangement.companionId != null
+                mirroredIds = arrangement.mirrored
                 if (DualScreenOrchestration.shouldDismissCompanion(showCompanion, host.companionVisible())) {
                     host.stopCompanion()
                 }
@@ -331,12 +335,10 @@ class SecondScreenOrchestrator(
                     companionCoveredDisplayId = CompanionCover.displayId,
                 )
                 val secondAvailable = second != null && second.androidDisplayId != parked
-                val mainScreen = withContext(Dispatchers.IO) { MainScreen.choice(context) }
                 // Choosing the Main screen is the user asking for the screens back.
-                if (lastMainScreen != null && lastMainScreen != mainScreen) giveScreensBack()
-                lastMainScreen = mainScreen
-                val wantShellOnSecond = (gaming || desktop) && secondAvailable &&
-                    mainScreen == MainScreenChoice.SECOND_WHEN_PRESENT
+                if (lastMainId != null && lastMainId != arrangement.mainId) giveScreensBack()
+                lastMainId = arrangement.mainId
+                val wantShellOnSecond = (gaming || desktop) && secondAvailable && mainElsewhere
                 val relocationGaveUp = currentDisplay != second?.androidDisplayId &&
                     DualScreenOrchestration.relocationHasFailed(relocationAttempts)
                 // Where the shell IS, from its own display: parking changes
@@ -346,7 +348,7 @@ class SecondScreenOrchestrator(
                     shellDisplayId = currentDisplay,
                     secondDisplayId = second?.androidDisplayId,
                     shellModeEligible = gaming || desktop,
-                    mainScreenWantsSecond = mainScreen == MainScreenChoice.SECOND_WHEN_PRESENT,
+                    mainScreenWantsSecond = mainElsewhere,
                     secondParked = !secondAvailable,
                     relocationFailed = relocationGaveUp,
                 )
@@ -373,6 +375,8 @@ class SecondScreenOrchestrator(
                         screenNames,
                         currentDisplay,
                         second?.androidDisplayId,
+                        mainDisplayId = arrangement.mainId,
+                        companionDisplayId = arrangement.companionId,
                     )
                 } else {
                     null

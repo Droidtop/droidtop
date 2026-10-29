@@ -3442,16 +3442,13 @@ the `ContainerRuntime` interface that already exists (§3):
   https://github.com/blacksheepmvp/mjolnir) (a companion dual-screen
   home-launcher-routing tool) is a concrete reference for the same
   problem.
-  **One persisted answer, relative (decided 2026-09-24):** which panel is
-  the main output is a single choice, `MainScreen` in `:runtime-common`
-  — "the second screen when one is connected" or "the built-in screen" —
-  written by the Main screen settings row and by Swap screens, and read
-  by Gaming and Desktop alike. It is never keyed by display id: Android
-  hands the add-on a new id when it re-enumerates, so an id-keyed store
-  (the earlier `DualScreenCoordinator`, which ran alongside a separate
-  shell-target preference with the opposite default) forgot the user's
-  swap after a replug and let the first Swap press do nothing. Changing
-  it, or the game launch target, re-runs orchestration immediately.
+  **One answer per screen (decided 2026-10-29, Droidtop/tracker#776, replacing the relative choice of
+  2026-09-24):** what each screen is for is the person's answer for that screen (`ScreenRoles` in
+  `:runtime-common`, "What each screen is for" in 4c), kept by Android's stable id for the screen and never by
+  display id: Android hands the add-on a new id when it re-enumerates, so an id-keyed store (the earlier
+  `DualScreenCoordinator`) forgot the user's swap after a replug. The screen roles rows in Settings > Displays,
+  Swap screens and the question a new screen gets write it; Gaming and Desktop read it alike. Changing it, or the
+  game launch target, re-runs orchestration immediately.
 - Each `DisplayOutput` maps to one headless output inside the primary
   container's compositor (whichever the user's configured — see §2).
 - **Every window is on the primary screen's output**: one shared desktop,
@@ -3476,9 +3473,9 @@ the `ContainerRuntime` interface that already exists (§3):
   just listing them by number. This configuration lives in the settings
   catalog (§7), rendered by every mode's settings surface; droidtop does
   not have or want a separate standalone settings app.
-  **How it fits the one main-screen answer (decided 2026-09-24):**
-  `MainScreen` says which panel is the main output and is the only
-  relative choice; the KScreen-shaped part is the **Displays** screen of
+  **How it fits the screen roles (decided 2026-09-24, roles since 2026-10-29):**
+  `ScreenRoles` says what each screen is for (4c, "What each screen is
+  for"); the KScreen-shaped part is the **Displays** screen of
   the catalog (`displays`, under Screens), one row per display Android
   currently has, named by the platform's own name for it ("DP Screen",
   a lapdock's EDID name) with its size beside it, and identified for
@@ -4833,11 +4830,14 @@ droidtop 0.2.0-dev.1931).
   "Companion screen" row (System, while a second screen holds the companion); the off screen is one TalkBack element,
   "Companion screen off, activate to turn on", and the first time it says how to wake it. On Input it is a dimmed
   trackpad: touches still move the pointer, and the Show tabs handle or the Tabs button wakes it. **Which screen**:
-  "Show the companion on" (Companion group) lists every screen but the main one in plain words; the choice is
+  (as built 2026-10-24) "Show the companion on" (Companion group) listed every screen but the main one in plain words; the choice was
   remembered per set of screens (`CompanionScreens`, keyed by each screen's name, native size and built-in or
   external, never display ids, so two identical monitors share a key and a choice); the default is the screen that
   is not the main one, built-in before external (an AYN Thor's second built-in screen before a monitor), and the
-  orchestrator puts the companion there after every hotplug, TalkBack hearing where it is. **System > Display** has
+  orchestrator puts the companion there after every hotplug, TalkBack hearing where it is. (Replaced 2026-10-29,
+  Droidtop/tracker#776: the companion's screen is the one answered Companion in Settings > Displays or in the
+  question a new screen gets, else the screen droidtop started on when the menus moved to another; "Show the
+  companion on", `CompanionScreens` and its built-in-first default are gone, "What each screen is for" in 4c.) **System > Display** has
   one card per screen: name, built-in or external, size, orientation and role; the main screen's brightness, the
   companion's own brightness and "Turn this screen off"; the refresh rate where the screen lists more than one
   (`cmd display set-user-preferred-display-mode` through the helper app, behind the new Risky actions class "Change
@@ -5029,7 +5029,7 @@ implementations of one job. A single module owns:
 - what that activity renders, chosen by the active mode: Standard gets
   the launcher's secondary-display UI, Gaming gets the companion
   surface, Desktop gets its input surface (§4);
-- the panel role assignment and swap (`MainScreen`, `DisplayArrangement`);
+- the screen roles and swap (`ScreenRoles`, `DisplayArrangement`);
 - launch-target resolution, relative vocabulary first.
 
 One controlling configuration read by every mode, rather than each shell
@@ -5071,7 +5071,7 @@ Three things droidtop should copy:
 
 **BUILT (2026-09-02), as the launch-screen memory model.** The three
 lessons above are now code, layered over (not replacing) the
-`MainScreenChoice`/`GameLaunchTarget` choices, which remain the global
+screen roles (`ScreenRoles`, 2026-10-29) and `GameLaunchTarget` choices, which remain the global
 fallback:
 
 - `LaunchScreenMemory` (library-core) stores relative `LaunchScreen`
@@ -5197,23 +5197,45 @@ verifiably on the addon — or immediately on a synchronous
 with the live companion covering the addon. Either way the addon shows
 a droidtop surface, never a mirror.
 
-### External screen priority, per mode (2026-09-02)
+### What each screen is for (decided 2026-10-29, Droidtop/tracker#776)
 
-What "the addon is the better screen" concretely means in each mode:
+The owner, 2026-10-29, on the default that moved droidtop to an add-on screen: "You're hardcoding that behavior
+based on specifically my device"; and 2026-10-28: "I don't want droidtop making assumptions based on MY device. I
+want us to design a system that works on any display." This replaces "External screen priority, per mode"
+(2026-09-02), whose "the addon is the better screen" made Main screen: Second screen when connected the silent
+default, moved Gaming and Desktop to whatever non-built-in display appeared, put the add-on first in the launch
+chooser, and gave the companion the lowest-numbered other screen. That fit a Retroid Pocket 5 with its DP add-on and
+nothing else: a phone with a small external display, a dual-screen handheld whose second panel is smaller, a TV-out
+while playing on the handheld, the dual-screen AVD (two external displays: the shell went to display 2).
 
-- **Gaming**: the shell itself moves to the addon (the existing
-  SECOND_WHEN_PRESENT default), the built-in panel gets the companion.
-- **Desktop**: same relocation, same default — the desktop renders on
-  the addon/external and the built-in panel becomes the input surface
-  (trackpad + keyboard, §6c) via the same role preference. This
-  replaces the earlier "Desktop is exempt" stance: exempt from GAME
-  launch targeting it remains (windows are the compositor's job), but
-  not from wanting the bigger/better panel as its output — a lapdock
-  monitor is the canonical case.
-- **Standard**: unchanged — Launcher3's own secondary-display handling.
-- The launch chooser lists the ADD-ON row first in both arrangements,
-  so the default-highlighted choice is the better screen
-  (`DualScreenOrchestration.chooserCandidates`, unit-tested).
+- **No screen is assumed better.** droidtop's menus stay on the screen it started on (Android's default display)
+  until the person answers another screen **Main screen**. Nothing is decided from a device model.
+- **One question per new screen** (`ScreenRoleAsk`, `ScreenRoleActivity`): a screen nobody has answered for, connected
+  while droidtop runs or found at its start, is asked about once, on the main screen, by pad or touch: "<name,
+  size> connected. Use it as": **Main screen** (the menus move there; the screen droidtop started on gets the
+  companion), **Companion** (the companion shows there; the menus stay), **Mirror** (droidtop draws nothing there and
+  leaves it to Android), **Nothing** (droidtop keeps it dark with its idle surface). The cursor starts on a
+  suggestion from what the screens report, never applied without the answer (`ScreenRoles.suggest`): a screen
+  markedly larger on the diagonal (1.5 times, from its pixels and its reported pixels per inch) suggests Main screen,
+  a smaller or similar one Companion; with no believable density, an external screen with twice the pixels counts as
+  larger, and a second built-in panel never does. One question at a time; one closed without an answer is not asked
+  again while droidtop runs, and the screen gets nothing of droidtop's until it is answered. Not while setup runs:
+  its Your screens step asks the same (7b, 2a).
+- **Remembered per screen** by Android's stable id for it (`Display.getUniqueId`, else its type, name and native
+  size; `DisplayOutput.uniqueId`), so a reconnected screen keeps its answer with no question, whatever display id it
+  comes up with. Settings > Displays has one row per connected screen other than the one droidtop started on, its
+  name, built-in or external and size, and its role ("Not answered yet" until there is one). One screen is the main
+  one: answering Main screen for one makes the screen that was main the companion's.
+- **The arrangement** (`ScreenRoles.arrange`, pure and tested): the menus on the screen answered Main screen (the
+  lowest id if several), else on the screen droidtop started on; the companion on the screen answered Companion (the
+  lowest id), else on the screen droidtop started on when the menus moved elsewhere, else nowhere. Gaming and Desktop
+  follow it; Standard is Launcher3's own. Swap screens (Quick Menu) swaps the menus and the companion between their
+  screens and remembers it (`ScreenRoles.swap`). The interface size of each screen follows the same roles.
+- **The launch chooser orders screens by role**: the main screen first, then the companion's, then the rest by id
+  (`DualScreenOrchestration.chooserCandidates`, tested). No screen is first for being an add-on.
+- **The owner's console:** the first time its add-on is connected after this change, it asks once; answering Main
+  screen gives what it did before, remembered across reconnects. A Main screen choice stored by the old setting is not
+  carried over: it was the silent default for nearly everyone, so it says nothing about what the person wants.
 
 ### A buried game, root-caused on the live console (2026-09-25)
 
@@ -5381,10 +5403,10 @@ had not moved.
   parking changes. The launch chooser labels and "Same display as the shell"
   follow that.
 - `DualScreenOrchestration.shellMove` is the one relocation decision, both
-  ways: Main screen "Second screen when connected" moves a built-in shell to the
-  second screen (not while an app is parked there, not after the platform
-  refused it); Main screen "Built-in screen" moves a shell on the second screen
-  back to the built-in display, also while an app is parked there. Both moves
+  ways: a screen answered Main screen ("What each screen is for", 2026-10-29)
+  takes a built-in shell (not while an app is parked there, not after the
+  platform refused it); once no other screen is the main one, a shell there
+  moves back to the built-in display, also while an app is parked there. Both moves
   share one cooldown.
 - The companion Presentation is only ever shown on a display the shell does not
   occupy and is not about to occupy (`companionPresentationDisplayId`).
@@ -5404,7 +5426,7 @@ had not moved.
   finish with one display left; the idle cover also finishes on the built-in
   display. What was under them shows: the shell, or Android's home.
 - The companion activity finishes when the shell covers it on its own screen
-  (Main screen "Built-in screen" moves the shell over it): it has no role there,
+  (the main screen made the built-in one again moves the shell over it): it has no role there,
   and stopped under the shell it would be what that screen shows whenever the
   shell leaves. An app covering it is not the shell, so that case keeps the
   companion waiting (tracker#265). A finished companion or cover clears its
@@ -9162,10 +9184,11 @@ line.
    role"): Android's own screen appears over the next step, and the summary says whether it took.
    droidtop never picks a launcher for anyone; the default is to change nothing.
 2a. **Your screens** (`SCREENS`; only when two screens are connected when the run starts, Droidtop/tracker#598).
-   Body: "Which screen should droidtop's menus be on? The other one gets the companion." Two answers, relative as the
-   setting is: **The second screen** (the default) and **The built-in screen**. Next writes the answer through
-   `MainScreen.set`, the write Settings > Displays > Main screen and the Quick Menu's Swap screens use; a note says
-   where to change it later. Detection can only guess which panel is which (4c), so the person says once, here.
+   Body: "Which screen should droidtop's menus be on? The other one gets the companion." One row per connected screen,
+   named with built-in or external and its size, and none preselected (no screen is assumed better, 4c "What each
+   screen is for", Droidtop/tracker#776): Next with no pick leaves the menus where droidtop started. Picking another
+   screen answers it Main screen; picking the one droidtop started on answers the other Companion (`ScreenRoles`, the
+   answers Settings > Displays and the Quick Menu's Swap screens change), so neither is asked about again.
 3. **Your games** (`GAMES`; Gaming only). One page with two states. Without file access, body:
    "droidtop reads only the folders you choose. Allow file access, turn on "Allow access to manage all
    files", then come back." (API 26-29: "droidtop reads only the folders you choose. Allow file access
@@ -17677,8 +17700,9 @@ companion screen are scaled separately, and each takes its own **Interface size*
 size, main screen" and "Interface size, companion screen"; Auto, 75, 90, 110, 125 or 150 percent; owner, 2026-10-29:
 "Sounds good"; Droidtop/tracker#656 point 3). It multiplies that display's canvas density (`InterfaceSize`,
 `scaledCanvasDensity`), so layout and text scale together; Auto is the canvas as reported, never a size picked from the
-device model. The role is the screen's, not the surface's: the main screen is the second screen when one is present
-and Main screen says so, else the built-in one (`InterfaceSize.roleOf`). The canvas is always worked out from the
+device model. The role is the screen's, not the surface's: the main screen is the one droidtop's menus are on (the
+screen answered Main screen, else the one droidtop started on, 4c "What each screen is for"), every other the
+companion's (`InterfaceSize.roleOf`). The canvas is always worked out from the
 display's own density, so the factor is applied once, both to an activity's Resources (`AccessibilityPrefs`) and to a
 Compose window (`ProvideShellCanvas`); a change redraws the screen. The pixels do not
 change, only how many a dp is: a Retroid Pocket 5's 5.5" 1080p panel reports 360dpi (2.25 pixels a dp, 853x480dp), so

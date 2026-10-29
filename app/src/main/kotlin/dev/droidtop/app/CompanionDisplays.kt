@@ -35,7 +35,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
-import dev.droidtop.runtime.CompanionScreens
+import dev.droidtop.runtime.ScreenRoles
 import dev.droidtop.runtime.DisplayControls
 import dev.droidtop.runtime.DisplayOutputRepository
 import dev.droidtop.runtime.ScreenClass
@@ -167,7 +167,7 @@ private fun CompanionBrightness() {
 private fun readCards(context: Context): List<DisplayCard> {
     val outputs = DisplayOutputRepository(context).currentOutputsSnapshot()
     val names = ScreenNaming.names(context, outputs)
-    val companion = CompanionScreens.companionDisplay(context, outputs)
+    val companion = ScreenRoles.arrangement(context, outputs).companionId
     val manager = context.getSystemService(DisplayManager::class.java)
     val main = ForegroundShell.current()?.window?.decorView?.display?.displayId ?: Display.DEFAULT_DISPLAY
     return outputs.sortedBy { it.androidDisplayId }.map { output ->

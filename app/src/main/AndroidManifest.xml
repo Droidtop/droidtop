@@ -594,6 +594,17 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
+        <!--
+          The one question a new screen gets (ScreenRoleAsk; docs/SPEC.md 4c, "What each screen is for"), over
+          whatever is on the main screen.
+        -->
+        <activity
+            android:name="dev.droidtop.app.ScreenRoleActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name="dev.droidtop.app.LauncherSearchActivity"
             android:exported="false"

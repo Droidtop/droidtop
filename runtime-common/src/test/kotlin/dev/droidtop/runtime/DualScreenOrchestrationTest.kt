@@ -133,31 +133,35 @@ class DualScreenOrchestrationTest {
     }
 
     @Test
-    fun `the addon is the first chooser row whichever screen the shell is on`() {
-        // Prioritising the external screen: the default-highlighted row
-        // is the addon in both arrangements; only the relative labels
-        // change.
+    fun `the main screen is the first chooser row, then the companion's, whichever screen the shell is on`() {
+        // No screen is first for being an add-on (Droidtop/tracker#776): the order is the person's roles.
         val names = mapOf(0 to "Bottom screen", 9 to "Top screen")
-        val shellOnAddon = DualScreenOrchestration.chooserCandidates(listOf(0, 9), names, shellDisplayId = 9, secondDisplayId = 9)
-        assertEquals(9, shellOnAddon.first().displayId)
-        assertEquals("Top screen (this one)", shellOnAddon.first().label)
+        val mainOnAddon = DualScreenOrchestration.chooserCandidates(
+            listOf(0, 9), names, shellDisplayId = 9, secondDisplayId = 9, mainDisplayId = 9, companionDisplayId = 0,
+        )
+        assertEquals(9, mainOnAddon.first().displayId)
+        assertEquals("Top screen (this one)", mainOnAddon.first().label)
         // The built-in screen is named by its id: no choice (null) is the shell's own screen.
-        assertEquals(0, shellOnAddon[1].displayId)
-        assertEquals("Bottom screen (the other one)", shellOnAddon[1].label)
+        assertEquals(0, mainOnAddon[1].displayId)
+        assertEquals("Bottom screen (the other one)", mainOnAddon[1].label)
 
-        val shellOnBuiltIn = DualScreenOrchestration.chooserCandidates(listOf(0, 9), names, shellDisplayId = 0, secondDisplayId = 9)
-        assertEquals(9, shellOnBuiltIn.first().displayId)
-        assertEquals("Top screen (the other one)", shellOnBuiltIn.first().label)
-        assertEquals("Bottom screen (this one)", shellOnBuiltIn[1].label)
+        val mainBuiltIn = DualScreenOrchestration.chooserCandidates(
+            listOf(0, 9), names, shellDisplayId = 0, secondDisplayId = 9, mainDisplayId = 0, companionDisplayId = 9,
+        )
+        assertEquals(0, mainBuiltIn.first().displayId)
+        assertEquals("Bottom screen (this one)", mainBuiltIn.first().label)
+        assertEquals("Top screen (the other one)", mainBuiltIn[1].label)
     }
 
     @Test
-    fun `three screens are all offered, only the two roles can be remembered`() {
+    fun `three screens are all offered by role, only the two roles can be remembered`() {
         val names = mapOf(0 to "Top screen", 4 to "Bottom screen", 9 to "DELL U2415")
-        val rows = DualScreenOrchestration.chooserCandidates(listOf(0, 9, 4), names, shellDisplayId = 0, secondDisplayId = 4)
-        assertEquals(listOf(4, 9, 0), rows.map { it.displayId })
-        assertEquals(listOf("Bottom screen", "DELL U2415", "Top screen (this one)"), rows.map { it.label })
-        assertEquals(listOf(true, false, true), rows.map { it.rememberable })
+        val rows = DualScreenOrchestration.chooserCandidates(
+            listOf(0, 9, 4), names, shellDisplayId = 0, secondDisplayId = 4, mainDisplayId = 0, companionDisplayId = 4,
+        )
+        assertEquals(listOf(0, 4, 9), rows.map { it.displayId })
+        assertEquals(listOf("Top screen (this one)", "Bottom screen", "DELL U2415"), rows.map { it.label })
+        assertEquals(listOf(true, true, false), rows.map { it.rememberable })
     }
 
     @Test

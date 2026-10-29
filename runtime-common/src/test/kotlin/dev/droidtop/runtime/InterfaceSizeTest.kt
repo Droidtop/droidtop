@@ -14,13 +14,10 @@ class InterfaceSizeTest {
     }
 
     @Test
-    fun `the main screen is the second one when present and chosen, else the built-in one`() {
-        val second = 2
-        assertEquals(DisplayRole.MAIN, InterfaceSize.roleOf(second, second, MainScreenChoice.SECOND_WHEN_PRESENT))
-        assertEquals(DisplayRole.COMPANION, InterfaceSize.roleOf(0, second, MainScreenChoice.SECOND_WHEN_PRESENT))
-        assertEquals(DisplayRole.MAIN, InterfaceSize.roleOf(0, second, MainScreenChoice.BUILT_IN))
-        assertEquals(DisplayRole.COMPANION, InterfaceSize.roleOf(second, second, MainScreenChoice.BUILT_IN))
-        // One screen: it is the main one whatever the choice.
-        assertEquals(DisplayRole.MAIN, InterfaceSize.roleOf(0, null, MainScreenChoice.SECOND_WHEN_PRESENT))
+    fun `the main screen is the one droidtop's menus are on, every other is the companion's`() {
+        assertEquals(DisplayRole.MAIN, InterfaceSize.roleOf(2, mainId = 2))
+        assertEquals(DisplayRole.COMPANION, InterfaceSize.roleOf(0, mainId = 2))
+        assertEquals(DisplayRole.MAIN, InterfaceSize.roleOf(0, mainId = 0))
+        assertEquals(DisplayRole.COMPANION, InterfaceSize.roleOf(3, mainId = 0))
     }
 }

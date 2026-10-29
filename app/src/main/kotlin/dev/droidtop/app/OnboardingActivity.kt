@@ -1706,10 +1706,12 @@ internal fun suggestedGameFolders(): List<String> {
  * "Controller buttons").
  */
 /**
- * SCREENS (Droidtop/tracker#598): with two screens connected, which one droidtop's menus are on. Detection can only
- * guess which physical panel is which (docs/SPEC.md 4c), so the person says, once, at the start. Relative, as the
- * setting is: "the second screen" stays right whichever id Android gives it after a replug. Next writes the answer
- * through [MainScreen.set], the same write Settings > Displays > Main screen and the Quick Menu's Swap screens use.
+ * SCREENS (Droidtop/tracker#598, #776): with two screens connected, which one droidtop's menus are on. No screen is
+ * assumed better (docs/SPEC.md 4c, "What each screen is for"): nothing is preselected until the person picks, and Next
+ * without a pick leaves the menus where droidtop started. Each screen is listed by its name, built-in or external, and
+ * size. Picking another screen answers it Main screen; picking the screen droidtop started on answers the other one
+ * Companion. Either way that screen is not asked about again ([ScreenRoles], the same answers Settings > Displays and
+ * the Quick Menu's Swap screens change).
  */
 @Composable
 private fun ScreensStep(
@@ -1719,34 +1721,49 @@ private fun ScreensStep(
     onContinue: () -> Unit,
 ) {
     val context = LocalContext.current
-    val stored by produceState<dev.droidtop.runtime.MainScreenChoice?>(null) {
-        value = withContext(Dispatchers.IO) { dev.droidtop.runtime.MainScreen.choice(context) }
+    val screens by produceState<List<Pair<dev.droidtop.runtime.ScreenFacts, String>>>(emptyList()) {
+        value = withContext(Dispatchers.IO) {
+            val outputs = dev.droidtop.runtime.DisplayOutputRepository(context).currentOutputsSnapshot()
+            val names = dev.droidtop.runtime.ScreenNaming.names(context, outputs)
+            outputs.map { output ->
+                val facts = dev.droidtop.runtime.ScreenNaming.facts(output)
+                val kind = if (facts.screenClass == dev.droidtop.runtime.ScreenClass.BUILT_IN) "built-in" else "external"
+                facts to "${names[facts.displayId] ?: output.name}, $kind, ${facts.nativeWidthPx}x${facts.nativeHeightPx}"
+            }
+        }
     }
-    var picked by remember { mutableStateOf<dev.droidtop.runtime.MainScreenChoice?>(null) }
-    val choice = picked ?: stored ?: dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT
+    var picked by remember { mutableStateOf<Int?>(null) }
     OnboardingScaffold(
         title = "Your screens",
         body = "Which screen should droidtop's menus be on? The other one gets the companion.",
         progress = progress,
         onBack = onBack,
         primary = StepAction(if (isReEntry) "Done" else "Next") {
-            if (picked != null && picked != stored) dev.droidtop.runtime.MainScreen.set(context, choice)
+            val choice = picked
+            val all = screens.map { it.first }
+            if (choice != null) {
+                // A preferences write that outlives this step, which closes as Next is pressed.
+                kotlin.concurrent.thread(name = "screen-roles") {
+                    val home = android.view.Display.DEFAULT_DISPLAY
+                    if (choice != home) {
+                        all.firstOrNull { it.displayId == choice }?.let { dev.droidtop.runtime.ScreenRoles.set(context, it.uniqueId, dev.droidtop.runtime.ScreenRole.MAIN) }
+                    } else {
+                        all.firstOrNull { it.displayId != home }?.let { dev.droidtop.runtime.ScreenRoles.set(context, it.uniqueId, dev.droidtop.runtime.ScreenRole.COMPANION) }
+                    }
+                }
+            }
             onContinue()
         },
         focusContentFirst = true,
     ) {
-        SelectableRow(
-            title = "The second screen",
-            supporting = "The bigger, docked or plugged-in one",
-            selected = choice == dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT,
-            onClick = { picked = dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT },
-        )
-        SelectableRow(
-            title = "The built-in screen",
-            supporting = "The handheld's own",
-            selected = choice == dev.droidtop.runtime.MainScreenChoice.BUILT_IN,
-            onClick = { picked = dev.droidtop.runtime.MainScreenChoice.BUILT_IN },
-        )
+        screens.forEach { (facts, label) ->
+            SelectableRow(
+                title = label,
+                supporting = if (facts.displayId == android.view.Display.DEFAULT_DISPLAY) "Where droidtop is now" else "Plugged in or the second panel",
+                selected = picked == facts.displayId,
+                onClick = { picked = facts.displayId },
+            )
+        }
         StepNote("Settings > Displays changes it later, and the Quick Menu can swap them.")
     }
 }

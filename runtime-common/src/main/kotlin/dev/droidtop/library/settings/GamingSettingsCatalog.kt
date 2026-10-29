@@ -147,7 +147,8 @@ object GamingSettingsCatalog {
     const val ID_DOWNLOADS = "pref_gaming_downloads"
     const val ID_GAME_FOLDERS = "pref_gaming_game_folders"
 
-    const val ID_DISPLAY_SHELL_TARGET = dev.droidtop.runtime.MainScreen.KEY
+    /** A screen's role row ([screenRoleItems]): this prefix and the screen's stable id. */
+    const val ID_SCREEN_ROLE_PREFIX = "screen_role:"
     const val ID_DISPLAY_GAME_LAUNCH_TARGET = "pref_display_game_launch_target"
     const val ID_DISPLAY_SWAP = "action_display_swap"
     const val ID_DISPLAY_REINIT = "action_display_reinit"
@@ -387,7 +388,7 @@ object GamingSettingsCatalog {
                     current = CatalogPrefs.prefs(context).getString(ID_ORIENTATION, "follow"),
                     onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(ID_ORIENTATION, value).apply() },
                 ))
-                add(displayShellTargetItem(context))
+                addAll(screenRoleItems(context))
                 add(displayGameLaunchTargetItem(context))
                 add(interfaceSizeItem(context, dev.droidtop.runtime.DisplayRole.MAIN))
                 add(interfaceSizeItem(context, dev.droidtop.runtime.DisplayRole.COMPANION))
@@ -562,16 +563,14 @@ object GamingSettingsCatalog {
                         },
                     ),
                 )
-                // Detection can only guess which physical panel is which --
-                // Android exposes no position signal -- so the correction
-                // is an action, in the Quick Menu's System tab, reachable
-                // from whichever screen the user is looking at.
+                // Swaps the menus and the companion between their screens and remembers it (ScreenRoles.swap), in the
+                // Quick Menu's System tab, reachable from whichever screen the person is looking at.
                 add(
                     AsyncActionItem(
                         id = ID_DISPLAY_SWAP,
                         title = "Swap screens",
-                        subtitle = "Move the shell to the other panel when droidtop guessed wrong",
-                        run = { ctx, _ -> dev.droidtop.runtime.DisplayArrangement.swap(ctx) },
+                        subtitle = "Puts the menus on the companion's screen and the companion on this one",
+                        run = { ctx, _ -> dev.droidtop.runtime.ScreenRoles.swap(ctx) },
                     ),
                 )
                 // A second screen stuck in its low safe mode (docs/SPEC.md
@@ -1041,23 +1040,34 @@ object GamingSettingsCatalog {
     /** The Navigation sounds switch's value: on unless the person turned it off. */
     fun navigationSoundsOn(context: Context): Boolean = CatalogPrefs.prefs(context).getBoolean(ID_NAVIGATION_SOUNDS, true)
 
-    // The one role model (MainScreen): this row and Swap screens both
-    // write it, and both Gaming and Desktop read it -- hence "Main
-    // screen", not "Gaming shell display".
-    private fun displayShellTargetItem(context: Context) = ChoiceItem(
-        id = ID_DISPLAY_SHELL_TARGET,
-        title = "Main screen",
-        subtitle = "Where the shell appears; the other screen gets widgets or input",
-        options = listOf(
-            ChoiceOption(dev.droidtop.runtime.MainScreenChoice.SECOND_WHEN_PRESENT.name, "Second screen when connected"),
-            ChoiceOption(dev.droidtop.runtime.MainScreenChoice.BUILT_IN.name, "Built-in screen"),
-        ),
-        current = dev.droidtop.runtime.MainScreen.choice(context).name,
-        onSelect = { ctx, value ->
-            runCatching { dev.droidtop.runtime.MainScreenChoice.valueOf(value) }.getOrNull()
-                ?.let { dev.droidtop.runtime.MainScreen.set(ctx, it) }
-        },
-    )
+    /**
+     * What each screen is for (docs/SPEC.md 4c, ScreenRoles; Droidtop/tracker#776): one row per screen other than the one
+     * droidtop started on, which holds the menus unless another screen is the main one. A screen nobody answered for
+     * says so; droidtop asks once when one is first connected, and this is where the answer is changed. Reads the
+     * display list and preferences: built off the main thread like the rest of this catalog.
+     */
+    private fun screenRoleItems(context: Context): List<CatalogItem> {
+        val outputs = dev.droidtop.runtime.DisplayOutputRepository(context).currentOutputsSnapshot()
+        val names = dev.droidtop.runtime.ScreenNaming.names(context, outputs)
+        val saved = dev.droidtop.runtime.ScreenRoles.saved(context)
+        return outputs.filter { it.androidDisplayId != android.view.Display.DEFAULT_DISPLAY }.map { output ->
+            val facts = dev.droidtop.runtime.ScreenNaming.facts(output)
+            val kind = if (facts.screenClass == dev.droidtop.runtime.ScreenClass.BUILT_IN) "Built-in" else "External"
+            val answered = saved[facts.uniqueId]
+            ChoiceItem(
+                id = ID_SCREEN_ROLE_PREFIX + facts.uniqueId,
+                title = names[output.androidDisplayId] ?: output.name.ifBlank { dev.droidtop.runtime.ScreenNames.EXTERNAL },
+                subtitle = "$kind, ${facts.nativeWidthPx}x${facts.nativeHeightPx}. What droidtop shows on it",
+                options = listOfNotNull(ChoiceOption("", "Not answered yet").takeIf { answered == null }) +
+                    dev.droidtop.runtime.ScreenRole.entries.map { ChoiceOption(it.name, it.label) },
+                current = answered?.name.orEmpty(),
+                onSelect = { ctx, value ->
+                    dev.droidtop.runtime.ScreenRole.entries.firstOrNull { it.name == value }
+                        ?.let { dev.droidtop.runtime.ScreenRoles.set(ctx, facts.uniqueId, it) }
+                },
+            )
+        }
+    }
 
     /**
      * A radio switched in place through the `priv.shell` provider's own command ([SystemControls.radioCommand]),
@@ -1285,7 +1295,6 @@ object GamingSettingsCatalog {
                     current = settings.wake,
                     onSelect = { c, value -> CompanionPrefs.setWake(c, value) },
                 ),
-                companionScreenItem(context),
                 ChoiceItem(
                     id = "companion_handle_edge",
                     title = "Show tabs handle",
@@ -1322,34 +1331,6 @@ object GamingSettingsCatalog {
                     run = { c -> CompanionPrefs.reset(c); PinnedControls.reset(c) },
                 ),
             ),
-        )
-    }
-
-    /**
-     * "Show the companion on" (docs/SPEC.md "The companion's tabs", Which screen; slice C14): every screen but the main
-     * one in plain words (droidtop's name, built-in or external, size), remembered for this set of displays
-     * ([dev.droidtop.runtime.CompanionScreens]); the default names the screen it resolves to now. Reads the display list
-     * and preferences: built off the main thread like the rest of this catalog.
-     */
-    private fun companionScreenItem(context: Context): CatalogItem {
-        val outputs = dev.droidtop.runtime.DisplayOutputRepository(context).currentOutputsSnapshot()
-        val facts = outputs.map(dev.droidtop.runtime.ScreenNaming::facts)
-        val names = dev.droidtop.runtime.ScreenNaming.names(context, outputs)
-        val set = dev.droidtop.runtime.CompanionScreens.setKey(facts)
-        val others = facts.filter { it.displayId != android.view.Display.DEFAULT_DISPLAY }
-        val auto = dev.droidtop.runtime.CompanionScreens.pick(facts, android.view.Display.DEFAULT_DISPLAY, null)
-        fun describe(f: dev.droidtop.runtime.ScreenFacts): String {
-            val kind = if (f.screenClass == dev.droidtop.runtime.ScreenClass.BUILT_IN) "built-in" else "external"
-            return "${names[f.displayId] ?: f.androidName}, $kind, ${f.nativeWidthPx}x${f.nativeHeightPx}"
-        }
-        val autoLabel = facts.firstOrNull { it.displayId == auto }?.let { "Automatic: ${describe(it)}" } ?: "Automatic (the screen that is not the main one)"
-        return ChoiceItem(
-            id = "companion_screen",
-            title = "Show the companion on",
-            subtitle = "Remembered for this set of screens. Identify screens under System > Display shows which is which",
-            options = listOf(ChoiceOption("", autoLabel)) + others.map { ChoiceOption(dev.droidtop.runtime.CompanionScreens.screenKey(it), describe(it)) },
-            current = dev.droidtop.runtime.CompanionScreens.chosen(context, set).orEmpty(),
-            onSelect = { c, value -> dev.droidtop.runtime.CompanionScreens.choose(c, set, value.ifEmpty { null }) },
         )
     }
 

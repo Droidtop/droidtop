@@ -664,6 +664,8 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
     override fun onResume() {
         super.onResume()
         refreshModeIfUndecided()
+        // A screen nobody has answered for yet (found at start, or left while setup ran) is asked about now (ScreenRoleAsk).
+        ScreenRoleAsk.check()
         // Back from a running game, by HOME, Recents or a wake with the shell in front: the game is what the person is
         // coming back to, so the Quick Menu opens on its Game section with Resume first (docs/SPEC.md 7f, "Sleep and
         // return to game"; ShellReturn says why this is decided here and not on HOME's intent).
