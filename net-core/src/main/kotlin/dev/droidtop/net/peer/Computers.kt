@@ -2,6 +2,7 @@ package dev.droidtop.net.peer
 
 import android.content.Context
 import android.os.Build
+import dev.droidtop.net.AtomicWrite
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -251,14 +252,8 @@ object Computers {
     }
 
     private fun write(context: Context, computers: List<Computer>) {
-        val dir = folder(context).apply { mkdirs() }
         val array = JSONArray().apply { computers.forEach { put(toJson(it)) } }
-        val tmp = File(dir, "computers.json.tmp")
-        tmp.writeText(array.toString())
-        if (!tmp.renameTo(file(context))) {
-            tmp.delete()
-            error("the list of computers could not be saved")
-        }
+        AtomicWrite.text(file(context), array.toString())
         cache = computers
     }
 

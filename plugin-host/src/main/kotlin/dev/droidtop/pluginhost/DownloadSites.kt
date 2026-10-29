@@ -1,9 +1,8 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -66,10 +65,7 @@ object DownloadSites {
     }.getOrDefault(emptyList())
 
     internal fun writeAdded(file: File, sites: List<Site>) {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(JSONArray(sites.map { JSONObject().put("name", it.name).put("domain", it.domain).put("signIn", it.signInUrl) }).toString())
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(file, JSONArray(sites.map { JSONObject().put("name", it.name).put("domain", it.domain).put("signIn", it.signInUrl) }).toString())
     }
 
     private fun listFile(context: Context) = File(context.applicationContext.noBackupFilesDir, "download-sites.json")

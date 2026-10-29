@@ -1,6 +1,7 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import org.json.JSONObject
 
@@ -43,13 +44,7 @@ class ProviderLevels private constructor(private val file: File) {
     private fun read(): JSONObject = runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())
 
     private fun write(all: JSONObject) {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.path + ".tmp")
-        tmp.writeText(all.toString())
-        if (!tmp.renameTo(file)) {
-            file.writeText(all.toString())
-            tmp.delete()
-        }
+        AtomicWrite.text(file, all.toString())
     }
 
     companion object {

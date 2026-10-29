@@ -1,8 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.time.ZoneId
 import org.json.JSONObject
@@ -64,10 +63,7 @@ class PluginCallCounts(private val dir: File) {
         val kept = all.entries.sortedByDescending { it.key }.take(DAYS)
         val json = JSONObject()
         for ((d, counts) in kept) json.put(d, JSONObject(counts as Map<*, *>))
-        dir.mkdirs()
-        val tmp = File(dir, "$pluginId.counts.json.tmp")
-        tmp.writeText(json.toString())
-        Files.move(tmp.toPath(), fileFor(pluginId).toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(fileFor(pluginId), json.toString())
     }
 
     private fun readLocked(pluginId: String): Map<String, Map<String, Int>> {

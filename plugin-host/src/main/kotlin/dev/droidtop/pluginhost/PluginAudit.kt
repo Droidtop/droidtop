@@ -1,9 +1,8 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import org.json.JSONObject
 
 /**
@@ -56,12 +55,9 @@ class PluginAudit(private val dir: File, private val maxEntries: Int = MAX_ENTRI
     }
 
     private fun appendLocked(pluginId: String, entry: AuditEntry, nowMs: Long) {
-        dir.mkdirs()
         val kept = readLocked(pluginId).filter { nowMs - it.atMs <= MAX_AGE_MS } + entry
         val trimmed = kept.takeLast(maxEntries)
-        val tmp = File(dir, "$pluginId.jsonl.tmp")
-        tmp.writeText(trimmed.joinToString("\n", postfix = "\n") { it.toJson().toString() })
-        Files.move(tmp.toPath(), fileFor(pluginId).toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(fileFor(pluginId), trimmed.joinToString("\n", postfix = "\n") { it.toJson().toString() })
         // A plugin installed again after a removal starts a live ring again.
         removedMarker(pluginId).delete()
     }

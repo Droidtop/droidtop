@@ -1,11 +1,10 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.net.KeystoreSecretCipher
 import dev.droidtop.net.SecretCipher
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.security.KeyStore
 import java.util.Base64
 import org.json.JSONObject
@@ -36,10 +35,7 @@ class PluginVault(
     }
 
     private fun write(pluginId: String, json: JSONObject) {
-        dir.mkdirs()
-        val tmp = File(dir, "$pluginId.json.tmp")
-        tmp.writeText(json.toString())
-        Files.move(tmp.toPath(), file(pluginId).toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(file(pluginId), json.toString())
     }
 
     @Synchronized

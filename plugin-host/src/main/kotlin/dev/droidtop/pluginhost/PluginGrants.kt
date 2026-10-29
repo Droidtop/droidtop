@@ -1,9 +1,8 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
@@ -61,7 +60,7 @@ data class PermissionDiff(
 /**
  * The grant store (docs/plugin-api.md 4.3): for every plugin, an explicit
  * [GrantState] per permission id, one JSON file per plugin under [dir],
- * written through a temp file and renamed so a crash never leaves half a
+ * written whole through AtomicWrite so a crash never leaves half a
  * file. Ids are the registry's own (`net.any`), plus two host-made kinds:
  * `provide:<point>` for a high-risk extension point and `export:<api>` for
  * an API the plugin offers other plugins.
@@ -108,14 +107,11 @@ class PluginGrants(private val dir: File) {
     private fun strings(array: JSONArray?): Set<String> = buildSet { if (array != null) for (i in 0 until array.length()) add(array.optString(i)) }
 
     private fun writeLocked(pluginId: String, snapshot: Snapshot) {
-        dir.mkdirs()
         val json = JSONObject()
         json.put("states", JSONObject().also { o -> snapshot.states.toSortedMap().forEach { (k, v) -> o.put(k, v.name) } })
         json.put("wanted", JSONArray(snapshot.wanted.sorted()))
         json.put("fresh", JSONArray(snapshot.fresh.sorted()))
-        val tmp = File(dir, "$pluginId.json.tmp")
-        tmp.writeText(json.toString())
-        Files.move(tmp.toPath(), fileFor(pluginId).toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(fileFor(pluginId), json.toString())
         changed()
         PluginEpoch.bump()
     }

@@ -1,6 +1,7 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.net.peer.Computers
 import org.json.JSONArray
 import org.json.JSONObject
@@ -44,10 +45,9 @@ class PluginContexts(private val appContext: Context) {
     @Synchronized
     private fun save(pluginId: String, contextId: String, state: State) {
         val file = stateFile(pluginId, contextId)
-        val tmp = File(file.parentFile, ".${file.name}.tmp")
-        tmp.writeText(JSONObject().put("decl", state.decl).put("records", state.records).put("conflicts", state.conflicts).toString())
-        if (!tmp.renameTo(file)) {
-            tmp.delete()
+        try {
+            AtomicWrite.text(file, JSONObject().put("decl", state.decl).put("records", state.records).put("conflicts", state.conflicts).toString())
+        } catch (e: java.io.IOException) {
             throw BrokerException(PluginErrorCode.FAILED, "the context could not be saved")
         }
     }

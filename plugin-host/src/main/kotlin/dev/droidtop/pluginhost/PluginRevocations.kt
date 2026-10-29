@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.shared.trust.ChainSignature
 import dev.droidtop.runtime.util.DroidtopSigningRoot
 import dev.droidtop.runtime.util.RevocationList
@@ -70,17 +71,14 @@ object PluginRevocations {
 
     /**
      * Stores [jws] as droidtop's list when it verifies under droidtop's signing root and its sequence is higher than the
-     * stored one's. Returns whether it replaced the stored list. Written via a temp file and rename, so a failed
+     * stored one's. Returns whether it replaced the stored list. Written whole through AtomicWrite, so a failed
      * write leaves the previous list in force.
      */
     fun accept(pluginsRoot: File, jws: String): Boolean {
         val anchor = DroidtopSigningRoot.anchor() ?: return false
         val offered = RevocationList.parse(jws, anchor, OFFICIAL_CATALOG_ID) ?: return false
         if (offered.sequence <= official(pluginsRoot).sequence) return false
-        pluginsRoot.mkdirs()
-        val temp = File(pluginsRoot, "$FILE_NAME.tmp")
-        temp.writeText(jws)
-        return temp.renameTo(File(pluginsRoot, FILE_NAME))
+        return runCatching { AtomicWrite.text(File(pluginsRoot, FILE_NAME), jws); true }.getOrDefault(false)
     }
 
     /**
@@ -103,10 +101,7 @@ object PluginRevocations {
                     .put("keySha256", JSONArray(list.keySha256.sorted())),
             )
         }
-        pluginsRoot.mkdirs()
-        val temp = File(pluginsRoot, "$ORIGINS_FILE_NAME.tmp")
-        temp.writeText(json.toString())
-        return temp.renameTo(File(pluginsRoot, ORIGINS_FILE_NAME))
+        return runCatching { AtomicWrite.text(File(pluginsRoot, ORIGINS_FILE_NAME), json.toString()); true }.getOrDefault(false)
     }
 
     private fun originLists(pluginsRoot: File): Map<String, RevocationList> {

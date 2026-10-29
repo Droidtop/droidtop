@@ -1,5 +1,6 @@
 package dev.droidtop.net.sitecheck
 
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.shared.sitecheck.Clearance
 import dev.droidtop.shared.sitecheck.SiteCheck
 import java.io.File
@@ -102,17 +103,12 @@ class SiteClearanceStore(private val storage: Storage, private val now: () -> Lo
         clearance = Clearance(ua, cookies).takeIf { cookies.isNotEmpty() }
     }
 
-    /** [file], replaced whole through a temporary file beside it. */
+    /** [file], replaced whole through AtomicWrite. */
     class FileStorage(private val file: File) : Storage {
         override fun read(): String? = runCatching { file.takeIf { it.isFile }?.readText() }.getOrNull()
 
         override fun write(text: String) {
-            val temp = File(file.parentFile, file.name + ".tmp")
-            temp.writeText(text)
-            if (!temp.renameTo(file)) {
-                file.writeText(text)
-                temp.delete()
-            }
+            AtomicWrite.text(file, text)
         }
     }
 

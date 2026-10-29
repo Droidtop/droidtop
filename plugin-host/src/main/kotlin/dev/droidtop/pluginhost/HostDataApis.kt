@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.util.Base64
 import org.json.JSONArray
@@ -39,11 +40,10 @@ class PluginDataStore(val root: File) {
         if (append) {
             file.appendBytes(bytes)
         } else {
-            // Through a temporary file: a crash never leaves half a file under the plugin's name.
-            val tmp = File(file.parentFile, ".${file.name}.tmp")
-            tmp.writeBytes(bytes)
-            if (!tmp.renameTo(file)) {
-                tmp.delete()
+            // Written whole through AtomicWrite: a crash never leaves half a file under the plugin's name.
+            try {
+                AtomicWrite.bytes(file, bytes)
+            } catch (e: java.io.IOException) {
                 throw BrokerException(PluginErrorCode.FAILED, "$name could not be written")
             }
         }

@@ -1,9 +1,8 @@
 package dev.droidtop.pluginhost
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import org.json.JSONObject
 
 /** One runnable plugin's export of an API (docs/plugin-api.md 2.3). */
@@ -173,10 +172,7 @@ class PluginProviderChoices(private val file: File) {
     fun choose(api: String, pluginId: String) = synchronized(LOCK) {
         val json = JSONObject(all() as Map<*, *>)
         json.put(api, pluginId)
-        file.parentFile?.mkdirs()
-        val tmp = File(file.path + ".tmp")
-        tmp.writeText(json.toString())
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(file, json.toString())
         PluginEpoch.bump()
     }
 

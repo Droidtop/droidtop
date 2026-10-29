@@ -1,8 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.Base64
 import java.util.UUID
 import org.json.JSONArray
@@ -23,10 +22,7 @@ class PluginFileTokens(private val dir: File) {
         runCatching { JSONObject(fileFor(pluginId).readText()) }.getOrDefault(JSONObject())
 
     private fun write(pluginId: String, json: JSONObject) {
-        dir.mkdirs()
-        val tmp = File(dir, "$pluginId.json.tmp")
-        tmp.writeText(json.toString())
-        Files.move(tmp.toPath(), fileFor(pluginId).toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(fileFor(pluginId), json.toString())
     }
 
     fun add(pluginId: String, document: PickedDocument): String = synchronized(LOCK) {

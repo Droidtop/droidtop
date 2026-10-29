@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.shared.trust.PublishedKeys
 import dev.droidtop.shared.trust.Sha256
 
@@ -54,8 +55,8 @@ sealed interface AddKeyOutcome {
  * private storage (`filesDir/plugin-user-keys.json`, [storeFile]) --
  * never in the official pinned set, never synced anywhere. One JSON
  * object keyed by origin id: `{ "<origin>": { "key": "<SPKI base64>",
- * "source": "<url, absent when pasted by hand>" } }`, written via a
- * temp file + rename so a failed write cannot leave a half-written
+ * "source": "<url, absent when pasted by hand>" } }`, written whole
+ * through AtomicWrite so a failed write cannot leave a half-written
  * store that would silently untrust every third-party plugin.
  *
  * `add` never overwrites: a different key for an origin that is already
@@ -128,7 +129,7 @@ object UserOriginKeys {
         require(cert.matches(HEX64)) { "not a SHA-256 certificate fingerprint" }
         val json = (if (file.isFile) runCatching { JSONObject(file.readText()) }.getOrNull() else null) ?: JSONObject()
         json.put(APP_PREFIX + packageName, JSONObject().put("app", JSONObject().put("package", packageName).put("certSha256", cert)))
-        writeWhole(file, json)
+        AtomicWrite.text(file, json.toString())
     }
 
     /** Stops trusting [packageName]'s certificate. */
@@ -136,17 +137,7 @@ object UserOriginKeys {
         if (!file.isFile) return
         val json = runCatching { JSONObject(file.readText()) }.getOrNull() ?: return
         json.remove(APP_PREFIX + packageName)
-        writeWhole(file, json)
-    }
-
-    private fun writeWhole(file: File, json: JSONObject) {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, "${file.name}.tmp")
-        tmp.writeText(json.toString())
-        if (!tmp.renameTo(file)) {
-            tmp.delete()
-            throw java.io.IOException("couldn't replace ${file.name}")
-        }
+        AtomicWrite.text(file, json.toString())
     }
 
     private fun save(file: File, keys: Map<String, UserOriginKey>) {
@@ -168,15 +159,7 @@ object UserOriginKeys {
                 },
             )
         }
-        val tmp = File(file.parentFile, "${file.name}.tmp")
-        tmp.writeText(json.toString())
-        if (!tmp.renameTo(file)) {
-            // Same-volume rename failing means the store cannot be
-            // replaced this moment; the old store stays authoritative
-            // rather than half of the new one.
-            tmp.delete()
-            throw java.io.IOException("couldn't replace ${file.name}")
-        }
+        AtomicWrite.text(file, json.toString())
     }
 
     /**

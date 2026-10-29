@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.shared.trust.BundleTar
 import dev.droidtop.shared.trust.Sha256
 
@@ -334,18 +335,11 @@ object PluginBundleInstaller {
     }
 
     /**
-     * Writes the record whole and then renames it over the old one, so a reader sees one record or the other, never a
-     * half-written file. Switching a plugin to another version is this one write ([installedDir]).
+     * Writes the record whole through AtomicWrite, so a reader sees one record or the other, never a half-written file.
+     * Switching a plugin to another version is this one write ([installedDir]).
      */
     fun writeRecord(pluginsRoot: File, record: PluginRecord) {
-        val dir = File(pluginsRoot, record.manifest.id)
-        dir.mkdirs()
-        val tmp = File(dir, ".record-" + System.nanoTime() + "-" + Thread.currentThread().id)
-        tmp.writeText(record.toJson().toString())
-        if (!tmp.renameTo(File(dir, "record.json"))) {
-            tmp.delete()
-            throw java.io.IOException("couldn't write the record of ${record.manifest.id}")
-        }
+        AtomicWrite.text(File(pluginsRoot, "${record.manifest.id}/record.json"), record.toJson().toString())
         PluginEpoch.bump()
     }
 

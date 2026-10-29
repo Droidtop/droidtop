@@ -2,6 +2,7 @@ package dev.droidtop.net.peer
 
 import android.content.Context
 import android.os.FileObserver
+import dev.droidtop.net.AtomicWrite
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -183,12 +184,6 @@ object PairedDevices {
     private fun read(file: File): JSONObject = runCatching { JSONObject(file.readText()) }.getOrDefault(JSONObject())
 
     private fun write(file: File, json: JSONObject) {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(json.toString())
-        if (!tmp.renameTo(file)) {
-            tmp.delete()
-            error("${file.name} could not be saved")
-        }
+        AtomicWrite.text(file, json.toString())
     }
 }
