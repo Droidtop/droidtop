@@ -11108,7 +11108,7 @@ Generalizing the
 real gamelist list-widget path (`EsDeListItem`) to badge/rating overlays
 the way a real theme's own game GRID entries sometimes show them inline;
 droidtop's own "Continue Playing" row (a real bolt-on with no equivalent
-in real ES-DE, see its own doc comment in `GamepadShell.kt`) visually
+in real ES-DE, see its own doc comment in `GamesSection.kt`) visually
 collides with decaffe's real metadata sidebar now that the sidebar
 actually renders — needs real per-theme-aware safe-zone placement, not
 a hardcoded top-left anchor; not yet designed. Also unverified: the
@@ -17898,7 +17898,7 @@ to call `FocusManager.moveFocus(FocusDirection.Up)` at the TOP row, which does n
 grid: Compose's focus search kept going and landed on `SectionTabBar`, so a D-pad press meant to
 mean "there is nothing further up" instead silently reassigned the pad to switching
 Games/Apps/Settings. Up at the grid's top row is now simply consumed and left there
-(`GamepadShell.kt`'s `GamesSection`); nothing before this shell had a bound way to reach the tab
+(`GamesSection.kt`); nothing before this shell had a bound way to reach the tab
 row by pad at all, since the row does not receive focus during ordinary play, so none was taken
 away. The tab row's own control is L1/R1, unconditionally, whether or not anything is focused on
 it (`esDeHelpRowOwner`/`GamingMenu`'s pad routing is untouched by this) -- the same binding
