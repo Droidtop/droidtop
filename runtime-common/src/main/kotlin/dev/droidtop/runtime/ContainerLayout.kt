@@ -193,6 +193,8 @@ object ContainerLayout {
         // With audio sharing off, or no bridge running, nothing listens
         // there either -- to a program that is the same as no PulseAudio.
         if (audioShared) put("PULSE_SERVER", "$SOCKET_DIR/$AUDIO_SOCKET")
+        // GTK apps dark or light as droidtop is (docs/SPEC.md 2b "Desktop appearance", Droidtop/tracker#694).
+        putAll(DesktopAppearance.environment(DesktopAppearance.dark))
     }
 
     /**

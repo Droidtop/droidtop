@@ -21,6 +21,7 @@ object DesktopSetupPrefs {
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
     private const val KEY_PANEL = "droidtop_desktop_panel"
     private const val KEY_TILE_WINDOWS = "droidtop_desktop_tile_windows"
+    private const val KEY_BACKGROUND = "droidtop_desktop_background"
     private const val KEY_KEEP_RUNNING = "droidtop_desktop_keep_running"
     /**
      * Whether the person chose. Not "droidtop_desktop_keep_running_answered": up to 0.2.0-dev.2398 the offer, asked
@@ -86,6 +87,16 @@ object DesktopSetupPrefs {
 
     fun setTileWindows(context: Context, on: Boolean) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_TILE_WINDOWS, on).apply()
+    }
+
+    /** The Linux desktop's background (dev.droidtop.runtime.DesktopAppearance, Droidtop/tracker#694). */
+    fun background(context: Context): dev.droidtop.runtime.DesktopAppearance.Background =
+        dev.droidtop.runtime.DesktopAppearance.Background.fromId(
+            context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_BACKGROUND, null),
+        )
+
+    fun setBackground(context: Context, background: dev.droidtop.runtime.DesktopAppearance.Background) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_BACKGROUND, background.id).apply()
     }
 
     /**

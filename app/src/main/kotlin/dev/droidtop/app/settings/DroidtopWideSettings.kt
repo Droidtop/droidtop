@@ -341,6 +341,17 @@ object DroidtopWideSettings {
                             current = dev.droidtop.app.DesktopSetupPrefs.tileWindows(context),
                             onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setTileWindows(ctx, on) },
                         ),
+                        ChoiceItem(
+                            id = "pref_desktop_background",
+                            title = "Desktop background",
+                            subtitle = "The colour behind the Linux desktop's windows. Its apps follow droidtop's Light or dark. " +
+                                "Applies when the desktop next starts",
+                            options = dev.droidtop.runtime.DesktopAppearance.Background.entries.map { ChoiceOption(it.id, it.label) },
+                            current = dev.droidtop.app.DesktopSetupPrefs.background(context).id,
+                            onSelect = { ctx, value ->
+                                dev.droidtop.app.DesktopSetupPrefs.setBackground(ctx, dev.droidtop.runtime.DesktopAppearance.Background.fromId(value))
+                            },
+                        ),
                         // The rows above that apply "when the desktop next starts" can apply now (Droidtop/tracker#687).
                         ActionItem(
                             id = "pref_desktop_restart",

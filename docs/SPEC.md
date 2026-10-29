@@ -535,6 +535,18 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   Android preferences, so Desktop's two System rows looked like two different apps. Desktop's page is first, and
   its last row, "All settings", opens the rest of Settings (`global_settings`). Reached from Global settings'
   own Desktop row it leads back there, a step B undoes. The Launcher3 fragment stays Standard's.
+- **Desktop appearance** (Droidtop/tracker#694, the coordinator's Desktop review, decided 2026-10-29). The Linux
+  desktop had sway's own background and stock GTK's light look, whatever droidtop's Light or dark. Now it follows
+  droidtop as the desktop starts (`DesktopAppearance`). GTK apps get `GTK_THEME=Adwaita:dark` (Adwaita is built
+  into GTK, so every image with GTK has it) and libadwaita apps `ADW_DEBUG_COLOR_SCHEME=prefer-dark`, or
+  `prefer-light`. These go through `ContainerLayout.clientEnvironment`, so every program the desktop starts gets
+  them. There is no settings portal in the container for the usual `color-scheme` key, and Qt apps keep their
+  own look. Desktop settings > "Desktop background" sets the colour droidtop's sway config gives the output
+  (`output * bg #RRGGBB solid_color`). "Match droidtop", the default, is droidtop's ground in light or dark;
+  Black, Slate, Deep blue and Forest are the others. Only a `#RRGGBB` value is written. Both apply from the next
+  desktop start, which Restart desktop gives at once. A picture as the background, from a game's art or a file,
+  is not built yet: it needs a picker and a copy the container can read, and stays open on #694. Sway's own bar
+  (the person's own config) and labwc keep their own background.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
   then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and
