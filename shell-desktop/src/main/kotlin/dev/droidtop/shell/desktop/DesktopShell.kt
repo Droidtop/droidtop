@@ -44,6 +44,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -476,7 +477,7 @@ private fun BoxScope.DesktopViewport(
 
         if (presentFailed) {
             Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Couldn't present the desktop output.", color = MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.desktop_output_failed), color = MaterialTheme.colorScheme.onSurface)
                 Text(
                     "Check that the primary container's compositor is running.",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -491,7 +492,7 @@ private fun BoxScope.DesktopViewport(
         ) {
             when (sessionMessage) {
                 is DesktopSessionMessage.Connecting -> {
-                    Text("Starting the desktop session…", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.desktop_starting), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         "The first start downloads a Linux system and installs the desktop " +
                             "into it, which takes several minutes. On a rooted device, grant " +
@@ -512,7 +513,7 @@ private fun BoxScope.DesktopViewport(
                     }
                 }
                 is DesktopSessionMessage.Failed -> {
-                    Text("Desktop session failed to start", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.desktop_start_failed), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         sessionMessage.reason,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -523,14 +524,14 @@ private fun BoxScope.DesktopViewport(
                     // The failure may be the setup itself (an image the catalog no longer has), so the
                     // way to fix it sits beside the retry rather than in the sentence (Droidtop/tracker#370).
                     Row(modifier = Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Button(onClick = onStartSession) { Text("Try again") }
-                        androidx.compose.material3.OutlinedButton(onClick = onOpenSetup) { Text("Desktop setup") }
+                        Button(onClick = onStartSession) { Text(stringResource(R.string.desktop_try_again)) }
+                        androidx.compose.material3.OutlinedButton(onClick = onOpenSetup) { Text(stringResource(R.string.desktop_setup)) }
                     }
                 }
                 is DesktopSessionMessage.NeedsSetup -> {
                     // Nothing to start yet: the one next step is choosing the Linux system the
                     // desktop runs, so the page offers exactly that (Droidtop/tracker#370).
-                    Text("Set up the desktop", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.desktop_set_up), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         "Choose the Linux system it runs.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -538,13 +539,13 @@ private fun BoxScope.DesktopViewport(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
-                    Button(onClick = onOpenSetup, modifier = Modifier.padding(top = 16.dp)) { Text("Desktop setup") }
+                    Button(onClick = onOpenSetup, modifier = Modifier.padding(top = 16.dp)) { Text(stringResource(R.string.desktop_setup)) }
                 }
                 is DesktopSessionMessage.Idle -> {
                     // The one thing to do here is start it, so the screen
                     // offers exactly that (rig, dq-desk2-02: the taskbar's
                     // "Start" is the Start menu, not the session).
-                    Text("The desktop is not running", color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.desktop_not_running), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         "It was stopped. Start it to see your desktop here.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -552,7 +553,7 @@ private fun BoxScope.DesktopViewport(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(top = 8.dp),
                     )
-                    Button(onClick = onStartSession, modifier = Modifier.padding(top = 16.dp)) { Text("Start the desktop") }
+                    Button(onClick = onStartSession, modifier = Modifier.padding(top = 16.dp)) { Text(stringResource(R.string.desktop_start)) }
                 }
             }
         }
@@ -605,7 +606,7 @@ private fun BoxScope.Taskbar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TaskbarButton(onClick = onOpenStartMenu) {
-                Text("Start")
+                Text(stringResource(R.string.desktop_start_menu))
             }
             Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
             TaskbarPinChips(pins, onOpenPin, onUnpin)
@@ -615,7 +616,7 @@ private fun BoxScope.Taskbar(
             // swaybar's status line), so the screen has one. The mode switcher stays, by name: Desktop's only
             // other route to the Android home or Gaming is a long-press of Back (SPEC 2c).
             TaskbarButton(onClick = { openModes(context) }) {
-                Text("Modes")
+                Text(stringResource(R.string.desktop_modes))
             }
             PluginTaskbarItems()
             CompanionTaskbarItem()
@@ -913,7 +914,7 @@ private fun TaskbarWindowRow(
                 onClick = { menuOpen = false; onMinimize() },
             )
             DropdownMenuItem(
-                text = { Text("Close") },
+                text = { Text(stringResource(R.string.desktop_close)) },
                 onClick = { menuOpen = false; onClose() },
             )
         }
@@ -950,7 +951,7 @@ private fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Unit
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("Unpin") },
+                        text = { Text(stringResource(R.string.desktop_unpin)) },
                         onClick = { menuOpen = false; onUnpin(pin) },
                     )
                 }
@@ -984,7 +985,7 @@ private fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> Un
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(
-                text = { Text("Close") },
+                text = { Text(stringResource(R.string.desktop_close)) },
                 onClick = { menuOpen = false; onClose() },
             )
         }
@@ -1006,7 +1007,7 @@ private fun ClipboardNotice() {
     var open by remember { mutableStateOf(false) }
     Box {
         androidx.compose.material3.TextButton(onClick = { open = !open }) {
-            Text("Clipboard: on focus", color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.desktop_clipboard_on_focus), color = MaterialTheme.colorScheme.onSurface)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             Text(
@@ -1015,7 +1016,7 @@ private fun ClipboardNotice() {
                 style = MaterialTheme.typography.bodySmall,
             )
             DropdownMenuItem(
-                text = { Text("Switch keyboard…") },
+                text = { Text(stringResource(R.string.desktop_switch_keyboard)) },
                 onClick = { open = false; dev.droidtop.library.settings.Keyboards.showPicker(context) },
             )
         }
@@ -1123,7 +1124,7 @@ private fun CompanionTaskbarItem() {
         offered = withContext(Dispatchers.IO) { dev.droidtop.runtime.CompanionSheet.offered(context) }
     }
     if (offered) {
-        TaskbarButton(onClick = { dev.droidtop.runtime.CompanionSheet.open(context, true) }) { Text("Companion") }
+        TaskbarButton(onClick = { dev.droidtop.runtime.CompanionSheet.open(context, true) }) { Text(stringResource(R.string.desktop_companion)) }
     }
 }
 
@@ -1158,6 +1159,6 @@ private fun PluginTaskbarItems() {
                     ),
                 )
             },
-        ) { Text("Plugins") }
+        ) { Text(stringResource(R.string.desktop_plugins)) }
     }
 }

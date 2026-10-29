@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Desktop shell's own words, English as the source language (docs/SPEC.md 7k, "Language is part of the system";
+  Droidtop/tracker#177). Names start desktop_, since Android merges every module's strings into one set.
+-->
+<resources>
+    <string name="desktop_output_failed">Couldn\'t present the desktop output.</string>
+    <string name="desktop_starting">Starting the desktop session…</string>
+    <string name="desktop_start_failed">Desktop session failed to start</string>
+    <string name="desktop_try_again">Try again</string>
+    <string name="desktop_setup">Desktop setup</string>
+    <string name="desktop_set_up">Set up the desktop</string>
+    <string name="desktop_not_running">The desktop is not running</string>
+    <string name="desktop_start">Start the desktop</string>
+    <string name="desktop_start_menu">Start</string>
+    <string name="desktop_modes">Modes</string>
+    <string name="desktop_close">Close</string>
+    <string name="desktop_unpin">Unpin</string>
+    <string name="desktop_clipboard_on_focus">Clipboard: on focus</string>
+    <string name="desktop_switch_keyboard">Switch keyboard…</string>
+    <string name="desktop_companion">Companion</string>
+    <string name="desktop_plugins">Plugins</string>
+</resources>
