@@ -30,6 +30,20 @@ class RunningListingTest {
     }
 
     @Test
+    fun `a task whose affinity is more than its package is listed as that package`() {
+        val withSettings: (String) -> String? = { if (it == "com.android.settings") "Settings" else label(it) }
+        val tasks = listOf(
+            DumpedTask(1, "com.android.settings.root", 0, true),
+            DumpedTask(2, "com.android.settings", 0, false),
+            DumpedTask(3, "dev.droidtop.app.desktop", 0, false),
+        )
+
+        val apps = RunningListing.fromDump(tasks, hidden = setOf("dev.droidtop.app"), label = { if (it == "dev.droidtop.app") "droidtop" else withSettings(it) })
+
+        assertEquals(listOf(RunningApp("com.android.settings", "Settings", 0, 1, true)), apps)
+    }
+
+    @Test
     fun `one package on one display is one row`() {
         val tasks = listOf(DumpedTask(1, "com.android.calendar", 0, true), DumpedTask(2, "com.android.calendar", 0, false))
 

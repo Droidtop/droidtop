@@ -74,4 +74,13 @@ class ActivityDumpTest {
         assertEquals(emptyList<DumpedTask>(), ActivityDump.parse(noise))
         assertEquals(emptyList<DumpedTask>(), ActivityDump.parse(""))
     }
+
+    @Test
+    fun `a task with no affinity is read by its component`() {
+        val text = """
+            Display #0 (activities from top to bottom):
+              * Task{1234567 #2001 type=standard I=com.example.notes/.MainActivity U=0 visible=true mode=fullscreen translucent=false sz=1}
+        """.trimIndent()
+        assertEquals(listOf(DumpedTask(2001, "com.example.notes", 0, true)), ActivityDump.parse(text))
+    }
 }

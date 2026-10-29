@@ -13,8 +13,10 @@ data class DumpedTask(
 /**
  * Reads the task list out of `dumpsys activity activities`, filtered by the shell to the `Display #N` and
  * `Task{...}` lines. The format is the one AOSP's `Task.toString()` writes
- * (`Task{hash #id type=standard A=uid:package U=0 visible=true ...}`) under a `Display #N (activities from
- * top to bottom):` header, with the older `A=package` form accepted too. Tolerant by design: a line that
+ * (`Task{hash #id type=standard A=uid:affinity U=0 visible=true ...}`) under a `Display #N (activities from
+ * top to bottom):` header, with the older `A=affinity` form accepted too, and `I=package/activity` for a task with
+ * no affinity. `A=` is the task's affinity, usually its package but not always (Settings' is
+ * `com.android.settings.root`); [RunningListing.fromDump] finds the package it belongs to. Tolerant by design: a line that
  * does not look like a task is skipped, never an error. The order is the dump's, most recent first per display.
  */
 object ActivityDump {
@@ -28,6 +30,7 @@ object ActivityDump {
     private val display = Regex("""Display #(\d+)""")
     private val task = Regex("""Task\{[0-9a-fA-F]+ #(\d+)\b([^}]*)\}""")
     private val affinity = Regex("""\bA=(?:\d+:)?([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)""")
+    private val component = Regex("""\bI=([A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)/""")
     private val type = Regex("""\btype=(\w+)""")
     private val visible = Regex("""\bvisible=(true|false)""")
     private val mode = Regex("""\bmode=(\w+)""")
@@ -44,7 +47,7 @@ object ActivityDump {
             // Home, recents and other special task types are not apps the user opened.
             val kind = type.find(rest)?.groupValues?.get(1)
             if (kind != null && kind != "standard") continue
-            val pkg = affinity.find(rest)?.groupValues?.get(1) ?: continue
+            val pkg = (affinity.find(rest) ?: component.find(rest))?.groupValues?.get(1) ?: continue
             if (!seen.add(id)) continue
             out += DumpedTask(
                 id,
