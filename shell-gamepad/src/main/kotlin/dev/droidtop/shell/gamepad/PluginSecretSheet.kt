@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,7 +44,8 @@ fun PluginSecretSheet(shown: PluginSecrets.Shown, onClose: () -> Unit) {
             copySensitive(context, shown.label, shown.value)
             copied = true
         }
-        val choices = listOf("Copy" to copy, "Close" to onClose)
+        val choices = listOf(stringResource(R.string.secret_copy) to copy, stringResource(R.string.secret_close) to onClose)
+        val copiedWord = stringResource(R.string.secret_copied)
 
         Dialog(onDismissRequest = onClose) {
             GatePadInThisDialog()
@@ -62,12 +64,12 @@ fun PluginSecretSheet(shown: PluginSecrets.Shown, onClose: () -> Unit) {
                 },
             ) {
                 Text(shown.label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text("From ${shown.pluginLabel}", color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.secret_from, shown.pluginLabel), color = MenuTokens.Value, style = MaterialTheme.typography.bodySmall)
                 Text(shown.value, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyLarge, fontFamily = FontFamily.Monospace)
                 choices.forEachIndexed { index, (label, run) ->
                     MenuRow(
                         title = label,
-                        value = if (index == 0 && copied) "Copied" else null,
+                        value = if (index == 0 && copied) copiedWord else null,
                         selected = index == selected,
                         onClick = {
                             selected = index
@@ -76,7 +78,10 @@ fun PluginSecretSheet(shown: PluginSecrets.Shown, onClose: () -> Unit) {
                     )
                 }
                 HintRow(
-                    bindings = listOf(HintBinding(GamepadAction.A, "Choose"), HintBinding(GamepadAction.B, "Close")),
+                    bindings = listOf(
+                        HintBinding(GamepadAction.A, stringResource(R.string.secret_hint_choose)),
+                        HintBinding(GamepadAction.B, stringResource(R.string.secret_close)),
+                    ),
                     background = androidx.compose.ui.graphics.Color.Transparent,
                 )
             }
