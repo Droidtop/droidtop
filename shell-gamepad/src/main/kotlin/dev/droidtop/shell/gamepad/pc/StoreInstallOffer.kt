@@ -1,12 +1,12 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.Corners
 import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -237,8 +237,8 @@ private fun volumeRow(text: String, selected: Boolean, action: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
-            .clip(RoundedCornerShape(8.dp))
-            .selectionFrame(selected, RoundedCornerShape(8.dp), rest = Color.Transparent)
+            .clip(Corners.Crisp)
+            .selectionFrame(selected, Corners.Crisp, rest = Color.Transparent)
             .padRow(onClick = action)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     )

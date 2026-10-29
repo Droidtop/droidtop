@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -114,7 +113,7 @@ private fun EmulatorRow(title: String, detail: String, onPick: () -> Unit) {
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .padRow(onClick = onPick)
-            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
+            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
             .heightIn(min = 64.dp)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),

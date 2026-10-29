@@ -22,7 +22,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -539,14 +538,14 @@ private fun ReadoutRow(label: String, value: String, fill: Int?, detail: String?
                     .fillMaxWidth()
                     .padding(top = 8.dp)
                     .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
+                    .clip(Corners.Icon)
                     .background(MenuTokens.SurfaceSelected),
             ) {
                 Box(
                     Modifier
                         .fillMaxWidth(fill.coerceIn(0, 100) / 100f)
                         .height(6.dp)
-                        .clip(RoundedCornerShape(3.dp))
+                        .clip(Corners.Icon)
                         .background(if (alarm) MenuTokens.NoticeDanger else MenuTokens.Accent),
                 )
             }

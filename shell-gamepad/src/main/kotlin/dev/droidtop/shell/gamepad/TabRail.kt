@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -89,7 +88,7 @@ fun TabRail(
             modifier = itemModifier
                 .bringIntoViewRequester(requester)
                 .sizeIn(minWidth = target, minHeight = target)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(Corners.Crisp)
                 .background(if (current) colors.selected else Color.Transparent)
                 // Ahead of the clickable: a plain clickable is still a focus target, and the pad never drives this.
                 .padRow { onSelect(tab) }
@@ -157,12 +156,12 @@ fun TabRail(
 @Composable
 private fun Badge(count: Int, colors: RailColors, modifier: Modifier) {
     if (count <= 0) {
-        Box(modifier.size(8.dp).clip(RoundedCornerShape(50)).background(colors.accent))
+        Box(modifier.size(8.dp).clip(Corners.Pill).background(colors.accent))
         return
     }
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.sizeIn(minWidth = 18.dp, minHeight = 18.dp).clip(RoundedCornerShape(50)).background(colors.accent),
+        modifier = modifier.sizeIn(minWidth = 18.dp, minHeight = 18.dp).clip(Corners.Pill).background(colors.accent),
     ) {
         Text(
             if (count > 9) "9+" else count.toString(),

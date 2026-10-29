@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -308,7 +307,7 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
                     false
                 }
             }
-            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
+            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -335,7 +334,7 @@ private fun MetadataPickerRow(label: String, currentValueLabel: String, onClick:
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .padRow(onClick = onClick)
-            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
+            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -400,7 +399,7 @@ private fun ControllerRow(label: String, isCurrent: Boolean, onPick: () -> Unit)
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .padRow(onClick = onPick)
-            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
+            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
             .padding(12.dp),
     )
 }

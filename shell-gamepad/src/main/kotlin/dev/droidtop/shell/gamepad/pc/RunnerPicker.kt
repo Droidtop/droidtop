@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.pc
 
+import dev.droidtop.shell.gamepad.Corners
 import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -235,7 +235,7 @@ private fun RunnerRow(
             .onFocusChanged { focused = it.isFocused }
             .focusable(enabled = enabled)
             .then(if (enabled) Modifier.padRow(onClick = onSelect) else Modifier)
-            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = MenuTokens.CardInset)
+            .selectionFrame(focused, Corners.Crisp, rest = MenuTokens.CardInset)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

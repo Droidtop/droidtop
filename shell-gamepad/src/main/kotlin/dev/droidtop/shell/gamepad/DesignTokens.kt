@@ -127,6 +127,9 @@ object Corners {
     val Plate = RoundedCornerShape(16.dp)
     /** Tabs, status badges, hint glyphs: fully round ends. */
     val Pill = RoundedCornerShape(50)
+
+    /** An icon or a small picture inside a row (a setting's glyph, a Quick Menu tile's mark). */
+    val Icon = RoundedCornerShape(3.dp)
 }
 
 /**

@@ -33,7 +33,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -1126,7 +1125,7 @@ private fun CatalogPane(
                                     coil3.compose.AsyncImage(
                                         model = java.io.File(path),
                                         contentDescription = null,
-                                        modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+                                        modifier = Modifier.fillMaxSize().clip(Corners.Crisp),
                                     )
                                 }
                             },
@@ -1137,7 +1136,7 @@ private fun CatalogPane(
                             bar = bar,
                             selected = barSlot.takeIf { isSelected },
                             onPress = { slot -> onBarPress(index, slot) },
-                            ring = { on -> Modifier.focusRing(on && PadModality.showsFocus, RoundedCornerShape(6.dp)) },
+                            ring = { on -> Modifier.focusRing(on && PadModality.showsFocus, Corners.Crisp) },
                             colors = gamingPageColors(),
                         )
                     } else if (block != null) {
@@ -1150,7 +1149,7 @@ private fun CatalogPane(
                             modifier = Modifier
                                 // The banner sits under the header with room below it (docs/SPEC.md 7k, "Notices").
                                 .padding(bottom = if (page) 12.dp else 0.dp)
-                                .focusRing(isSelected && PadModality.showsFocus, RoundedCornerShape(if (page) 6.dp else 3.dp)),
+                                .focusRing(isSelected && PadModality.showsFocus, if (page) Corners.Crisp else Corners.Icon),
                             onAction = notice.notice.action?.let { { onClick(index) } },
                             onInfo = { onLongClick(index) },
                         )
@@ -1926,7 +1925,7 @@ internal fun TextEditDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 12.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(Corners.Crisp)
                     .background(MenuTokens.SurfaceSelected)
                     .padding(12.dp),
             )
@@ -2006,7 +2005,7 @@ private fun SettingsSearchOverlay(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp)
-                .clip(RoundedCornerShape(8.dp))
+                .clip(Corners.Crisp)
                 .background(MenuTokens.SurfaceSelected)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {

@@ -25,7 +25,6 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -557,7 +556,7 @@ internal fun MenuRow(
                 Modifier
                     .width(4.dp)
                     .height(32.dp)
-                    .clip(RoundedCornerShape(2.dp))
+                    .clip(Corners.Icon)
                     .background(accent),
             )
             Spacer(Modifier.width(12.dp))
@@ -892,7 +891,7 @@ private fun AdjustArrow(glyph: String, onPress: () -> Unit) {
     Box(
         modifier = Modifier
             .size(LocalShellWindow.current.minTouchTarget)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(Corners.Pill)
             .padRow(onClick = onPress),
         contentAlignment = Alignment.Center,
     ) {

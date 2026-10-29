@@ -32,7 +32,6 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -1827,7 +1826,7 @@ private fun EntryDetailScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(220.dp)
-                    .background(MenuTokens.Card, RoundedCornerShape(16.dp)),
+                    .background(MenuTokens.Card, Corners.Plate),
             ) {
                 if (entry.kind == LibraryEntryKind.NATIVE_ANDROID_APP) {
                     // An app's artwork is its launcher icon: drawn at an
@@ -1844,7 +1843,7 @@ private fun EntryDetailScreen(
                         model = entry.artworkUri,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().background(MenuTokens.Card, RoundedCornerShape(16.dp)),
+                        modifier = Modifier.fillMaxSize().background(MenuTokens.Card, Corners.Plate),
                     )
                 }
                 // Platform/kind label overlaid on the art, matching Daijishō's
@@ -4052,7 +4051,7 @@ private fun AppIconTile(
             // selected look like" on two grids of the same shell.
             .selectionFrame(
                 selected = focused,
-                shape = RoundedCornerShape(16.dp),
+                shape = Corners.Plate,
                 rest = Color.Transparent,
                 restOutline = MenuTokens.CardOutline,
             )
@@ -4062,7 +4061,7 @@ private fun AppIconTile(
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .background(MenuTokens.Card, RoundedCornerShape(16.dp)),
+                .background(MenuTokens.Card, Corners.Plate),
         ) {
             if (entry.artworkUri != null) {
                 AsyncImage(
@@ -4259,7 +4258,7 @@ internal fun GameCard(
             }
             .focusable()
             // Real bug fix, reported directly: touch input didn't work
-            // anywhere in Gaming mode -- .clickable() was never actually
+            // anywhere in Gaming mode -- a click handler was never actually
             // applied here (an older comment claimed it was, but it wasn't;
             // .focusable() alone doesn't respond to taps, only to real
             // focus + the onKeyEvent below). This also gives DPAD_CENTER/

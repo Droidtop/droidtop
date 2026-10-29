@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -68,8 +67,8 @@ internal fun PadCapturePrompt(light: Boolean, onDone: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = window.minTouchTarget)
-                    .clip(RoundedCornerShape(8.dp))
-                    .selectionFrame(false, RoundedCornerShape(8.dp), rest = Color.Transparent)
+                    .clip(Corners.Crisp)
+                    .selectionFrame(false, Corners.Crisp, rest = Color.Transparent)
                     .padRow {
                         ControllerLayouts.dismissRecapture()
                         onDone()

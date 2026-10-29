@@ -5,7 +5,6 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -145,7 +144,7 @@ private fun NoticeDialogWindow(request: NoticeDialogs.Request) {
                     onCancel = cancel,
                     onProceed = proceed,
                     onToggleDetails = { detailsOpen = !detailsOpen },
-                    focusModifier = { shown -> Modifier.focusRing(shown && PadModality.showsFocus, RoundedCornerShape(6.dp)) },
+                    focusModifier = { shown -> Modifier.focusRing(shown && PadModality.showsFocus, Corners.Crisp) },
                 )
             }
         }

@@ -17472,7 +17472,9 @@ none believable), never under 48dp of the canvas. The Text size setting still sc
 docs/DESIGN-LANGUAGE.md "The approved design"): 8dp on rows, buttons and chips that are not pills
 (`Corners.Crisp`), 12dp on art tiles and cards (`Corners.Tile`) and on panels, sheets and dialogs
 (`Corners.Panel`), a 16dp plate for a large generic focused surface, pills for tabs, badges and
-glyphs. The type ladder is the same document's: Display 32 bold (`heroTitle`), Title 24 bold
+glyphs, and 3dp for an icon or small picture inside a row (`Corners.Icon`). A Gaming screen names one of these and
+never a raw `RoundedCornerShape`, and every tap target goes through `padRow`; `check-ui-rules.sh` fails a new one of
+either (`raw-corners`, `bare-click`), except a theme's own radii under `theme/` (Droidtop/tracker#670). The type ladder is the same document's: Display 32 bold (`heroTitle`), Title 24 bold
 (`screenTitle`), body 18 (rows, prose and values; a row's name 18 medium), Label 15 medium (tabs,
 buttons, a row's supporting line), Section 13 medium uppercase tracked 4 percent (`sectionLabel`,
 `eyebrow`), Caption 13 (`caption`); 13 sp is the floor. A focused row (`MenuRow`) is the accent

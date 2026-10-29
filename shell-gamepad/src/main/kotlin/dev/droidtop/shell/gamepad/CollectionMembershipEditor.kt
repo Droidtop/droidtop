@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -178,7 +177,7 @@ private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -
             .onFocusChanged { focused = it.isFocused }
             .focusable()
             .padRow(onClick = onClick)
-            .selectionFrame(focused, RoundedCornerShape(8.dp), rest = Color.Transparent)
+            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

@@ -4,7 +4,6 @@ import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.PressWords
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -230,7 +229,7 @@ fun SharedRunningAppsList(
 
 @Composable
 private fun SharedTaskAction(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(modifier = Modifier.padding(horizontal = 4.dp).clip(RoundedCornerShape(8.dp))
+    Box(modifier = Modifier.padding(horizontal = 4.dp).clip(Corners.Crisp)
         .background(if (selected) MenuTokens.Selected else MenuTokens.CardInset)
         .padRow(onClick = onClick).heightIn(min = 48.dp).widthIn(min = 64.dp).padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center) {
