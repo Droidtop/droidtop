@@ -127,8 +127,12 @@ internal fun TouchHintBar(
         val tight = window.compact || maxWidth < TIGHT_HINT_BAR_WIDTH
         val gap = if (tight) 10.dp else 24.dp
         val sidePadding = if (tight) minOf(window.barPadding, 12.dp) else window.barPadding
-        // The fit rule, measured at the live text size: each hint is its keycap, 4dp, its label, and the gap.
-        val shown = remember(hints, maxWidth, tight, density.fontScale, labelStyle, glyphStyle) {
+        // The fit rule, measured at the live text size: each hint is its keycap, 4dp, its label, and the gap,
+        // plus the pill's own side padding on a touch-first window. Without the padding a portrait bar
+        // accepted a stage 16dp a hint too wide and wrapped "B Back" alone onto a second line, never
+        // reaching the later drops (Droidtop/tracker#660).
+        val pill = if (window.touchFirst) TOUCH_PILL_PADDING * 2 else 0.dp
+        val shown = remember(hints, maxWidth, tight, pill, density.fontScale, labelStyle, glyphStyle) {
             with(density) {
                 val available = (maxWidth - sidePadding * 2).toPx()
                 HintFit.fit(hints, available) { list ->
@@ -139,7 +143,7 @@ internal fun TouchHintBar(
                             MenuTokens.KeycapHeight.toPx(),
                         )
                         val label = hint.label?.let { measurer.measure(it, labelStyle, maxLines = 1).size.width + 4.dp.toPx() } ?: 0f
-                        (cap + label).toDouble()
+                        (cap + label + pill.toPx()).toDouble()
                     }.toFloat() + gap.toPx() * (list.size - 1).coerceAtLeast(0)
                 }
             }
@@ -182,6 +186,9 @@ internal fun TouchHintBar(
     }
 }
 
+/** A touch pill's side padding inside its outline; the fit rule counts it. */
+private val TOUCH_PILL_PADDING = 8.dp
+
 /** Below this width a hint bar is a sheet's, not the window's, and packs its pills. */
 private val TIGHT_HINT_BAR_WIDTH = 600.dp
 
@@ -222,7 +229,7 @@ private fun TouchHint(action: GamepadAction, label: String?, onPress: () -> Unit
                         Modifier
                     },
                 )
-                .padding(horizontal = if (window.touchFirst) 8.dp else 0.dp, vertical = 2.dp),
+                .padding(horizontal = if (window.touchFirst) TOUCH_PILL_PADDING else 0.dp, vertical = 2.dp),
         ) {
             Keycap(GamepadKeyMap.labelFor(action).takeIf { it.isNotBlank() } ?: label.orEmpty())
             // Null: the fit rule folded this hint to its glyph (HintFit).
