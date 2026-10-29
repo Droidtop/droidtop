@@ -15600,9 +15600,10 @@ structure, top to bottom, drawn only from theme tokens:
   toward the ground by a gradient so what is laid over it stays legible on
   any art, with the game's logo (`logoUri`) or, without one, its name, and
   nothing else stacked on the art (the source and engine are rows, not a
-  line on the hero). Only portrait art: that art at its own shape on the
-  right of a plate, never stretched across the band. No art: the plate and
-  the name. Its height is a share of the window's (46 percent landscape,
+  line on the hero). Only portrait art: that art at its own 2:3 shape on the
+  right of a plate, never stretched across the band, and the name keeps to
+  the width left of it, wrapping to three lines, never running under the art
+  (Droidtop/tracker#666). No art: the plate and the name. Its height is a share of the window's (46 percent landscape,
   Steam's hero ends at about 46; 30 percent portrait).
 - **One scrolling page** (2026-10-08, Droidtop/tracker#363, Steam's game
   page): the hero, the action band, the tab strip and the tab's rows are ONE

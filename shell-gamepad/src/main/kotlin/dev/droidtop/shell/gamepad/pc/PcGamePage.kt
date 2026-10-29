@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -936,7 +938,8 @@ private const val PAGE_PLATE_SHADOW_ALPHA = 0.5f
  * page's ground so what is laid over it stays legible whatever the art is,
  * with the logo (or the name) bottom-left.
  * With only portrait art that art sits at its own shape on the right of a
- * plate, never stretched across the band; with none, the plate carries the
+ * plate, never stretched across the band, and the name keeps to the width
+ * left of it; with none, the plate carries the
  * name, never a stand-in cover. The logo is large, bottom-left, as on
  * Steam's page; nothing else is stacked on the art.
  */
@@ -945,7 +948,9 @@ private fun PageHero(entry: LibraryEntry, height: Dp) {
     val window = LocalShellWindow.current
     val title = GameNaming.displayName(entry.title)
     val hero = entry.heroUri
-    val portraitArt = entry.artworkUri
+    // Only portrait art: it takes its own cover shape at the right and the name keeps to the width left of
+    // it, wrapping, rather than running under the art with only the gradient between (Droidtop/tracker#666).
+    val coverArt = entry.artworkUri.takeIf { hero == null }
     Box(modifier = Modifier.fillMaxWidth().height(height).background(MenuTokens.Card)) {
         if (hero != null) {
             AsyncImage(
@@ -954,47 +959,60 @@ private fun PageHero(entry: LibraryEntry, height: Dp) {
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        } else if (portraitArt != null) {
-            AsyncImage(
-                model = portraitArt,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                alignment = Alignment.CenterEnd,
-                modifier = Modifier.fillMaxSize().padding(vertical = Space.Sm, horizontal = window.edgePadding),
-            )
         }
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Brush.verticalGradient(listOf(Color.Transparent, MenuTokens.Ground))),
         )
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(horizontal = window.edgePadding, vertical = Space.Md),
+        Row(
+            modifier = Modifier.fillMaxSize().padding(horizontal = window.edgePadding),
+            horizontalArrangement = Arrangement.spacedBy(Space.Lg),
         ) {
-            val logo = entry.logoUri
-            if (logo != null) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .align(Alignment.Bottom)
+                    .padding(vertical = Space.Md),
+            ) {
+                val logo = entry.logoUri
+                if (logo != null) {
+                    AsyncImage(
+                        model = logo,
+                        contentDescription = title,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
+                        modifier = Modifier.height(96.dp).widthIn(max = 360.dp),
+                    )
+                } else {
+                    Text(
+                        title,
+                        color = MenuTokens.OnSurface,
+                        style = TypeRole.screenTitle,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (coverArt != null) {
                 AsyncImage(
-                    model = logo,
-                    contentDescription = title,
+                    model = coverArt,
+                    contentDescription = null,
                     contentScale = ContentScale.Fit,
-                    alignment = Alignment.CenterStart,
-                    modifier = Modifier.height(96.dp).widthIn(max = 360.dp),
-                )
-            } else {
-                Text(
-                    title,
-                    color = MenuTokens.OnSurface,
-                    style = TypeRole.screenTitle,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    alignment = Alignment.CenterEnd,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(vertical = Space.Sm)
+                        .aspectRatio(COVER_ASPECT, matchHeightConstraintsFirst = true),
                 )
             }
         }
     }
 }
+
+/** A cover's shape, width over height: the 2:3 of a box cover and of Steam's library capsule. */
+private const val COVER_ASPECT = 2f / 3f
 
 /**
  * The action band, one row as on Steam's page: the ONE large primary action
