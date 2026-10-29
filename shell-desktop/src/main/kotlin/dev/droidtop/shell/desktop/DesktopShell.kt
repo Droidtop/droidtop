@@ -37,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
@@ -278,7 +279,9 @@ fun DesktopShell(
             hostBridge = hostBridge,
             toplevels = toplevels,
             androidApps = androidApps,
-            pins = pins.list,
+            // A Linux pin made before its app had an icon takes the icon it has now (Droidtop/tracker#689).
+            pins = remember(pins.list, linuxApps) { withLinuxIcons(pins.list, linuxApps) },
+            windowIcons = remember(linuxApps) { windowIcons(linuxApps) },
             onOpenPin = openPin,
             onUnpin = { pins.toggle(it) },
             windows = windows,
@@ -582,6 +585,7 @@ private fun BoxScope.Taskbar(
     onUnpin: (TaskbarPin) -> Unit,
     windows: DesktopWindows?,
     onOpenStartMenu: () -> Unit,
+    windowIcons: Map<String, String> = emptyMap(),
     onOpenQuickMenu: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -622,7 +626,7 @@ private fun BoxScope.Taskbar(
             }
             Spacer(modifier = Modifier.width(1.dp).height(32.dp).background(MaterialTheme.colorScheme.outline))
             TaskbarPinChips(pins, onOpenPin, onUnpin)
-            TaskbarWindowList(hostBridge, toplevels, androidApps, windows, modifier = Modifier.weight(1f))
+            TaskbarWindowList(hostBridge, toplevels, androidApps, windows, windowIcons, modifier = Modifier.weight(1f))
             // What only Android can do stays on droidtop's bar (Droidtop/tracker#555 D4): Terminal, Containers
             // and Settings are Start's System rows, and the clock is the panel's (Waybar's custom/clock, or
             // swaybar's status line), so the screen has one. The mode switcher stays, by name: Desktop's only
@@ -699,6 +703,7 @@ private fun TaskbarWindowList(
     toplevels: List<Toplevel>,
     androidApps: List<RunningApp>,
     windows: DesktopWindows?,
+    windowIcons: Map<String, String>,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -716,6 +721,7 @@ private fun TaskbarWindowList(
             val minimized = windows?.isMinimized(toplevel, hidden) ?: toplevel.minimized
             TaskbarWindowRow(
                 toplevel = toplevel,
+                icon = windowIcons[toplevel.appId],
                 minimized = minimized,
                 onTap = {
                     scope.launch {
@@ -800,12 +806,24 @@ private fun DesktopSearch(
     LaunchedEffect(library) { library.scanInBackground(START_MENU_KINDS) }
     val apps by rememberUpdatedState(linuxApps)
     val launch by rememberUpdatedState(onLaunchLinuxApp)
+    // The search's rows hold a bitmap, not a picture to load: the PNG icons are decoded once, off the main
+    // thread, while the search is open (Droidtop/tracker#689). An SVG icon is the image loader's alone and has
+    // none here.
+    val icons by produceState(emptyMap<String, android.graphics.Bitmap>(), linuxApps) {
+        value = withContext(Dispatchers.IO) {
+            linuxApps.mapNotNull { app ->
+                app.iconFile?.takeIf { it.endsWith(".png") }
+                    ?.let { runCatching { android.graphics.BitmapFactory.decodeFile(it) }.getOrNull() }
+                    ?.let { app.id to it }
+            }.toMap()
+        }
+    }
     LauncherSearchScreen(
         initialText = initialText,
         games = games,
         findApps = { text ->
             apps.filter { StartMenuSections.appMatches(it.name, it.genericName, text) }.map { app ->
-                LauncherSearchApp(key = "linux:" + app.id, title = app.name, icon = null, open = { launch?.invoke(app) })
+                LauncherSearchApp(key = "linux:" + app.id, title = app.name, icon = icons[app.id], open = { launch?.invoke(app) })
             }
         },
         // Desktop has no game page; the Start menu's search plays the game.
@@ -903,6 +921,7 @@ private fun WindowsSheet(
 @Composable
 private fun TaskbarWindowRow(
     toplevel: Toplevel,
+    icon: String?,
     minimized: Boolean,
     onTap: () -> Unit,
     onMinimize: () -> Unit,
@@ -912,16 +931,9 @@ private fun TaskbarWindowRow(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
-        Text(
-            toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } },
-            color = if (toplevel.activated) {
-                MaterialTheme.colorScheme.onSurface
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-            fontWeight = if (toplevel.activated) FontWeight.Bold else FontWeight.Normal,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        // The app's icon ahead of the title, so windows of different programs tell apart at a glance (#689).
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .widthIn(max = 180.dp)
                 .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true })
@@ -933,7 +945,20 @@ private fun TaskbarWindowRow(
                     },
                 )
                 .padding(horizontal = 10.dp, vertical = 6.dp),
-        )
+        ) {
+            if (icon != null) HostedArt(icon, modifier = Modifier.padding(end = 6.dp), size = 20.dp)
+            Text(
+                toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } },
+                color = if (toplevel.activated) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                fontWeight = if (toplevel.activated) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
             DropdownMenuItem(
                 text = { Text(if (minimized) "Restore" else "Minimize") },
@@ -1209,3 +1234,21 @@ private fun PluginTaskbarItems() {
         ) { Text(stringResource(R.string.desktop_plugins)) }
     }
 }
+
+/** A Linux app's cached icon ([ContainerApp.iconFile]) as the image loader takes it. */
+internal fun linuxIconUri(app: ContainerApp): String? = app.iconFile?.let { "file://$it" }
+
+/** [pins] with a Linux pin that has no picture given its app's icon, when the app has one now. */
+private fun withLinuxIcons(pins: List<TaskbarPin>, linuxApps: List<ContainerApp>): List<TaskbarPin> =
+    pins.map { pin ->
+        if (pin.art != null) return@map pin
+        val app = linuxApps.firstOrNull { TaskbarPins.linuxKey(it.id) == pin.key } ?: return@map pin
+        linuxIconUri(app)?.let { pin.copy(art = it) } ?: pin
+    }
+
+/**
+ * Each window's icon by its app id: a Wayland window's app id is its program's desktop file id without
+ * `.desktop` (foot's windows are `foot`, from `foot.desktop`), which is how the bar finds a window's icon.
+ */
+private fun windowIcons(linuxApps: List<ContainerApp>): Map<String, String> =
+    linuxApps.mapNotNull { app -> linuxIconUri(app)?.let { app.id.removeSuffix(".desktop") to it } }.toMap()

@@ -172,10 +172,12 @@ internal fun StartMenu(
             val target = if (entryId != null) {
                 byId[entryId]?.let { StartTarget(pin, it, null) }
             } else {
-                linuxApps.firstOrNull { TaskbarPins.linuxKey(it.id) == pin.key }?.let { StartTarget(pin, null, it) }
+                // A pin made before its app had an icon shows the icon the app has now (Droidtop/tracker#689).
+                linuxApps.firstOrNull { TaskbarPins.linuxKey(it.id) == pin.key }
+                    ?.let { app -> StartTarget(if (pin.art == null) pin.copy(art = linuxIconUri(app)) else pin, null, app) }
             }
             if (target != null) {
-                out.add(rowFor(target, key = "pinned:" + pin.key, section = "Pinned", art = pin.art != null, showPinned = false))
+                out.add(rowFor(target, key = "pinned:" + pin.key, section = "Pinned", art = target.pin.art != null, showPinned = false))
             }
         }
         // The primary container's own applications, right after Pinned: what the desktop runs
@@ -194,9 +196,10 @@ internal fun StartMenu(
                 )
             }
             linuxApps.forEach { app ->
-                val target = StartTarget(TaskbarPin(TaskbarPins.linuxKey(app.id), app.name), null, app)
+                // Its icon from the container's theme, when there is one (Droidtop/tracker#689); pinned, the pin keeps it.
+                val target = StartTarget(TaskbarPin(TaskbarPins.linuxKey(app.id), app.name, linuxIconUri(app)), null, app)
                 // The app's own name, and under it what kind of program it is when the entry says (foot: "Terminal").
-                out.add(rowFor(target, key = "linux:" + app.id, section = "Linux apps", subtitle = app.genericName))
+                out.add(rowFor(target, key = "linux:" + app.id, section = "Linux apps", subtitle = app.genericName, art = app.iconFile != null))
             }
         }
         // The taskbar's own buttons, for a pad that has no way to the bar itself.

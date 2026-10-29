@@ -423,7 +423,11 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                             }
                         },
                         loadLinuxApps = connected?.let { session ->
-                            suspend { ContainerApplications.list(session.runtime, session.container) }
+                            // With each app's icon from the container's theme, resolved once and cached (Droidtop/tracker#689).
+                            suspend {
+                                val apps = ContainerApplications.list(session.runtime, session.container)
+                                dev.droidtop.runtime.ContainerIcons.attach(session.runtime, session.container, filesDir, apps)
+                            }
                         },
                         onLaunchLinuxApp = connected?.let {
                             { app: ContainerApp ->

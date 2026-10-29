@@ -11,6 +11,8 @@ package dev.droidtop.runtime
  * [genericName] is what kind of program it is (`GenericName`, "Terminal"),
  * shown under its name; [icon] is its `Icon` key, which is how an entry's
  * variants are recognised ([ContainerApplications.parseListing]).
+ * [iconFile] is that icon as a file droidtop can draw, once [ContainerIcons]
+ * has resolved it (Droidtop/tracker#689).
  */
 data class ContainerApp(
     val id: String,
@@ -19,6 +21,7 @@ data class ContainerApp(
     val terminal: Boolean,
     val genericName: String? = null,
     val icon: String? = null,
+    val iconFile: String? = null,
 )
 
 /**

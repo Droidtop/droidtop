@@ -512,6 +512,19 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   `GLOBAL_ACTION_LOCK_SCREEN`, the lock Standard's double tap uses. Without that service it says where to turn
   it on, and does not open Android's accessibility settings past the disclosure Standard shows first. Sleep is
   not offered: Android gives an app no way to sleep the device but that lock.
+- **Linux app icons** (Droidtop/tracker#689, the coordinator's Desktop review, decided 2026-10-29). The
+  container's applications carry their own icons in droidtop's chrome: Start's Linux apps rows, their taskbar
+  pins, search, and the bar's window buttons. A window's app id is its desktop file id without `.desktop`.
+  Each entry's `Icon` is resolved once, by one exec in the container (`ContainerIcons`), only for icons droidtop
+  has not seen. The lookup takes the first PNG or SVG in hicolor, then Adwaita, by size (128 px first, then
+  the sizes around it, then scalable), then `/usr/share/pixmaps`. It copies the file into
+  `desktop-launcher/icons` in the app's files, which every container sees as
+  `/run/droidtop-app-storage/desktop-launcher/icons`, named by the `Icon` value's token. A name with nothing
+  found leaves an empty `.none` file, so it is not looked for again. Only a theme name or an absolute
+  `.png`/`.svg` path is looked for, passed as arguments and never into the script's text. XPM is left out,
+  since nothing in droidtop decodes it. Rows, pins and window buttons draw the file with `HostedArt`, and a
+  pin made before its app had an icon takes the icon now. Search's rows hold a bitmap rather than a picture
+  to load, so they decode the PNG icons once while the search is open, and an SVG icon shows there as none.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
   then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and
