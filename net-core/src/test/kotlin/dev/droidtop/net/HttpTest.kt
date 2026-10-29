@@ -1,25 +1,23 @@
 package dev.droidtop.net
 
-import com.sun.net.httpserver.HttpServer
-import java.net.InetSocketAddress
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 
 class HttpTest {
-    private lateinit var server: HttpServer
+    private lateinit var server: TestServer
     private val body = "response"
-    private val base get() = "http://127.0.0.1:${server.address.port}"
+    private val base get() = "http://127.0.0.1:${server.port}"
 
     @Before fun start() {
-        server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
+        server = TestServer()
         server.createContext("/ok") { it.sendResponseHeaders(200, body.length.toLong()); it.responseBody.use { out -> out.write(body.toByteArray()) } }
         server.createContext("/missing") { it.sendResponseHeaders(429, -1); it.close() }
         server.start()
     }
 
-    @After fun stop() { server.stop(0) }
+    @After fun stop() { server.stop() }
 
     @Test fun readsSuccessfulResponseAndPreservesRateLimitOnFailure() {
         assertEquals(body, Http.get(base + "/ok").text())
