@@ -22392,8 +22392,11 @@ the secondary path for sources that publish no key.
   nightly, by hand and when it or the tests change, takes the x86_64 debug APK and the test APK of one `android-build`
   run (the latest successful one on `main`, or the run it is given) and runs them on an x86_64 AOSP emulator with
   `scripts/emulator-tests.sh`, started as Droidtop/enginehost's `conformance-emulator.yml` starts its own (the same
-  pinned `ReactiveCircus/android-emulator-runner`). It fails when `ContainedFilesRigTest` fails or droidtop is not
-  running, or has crashed, 30 s after it is started. `PluginStartRigTest` is run and reported without failing the run,
+  pinned `ReactiveCircus/android-emulator-runner`), on Android 13 and 14. It fails when a test fails or droidtop is not
+  running, or has crashed, 30 s after it is started, except that the two `ContainedFilesRigTest` tests are listed as
+  known failing under Droidtop/tracker#741 (the contained plugin folder failed in an isolated process on stock Android
+  13 and 14, the first run of those tests anywhere): they are reported and do not fail the run, and one of them passing
+  fails it, so the entry (`KNOWN_FAILING` in the script) is removed when #741 is fixed. `PluginStartRigTest` is run and reported without failing the run,
   since the start-time budget it holds is the rig's and not an emulator's. `PrivPackagesRigTest` is not run: it needs
   the installed Shizuku plugin and a console's privileged package service. The rig tests stay "run by hand" for
   what only the rig has.

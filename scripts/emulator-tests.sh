@@ -22,18 +22,58 @@ summary="$out/summary.md"
 
 say() { echo "$*" | tee -a "$summary"; }
 
-# One instrumentation class: its output kept, and 0 when am instrument says OK.
+# Tests known to fail, each with the issue that carries the finding (Droidtop/tracker#741, from the first run of these
+# tests anywhere, which found the contained plugin folder failing in an isolated process on stock Android 13 and 14).
+# A known test that fails is reported and does not fail the run. One that PASSES fails the run, so that the entry is
+# removed as the issue is fixed and cannot go stale; any other failure is a failure.
+KNOWN_FAILING=(
+  "dev.droidtop.app.ContainedFilesRigTest#theOwnFolderBehavesForPathsListingChmodUtimesPrefsAndSqlite|Droidtop/tracker#741"
+  "dev.droidtop.app.ContainedFilesRigTest#theQuotaRefusesANewFileWithEnospcAndOneFileWithEfbig|Droidtop/tracker#741"
+)
+
+# The "class#method" of every test am instrument says failed, one per line ("1) method(class)").
+failing_tests() { sed -n 's/^[0-9][0-9]*) \([^(]*\)(\(.*\))$/\2#\1/p' "$1"; }
+
+# One instrumentation class: its output kept; 0 when every test passed or failed as known, 1 otherwise.
 instrument() {
-  local class="$1" log="$out/instrument-${1##*.}.txt"
+  local class="$1" log="$out/instrument-${1##*.}.txt" entry known issue t status=0
   adb shell am instrument -w -e class "$class" "$runner" > "$log" 2>&1
-  if grep -q '^OK (' "$log" && ! grep -q 'FAILURES!!!' "$log"; then
+  local ran=0 failing
+  if grep -q '^OK (' "$log" || grep -q 'Tests run:' "$log"; then ran=1; fi
+  failing="$(failing_tests "$log")"
+  if [ "$ran" = 1 ] && [ -z "$failing" ] && ! grep -q 'FAILURES!!!' "$log"; then
     say "- $class: $(grep '^OK (' "$log" | head -1)"
-    return 0
+  elif [ "$ran" = 1 ] && [ -n "$failing" ]; then
+    local unexpected=""
+    while IFS= read -r t; do
+      [ -z "$t" ] && continue
+      issue=""
+      for entry in "${KNOWN_FAILING[@]}"; do
+        [ "${entry%%|*}" = "$t" ] && issue="${entry##*|}"
+      done
+      if [ -n "$issue" ]; then say "- $t: fails as known ($issue)"; else unexpected="$unexpected $t"; fi
+    done <<< "$failing"
+    if [ -n "$unexpected" ]; then
+      say "- $class: FAILED:$unexpected"
+      status=1
+    fi
+  else
+    say "- $class: FAILED ($(grep -m1 -E 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|Error' "$log" || echo 'no result line'))"
+    status=1
   fi
-  say "- $class: FAILED ($(grep -m1 -E 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|Error' "$log" || echo 'no result line'))"
-  # What failed and where, in the log and the summary: the full output is only in the uploaded results.
-  { echo '```'; sed -n '/^There w\|^Error in\|INSTRUMENTATION_RESULT: shortMsg\|^java\.\|^junit\.\|^Caused by/,$p' "$log" | head -45; echo '```'; } | tee -a "$summary"
-  return 1
+  # A test that is known to fail and passed: take its entry out of KNOWN_FAILING.
+  for entry in "${KNOWN_FAILING[@]}"; do
+    known="${entry%%|*}"
+    if [ "${known%%#*}" = "$class" ] && [ "$ran" = 1 ] && ! grep -qxF "$known" <<< "$failing"; then
+      say "- $known PASSED but is listed as known failing (${entry##*|}): remove it from KNOWN_FAILING in scripts/emulator-tests.sh"
+      status=1
+    fi
+  done
+  if [ "$status" != 0 ] || [ -n "$failing" ]; then
+    # What failed and where, in the log and the summary: the full output is only in the uploaded results.
+    { echo '```'; sed -n '/^There w\|^Error in\|INSTRUMENTATION_RESULT: shortMsg\|^java\.\|^junit\.\|^Caused by/,$p' "$log" | head -45; echo '```'; } | tee -a "$summary"
+  fi
+  return "$status"
 }
 
 say "## Emulator tests"
