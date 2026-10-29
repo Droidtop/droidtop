@@ -7883,10 +7883,21 @@ L2 rather than L1, as first proposed on #383, because L1 is already the windows 
 
 Still to come, in the same format: per-app and per-game layouts, the RP5's back buttons, and a "send this chord" macro key for the keyboard (#340).
 
-Known gaps, stated rather than guessed at: no long-press-to-right-click on the
-touchscreen (a hold threshold is not worth inventing without a device to tune
-it on). The second-screen trackpad surface of §6 is built on top of this
-router's relative-motion path — see §6c.
+**Touch on the desktop** (Droidtop/tracker#684, the coordinator's Desktop review, 2026-10-29: context menus were
+unreachable by touch, and every touch pressed at once, so a meant scroll became a drag). On the surface the finger is
+the pointer (`DirectTouchGestures`, pure and tested):
+- a tap is a left click where the finger was;
+- a finger that moves past the touch slop presses the left button where it went down and drags (a title bar, a
+  selection);
+- a finger held still for the long-press time is a right click: context menus, the terminal's paste;
+- two fingers lifted without moving are a right click; two fingers moving scroll, the content following them.
+
+The thresholds are Android's own for the screen (`ViewConfiguration` touch slop and long-press timeout), not new
+constants. The laptop-style `TrackpadGestureEngine` (6c) is not used here: there one finger moves the pointer by its
+travel without pressing, and dragging is tap-then-drag, while on the surface the pointer jumps to the finger and
+press-and-move must drag.
+
+The second-screen trackpad surface of §6 is built on top of this router's relative-motion path; see §6c.
 
 ### Keyboard layout (decided 2026-10-09, Droidtop/tracker#387)
 

@@ -68,10 +68,33 @@ class DesktopInputRouter {
     /** The pad buttons the chord engine took the press of, so it also gets their release. */
     private val chordHeld = mutableSetOf<dev.droidtop.mapping.MappingEngine.Physical>()
 
-    private var touchButtonDown = false
-    private var touchScrolling = false
-    private var lastTouchCentroidX = 0f
-    private var lastTouchCentroidY = 0f
+    /** Touch on the surface: tap, drag, long press and two-finger tap and scroll (docs/SPEC.md 6b, Droidtop/tracker#684). */
+    private val touch = DirectTouchGestures(
+        object : DirectTouchGestures.Output {
+            override fun moveTo(x: Float, y: Float) {
+                val seat = seat ?: return
+                val point = transform?.map(x, y) ?: return
+                seat.onPointerAbsolute(InputSource.TOUCH, point.x, point.y, point.extentWidth, point.extentHeight)
+            }
+
+            override fun button(evdevButton: Int, pressed: Boolean) {
+                val seat = seat ?: return
+                if (pressed) pressButton(seat, InputSource.TOUCH, evdevButton) else releaseButton(seat, InputSource.TOUCH, evdevButton)
+            }
+
+            override fun scroll(dxPx: Float, dyPx: Float) {
+                val seat = seat ?: return
+                val delta = transform?.mapDelta(dxPx, dyPx) ?: return
+                // Content follows the fingers: dragging up (a negative dy in view space) reveals content further
+                // down the document, which is a positive Wayland axis value.
+                seat.onPointerScroll(InputSource.TOUCH, -delta.first, -delta.second)
+            }
+        },
+    )
+
+    /** Where the long press's timer runs; set when the router is attached to its view. */
+    private var touchHandler: android.os.Handler? = null
+    private val touchTimeout = Runnable { touch.tick(android.os.SystemClock.uptimeMillis()) }
 
     private var lastMouseButtonState = 0
     /** Every key the container sees held, and whether it went through the typed-text keyboard (InputSeat.onKey). */
@@ -98,6 +121,11 @@ class DesktopInputRouter {
     fun attachTo(view: View) {
         view.isFocusable = true
         view.isFocusableInTouchMode = true
+        // Android's own touch thresholds for this screen (Droidtop/tracker#684).
+        val config = android.view.ViewConfiguration.get(view.context)
+        touch.slopPx = config.scaledTouchSlop.toFloat()
+        touch.longPressMs = android.view.ViewConfiguration.getLongPressTimeout().toLong()
+        touchHandler = view.handler ?: android.os.Handler(android.os.Looper.getMainLooper())
         view.setOnTouchListener { v, event ->
             v.requestFocus()
             onMotionEvent(event)
@@ -120,6 +148,9 @@ class DesktopInputRouter {
      */
     fun releaseHeldInput() {
         releaseChords()
+        // A touch drag's button goes first, through the gestures, so it is not released twice below.
+        touchHandler?.removeCallbacks(touchTimeout)
+        touch.cancel()
         val current = seat
         if (current != null) {
             heldButtons.forEach { current.onPointerButton(InputSource.TOUCH, it, pressed = false) }
@@ -128,8 +159,6 @@ class DesktopInputRouter {
         heldButtons.clear()
         heldKeys.clear()
         synthesized.clear()
-        touchButtonDown = false
-        touchScrolling = false
         lastMouseButtonState = 0
         stickX = 0f
         stickY = 0f
@@ -150,84 +179,42 @@ class DesktopInputRouter {
     }
 
     /**
-     * Direct touch: the finger *is* the cursor, so position is absolute and
-     * a single finger holds the left button down for its whole gesture,
-     * which is what makes dragging a window title bar work.
-     *
-     * Two fingers scroll instead. The left button is released first, so a
-     * second finger landing mid-drag cannot leave a button stuck down.
-     * There is deliberately no long-press-to-right-click here: it is a real
-     * gap, but guessing at a hold duration with no device to tune it on
-     * would be worse than leaving right click to a mouse or to the
-     * second-screen trackpad.
+     * Direct touch: the finger *is* the cursor, through [DirectTouchGestures]: a tap clicks, a finger moved past the
+     * touch slop drags with the left button (a title bar, a selection), a finger held still for the long-press time
+     * right-clicks, and two fingers tap to right-click or move to scroll.
      */
     private fun onTouch(event: MotionEvent): Boolean {
-        val seat = seat ?: return false
-        val transform = transform ?: return false
-
+        if (seat == null || transform == null) return false
+        val now = event.eventTime
         when (event.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                val point = transform.map(event.x, event.y) ?: return false
-                seat.onPointerAbsolute(InputSource.TOUCH, point.x, point.y, point.extentWidth, point.extentHeight)
-                pressButton(seat, InputSource.TOUCH, EvdevKeys.BTN_LEFT)
-                touchButtonDown = true
-            }
-
+            MotionEvent.ACTION_DOWN -> touch.down(event.x, event.y, now)
             MotionEvent.ACTION_POINTER_DOWN -> {
-                if (touchButtonDown) {
-                    releaseButton(seat, InputSource.TOUCH, EvdevKeys.BTN_LEFT)
-                    touchButtonDown = false
-                }
-                touchScrolling = true
-                val centroid = centroidOf(event)
-                lastTouchCentroidX = centroid.first
-                lastTouchCentroidY = centroid.second
+                val (cx, cy) = centroidOf(event)
+                touch.secondDown(cx, cy, now)
             }
-
             MotionEvent.ACTION_MOVE -> {
-                if (touchScrolling && event.pointerCount >= 2) {
-                    val centroid = centroidOf(event)
-                    val delta = transform.mapDelta(
-                        centroid.first - lastTouchCentroidX,
-                        centroid.second - lastTouchCentroidY,
-                    ) ?: return true
-                    lastTouchCentroidX = centroid.first
-                    lastTouchCentroidY = centroid.second
-                    // Content follows the fingers: dragging up (a negative
-                    // dy in view space) reveals content further down the
-                    // document, which is a positive Wayland axis value.
-                    seat.onPointerScroll(InputSource.TOUCH, -delta.first, -delta.second)
-                } else if (!touchScrolling) {
-                    val point = transform.map(event.x, event.y) ?: return true
-                    seat.onPointerAbsolute(InputSource.TOUCH, point.x, point.y, point.extentWidth, point.extentHeight)
+                if (event.pointerCount >= 2) {
+                    val (cx, cy) = centroidOf(event)
+                    touch.twoMove(cx, cy)
+                } else {
+                    touch.move(event.x, event.y, now)
                 }
             }
-
-            MotionEvent.ACTION_POINTER_UP -> {
-                if (event.pointerCount <= 2) touchScrolling = false
-            }
-
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (touchButtonDown) {
-                    val point = transform.map(event.x, event.y)
-                    if (point != null) {
-                        seat.onPointerAbsolute(
-                            InputSource.TOUCH,
-                            point.x,
-                            point.y,
-                            point.extentWidth,
-                            point.extentHeight,
-                        )
-                    }
-                    releaseButton(seat, InputSource.TOUCH, EvdevKeys.BTN_LEFT)
-                    touchButtonDown = false
-                }
-                touchScrolling = false
-            }
-
+            MotionEvent.ACTION_POINTER_UP -> touch.pointerUp(now)
+            MotionEvent.ACTION_UP -> touch.up(event.x, event.y, now)
+            MotionEvent.ACTION_CANCEL -> touch.cancel()
             else -> return false
         }
+        scheduleTouchTimeout()
         return true
+    }
+
+    /** The long press fires without another touch event, so its time is waited for. */
+    private fun scheduleTouchTimeout() {
+        val handler = touchHandler ?: return
+        handler.removeCallbacks(touchTimeout)
+        val due = touch.nextTimeoutAtMs() ?: return
+        handler.postDelayed(touchTimeout, (due - android.os.SystemClock.uptimeMillis()).coerceAtLeast(0L))
     }
 
     /**
