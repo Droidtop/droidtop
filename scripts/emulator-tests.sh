@@ -66,6 +66,10 @@ adb shell monkey -p "$app_id" -c android.intent.category.LAUNCHER 1 > "$out/monk
 sleep 30
 pid="$(adb shell pidof "$app_id" | tr -d '\r')"
 adb logcat -d > "$out/logcat.txt" 2>&1
+if [ "$failed" -ne 0 ]; then
+  # The lines about droidtop's own sandbox and files, in the log and the summary: the whole logcat is only in the results.
+  { echo 'Relevant logcat lines:'; echo '```'; grep -E "droidtop|Sandbox|Contained|isolated|SecurityException|avc: denied" "$out/logcat.txt" | grep -v "^--------" | tail -40; echo '```'; } | tee -a "$summary"
+fi
 if [ -z "$pid" ]; then
   say "- start: droidtop is not running 30 s after it was started"
   failed=1

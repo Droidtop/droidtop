@@ -30,6 +30,13 @@ concurrency:
 
 jobs:
   emulator:
+    # Android 13 is the rig's (BlueStacks) and 14 is what newer handhelds ship: a test that passes on one and fails on the
+    # other is a difference in Android, not in the emulator.
+    name: Android API ${{ matrix.api-level }}
+    strategy:
+      fail-fast: false
+      matrix:
+        api-level: [33, 34]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -83,7 +90,7 @@ jobs:
       - name: Run the tests
         uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
-          api-level: 34
+          api-level: ${{ matrix.api-level }}
           # The plain AOSP image: Google Play services' processes come and go on an emulator and Android kills every
           # app process using one of their providers when they do (the same finding as conformance-emulator.yml in
           # Droidtop/enginehost, run 40834905579).
@@ -97,12 +104,13 @@ jobs:
       - name: Summarise
         if: always()
         run: |
+          echo "### Android API ${{ matrix.api-level }}" >> "$GITHUB_STEP_SUMMARY"
           if [ -f results/summary.md ]; then cat results/summary.md >> "$GITHUB_STEP_SUMMARY"; else echo "No summary was written." >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Upload the results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: emulator-tests
+          name: emulator-tests-api-${{ matrix.api-level }}
           path: results
           if-no-files-found: warn
