@@ -238,6 +238,9 @@ public class LatinKeyboardView extends LatinKeyboardBaseView {
         } else if (primaryCode == '0' && getKeyboard() == mPhoneKeyboard) {
             // Long pressing on 0 in phone number keypad gives you a '+'.
             return invokeOnKey('+');
+        } else if (SwitchKeyboard.INSTANCE.longPressCode(primaryCode) != null) {
+            // A long press on space switches to the next keyboard (Droidtop/tracker#717).
+            return invokeOnKey(SwitchKeyboard.CODE);
         } else {
             return super.onLongPress(key);
         }

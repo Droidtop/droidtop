@@ -1603,6 +1603,21 @@ public class LatinIME extends InputMethodService implements
         }
     }
 
+    /**
+     * Moves to the next keyboard enabled on the device (Droidtop/tracker#717). With droidtop's keyboard the only one
+     * there is to move to, the system's picker opens instead, which also offers enabling another.
+     */
+    private void switchToNextKeyboard() {
+        boolean switched = false;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            switched = switchToNextInputMethod(false);
+        } else if (getWindow() != null && getWindow().getWindow() != null) {
+            switched = ((InputMethodManager) getSystemService(INPUT_METHOD_SERVICE))
+                    .switchToNextInputMethod(getWindow().getWindow().getAttributes().token, false);
+        }
+        if (!switched) showInputMethodPicker();
+    }
+
     private void onOptionKeyLongPressed() {
         if (!isShowingOptionDialog()) {
             showInputMethodPicker();
@@ -2131,6 +2146,9 @@ public class LatinIME extends InputMethodService implements
             break;
         case LatinKeyboardView.KEYCODE_OPTIONS_LONGPRESS:
             onOptionKeyLongPressed();
+            break;
+        case SwitchKeyboard.CODE:
+            switchToNextKeyboard();
             break;
         case LatinKeyboardView.KEYCODE_COMPOSE:
             mComposeMode = !mComposeMode;

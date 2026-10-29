@@ -7607,8 +7607,14 @@ open Android's own pickers.
   because an installed-but-not-enabled IME does not appear in the picker
   at all.
 - An IME may also call `switchInputMethod`/`switchToNextInputMethod` for
-  itself, so droidtop's own keyboard can offer "switch keyboard" from a
-  key — a real future addition, not built yet.
+  itself. droidtop's own keyboard does (built 2026-10-29, Droidtop/tracker#717):
+  a long press on the space bar moves to the next keyboard enabled on the
+  device (`SwitchKeyboard`, code -106, beside the fork's other keyboard codes;
+  a layout may carry it as a key of its own). With no other keyboard enabled,
+  the system's picker opens instead, which also offers enabling one. The
+  code addresses the keyboard, never the text, so it never reaches a
+  container (`HackersKeyCodes` drops it). A space drag still moves the
+  cursor: the drag cancels the long press.
 
 `Keyboards` (`:runtime-common`) is the single surface for all of this,
 and the settings catalog shows the active keyboard, says what it is, and

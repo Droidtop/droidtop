@@ -52,7 +52,7 @@ object HackersKeyCodes {
      */
     private val KEYBOARD_INTERNAL = setOf(
         HK_MODE_CHANGE, HK_CANCEL, HK_DONE, HK_ALT_SYM,
-        -100, -101, -102, -103, -104, -105, -10024,
+        -100, -101, -102, -103, -104, -105, SwitchKeyboard.CODE, -10024,
     )
 
     /**
