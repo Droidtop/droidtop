@@ -73,6 +73,12 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // manifest removes the startup provider), so its public suffix list
         // is unreadable until it gets the context here (SPEC 10b).
         dev.droidtop.runtime.windows.OkHttpPlatform.install(this)
+        // What passing a site's browser check earned is kept once for every request droidtop makes (SPEC 12a,
+        // Droidtop/tracker#751); the file is read on first use, not here.
+        val clearanceFile = java.io.File(filesDir, "site-clearance.txt")
+        dev.droidtop.net.sitecheck.SiteClearances.install {
+            dev.droidtop.net.sitecheck.SiteClearanceStore(dev.droidtop.net.sitecheck.SiteClearanceStore.FileStorage(clearanceFile))
+        }
         // Everything mode-specific this process starts, and nothing else:
         // the mode snapshot was already taken by
         // SettingsCatalogInitProvider (a ContentProvider's onCreate runs

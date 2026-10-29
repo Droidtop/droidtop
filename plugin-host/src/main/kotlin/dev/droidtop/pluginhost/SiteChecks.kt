@@ -1,5 +1,7 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.sitecheck.SiteClearanceStore
+import dev.droidtop.net.sitecheck.SiteClearances
 import dev.droidtop.shared.sitecheck.Clearance
 import java.util.concurrent.ConcurrentHashMap
 
@@ -23,13 +25,30 @@ object SiteChecks {
     /** The clearance a web view left in [session]: its user agent and, per site, only the clearance cookies; null when none. */
     fun clearanceFrom(session: WebSessions.Stored?): Clearance? = Clearance.from(session?.userAgent, session?.cookies.orEmpty())
 
-    fun read(vault: PluginVault, pluginId: String): Clearance? = parse(vault.getHost(pluginId, VAULT_KEY))
+    /**
+     * What droidtop has kept for [pluginId]'s requests: the one clearance store every request of droidtop shares
+     * (Droidtop/tracker#751), since a check is the site's and not the plugin's. A clearance an earlier build kept in the
+     * plugin's own vault moves into the store the first time it is read, and leaves the vault. Without a store (a test)
+     * the vault is the place, as it was.
+     */
+    fun read(vault: PluginVault, pluginId: String): Clearance? {
+        val store = SiteClearances.current ?: return parse(vault.getHost(pluginId, VAULT_KEY))
+        if (adopt(vault.getHost(pluginId, VAULT_KEY), store)) vault.deleteHost(pluginId, VAULT_KEY)
+        return store.snapshot()
+    }
+
+    /** Moves a clearance kept as [legacy] (the vault's JSON) into [store]; whether there was one. */
+    fun adopt(legacy: String?, store: SiteClearanceStore): Boolean {
+        val kept = parse(legacy) ?: return false
+        store.keep(kept)
+        return true
+    }
 
     /** Keeps what [session] cleared for [pluginId], over what was kept; nothing when it cleared nothing. */
     fun keep(vault: PluginVault, pluginId: String, session: WebSessions.Stored?) {
         val earned = clearanceFrom(session) ?: return
-        val kept = read(vault, pluginId)
-        vault.putHost(pluginId, VAULT_KEY, toJson(kept?.plus(earned) ?: earned))
+        val store = SiteClearances.current
+        if (store != null) store.keep(earned) else vault.putHost(pluginId, VAULT_KEY, toJson(read(vault, pluginId)?.plus(earned) ?: earned))
         earned.cookies.keys.forEach { site -> passed(pluginId, site) }
     }
 

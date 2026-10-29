@@ -37,6 +37,9 @@ class SiteClearanceStore(private val storage: Storage, private val now: () -> Lo
         c.forHost(host)?.let { Headers(it, c.userAgent) }
     }
 
+    /** Everything kept, for a caller that reads it per site ([Clearance.forHost]); null when nothing is. */
+    fun snapshot(): Clearance? = synchronized(lock) { clearance }
+
     /** Keeps what a pass earned over what was kept: a newer pass of a site replaces its older one. */
     fun keep(earned: Clearance) = synchronized(lock) {
         clearance = clearance?.plus(earned) ?: earned

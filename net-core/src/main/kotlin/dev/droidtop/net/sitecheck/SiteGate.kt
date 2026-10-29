@@ -137,3 +137,22 @@ object SiteGates {
     @Volatile
     var current: SiteGate? = null
 }
+
+/**
+ * The one clearance store of this process (docs/SPEC.md 12a): the gate, a plugin's requests and the web view's results
+ * all keep to it and read from it. Installed when the app starts; it is made on first use, so the file is not read on
+ * the main thread. None until then, and the code that reads it carries on as it did without one.
+ */
+object SiteClearances {
+    private val lock = Any()
+    private var make: (() -> SiteClearanceStore)? = null
+    private var made: SiteClearanceStore? = null
+
+    fun install(make: () -> SiteClearanceStore) = synchronized(lock) {
+        this.make = make
+        made = null
+    }
+
+    val current: SiteClearanceStore?
+        get() = synchronized(lock) { made ?: make?.invoke()?.also { made = it } }
+}

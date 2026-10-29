@@ -1,5 +1,6 @@
 package dev.droidtop.pluginhost
 
+import dev.droidtop.net.sitecheck.SiteClearanceStore
 import dev.droidtop.shared.sitecheck.Clearance
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -31,6 +32,20 @@ class SiteChecksTest {
         assertEquals("another site getting through says nothing", "https://f95zone.to/threads/1/", SiteChecks.pendingFor("test.plugin"))
         SiteChecks.passed("test.plugin", "f95zone.to")
         assertNull(SiteChecks.pendingFor("test.plugin"))
+    }
+
+    @Test
+    fun `a clearance an earlier build kept in a plugin's vault moves into the shared store, and a second plugin then sends it too`() {
+        val store = SiteClearanceStore(object : SiteClearanceStore.Storage {
+            override fun read(): String? = null
+            override fun write(text: String) {}
+        })
+        val legacy = SiteChecks.toJson(Clearance("Chrome/131", mapOf("f95zone.to" to "cf_clearance=abc")))
+        assertEquals(true, SiteChecks.adopt(legacy, store))
+        assertEquals("cf_clearance=abc", store.headersFor("attachments.f95zone.to")?.cookie)
+        assertEquals("Chrome/131", store.headersFor("f95zone.to")?.userAgent)
+        assertEquals("nothing kept is nothing to move", false, SiteChecks.adopt(null, store))
+        assertEquals("unreadable text is nothing to move", false, SiteChecks.adopt("not json", store))
     }
 
     @Test
