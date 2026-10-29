@@ -155,7 +155,7 @@ import java.io.File
  *   selected row's full text in the detail strip under the list
  *   (docs/SPEC.md 7k, "Text in rows and tiles"). A game of several parts
  *   lists them first on Overview ([partFacts]). Every fact the page always
- *   had is still a row, under the tab [pageTabOf] puts it in; nothing a
+ *   had is still a row, under the tab it names ([PageFact.tab]); nothing a
  *   person would look for is behind a menu (Droidtop/tracker#173).
  *
  * The pad comes through the one pipeline (docs/SPEC.md 6e,
@@ -320,6 +320,7 @@ internal fun PcGamePage(
                 } else {
                     null
                 },
+                tab = PageTab.DETAILS,
             )
         }
     }
@@ -457,6 +458,7 @@ internal fun PcGamePage(
             current.ifEmpty { "Choose" },
             subtitle = if (current.isEmpty()) "droidtop can't tell which program is the game" else null,
             onActivate = { programScreen = dev.droidtop.library.WindowsPrograms.screen(entry.id, GameNaming.displayName(entry.title), folder) },
+            tab = PageTab.DETAILS,
         )
     }
     val tabs = remember { PageTab.values() }
@@ -1296,8 +1298,11 @@ internal data class PageFact(
     val onActivate: (() -> Unit)? = null,
     /** The long form of the row (a full path, a link): on the detail strip while the row is selected. */
     val tip: String? = null,
-    /** The tab this row lives on when its title cannot say ([pageTabOf]). */
-    val tab: PageTab? = null,
+    /**
+     * The tab this row lives on, said by every row that makes one: a row is never placed by matching its title,
+     * so renaming a row cannot move it, and a new row cannot land on a tab by accident (Droidtop/tracker#678).
+     */
+    val tab: PageTab,
     /** What Select does on this row (a copy's Options); null for a row that has none. */
     val onOptions: (() -> Unit)? = null,
 )
@@ -1424,7 +1429,7 @@ private fun pageRows(
     // is the game, Versions what is installed against what is out, Extras
     // what comes with it, Details where it lives and what runs it.
     if (!entry.hideMetadata) {
-        entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it)) }
+        entry.description?.takeIf { it.isNotBlank() }?.let { add(PageFact("About", subtitle = it, tab = PageTab.OVERVIEW)) }
     }
     if (entry.isUnscraped()) {
         add(
@@ -1433,16 +1438,17 @@ private fun pageRows(
                 value = scrapeStatus ?: "Scrape",
                 subtitle = "No cover or description yet",
                 onActivate = onScrape,
+                tab = PageTab.OVERVIEW,
             ),
         )
     }
-    if (entry.pcInfo?.installed == false) add(PageFact("Install state", "Not installed"))
+    if (entry.pcInfo?.installed == false) add(PageFact("Install state", "Not installed", tab = PageTab.OVERVIEW))
     // A GOG installer's row: what the installer file says it holds (docs/SPEC.md 7g, "Installers in a games folder").
     entry.pcInfo?.installer?.let { installer ->
-        add(PageFact("Installer", installer.file, subtitle = listOfNotNull(installer.version?.let { "Version $it" }, installer.build?.let { "GOG build $it" }).joinToString(". ").ifEmpty { null }))
+        add(PageFact("Installer", installer.file, subtitle = listOfNotNull(installer.version?.let { "Version $it" }, installer.build?.let { "GOG build $it" }).joinToString(". ").ifEmpty { null }, tab = PageTab.OVERVIEW))
     }
-    if (entry.playCount > 0) add(PageFact("Times played", entry.playCount.toString()))
-    entry.pcInfo?.compatibility?.let { add(PageFact("Compatibility", subtitle = it.summary() + ". Other people's results on other hardware, not a verdict.")) }
+    if (entry.playCount > 0) add(PageFact("Times played", entry.playCount.toString(), tab = PageTab.OVERVIEW))
+    entry.pcInfo?.compatibility?.let { add(PageFact("Compatibility", subtitle = it.summary() + ". Other people's results on other hardware, not a verdict.", tab = PageTab.OVERVIEW)) }
 
     // A version comes from a folder's own name (docs/SPEC.md 7m); a store
     // row has none to derive.
@@ -1455,15 +1461,16 @@ private fun pageRows(
                 availableVersions.first(),
                 subtitle = if (availableVersions.size > 1) "Also here: ${availableVersions.drop(1).joinToString(", ")}" else null,
                 onActivate = onSetVersion,
+                tab = PageTab.VERSIONS,
             ),
         )
     } else if (onSetVersion != null) {
-        add(PageFact("Version", "Set", subtitle = "The folder's name says no version", onActivate = onSetVersion))
+        add(PageFact("Version", "Set", subtitle = "The folder's name says no version", onActivate = onSetVersion, tab = PageTab.VERSIONS))
     }
     if (setVersion != null && onClearVersion != null) {
         add(PageFact(CLEAR_VERSION_ROW, "Use folder name", onActivate = onClearVersion, tab = PageTab.VERSIONS))
     }
-    latest?.let { add(PageFact("Latest", it)) }
+    latest?.let { add(PageFact("Latest", it, tab = PageTab.VERSIONS)) }
     // A copy a store installed outside droidtop (its marker, docs/SPEC.md 7g): the store's newer build is had
     // from the account's own library, where the installers are, never by droidtop downloading over the folder.
     val marker = entry.pcInfo?.marker
@@ -1480,16 +1487,17 @@ private fun pageRows(
                     else -> GameUpdates.line(update)
                 },
                 onActivate = marker?.let { m -> { onGetInstaller(m) } } ?: onOpenUpdate,
+                tab = PageTab.VERSIONS,
             ),
         )
     }
     addAll(sourceRows)
     // The DLC installed beside the game, from the store's marker files in its folder.
     marker?.dlcIds?.takeIf { it.isNotEmpty() }?.let { dlc ->
-        add(PageFact("DLC", "${dlc.size} installed", subtitle = "$markerStore DLC in the game's folder"))
+        add(PageFact("DLC", "${dlc.size} installed", subtitle = "$markerStore DLC in the game's folder", tab = PageTab.DETAILS))
     }
     entry.pcInfo?.takeIf { (entry.isStoreRow() || it.marker?.buildId != null) && it.installed }?.let { pc ->
-        pc.installedVersion?.takeIf { availableVersions.isEmpty() }?.let { add(PageFact("Version", it)) }
+        pc.installedVersion?.takeIf { availableVersions.isEmpty() }?.let { add(PageFact("Version", it, tab = PageTab.VERSIONS)) }
         // A store with no way to tell droidtop says so; it is never shown as up to date.
         when {
             // Already said above, under the same row.
@@ -1497,51 +1505,51 @@ private fun pageRows(
             // A marker copy whose store was not asked (signed out, offline) has no Update row at all.
             pc.update == dev.droidtop.library.StoreUpdate.UNKNOWN && pc.marker != null -> Unit
             pc.update == dev.droidtop.library.StoreUpdate.UNKNOWN ->
-                add(PageFact("Update", "Not known", subtitle = "${dev.droidtop.library.PcSource.of(entry)?.label() ?: "The store"} has not said whether a newer build exists yet; it is asked in the background, and an install made before its build was recorded is checked after its next update"))
+                add(PageFact("Update", "Not known", subtitle = "${dev.droidtop.library.PcSource.of(entry)?.label() ?: "The store"} has not said whether a newer build exists yet; it is asked in the background, and an install made before its build was recorded is checked after its next update", tab = PageTab.VERSIONS))
             pc.update == dev.droidtop.library.StoreUpdate.CURRENT ->
-                add(PageFact("Update", "Up to date", subtitle = "${dev.droidtop.library.PcSource.of(entry)?.label() ?: "The store"} says this is the newest build"))
+                add(PageFact("Update", "Up to date", subtitle = "${dev.droidtop.library.PcSource.of(entry)?.label() ?: "The store"} says this is the newest build", tab = PageTab.VERSIONS))
             else -> Unit
         }
     }
 
-    entry.manualUri?.let { add(PageFact("Manual", "Available")) }
-    entry.videoUri?.let { add(PageFact("Video", "Available")) }
+    entry.manualUri?.let { add(PageFact("Manual", "Available", tab = PageTab.EXTRAS)) }
+    entry.videoUri?.let { add(PageFact("Video", "Available", tab = PageTab.EXTRAS)) }
     entry.links.forEach { link ->
         add(PageFact(link.label, value = "Open", onActivate = { onOpenLink(link.url) }, tip = link.url, tab = PageTab.EXTRAS))
     }
     if (!entry.hideMetadata) {
-        sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it)) }
+        sourcesLine(entry)?.let { add(PageFact("Where these facts came from", subtitle = it, tab = PageTab.EXTRAS)) }
     }
 
     val owned = siblings.mapNotNull { it.ownership() }
     val ownedLine = owned.ownershipLabel().takeIf { owned.map { it.store }.distinct().size > 1 }
     val folderPath = entry.groupingPath()
     // Where it came from, in full ("Steam · Shared with you", "GOG · via Heroic", "Folder: Games").
-    add(PageFact("Source", origin ?: dev.droidtop.library.PcSource.of(entry)?.detail() ?: "Folder", subtitle = ownedLine))
+    add(PageFact("Source", origin ?: dev.droidtop.library.PcSource.of(entry)?.detail() ?: "Folder", subtitle = ownedLine, tab = PageTab.DETAILS))
     // How the account holds it, only when that is not simply owned (docs/SPEC.md 7g, "Ownership is a fact").
-    ownershipSentence(entry)?.let { (value, sentence) -> add(PageFact("Ownership", value, subtitle = sentence)) }
-    size?.let { add(PageFact("Size", it)) }
+    ownershipSentence(entry)?.let { (value, sentence) -> add(PageFact("Ownership", value, subtitle = sentence, tab = PageTab.DETAILS)) }
+    size?.let { add(PageFact("Size", it, tab = PageTab.DETAILS)) }
     cloudSaves?.let(::add)
     // The technical facts, folded away until asked for (docs/SPEC.md 7i).
     val more = buildList {
-        entry.pcInfo?.storeId?.takeIf { entry.isStoreRow() }?.let { add(PageFact("Store id", it)) }
-        entry.pcInfo?.marker?.let { add(PageFact("Store id", it.key, subtitle = "From the store's files in the game's folder")) }
-        entry.pcInfo?.installedVersion?.let { add(PageFact("Installed build", it)) }
+        entry.pcInfo?.storeId?.takeIf { entry.isStoreRow() }?.let { add(PageFact("Store id", it, tab = PageTab.DETAILS)) }
+        entry.pcInfo?.marker?.let { add(PageFact("Store id", it.key, subtitle = "From the store's files in the game's folder", tab = PageTab.DETAILS)) }
+        entry.pcInfo?.installedVersion?.let { add(PageFact("Installed build", it, tab = PageTab.DETAILS)) }
         // Where it lives as a person names it; the whole path is the tooltip.
-        folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it)) }
-        shownVersion?.let { (version, from) -> add(PageFact("Version from", from.words, subtitle = version)) }
+        folderPath?.let { add(PageFact("Install location", friendlyLocation(it), tip = it, tab = PageTab.DETAILS)) }
+        shownVersion?.let { (version, from) -> add(PageFact("Version from", from.words, subtitle = version, tab = PageTab.DETAILS)) }
     }
     if (more.isNotEmpty()) {
-        add(PageFact(MORE_ROW, if (moreOpen) "Hide" else "Show", subtitle = if (moreOpen) null else more.joinToString(", ") { it.title }, onActivate = onToggleMore))
+        add(PageFact(MORE_ROW, if (moreOpen) "Hide" else "Show", subtitle = if (moreOpen) null else more.joinToString(", ") { it.title }, onActivate = onToggleMore, tab = PageTab.DETAILS))
         if (moreOpen) more.forEach { add(it.copy(tab = PageTab.DETAILS)) }
     }
     // The name as it is on disk, beside the title drawn from it (docs/SPEC.md
     // 7n): the raw name is never altered, only parsed.
     folderPath?.trimEnd('/')?.substringAfterLast('/')?.takeIf { it.isNotEmpty() && it != GameNaming.displayName(entry.title) }
-        ?.let { add(PageFact("Folder name", it)) }
+        ?.let { add(PageFact("Folder name", it, tab = PageTab.DETAILS)) }
     // A Wine-run engine says so: what it was built with, and how it runs here (#603).
     entry.engineLabel()?.let { label ->
-        add(PageFact("Engine", if (!entry.kind.runsInEnginehost()) "$label, runs in Wine" else label))
+        add(PageFact("Engine", if (!entry.kind.runsInEnginehost()) "$label, runs in Wine" else label, tab = PageTab.DETAILS))
     }
     // The play state's own line (a store game's "Downloads 590 MB", an install step) is the action band's
     // and is not a statement about the runner, so it is never drawn under this label; a store stage with
@@ -1552,12 +1560,13 @@ private fun pageRows(
                 "Runner",
                 runner?.label ?: if (play.pressable && !play.chooseEngine) "" else play.verb,
                 subtitle = if (runner != null) runner.reason else play.detail,
+                tab = PageTab.DETAILS,
             ),
         )
     }
     if (!entry.hideMetadata) {
-        aboutFacts(entry).forEach { (label, value) -> add(PageFact(label, value)) }
-        entry.players?.takeIf { it.isNotBlank() }?.let { add(PageFact("Players", it)) }
+        aboutFacts(entry).forEach { (label, value) -> add(PageFact(label, value, tab = PageTab.DETAILS)) }
+        entry.players?.takeIf { it.isNotBlank() }?.let { add(PageFact("Players", it, tab = PageTab.DETAILS)) }
     }
 }
 
@@ -1626,18 +1635,6 @@ internal enum class PageTab(val label: String, val emptyLine: String) {
     DETAILS("Details", "No details for this game yet"),
 }
 
-/**
- * Which tab a fact row lives under, by its title: the one place that says
- * so, so a new row lands under a tab by adding its title here and the rows
- * ([pageRows]) stay a plain list. What is not named is a detail.
- */
-internal fun pageTabOf(title: String): PageTab = when (title) {
-    "About", "Not scraped yet", "Compatibility", "Install state", "Installer", "Times played" -> PageTab.OVERVIEW
-    "Version", "Latest", "Update", OPEN_SOURCE_ROW, CLEAR_VERSION_ROW -> PageTab.VERSIONS
-    "Manual", "Video", "Where these facts came from" -> PageTab.EXTRAS
-    else -> PageTab.DETAILS
-}
-
 /** The rows a game page folds under More (docs/SPEC.md 7i), and the row that opens them. */
 internal const val MORE_ROW = "More"
 internal const val CLEAR_VERSION_ROW = "Clear set version"
@@ -1660,7 +1657,7 @@ private fun detailsRank(title: String): Int = when (title) {
 /** Every row under its tab, in row order; the multi-part list leads Overview. Pure, for the tests. */
 internal fun groupRowsByTab(rows: List<PageFact>, parts: List<PageFact>): Map<PageTab, List<PageFact>> =
     PageTab.values().associateWith { tab ->
-        val own = rows.filter { (it.tab ?: pageTabOf(it.title)) == tab }
+        val own = rows.filter { it.tab == tab }
         val ordered = when (tab) {
             // An available update leads Versions: it is what a person opens the tab for.
             PageTab.VERSIONS -> own.sortedBy { if (it.title == "Update") 0 else 1 }
@@ -1684,9 +1681,9 @@ internal fun partFacts(siblings: List<LibraryEntry>): List<PageFact> {
         .maxByOrNull { it.segments.size }
         ?: return emptyList()
     return buildList {
-        add(PageFact("Parts", "${game.segments.size} parts", subtitle = "Played in the order the folders name them"))
+        add(PageFact("Parts", "${game.segments.size} parts", subtitle = "Played in the order the folders name them", tab = PageTab.OVERVIEW))
         game.segments.forEach { segment ->
-            add(PageFact(segment.label, segment.versions.firstOrNull()?.version?.takeIf { it.isNotBlank() }))
+            add(PageFact(segment.label, segment.versions.firstOrNull()?.version?.takeIf { it.isNotBlank() }, tab = PageTab.OVERVIEW))
         }
     }
 }

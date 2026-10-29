@@ -130,9 +130,14 @@ class PcPageAboutTest {
 
     @Test
     fun everyFactRowLivesUnderExactlyOneTabAndPartsLeadOverview() {
-        val rows = listOf("Times played", "Install location", "Version", "Latest", "Update", "Runner", "Manual", "Engine", "Developer", "About")
-            .map { PageFact(it) } + PageFact("Official site", tab = PageTab.EXTRAS)
-        val parts = listOf(PageFact("Parts"), PageFact("Week 1"))
+        val o = PageTab.OVERVIEW
+        val v = PageTab.VERSIONS
+        val d = PageTab.DETAILS
+        val rows = listOf(
+            "Times played" to o, "Install location" to d, "Version" to v, "Latest" to v, "Update" to v, "Runner" to d,
+            "Manual" to PageTab.EXTRAS, "Engine" to d, "Developer" to d, "About" to o,
+        ).map { (title, tab) -> PageFact(title, tab = tab) } + PageFact("Official site", tab = PageTab.EXTRAS)
+        val parts = listOf(PageFact("Parts", tab = o), PageFact("Week 1", tab = o))
         val byTab = groupRowsByTab(rows, parts)
 
         assertEquals(PageTab.values().toList(), byTab.keys.toList())
@@ -141,16 +146,15 @@ class PcPageAboutTest {
         // An available update leads the tab.
         assertEquals(listOf("Update", "Version", "Latest"), byTab.getValue(PageTab.VERSIONS).map { it.title })
         assertEquals(listOf("Manual", "Official site"), byTab.getValue(PageTab.EXTRAS).map { it.title })
-        // What no tab names is a detail, so a new row is never lost.
         // Details in order of use; the install location is one of More's technical rows, last.
         assertEquals(listOf("Runner", "Engine", "Developer", "Install location"), byTab.getValue(PageTab.DETAILS).map { it.title })
-        assertEquals(PageTab.DETAILS, pageTabOf("Something new"))
+        // A row is placed by the tab it names, never by its title: an Overview title on Extras stays on Extras.
+        assertEquals(listOf("Times played"), groupRowsByTab(listOf(PageFact("Times played", tab = PageTab.EXTRAS)), emptyList()).getValue(PageTab.EXTRAS).map { it.title })
     }
 
     @Test
     fun theSourceRowsLiveUnderVersionsAndOpenSourcePageNeedsAKnownPage() {
         val source = UpdateSources.Source("forum", "Forum thread", null)
-        assertEquals(PageTab.VERSIONS, pageTabOf(OPEN_SOURCE_ROW))
         val unlinked = sourceRows(listOf(source), null, {}, {})
         assertEquals(listOf("Forum thread"), unlinked.map { it.title })
         assertEquals(PageTab.VERSIONS, unlinked[0].tab)
@@ -273,7 +277,7 @@ class PcPageAboutTest {
 
     @Test
     fun `details lead with where it came from, then ownership, size and cloud saves, and More last`() {
-        val rows = listOf("Install location", "Runner", MORE_ROW, "Cloud saves", "Size", "Ownership", "Source", "Store id").map { PageFact(it) }
+        val rows = listOf("Install location", "Runner", MORE_ROW, "Cloud saves", "Size", "Ownership", "Source", "Store id").map { PageFact(it, tab = PageTab.DETAILS) }
         assertEquals(
             listOf("Source", "Ownership", "Size", "Cloud saves", "Runner", MORE_ROW, "Install location", "Store id"),
             groupRowsByTab(rows, emptyList()).getValue(PageTab.DETAILS).map { it.title },

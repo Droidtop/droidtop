@@ -15865,9 +15865,10 @@ structure, top to bottom, drawn only from theme tokens:
   cut at the edge says there is more (`fadeWhileMoreSideways`, the library's
   view strip too; the four short names fit a landscape page, so "Versions"
   replaced "Versions and updates", Droidtop/tracker#661), under the band and pinned at the top once
-  the page scrolls, L1/R1 glyphs at its ends (half strength at an end). `pageTabOf` is the one place that says which tab a row lives under,
-  by its title; a title no tab names is a detail, so a new row is never
-  lost. No row repeats the facts strip (last played, play time, version,
+  the page scrolls, L1/R1 glyphs at its ends (half strength at an end). Every row names its own tab (`PageFact.tab`, required): a row is never
+  placed by matching its English title, so renaming one cannot move it and a
+  plugin's or a new row cannot land on Details by accident
+  (Droidtop/tracker#678). No row repeats the facts strip (last played, play time, version,
   size, runs with). Overview: About, the unscraped game's Scrape row,
   Install state, Times played, Compatibility, and for a game of several parts
   the **part list** first (`partFacts`: a heading row with the count, then
