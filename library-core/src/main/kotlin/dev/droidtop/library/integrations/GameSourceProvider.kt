@@ -165,7 +165,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
 
     private fun resultOf(row: dev.droidtop.pluginhost.SourceResultRow) = AcquireContentResult(
         row.id, row.title, row.subtitle, row.sizeBytes?.let(SourceSize::label), row.platform,
-        dev.droidtop.pluginhost.SourceResultProtocol.boxArt(row.facets), emptyList(), row.refJson,
+        dev.droidtop.pluginhost.SourceResultProtocol.boxArt(row.facets), row.refJson,
         columns = listOfNotNull(row.version) + row.columns, badges = row.badges,
         version = row.version, sizeBytes = row.sizeBytes, getValuesJson = row.get?.valuesJson, getTitle = row.get?.title,
         facets = row.facets,
