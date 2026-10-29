@@ -165,4 +165,16 @@ class FacetViewsTest {
         assertEquals(emptyMap<String, String>(), FacetViews.toView(facets).initialValues())
     }
 
+    @Test
+    fun `an input's field type is its own inputKind, not the envelope's kind`() {
+        val reading = Facets.read(JSONObject("""{"facets": [{"id": "port", "kind": "group", "form": true,
+            "submit": {"label": "Save", "call": {"op": "save"}},
+            "facets": [{"id": "n", "kind": "input", "inputKind": "number", "label": "Port", "value": "22000"}]}]}"""))
+        assertEquals(emptyList<String>(), reading.messages)
+        val input = (reading.facets.single().body as FacetBody.Group).facets.single().body as FacetBody.Input
+        assertEquals("number", input.inputKind)
+        val view = FacetViews.toView(reading.facets)
+        val submit = view.sections.single().nodes.last() as ViewNode.Button
+        assertEquals(22000.0, PluginViewCall.args(submit.action.args(), view.initialValues(), JSONObject()).getJSONObject("values").get("n"))
+    }
 }

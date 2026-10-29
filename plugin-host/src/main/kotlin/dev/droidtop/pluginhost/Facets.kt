@@ -420,7 +420,7 @@ object Facets {
             }
             // Never secret: a secret stays with the vault (G1) and the web session (G3).
             "input" -> if (json.optBoolean("secret")) null else input { c ->
-                label()?.let { FacetBody.Input(it, json.text("value")?.cut(length("value")).orEmpty(), text("hint", "sub"), oneOf("kind", INPUT_KINDS, "text"), c, json.optBoolean("optional")) }
+                label()?.let { FacetBody.Input(it, json.text("value")?.cut(length("value")).orEmpty(), text("hint", "sub"), oneOf("inputKind", INPUT_KINDS, "text"), c, json.optBoolean("optional")) }
             }
             "list" -> FacetBody.ListBody(
                 text("title", "label"),
