@@ -2012,10 +2012,9 @@ to do, never the machinery. "Starting the desktop…" says the first start downl
 a Linux system and sets up the desktop, which takes several minutes, with the boot's
 own latest line under it. It no longer tells a rooted device to grant root when
 asked: droidtop never asks for root itself (root goes through Shizuku). A failed
-start keeps its title, "Desktop session failed to start", until the open Desktop
-stack (#688's "The desktop stopped" beside it in the same file) has landed, and then
-reads "The desktop didn't start", with Try again and Desktop setup. Its reason is
-plain: "Couldn't install the Linux system", "The Linux system didn't start",
+start reads "The desktop didn't start", with Try again and Desktop setup (worded
+once #688's "The desktop stopped" beside it in the same file had landed). Its reason
+is plain: "Couldn't install the Linux system", "The Linux system didn't start",
 "The desktop started, but droidtop couldn't show it". The container, compositor and
 socket details go to logcat (`DesktopSessionService.fail`'s `log`). A view that
 cannot present the output says "Couldn't show the desktop. Restart it from Start,
