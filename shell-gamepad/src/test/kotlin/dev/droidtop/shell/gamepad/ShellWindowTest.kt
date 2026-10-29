@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -42,5 +43,23 @@ class ShellWindowTest {
     fun `the console's assumed 1280x720dp landscape is never touch-first`() {
         assertFalse(ShellWindow(widthDp = 1280, heightDp = 720, padPresent = false).touchFirst)
         assertFalse(ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true).touchFirst)
+    }
+
+    @Test
+    fun `a Retroid Pocket 5 panel lays out at the 1080p canvas`() {
+        // 1080x1920 at 360dpi, landscape: 853x480dp at 2.25, drawn at 1.5 so it is 1280x720dp like the DP screen.
+        assertEquals(1.5f, canvasDensity(2.25f, 853, 480, touchFirst = false), 0.001f)
+    }
+
+    @Test
+    fun `a window already at the canvas keeps its own density`() {
+        // The 1080p DP screen at 1.5x, and a 4K television at 2x (1920x1080dp).
+        assertEquals(1.5f, canvasDensity(1.5f, 1280, 720, touchFirst = false), 0.001f)
+        assertEquals(2f, canvasDensity(2f, 1920, 1080, touchFirst = false), 0.001f)
+    }
+
+    @Test
+    fun `a touch-first window keeps Android's density`() {
+        assertEquals(2.625f, canvasDensity(2.625f, 411, 731, touchFirst = true), 0.001f)
     }
 }

@@ -1,11 +1,17 @@
 package dev.droidtop.shell.gamepad
 
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import dev.droidtop.shell.gamepad.input.ControllerLayouts
 
 /**
@@ -273,6 +279,64 @@ val LocalShellWindow = staticCompositionLocalOf {
     // Only ever seen by a preview or a test composing a screen outside
     // the shell: the console's own landscape geometry.
     ShellWindow(widthDp = 1280, heightDp = 720)
+}
+
+/**
+ * The short side, in dp, of the window the shell is laid out for: the console's landscape 1280x720dp. Every type size
+ * (`DroidtopTypography`) and spacing (`Space`, `MenuTokens`) was tuned at it, and the DP screen gives it (1920x1080
+ * at 1.5x).
+ */
+const val CANVAS_SHORT_SIDE_DP = 720
+
+/**
+ * The density a window [widthDp] by [heightDp] at [density] lays the shell out at. A pad-first window draws the
+ * shell's canvas whatever its panel's dpi: a 1080p panel is 720dp tall on its short side, so a Retroid Pocket 5's
+ * 5.5" panel (1080x1920 at 360dpi, 853x480dp) gets the same layout and the same proportions as the 1080p DP screen,
+ * instead of 1.5 times the text and spacing in the same pixels (owner, 2026-10-29: the text needed to come "WWAAYY
+ * down"; "We need responsive design and intelligent scaling"). A window that is already at least the canvas keeps its
+ * own density, so a bigger screen is never shrunk below Android's own size. A touch-first window (a phone, upright or
+ * without a pad) keeps Android's density too: its touch targets have to stay a finger's size. Pure.
+ */
+fun canvasDensity(density: Float, widthDp: Int, heightDp: Int, touchFirst: Boolean): Float {
+    if (touchFirst) return density
+    val shortSidePx = minOf(widthDp, heightDp) * density
+    return minOf(density, shortSidePx / CANVAS_SHORT_SIDE_DP)
+}
+
+/**
+ * Lays [content] out at [canvasDensity]: the composition's density and its configuration's dp sizes both follow, so
+ * every `dp`, every `sp` (with the Text size setting's scale kept), [currentShellWindow] and every
+ * `BoxWithConstraints` measure the same canvas. Applying it twice changes nothing, since the window's pixels are the
+ * same at either density. Every droidtop Compose root goes through it, from `GamingTheme` and `DroidtopTheme`.
+ */
+@Composable
+fun ProvideShellCanvas(content: @Composable () -> Unit) {
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val target = canvasDensity(
+        density.density,
+        configuration.screenWidthDp,
+        configuration.screenHeightDp,
+        currentShellWindow().touchFirst,
+    )
+    if (target >= density.density * 0.99f) {
+        content()
+        return
+    }
+    val ratio = density.density / target
+    val scaled = remember(configuration, ratio) {
+        Configuration(configuration).apply {
+            screenWidthDp = (configuration.screenWidthDp * ratio).roundToInt()
+            screenHeightDp = (configuration.screenHeightDp * ratio).roundToInt()
+            smallestScreenWidthDp = (configuration.smallestScreenWidthDp * ratio).roundToInt()
+            densityDpi = (configuration.densityDpi / ratio).roundToInt()
+        }
+    }
+    CompositionLocalProvider(
+        LocalConfiguration provides scaled,
+        LocalDensity provides Density(target, density.fontScale),
+        content = content,
+    )
 }
 
 /** Reads the live configuration. Recomposes on rotation, which is what makes one screen serve both orientations. */

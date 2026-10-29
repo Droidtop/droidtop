@@ -444,7 +444,7 @@ fun GamingTheme(content: @Composable () -> Unit) {
     CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
         MaterialTheme(colorScheme = palette.colorScheme, typography = palette.typography) {
             // No full-screen input method over droidtop's own fields (Droidtop/tracker#485 comment 6224857113).
-            dev.droidtop.ui.shared.NoFullscreenTextInput(content)
+            ProvideShellCanvas { dev.droidtop.ui.shared.NoFullscreenTextInput(content) }
         }
     }
 }

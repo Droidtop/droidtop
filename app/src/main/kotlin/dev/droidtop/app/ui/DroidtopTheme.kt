@@ -12,6 +12,7 @@ import dev.droidtop.shell.gamepad.GamingPalette
 import dev.droidtop.shell.gamepad.rememberLightAppearance
 import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.shell.gamepad.DroidtopTypography
+import dev.droidtop.shell.gamepad.ProvideShellCanvas
 
 /**
  * The one shared Material theme for droidtop's own chrome (onboarding,
@@ -54,7 +55,7 @@ fun DroidtopTheme(
     CompositionLocalProvider(LocalNoticePalette provides palette.notice) {
         MaterialTheme(colorScheme = palette.colorScheme, typography = DroidtopTypography) {
             // No full-screen input method over droidtop's own fields (Droidtop/tracker#485 comment 6224857113).
-            dev.droidtop.ui.shared.NoFullscreenTextInput(content)
+            ProvideShellCanvas { dev.droidtop.ui.shared.NoFullscreenTextInput(content) }
         }
     }
 }
