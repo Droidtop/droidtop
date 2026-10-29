@@ -65,6 +65,7 @@ import dev.droidtop.runtime.ContainerApp
 import dev.droidtop.runtime.DesktopLaunchRequests
 import dev.droidtop.runtime.DesktopScale
 import dev.droidtop.runtime.DisplayOutput
+import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -748,7 +749,7 @@ private fun TaskbarWindowList(
             val minimized = windows?.isMinimized(toplevel, hidden) ?: toplevel.minimized
             TaskbarWindowRow(
                 toplevel = toplevel,
-                icon = windowIcons[toplevel.appId],
+                icon = windowIcons[toplevel.appId.lowercase()],
                 minimized = minimized,
                 onTap = {
                     scope.launch {
@@ -849,17 +850,17 @@ private fun DesktopSearch(
     LaunchedEffect(library) { library.scanInBackground(START_MENU_KINDS) }
     val apps by rememberUpdatedState(linuxApps)
     val launch by rememberUpdatedState(onLaunchLinuxApp)
-    // The search's rows hold a bitmap, not a picture to load: the PNG icons are decoded once, off the main
-    // thread, while the search is open (Droidtop/tracker#689). An SVG icon is the image loader's alone and has
-    // none here.
+    // The search's rows hold a bitmap, not a picture to load: the icons are decoded once, by the image loader (off
+    // the main thread, PNG or SVG alike), while the search is open (Droidtop/tracker#689; rig 2026-10-29: SVG
+    // icons had none here).
+    val context = androidx.compose.ui.platform.LocalContext.current
     val icons by produceState(emptyMap<String, android.graphics.Bitmap>(), linuxApps) {
-        value = withContext(Dispatchers.IO) {
-            linuxApps.mapNotNull { app ->
-                app.iconFile?.takeIf { it.endsWith(".png") }
-                    ?.let { runCatching { android.graphics.BitmapFactory.decodeFile(it) }.getOrNull() }
-                    ?.let { app.id to it }
-            }.toMap()
-        }
+        val loader = coil3.SingletonImageLoader.get(context)
+        value = linuxApps.mapNotNull { app ->
+            val file = app.iconFile ?: return@mapNotNull null
+            val request = coil3.request.ImageRequest.Builder(context).data(java.io.File(file)).size(SEARCH_ICON_PX).build()
+            (loader.execute(request) as? coil3.request.SuccessResult)?.image?.toBitmap()?.let { app.id to it }
+        }.toMap()
     }
     LauncherSearchScreen(
         initialText = initialText,
@@ -1313,6 +1314,9 @@ private fun PluginTaskbarItems() {
     }
 }
 
+/** The size the search's Linux app icons are decoded at. */
+private const val SEARCH_ICON_PX = 96
+
 /** A Linux app's cached icon ([ContainerApp.iconFile]) as the image loader takes it. */
 internal fun linuxIconUri(app: ContainerApp): String? = app.iconFile?.let { "file://$it" }
 
@@ -1326,7 +1330,8 @@ private fun withLinuxIcons(pins: List<TaskbarPin>, linuxApps: List<ContainerApp>
 
 /**
  * Each window's icon by its app id: a Wayland window's app id is its program's desktop file id without
- * `.desktop` (foot's windows are `foot`, from `foot.desktop`), which is how the bar finds a window's icon.
+ * `.desktop` (foot's windows are `foot`, from `foot.desktop`), which is how the bar finds a window's icon. Matched
+ * without case: some toolkits capitalise the id their program gives.
  */
 private fun windowIcons(linuxApps: List<ContainerApp>): Map<String, String> =
-    linuxApps.mapNotNull { app -> linuxIconUri(app)?.let { app.id.removeSuffix(".desktop") to it } }.toMap()
+    linuxApps.mapNotNull { app -> linuxIconUri(app)?.let { app.id.removeSuffix(".desktop").lowercase() to it } }.toMap()

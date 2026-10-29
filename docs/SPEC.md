@@ -526,17 +526,22 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   not offered: Android gives an app no way to sleep the device but that lock.
 - **Linux app icons** (Droidtop/tracker#689, the coordinator's Desktop review, decided 2026-10-29). The
   container's applications carry their own icons in droidtop's chrome: Start's Linux apps rows, their taskbar
-  pins, search, and the bar's window buttons. A window's app id is its desktop file id without `.desktop`.
-  Each entry's `Icon` is resolved once, by one exec in the container (`ContainerIcons`), only for icons droidtop
-  has not seen. The lookup takes the first PNG or SVG in hicolor, then Adwaita, by size (128 px first, then
-  the sizes around it, then scalable), then `/usr/share/pixmaps`. It copies the file into
+  pins, search, and the bar's window buttons. A window's app id is its desktop file id without `.desktop`,
+  matched without case. Each entry's `Icon` is resolved once, by one exec in the container (`ContainerIcons`),
+  only for icons droidtop has not seen. The lookup takes the first PNG or SVG in hicolor, then Adwaita, then
+  every other installed theme, in any of a theme's contexts (apps, places, devices, ...), by size (128 px
+  first, then the sizes around it, then scalable), then in a context-first layout (breeze's `apps/48`), then
+  `/usr/share/pixmaps`, and last a theme's `-symbolic` SVG. (Rig 2026-10-29, main 235310fcf: only Foot's PNG
+  showed. The first lookup read only hicolor's and Adwaita's `apps`, while Desktop Preferences' `user-desktop`
+  is an Adwaita place and current Adwaita has some app icons only as symbolic ones.) It copies the file into
   `desktop-launcher/icons` in the app's files, which every container sees as
   `/run/droidtop-app-storage/desktop-launcher/icons`, named by the `Icon` value's token. A name with nothing
-  found leaves an empty `.none` file, so it is not looked for again. Only a theme name or an absolute
+  found leaves an empty `.none-2` file, so it is not looked for again; the first lookup's `.none` marks are
+  not read, so what it gave up on is looked for again. Only a theme name or an absolute
   `.png`/`.svg` path is looked for, passed as arguments and never into the script's text. XPM is left out,
   since nothing in droidtop decodes it. Rows, pins and window buttons draw the file with `HostedArt`, and a
   pin made before its app had an icon takes the icon now. Search's rows hold a bitmap rather than a picture
-  to load, so they decode the PNG icons once while the search is open, and an SVG icon shows there as none.
+  to load, so the image loader decodes their icons once while the search is open, PNG and SVG alike.
 - **Settings in one chrome** (Droidtop/tracker#692, the coordinator's Desktop review, decided 2026-10-29). Start >
   System > Settings opens Desktop's settings page (`desktop_settings`) in droidtop's screen host
   (`CatalogScreenLink`, `CatalogScreenActivity`), the Gaming-look host Containers and the places open in. It

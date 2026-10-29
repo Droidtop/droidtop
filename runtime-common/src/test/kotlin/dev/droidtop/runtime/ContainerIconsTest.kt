@@ -52,4 +52,35 @@ class ContainerIconsTest {
             dir.delete()
         }
     }
+
+    @Test
+    fun `the script finds an icon in any context and theme, then pixmaps, then a symbolic one`() {
+        val root = Files.createTempDirectory("share").toFile()
+        val out = Files.createTempDirectory("out").toFile()
+        try {
+            fun put(path: String, text: String) = File(root, path).apply { parentFile.mkdirs(); writeText(text) }
+            listOf("hicolor", "Adwaita", "breeze").forEach { put("icons/$it/index.theme", "") }
+            put("icons/hicolor/48x48/apps/foot.png", "png")
+            put("icons/hicolor/scalable/apps/foot.svg", "svg")
+            put("icons/Adwaita/scalable/places/user-desktop.svg", "place")
+            put("icons/Adwaita/symbolic/apps/system-file-manager-symbolic.svg", "symbolic")
+            put("icons/breeze/apps/48/kate.svg", "breeze")
+            put("pixmaps/xterm.png", "pixmap")
+            val names = listOf("foot", "user-desktop", "system-file-manager", "kate", "xterm", "nothing-here")
+            val command = ContainerIcons.command(names).toMutableList().also { it[4] = out.path }
+            val process = ProcessBuilder(command).apply { environment()["DROIDTOP_ICON_ROOT"] = root.path }.start()
+            assertEquals(0, process.waitFor())
+            fun found(name: String) = ContainerIcons.cached(out, name)?.readText()
+            assertEquals("png", found("foot"))
+            assertEquals("place", found("user-desktop"))
+            assertEquals("symbolic", found("system-file-manager"))
+            assertEquals("breeze", found("kate"))
+            assertEquals("pixmap", found("xterm"))
+            assertNull(found("nothing-here"))
+            assertTrue(File(out, ContainerLauncher.token("nothing-here") + ContainerIcons.NONE).isFile)
+        } finally {
+            root.deleteRecursively()
+            out.deleteRecursively()
+        }
+    }
 }

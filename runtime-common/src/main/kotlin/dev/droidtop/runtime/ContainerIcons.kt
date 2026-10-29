@@ -6,11 +6,14 @@ import java.io.File
  * The container's application icons, for droidtop's own chrome (docs/SPEC.md 2b "Linux app icons",
  * Droidtop/tracker#689): the Start menu's Linux apps, their taskbar pins, search and the bar's window buttons.
  *
- * An entry's `Icon` names a file in the container's icon theme. One exec resolves the icons droidtop has not
- * seen yet: for each, the first PNG or SVG in hicolor, then Adwaita, by size (128 px first, then the sizes
- * around it, then scalable), then `/usr/share/pixmaps`. It copies the file whole into [IN_CONTAINER_DIR],
- * which is the app's own [hostDir], so droidtop reads it as a plain file. A name with nothing found is
- * remembered with an empty `.none` file, so it is not looked for again. Each cached file is named by
+ * An entry's `Icon` names a file in the container's icon themes. One exec resolves the icons droidtop has not
+ * seen yet: for each, the first PNG or SVG in hicolor, then Adwaita, then every other installed theme, in any of
+ * a theme's contexts (apps, places, devices, ...: Desktop Preferences' `user-desktop` is a place), by size (128 px
+ * first, then the sizes around it, then scalable), then in a context-first layout (breeze's `apps/48`), then
+ * `/usr/share/pixmaps`, and last a theme's `-symbolic` SVG (current Adwaita has some app icons only so), rig
+ * 2026-10-29: only Foot's icon showed. It copies the file whole into [IN_CONTAINER_DIR], which is the app's own
+ * [hostDir], so droidtop reads it as a plain file; droidtop's image loader draws SVG as well as PNG. A name with
+ * nothing found is remembered with an empty [NONE] file, so it is not looked for again. Each cached file is named by
  * [ContainerLauncher.token] of the `Icon` value. XPM is left out, as nothing in droidtop decodes it.
  */
 object ContainerIcons {
@@ -32,7 +35,7 @@ object ContainerIcons {
     suspend fun attach(runtime: ContainerRuntime, container: Container, filesDir: File, apps: List<ContainerApp>): List<ContainerApp> {
         val dir = hostDir(filesDir)
         val wanted = apps.mapNotNull { it.icon }.filter(::lookable).distinct()
-        val unseen = wanted.filter { cached(dir, it) == null && !File(dir, ContainerLauncher.token(it) + ".none").isFile }
+        val unseen = wanted.filter { cached(dir, it) == null && !File(dir, ContainerLauncher.token(it) + NONE).isFile }
         if (unseen.isNotEmpty()) {
             dir.mkdirs()
             val result = runCatching { runtime.exec(container, command(unseen)) }
@@ -53,34 +56,55 @@ object ContainerIcons {
 
     internal val SCRIPT = """
         dir=${'$'}1; shift
+        r=${'$'}{DROIDTOP_ICON_ROOT:-/usr/share}
         mkdir -p "${'$'}dir" || exit 0
+        themes="hicolor Adwaita"
+        for d in "${'$'}r"/icons/*/index.theme; do
+          [ -f "${'$'}d" ] || continue
+          th=${'$'}{d%/index.theme}; th=${'$'}{th##*/}
+          case "${'$'}th" in hicolor|Adwaita|*' '*) ;; *) themes="${'$'}themes ${'$'}th" ;; esac
+        done
         while [ ${'$'}# -ge 2 ]; do
           t=${'$'}1; n=${'$'}2; shift 2; found=
           case "${'$'}n" in
             /*) [ -f "${'$'}n" ] && found=${'$'}n ;;
             *)
-              for th in hicolor Adwaita; do
-                for s in 128x128 96x96 64x64 256x256 48x48 512x512 scalable; do
-                  for e in png svg; do
-                    f=/usr/share/icons/${'$'}th/${'$'}s/apps/${'$'}n.${'$'}e
+              for th in ${'$'}themes; do
+                for s in 128x128 96x96 256x256 64x64 512x512 48x48 scalable; do
+                  for f in "${'$'}r"/icons/${'$'}th/${'$'}s/*/"${'$'}n".png "${'$'}r"/icons/${'$'}th/${'$'}s/*/"${'$'}n".svg; do
                     if [ -f "${'$'}f" ]; then found=${'$'}f; break 3; fi
                   done
                 done
+                for f in "${'$'}r"/icons/${'$'}th/*/*/"${'$'}n".svg "${'$'}r"/icons/${'$'}th/*/*/"${'$'}n".png; do
+                  if [ -f "${'$'}f" ]; then found=${'$'}f; break 2; fi
+                done
               done
               if [ -z "${'$'}found" ]; then
-                for e in png svg; do
-                  f=/usr/share/pixmaps/${'$'}n.${'$'}e
+                for f in "${'$'}r"/pixmaps/"${'$'}n".png "${'$'}r"/pixmaps/"${'$'}n".svg; do
                   if [ -f "${'$'}f" ]; then found=${'$'}f; break; fi
+                done
+              fi
+              if [ -z "${'$'}found" ]; then
+                for th in ${'$'}themes; do
+                  for f in "${'$'}r"/icons/${'$'}th/*/*/"${'$'}n"-symbolic.svg; do
+                    if [ -f "${'$'}f" ]; then found=${'$'}f; break 2; fi
+                  done
                 done
               fi ;;
           esac
           case "${'$'}found" in
             *.png) e=png ;;
             *.svg) e=svg ;;
-            *) : > "${'$'}dir/${'$'}t.none"; continue ;;
+            *) : > "${'$'}dir/${'$'}t$NONE"; continue ;;
           esac
           cp -L "${'$'}found" "${'$'}dir/.${'$'}t.${'$'}e" && mv -f "${'$'}dir/.${'$'}t.${'$'}e" "${'$'}dir/${'$'}t.${'$'}e"
         done
         true
     """.trimIndent()
+
+    /**
+     * The mark of a name looked for and not found. Its name changes with the search: the first search (`.none`) read
+     * only hicolor's and Adwaita's `apps`, and what it gave up on is looked for again.
+     */
+    internal const val NONE = ".none-2"
 }

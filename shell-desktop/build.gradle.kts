@@ -35,6 +35,9 @@ dependencies {
     implementation(project(":shell-gamepad"))
     // The notice card every surface shares (docs/SPEC.md 7k, "Notices").
     implementation(project(":ui-shared"))
+    // The search's Linux app icons, PNG or SVG, decoded by droidtop's one image loader (Droidtop/tracker#689).
+    implementation(libs.coil.compose)
+    implementation(libs.coil.android)
     implementation(libs.androidx.core.ktx)
     implementation(libs.kotlinx.coroutines.android)
 
