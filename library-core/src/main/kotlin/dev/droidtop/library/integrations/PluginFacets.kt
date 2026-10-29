@@ -25,6 +25,7 @@ object PluginFacets {
     const val PLUGIN_PAGE = "plugin.page"
     const val SETTINGS_PAGE = "settings.page"
     const val ITEM_PAGE = "item.page"
+    const val SEARCH_FILTER = "search.filter"
     const val COMPANION_TAB = "companion.tab"
 
     /** The subject of a companion tab's `get` away from a game: the device (docs/plugin-api.md 1.10, Targets). */
@@ -66,6 +67,21 @@ object PluginFacets {
         hostContext = JSONObject().put("target", "plugin"),
     )
 
+    /**
+     * A source's search options (`search.filter`), drawn by the one renderer: each option the person changes is kept
+     * ([SourceFilters]) and goes with the source's next search; its notices and actions run as anywhere else.
+     */
+    fun filterScreen(record: PluginRecord): dev.droidtop.library.settings.CatalogScreen = PluginViews.screen(
+        record = record,
+        point = POINT,
+        op = OP_GET,
+        id = "plugin_search_filter_${record.manifest.id}",
+        title = "Search options",
+        args = getArgs(SEARCH_FILTER),
+        hostContext = JSONObject().put("target", SEARCH_FILTER),
+        onCommit = { context, node, raw -> SourceFilters.put(context, record.manifest.id, node, raw) },
+    )
+
     /** The subject of a game page's `get`: the game by droidtop's id, when [targetArg] carries its identity. */
     fun gameSubject(targetArg: JSONObject): JSONObject? =
         targetArg.optString("id").takeIf { it.isNotBlank() }?.let { JSONObject().put("type", "game").put("gameId", it) }
@@ -83,9 +99,12 @@ object PluginFacets {
         val target = args.optString("target")
         // A game page's facets are about its game even when the plugin may not learn which one it is (library.read).
         val subject = Facets.subjectOf(args.optJSONObject("subject")) ?: if (target == GAME_PAGE) FacetSubject.Game("") else FacetSubject.Plugin
-        val reading = Facets.read(data, subject)
+        // A source's search options are held by droidtop: their inputs need no call, and show what the person set.
+        val held = target == SEARCH_FILTER
+        val reading = Facets.read(data, subject, held)
         messages += reading.messages
-        val admitted = FacetGuards.admit(reading.facets, target, guardsFor(record), messages)
+        val guarded = FacetGuards.admit(reading.facets, target, guardsFor(record), messages)
+        val admitted = if (held && context != null) SourceFilters.applied(guarded, SourceFilters.read(context, record.manifest.id)) else guarded
         // What it gave is remembered for "Where it appears", hidden ones too, so they can be shown again there.
         val shown = if (context == null) {
             admitted

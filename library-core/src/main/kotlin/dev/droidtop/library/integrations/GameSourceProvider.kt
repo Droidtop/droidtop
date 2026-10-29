@@ -76,6 +76,9 @@ interface GameSourceProvider {
 
     fun settingsScreen(): CatalogScreen? = null
 
+    /** The source's own search options (docs/plugin-api.md 1.10, `search.filter`); null when it gives none. Reads files. */
+    fun filterScreen(context: Context): CatalogScreen? = null
+
     /** True when [result] can be fetched straight from its row, without its detail page (a result's `get`). */
     fun canGet(result: AcquireContentResult): Boolean = false
 
@@ -129,6 +132,10 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         destination?.let { hostContext.put("destination", it.absolutePath) }
         val args = org.json.JSONObject().put("query", query).put("values", org.json.JSONObject(values as Map<*, *>)).put("context", hostContext)
         limit?.let { args.put("limit", it) }
+        // What the person set on the source's own options travels with every search, kept per source (search.filter).
+        if (PluginFacets.declares(source.record, PluginFacets.SEARCH_FILTER)) {
+            SourceFilters.read(context, source.record.manifest.id).takeIf { it.length() > 0 }?.let { args.put("filters", it) }
+        }
         // A slow site is slow, not broken: a search that misses its budget is "didn't answer in time", not a crash.
         val reply = PluginViews.call(context, source.record, "library.sources", "search", args, timeoutMs = SEARCH_TIMEOUT_MS)
         if (!reply.ok) return Result.failure(SourceReplyFailure(reply.code ?: dev.droidtop.pluginhost.PluginErrorCode.FAILED, reply.message, reply.detail))
@@ -213,6 +220,9 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
 
     override fun settingsScreen(): CatalogScreen? =
         if (PluginSettingsRows.has(source.record)) PluginSettingsRows.screenFor(source.record) else null
+
+    override fun filterScreen(context: Context): CatalogScreen? =
+        if (PluginFacets.shows(context, source.record, PluginFacets.SEARCH_FILTER)) PluginFacets.filterScreen(source.record) else null
 
 }
 

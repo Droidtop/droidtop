@@ -23,6 +23,8 @@ object FacetGuards {
         Target("library.filter", setOf("info") + Facet.BUNDLES, setOf("item", "game"), PointRisk.MEDIUM),
         Target("library.sort", setOf("info") + Facet.BUNDLES, setOf("item", "game"), PointRisk.MEDIUM),
         Target("search.result", setOf("list", "collection"), setOf("plugin"), PointRisk.MEDIUM),
+        // A source's own options in the one search: droidtop holds the values and sends them with each search.
+        Target("search.filter", setOf("choice", "toggle", "input", "notice", "action"), setOf("plugin"), PointRisk.MEDIUM),
         Target("home.shelf", setOf("collection"), setOf("plugin"), PointRisk.MEDIUM),
         Target("home.card", setOf("info", "media", "action", "progress"), setOf("plugin"), PointRisk.MEDIUM),
         Target("quickmenu", setOf("status", "toggle", "action", "progress", "meter", "chart", "choice", "group"), setOf("plugin", "device", "game"), PointRisk.LOW),
@@ -226,6 +228,7 @@ object FacetGuards {
         "library.filter" to "Library filters",
         "library.sort" to "Library sorting",
         "search.result" to "Search results",
+        "search.filter" to "Search options",
         "home.shelf" to "Home shelves",
         "home.card" to "Home cards",
         "quickmenu" to "Quick Menu",

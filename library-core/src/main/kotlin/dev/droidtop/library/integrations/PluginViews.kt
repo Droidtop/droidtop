@@ -93,7 +93,9 @@ object PluginViews {
         // A plugin's panel ([CatalogScreen.panel]) with its icon; false for any other plugin page.
         panel: Boolean = false,
         iconFile: String? = null,
-    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups).screen(id, title, panel, iconFile)
+        // Told of each input value the person commits, for a page whose values droidtop keeps (a source's search options).
+        onCommit: ((Context, ViewNode, String) -> Unit)? = null,
+    ): CatalogScreen = PluginPage(record, point, op, args, hostContext, emptyMap(), null, fallback, onJobDone, extraWhenFailed, extraGroups, leadGroups, onCommit).screen(id, title, panel, iconFile)
 
     /**
      * What running one view action came to: the sentence to show, a view the reply carried, whether the page should be
@@ -321,6 +323,7 @@ private class PluginPage(
     private val extraWhenFailed: () -> List<CatalogItem>,
     private val extraGroups: suspend (Context, Map<String, String>) -> List<CatalogGroup> = { _, _ -> emptyList() },
     private val leadGroups: suspend (Context) -> List<CatalogGroup> = { emptyList() },
+    private val onCommit: ((Context, ViewNode, String) -> Unit)? = null,
 ) {
     @Volatile private var view: PluginView? = initial
     @Volatile private var error: String? = null
@@ -673,6 +676,7 @@ private class PluginPage(
     /** An input's new value; its action, if any, runs in the background and the next [load] waits for it. */
     private fun commit(context: Context, id: String, value: String, action: ViewAction?) {
         values[id] = value
+        onCommit?.let { tell -> view?.sections?.flatMap { it.nodes }?.firstOrNull { it.id == id }?.let { node -> tell(context.applicationContext, node, value) } }
         if (action == null) return
         val appContext = context.applicationContext
         pending = inputScope.launch { notice = perform(appContext, action, id) {} }

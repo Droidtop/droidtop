@@ -201,9 +201,10 @@ object Facets {
     /**
      * The facets of a reply's `facets`. A `template` entry among them is not drawn: it names an arrangement that `use`
      * entries fill in. [defaultSubject] is the subject of a facet that names none: the plugin itself, unless the
-     * asking target has a subject of its own.
+     * asking target has a subject of its own. [held]: the target holds its inputs' values itself (`search.filter`),
+     * so an input there needs no call of its own, as in a form.
      */
-    fun read(json: JSONObject?, defaultSubject: FacetSubject = FacetSubject.Plugin): Reading {
+    fun read(json: JSONObject?, defaultSubject: FacetSubject = FacetSubject.Plugin, held: Boolean = false): Reading {
         val messages = mutableListOf<String>()
         val array = json?.optJSONArray("facets") ?: return Reading(emptyList(), messages)
         val entries = (0 until array.length()).mapNotNull { array.optJSONObject(it) }
@@ -211,7 +212,7 @@ object Facets {
         val drawn = entries.filter { it.optString("kind") != "template" }
         val max = PluginViewLimits.facetCount("facetsPerReply")
         if (drawn.size > max) messages += "only the first $max facets of a reply were read"
-        val facets = drawn.take(max).mapNotNull { parse(it, templates, defaultSubject, messages, depth = 0) }
+        val facets = drawn.take(max).mapNotNull { parse(it, templates, defaultSubject, messages, depth = 0, inForm = held) }
         return Reading(facets, messages)
     }
 

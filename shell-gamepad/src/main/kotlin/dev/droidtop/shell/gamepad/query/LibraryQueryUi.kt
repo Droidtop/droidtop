@@ -746,6 +746,12 @@ internal fun LibrarySearchDialog(
                 state.unavailable.filter { !it.waitingForApproval }.forEach { off ->
                     add(SearchLine.Entry("off:${off.pluginId}", "${off.label} ${off.reason}", subtitle = "Open its page") { openPlugin(off.pluginId) })
                 }
+                // A source's own search options (docs/plugin-api.md 1.10, search.filter): its page, then the search again.
+                state.sources.forEach { status ->
+                    status.source.filterScreen(context)?.let { options ->
+                        add(SearchLine.Entry("filters:${status.source.id}", "${status.source.label}: search options", subtitle = "Searches again after") { activeCatalog = options })
+                    }
+                }
                 state.sources.filter { it.failure != null }.forEach { status ->
                     val source = status.source
                     add(SearchLine.Note("${source.label}: ${status.failure}"))
