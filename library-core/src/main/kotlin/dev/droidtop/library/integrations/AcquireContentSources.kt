@@ -15,18 +15,14 @@ import dev.droidtop.library.settings.NoticeItem
 import dev.droidtop.library.settings.SettingsScreenRegistry
 import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.PluginCapability
-import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginGrants
-import dev.droidtop.pluginhost.PluginJobsCenter
 import dev.droidtop.pluginhost.PluginRecord
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.PluginTrustState
 import dev.droidtop.pluginhost.SourceSystems
 import java.io.File
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONArray
 
 /**
  * Unifies droidtop's two `acquire_content` mechanisms into the ONE "Get
@@ -37,37 +33,16 @@ import org.json.JSONArray
  *
  * - a JSON [Integration] (docs/SPEC.md §12): one-way, fire-and-forget,
  *   launches another app with extras and never hears back;
- * - a real plugin declaring [PluginCapability.ACQUIRE_CONTENT] (§12a):
- *   `invoke(action=search)` returns real results droidtop renders itself,
- *   `startJob(action=download)` is a real job with progress and a real
- *   completion signal droidtop rescans on.
+ * - a real plugin providing `library.sources` (§12a, docs/plugin-api.md
+ *   1.8): its `search` returns real results droidtop renders itself, and
+ *   its `acquire` is a real job with progress and a real completion signal
+ *   droidtop indexes on ([GameSourceProvider], [PluginGameSource]).
  *
- * There is no Get games screen (docs/SPEC.md 13, "There is no Get games sheet"). [search] is the contract 1
+ * There is no Get games screen (docs/SPEC.md 13, "There is no Get games sheet"). [PluginGameSource.search] is the
  * backing call for the search in `dev.droidtop.library.integrations.UnifiedSearch`, which asks
  * every source in parallel and ranks the answers in the one result list
  * with the device's own rows -- so a plugin never needs a second, dedicated
  * screen to be found; droidtop's own search already asks it.
- *
- * **The wire contract for a plugin's `acquire_content` calls**:
- * - `invoke(ACQUIRE_CONTENT, {"action": "search", "query", "systemId",
- *   "systemName"})` -> `PluginResult.success(values = {"entries": <a JSON
- *   array string>})`. Each element is a JSON object; droidtop reads a
- *   generic shape -- `id` (or `slug`/`rom_id`, falling back to a hash of
- *   the object when neither is present), `title` (or `name`), `platform`,
- *   a size label (`size_str`, `sizeLabel`, or the first `links` entry's
- *   own `size_str`), an optional `boxart`/`boxart_url`/`artUrl`, an
- *   optional `subtitle` (falling back to the comma-joined `regions`, if
- *   any), and an `options` list built from a `links` array (each link's
- *   `name`/`host`/`size_str` joined as the option's label, its position
- *   as the index `startJob`'s `linkIndex` expects) -- everything else in
- *   the object is opaque and round-tripped back to the plugin unread
- *   (§12a point 5: a plugin's own values are untrusted and never parsed
- *   beyond what droidtop actually needs).
- * - `startJob(ACQUIRE_CONTENT, {"action": "download", "entry": <the exact
- *   JSON object a search result came from>, "destinationPath": <the
- *   system's real, already-resolved folder>, "linkIndex": <the chosen
- *   option's index, "0" when a result has no options>})`,
- *   progress/completion over the normal `PluginJobProgress` callback.
  */
 sealed interface AcquireContentSource {
     val id: String
@@ -109,23 +84,14 @@ data class SourceListing(val record: PluginRecord, val state: SourceState) {
 }
 
 /**
- * One labelled choice a result carries -- a mirror, a region, a format --
- * shown in the options sheet the search surfaces (LibraryQueryUi's "Get
- * more" group, docs/SPEC.md 12a "Search fan-out") open on selection.
- * [index] round-trips back as `linkIndex` in the download job, the same
- * field [SourceScreens.searchScreen] now opens result details.
- */
-data class AcquireContentOption(val label: String, val index: Int)
-
-/**
- * One search result a plugin returned. [raw] is the exact JSON object the
- * plugin sent, round-tripped back unchanged in the download job -- droidtop
- * never re-derives or edits it beyond the generic display shape SPEC 12a
- * settled on: [id], [title], [subtitle], [platform], an optional [artUrl],
- * and an [options] list of labelled choices (source/mirror/region/format).
- * [sizeLabel] is the size as a row shows it. [version], [sizeBytes] and [getValuesJson] are a
- * contract 2 result's for the one search (docs/plugin-api.md "Fetchers
- * answer in the one search", Droidtop/tracker#218): [getValuesJson] is set
+ * One search result a plugin returned. [raw] is the result's `ref`, the
+ * exact JSON object the plugin sent, round-tripped back unchanged to its
+ * `detail` and `acquire` -- droidtop never re-derives or edits it beyond the
+ * generic display shape: [id], [title], [subtitle], [platform] and an
+ * optional [artUrl]. [sizeLabel] is the size as a row shows it.
+ * [version], [sizeBytes] and [getValuesJson] serve the one search
+ * (docs/plugin-api.md "Fetchers answer in the one search",
+ * Droidtop/tracker#218): [getValuesJson] is set
  * when the result can be fetched from its row without its detail page
  * ([GameSourceProvider.get]), titled [getTitle] when the source gave one.
  */
@@ -136,7 +102,6 @@ data class AcquireContentResult(
     val sizeLabel: String?,
     val platform: String?,
     val artUrl: String?,
-    val options: List<AcquireContentOption>,
     val raw: String,
     val columns: List<String> = emptyList(),
     val badges: List<String> = emptyList(),
@@ -165,21 +130,6 @@ object SourceSize {
 
 /** What a finished (or failed) download job reported, translated out of plugin-host's own `PluginResult` so callers never need that type. */
 data class AcquireDownloadOutcome(val ok: Boolean, val message: String, val filePath: String?)
-
-/**
- * A live download job -- now a thin handle onto [PluginJobsCenter]'s own
- * tracking ([trackingId]) rather than a private binder connection this
- * class owned itself (docs/SPEC.md 12a "Jobs": "reused by acquire_content
- * downloads so there's one mechanism"). [close] is a no-op kept only so
- * existing call sites ([runDownloadAndAwait]) don't need to change shape
- * -- [PluginJobsCenter] owns tearing its own policy down on completion.
- */
-class AcquireContentJob internal constructor(
-    val trackingId: String,
-) {
-    fun cancel() = PluginJobsCenter.cancel(trackingId)
-    fun close() {}
-}
 
 /** An installed plugin that offers downloads but cannot answer right now, and why, in words a person reads. */
 data class UnavailableSource(
@@ -419,184 +369,5 @@ object AcquireContentSources {
             .sortedBy { it.displayName.lowercase() }
             .map { File(root, it.id) to it }
         return yours to others
-    }
-
-    /**
-     * Searches a plugin source. Bounded by `PluginCrashPolicy.invoke`'s
-     * own watchdog (`PluginRunner.CALL_TIMEOUT_MS`, 15s) -- fine for a
-     * local index, tight for a live network search, the same tradeoff
-     * every `invoke()` call already has (§12a). [systemId]/[systemName]
-     * are blank when a search is not scoped to one system (the shared
-     * game search calling this through [PluginSearchAggregator] outside
-     * a per-system list) -- a plugin sees an empty string, not a made-up
-     * system.
-     */
-    suspend fun search(
-        context: Context,
-        source: AcquireContentSource.Plugin,
-        systemId: String,
-        systemName: String,
-        query: String,
-    ): Result<List<AcquireContentResult>> {
-        val policy = PluginCrashPolicy(context.applicationContext)
-        return try {
-            val result = policy.invoke(
-                source.record,
-                PluginCapability.ACQUIRE_CONTENT,
-                mapOf("action" to "search", "query" to query, "systemId" to systemId, "systemName" to systemName),
-            )
-            if (!result.ok) return Result.failure(RuntimeException(result.error ?: "search failed"))
-            val entriesJson = result.values["entries"] ?: return Result.success(emptyList())
-            Result.success(parseResults(entriesJson))
-        } catch (e: Exception) {
-            Result.failure(e)
-        } finally {
-            policy.shutdown()
-        }
-    }
-
-    /** Pure so it is unit-tested without a plugin connection -- see AcquireContentSourcesParseTest. */
-    internal fun parseResults(entriesJson: String): List<AcquireContentResult> {
-        val array = runCatching { JSONArray(entriesJson) }.getOrNull() ?: return emptyList()
-        return buildList {
-            for (i in 0 until array.length()) {
-                val obj = array.optJSONObject(i) ?: continue
-                val title = obj.optString("title").ifBlank { obj.optString("name") }
-                if (title.isBlank()) continue
-                val id = obj.optString("id").ifBlank { obj.optString("slug") }
-                    .ifBlank { obj.optString("rom_id") }
-                    .ifBlank { obj.toString().hashCode().toString() }
-                val platform = obj.optString("platform").takeIf { it.isNotBlank() }
-                val sizeLabel = obj.optString("size_str").takeIf { it.isNotBlank() }
-                    ?: obj.optString("sizeLabel").takeIf { it.isNotBlank() }
-                    ?: obj.optJSONArray("links")?.optJSONObject(0)?.optString("size_str")?.takeIf { it.isNotBlank() }
-                val artUrl = obj.optString("artUrl").takeIf { it.isNotBlank() }
-                    ?: obj.optString("boxart").takeIf { it.isNotBlank() }
-                    ?: obj.optString("boxart_url").takeIf { it.isNotBlank() }
-                val regions = obj.optJSONArray("regions")?.let { arr ->
-                    (0 until arr.length()).mapNotNull { arr.optString(it).takeIf(String::isNotBlank) }
-                }.orEmpty()
-                val subtitle = obj.optString("subtitle").takeIf { it.isNotBlank() }
-                    ?: regions.takeIf { it.isNotEmpty() }?.joinToString(", ")
-                val options = obj.optJSONArray("links")?.let { links ->
-                    buildList {
-                        for (li in 0 until links.length()) {
-                            val link = links.optJSONObject(li) ?: continue
-                            val label = listOfNotNull(
-                                link.optString("name").takeIf { it.isNotBlank() },
-                                link.optString("host").takeIf { it.isNotBlank() },
-                                link.optString("size_str").takeIf { it.isNotBlank() },
-                            ).joinToString(" · ").ifBlank { "Option ${li + 1}" }
-                            add(AcquireContentOption(label = label, index = li))
-                        }
-                    }
-                }.orEmpty()
-                add(
-                    AcquireContentResult(
-                        id = id,
-                        title = title,
-                        subtitle = subtitle,
-                        sizeLabel = sizeLabel,
-                        platform = platform,
-                        artUrl = artUrl,
-                        options = options,
-                        raw = obj.toString(),
-                    ),
-                )
-            }
-        }
-    }
-
-    /**
-     * Starts the real download job (§12a's `PluginJob` shape) into
-     * [systemFolder] -- the exact folder droidtop already scans for this
-     * system. [onProgress]/[onComplete] fire on whatever thread the
-     * binder callback arrives on. Returns null when the plugin refused
-     * the job outright (not loaded, or no `startJob` override). The
-     * returned [AcquireContentJob] must be [AcquireContentJob.close]d
-     * once the caller is done with it.
-     */
-    suspend fun startDownload(
-        context: Context,
-        source: AcquireContentSource.Plugin,
-        systemFolder: File,
-        result: AcquireContentResult,
-        linkIndex: Int = 0,
-        onProgress: (percent: Int, statusLine: String) -> Unit,
-        onComplete: (AcquireDownloadOutcome) -> Unit,
-    ): AcquireContentJob? {
-        val startedAt = System.currentTimeMillis()
-        // A system whose folder does not exist yet: made now, under the games folder.
-        if (!systemFolder.isDirectory) withContext(Dispatchers.IO) { systemFolder.mkdirs() }
-        val trackingId = PluginJobsCenter.start(
-            context = context,
-            record = source.record,
-            capability = PluginCapability.ACQUIRE_CONTENT,
-            args = mapOf(
-                "action" to "download",
-                "entry" to result.raw,
-                "destinationPath" to systemFolder.absolutePath,
-                "linkIndex" to linkIndex.toString(),
-            ),
-            title = "Downloading ${result.title}",
-            onProgress = onProgress,
-            onComplete = { jobResult ->
-                // Said by the job, not by the screen that waits for it: the downloaded file is looked at, nothing is walked.
-                if (jobResult.ok) AcquireIndexing.afterAcquire(context, source.record.manifest.id, startedAt, systemFolder, jobResult.values)
-                onComplete(
-                    AcquireDownloadOutcome(
-                        ok = jobResult.ok,
-                        message = if (jobResult.ok) "Downloaded ${result.title}" else (jobResult.error ?: "Download failed"),
-                        filePath = jobResult.values["filePath"],
-                    ),
-                )
-            },
-        ) ?: return null
-        return AcquireContentJob(trackingId)
-    }
-
-    /**
-     * Bridges [startDownload]'s async job callback (progress/completion
-     * arrive later, over the binder) into [AsyncActionItem.run]'s
-     * synchronous suspend shape (report through `onStatus`, return the
-     * final sentence) with a [CompletableDeferred] -- the same "wrap a
-     * callback API as a suspend function" pattern this module otherwise
-     * has no need for. The downloaded file reaches the library from the job
-     * itself ([startDownload]), not from here, so it shows up whether or not
-     * this screen is still open.
-     */
-    internal suspend fun runDownloadAndAwait(
-        context: Context,
-        source: AcquireContentSource.Plugin,
-        systemFolder: File,
-        result: AcquireContentResult,
-        onStatus: (String) -> Unit,
-        linkIndex: Int,
-    ): String {
-        val done = CompletableDeferred<Boolean>()
-        var finalMessage = ""
-        val job = startDownload(
-            context = context,
-            source = source,
-            systemFolder = systemFolder,
-            result = result,
-            linkIndex = linkIndex,
-            onProgress = { percent, statusLine ->
-                onStatus(if (percent >= 0) "$statusLine ($percent%)" else statusLine)
-            },
-            onComplete = { outcome ->
-                if (!done.isCompleted) {
-                    finalMessage = outcome.message + (outcome.filePath?.let { " -> $it" } ?: "")
-                    done.complete(outcome.ok)
-                }
-            },
-        )
-        if (job == null) return "Couldn't start the download: ${source.label} has no running job support"
-        return try {
-            done.await()
-            finalMessage
-        } finally {
-            job.close()
-        }
     }
 }

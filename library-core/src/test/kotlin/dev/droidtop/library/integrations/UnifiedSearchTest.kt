@@ -19,7 +19,7 @@ class UnifiedSearchTest {
 
     private fun result(id: String, title: String = id) = AcquireContentResult(
         id = id, title = title, subtitle = null, sizeLabel = null, platform = null,
-        artUrl = null, options = emptyList(), raw = "{}",
+        artUrl = null, raw = "{}",
     )
 
     private fun source(

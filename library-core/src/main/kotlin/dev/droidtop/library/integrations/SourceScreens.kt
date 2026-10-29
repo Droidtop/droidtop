@@ -6,11 +6,9 @@ import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.consoles.SystemFolders
 import dev.droidtop.library.settings.ActionItem
-import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogGroup
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.NestedScreenItem
-import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.pluginhost.PluginView
 import dev.droidtop.pluginhost.SourceSystems
 import dev.droidtop.pluginhost.ViewNode
@@ -18,7 +16,7 @@ import dev.droidtop.pluginhost.ViewSection
 import java.io.File
 import org.json.JSONObject
 
-/** Shared source search screens: contract 2 views and the host's contract 1 form use the same result renderer. */
+/** Shared source search screens: a source's search form (its own view, or the host's fallback form) and the result list under it. */
 object SourceScreens {
     /**
      * What a source's page needs to know about the device, read once for a whole Game sources list (off the main
@@ -78,7 +76,6 @@ object SourceScreens {
 
     fun searchScreen(source: AcquireContentSource.Plugin, systemId: String, systemName: String, systemFolder: File?): CatalogScreen {
         val adapter = PluginGameSource(source)
-        if (source.record.manifest.contractVersion < 2) return legacySearchScreen(source, adapter, systemId, systemName, systemFolder)
         val form = PluginView(null, null, listOf(ViewSection("search", null, listOf(ViewNode.Text("query", "Search", null, "", null)))))
         var lastValues: Map<String, String>? = null
         var cachedGroups: List<CatalogGroup> = emptyList()
@@ -96,20 +93,6 @@ object SourceScreens {
             extraWhenFailed = { listOfNotNull(adapter.settingsScreen()?.let { NestedScreenItem("source_settings_${source.id}", "Open ${source.label} settings", inline = it) }) },
         )
         return screen
-    }
-
-    private fun legacySearchScreen(source: AcquireContentSource.Plugin, adapter: PluginGameSource, systemId: String, systemName: String, folder: File?): CatalogScreen {
-        var query = ""
-        var groups: List<CatalogGroup> = emptyList()
-        return CatalogScreen("source_search_${source.id}_$systemId", source.label, "Search ${source.label} for $systemName", groups = {
-            listOf(CatalogGroup("source_form_${source.id}", null, listOf(TextInputItem(
-                "source_query_${source.id}", "Search", value = query,
-                onChange = { context, committed ->
-                    query = committed
-                    groups = resultGroups(context, adapter, systemId, systemName, folder, committed, mapOf("query" to committed))
-                },
-            )))) + groups
-        })
     }
 
     private suspend fun resultGroups(context: Context, adapter: PluginGameSource, systemId: String, systemName: String, folder: File?, query: String, values: Map<String, String>): List<CatalogGroup> {
@@ -151,16 +134,4 @@ object SourceScreens {
             ))))
         },
     )
-
-    fun legacyDetail(source: AcquireContentSource.Plugin, result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?) =
-        if (destination == null) noDestination(result, systemName) else {
-            var picked = result.options.firstOrNull()?.index ?: 0
-            CatalogScreen("source_detail_${source.id}_${result.id}", result.title, groups = { context ->
-                listOf(CatalogGroup("detail", null, buildList {
-                    add(ActionItem("facts", listOfNotNull(result.platform, result.sizeLabel).joinToString(" · ").ifBlank { result.title }))
-                    if (result.options.size > 1) add(dev.droidtop.library.settings.ChoiceItem(id = "option", title = "Download option", options = result.options.map { dev.droidtop.library.settings.ChoiceOption(it.index.toString(), it.label) }, current = picked.toString(), onSelect = { _, value -> picked = value.toIntOrNull() ?: picked }))
-                    add(AsyncActionItem("download", "Download", run = { ctx, status -> AcquireContentSources.runDownloadAndAwait(ctx, source, destination, result, status, picked) }))
-                }))
-            })
-        }
 }

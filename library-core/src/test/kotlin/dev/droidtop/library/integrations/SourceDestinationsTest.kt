@@ -100,7 +100,7 @@ class SourceDestinationsTest {
     fun `a badge can name the console system when the platform field is empty`() {
         val names = SourceDestinations.consoleNamesOf(systems)
         fun result(platform: String?, vararg badges: String) =
-            AcquireContentResult("id", "title", null, null, platform, null, emptyList(), "{}", badges = badges.toList())
+            AcquireContentResult("id", "title", null, null, platform, null, "{}", badges = badges.toList())
         assertFalse(SourceDestinations.isPcResult(result(null, "PSP"), names))
         assertFalse(SourceDestinations.isPcResult(result("", "Vita", "English"), names))
         assertTrue(SourceDestinations.isPcResult(result(null, "English"), names))

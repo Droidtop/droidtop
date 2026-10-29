@@ -32,8 +32,9 @@ import java.io.File
  * **Versioning.** This is droidtop's own internal Kotlin interface, not a
  * wire contract -- a plugin never implements it directly; [PluginGameSource]
  * is the one adapter translating plugin-host's actual wire contract
- * (`invoke`/`startJob` over [dev.droidtop.pluginhost.PluginCapability.ACQUIRE_CONTENT],
- * documented on [AcquireContentSources]) into this shape. Adding a method
+ * (`handle` calls on the `library.sources` extension point: `search`,
+ * `featured`, `detail` and the `acquire` job, docs/plugin-api.md 1.8) into
+ * this shape. Adding a method
  * here is a normal Kotlin source change gated by droidtop's own compile,
  * not a plugin-facing breaking change; [dev.droidtop.pluginhost.PLUGIN_CONTRACT_VERSION]
  * is what actually gates plugin compatibility.
@@ -105,11 +106,10 @@ interface GameSourceProvider {
 }
 
 /**
- * The one real [GameSourceProvider] implementation today: a plugin
- * declaring [dev.droidtop.pluginhost.PluginCapability.ACQUIRE_CONTENT],
- * adapted straight onto [AcquireContentSources]'s existing invoke/startJob
- * calls -- no behavior change from before this interface existed, just
- * named as a Sources API implementation so the UI and
+ * The one real [GameSourceProvider] implementation today: a plugin that
+ * provides `library.sources` (listed by [AcquireContentSources]), adapted
+ * onto that point's `search`/`featured`/`detail`/`acquire` ops through
+ * [PluginViews] -- named as a Sources API implementation so the UI and
  * [PluginSearchAggregator]/`GetMoreComposer` can hold a
  * `List<GameSourceProvider>` without knowing plugins exist.
  *
@@ -131,7 +131,6 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
      * source that ignores it is cut to [limit] here.
      */
     internal suspend fun searchWithValues(context: Context, query: String, platform: String?, values: Map<String, String>, destination: File?, systemName: String, limit: Int? = null): Result<List<AcquireContentResult>> {
-        if (source.record.manifest.contractVersion < 2) return AcquireContentSources.search(context, source, platform.orEmpty(), systemName, query)
         val systemId = platform.orEmpty()
         val hostContext = org.json.JSONObject().put("system", org.json.JSONObject().put("id", systemId).put("name", systemName))
         destination?.let { hostContext.put("destination", it.absolutePath) }
@@ -149,11 +148,10 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
 
     /**
      * `featured {platform, limit, context}` (docs/plugin-api.md 1.8, Droidtop/tracker#612): optional, so a source that
-     * answers UNSUPPORTED, or a contract 1 one that has no such op, features nothing. Any other failure is the
+     * answers UNSUPPORTED features nothing. Any other failure is the
      * source's to show, as a search's is. The same budget as a search.
      */
     override suspend fun featured(context: Context, platform: String?, limit: Int): Result<List<AcquireContentResult>> {
-        if (source.record.manifest.contractVersion < 2) return Result.success(emptyList())
         val hostContext = org.json.JSONObject().put("system", org.json.JSONObject().put("id", platform.orEmpty()))
         val args = org.json.JSONObject().put("limit", limit).put("context", hostContext)
         platform?.takeIf { it.isNotBlank() }?.let { args.put("platform", it) }
@@ -173,7 +171,7 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
         facets = row.facets,
     )
 
-    override fun canGet(result: AcquireContentResult): Boolean = source.record.manifest.contractVersion >= 2 && result.getValuesJson != null
+    override fun canGet(result: AcquireContentResult): Boolean = result.getValuesJson != null
 
     override suspend fun get(
         context: Context,
@@ -203,7 +201,6 @@ class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProv
     }
 
     override fun detailScreen(result: AcquireContentResult, systemId: String?, systemName: String?, destination: File?): CatalogScreen {
-        if (source.record.manifest.contractVersion < 2) return SourceScreens.legacyDetail(source, result, systemId, systemName, destination)
         if (destination == null) return SourceScreens.noDestination(result, systemName)
         val ref = org.json.JSONObject(result.raw)
         val context = org.json.JSONObject().put("system", org.json.JSONObject().put("id", systemId.orEmpty()).put("name", systemName.orEmpty())).put("destination", destination.absolutePath)

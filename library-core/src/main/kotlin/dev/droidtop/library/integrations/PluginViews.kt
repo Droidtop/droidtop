@@ -274,7 +274,7 @@ object PluginViews {
 
     /**
      * Runs [op] on [point] as a contract 2 job (docs/plugin-api.md 1.6, "Jobs in
-     * contract 2"): `startJob` with the point's contract 1 capability and the whole
+     * contract 2"): `startJob` with the capability the point is served as and the whole
      * envelope as `call`, tracked in [PluginJobsCenter] like every other job, and
      * awaited here so a row can show its progress through [onStatus].
      */

@@ -761,12 +761,11 @@ internal fun AppSettingsCatalogs.pluginDetailPage(
             pluginsChanged(ctx)
         }
 
-        // Approving with full access ticked (or an older plugin, which always has it) asks in red first
-        // (Droidtop/tracker#481, D1); Cancel approves nothing.
+        // Approving with full access ticked asks in red first (Droidtop/tracker#481, D1); Cancel approves nothing.
         suspend fun approveAsking(ctx: Context, root: Boolean): String {
             // An update from a different maker asks first (D3), then full access does (D1).
             if (!PluginDangers.askDifferentMaker(record)) return "Not approved"
-            val full = m.contractVersion < 2 || PluginTiers.FULL_TRUST in approvalTicks
+            val full = PluginTiers.FULL_TRUST in approvalTicks
             if (full && !PluginDangers.askFullAccess(record, update = false)) return "Not approved"
             withContext(Dispatchers.Main) { approve(ctx, root) }
             return "Approved"
@@ -1674,7 +1673,6 @@ internal fun AppSettingsCatalogs.pluginPermissionGroups(context: Context, plugin
         val badge = PluginTiers.badge(record, snap)
         when {
             refusal != null -> ActionItem(id = "plugin_permissions_access_row", title = if (PluginTiers.declaresFullTrust(record.manifest)) "Needs full access to work" else "Needs an update", subtitle = refusal)
-            record.manifest.contractVersion < 2 -> ActionItem(id = "plugin_permissions_access_row", title = badge ?: "Full access (older plugin)", subtitle = "Written before permissions: it can do all droidtop can; Activity lists what it asks for")
             badge != null -> ActionItem(id = "plugin_permissions_access_row", title = badge, subtitle = accessLine(record, snap))
             // A permission's caution (gpu.render) is on its own line below, where the person can take it back.
             else -> null
@@ -1797,8 +1795,6 @@ internal fun AppSettingsCatalogs.pluginConsentGroups(
     return listOfNotNull(
         if (only != null) {
             null
-        } else if (view.olderPluginFullAccess) {
-            group("older", "Older plugin", listOf(info("older", "Full access (older plugin)", "Written before permissions existed: it can do everything it could before. Allow it only if you trust the plugin")))
         } else if (view.asksFullAccess) {
             group("access", "Access", listOf(info("access", "Asks for full access", "Allowed, it can do anything droidtop can; only what it asks droidtop to do is listed under Activity. Allow it only if you trust the plugin")))
         } else {

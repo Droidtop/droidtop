@@ -28,7 +28,6 @@ class PluginSearchAggregatorTest {
         sizeLabel = null,
         platform = null,
         artUrl = null,
-        options = emptyList(),
         raw = "{}",
     )
 
