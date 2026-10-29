@@ -156,7 +156,7 @@ class SteamStore : StoreLibrary {
     override suspend fun collections(context: Context): List<StoreCollection>? = withContext(Dispatchers.IO) {
         SteamCollections.load(context)?.collections
             ?.filter { it.id != SteamCollections.ID_HIDDEN }
-            ?.map { StoreCollection(it.id, it.name, it.appIds.mapTo(HashSet()) { app -> app.toString() }) }
+            ?.map { StoreCollection(it.id, it.name, it.appIds.mapTo(HashSet()) { app -> app.toString() }, favourites = it.id == SteamCollections.ID_FAVOURITES) }
     }
 
     /** Steam's hidden-games list as the last sync read it (Droidtop/tracker#402); null before Steam has answered. */

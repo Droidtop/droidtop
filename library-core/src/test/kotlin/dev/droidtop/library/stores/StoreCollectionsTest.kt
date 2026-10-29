@@ -21,4 +21,11 @@ class StoreCollectionsTest {
         assertTrue(collection.id.startsWith(StoreCollections.prefixFor("gog")))
         assertTrue(!StoreCollections.prefixFor("gog").startsWith(StoreCollections.prefixFor("go")))
     }
+
+    @Test
+    fun `a store's favourites are droidtop favourites, not a collection`() {
+        val favourites = StoreCollection("favorite", "Favorites", setOf("20", "10"), favourites = true)
+        assertEquals(listOf("steam:10", "steam:20"), StoreCollections.favouriteIds("steam", listOf(favourites)))
+        assertEquals(emptyList<String>(), StoreCollections.favouriteIds("steam", emptyList()))
+    }
 }

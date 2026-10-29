@@ -422,4 +422,14 @@ class PcShelvesTest {
         val pc = game("folder:A").copy(heroUri = "/media/pc/fanart/A.png", artworkUri = "/media/pc/covers/A.png")
         assertEquals(HeroArt("/media/pc/fanart/A.png", "/media/pc/covers/A.png"), pc.heroArt())
     }
+
+    @Test
+    fun `a game whose files are missing is offered no update and is not installed, whatever its store row says`() {
+        val gone = game("steam:9", kind = LibraryEntryKind.WINE_PROFILE, update = "1.1", pcInfo = PcInfo(storeId = "steam:9", installed = true), missing = true)
+        val here = game("steam:8", kind = LibraryEntryKind.WINE_PROFILE, update = "1.1", pcInfo = PcInfo(storeId = "steam:8", installed = true))
+        val updates = pcShelves(listOf(gone, here)).firstOrNull { it.id == SHELF_UPDATES }
+        assertEquals(listOf("steam:8"), updates?.entries?.map { it.id })
+        assertEquals(false, gone.isInstalled)
+        assertEquals(true, here.isInstalled)
+    }
 }

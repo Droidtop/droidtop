@@ -197,7 +197,8 @@ internal fun pcShelves(
         val ordered = all.sortedWith(byRecency)
         return PcShelf(id, title, ordered.take(SHELF_LIMIT), ordered.size)
     }
-    val updates = shelf(SHELF_UPDATES, "Update available", listed.filter { it.availableUpdate != null })
+    // A game whose files are missing cannot be updated, so it is not offered one (Droidtop/tracker#756).
+    val updates = shelf(SHELF_UPDATES, "Update available", listed.filter { it.availableUpdate != null && !it.missing })
     return buildList {
         if (updatesFirst) updates?.let(::add)
         // Continue playing leads: its first card is the hero card (PcCapsule

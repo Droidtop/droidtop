@@ -633,7 +633,25 @@ object LibraryKinds {
  * one entry of its kind is called. Never the name of the group it is
  * filed under — that is the heading directly above it.
  */
-fun LibraryEntry.kindLine(): String = genre?.takeIf { it.isNotBlank() } ?: kind.itemName()
+fun LibraryEntry.kindLine(): String = genre?.let(GenreWords::withoutDescriptors) ?: kind.itemName()
+
+/**
+ * What a genre line may hold. Steam lists its content descriptors among a game's genres, and a game scraped before
+ * they were dropped ([dev.droidtop.library.scraper.SteamStoreClient.genres]) still has them stored, so the line under
+ * a card leaves them out too (Droidtop/tracker#756). Pure.
+ */
+object GenreWords {
+    /** Steam's genre ids for its content descriptors: sexual content, nudity, violence, gore. */
+    val STEAM_DESCRIPTOR_IDS = setOf("71", "72", "73", "74")
+
+    private val DESCRIPTORS = setOf("sexual content", "nudity", "violent", "gore")
+
+    fun isDescriptor(word: String): Boolean = word.trim().lowercase() in DESCRIPTORS
+
+    /** [genre] without the descriptors; null when nothing else is left. */
+    fun withoutDescriptors(genre: String): String? =
+        genre.split(",").map { it.trim() }.filter { it.isNotEmpty() && !isDescriptor(it) }.joinToString(", ").ifBlank { null }
+}
 
 /**
  * What ONE entry of this kind IS, in the singular — the line under a

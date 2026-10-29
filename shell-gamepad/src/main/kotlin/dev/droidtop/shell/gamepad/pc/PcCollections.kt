@@ -65,6 +65,17 @@ internal fun collectionQuery(collectionId: String): LibraryQuery =
 internal fun collectionViewId(collectionId: String): String = "collection:$collectionId"
 
 /**
+ * The saved views that are tabs of a store's imported collection the store no longer has (a sync replaced it, or it
+ * became favourites instead: Steam's "favorite" was a second Favourites tab, Droidtop/tracker#756). A person's own
+ * views and their own collections' views are never in it. Pure.
+ */
+internal fun staleImportedViewIds(viewIds: Collection<String>, collectionIds: Set<String>): Set<String> =
+    viewIds.filterTo(HashSet()) { id ->
+        val collectionId = id.removePrefix("collection:").takeIf { id.startsWith("collection:") } ?: return@filterTo false
+        dev.droidtop.library.CollectionScope.isImported(collectionId) && collectionId !in collectionIds
+    }
+
+/**
  * The Collections tab's groups (docs/SPEC.md 7i): the person's own
  * collections, then their saved views (a pinned collection's own tab is not
  * listed twice), then each store's imported collections under "From <store>".

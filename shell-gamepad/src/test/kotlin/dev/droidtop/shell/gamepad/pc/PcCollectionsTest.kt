@@ -92,4 +92,17 @@ class PcCollectionsTest {
         assertEquals(5, gridIndexOfTile(groups, 3))
         assertEquals(1, gridIndexOfTile(groups, 0))
     }
+
+    @Test
+    fun `a tab of an imported collection the store no longer has goes, and nothing else does`() {
+        val views = listOf(
+            "collection:import:steam:favorite",
+            "collection:import:steam:rpgs",
+            "collection:mine",
+            "builtin:favourites",
+            "3f2b",
+        )
+        assertEquals(setOf("collection:import:steam:favorite"), staleImportedViewIds(views, setOf("import:steam:rpgs", "mine")))
+        assertEquals(emptySet<String>(), staleImportedViewIds(listOf("collection:mine"), emptySet()))
+    }
 }

@@ -38,6 +38,9 @@ internal object SteamCollections {
     /** Steam's own hidden-games list, not a grouping the person made. */
     const val ID_HIDDEN = "hidden"
 
+    /** Steam's own favourites, which droidtop keeps as its favourites rather than as a collection (Droidtop/tracker#756). */
+    const val ID_FAVOURITES = "favorite"
+
     data class Collection(val id: String, val name: String, val appIds: Set<Int>)
 
     /**

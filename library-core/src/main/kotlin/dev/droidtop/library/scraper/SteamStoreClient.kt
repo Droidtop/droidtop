@@ -107,11 +107,24 @@ object SteamStoreClient {
                 description = data.optString("short_description", "").ifBlank { null }?.let { decodeEntities(it) },
                 developer = names("developers"),
                 publisher = names("publishers"),
-                genre = names("genres", "description"),
+                genre = genres(data.optJSONArray("genres")),
                 releaseDate = releaseDate,
                 ids = PcGameIds(steamAppId = appId),
             ),
         )
+    }
+
+    /**
+     * The game's genres, without the content descriptors Steam lists among them (Droidtop/tracker#756: a card read
+     * "Sexual Content, Visua..." where its kind belongs). Pure.
+     */
+    internal fun genres(array: org.json.JSONArray?): String? = array?.let {
+        (0 until it.length()).mapNotNull { i ->
+            val genre = it.optJSONObject(i) ?: return@mapNotNull null
+            genre.optString("description", "").trim().takeIf { name ->
+                name.isNotEmpty() && genre.optString("id") !in dev.droidtop.library.GenreWords.STEAM_DESCRIPTOR_IDS && !dev.droidtop.library.GenreWords.isDescriptor(name)
+            }
+        }.joinToString(", ").ifBlank { null }
     }
 
     /**

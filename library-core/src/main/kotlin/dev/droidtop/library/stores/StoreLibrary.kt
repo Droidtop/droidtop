@@ -189,7 +189,13 @@ interface StoreAccountSignIn {
  * the store's own ids of the games in it ([StoreGame.gameId]). docs/SPEC.md 7g,
  * "Collections".
  */
-data class StoreCollection(val id: String, val name: String, val gameIds: Set<String>)
+data class StoreCollection(
+    val id: String,
+    val name: String,
+    val gameIds: Set<String>,
+    /** The store's own favourites (Steam's "favorite"): its games become droidtop favourites, not a collection (#756). */
+    val favourites: Boolean = false,
+)
 
 /** What a store answers about a newer build of one installed game. */
 data class StoreUpdateCheck(val update: StoreUpdate, val latest: String? = null)

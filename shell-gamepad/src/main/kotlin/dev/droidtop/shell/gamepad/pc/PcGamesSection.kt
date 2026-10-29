@@ -638,6 +638,14 @@ internal fun PcGamesSection(
         }
         state.itemIndex = state.itemIndex.coerceIn(0, last.coerceAtLeast(0))
     }
+    // A tab of an imported collection the store no longer has goes with it (Droidtop/tracker#756). Read from the
+    // membership as it is stored, never from the empty value shown before the first read.
+    LaunchedEffect(Unit) {
+        CollectionMembership.flow(context).collect { stored ->
+            val stale = staleImportedViewIds(savedViews.views.map { it.id }, stored.collections.mapTo(HashSet()) { it.id })
+            if (stale.isNotEmpty()) savedViews.replaceAll(savedViews.views.filterNot { it.id in stale })
+        }
+    }
     // The imported collections a store brought, and whether to make them tabs: asked once per store.
     var promptStore by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(membership) {
