@@ -67,9 +67,9 @@ class LocalPassTest {
     fun aPauseClosesThePassToo() = runTest {
         val engine = Engine(Transfer("active", 100, 10, 5, 0))
         val job = launch(start = CoroutineStart.UNDISPATCHED) {
-            EngineFetch.fetch(engine, request("http://192.168.1.20:8080/a.zip"), { }, size, passThrough, Dispatchers.Unconfined) {
+            EngineFetch.fetch(engine, request("http://192.168.1.20:8080/a.zip"), { }, size, passThrough, Dispatchers.Unconfined, lookup = {
                 listOf(InetAddress.getByName("192.168.1.20"))
-            }
+            })
         }
         advanceTimeBy(EngineFetch.POLL_MS * 2)
         runCurrent()
@@ -81,9 +81,9 @@ class LocalPassTest {
     @Test
     fun aPublicServerGetsNoPass() = runTest {
         val engine = Engine(Transfer("complete", 10, 10, 0, 0))
-        EngineFetch.fetch(engine, request("https://example.org/a.zip"), { }, size, passThrough, Dispatchers.Unconfined) {
+        EngineFetch.fetch(engine, request("https://example.org/a.zip"), { }, size, passThrough, Dispatchers.Unconfined, lookup = {
             listOf(InetAddress.getByName("93.184.216.34"))
-        }
+        })
         assertEquals(listOf("add https://example.org/a.zip"), engine.calls)
     }
 

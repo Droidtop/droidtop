@@ -78,10 +78,10 @@ class RedirectGuardTest {
     fun aServerThatRefusesHeadIsAskedWithAOneByteGet() {
         val net = Net()
         val answers = ArrayDeque(listOf(RedirectGuard.Answer(405, null), redirect("https://cdn.test/x")))
-        val resolved = RedirectGuard.resolve("https://a.test/f", identifying) { url, headers, method ->
+        val resolved = RedirectGuard.resolve("https://a.test/f", identifying, ask = { url, headers, method ->
             net.asked += Triple(url, headers, method)
             if (url == "https://a.test/f") answers.removeFirst() else RedirectGuard.Answer(200, null)
-        }
+        })
         assertEquals(listOf("HEAD", "GET", "HEAD"), net.asked.map { it.third })
         assertEquals("https://cdn.test/x", resolved.url)
     }
