@@ -425,13 +425,20 @@ internal fun rememberSavedViews(scopeId: String): SavedViews {
 /**
  * Remembers one view's query across visits: loaded from the list's prefs
  * once, then written back on every change, off the main thread.
- * [onLoaded] gets what was saved; [loaded] says it has.
+ * [onLoaded] gets what was saved, or [default] when nothing was; [loaded]
+ * says it has, and nothing is written before it.
  */
 @Composable
-internal fun PersistQuery(scopeId: String, query: LibraryQuery, loaded: Boolean, onLoaded: (LibraryQuery) -> Unit) {
+internal fun PersistQuery(
+    scopeId: String,
+    query: LibraryQuery,
+    loaded: Boolean,
+    default: LibraryQuery = LibraryQuery(),
+    onLoaded: (LibraryQuery) -> Unit,
+) {
     val context = LocalContext.current
     LaunchedEffect(scopeId) {
-        if (!loaded) onLoaded(withContext(Dispatchers.IO) { LibraryViewPrefs.activeQuery(context, scopeId) })
+        if (!loaded) onLoaded(withContext(Dispatchers.IO) { LibraryViewPrefs.activeQuery(context, scopeId, default) })
     }
     LaunchedEffect(query, loaded) {
         if (loaded) withContext(Dispatchers.IO) { LibraryViewPrefs.setActiveQuery(context, scopeId, query) }

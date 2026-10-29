@@ -84,7 +84,6 @@ import dev.droidtop.shell.gamepad.query.APPS_SCOPE_ID
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryFilterSheet
 import dev.droidtop.shell.gamepad.query.LibraryQuery
-import dev.droidtop.shell.gamepad.query.LibraryViewPrefs
 import dev.droidtop.shell.gamepad.query.retroQueryScope
 import dev.droidtop.shell.gamepad.query.LibrarySortSheet
 import dev.droidtop.shell.gamepad.query.PersistQuery
@@ -2678,8 +2677,8 @@ private fun GamesSection(
     // below, unlike allGames' own natural Library order.
     // The group's own filter and sort: the same query model, sheets and
     // remembered state every library list uses (docs/SPEC.md 7j). The
-    // stored view is read once per group (an in-memory preference read) and
-    // written back off the main thread.
+    // stored view is read once per group and written back, both off the
+    // main thread (PersistQuery).
     val retroScope = remember(selectedGroup?.label) { retroQueryScope(selectedGroup?.label.orEmpty()) }
     // Real ES-DE's Last Played collection opens in recency order, the one list where A to Z would defeat its
     // purpose; the person can still pick another sort and it is remembered like any list's.
@@ -2690,9 +2689,12 @@ private fun GamesSection(
             LibraryQuery()
         }
     }
-    var retroQuery by remember(retroScope.id) { mutableStateOf(LibraryViewPrefs.activeQuery(context, retroScope.id, retroDefault)) }
-    LaunchedEffect(retroQuery, retroScope.id) {
-        withContext(Dispatchers.IO) { LibraryViewPrefs.setActiveQuery(context, retroScope.id, retroQuery) }
+    // The default draws until the stored view, read off the main thread, lands.
+    var retroQuery by remember(retroScope.id) { mutableStateOf(retroDefault) }
+    var retroQueryLoaded by remember(retroScope.id) { mutableStateOf(false) }
+    PersistQuery(retroScope.id, retroQuery, retroQueryLoaded, default = retroDefault) {
+        retroQuery = it
+        retroQueryLoaded = true
     }
     val retroSaved = rememberSavedViews(retroScope.id)
     val retroBase = remember(entries, selectedGroup, collectionGroupMembers) {
