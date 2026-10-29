@@ -11,7 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-phrases='not built|not yet built|not yet (done|there|implemented|written|wired|shown|supported|available)|still open|is not implemented|are not implemented|never built|unbuilt|nothing builds|not built yet'
+phrases='not built|not yet built|not yet (done|there|implemented|written|wired|shown|supported|available)|still open\b(?!s)|is not implemented|are not implemented|never built|unbuilt|nothing builds|not built yet'
 
 count=false
 all=0
