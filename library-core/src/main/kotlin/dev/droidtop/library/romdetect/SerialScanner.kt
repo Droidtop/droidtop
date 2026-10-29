@@ -15,13 +15,10 @@ import kotlin.math.roundToInt
  * SegaCD/3DS (`.iso`/`.bin`/`.pbp`/`.3ds`) -- genuinely useful, self-
  * contained (only [SystemID]/[MagicNumber], no Lemuroid-app coupling).
  *
- * Real, honest gaps, not covered by this port (matches the direction this
- * was forked in under -- "it's a start, a framework," not a finished
- * detector): no Switch, no GameCube/Wii disc parsing, and [SystemID]'s own
- * id space doesn't line up 1:1 with [dev.droidtop.library.consoles.
- * ConsoleSystemDef.id] (ES-DE's real system ids) -- mapping between them,
- * and actually wiring this into [dev.droidtop.library.consoles.
- * ConsoleRomProvider]'s own scan, is real, separate follow-up work.
+ * [dev.droidtop.library.consoles.ConsoleRomProvider]'s scan reads it first
+ * for the disc formats it covers, and [toConsoleSystemId] maps its
+ * [SystemID] onto droidtop's system ids. It reads no Switch, GameCube or
+ * Wii disc.
  */
 object SerialScanner {
     private val READ_BUFFER_SIZE = 64.kiloBytes()

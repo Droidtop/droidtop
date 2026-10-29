@@ -106,12 +106,8 @@ interface GameSourceProvider {
  * [PluginSearchAggregator]/`GetMoreComposer` can hold a
  * `List<GameSourceProvider>` without knowing plugins exist.
  *
- * Built-in store adapters (Steam/GOG/Epic/Amazon/itch/DLsite, and later
- * official re-release markets) are the next implementations of this same
- * interface -- not built yet (SPEC 12a "Sources API", tracked as its own
- * follow-up on Droidtop/tracker), since a real store "does this exist,
- * where" lookup needs each store's own search/catalog API or scrape,
- * which is separate infrastructure from this interface itself.
+ * SPEC 12a "Sources API" has the built-in stores implement this interface
+ * too; none does yet, so a store's catalog is not part of this search.
  */
 class PluginGameSource(val source: AcquireContentSource.Plugin) : GameSourceProvider {
     override val id get() = source.id

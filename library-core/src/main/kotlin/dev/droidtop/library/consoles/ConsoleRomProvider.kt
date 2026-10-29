@@ -239,13 +239,9 @@ internal fun noEmulatorInstalledMessage(context: Context, system: ConsoleSystemD
  * since they identify different real systems than any ES-DE entry with a
  * similar name).
  *
- * Real, remaining, honest gap: several Daijishō platforms (RPG Maker,
- * Quake II engine, NEC PC-60, Elektor TV Games Computer, Sega Genesis
- * MSU, ...) have no ES-DE equivalent at all -- an alias can't fix that,
- * since there's no [ConsoleSystemDef] to alias TO. Adding real new
- * ConsoleSystemDef entries for those (extensions/display name sourced
- * from the same real Daijishō data) is separate, worthwhile follow-up
- * work, not attempted here.
+ * Several Daijishō platforms (RPG Maker, Quake II engine, NEC PC-60,
+ * Elektor TV Games Computer, Sega Genesis MSU, ...) have no ES-DE system,
+ * so there is no [ConsoleSystemDef] to alias them to and they get none.
  */
 private val SYSTEM_ID_ALIASES: Map<String, String> = mapOf(
     "ps1" to "psx",
@@ -709,12 +705,8 @@ class ConsoleRomProvider(
         // ROM database (libretro-db.sqlite, bundled
         // as droidtop's own asset -- a single fast indexed query, no file
         // content read at all), before falling back to trusting the
-        // folder. Full CRC32 hashing (Lemuroid's own strongest,
-        // first-priority signal) is real, deferred follow-up work --
-        // reading a multi-gigabyte disc image's entire content for a hash
-        // needs real performance tuning this pass didn't have room for;
-        // header-read serial detection and free filename lookup are the
-        // safe, cheap wins taken here.
+        // folder. Lemuroid's strongest signal, a whole-content CRC32, is
+        // Droidtop/tracker#780.
         //
         // Real bug this fixes, found via actual on-device testing: this
         // per-file cascade used to run as a sequential for-loop, meaning

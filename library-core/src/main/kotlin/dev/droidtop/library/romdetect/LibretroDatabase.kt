@@ -18,18 +18,12 @@ import androidx.room.RoomDatabase
  * `LibretroDBMetadataProvider`
  * for the real, prioritized cascade this was ported from: CRC32 -> embedded
  * serial -> filename -> path+filename -> unique-extension -> known-system
- * -> path+extension). Only the CRC32/serial/filename lookups are ported
- * here (see [ConsoleRomProvider]'s own real usage) -- full CRC32 hashing
- * (reading a ROM's entire content, not just its header) is real, deferred
- * follow-up work; a multi-gigabyte disc image would make that genuinely
- * slow without real performance tuning this pass didn't have room for.
- * Filename lookup needs no file read at all (a single indexed query
- * against [libretro-db.sqlite] -- the same real, ~13MB community database
- * Lemuroid itself ships, bundled here as droidtop's own asset) and
- * [SerialScanner]'s own embedded-
- * serial detection already reads the file's own real header for the
- * disc-based systems it covers -- both real, cheap signals, unlike a full
- * CRC32 pass.
+ * -> path+extension). The CRC32, serial and filename lookups are ported;
+ * [dev.droidtop.library.consoles.ConsoleRomProvider] uses the filename one
+ * (one indexed query against `libretro-db.sqlite`, the ~13MB community
+ * database Lemuroid ships, bundled as droidtop's asset), after
+ * [SerialScanner]'s header read. Matching by a ROM's whole-content CRC32
+ * is Droidtop/tracker#780.
  *
  * `system` values in this real database use [SystemID.dbname]'s own
  * convention (Lemuroid's real system id space, e.g. "nes"/"md"/"scd"),
