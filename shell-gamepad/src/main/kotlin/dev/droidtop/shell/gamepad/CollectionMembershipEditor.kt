@@ -3,7 +3,6 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,8 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.Library
@@ -161,23 +158,10 @@ internal fun CollectionMembershipEditor(entry: LibraryEntry, library: Library, o
 /** [isMember] null renders a plain action row (no on/off state) -- used for "+ New collection." */
 @Composable
 private fun CollectionToggleRow(label: String, isMember: Boolean?, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                if (press.action == GamepadAction.A) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .padRow(onClick = onClick)
-            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
+            .pressableRow(onClick = onClick)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {

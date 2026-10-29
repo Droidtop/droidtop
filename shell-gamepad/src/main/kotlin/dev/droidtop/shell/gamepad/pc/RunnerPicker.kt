@@ -1,11 +1,9 @@
 package dev.droidtop.shell.gamepad.pc
 
-import dev.droidtop.shell.gamepad.Corners
-import dev.droidtop.shell.gamepad.padRow
+import dev.droidtop.shell.gamepad.pressableRow
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.GameEngine
@@ -31,7 +28,6 @@ import dev.droidtop.library.RunnerState
 import dev.droidtop.library.displayName
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
-import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 
 /**
@@ -219,23 +215,10 @@ private fun RunnerRow(
     selected: Boolean,
     onSelect: () -> Unit,
 ) {
-    var focused by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                if (enabled && press.action == GamepadAction.A) {
-                    onSelect()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable(enabled = enabled)
-            .then(if (enabled) Modifier.padRow(onClick = onSelect) else Modifier)
-            .selectionFrame(focused, Corners.Crisp, rest = MenuTokens.CardInset)
+            .pressableRow(onClick = onSelect, rest = MenuTokens.CardInset, enabled = enabled)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {

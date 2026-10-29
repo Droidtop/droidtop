@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad.theme
 
+import dev.droidtop.shell.gamepad.pressableRow
 import dev.droidtop.shell.gamepad.padRow
 import dev.droidtop.shell.gamepad.R
 import androidx.compose.ui.res.stringResource
@@ -35,7 +36,6 @@ import androidx.compose.ui.draw.clip
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.layout.ContentScale
@@ -47,7 +47,6 @@ import dev.droidtop.library.theme.ThemeDownloader
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.ProgressLook
 import dev.droidtop.shell.gamepad.ShellLoading
-import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
@@ -325,25 +324,10 @@ private fun ThemeBrowserRow(
     modifier: Modifier,
     onDownload: () -> Unit,
 ) {
-    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = modifier
             .fillMaxWidth()
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                if (press.action == GamepadAction.A) {
-                    onDownload()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            // Same real touch-input fix used throughout this shell --
-            // .focusable() alone only covers D-pad/gamepad focus, never touch.
-            .padRow(onClick = onDownload)
-            .selectionFrame(focused, RoundedCornerShape(12.dp), rest = MenuTokens.Card)
+            .pressableRow(onClick = onDownload, shape = RoundedCornerShape(12.dp), rest = MenuTokens.Card)
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {

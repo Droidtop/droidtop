@@ -1,7 +1,6 @@
 package dev.droidtop.shell.gamepad
 
 import androidx.compose.ui.res.stringResource
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,8 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.droidtop.library.LibraryEntry
@@ -97,23 +94,10 @@ internal fun GameEmulatorPicker(
 
 @Composable
 private fun EmulatorRow(title: String, detail: String, onPick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                if (press.action == GamepadAction.A) {
-                    onPick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .padRow(onClick = onPick)
-            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
+            .pressableRow(onClick = onPick)
             .heightIn(min = 64.dp)
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),

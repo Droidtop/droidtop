@@ -3,7 +3,6 @@ package dev.droidtop.shell.gamepad
 import androidx.compose.ui.res.stringResource
 import dev.droidtop.shell.gamepad.input.onPad
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -295,22 +293,10 @@ private val LocalMetadataEditing = staticCompositionLocalOf { mutableStateOf(fal
 
 @Composable
 private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean) -> Unit) {
-    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .padRow { onToggle(!value) }
-            .onPad { press ->
-                if (press.action == GamepadAction.A) {
-                    onToggle(!value)
-                    true
-                } else {
-                    false
-                }
-            }
-            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
+            .pressableRow(onClick = { onToggle(!value) })
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -323,23 +309,10 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
 
 @Composable
 private fun MetadataPickerRow(label: String, currentValueLabel: String, onClick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                if (press.action == GamepadAction.A) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .padRow(onClick = onClick)
-            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
+            .pressableRow(onClick = onClick)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
@@ -385,26 +358,13 @@ private fun ControllerPicker(current: String?, onPick: (String?) -> Unit, onDism
 
 @Composable
 private fun ControllerRow(label: String, isCurrent: Boolean, onPick: () -> Unit) {
-    var focused by remember { mutableStateOf(false) }
     Text(
         label + if (isCurrent) " (current)" else "",
         color = MenuTokens.OnSurface,
         style = MaterialTheme.typography.titleMedium,
         modifier = Modifier
             .fillMaxWidth()
-            // Ahead of the focus targets, not after them: see [GameCard].
-            .onPad { press ->
-                if (press.action == GamepadAction.A) {
-                    onPick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .onFocusChanged { focused = it.isFocused }
-            .focusable()
-            .padRow(onClick = onPick)
-            .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
+            .pressableRow(onClick = onPick)
             .padding(12.dp),
     )
 }

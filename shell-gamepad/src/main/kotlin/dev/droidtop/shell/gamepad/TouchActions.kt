@@ -21,6 +21,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import dev.droidtop.shell.gamepad.input.onPad
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
@@ -219,6 +224,35 @@ internal fun Modifier.padRow(
         else -> Modifier.clickable(enabled = enabled, onClick = onClick)
     }
     return this.focusProperties { canFocus = false }.then(press)
+}
+
+/**
+ * The shell's one pressable list row (Droidtop/tracker#763): a focus target the pad's cursor lands on, framed while it
+ * is there ([selectionFrame] in [shape], [rest] when not), where A on the pad and a tap ([padRow]) both run [onClick].
+ * The pad handler sits ahead of the focus target, as [GameCard]'s does, so A reaches it. A row that is not [enabled]
+ * takes neither focus nor taps and is drawn by its caller as dimmed. The caller adds its own size and padding after.
+ */
+@Composable
+internal fun Modifier.pressableRow(
+    onClick: () -> Unit,
+    shape: androidx.compose.ui.graphics.Shape = Corners.Crisp,
+    rest: Color = Color.Transparent,
+    enabled: Boolean = true,
+): Modifier {
+    var focused by remember { androidx.compose.runtime.mutableStateOf(false) }
+    return this
+        .onPad { press ->
+            if (enabled && press.action == GamepadAction.A) {
+                onClick()
+                true
+            } else {
+                false
+            }
+        }
+        .onFocusChanged { focused = it.isFocused }
+        .focusable(enabled = enabled)
+        .then(if (enabled) Modifier.padRow(onClick = onClick) else Modifier)
+        .selectionFrame(focused, shape, rest = rest)
 }
 
 /** A touch pill's side padding inside its outline; the fit rule counts it. */
