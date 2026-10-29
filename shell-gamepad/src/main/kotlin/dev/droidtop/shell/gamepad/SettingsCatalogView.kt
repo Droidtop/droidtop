@@ -1261,7 +1261,8 @@ private fun SettingsCategoryColumn(
     ) {
         if (showSearch) {
             item(key = SEARCH_ROW_ID) {
-                CategoryEntry(label = "Search", icon = CatalogIcon.SEARCH, current = false, cursor = cursor == 0, onClick = onSearch)
+                // It searches settings only, so it says so: "Search" alone read as the global search (Droidtop/tracker#680).
+                CategoryEntry(label = "Search settings", icon = CatalogIcon.SEARCH, current = false, cursor = cursor == 0, onClick = onSearch)
             }
         }
         itemsIndexed(categories, key = { _, category -> category.key }) { index, category ->

@@ -17437,8 +17437,9 @@ Info sheet: Y on the row, or a long press, shows its name, value, full explanati
 status; the row itself keeps one line, so every row with a supporting line is the same height
 (UI pass 2026-09-24, M14). **Y in Settings stays Info (decided 2026-10-28, Droidtop/tracker#644 slice 4).** Proposal
 6.H had Y search settings; the owner, asked: "Whatever, so long as it's consistent". Y is the focused thing's detail
-on every other list (proposal 6.A), so in Settings Y opens the focused row's Info sheet, and Search stays the first
-entry of the category column. L1/R1 step the categories (`OwnShoulders` on the category view), stopping at the ends.
+on every other list (proposal 6.A), so in Settings Y opens the focused row's Info sheet, and "Search settings" stays
+the first entry of the category column (named for what it searches, not "Search", which read as the global search;
+Droidtop/tracker#680). L1/R1 step the categories (`OwnShoulders` on the category view), stopping at the ends.
 
 **The hint bar is console-sized, not phone-sized (owner direction 2026-09-25, on the RP5
 console: "the pills are also too big").** `TouchHintBar`/`TouchHint` (`:shell-gamepad`,
