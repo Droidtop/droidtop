@@ -171,7 +171,6 @@ private suspend fun classifyFolder(
 object AppSettingsCatalogs {
 
     const val SCREEN_CONSOLE_SYSTEMS = "console_systems"
-    const val SCREEN_ROM_FOLDERS = "rom_folders"
     const val SCREEN_SCRAPER = "rom_scraper"
     const val SCREEN_PLATFORMS = "manage_platforms"
     const val SCREEN_INTEGRATIONS = AcquireContentSources.INTEGRATIONS_SCREEN_ID
@@ -219,7 +218,8 @@ object AppSettingsCatalogs {
         SettingsScreenRegistry.register(consoleSystemsScreen())
         SettingsScreenRegistry.register(EmulatorsCatalog.screen())
         SettingsScreenRegistry.register(RiskyActionsCatalog.screen())
-        SettingsScreenRegistry.register(romFoldersScreen())
+        // The one game folders screen (Droidtop/tracker#589).
+        SettingsScreenRegistry.register(FoldersCatalog.screen())
         SettingsScreenRegistry.register(scraperScreen())
         SettingsScreenRegistry.register(platformsScreen())
         SettingsScreenRegistry.register(integrationsScreen())
@@ -2088,6 +2088,28 @@ object AppSettingsCatalogs {
             if (record.runnable()) {
                 dev.droidtop.pluginhost.PluginWebAccount.of(context, record)?.let { account -> add(pluginAccountRow(record, account)) }
             }
+            // A store the plugin provides (docs/plugin-api.md 3 A13): signed in with the account row above, read here.
+            if (record.runnable()) {
+                record.manifest.v2.provides.filter { it.point == dev.droidtop.library.integrations.PluginStores.POINT }.mapNotNull { it.id }
+                    .mapNotNull { dev.droidtop.library.stores.StoreLibraries.byId(it) }
+                    .filterIsInstance<dev.droidtop.library.integrations.PluginStoreLibrary>()
+                    .forEach { store ->
+                        add(
+                            AsyncActionItem(
+                                id = "plugin_${m.id}_store_${store.id}_sync",
+                                title = "${store.label}: read your games",
+                                subtitle = "Adds the games your ${store.label} account holds to your library. Sign in with the account row first",
+                                run = { ctx, _ ->
+                                    if (!withContext(Dispatchers.IO) { store.signedIn(ctx) }) {
+                                        "Sign in to ${store.label} first"
+                                    } else {
+                                        store.sync(ctx).fold({ "$it games from ${store.label}" }, { it.message ?: "${store.label} did not answer" })
+                                    }
+                                },
+                            ),
+                        )
+                    }
+            }
             if (record.runnable() && PluginCapability.APP_STATUS in m.capabilities) {
                 add(
                     NestedScreenItem(
@@ -2686,6 +2708,9 @@ object AppSettingsCatalogs {
     private fun pluginsChanged(context: Context) {
         PluginStatusWidgetProvider.requestUpdate(context)
         PluginBackground.changed(context)
+        // A store a plugin provides comes and goes with it (docs/plugin-api.md 3 A13).
+        val app = context.applicationContext
+        Thread { runCatching { dev.droidtop.library.integrations.PluginStores.refresh(app) } }.start()
     }
 
     private fun pluginPermissionGroups(context: Context, pluginId: String): List<CatalogGroup> {
@@ -2988,7 +3013,7 @@ object AppSettingsCatalogs {
     )
 
     // Buffers between the text fields and their actions, the same
-    // pending-buffer shape pendingRootPath uses below.
+    // pending-buffer shape the game folders screen uses for a typed path.
     private var pendingKeySourceUrl = ""
     private var pendingKeyManualOrigin = ""
     private var pendingKeyManualKey = ""
@@ -3321,88 +3346,6 @@ object AppSettingsCatalogs {
                 "trusting the origin first, then add the new key."
         is AddKeyOutcome.Refused -> "Refused: ${outcome.reason}"
     }
-
-    // ------------------------------------------------------------------
-    // ROM folders (games roots).
-    // ------------------------------------------------------------------
-
-    // Buffers the typed path between the field and the Add action, the
-    // same pending-buffer shape addCustomPlayerScreen uses.
-    private var pendingRootPath = ""
-
-    private fun romFoldersScreen() = CatalogScreen(
-        id = SCREEN_ROM_FOLDERS,
-        // One name for one concept: the Settings row that opens this
-        // screen already said "Game folders" and the screen itself said
-        // "ROM folders", one navigation step apart -- and the folders are
-        // not only ROMs: engine and Windows games are found in them too.
-        title = "Game folders",
-        subtitle = "Console games go in a folder named for their system (snes, psx) inside one of these; " +
-            "PC and engine games can be anywhere under them. Rescan the library after a change",
-        groups = { context ->
-            listOf(
-                // One list: the folders and, under them, the row that adds one, so a folder just added shows
-                // where it was added (#537). Every group is titled: an untitled one is named after the screen in
-                // the category column, which listed "Game folders" twice.
-                CatalogGroup(
-                    id = "rom_folders_list",
-                    title = "Game folders",
-                    items = GamesRootPrefs.gamesRootPaths(context).sorted().map { path ->
-                        ActionItem(
-                            id = "rom_folder_$path",
-                            title = FoldersCatalog.folderName(path),
-                            subtitle = "$path. Select twice to stop scanning this folder",
-                            confirmTitle = "Remove $path?",
-                            run = { ctx -> GamesRootPrefs.removeGamesRoot(ctx, path) },
-                        )
-                    } + FoldersCatalog.addFolderItem("rom_folders_pick"),
-                ),
-                CatalogGroup(
-                    id = "rom_folders_add_by_path",
-                    title = "Add a folder by path",
-                    items = listOf(
-                        TextInputItem(
-                            id = "rom_folders_path",
-                            title = "Folder path",
-                            subtitle = "The picker only offers what Android calls a storage volume. " +
-                                "An emulator's host share (BlueStacks' /mnt/windows/BstSharedFolder), " +
-                                "a mount a rooted device adds itself, or a USB drive under /mnt is none " +
-                                "of those, and is typed here instead",
-                            value = pendingRootPath,
-                            onChange = { _, value -> pendingRootPath = value },
-                        ),
-                        AsyncActionItem(
-                            id = "rom_folders_path_add",
-                            title = "Add this folder",
-                            subtitle = "Checked for real before it is stored: it must exist, be a folder, and be readable",
-                            run = { ctx, _ ->
-                                val typed = pendingRootPath
-                                val error = withContext(Dispatchers.IO) {
-                                    GamesRootPrefs.addGamesRootByPath(ctx, typed)
-                                }
-                                if (error == null) {
-                                    pendingRootPath = ""
-                                    "Added " + typed.trim()
-                                } else {
-                                    error
-                                }
-                            },
-                        ),
-                    ),
-                ),
-                CatalogGroup(
-                    id = "rom_folders_rescan",
-                    title = "Library",
-                    // The same action Gaming settings offers, not a second
-                    // one: this screen changes WHICH folders are scanned,
-                    // so it is where a user wants to act on that change.
-                    items = listOf(
-                        GamingSettingsCatalog.rescanLibraryItem(),
-                    ),
-                ),
-            )
-        },
-    )
 
     // ------------------------------------------------------------------
     // Scraper source + credentials.

@@ -37,6 +37,8 @@ object ExtensionPoints {
         ExtensionPoint("library.metadata","Game information", PointRisk.MEDIUM, lets = "Lets it supply descriptions and details for your games."),
         ExtensionPoint("library.artwork", "Artwork and media", PointRisk.MEDIUM, lets = "Lets it supply covers, screenshots and other media for your games."),
         ExtensionPoint("library.updates", "Update checks", PointRisk.MEDIUM, lets = "Lets it tell you when a game has a newer version."),
+        // docs/plugin-api.md 3 A13, Droidtop/tracker#220: a store droidtop shows beside its own; the account and the library are the plugin's.
+        ExtensionPoint("library.stores", "Stores", PointRisk.HIGH, lets = "Lets it add a store whose games you own to your library."),
         ExtensionPoint("saves.sync", "Save sync", PointRisk.HIGH, lets = "Lets it copy your game saves to and from another place."),
         // docs/plugin-api.md 3 A7a, Droidtop/tracker#546 design v3 section 8: an app's plugin says where its app keeps
         // saves, as roots, never files. Used only past the checks C10 and D12; droidtop writes nothing for them alone.

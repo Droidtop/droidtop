@@ -10,17 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,14 +25,13 @@ import dev.droidtop.library.CollectionMembership
 import dev.droidtop.library.CollectionScope
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PcSource
+import dev.droidtop.shell.gamepad.ActionRow
+import dev.droidtop.shell.gamepad.ActionSheet
 import dev.droidtop.shell.gamepad.LocalShellWindow
-import dev.droidtop.shell.gamepad.MenuPanel
-import dev.droidtop.shell.gamepad.MenuRow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.Space
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.input.GamepadAction
-import dev.droidtop.shell.gamepad.menuMove
 import dev.droidtop.shell.gamepad.query.LibraryFacet
 import dev.droidtop.shell.gamepad.query.LibraryQuery
 import dev.droidtop.shell.gamepad.query.LibraryQueryScope
@@ -251,15 +245,15 @@ internal fun CollectionTileMenu(
     onUnpinAllImported: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val rows = buildList<Pair<String, () -> Unit>> {
-        add((if (tile.pinned) "Unpin" else "Pin as a tab") to onTogglePin)
+    val rows = buildList {
+        add(ActionRow(if (tile.pinned) "Unpin" else "Pin as a tab", onSelect = onTogglePin))
         if (hasImported) {
-            add("Pin all imported" to onPinAllImported)
-            add("Unpin all imported" to onUnpinAllImported)
+            add(ActionRow("Pin all imported", onSelect = onPinAllImported))
+            add(ActionRow("Unpin all imported", onSelect = onUnpinAllImported))
         }
-        add("Close" to onDismiss)
+        add(ActionRow("Close", onSelect = onDismiss))
     }
-    ChoiceMenu(title = tile.name, rows = rows, onDismiss = onDismiss)
+    ActionSheet(title = tile.name, rows = rows, onDismiss = onDismiss)
 }
 
 /**
@@ -275,39 +269,13 @@ internal fun ImportedCollectionsPrompt(
     onAddAll: () -> Unit,
     onNotNow: () -> Unit,
 ) {
-    ChoiceMenu(
+    ActionSheet(
         title = "Add your $count $storeLabel collections as tabs after Updates?",
         rows = listOf(
-            "Choose in Collections" to onChoose,
-            "Add all $count" to onAddAll,
-            "Not now" to onNotNow,
+            ActionRow("Choose in Collections", onSelect = onChoose),
+            ActionRow("Add all $count", onSelect = onAddAll),
+            ActionRow("Not now", onSelect = onNotNow),
         ),
         onDismiss = onNotNow,
     )
-}
-
-/** A short panel of choices, the first focused: A chooses, B closes. */
-@Composable
-private fun ChoiceMenu(title: String, rows: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
-    var focusIndex by remember { mutableIntStateOf(0) }
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        MenuPanel(
-            modifier = Modifier.width(LocalShellWindow.current.panelWidth(480.dp)),
-            focusLabel = title,
-            title = title,
-            onPad = { press ->
-                when (press.action) {
-                    GamepadAction.UP, GamepadAction.DOWN -> focusIndex = menuMove(focusIndex, rows.size, press)
-                    GamepadAction.A -> rows.getOrNull(focusIndex)?.second?.invoke()
-                    GamepadAction.B, GamepadAction.SELECT -> onDismiss()
-                    else -> Unit
-                }
-                true
-            },
-        ) {
-            rows.forEachIndexed { index, (label, action) ->
-                MenuRow(title = label, selected = index == focusIndex, onClick = action)
-            }
-        }
-    }
 }

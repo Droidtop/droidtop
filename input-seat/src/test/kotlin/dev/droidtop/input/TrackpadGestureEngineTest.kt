@@ -20,6 +20,7 @@ class TrackpadGestureEngineTest {
         data class Move(val dx: Float, val dy: Float, val speed: Float) : Event
         data class Scroll(val dx: Float, val dy: Float) : Event
         data class Button(val code: Int, val pressed: Boolean) : Event
+        data class Swipe(val leftward: Boolean) : Event
     }
 
     private class Recorder : TrackpadOutput {
@@ -34,6 +35,10 @@ class TrackpadGestureEngineTest {
 
         override fun onButton(evdevButton: Int, pressed: Boolean) {
             events += Event.Button(evdevButton, pressed)
+        }
+
+        override fun onSwipe(leftward: Boolean) {
+            events += Event.Swipe(leftward)
         }
 
         val buttons: List<Event.Button> get() = events.filterIsInstance<Event.Button>()
@@ -142,6 +147,28 @@ class TrackpadGestureEngineTest {
             ),
             out.buttons,
         )
+    }
+
+    @Test
+    fun `three fingers swiped sideways are one swipe when they lift, and nothing else`() {
+        val out = Recorder()
+        val engine = TrackpadGestureEngine(out)
+        fun three(x: Float, y: Float) = listOf(touch(0, x, y), touch(1, x + 10f, y), touch(2, x + 20f, y))
+
+        engine.onFrame(three(40f, 10f), 0L)
+        engine.onFrame(three(30f, 11f), 30L)
+        engine.onFrame(three(15f, 12f), 60L)
+        assertTrue(out.events.isEmpty())
+        engine.onFrame(emptyList(), 300L)
+        assertEquals(listOf<Event>(Event.Swipe(leftward = true)), out.events)
+
+        // Too short, or more down than across: a three-finger touch that is not a swipe does nothing.
+        val still = Recorder()
+        val engine2 = TrackpadGestureEngine(still)
+        engine2.onFrame(three(40f, 10f), 0L)
+        engine2.onFrame(three(45f, 30f), 60L)
+        engine2.onFrame(emptyList(), 300L)
+        assertTrue(still.events.none { it is Event.Swipe })
     }
 
     @Test

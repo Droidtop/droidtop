@@ -122,6 +122,12 @@ sealed interface StoreSignIn {
      * screen to the store's connection and is never kept.
      */
     class Account(val session: StoreAccountSignIn) : StoreSignIn
+
+    /**
+     * A sign-in someone else draws (a plugin's store signs in with the plugin's own site account, docs/plugin-api.md
+     * 3 A13): [run] shows it and answers whether the person is signed in; nothing is pasted or read here.
+     */
+    class Delegated(val run: suspend (Context) -> Boolean) : StoreSignIn
 }
 
 /** Which of the [StoreSignIn] forms a store uses, known without starting a sign-in. */
@@ -482,6 +488,12 @@ object StoreLibraries {
     @Synchronized
     fun register(store: StoreLibrary) {
         stores = stores.filterNot { it.id == store.id } + store
+    }
+
+    /** Removes the store [id] (a plugin's store whose plugin is gone or stopped). */
+    @Synchronized
+    fun unregister(id: String) {
+        stores = stores.filterNot { it.id == id }
     }
 
     fun all(): List<StoreLibrary> = stores

@@ -52,6 +52,8 @@ object StoreAutoSync {
         val interval = interval(app)
         if (interval == Interval.OFF || !unmetered(app)) return
         var changed = false
+        // A plugin's stores are read again first, so one installed since droidtop started is synced too (A13).
+        runCatching { dev.droidtop.library.integrations.PluginStores.refresh(context) }
         for (store in StoreLibraries.all()) {
             val now = System.currentTimeMillis()
             if (!runCatching { store.signedIn(app) }.getOrDefault(false)) continue

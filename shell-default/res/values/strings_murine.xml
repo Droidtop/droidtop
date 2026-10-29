@@ -53,6 +53,10 @@
     <string name="label_visibility_drawer_only">Drawer only</string>
     <string name="label_visibility_home_only">Home only</string>
     <string name="label_visibility_auto">Auto</string>
+    <string name="pref_label_color_title">Label colour on Home</string>
+    <string name="label_color_auto">From the wallpaper</string>
+    <string name="label_color_white">White</string>
+    <string name="label_color_black">Black</string>
     <string name="pref_adaptive_icons_title">Adaptive icons</string>
     <string name="pref_adaptive_icons_summary">Reshape icons that are not adaptive</string>
     <string name="pref_adaptive_icons_except_system">Except system apps</string>

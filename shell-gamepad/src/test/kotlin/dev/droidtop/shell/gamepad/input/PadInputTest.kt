@@ -168,4 +168,12 @@ class PadInputTest {
         assertEquals(3, menuStep(2, 5, +1))
         assertEquals(0, menuStep(3, 0, +1))
     }
+
+    @Test
+    fun `a pad with no triggers names the holds that stand in for L2 and R2`() {
+        assertEquals("L2", GamepadKeyMap.triggerLabel(GamepadAction.L2, triggerless = false))
+        assertEquals("R2", GamepadKeyMap.triggerLabel(GamepadAction.R2, triggerless = false))
+        assertEquals("Hold Start", GamepadKeyMap.triggerLabel(GamepadAction.L2, triggerless = true))
+        assertEquals("Hold Select", GamepadKeyMap.triggerLabel(GamepadAction.R2, triggerless = true))
+    }
 }

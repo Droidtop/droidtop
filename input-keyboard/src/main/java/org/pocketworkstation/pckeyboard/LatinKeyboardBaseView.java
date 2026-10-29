@@ -869,6 +869,38 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
             onBufferDraw(canvas);
         }
         if (mBuffer != null) canvas.drawBitmap(mBuffer, 0, 0, null);
+        // droidtop: the pad's focus ring (Droidtop/tracker#338), over the keys, only while a pad drives.
+        if (mPadFocus != null) {
+            Key k = mPadFocus;
+            float inset = mPadRingPaint.getStrokeWidth() / 2f;
+            float left = k.x + getPaddingLeft() + inset;
+            float top = k.y + getPaddingTop() + inset;
+            float radius = 6f * getResources().getDisplayMetrics().density;
+            canvas.drawRoundRect(left, top, left + k.width - 2 * inset, top + k.height - 2 * inset, radius, radius, mPadRingPaint);
+        }
+    }
+
+    // droidtop: the key the pad's focus ring is on, or null (Droidtop/tracker#338, PadKeys).
+    private Key mPadFocus;
+    private final Paint mPadRingPaint = padRingPaint(getResources().getDisplayMetrics().density);
+
+    private static Paint padRingPaint(float density) {
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(3f * density);
+        // droidtop's focus accent, the azure fallback (docs/SPEC.md "Product rules", ES-DE accent).
+        paint.setColor(0xFF3BB5FF);
+        return paint;
+    }
+
+    public void setPadFocus(Key key) {
+        if (mPadFocus == key) return;
+        mPadFocus = key;
+        invalidate();
+    }
+
+    public Key getPadFocus() {
+        return mPadFocus;
     }
     
     private void drawDeadKeyLabel(Canvas canvas, String hint, int x, float baseline, Paint paint) {
@@ -1598,6 +1630,8 @@ public class LatinKeyboardBaseView extends View implements PointerTracker.UIProx
 
     @Override
     public boolean onTouchEvent(MotionEvent me) {
+        // droidtop: a finger on the keys ends the pad's ring (Droidtop/tracker#338).
+        if (mPadFocus != null && me.getActionMasked() == MotionEvent.ACTION_DOWN) setPadFocus(null);
         return onTouchEvent(me, false);
     }
 

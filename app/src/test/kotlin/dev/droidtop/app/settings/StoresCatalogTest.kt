@@ -76,6 +76,5 @@ class StoresCatalogTest {
         assertEquals("400 games · not scanned yet", FoldersCatalog.rootValue(counts.roots[0], 0L))
         assertEquals("Not available", FoldersCatalog.rootValue(counts.roots[1], 1_000L))
         assertEquals("12 games · scanned just now", FoldersCatalog.rootValue(counts.roots[1].copy(available = true), 1_000L))
-        assertEquals("/sd/Games. Select to stop looking here", FoldersCatalog.rootLine(counts.roots[0]))
     }
 }

@@ -328,6 +328,8 @@ constructor(@ApplicationContext private val encryptedContext: Context) {
         @JvmField
         val LABEL_VISIBILITY = backedUpItem(SettingsIconsFragment.LABEL_VISIBILITY_KEY, LabelVisibility.AUTO)
         @JvmField
+        val LABEL_COLOR = backedUpItem(SettingsIconsFragment.LABEL_COLOR_KEY, app.murinelauncher.settings.prefs.LabelColor.AUTO)
+        @JvmField
         val ADAPTIVE_ICONS = backedUpItem(SettingsIconsFragment.ADAPTIVE_ICONS_KEY, AdaptiveIcons.ALWAYS)
 
         @JvmField

@@ -93,6 +93,20 @@ class DesktopWindows(
         bridge.activateToplevel(toplevel.id)
     }
 
+    /**
+     * Switches to the next or previous workspace on the focused output (sway's `workspace next_on_output`), for the
+     * trackpad's three-finger swipe (Droidtop/tracker#426). False under labwc, which takes no command from outside,
+     * or when sway could not be asked.
+     */
+    suspend fun switchWorkspace(next: Boolean): Boolean {
+        if (!sway) return false
+        return withContext(Dispatchers.IO) {
+            runCatching { ipc()?.run(if (next) "workspace next_on_output" else "workspace prev_on_output") == true }
+                .onFailure { Log.w(TAG, "sway workspace switch failed", it) }
+                .getOrDefault(false)
+        }
+    }
+
     private fun ipc(): SwayIpc? = ContainerLayout.findSwayIpcSocket(hostSocketDir)?.let { SwayIpc(it.absolutePath) }
 
     /** [toplevel]'s container in sway's tree: the one match, or, among several alike, the focused one after raising it. */

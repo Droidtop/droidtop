@@ -5,6 +5,7 @@ import app.murinelauncher.graphics.IconShapeDrawables
 import app.murinelauncher.settings.common.AbstractSettingsFragment
 import app.murinelauncher.settings.prefs.AdaptiveIcons
 import app.murinelauncher.util.isResourceHackSupported
+import app.murinelauncher.settings.prefs.LabelColor
 import app.murinelauncher.settings.prefs.LabelVisibility
 import app.murinelauncher.widget.radio.RadioGroupPreference
 import com.android.launcher3.BuildConfig
@@ -25,6 +26,7 @@ public final class SettingsIconsFragment: AbstractSettingsFragment() {
         const val ICON_SHAPE_KEY: String = "pref_icon_shape"
         const val NOTIFICATION_BADGE_COUNT_KEY: String = "pref_notification_badge_count"
         const val LABEL_VISIBILITY_KEY: String = "pref_label_visibility_mode"
+        const val LABEL_COLOR_KEY: String = "pref_label_color"
         const val ADAPTIVE_ICONS_KEY: String = "pref_adaptive_icons"
     }
 
@@ -49,6 +51,14 @@ public final class SettingsIconsFragment: AbstractSettingsFragment() {
                 preference.asEnum(LabelVisibility::class.java).apply {
                     setDefaultValue(LauncherPrefs.LABEL_VISIBILITY.defaultValue)
                     setTextProvider { ctx, mode -> ctx.getString(mode.title) }
+                }
+                return true
+            }
+            LABEL_COLOR_KEY -> {
+                preference as RadioGroupPreference
+                preference.asEnum(LabelColor::class.java).apply {
+                    setDefaultValue(LauncherPrefs.LABEL_COLOR.defaultValue)
+                    setTextProvider { ctx, color -> ctx.getString(color.title) }
                 }
                 return true
             }

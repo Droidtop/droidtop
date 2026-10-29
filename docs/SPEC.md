@@ -1195,6 +1195,7 @@ sources rather than assumed from Nova/Apex's feature lists:
 | Drawer tabs: groups the person names, as a row of chips at the top of the drawer ("All" first) that stays with the header as the list scrolls (built 2026-10-16, Droidtop/tracker#564) | HAVE | `DrawerTabs` (one JSON string in the launcher's preferences, beside the hidden apps, read once and held in memory), `DrawerTabsRow` (a `FloatingHeaderRow` in `floating_header_content.xml`, above the personal and work tabs), and the filter in `AlphabeticalAppsList.onAppsUpdated`. An app's long-press menu in the drawer has "Drawer tabs": a tick per tab, and New tab, which makes one holding that app. A long press on a tab's chip renames, moves or deletes it. The row shows only once a tab exists. A tab hides the Recent row and the private space; search still covers every app. The chosen tab is not saved, so the drawer opens on All after a restart. An app can be in several tabs, and an uninstalled app drops out on its own |
 | Drawer folders: a drawer tab marked "Show as a folder in All" (the tab chip's long-press menu) is one folder in All, its apps leaving the list; it opens the same folder view as the home screen (built 2026-10-16, Droidtop/tracker#564) | HAVE | One model: the tab (`DrawerTabs.Tab.folder`). Coordinator, 2026-10-16: "Drawer folders: keep one data model... tapping the tile opens the same popup folder view the home screen uses (reuse that view, not a copy)". `AlphabeticalAppsList.onAppsUpdated` makes a `FolderInfo` per such tab on the personal list in All (two apps or more; a folder of one is just the app), in no database, and `BaseAllAppsAdapter.VIEW_TYPE_DRAWER_FOLDERS` is one row of them above the Recent row, each from `FolderIcon.inflateDrawerFolder`. That folder is read only (`Folder.setDrawerFolder`, `LauncherDelegate.DrawerFolderDelegate`): it opens and starts apps as any folder does, but nothing in it is dragged, renamed, saved or turned back into an icon. Its apps change from the tab ("Drawer tabs" in an app's menu, or the tab itself) |
 | Home screen lock (no moving, adding or removing icons and widgets), labels hidden everywhere or shown on Home only, drawer side padding (Murine upstream's, taken 2026-10-16, Droidtop/tracker#564) | HAVE | `LauncherPrefs.LOCK_HOME_SCREEN` (`Launcher.isDraggingEnabled`), `LabelVisibility.NEVER_FULL`/`NEVER_DRAWER`, `LauncherPrefs.DRAWER_PADDING`; shell-default/UPSTREAM.md lists the commits. "Home only" shows labels on the home screen as Always does: it used to mean Auto there, which drops labels where the layout is short of room, so on a landscape handheld it showed none (rig, 2026-10-16; Always worked). The rule is `LauncherLabels` in `:runtime-common`, used by `DeviceProfile` and tested there |
+| Label colour on Home: from the wallpaper (the theme's own), White or Black (Nova's label colour, built 2026-10-28, Droidtop/tracker#564) | HAVE | `LabelColor`, `LauncherPrefs.LABEL_COLOR`, Settings > Icons beside Labels visibility. Home-screen icons and folder names take it (`BubbleTextView` with the workspace display, applied after the style's colour); the drawer, the dock's hidden labels and folders' insides keep the theme's. A change lays the home screen out again, as a label size change does (`InvariantDeviceProfile`) |
 | Folder covers, per folder: swipe to open (a tap starts the folder's first app, a swipe up on the icon opens the folder) and a cover (the folder shows its first app's icon in place of its preview) (built 2026-10-16, Droidtop/tracker#564) | HAVE | The open folder's footer has a Folder options button (`Folder.showOptions`), two ticks saved with the folder as `FolderInfo.FLAG_SWIPE_TO_OPEN` and `FLAG_COVER` in its `options` column, read only while the home screen is locked. The first app is the lowest rank (`FolderInfo.firstApp`), so reordering the folder changes it. The tap goes through `ItemClickHandler.onClickAppShortcut`, the same path as an icon's tap. The swipe is `FolderIcon.handleSwipeToOpen`: claimed from the workspace at half a touch slop when it goes more up than sideways (before the drawer's own swipe up takes it at one), so a page swipe that starts on the folder still pages. The cover is drawn in `FolderIcon.drawCover` from the app's in-memory icon, with the notification dot kept. A folder's own picture, drawn in place of both the preview and a cover, is one of the per-icon options below (built 2026-10-16) |
 | Widget stacks: several widgets in one place on the home screen; a vertical swipe on it shows the next, and dots down its edge show which (built 2026-10-16, Droidtop/tracker#564) | HAVE | The shown widget is the model's item; the others are bound to the launcher's widget host and listed in a side table (`WidgetStackTable` in `:runtime-common`, pure and unit-tested; `WidgetStacks` keeps it in the launcher's preferences). A swipe swaps the item's widget id and provider for the next member's and binds it again (`WidgetStacks.swipe`, from `LauncherAppWidgetHostView`). It is claimed from the workspace at half a touch slop when vertical, and not taken while what is under the finger can still scroll that way, so a list widget scrolls first. Adding: the widget's resize frame (after a long press) has a "Stack a widget here" button. `WidgetStackActivity` lists the device's widgets, gives the chosen one an id on the launcher's host, binds it (asking when the system wants that), runs its setup, and shows it in the stack. The one model change is the ghost-widget cleanup sparing live stacks' hidden widgets (shell-default/UPSTREAM.md, "Deliberate local changes"; coordinator, 2026-10-16: "Widget stacks: go with your design... Keep the Launcher3 change to that single removeGhostWidgets hook"), because the loader keeps only widgets on the grid that overlap nothing. Removing the shown widget removes the stack, and its other widgets are freed at the next load. Taking one widget out of a stack is not built. Every member, hidden ones included, is given the place's size as its widget options whenever the stack is made, a member is shown, or the stacked widget's view comes on screen (`WidgetStacks.sizeMembers`, by widget id, off the main thread): members are bound without size options, and a provider that lays out from them (the system Digital clock) otherwise drew for 0x0 (rig on 0.2.0-dev.2070) |
 | Per-icon options on the home screen, in the dock and in folders: a title of the icon's own, a picture in place of its icon, and what a swipe up or down on it does (an action of Standard's or an app); a folder's own picture in place of its preview (built 2026-10-16 for the Nova and Apex import, Droidtop/tracker#564: both launchers have them) | HAVE | An app icon's long-press menu has Customize (not while the home screen is locked): Title, Choose a picture / Remove the picture, Swipe up, Swipe down. A folder's options (its footer button) have Choose a picture / Remove the picture. All are kept per item id by `HomeItemExtras` (`dev.droidtop.shell.standard`): the title as Launcher3's own per-item label (`IconPreferences`' instance labels, which the loader had applied to pinned shortcuts only), the picture as a PNG in the app's files (`home_item_pictures/<id>.png`, fitted into a square of at most 384 pixels, read into memory as the workspace loads so no view reads a file), the swipes as `HomeAction`s in one JSON object in the launcher's preferences (`home_item_swipes`). They are drawn when a view applies its item (`BubbleTextView.applyLabel` and its icon, the folder preview, `FolderIcon`'s cover), so an icon refresh keeps them, and forgotten when the item is deleted (`ModelWriter`). A title equal to the app's own clears it; a picture is never themed. The picture is picked with the system's file picker (`ItemPictureActivity`, `ACTION_OPEN_DOCUMENT`, images only, at most 16 MB read). An icon's swipe is claimed from the workspace as a folder's swipe to open is, one shared rule (`IconSwipe`: half a touch slop to claim, more vertical than sideways, one slop to fire), and only in a direction the icon has an action for, so the workspace's own swipe up (the drawer) and swipe down (its gesture) still work from an icon with nothing set. Per-app titles from the drawer (App info's rename) stay as they were, for every icon of that app. Standard's own backup (Settings > Backup) carries the pictures, one flat entry each (`home_item_picture_<id>.png`), and a restore replaces them; titles and swipes are in the preferences it already carries |
@@ -2123,7 +2124,14 @@ error: ptrace(TRACEME): Operation not permitted"), while the identical
 x86_64 proot runs as the shell user there (dq-desktop-05: SELinux disabled,
 no Yama, the app untraced and without seccomp). That is BlueStacks' kernel,
 and proot has no way around it; the proot check reports it and Desktop mode
-is unavailable there. Container work is verified on the stock-Android
+is unavailable there without root. The BlueStacks rig on Android 13 x86_64
+refuses it the same way (Droidtop/tracker#555). The root backend
+(droidspaces, namespaces and cgroups) traces nothing, and
+`ContainerRuntimeFactory` picks it whenever Shizuku or Sui runs as root, so
+such a device runs Desktop with root only: onboarding's check and the
+session's failure say so ("Desktop can't run here without root ... With
+Shizuku started as root, it can.", `desktopCheckMessage`) instead of a bare
+"can't run on this device". Container work is verified on the stock-Android
 emulator (API 34), which, like the user's Android 13 console, also applies
 the exec restrictions on app-private files.
 
@@ -4454,7 +4462,12 @@ droidtop 0.2.0-dev.1931).
   `TrackpadSettings`) are libinput's options with libinput's defaults: pointer speed, tap to click, tap time, hold
   to drag (the tap-and-drag window), two-finger scroll, two-finger tap right-click, long press right-click (one finger
   held still for 600 ms, a touch screen's own gesture, on by default), three-finger tap middle-click, natural scrolling
-  on; scroll momentum and drag lock off.
+  on; scroll momentum and drag lock off. **Three fingers swiped sideways switch the desktop's workspace**
+  (Droidtop/tracker#426): at least 15 mm across and at most half as much down, told once as the fingers lift
+  (`TrackpadOutput.onSwipe`), the content following the fingers (a swipe to the left brings the next workspace). In
+  Desktop under sway it is `workspace next_on_output` / `prev_on_output` over sway's IPC (`DesktopWindows.switchWorkspace`);
+  labwc takes no command from outside, and outside Desktop there is nothing to switch, so there it does nothing. The
+  render resolution beside the scale (Full, 75%, 50%) is `DesktopScale`'s, decided 2026-10-14 on the same issue.
   **The trackpad is a pointer on the main screen (Droidtop/tracker#486 item 3).** Outside Desktop it drives the target
   screen (above), by `TrackpadRoute` chosen as each gesture starts and kept until its left button is let go: while
   droidtop's shell is what that screen shows it moves the shell's selection (focus steps, confirm, back:
@@ -7335,6 +7348,8 @@ compositor only ever sees one logical pointer and keyboard.
 
 **The keyboard follows Light or dark (Droidtop/tracker#562, with #337's "droidtop theme").** #562: "A default keyboard theme that follows droidtop's Light or dark: Material light or Material dark, re-chosen when the setting changes. The person's explicit theme choice still wins." The theme list gains "Follow light or dark" (id 8, after every existing id, as `strings.xml` asks), now the default for anyone who never chose a theme; a stored choice, the old default "0" included, is kept as it is. It draws Material light or Material dark by `KeyboardAppearance`: droidtop's `DroidtopApplication` sets the host answer to its Appearance setting (7k, `AppearancePrefs.light`); the standalone app has no host and follows the system's night mode. `KeyboardSwitcher` keeps the stored choice apart from the theme drawn and re-checks as each editor starts (`refreshAppearance` in `onStartInputView`), so a change made while the keyboard was away shows on its next use. The tools strip, clipboard and macro panels, emoji browser and search, and the inline autofill chips take one palette (`KeyboardAppearance.palette`): light beside the light keyboard, dark beside every other theme, in place of their own dark literals.
 
+**A pad on the keyboard (Droidtop/tracker#338).** #338: "D-pad moves a focus ring over keys, A presses"; the slab (4c) had since given a pad its typing buttons, so the input method's own keyboard takes the same ones, one pad vocabulary for typing: while it shows, Android hands key events to the input method first, and `PadKeys` takes a pad's (source gamepad or joystick, or a gamepad button): the D-pad moves a focus ring over the keys (`KeyFocus`, pure: rows share a top edge, Left and Right wrap, Up and Down go to the nearest key across and stop at the top and bottom rows), A presses the key under it as a tap would, X is Backspace (held, it repeats), Y Space, L1 Shift, R1 the symbols, R2 or Start Enter, and B closes the keyboard; the face buttons go through `FaceKeys`, so a Nintendo-layout swap holds. The first A or D-pad press shows the ring in the middle of the keyboard; it is drawn only while the pad drives (DESIGN-LANGUAGE) and a touch removes it. The ring's place is a point, not a key, so it survives a layer switch by landing on the nearest key. A physical keyboard is not taken (lane default, 2026-10-28): it types, and its arrows move the app's caret, as before; its Ctrl, Alt and Fn keys already reach the app. The companion's and the second screen's keyboards are the slab, which a pad already drives.
+
 droidtop ships **Hacker's Keyboard** — `:input-keyboard`, forked from
 klausw/hackerskeyboard (`org.pocketworkstation.pckeyboard`). Its main
 class is named `LatinIME` because Hacker's Keyboard is itself an AOSP
@@ -7961,6 +7976,9 @@ leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
   sees half a hold. A tap of Start therefore opens the left menu on release, as Select's tap already acted. Start here
   is the pad's Start or Menu button (`BUTTON_START`), never the Xbox, PlayStation or Steam button (`BUTTON_MODE`),
   which Gaming does not use.
+  The hints say so only where it matters (M9, approved 2026-10-23): on a pad with no L2 and R2 at all, as keys or as
+  trigger axes (`ControllerLayouts.triggerless`), the R2 pill reads "Hold Select" and the L2 pill "Hold Start"
+  (`GamepadKeyMap.triggerLabel`); every other pad keeps "R2" and "L2". The holds work on every pad either way.
 - Desktop mode hands the pad to the container (§6b), so the activity's
   gate steps aside there. Every D-pad edge is logged under
   `droidtop.input` with what became of it, for console runs read back
@@ -11766,6 +11784,22 @@ one page per store in **Stores** (`stores`, reached from the Gaming left
 menu, "Places" under 7j), and Accounts and sources links to it with one row
 instead of five sign-in rows.
 
+**A plugin's store (2026-10-28, Droidtop/tracker#220, docs/plugin-api.md 3
+A13).** A plugin that provides `library.stores` adds a store beside
+droidtop's own: a `StoreLibrary` (`PluginStoreLibrary`) registered at
+start, after a change to the plugins and before each automatic sync, so
+its games join the PC library and the automatic sync like a built-in
+store's. Its account is the plugin's own site account (droidtop's web
+view, no password seen), and its rows are droidtop's copy of the
+plugin's last `library` answer. Its plugin's page has "<store>: read your
+games". Install asks the plugin where the game's files are (`install`,
+answered as a source's acquire is) and droidtop fetches them with
+Downloads into a new folder for the game under the store's folder, as a
+built-in store's install goes (7g, "Where a store installs"); the
+plugin never names a path. Uninstall deletes only the folder droidtop
+made. Not built yet: updating from it, launching through it, and its
+page in Stores, which lists droidtop's five.
+
 ### One consistent way into Settings (directed 2026-09-28)
 
 **Audit.** Before this pass droidtop already had one real, working route
@@ -13060,12 +13094,16 @@ action Gaming settings does — the same item, by id, so the in-shell
 renderer's real in-place rescan serves both rather than one screen getting
 a second, weaker mechanism.
 
-**The Game folders page is one list (Droidtop/tracker#537).** Group "Game folders" holds the folders, each named by
-its last segment with the path as its hint, and the "Add a folder" row under them (the one `FoldersCatalog
-.addFolderItem`, shared with Game sources > Folders); after the picker the row says "Added <name>" and the folder
-appears in the list above it. Then "Add a folder by path" and "Library" (rescan, rebuild). Every group is titled, and
-the category column joins untitled groups, so no name repeats. Drawn in place of an empty library's Games tab, the
-footer says A Select and B Back, not the tab's Options.
+**One Game folders screen (Droidtop/tracker#589, replacing #537's page).** Settings > Library > Game folders and Game
+sources > Folders were two screens over the same `GamesRootPrefs` list, each with its own Add and rescan, and on both a
+folder row removed the folder on A, with nothing on the row saying so. Now there is one, `FoldersCatalog.screen()`,
+registered as `rom_folders` and opened by every way in (Settings, Game sources, Downloads and Updates' Sources, an
+empty library, the Launcher's grid). Each folder is a row named by its last segment, its games and last scan in the
+value column ("170 games · scanned 5 min ago", or "Not available"); A opens the folder's own page: what was found,
+Rescan PC game folders, and **Remove this folder** as a named row behind a question ("Stop looking in <path>?"; its
+games leave the library, adding it back restores them, nothing on the device is deleted). Under the folders: Add a
+folder (the picker, then "Added <name>"), Rescan library, Rescan PC game folders and the Wine shortcuts, then "Add a
+folder by path". Drawn in place of an empty library's Games tab, the footer says A Select and B Back.
 
 ### Launch resolution: keep the default, expose it
 
@@ -23865,6 +23903,14 @@ listed only when it has a row that can be pressed and saying its first rows ("Sc
   properties, the Lutris import; Enginehost's settings).
 - **Controls and saves:** Controls, Saves, Sync cloud saves.
 - **Manage:** Run a program in a Wine prefix, Prefix tools, and Linux tools for a game with a Linux build.
+
+**The one sheet of choices (Droidtop/tracker#610, "a shared ActionSheet and row model").** A thing's short menu in
+Gaming is `ActionSheet` over `ActionRow` (a title, a line under it, the danger look, what A does): the app menu
+(`AppOptionsMenu`), a collection tile's menu and the imported-collections prompt are built on it, and their own row
+types and panels are gone. Up and Down move, A chooses, B, Select or L2 closes, and the sheet holds the pad. A row
+that has a choice of its own opens a page or a task, never a second sheet. The game menu's categories, the Quick
+Menu and the other shells' menus move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left
+(`raw-dialog`, off until its last site is moved).
 
 **Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's
 translation updater under Wine while Enginehost plays the game: "We can set the game type. We can probably also do a
