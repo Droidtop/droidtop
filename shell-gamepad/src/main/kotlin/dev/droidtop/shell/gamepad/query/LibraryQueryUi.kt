@@ -68,6 +68,9 @@ import dev.droidtop.library.integrations.SourceDestinations
 import dev.droidtop.library.integrations.SourceHit
 import dev.droidtop.library.integrations.UnavailableSource
 import dev.droidtop.library.integrations.UnifiedSearch
+import dev.droidtop.library.integrations.SourceFix
+import dev.droidtop.library.settings.StatusMark
+import dev.droidtop.library.settings.Notices
 import dev.droidtop.library.integrations.UnifiedState
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.SettingsScreenRegistry
@@ -555,6 +558,9 @@ internal fun LibrarySearchDialog(
     var searchTick by remember { mutableIntStateOf(0) }
     // What a failed source reported in its own words, shown on request under its plain sentence (Droidtop/tracker#167), by source id.
     var technicalDetails by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    // Whether the folded "N sources need attention" row was opened; a new search folds them again.
+    var failuresOpen by remember(text) { mutableStateOf(false) }
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
     // The row under the pad's cursor, by key so a source answering above it does not move it; null is the field.
     var focusKey by remember { mutableStateOf<String?>(null) }
     val currentLocal by rememberUpdatedState(local)
@@ -755,68 +761,87 @@ internal fun LibrarySearchDialog(
                         add(SearchLine.Entry("filters:${status.source.id}", "${status.source.label}: search options", subtitle = "Searches again after") { activeCatalog = options })
                     }
                 }
-                state.sources.filter { it.failure != null }.forEach { status ->
+                // A failed source is one compact row below the results (docs/SPEC.md 12a, "One search", Droidtop/tracker#746):
+                // its icon, the attention glyph and its short reason, and A runs the one fix (SourceFix). Several fold into
+                // one row until it is opened. Technical details stay one press away, and a second press copies them.
+                val failed = state.sources.filter { it.failure != null }
+                if (failed.size > 1 && !failuresOpen) {
+                    add(
+                        SearchLine.Entry(
+                            "failures",
+                            SourceFix.foldedTitle(failed.size),
+                            subtitle = failed.joinToString(", ") { it.source.label },
+                            mark = StatusMark.ATTENTION,
+                        ) { failuresOpen = true },
+                    )
+                }
+                if (failed.size == 1 || failuresOpen) failed.forEach { status ->
                     val source = status.source
-                    add(SearchLine.Note("${source.label}: ${status.failure}"))
-                    // A source that needs the person in its site: droidtop's own Sign in / Open the site, then search again.
                     val record = (source as? PluginGameSource)?.source?.record
                     val access = status.access
-                    if (record != null && access != null && PluginWebAccount.checkUrl(record) != null) {
-                        add(
-                            SearchLine.Entry(
-                                "access:${source.id}",
-                                if (access == PluginWebAccount.Need.SIGN_IN) "Sign in" else "Open the site",
-                                subtitle = "${source.label}. Searches again after",
-                            ) {
-                                coroutineScope.launch {
-                                    val kept = withContext(Dispatchers.IO) { PluginWebAccount.open(context, record, access) }
-                                    if (kept && access == PluginWebAccount.Need.SIGN_IN) dev.droidtop.library.integrations.notifyWebSignedIn(context, record)
-                                    if (kept) searchTick++ else statusLine = PluginWebAccount.notKept(record.manifest.label, access)
+                    val runtime = status.runtimeNeed
+                    val fix = SourceFix.of(
+                        access = access,
+                        siteKnown = record != null && PluginWebAccount.checkUrl(record) != null,
+                        permissionOff = status.outcome?.permissionOff == true && record != null,
+                        needsRuntime = runtime != null,
+                    )
+                    val label = if (fix == SourceFix.GET_RUNTIME && runtime != null) runtime.actionLabel else fix.label
+                    add(
+                        SearchLine.Entry(
+                            "failed:${source.id}",
+                            "${source.label}: ${status.failure}",
+                            subtitle = if (fix == SourceFix.OPEN_PAGE) "$label. Allow it there, then search again" else "$label. Searches again after",
+                            iconFile = record?.let { PluginStore.iconFile(context, it) },
+                            mark = StatusMark.ATTENTION,
+                        ) {
+                            when (fix) {
+                                SourceFix.SIGN_IN, SourceFix.OPEN_SITE -> if (record != null && access != null) {
+                                    coroutineScope.launch {
+                                        val kept = withContext(Dispatchers.IO) { PluginWebAccount.open(context, record, access) }
+                                        if (kept && access == PluginWebAccount.Need.SIGN_IN) dev.droidtop.library.integrations.notifyWebSignedIn(context, record)
+                                        if (kept) searchTick++ else statusLine = PluginWebAccount.notKept(record.manifest.label, access)
+                                    }
                                 }
-                            },
-                        )
-                    }
-                    // Refused by droidtop's own permission check: the plugin's page is where it is allowed (#485 rig step 5).
-                    val pluginId = (source as? PluginGameSource)?.source?.record?.manifest?.id
-                    if (status.outcome?.permissionOff == true && pluginId != null) {
-                        add(SearchLine.Entry("permission:${source.id}", "Open ${source.label}'s page", subtitle = "Allow it there, then search again") { openPlugin(pluginId) })
-                    }
+                                SourceFix.OPEN_PAGE -> openPlugin(record?.manifest?.id)
+                                SourceFix.GET_RUNTIME -> if (runtime != null) {
+                                    coroutineScope.launch {
+                                        val error = withContext(Dispatchers.IO) {
+                                            PluginRuntimeNeeds.install(context, runtime) { statusLine = it }
+                                        }
+                                        if (error == null) {
+                                            statusLine = null
+                                            searchTick++
+                                        } else {
+                                            statusLine = "The ${runtime.runtime} runtime could not be installed: $error"
+                                        }
+                                    }
+                                }
+                                SourceFix.TRY_AGAIN -> searchTick++
+                            }
+                        },
+                    )
                     val shown = technicalDetails[source.id]
-                    if (shown != null) {
-                        add(SearchLine.Note(shown))
-                    } else {
-                        add(
-                            SearchLine.Entry("technical:${source.id}", "Technical details", subtitle = source.label) {
+                    add(
+                        SearchLine.Entry(
+                            "technical:${source.id}",
+                            "Technical details",
+                            subtitle = shown ?: source.label,
+                            value = if (shown != null) "Copy" else null,
+                        ) {
+                            if (shown != null) {
+                                clipboard.setText(androidx.compose.ui.text.AnnotatedString(shown))
+                                Notices.flash("Technical details copied", source = source.label)
+                            } else {
                                 coroutineScope.launch {
-                                    val pluginId = (source as? PluginGameSource)?.source?.record?.manifest?.id
-                                    val recorded = pluginId?.let { withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, it) } }
+                                    val recorded = record?.let { withContext(Dispatchers.IO) { PluginStore.disabledDetail(context, it.manifest.id) } }
                                     technicalDetails = technicalDetails + (
                                         source.id to (listOfNotNull(status.technical, recorded).joinToString("\n").ifBlank { "The source reported nothing more." })
                                     )
                                 }
-                            },
-                        )
-                    }
-                    source.settingsScreen()?.let { settings ->
-                        add(SearchLine.Entry("settings:${source.id}", "${source.label} settings") { activeCatalog = settings })
-                    }
-                    status.runtimeNeed?.let { need ->
-                        add(
-                            SearchLine.Entry("runtime:${source.id}", need.actionLabel, subtitle = "Searches again after") {
-                                coroutineScope.launch {
-                                    val error = withContext(Dispatchers.IO) {
-                                        PluginRuntimeNeeds.install(context, need) { statusLine = it }
-                                    }
-                                    if (error == null) {
-                                        statusLine = null
-                                        searchTick++
-                                    } else {
-                                        statusLine = "The ${need.runtime} runtime could not be installed: $error"
-                                    }
-                                }
-                            },
-                        )
-                    }
+                            }
+                        },
+                    )
                 }
                 // No source could be asked at all: one line that leads to Plugins (docs/SPEC.md 13, "There is no Get games
                 // sheet"). A source waiting or turned off already has its own row above.
@@ -991,6 +1016,10 @@ private sealed interface SearchLine {
         val icon: android.graphics.Bitmap? = null,
         /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
         val on: Boolean? = null,
+        /** A plugin's own icon as a file, for a row about the plugin itself (a failed source). */
+        val iconFile: String? = null,
+        /** A state glyph beside the title (a failed source's attention, Droidtop/tracker#746). */
+        val mark: StatusMark? = null,
         val onPick: () -> Unit,
     ) : SearchLine
 }
@@ -1011,6 +1040,8 @@ private fun SearchEntryRow(entry: SearchLine.Entry, selected: Boolean, onPick: (
             subtitle = entry.subtitle,
             value = entry.value,
             switchOn = entry.on,
+            iconFile = entry.iconFile,
+            statusMark = entry.mark,
             selected = selected,
             modifier = Modifier.weight(1f),
             onClick = onPick,

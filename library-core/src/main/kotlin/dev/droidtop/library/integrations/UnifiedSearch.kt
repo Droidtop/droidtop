@@ -83,6 +83,42 @@ class SourceStatus(
 }
 
 /**
+ * The one action that fixes a failed source's search (docs/SPEC.md 12a, "One search", Droidtop/tracker#746): what A on
+ * the source's row runs, read from what the failure already says. Pure.
+ */
+enum class SourceFix(val label: String) {
+    SIGN_IN("Sign in"),
+    OPEN_SITE("Open the site"),
+    OPEN_PAGE("Open its page"),
+    GET_RUNTIME("Get the runtime"),
+    TRY_AGAIN("Try again"),
+    ;
+
+    companion object {
+        /**
+         * [access] is what the source needs the person to do in its site, honoured only when droidtop knows that site
+         * ([siteKnown]); [permissionOff] is droidtop's own permission check refusing it; [needsRuntime] a runtime it
+         * runs on is missing. Anything else is tried again.
+         */
+        fun of(
+            access: dev.droidtop.pluginhost.PluginWebAccount.Need?,
+            siteKnown: Boolean,
+            permissionOff: Boolean,
+            needsRuntime: Boolean,
+        ): SourceFix = when {
+            access == dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN && siteKnown -> SIGN_IN
+            access != null && siteKnown -> OPEN_SITE
+            permissionOff -> OPEN_PAGE
+            needsRuntime -> GET_RUNTIME
+            else -> TRY_AGAIN
+        }
+
+        /** Several failed sources fold into this one row until it is opened. */
+        fun foldedTitle(count: Int): String = if (count == 1) "1 source needs attention" else "$count sources need attention"
+    }
+}
+
+/**
  * What the search shows right now. It is emitted again each time something
  * arrives: the device's rows first, then each source as it answers, so a
  * slow source never holds up the list. [settled] is true once every source

@@ -24534,7 +24534,14 @@ match" for games Gaming listed (console, 2026-10-17).
   search`), `Plugin:` (its id and version), `Answer:` (the error code it replied with) or `Exception:` (when there was
   no reply: a timeout, a crash), `Said:` and `Detail:` (the source's own words and its `detail`, markup removed, at most
   400 characters each, each left out when it only repeats the sentence above) and `At:` (the time, UTC)
-  (`SourceFailures.details`, `SourceOutcome.technical`). There is no "Get games" row (2026-10-16, Droidtop/tracker#218, "There is no
+  (`SourceFailures.details`, `SourceOutcome.technical`). **A failed source is one compact row** (2026-10-29,
+  Droidtop/tracker#746), below the results and never between them: the plugin's icon, the attention glyph and
+  "<source>: <sentence>", and A runs the one action that fixes it (`SourceFix.of`): Sign in or Open the site when
+  the source needs the person in a site droidtop knows, Open its page when droidtop's own permission check refused
+  it, Get the runtime when a runtime is missing, else Try again; each searches again after. Its Technical details
+  row sits under it: the first press shows the lines, the next copies them. Two or more failed sources fold into
+  one "N sources need attention" row naming them, and pressing it opens the rows; a new query folds them again.
+  The source's settings are on its page, not a row here. There is no "Get games" row (2026-10-16, Droidtop/tracker#218, "There is no
   Get games sheet" in 13); a source's own filters live on its page under Game sources (`SourceScreens`). A plugin's own full screen (`ui.main`) is opened
   from its page in Settings, Plugins, not from search results
   (`GameSourceProvider.hasMainUi`/`openMainUi` are deleted).
