@@ -10,7 +10,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -44,26 +43,26 @@ internal fun SaveConflictHost() {
 
 /**
  * "Cloud saves differ": this device's saves and the cloud's, each with when it
- * last changed and how many files, the newer one marked. Picking a side
- * replaces the other, so it asks twice (the design language's two-step
- * confirm: A arms and the row says what it does, A again confirms, moving
- * disarms). B decides later and changes nothing.
+ * last changed and how many files, the newer one marked. "Decide later" comes
+ * first and has the focus, so a mashed A changes nothing (the design
+ * language's modal rule, Droidtop/tracker#663); each side is one labelled
+ * action in the danger colour that says what it replaces, chosen with one
+ * deliberate move and press, no arming. B decides later too.
  */
 @Composable
 internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAnswer: (SaveChoice?) -> Unit) {
     val context = LocalContext.current
     var selected by remember { mutableIntStateOf(0) }
-    var armed by remember { mutableStateOf<Int?>(null) }
     val newerIsLocal = conflict.local.timestampMs >= conflict.cloud.timestampMs
     fun press(index: Int) {
         selected = index
-        if (index == 2) {
-            onAnswer(null)
-        } else if (armed != index) {
-            armed = index
-        } else {
-            onAnswer(if (index == 0) SaveChoice.LOCAL else SaveChoice.CLOUD)
-        }
+        onAnswer(
+            when (index) {
+                1 -> SaveChoice.LOCAL
+                2 -> SaveChoice.CLOUD
+                else -> null
+            },
+        )
     }
     fun describe(side: SaveSide, newer: Boolean): String {
         val whenText = if (side.timestampMs > 0) {
@@ -85,10 +84,7 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
                     GamepadAction.UP, GamepadAction.DOWN -> {
                         val next = menuStep(selected, 3, if (pad.action == GamepadAction.UP) -1 else 1)
                         moveCue(next != selected, pad.repeat)
-                        if (next != selected) {
-                            selected = next
-                            armed = null
-                        }
+                        selected = next
                     }
                     GamepadAction.A -> press(selected)
                     GamepadAction.B -> onAnswer(null)
@@ -98,23 +94,22 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
             },
         ) {
             Text(gameTitle, style = TypeRole.supporting, color = MenuTokens.OnSurfaceMuted)
-            // The two sides first, the way out last on its own (Steam's dialog order). The side that is
-            // armed says what it will replace, in the danger colour: a second A does it.
+            // Both sides are one-way, so the way out is the safe choice: first, on its own, focused.
             DialogChoices(
                 groups = listOf(
+                    listOf(DialogChoice("Decide later", "Changes nothing")),
                     listOf(
                         DialogChoice(
-                            "This device",
-                            if (armed == 0) "Replaces the saves in ${conflict.cloudLabel}" else describe(conflict.local, newerIsLocal),
-                            danger = armed == 0,
+                            "Keep this device's saves",
+                            "Replaces the saves in ${conflict.cloudLabel} · ${describe(conflict.local, newerIsLocal)}",
+                            danger = true,
                         ),
                         DialogChoice(
-                            conflict.cloudLabel,
-                            if (armed == 1) "Replaces the saves on this device" else describe(conflict.cloud, !newerIsLocal),
-                            danger = armed == 1,
+                            "Keep the saves in ${conflict.cloudLabel}",
+                            "Replaces the saves on this device · ${describe(conflict.cloud, !newerIsLocal)}",
+                            danger = true,
                         ),
                     ),
-                    listOf(DialogChoice("Decide later")),
                 ),
                 selected = selected,
                 onChoose = ::press,

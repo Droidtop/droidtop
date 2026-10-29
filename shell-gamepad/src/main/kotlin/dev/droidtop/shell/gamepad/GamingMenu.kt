@@ -1040,7 +1040,8 @@ internal class DialogChoice(val label: String, val detail: String? = null, val d
 /**
  * A modal's choices, Steam's dialog list (its power dialog, docs/SPEC.md 7k "Dialogs"): flat rows on
  * one plate, groups split by a thin dark rule ([DialogLook.RuleHeight]), the safe choices first and
- * the way out (Cancel, OK, Decide later) last in a group of its own. The row under the cursor is the
+ * the way out (Cancel, OK, Decide later) last in a group of its own, except when every other choice
+ * is one-way: then the way out is the safe choice and comes first. The row under the cursor is the
  * solid selected inversion, with the window's one ring. [selected] counts rows across the groups,
  * in order; a tap chooses ([onChoose]). One component for every dialog, so they read alike.
  */

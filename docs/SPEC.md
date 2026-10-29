@@ -10680,7 +10680,8 @@ toast drawn in the shell's own window would sit under an open menu or the game
 page (so Steam's toast motion is not taken; accepted by the owner, 2026-10-09). **Dialogs** draw their choices with
 one component (`DialogChoices`, Steam's power dialog): flat rows on one plate,
 groups split by a thin rule in the scrim role, the safe choices first and the
-way out (OK, Cancel, Decide later) last in a group of its own, the row under the
+way out (OK, Cancel, Decide later) last in a group of its own (first instead when
+every other choice is one-way, as in the cloud-save conflict), the row under the
 cursor the solid selected inversion; the page behind is dimmed to the scrim
 role's 80% (`ModalScrim`). The launch failure dialog, the launch screen chooser
 (which gained a Cancel row in place of its "B cancels" line) and the cloud-save
@@ -13901,8 +13902,11 @@ follows:
   still differ it is a conflict. A first sync with files on both sides that
   differ is a conflict. **A conflict is the person's** (`SaveConflictResolver`,
   filled by `SaveConflictHost` while the Gaming shell is composed): "Cloud saves
-  differ" shows each side's last change, file count and which is newer; picking
-  a side replaces the other (two-step confirm), B decides later and changes
+  differ" puts "Decide later" first with the focus, so a mashed A changes
+  nothing; then "Keep this device's saves" and "Keep the saves in <cloud>", each
+  in the danger colour with what it replaces, the side's last change, file count
+  and which is newer. One press on a side does it, no arming (the modal rule of
+  DESIGN-LANGUAGE, Droidtop/tracker#663). B decides later and changes
   nothing. With no shell to ask (another mode launched the game) both sides are
   left as they are and the game starts on its local files. Files are written
   beside their target and replace it only when their SHA-1 matches the one Steam
