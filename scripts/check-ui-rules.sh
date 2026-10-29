@@ -44,7 +44,7 @@ RULES=(
 "formatters @@ 1 @@ %\.[0-9]f [KMGT]B|Formatter\.format(Short)?FileSize|getRelativeTimeSpanString @@ /ValueFormat\.kt$|^stores/|/runtime/EngineCli\.kt$ @@ sizes, durations and times go through ValueFormat, the one formatter (the ported store code keeps its own, and the docker and podman commands print in their tools' own format)"
 "permission-titles @@ 1 @@ PluginPermission\(\"[^\"]+\", [A-Za-z.]+, \"[^\"]*(${BANNED}) @@ - @@ a permission's title is plain words; its raw id is on Y Info"
 "hint-tip @@ 1 @@ \bHintTip\b @@ - @@ explanations live on the focus line and in Info (Y), never in a bubble"
-"literal-text @@ 1 @@ \bText\(\"[A-Z] @@ ^(app|display|host-bridge|input-keyboard|input-seat|library-core|net-core|plugin-host|plugin-host-testing|runtime-common|runtime-linux-noroot|runtime-linux-root|runtime-windows|shell-default|shell-desktop|stores|ui-shared)/ @@ a word on screen is a string resource (Droidtop/tracker#177); a module leaves this allowlist in the commit that clears it"
+"literal-text @@ 1 @@ \bText\(\"[A-Z] @@ ^(app|display|host-bridge|input-keyboard|input-seat|library-core|net-core|plugin-host|plugin-host-testing|runtime-common|runtime-linux-noroot|runtime-linux-root|runtime-windows|shell-default|stores)/ @@ a word on screen is a string resource (Droidtop/tracker#177); a module leaves this allowlist in the commit that clears it"
 )
 
 failed=0

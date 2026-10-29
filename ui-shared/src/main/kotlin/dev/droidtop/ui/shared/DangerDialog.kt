@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -118,7 +119,7 @@ fun ConfirmDialogCard(
                             .semantics { role = Role.Button }
                             .padding(vertical = 8.dp),
                     ) {
-                        Text("Details", color = onSurface, style = BODY, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.ui_shared_details), color = onSurface, style = BODY, modifier = Modifier.weight(1f))
                         Icon(if (detailsOpen) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore, contentDescription = null, tint = onSurface)
                     }
                     if (detailsOpen) Text(details, color = onSurface, style = DETAILS)
