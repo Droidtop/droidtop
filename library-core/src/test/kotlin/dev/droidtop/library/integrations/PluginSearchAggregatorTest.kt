@@ -155,11 +155,28 @@ class PluginSearchAggregatorTest {
         assertEquals(dev.droidtop.pluginhost.PluginWebAccount.Need.SIGN_IN, signIn.access)
         val check = PluginSearchAggregator.failureOutcome(source, SourceReplyFailure(dev.droidtop.pluginhost.PluginErrorCode.BROWSER_CHECK_REQUIRED, null, "<p>Just a moment</p>"))
         assertEquals(SourceFailures.NEEDS_BROWSER_CHECK, check.failure)
-        assertEquals("Just a moment", check.technical)
+        assertTrue(check.technical!!.contains("Detail: Just a moment"))
+        assertTrue(check.technical!!.contains("Answer: BROWSER_CHECK_REQUIRED"))
         val plain = PluginSearchAggregator.failureOutcome(source, SourceReplyFailure(dev.droidtop.pluginhost.PluginErrorCode.FAILED, "The site did not answer", "socket closed after 3 s"))
         assertEquals("The site did not answer", plain.failure)
-        assertEquals("socket closed after 3 s", plain.technical)
+        assertTrue(plain.technical!!.contains("Detail: socket closed after 3 s"))
         assertEquals(null, plain.access)
+    }
+
+    @Test
+    fun `technical details say what failed, never only the headline again (tracker 746)`() {
+        val source = fakeSource("Site")
+        val vague = PluginSearchAggregator.failureOutcome(
+            source,
+            SourceReplyFailure(dev.droidtop.pluginhost.PluginErrorCode.FAILED, "Site could not complete the request", null),
+            now = 1_761_757_200_000L,
+        )
+        assertEquals("Site could not complete the request", vague.failure)
+        val lines = vague.technical!!.lines()
+        assertEquals("Call: library.sources search", lines.first())
+        assertTrue(lines.contains("Answer: FAILED"))
+        assertTrue(lines.contains("At: 2025-10-29 17:00:00 UTC"))
+        assertFalse("the headline is not repeated", lines.any { it.startsWith("Said:") })
     }
 
     @Test
@@ -175,7 +192,8 @@ class PluginSearchAggregatorTest {
         val outcome = PluginSearchAggregator.fanOutOutcomes(listOf(source)) { it.search(android.content.ContextWrapper(null), "q", null) }.single()
         assertEquals(SourceFailures.SIGN_IN, outcome.failure)
         assertNotNull(outcome.technical)
-        assertTrue(outcome.technical!!.startsWith("JavaScript is disabled"))
+        assertTrue(outcome.technical!!.contains("Said: JavaScript is disabled"))
+        assertTrue(outcome.technical!!.contains("Exception: IllegalStateException"))
         assertFalse(outcome.failure!!.contains("JavaScript"))
     }
 }

@@ -24356,9 +24356,13 @@ match" for games Gaming listed (console, 2026-10-17).
   is kept as the source wrote it. A source refused by droidtop's own permission check (PERMISSION_DENIED, or the
   broker's '"<label>" is turned off for <plugin>' passed through by the plugin) reads "It needs "<label>", which is not
   allowed for it", with "Open <source>'s page" under it, where it is allowed (`SourceFailures.permissionOff`;
-  Droidtop/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission). What the source said stays behind the
-  "Technical details" row, with markup removed and at most 400 characters
-  (`SourceOutcome.technical`). There is no "Get games" row (2026-10-16, Droidtop/tracker#218, "There is no
+  Droidtop/tracker#485 rig step 5: LewdCorner's line was the broker's own words about its sign-in permission). The
+  "Technical details" row says what actually failed, one fact per line, never only the row's sentence again
+  (2026-10-29, Droidtop/tracker#746, where a source's details repeated its headline): `Call:` (`library.sources
+  search`), `Plugin:` (its id and version), `Answer:` (the error code it replied with) or `Exception:` (when there was
+  no reply: a timeout, a crash), `Said:` and `Detail:` (the source's own words and its `detail`, markup removed, at most
+  400 characters each, each left out when it only repeats the sentence above) and `At:` (the time, UTC)
+  (`SourceFailures.details`, `SourceOutcome.technical`). There is no "Get games" row (2026-10-16, Droidtop/tracker#218, "There is no
   Get games sheet" in 13); a source's own filters live on its page under Game sources (`SourceScreens`). A plugin's own full screen (`ui.main`) is opened
   from its page in Settings, Plugins, not from search results
   (`GameSourceProvider.hasMainUi`/`openMainUi` are deleted).

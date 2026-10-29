@@ -123,10 +123,9 @@ object PluginSearchAggregator {
     }
 
     /** What a failed [source] shows: droidtop's sentence for a code it acts on, else the source's plain sentence, guarded. */
-    internal fun failureOutcome(source: GameSourceProvider, failure: Throwable): SourceOutcome {
+    internal fun failureOutcome(source: GameSourceProvider, failure: Throwable, now: Long = System.currentTimeMillis()): SourceOutcome {
         val said = describe(failure)
         val reply = failure as? SourceReplyFailure
-        val technical = SourceFailures.technical(reply?.detail ?: said)
         val access = when (reply?.code) {
             PluginErrorCode.SIGN_IN_REQUIRED -> PluginWebAccount.Need.SIGN_IN
             PluginErrorCode.BROWSER_CHECK_REQUIRED -> PluginWebAccount.Need.BROWSER_CHECK
@@ -138,6 +137,19 @@ object PluginSearchAggregator {
             PluginWebAccount.Need.BROWSER_CHECK -> SourceFailures.NEEDS_BROWSER_CHECK
             null -> permission ?: SourceFailures.plain(said)
         }
+        // What actually failed, never the headline again (Droidtop/tracker#746): the call, the plugin, the code or the
+        // exception, the source's own words and when.
+        val manifest = (source as? PluginGameSource)?.source?.record?.manifest
+        val technical = SourceFailures.details(
+            call = "library.sources search",
+            headline = sentence,
+            plugin = manifest?.let { "${it.id} ${it.version}" } ?: source.id,
+            code = reply?.code,
+            exception = if (reply == null) failure::class.java.simpleName else null,
+            said = said,
+            detail = reply?.detail,
+            at = now,
+        )
         return SourceOutcome(source, emptyList(), failure = sentence, technical = technical, access = access, permissionOff = permission != null)
     }
 

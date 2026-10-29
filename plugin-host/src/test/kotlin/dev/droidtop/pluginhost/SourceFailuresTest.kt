@@ -45,6 +45,20 @@ class SourceFailuresTest {
     }
 
     @Test
+    fun `details name the call, the plugin, the answer and the time, and leave out what repeats the headline`() {
+        val text = SourceFailures.details(
+            call = "library.sources search", headline = "It did not answer", plugin = "gamegrab.repacks 0.7.0",
+            code = PluginErrorCode.TIMEOUT, said = "It did not answer", detail = "<b>read timed out</b> after 10 s", at = 0L,
+        )
+        assertEquals(
+            listOf("Call: library.sources search", "Plugin: gamegrab.repacks 0.7.0", "Answer: TIMEOUT", "Detail: read timed out after 10 s", "At: 1970-01-01 00:00:00 UTC"),
+            text.lines(),
+        )
+        val thrown = SourceFailures.details(call = "library.sources search", headline = "x", exception = "SocketException", said = "Connection reset")
+        assertTrue(thrown.lines().containsAll(listOf("Exception: SocketException", "Said: Connection reset")))
+    }
+
+    @Test
     fun `technical details are one bounded line without markup`() {
         assertEquals("Hello world", SourceFailures.technical("<p>Hello</p>\n<b>world</b>"))
         assertEquals(400, SourceFailures.technical("y".repeat(900))!!.length)

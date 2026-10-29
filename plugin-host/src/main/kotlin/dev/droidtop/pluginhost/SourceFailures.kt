@@ -83,6 +83,36 @@ object SourceFailures {
         }
     }
 
+    /**
+     * "Technical details" for a failed call (Droidtop/tracker#746): what was asked of which plugin, what came back (the
+     * error code, or the exception when there was no reply), the source's own words and the time, one fact per line,
+     * so it can be copied into a report. A line that would only repeat [headline], the sentence already on the row, is
+     * left out; the call and the time always say more than the headline does.
+     */
+    fun details(
+        call: String,
+        headline: String?,
+        plugin: String? = null,
+        code: PluginErrorCode? = null,
+        exception: String? = null,
+        said: String? = null,
+        detail: String? = null,
+        at: Long = System.currentTimeMillis(),
+    ): String {
+        val saidLine = technical(said)?.takeIf { it != headline?.trim() }
+        val detailLine = technical(detail)?.takeIf { it != saidLine && it != headline?.trim() }
+        return listOfNotNull(
+            "Call: $call",
+            plugin?.let { "Plugin: $it" },
+            code?.let { "Answer: ${it.name}" } ?: exception?.let { "Exception: $it" },
+            saidLine?.let { "Said: $it" },
+            detailLine?.let { "Detail: $it" },
+            "At: ${TIME.format(java.time.Instant.ofEpochMilli(at))} UTC",
+        ).joinToString("\n")
+    }
+
+    private val TIME = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(java.time.ZoneOffset.UTC)
+
     /** What the source said, as one bounded line of text with any markup removed. */
     fun technical(raw: String?): String? {
         val text = raw.orEmpty().replace(MARKUP, " ").replace(SPACES, " ").trim()
