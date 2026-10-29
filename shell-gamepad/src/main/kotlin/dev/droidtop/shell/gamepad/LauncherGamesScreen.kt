@@ -80,8 +80,9 @@ internal const val GAME_FOLDERS_SCREEN_ID = "rom_folders"
  * A PC or engine game is Gaming's PC game wired out (Droidtop/tracker#349):
  * A follows the same primary-action rule as the PC Games tab (a store game
  * that is not installed offers the install), and a long press or Options >
- * Game page opens the same page and menu ([PcGameStandalone]). A long press on any game opens its options:
- * Game page for a PC game, Favourite, Hide, Pin to home screen (the gap review, 2026-10-17: a long press used to
+ * Game page opens the same page and menu; a console game's Game page is Gaming's detail for it
+ * ([GamePageStandalone]). A long press on any game opens its options:
+ * Game page for a PC or console game, Favourite, Hide, Pin to home screen (the gap review, 2026-10-17: a long press used to
  * pin a console game outright, with no way to favourite or hide one here). There are no themes or Quick Menu here.
  *
  * [games] null is "not read yet", which says so rather than "no games".
@@ -158,11 +159,11 @@ private fun GamesGrid(
 ) {
     val window = LocalShellWindow.current
     val pad = rememberGridPad()
-    // A PC or engine game takes the PC Games tab's primary action and has its page (Droidtop/tracker#349).
-    fun hasPage(entry: LibraryEntry) = library != null && entry.isPcOrEngineGame
+    // A PC or engine game takes the PC Games tab's primary action; it and a console game have Gaming's page (Droidtop/tracker#349).
+    fun hasPage(entry: LibraryEntry) = library != null && hasGamePage(entry)
     var pageId by remember(openPageId) { mutableStateOf(openPageId?.takeIf { library != null }) }
     val pcLaunch = dev.droidtop.shell.gamepad.pc.rememberPcLaunch(onLaunch = onPlay, onOpenDownloads = onOpenDownloads)
-    val play: (LibraryEntry) -> Unit = { entry -> if (hasPage(entry)) pcLaunch.launch(entry) else onPlay(entry) }
+    val play: (LibraryEntry) -> Unit = { entry -> if (library != null && entry.isPcOrEngineGame) pcLaunch.launch(entry) else onPlay(entry) }
     val emptyAction = remember { FocusRequester() }
     // The one query model the Gaming lists use (docs/SPEC.md 7j): this view's filters and sort are
     // remembered, and applied off the main thread.
@@ -332,11 +333,11 @@ private fun GamesGrid(
     if (sortOpen) {
         LibrarySortSheet(scope = scope, query = query, onQueryChange = { query = it }, onDismiss = { sortOpen = false })
     }
-    // The PC Games tab's page, menu and install offer, wired out (Droidtop/tracker#349).
+    // Gaming's game page: the PC Games tab's page, menu and install offer, or a console game's detail (Droidtop/tracker#349).
     val pageLibrary = library
     val openPage = pageId
     if (pageLibrary != null && openPage != null) {
-        dev.droidtop.shell.gamepad.pc.PcGameStandalone(
+        GamePageStandalone(
             library = pageLibrary,
             entryId = openPage,
             onLaunch = onPlay,

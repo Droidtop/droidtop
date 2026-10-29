@@ -79,7 +79,7 @@ import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.Place
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.isPcOrEngineGame
-import dev.droidtop.shell.gamepad.pc.PcGameStandalone
+import dev.droidtop.shell.gamepad.GamePageStandalone
 import dev.droidtop.shell.gamepad.pc.PcLaunchOfferSheet
 import dev.droidtop.library.TaskbarPin
 import dev.droidtop.library.TaskbarPins
@@ -363,7 +363,7 @@ fun DesktopShell(
         }
 
         pageId?.let { id ->
-            PcGameStandalone(
+            GamePageStandalone(
                 library = library,
                 entryId = id,
                 onLaunch = launchEntry,

@@ -1710,7 +1710,7 @@ private object GamingPrefs {
  * only behavior. Reached via a card's Y/Info action, closed via B/Back.
  */
 @Composable
-private fun EntryDetailScreen(
+internal fun EntryDetailScreen(
     entry: LibraryEntry,
     library: Library,
     onLaunch: () -> Unit,

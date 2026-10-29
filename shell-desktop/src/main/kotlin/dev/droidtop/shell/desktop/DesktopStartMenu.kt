@@ -28,6 +28,7 @@ import dev.droidtop.library.settings.SocialBadge
 import dev.droidtop.library.settings.UiModePrefs
 import dev.droidtop.pluginhost.PluginModes
 import dev.droidtop.runtime.ContainerApp
+import dev.droidtop.shell.gamepad.hasGamePage
 import dev.droidtop.shell.gamepad.hosted.HostedArt
 import dev.droidtop.shell.gamepad.hosted.HostedCursor
 import dev.droidtop.shell.gamepad.hosted.HostedListSheet
@@ -55,7 +56,7 @@ private class StartTarget(val pin: TaskbarPin, val entry: LibraryEntry?, val lin
  * (Wine shortcuts) and Android apps (Droidtop/tracker#348). Its rows are compact (56 dp, [START_ROW_HEIGHT]). A takes the row's own action
  * (a PC or engine game takes Gaming's primary-action rule, a store game that is not installed offers the
  * install); X pins it to the taskbar or takes it off; Y and a long press open the row's menu: Open, the
- * game page of a PC or engine game, and pin or unpin.
+ * game page of a PC, engine or console game, and pin or unpin.
  */
 @Composable
 internal fun StartMenu(
@@ -329,7 +330,7 @@ internal fun StartMenu(
     } else {
         // The row's menu: the one place a finger or Y reaches pinning and the game page.
         val pinned = TaskbarPins.isPinned(pins.list, target.pin.key)
-        val page = target.entry?.takeIf { it.isPcOrEngineGame }
+        val page = target.entry?.takeIf { hasGamePage(it) }
         val menuRows = ArrayList<HostedRow>()
         menuRows.add(
             HostedRow(
@@ -348,7 +349,7 @@ internal fun StartMenu(
                 HostedRow(
                     key = "page",
                     title = "Game page",
-                    subtitle = "Install, runner, saves and more",
+                    subtitle = if (page.isPcOrEngineGame) "Install, runner, saves and more" else "Details, artwork, scraping and collections",
                     onSelect = {
                         menuFor = null
                         openPage(page)

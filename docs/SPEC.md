@@ -15979,8 +15979,15 @@ copied:
   Hide / Show again (`GameHiding`, the `game_metadata` row's `hidden`, the one Hidden rule; the store mirror
   `StoreHidden` writes through it too), Pin to home screen, Game folders. A change shows at once and the
   library's next read carries it. Desktop's Start menu: a tap takes the rule; Y or a long press opens
-  the row's menu, whose Game page row opens the page over the desktop. Retro
-  games keep their themed detail in Gaming only.
+  the row's menu, whose Game page row opens the page over the desktop.
+- A console game has a page outside Gaming too (2026-10-29, Droidtop/tracker#349; the owner's
+  2026-10-08 option of hosting a Gaming destination instead of porting it). `GamePageStandalone`
+  (`:shell-gamepad`) is the one entry for both hosts: a PC or engine game gets `PcGameStandalone`, a
+  console game Gaming's own detail (`EntryDetailScreen`, the screen Y opens on a themed gamelist) in a
+  window of its own, with its Launch, Edit metadata, Scrape, Choose match, View media and Collections. Play
+  is the host's launch path. `hasGamePage` says which games have one, so Standard's options and Desktop's
+  row menu offer Game page for PC, engine and console games. What the themed gamelist draws around a
+  game (the theme's own elements) stays Gaming's.
 
 Droidtop/tracker#254, 2026-10-02. The page keeps one job, "everything about
 this game and the one thing you most likely want to do", and has this
