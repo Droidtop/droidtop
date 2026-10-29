@@ -61,6 +61,7 @@ import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.ShellDialog
 import dev.droidtop.library.itemName
 import dev.droidtop.library.message
+import dev.droidtop.runtime.tasks.text
 import dev.droidtop.shell.gamepad.groundBackground
 import dev.droidtop.library.scraper.isPcOrEngineGame
 import androidx.compose.ui.window.DialogProperties
@@ -380,6 +381,9 @@ private val HOSTED_SHEET_WIDTH = 520.dp
  */
 @Composable
 fun LeftMenuStandalone(
+    // Whether Gaming is the mode in use: only then are Gaming's own sections offered, since they open Gaming; the places
+    // (Downloads and the rest) open in every mode.
+    gamingSections: Boolean,
     runningTitle: String?,
     onResume: () -> Unit,
     onOpenSection: (section: String, placeScreenId: String?) -> Unit,
@@ -394,7 +398,8 @@ fun LeftMenuStandalone(
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { UiModePrefs.get(context) }
     }
     val uiMode = stored ?: return
-    val sections = dev.droidtop.shell.gamepad.menuSectionsFor(uiMode)
+    val all = dev.droidtop.shell.gamepad.menuSectionsFor(uiMode)
+    val sections = if (gamingSections) all else all.filter { it.placeScreenId != null }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         dev.droidtop.shell.gamepad.LeftMenu(
             entries = dev.droidtop.shell.gamepad.leftMenuEntries(sections),
@@ -404,7 +409,7 @@ fun LeftMenuStandalone(
             onSelect = { entry -> onOpenSection(entry.section.name, entry.section.placeScreenId) },
             onOpenQuickMenu = onOpenQuickMenu,
             // Kiosk and Kid have no Search here either (the same rule as the shell's left menu).
-            onSearch = if (sections.any { it.managesDevice }) onSearch else null,
+            onSearch = if (all.any { it.managesDevice }) onSearch else null,
             onDismiss = onDismiss,
         )
     }
@@ -559,4 +564,57 @@ private fun GameOptions(
         },
         onDismiss = onClose,
     )
+}
+
+/**
+ * HOME + L2 over an app droidtop did not launch, Android's Settings included (docs/SPEC.md "In-game overlays: HOME
+ * chords", Droidtop/tracker#740): that app's menu over it. Its name, then Resume (closes the overlay; the app never
+ * left), Close the app on a second press (the task manager's one way, [dev.droidtop.runtime.tasks.TaskManager.close],
+ * its outcome said on the row) and App info (Android's page for the app, [onAppInfo]).
+ */
+@Composable
+fun AppInFrontStandalone(
+    packageName: String,
+    onResume: () -> Unit,
+    onAppInfo: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val label by androidx.compose.runtime.produceState(packageName, packageName) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val pm = context.packageManager
+                pm.getApplicationInfo(packageName, 0).loadLabel(pm).toString()
+            }.getOrDefault(packageName)
+        }
+    }
+    var armed by remember(packageName) { mutableStateOf(false) }
+    var said by remember(packageName) { mutableStateOf<String?>(null) }
+    CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
+        dev.droidtop.shell.gamepad.ActionSheet(
+            title = label,
+            rows = listOf(
+                dev.droidtop.shell.gamepad.ActionRow("Resume", "Back to the app; it never stopped") { onResume() },
+                dev.droidtop.shell.gamepad.ActionRow(
+                    title = "Close the app",
+                    detail = said ?: if (armed) dev.droidtop.shell.gamepad.input.PressWords.againSentence else "Ends it the way the task manager does",
+                    danger = true,
+                ) {
+                    if (!armed) {
+                        armed = true
+                    } else {
+                        armed = false
+                        scope.launch {
+                            val outcome = dev.droidtop.runtime.tasks.TaskManager.close(context, packageName)
+                            said = outcome.text
+                            if (outcome == dev.droidtop.runtime.tasks.CloseOutcome.Closed) onDismiss()
+                        }
+                    }
+                },
+                dev.droidtop.shell.gamepad.ActionRow("App info", "Android's page for the app") { onAppInfo() },
+            ),
+            onDismiss = onDismiss,
+        )
+    }
 }

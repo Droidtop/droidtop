@@ -19,6 +19,7 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import dev.droidtop.runtime.overlay.OverlayRequest
 import dev.droidtop.runtime.overlay.OverlayRequests
 import dev.droidtop.shell.gamepad.LocalInGameOverlay
+import dev.droidtop.shell.gamepad.hosted.AppInFrontStandalone
 import dev.droidtop.shell.gamepad.hosted.GameOptionsStandalone
 import dev.droidtop.shell.gamepad.hosted.LeftMenuStandalone
 import dev.droidtop.shell.gamepad.hosted.QuickMenuStandalone
@@ -45,10 +46,13 @@ import kotlinx.coroutines.launch
  * it, and to a sheet it opens, by Android's own focus (as [LaunchAlertOverlay]'s card takes them); B, or the same chord
  * again, closes it. Main process only.
  *
- * Built: the Quick Menu (HOME + R2), the shell's own and unchanged; the running game's own overlay (HOME + L2,
- * [GameOptionsStandalone]): its name, Resume, "Pause the game" (the one explicit way to pause it), the game's own
- * options as L2 opens them in Gaming, Quit and Kill; and the left menu's launcher content (HOME + Start,
- * [LeftMenuStandalone]), whose destinations open droidtop.
+ * Over whatever is on screen (the owner, 2026-10-29: "home+ r2 draws over the screen, too. On steanos, the qam can
+ * always be called up"): any app or game, droidtop's own screens in every mode, Android's Settings and dialogs. The
+ * Quick Menu (HOME + R2), the shell's own and unchanged; HOME + L2, the menu of what is in front: the running game's
+ * own overlay ([GameOptionsStandalone]: its name, Resume, "Pause the game", the one explicit way to pause it, the
+ * game's own options, Quit and Kill), another app's ([AppInFrontStandalone]), or, over droidtop's own screen, that
+ * screen's own L2 menu; and the left menu's launcher content (HOME + Start, [LeftMenuStandalone]), whose destinations
+ * open droidtop, its Gaming sections only while Gaming is the mode in use.
  */
 internal object InGameOverlays {
     private const val TAG = "droidtop.InGameOverlay"
@@ -83,17 +87,26 @@ internal object InGameOverlays {
         val runningEntry = dev.droidtop.library.LaunchDisplay.running.value?.context?.gameId?.let { id ->
             library.backgroundScanState(dev.droidtop.library.LibraryKinds.GAMES).value?.firstOrNull { it.id == id }
         }
-        // HOME + L2 is a game's menu: with no game droidtop started under it there is nothing to show.
-        if (request.kind == OverlayRequest.Kind.CONTEXT_MENU && runningEntry == null) {
-            Log.i(TAG, "HOME + L2 with no game droidtop started in front")
-            return
+        // HOME + L2 is the menu of what is in front: the game droidtop launched, another app (Android's Settings included),
+        // or droidtop's own screen, whose own L2 menu it opens.
+        val front = request.frontPackage
+        val gameInFront = runningEntry != null && (front == null || front == dev.droidtop.library.LaunchDisplay.runningPackageName)
+        if (request.kind == OverlayRequest.Kind.CONTEXT_MENU && !gameInFront) {
+            when (front) {
+                null -> {
+                    Log.i(TAG, "HOME + L2 with nothing known in front")
+                    return
+                }
+                app.packageName -> {
+                    pressL2OnDroidtop()
+                    return
+                }
+            }
         }
-        // The left menu is Gaming's, and its rows open Gaming: it is drawn only when Gaming is the mode in use, so a row
-        // never switches the person into a mode they are not using (the mode boundary, as PlaceLinks).
-        if (request.kind == OverlayRequest.Kind.LEFT_MENU && !Place.opensInGaming(Modes.lastMode(app), Modes.enabled)) {
-            Log.i(TAG, "HOME + Start with Gaming not the mode in use")
-            return
-        }
+        // The left menu's Gaming sections open Gaming: they are offered only while Gaming is the mode in use, so a row
+        // never switches the person into a mode they are not using (the mode boundary, as PlaceLinks); the places open
+        // in every mode.
+        val gamingInUse = Place.opensInGaming(Modes.lastMode(app), Modes.enabled)
         val (windowContext, type) = GameOverlay.windowContext(app, request.displayId) ?: run {
             Log.i(TAG, "no overlay on display ${request.displayId} (no accessibility service, no Display over other apps)")
             return
@@ -120,10 +133,24 @@ internal object InGameOverlays {
                             OverlayRequest.Kind.QUICK_MENU -> QuickMenuStandalone(
                                 library = library,
                                 // Start swaps to the left menu, as it does in Gaming.
-                                onOpenStartMenu = { swap(OverlayRequest.Kind.LEFT_MENU, request.displayId) },
+                                onOpenStartMenu = { swap(request.copy(kind = OverlayRequest.Kind.LEFT_MENU)) },
                                 onDismiss = { close() },
                             )
-                            OverlayRequest.Kind.CONTEXT_MENU -> runningEntry?.let { entry ->
+                            OverlayRequest.Kind.CONTEXT_MENU -> if (!gameInFront) {
+                                front?.let { packageName ->
+                                    AppInFrontStandalone(
+                                        packageName = packageName,
+                                        onResume = { close() },
+                                        onAppInfo = {
+                                            open(
+                                                Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.fromParts("package", packageName, null))
+                                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                            )
+                                        },
+                                        onDismiss = { close() },
+                                    )
+                                }
+                            } else runningEntry?.let { entry ->
                                 GameOptionsStandalone(
                                     library = library,
                                     entry = entry,
@@ -134,10 +161,11 @@ internal object InGameOverlays {
                                 )
                             }
                             OverlayRequest.Kind.LEFT_MENU -> LeftMenuStandalone(
+                                gamingSections = gamingInUse,
                                 runningTitle = runningEntry?.let { dev.droidtop.library.GameNaming.displayName(it.title) },
                                 onResume = { close() },
                                 onOpenSection = { section, placeScreenId -> open(sectionIntent(section, placeScreenId)) },
-                                onOpenQuickMenu = { swap(OverlayRequest.Kind.QUICK_MENU, request.displayId) },
+                                onOpenQuickMenu = { swap(request.copy(kind = OverlayRequest.Kind.QUICK_MENU)) },
                                 onSearch = { open(Intent(app, LauncherSearchActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
                                 onDismiss = { close() },
                             )
@@ -157,8 +185,9 @@ internal object InGameOverlays {
         runCatching { wm.addView(view, params) }
             .onSuccess {
                 shown = Shown(request.kind, view, wm, lifecycleOwner.registry)
+                OverlayRequests.open = true
                 view.requestFocus()
-                Log.i(TAG, "${request.kind} over the app on display ${request.displayId}")
+                Log.i(TAG, "${request.kind} over ${request.frontPackage ?: "the screen"} on display ${request.displayId}")
             }
             .onFailure {
                 lifecycleOwner.registry.currentState = Lifecycle.State.DESTROYED
@@ -167,11 +196,32 @@ internal object InGameOverlays {
     }
 
     /** One overlay for another on the same display (R2 in the left menu, Start in the Quick Menu). */
-    private fun swap(kind: OverlayRequest.Kind, displayId: Int) {
+    private fun swap(next: OverlayRequest) {
         // Posted: the press that asks for it is still being handled by the window being removed.
         scope.launch(Dispatchers.Main) {
             close()
-            show(OverlayRequest(kind, displayId))
+            show(next)
+        }
+    }
+
+    /**
+     * HOME + L2 over droidtop's own screen: that screen's own context menu, the one L2 opens there, so droidtop's screen
+     * gets the L2 press the chord took. Nothing is drawn by the overlay itself.
+     */
+    private fun pressL2OnDroidtop() {
+        // Only the screen the person is on: a shell stopped behind another droidtop screen (Settings) has no focus.
+        val shell = ForegroundShell.current()?.takeIf { !it.isFinishing && !it.isDestroyed && it.hasWindowFocus() } ?: run {
+            Log.i(TAG, "HOME + L2 over droidtop with no screen of its own to take it")
+            return
+        }
+        val now = android.os.SystemClock.uptimeMillis()
+        listOf(android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.ACTION_UP).forEach { action ->
+            shell.dispatchKeyEvent(
+                android.view.KeyEvent(
+                    now, now, action, android.view.KeyEvent.KEYCODE_BUTTON_L2, 0, 0, android.view.KeyCharacterMap.VIRTUAL_KEYBOARD, 0, 0,
+                    android.view.InputDevice.SOURCE_GAMEPAD,
+                ),
+            )
         }
     }
 
@@ -195,6 +245,7 @@ internal object InGameOverlays {
     private fun close() {
         val open = shown ?: return
         shown = null
+        OverlayRequests.open = false
         open.lifecycle.currentState = Lifecycle.State.DESTROYED
         runCatching { open.windowManager.removeView(open.view) }
     }
