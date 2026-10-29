@@ -10566,10 +10566,17 @@ firmware under `<gamesRoot>/bios` by presence AND md5 (the classic
 folder's screen: a BIOS status screen per system that needs firmware,
 and — when NO installed emulator can run a system — "Get an emulator"
 actions built from the player database's real packages (market:// with
-a web fallback). Follow-ups, not started: per-emulator install sources
-beyond Play (GitHub releases in the players DB), and applying
-recommended per-emulator settings where an emulator exposes a real
-configuration surface.
+a web fallback). Install sources are data (decided 2026-10-29,
+Droidtop/tracker#754): a player row may carry a versioned, cited `install`
+object (Play, F-Droid, IzzyOnDroid, GitHub/GitLab releases with an asset
+pattern and ABIs only where a file name was read, the project's page), and an
+engine row's `runners.enginehost` names the Enginehost core the engine needs
+and Enginehost's own source (droidtop-platforms docs/FORMAT.md, "Install
+sources"). A source nobody could confirm is left out, so absence means "not
+confirmed", never "not available". droidtop does not read these fields yet:
+the Install and Get offers built on them are the Plugins lane's, after the
+data lands. Recommended per-emulator settings are `setup.config` ("Emulator setup helper" below),
+filled emulator by emulator with every key cited to the emulator's source.
 
 **A failed launch is a focused dialog, not a dead end (2026-10-02,
 Droidtop/tracker#171).** A launch that fails in the Gaming shell used
