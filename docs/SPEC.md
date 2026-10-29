@@ -3774,8 +3774,13 @@ the `ContainerRuntime` interface that already exists (§3):
   - The overlay window is focusable, so the pad reaches it, and the sheet it opens, by Android's own focus (as the
     launch watchdog's card does), rather than through `OverlayRequests.keys`, which delivers to one view and not to a
     sub-window; the input half keeps that route for a host that wants it.
-  - Not built yet: HOME + L2 (the context menu) and HOME + Start (the left menu), which log that they are not drawn,
-    and "Pause the game".
+  - Over a game droidtop launched, HOME + R2's Quick Menu opens on that game's Game section (`QuickMenuStandalone`
+    with the running entry): Resume closes the overlay (the game never left), Quit and Kill end it the shell's way, and
+    Restart starts it again once it ended. **Pause the game** is a row there, only in an overlay and for a console
+    game: it sends RetroArch's `PAUSE_TOGGLE` to its command port (`RetroArchCommands`) when pressed, and pressed
+    again carries on. Nothing else ever pauses the game.
+  - Not built yet: HOME + L2 (the game's own L2 options, the context menu) and HOME + Start (the left menu), which log
+    that they are not drawn.
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a

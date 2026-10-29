@@ -38,8 +38,8 @@ import kotlinx.coroutines.launch
  * it, and to a sheet it opens, by Android's own focus (as [LaunchAlertOverlay]'s card takes them); B, or the same chord
  * again, closes it. Main process only.
  *
- * Built: the Quick Menu (HOME + R2). Not yet: the context menu (HOME + L2) and the left menu (HOME + Start), and the
- * explicit "Pause the game" action.
+ * Built: the Quick Menu (HOME + R2), on the running game's Game section, whose "Pause the game" is the one explicit
+ * way to pause it. Not yet: the context menu (HOME + L2) and the left menu (HOME + Start).
  */
 internal object InGameOverlays {
     private const val TAG = "droidtop.InGameOverlay"
@@ -90,6 +90,10 @@ internal object InGameOverlays {
         savedStateOwner.controller.performRestore(null)
         lifecycleOwner.registry.currentState = Lifecycle.State.RESUMED
         val library = LibraryCore.library(app)
+        // The game under the overlay, for the Quick Menu's Game section: the one droidtop launched and still runs.
+        val runningEntry = dev.droidtop.library.LaunchDisplay.running.value?.context?.gameId?.let { id ->
+            library.backgroundScanState(dev.droidtop.library.LibraryKinds.GAMES).value?.firstOrNull { it.id == id }
+        }
         val view = ComposeView(windowContext).apply {
             setViewTreeLifecycleOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(savedStateOwner)
@@ -101,6 +105,7 @@ internal object InGameOverlays {
                             // Start is the left menu's overlay's chord; inside the Quick Menu it closes it.
                             onOpenStartMenu = { close() },
                             onDismiss = { close() },
+                            runningEntry = runningEntry,
                         )
                     }
                 }

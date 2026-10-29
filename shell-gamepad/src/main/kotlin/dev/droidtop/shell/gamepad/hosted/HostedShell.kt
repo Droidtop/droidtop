@@ -56,6 +56,7 @@ import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.PadPress
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.menuMove
+import kotlinx.coroutines.launch
 import dev.droidtop.shell.gamepad.ShellDialog
 
 /*
@@ -334,16 +335,36 @@ fun QuickMenuStandalone(
     library: Library,
     onOpenStartMenu: () -> Unit,
     onDismiss: () -> Unit,
+    // The game running under an in-game overlay (Droidtop/tracker#740): its Game section, where Resume is closing the
+    // overlay (the game never left), Quit and Kill end it as the shell's do, and Restart starts it again once it ended.
+    runningEntry: dev.droidtop.library.LibraryEntry? = null,
 ) {
     val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var quitOutcome by remember { mutableStateOf<dev.droidtop.library.QuitResult?>(null) }
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         QuickMenu(
-            runningEntry = null,
+            runningEntry = runningEntry,
             library = library,
-            onResume = {},
-            onQuit = { _, _ -> },
-            onKill = { },
-            quitOutcome = null,
+            onResume = { onDismiss() },
+            onQuit = { entry, restart ->
+                scope.launch {
+                    val outcome = library.quitRunning(context, entry)
+                    quitOutcome = outcome
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) {
+                        onDismiss()
+                        if (restart) library.launch(entry)
+                    }
+                }
+            },
+            onKill = { entry ->
+                scope.launch {
+                    val outcome = library.killRunning(context, entry)
+                    quitOutcome = outcome
+                    if (outcome is dev.droidtop.library.QuitResult.Ended) onDismiss()
+                }
+            },
+            quitOutcome = quitOutcome,
             onOpenLeftMenu = onOpenStartMenu,
             openPlace = { screenId ->
                 context.startActivity(CatalogScreenLink.intent(context, screenId))
