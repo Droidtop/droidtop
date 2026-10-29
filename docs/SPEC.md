@@ -2842,8 +2842,10 @@ the `ContainerRuntime` interface that already exists (§3):
   own state: `ps [-a] [-q]` (NAME, IMAGE, STATUS from the container's
   program first, PORTS from its image; without `-a`, the ones whose
   program runs or whose container is started), `images [-q]` (the image
-  store), `logs [-n N] CONTAINER` (the program's log, at most 2000
-  lines; no `-f` yet), `start` and `stop CONTAINER...` (the container's
+  store), `logs [-n N] [-f] CONTAINER` (the program's log, at most 2000
+  lines; `-f` then follows what the program writes, read as an attached
+  `run` reads it, until the program ends, Droidtop/tracker#715; the Engine
+  API's and libpod's `follow` are not built yet), `start` and `stop CONTAINER...` (the container's
   own program, as its page's Start it and Stop it; a container whose
   image names no program says so), and `exec [-e K=V] [-w DIR] CONTAINER
   COMMAND...` (the enter path with any command, behind the same

@@ -131,13 +131,14 @@ class EngineCli private constructor(val front: Front) {
     private fun logs(args: List<String>): EngineRequest {
         var tail = DEFAULT_TAIL
         var container: String? = null
+        var follow = false
         var i = 0
         while (i < args.size) {
             val a = args[i]
             val value = when {
                 a == "-n" || a == "--tail" -> args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} logs: $a needs a number\n", 1)
                 a.startsWith("--tail=") -> a.substringAfter('=')
-                a == "-f" || a == "--follow" -> return EngineRequest.Answer("${front.command} logs: following is not built in droidtop yet\n", 1)
+                a == "-f" || a == "--follow" -> { follow = true; null }
                 a.startsWith("-") -> return error("logs", a)
                 container == null -> { container = a; null }
                 else -> return error("logs", a)
@@ -147,7 +148,7 @@ class EngineCli private constructor(val front: Front) {
             }
             i++
         }
-        return container?.let { EngineRequest.Logs(it, tail.coerceAtMost(MAX_TAIL)) } ?: EngineRequest.Answer("${front.command} logs: name a container\n", 1)
+        return container?.let { EngineRequest.Logs(it, tail.coerceAtMost(MAX_TAIL), follow) } ?: EngineRequest.Answer("${front.command} logs: name a container\n", 1)
     }
 
     private fun exec(args: List<String>): EngineRequest {

@@ -14,8 +14,11 @@ sealed interface EngineRequest {
     /** `images`: the images droidtop's store holds. */
     data class Images(val quiet: Boolean) : EngineRequest
 
-    /** `logs`: the last [tail] lines of a container's program log. */
-    data class Logs(val container: String, val tail: Int) : EngineRequest
+    /**
+     * `logs`: the last [tail] lines of a container's program log; with [follow] (`-f`), then what it writes next, until
+     * its program ends (Droidtop/tracker#715).
+     */
+    data class Logs(val container: String, val tail: Int, val follow: Boolean = false) : EngineRequest
 
     /** `start`: starts each container's own program. */
     data class Start(val containers: List<String>) : EngineRequest

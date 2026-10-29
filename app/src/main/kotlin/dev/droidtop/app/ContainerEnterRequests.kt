@@ -182,7 +182,11 @@ internal object ContainerEnterRequests {
             }
             is EngineRequest.Logs -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
-                answer(dir, EngineActions.logs(app, info, command.tail).joinToString("") { it + "\n" }, "", 0)
+                if (command.follow) {
+                    followLogs(app, dir, info.container.id, EngineActions.logs(app, info, command.tail))
+                } else {
+                    answer(dir, EngineActions.logs(app, info, command.tail).joinToString("") { it + "\n" }, "", 0)
+                }
             }
             is EngineRequest.Start, is EngineRequest.Stop -> {
                 val names = if (command is EngineRequest.Start) command.containers else (command as EngineRequest.Stop).containers
@@ -380,6 +384,31 @@ internal object ContainerEnterRequests {
         writeStatus(dir, code)
     }
 
+    /**
+     * `logs -f` (Droidtop/tracker#715): the [tail] lines, then what the program writes next, read the way an attached
+     * run reads it, until the program is no longer running, as Docker's and Podman's follow end with their container.
+     * The helper's own end (Ctrl+C) closes the FIFO, and the next write ends this.
+     */
+    private suspend fun followLogs(app: Context, dir: File, id: String, tail: List<String>) = withContext(Dispatchers.IO) {
+        val log = ContainerProgram.hostLogFile(app.filesDir, id)
+        runCatching { FileOutputStream(File(dir, "err")).use { } }
+        runCatching {
+            FileOutputStream(File(dir, "out")).use { out ->
+                out.write(tail.joinToString("") { it + "\n" }.toByteArray(Charsets.UTF_8))
+                out.flush()
+                // From where the tail ended: what is written from now on.
+                val follow = LogFollower(log, startAt = log.length())
+                while (ContainerPrograms.isRunning(id)) {
+                    follow.copyTo(out)
+                    kotlinx.coroutines.delay(FOLLOW_MS)
+                }
+                follow.copyTo(out)
+                follow.finish(out)
+            }
+        }
+        writeStatus(dir, 0)
+    }
+
     /** How often an attached run looks for more output. */
     private const val FOLLOW_MS = 100L
 
@@ -387,8 +416,8 @@ internal object ContainerEnterRequests {
      * Reads what a program's log gained since the last look, leaving out the line the program's wrapper writes before
      * each start. Should the log be trimmed meanwhile ([ContainerProgram.trim]), reading goes on from its new end.
      */
-    private class LogFollower(private val log: File) {
-        private var offset = 0L
+    private class LogFollower(private val log: File, startAt: Long = 0L) {
+        private var offset = startAt
         private var pending = ByteArray(0)
 
         fun copyTo(out: java.io.OutputStream) {

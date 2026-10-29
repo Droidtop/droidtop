@@ -26,6 +26,9 @@ class EngineCliTest {
         assertEquals(EngineRequest.Logs("gitea", 5), EngineCli.DOCKER.parse(listOf("logs", "-n", "5", "gitea")))
         assertEquals(EngineRequest.Logs("gitea", EngineCli.MAX_TAIL), EngineCli.DOCKER.parse(listOf("logs", "--tail=all", "gitea")))
         assertEquals(EngineRequest.Logs("gitea", EngineCli.MAX_TAIL), EngineCli.DOCKER.parse(listOf("logs", "--tail", "999999", "gitea")))
+        // -f follows (#715).
+        assertEquals(EngineRequest.Logs("gitea", 5, follow = true), EngineCli.DOCKER.parse(listOf("logs", "-f", "-n", "5", "gitea")))
+        assertEquals(EngineRequest.Logs("gitea", EngineCli.DEFAULT_TAIL, follow = true), EngineCli.PODMAN.parse(listOf("logs", "gitea", "--follow")))
         assertEquals(EngineRequest.Start(listOf("a", "b")), EngineCli.DOCKER.parse(listOf("start", "a", "b")))
         assertEquals(EngineRequest.Stop(listOf("a")), EngineCli.DOCKER.parse(listOf("stop", "a")))
     }
@@ -51,7 +54,6 @@ class EngineCliTest {
         assertTrue(answer(listOf("build", ".")).text.contains("do not have this"))
         assertTrue(answer(listOf("frobnicate")).text.contains("not a docker command"))
         assertEquals(1, answer(listOf("ps", "--format", "{{.Nope}}")).code)
-        assertEquals(1, answer(listOf("logs", "-f", "gitea")).code)
         assertEquals(1, answer(listOf("logs", "-n", "x", "gitea")).code)
         assertEquals(1, answer(listOf("logs")).code)
         assertEquals(1, answer(listOf("stop")).code)
