@@ -1,5 +1,7 @@
 package dev.droidtop.runtime.tasks
 
+import dev.droidtop.shared.launchcontract.EnginehostIntents
+
 /**
  * One app Android is running, or that droidtop opened and has no reason to think is gone.
  * [displayId] is the screen its task is on (0 is the built-in one); [taskId] is known only
@@ -73,7 +75,7 @@ object TaskPolicy {
     const val CONFIRM_CLEAR_ALL_ABOVE = 3
 
     /** Enginehost hosts engine games: Clear all leaves it alone, because a game may be running in it (#252). Closing it by name is allowed. */
-    const val ENGINEHOST_PACKAGE = "dev.enginehost"
+    const val ENGINEHOST_PACKAGE = EnginehostIntents.PACKAGE
 
     /** System surfaces nobody wants closed by a task manager. */
     private val SYSTEM_PROTECTED = setOf("android", "com.android.systemui")

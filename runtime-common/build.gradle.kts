@@ -24,6 +24,8 @@ android {
             // pinned as a submodule; docs/SPEC.md 12a "Shared trust code"): compiled in the same way as the notices.
             java.srcDir("../vendor/droidtop-shared/version/src/main/kotlin")
             java.srcDir("../vendor/droidtop-shared/trust/src/main/kotlin")
+            // The names droidtop and Enginehost agree on to start each other (docs/SPEC.md 7d, Droidtop/tracker#204).
+            java.srcDir("../vendor/droidtop-shared/launch-contract/src/main/kotlin")
         }
         getByName("test") {
             resources.srcDirs("src/main/assets")

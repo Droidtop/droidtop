@@ -9566,6 +9566,14 @@ ever copied, moved or imported by either app; both read it in place.
 
 ### The contract droidtop uses
 
+**The names are held once (2026-10-29, Droidtop/tracker#204).** The actions, the extras, the reasons a game
+ended, the capabilities provider's authority and the `enginehost.json` keys are
+`Droidtop/droidtop-shared`'s `:launch-contract` (`EnginehostIntents`, `EnginehostConfig`), compiled into
+`:runtime-common` like `:version` and `:trust`. `EngineHost`, `EnginehostEndGame` and `TaskPolicy` use its
+constants, and every string is the one released builds already send and read. `EnginehostContractTest`
+checks droidtop's names and the config droidtop writes against it; Enginehost checks its manifest and its
+contract page the same way.
+
 Enginehost's surface is Intents and one content provider, and the rule
 both apps hold to is that **any flow in Enginehost's UI has a programmatic
 equivalent, and vice versa** (its README). What droidtop calls:

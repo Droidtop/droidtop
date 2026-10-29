@@ -3,6 +3,8 @@ package dev.droidtop.library
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import dev.droidtop.shared.launchcontract.EnginehostConfig
+import dev.droidtop.shared.launchcontract.EnginehostIntents
 import org.json.JSONObject
 import java.io.File
 import kotlinx.serialization.Serializable
@@ -51,7 +53,7 @@ object EngineHost {
         onChosen: (EnginehostRunOption) -> Unit,
     ) -> Unit)? = null
 
-    const val PACKAGE_NAME = "dev.enginehost"
+    const val PACKAGE_NAME = EnginehostIntents.PACKAGE
 
     /**
      * The contract's config-creator action (review response 2026-08-31,
@@ -62,14 +64,14 @@ object EngineHost {
      * -- their own guidance for RPG Maker 2000/2003 and KiriKiri2 is
      * "leave unknown and open CONFIGURE", never fabricate.
      */
-    const val ACTION_CONFIGURE = "dev.enginehost.CONFIGURE"
+    const val ACTION_CONFIGURE = EnginehostIntents.ACTION_CONFIGURE
 
     /** Global enginehost settings (2026-08-31 10:55 response) -- the emulator's own settings screen, surfaced like any player's. */
-    const val ACTION_CONFIGURE_SETTINGS = "dev.enginehost.CONFIGURE_SETTINGS"
+    const val ACTION_CONFIGURE_SETTINGS = EnginehostIntents.ACTION_CONFIGURE_SETTINGS
 
     /** Narrower saves-only alias of [ACTION_CONFIGURE_SETTINGS]; kept for surfaces that want to deep-link saves directly. */
-    const val ACTION_CONFIGURE_SAVES = "dev.enginehost.CONFIGURE_SAVES"
-    private const val ACTION_LAUNCH = "dev.enginehost.LAUNCH"
+    const val ACTION_CONFIGURE_SAVES = EnginehostIntents.ACTION_CONFIGURE_SAVES
+    private const val ACTION_LAUNCH = EnginehostIntents.ACTION_LAUNCH
 
     /**
      * A package-scoped implicit intent, exactly as the contract
@@ -137,9 +139,9 @@ object EngineHost {
      */
     fun configureIntent(gameFolder: File, target: EnginehostTarget?): Intent =
         Intent(ACTION_CONFIGURE).setPackage(PACKAGE_NAME).apply {
-            putExtra("path", gameFolder.absolutePath)
+            putExtra(EnginehostIntents.EXTRA_PATH, gameFolder.absolutePath)
             if (target != null) {
-                putExtra("config", target.toConfigJson(engineVersion = null).toString())
+                putExtra(EnginehostIntents.EXTRA_CONFIG, target.toConfigJson(engineVersion = null).toString())
             }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -188,25 +190,25 @@ object EngineHost {
         val intent = launchIntent().apply {
             // The one inline field that is always worth sending: the folder
             // wins at every key, so this only ever fills a gap.
-            JSONObject().withTitle(title).withSaveRoot(saveRoot, savesSynced).takeIf { it.length() > 0 }?.let { putExtra("config", it.toString()) }
+            JSONObject().withTitle(title).withSaveRoot(saveRoot, savesSynced).takeIf { it.length() > 0 }?.let { putExtra(EnginehostIntents.EXTRA_CONFIG, it.toString()) }
             // A filesystem path, not a content:// URI -- enginehost holds
             // its own storage permission and the contract is explicit
             // that the caller does not grant its UID by passing a URI.
-            putExtra("path", gameFolder.absolutePath)
+            putExtra(EnginehostIntents.EXTRA_PATH, gameFolder.absolutePath)
             if (!hasOwnConfig) {
                 // An answer already recorded for this game makes every
                 // later launch fully programmatic.
                 val remembered = EnginehostManualChoicePrefs.get(context, gameFolder)
                 if (remembered != null) {
                     putExtra(
-                        "config",
+                        EnginehostIntents.EXTRA_CONFIG,
                         target.copy(engineContext = remembered.engineContext)
                             .toConfigJson(remembered.engineVersion)
                             .withTitle(title)
                             .withSaveRoot(saveRoot, savesSynced)
                             .toString(),
                     )
-                    if (remembered.engineContext != null) putExtra("autoinstallPlugin", true)
+                    if (remembered.engineContext != null) putExtra(EnginehostIntents.EXTRA_AUTOINSTALL_PLUGIN, true)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     LaunchDisplay.start(context, this)
                     return
@@ -250,13 +252,13 @@ object EngineHost {
                     LaunchDisplay.start(context, configureIntent(gameFolder, target))
                     return
                 }
-                putExtra("config", target.toConfigJson(effectiveVersion).withTitle(title).withSaveRoot(saveRoot, savesSynced).toString())
+                putExtra(EnginehostIntents.EXTRA_CONFIG, target.toConfigJson(effectiveVersion).withTitle(title).withSaveRoot(saveRoot, savesSynced).toString())
                 // Confident = we know the exact compatibility line AND the
                 // exact version. A family whose context droidtop cannot
                 // yet determine (RPG Maker 2000 vs 2003, CMVS ps2 vs ps3)
                 // deliberately lands in enginehost's own choice UI rather
                 // than auto-installing against a guess.
-                if (target.engineContext != null) putExtra("autoinstallPlugin", true)
+                if (target.engineContext != null) putExtra(EnginehostIntents.EXTRA_AUTOINSTALL_PLUGIN, true)
             }
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -264,16 +266,16 @@ object EngineHost {
     }
 
     private fun JSONObject.withTitle(title: String?): JSONObject = apply {
-        title?.takeIf { it.isNotBlank() }?.let { put("title", it) }
+        title?.takeIf { it.isNotBlank() }?.let { put(EnginehostConfig.TITLE, it) }
     }
 
     private fun JSONObject.withSaveRoot(saveRoot: File?, savesSynced: Boolean): JSONObject = apply {
-        saveRoot?.let { put("saveRoot", it.absolutePath) }
-        if (savesSynced) put("savesSynced", true)
+        saveRoot?.let { put(EnginehostConfig.SAVE_ROOT, it.absolutePath) }
+        if (savesSynced) put(EnginehostConfig.SAVES_SYNCED, true)
     }
 
     /** What Enginehost sends droidtop's package alone when a game droidtop launched ends (tracker#580). */
-    const val ACTION_GAME_ENDED = "dev.enginehost.GAME_ENDED"
+    const val ACTION_GAME_ENDED = EnginehostIntents.ACTION_GAME_ENDED
 }
 
 /**
@@ -318,11 +320,11 @@ data class EnginehostTarget(
      * null-version launch path routes to CONFIGURE instead of here.
      */
     fun toConfigJson(engineVersion: String?): JSONObject = JSONObject().apply {
-        put("engine", engine)
-        engineVersion?.let { put("engineVersion", it) }
-        engineContext?.let { put("engineContext", it) }
+        put(EnginehostConfig.ENGINE, engine)
+        engineVersion?.let { put(EnginehostConfig.ENGINE_VERSION, it) }
+        engineContext?.let { put(EnginehostConfig.ENGINE_CONTEXT, it) }
         if (runtimeRequirements.isNotEmpty()) {
-            put("runtimeRequirements", JSONObject(runtimeRequirements.toMap()))
+            put(EnginehostConfig.RUNTIME_REQUIREMENTS, JSONObject(runtimeRequirements.toMap()))
         }
     }
 }

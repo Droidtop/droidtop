@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import dev.droidtop.shared.launchcontract.EnginehostIntents
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -80,9 +81,9 @@ class EnginehostEndGame : Activity() {
         private const val REQUEST = 1
 
         /** Enginehost's contract (LaunchEntryActivity in Droidtop/enginehost). */
-        const val ACTION_END_GAME = "dev.enginehost.END_GAME"
-        const val EXTRA_ENDED = "ended"
-        const val EXTRA_ERROR = "error"
+        const val ACTION_END_GAME = EnginehostIntents.ACTION_END_GAME
+        const val EXTRA_ENDED = EnginehostIntents.EXTRA_ENDED
+        const val EXTRA_ERROR = EnginehostIntents.EXTRA_ERROR
 
         /** A person pressed Kill and is watching; Enginehost answers at once, so a long silence means the start was blocked. */
         private const val TIMEOUT_MS = 4_000L
