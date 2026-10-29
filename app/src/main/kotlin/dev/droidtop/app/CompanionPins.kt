@@ -259,7 +259,9 @@ private fun PinTile(item: CatalogItem, modifier: Modifier, onChanged: () -> Unit
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         Text(tile.label, style = MaterialTheme.typography.labelLarge, color = if (lit) colors.onPrimaryContainer else colors.onSurface, maxLines = 2)
-        val value = status ?: tile.value ?: tile.on?.let { if (it) "On" else "Off" }
+        // An on/off tile shows its switch, as the Quick Menu's tile does (show, then say: Droidtop/tracker#738).
+        tile.on?.let { androidx.compose.material3.Switch(checked = it, onCheckedChange = null) }
+        val value = status ?: tile.value
         if (value != null) {
             Text(value, style = MaterialTheme.typography.bodySmall, color = if (lit) colors.onPrimaryContainer else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

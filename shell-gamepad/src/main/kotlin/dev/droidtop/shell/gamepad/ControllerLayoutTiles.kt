@@ -38,13 +38,13 @@ internal object ControllerLayoutTiles {
                 icon = CatalogIcon.CONTROLLER,
                 run = { ControllerLayouts.requestCapture() },
             ),
+            // The tile showed no state (console, build 1386). On = droidtop trades the A and B (and X and Y) key codes
+            // right now, whatever decided it; a switch, not the word (show, then say: Droidtop/tracker#738).
             ActionItem(
                 id = ID_SWAP,
                 title = "Swap A and B",
                 subtitle = "For when the buttons are named wrong",
-                // The tile showed no state (console, build 1386). On = droidtop trades the A and B
-                // (and X and Y) key codes right now, whatever decided it.
-                value = if (layout.swapped) "On" else "Off",
+                state = layout.swapped,
                 icon = CatalogIcon.CONTROLLER,
                 run = { ControllerLayouts.swapNow(it) },
             ),

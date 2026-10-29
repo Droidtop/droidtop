@@ -85,6 +85,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.ButtonBarItem
 import dev.droidtop.library.settings.ButtonRole
@@ -1747,9 +1749,11 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
             },
         ) {
             Text(item.title, color = MenuTokens.OnSurface, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            // Show, then say (Droidtop/tracker#738): a switch's state is the switch, as on its row.
+            if (item is ToggleItem) ShellSwitch(item.current, Modifier.padding(top = 4.dp).semantics { stateDescription = if (item.current) "On" else "Off" })
             val value = when (item) {
                 is ChoiceItem -> item.currentLabel()
-                is ToggleItem -> if (item.current) "On" else "Off"
+                is ToggleItem -> null
                 is SliderItem -> item.current.toString()
                 else -> item.value
             }

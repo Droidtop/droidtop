@@ -133,7 +133,8 @@ class SourceRecordPageTest {
         val moved = UpdateSources.Control("moved", UpdateSources.Control.Kind.NOTICE, "The thread was moved")
         val rows = recordRows(record.copy(controls = listOf(watch, thread, moved)), RecordTab.OVERVIEW) { "" }
         assertEquals(listOf("Version", "Status", "Watch this thread", "Thread", "The thread was moved", "About"), rows.map { it.title })
-        assertEquals("On", rows[2].value)
+        assertEquals(true, rows[2].on)
+        assertNull(rows[2].value)
         assertEquals(RecordAction.Control(watch), rows[2].action)
         assertEquals(RecordAction.Open("https://f95zone.to/threads/18978"), rows[3].action)
         // A notice with nothing to run only says.

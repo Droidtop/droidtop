@@ -57,6 +57,7 @@ import dev.droidtop.shell.gamepad.ActionRow
 import dev.droidtop.shell.gamepad.ActionSheet
 import dev.droidtop.shell.gamepad.AppOptionsMenu
 import dev.droidtop.shell.gamepad.GamelistOptionsMenu
+import dev.droidtop.shell.gamepad.ListOption
 import dev.droidtop.shell.gamepad.HelpRowClaim
 import dev.droidtop.shell.gamepad.GamingSection
 import dev.droidtop.shell.gamepad.LocalShellWindow
@@ -1428,31 +1429,31 @@ internal fun PcGamesSection(
             // optional tabs (7i): global, not part of a view.
             listOptions = listOf(
                 // X is Play now on a game (Droidtop/tracker#641), so the list's filter is here.
-                "Filter" to {
+                ListOption("Filter") {
                     state.optionsOpen = false
                     state.filterOpen = true
                 },
                 // Y is Search (Droidtop/tracker#644 slice 4), so Sort By is here beside Filter.
-                "Sort by" to {
+                ListOption("Sort by") {
                     state.optionsOpen = false
                     state.sortOpen = true
                 },
-                ("Favourites tab: " + if (stripTabs.favourites) "Shown" else "Hidden") to {
+                ListOption("Favourites tab", on = stripTabs.favourites) {
                     setStripTabs(stripTabs.copy(favourites = !stripTabs.favourites))
                 },
-                ("Collections tab: " + if (stripTabs.collections) "Shown" else "Hidden") to {
+                ListOption("Collections tab", on = stripTabs.collections) {
                     setStripTabs(stripTabs.copy(collections = !stripTabs.collections))
                 },
+                ListOption("Show names under images", on = namesUnder) { setNamesUnder(!namesUnder) },
                 // Full ("PC · GOG", "Engine · Ren'Py"), Kind only ("PC"), Off: what a capsule's badge says.
-                ("Show names under images: " + if (namesUnder) "On" else "Off") to { setNamesUnder(!namesUnder) },
-                ("Capsule badge: " + badgeStyle.label) to {
+                ListOption("Capsule badge", value = badgeStyle.label) {
                     val styles = dev.droidtop.library.CapsuleBadgeStyle.entries
                     setBadgeStyle(styles[(styles.indexOf(badgeStyle) + 1) % styles.size])
                 },
-                ("Show games shared with you: " + if (ownership.showShared) "On" else "Off") to {
+                ListOption("Show games shared with you", on = ownership.showShared) {
                     setOwnership(ownership.copy(showShared = !ownership.showShared))
                 },
-                ("Show free-to-play games not in your library: " + if (ownership.showFree) "On" else "Off") to {
+                ListOption("Show free-to-play games not in your library", on = ownership.showFree) {
                     setOwnership(ownership.copy(showFree = !ownership.showFree))
                 },
             ),

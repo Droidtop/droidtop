@@ -26,7 +26,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
@@ -310,9 +313,11 @@ private fun MetadataToggleRow(label: String, value: Boolean, onToggle: (Boolean)
             .selectionFrame(focused, Corners.Crisp, rest = Color.Transparent)
             .padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, color = MenuTokens.OnSurface, style = MaterialTheme.typography.bodyLarge)
-        Text(if (value) "On" else "Off", color = if (value) MenuTokens.Affirmative else MenuTokens.OnSurfaceMuted, style = MaterialTheme.typography.bodyLarge)
+        // Show, then say (Droidtop/tracker#738): the state is the switch every settings row draws.
+        ShellSwitch(value, Modifier.semantics { stateDescription = if (value) "On" else "Off" })
     }
 }
 

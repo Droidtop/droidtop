@@ -110,6 +110,7 @@ internal fun rememberPluginPageRows(entry: LibraryEntry): PluginPageRows {
                             onActivate = onActivate,
                             tip = from,
                             tab = tab,
+                            on = row.on,
                         ),
                     )
                 }

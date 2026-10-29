@@ -65,6 +65,9 @@ private const val ORPHANS_DELETE = "Delete orphaned media"
  * configured games root's child folders whose resolved system is this
  * group's), run in place with live status, and never navigate away.
  */
+/** One of a list's own options: [on] for an on/off one (drawn as a switch), [value] for a choice, and what A does. */
+internal class ListOption(val label: String, val on: Boolean? = null, val value: String? = null, val action: () -> Unit)
+
 @Composable
 internal fun GamelistOptionsMenu(
     groupKey: String,
@@ -92,9 +95,9 @@ internal fun GamelistOptionsMenu(
     // docs/SPEC.md 7j) over this gamelist; null where the list has none.
     onOpenSort: (() -> Unit)? = null,
     onOpenFilter: (() -> Unit)? = null,
-    // The list's own options, each a row whose label says its state and an
-    // action that changes it (the PC library's ownership options, docs/SPEC.md 7j).
-    listOptions: List<Pair<String, () -> Unit>> = emptyList(),
+    // The list's own options (the PC library's ownership options, docs/SPEC.md 7j): a switch for an on/off one, its
+    // value for a choice, and the action that changes it.
+    listOptions: List<ListOption> = emptyList(),
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val scope = rememberCoroutineScope()
@@ -196,7 +199,7 @@ internal fun GamelistOptionsMenu(
             if (systemId == PC_SYSTEM_ID) add(PC_SETUP)
             // The PC walks only, the same action as Game sources > Folders' row (LibraryRescan).
             if (systemId == PC_SYSTEM_ID) add(GamingSettingsCatalog.RESCAN_PC_FOLDERS)
-            listOptions.forEach { add(it.first) }
+            listOptions.forEach { add(it.label) }
         }
         add("Close")
     }
@@ -385,7 +388,7 @@ internal fun GamelistOptionsMenu(
                 if (screen != null) acquireScreen = screen else status = "Settings screen unavailable"
             }
             "Close" -> onDismiss()
-            else -> listOptions.firstOrNull { it.first == actions[index] }?.second?.invoke()
+            else -> listOptions.firstOrNull { it.label == actions[index] }?.action?.invoke()
         }
     }
 
@@ -462,8 +465,12 @@ internal fun GamelistOptionsMenu(
                 }
             } else {
                 actions.forEachIndexed { index, label ->
+                    val option = listOptions.firstOrNull { it.label == label }
                     MenuRow(
                         title = if (label == ORPHANS_DELETE) "$label: ${PressWords.again}" else label,
+                        // Show, then say (Droidtop/tracker#738): an on/off option is a switch, a choice its value.
+                        value = option?.value,
+                        switchOn = option?.on,
                         selected = index == focusIndex,
                         danger = label == ORPHANS_DELETE,
                         onClick = {

@@ -632,7 +632,7 @@ internal fun LibrarySearchDialog(
 
     val lines = buildList<SearchLine> {
         switches.forEach { switch ->
-            add(SearchLine.Entry("switch:${switch.label}", switch.label, value = if (switch.on) "On" else "Off", onPick = switch.toggle))
+            add(SearchLine.Entry("switch:${switch.label}", switch.label, on = switch.on, onPick = switch.toggle))
         }
         if (local == null) {
             add(
@@ -989,6 +989,8 @@ private sealed interface SearchLine {
         val subtitle: String? = null,
         val value: String? = null,
         val icon: android.graphics.Bitmap? = null,
+        /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
+        val on: Boolean? = null,
         val onPick: () -> Unit,
     ) : SearchLine
 }
@@ -1008,6 +1010,7 @@ private fun SearchEntryRow(entry: SearchLine.Entry, selected: Boolean, onPick: (
             title = entry.title,
             subtitle = entry.subtitle,
             value = entry.value,
+            switchOn = entry.on,
             selected = selected,
             modifier = Modifier.weight(1f),
             onClick = onPick,
