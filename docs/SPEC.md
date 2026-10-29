@@ -3801,8 +3801,16 @@ the `ContainerRuntime` interface that already exists (§3):
     Restart starts it again once it ended. **Pause the game** is a row there, only in an overlay and for a console
     game: it sends RetroArch's `PAUSE_TOGGLE` to its command port (`RetroArchCommands`) when pressed, and pressed
     again carries on. Nothing else ever pauses the game.
-  - Not built yet: HOME + L2 (the game's own L2 options, the context menu) and HOME + Start (the left menu), which log
-    that they are not drawn.
+  - HOME + L2 is the running game's own menu (`GameOptionsStandalone`), what L2 opens on it in Gaming: a PC or engine
+    game's `PcGameMenu`, whose Game page is drawn over the game too, and a console game's game menu (`AppOptionsMenu`),
+    whose Game details is Gaming's detail screen. Play there is Resume, closing the overlay. With no game droidtop
+    started in front, HOME + L2 does nothing (it logs so).
+  - HOME + Start is the left menu's launcher content (`LeftMenuStandalone`): the shell's own `LeftMenu` with the
+    destinations the UI mode allows (read from storage before it draws, so Kiosk and Kid never show the places), Resume
+    first and the cursor on it while a game runs, then Search (`LauncherSearchActivity`, droidtop's one search). A
+    destination leaves the game for droidtop: a place through `PlaceLinks` (Gaming on it when Gaming is the mode in
+    use, else the screen host), any other section in Gaming. With Gaming off there is no left menu, and HOME + Start
+    does nothing. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a
