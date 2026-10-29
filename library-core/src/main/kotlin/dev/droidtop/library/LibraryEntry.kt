@@ -1153,8 +1153,10 @@ class Library(
         val normalized = { files: Collection<File> -> files.map { File(it.absolutePath.trimEnd('/')) }.distinct() }
         val reported = (normalized(added) + normalized(changed)).distinct()
         val removedPaths = normalized(removed)
-        val gone = (removedPaths + reported.filterNot { it.exists() }).distinct().filterNot { it.exists() }
-        val stillThere = (reported + removedPaths).distinct().filter { it.exists() }
+        // Each path is looked at once (Droidtop/tracker#766: it was three times), in the same order as before.
+        val present = (reported + removedPaths).distinct().associateWith { it.exists() }
+        val gone = (removedPaths + reported).distinct().filter { present[it] == false }
+        val stillThere = present.filterValues { it }.keys.toList()
         val ordered = providers.filter { it.indexed }.sortedByDescending { it.indexesPathsEarly }
         var reindexed = 0
         var dropped = 0
