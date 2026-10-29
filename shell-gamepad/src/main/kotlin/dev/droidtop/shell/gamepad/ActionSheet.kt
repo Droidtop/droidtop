@@ -12,7 +12,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
@@ -67,7 +66,7 @@ fun ActionSheet(
 ) {
     var focusIndex by focus
     val choices = rows.filterIsInstance<ActionRow>()
-    Dialog(onDismissRequest = onBack) {
+    ShellDialog(onDismissRequest = onBack) {
         HideSystemBarsInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(width)),

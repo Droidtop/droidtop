@@ -22,7 +22,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.consoles.ConsoleSystemsRepository
 import dev.droidtop.library.scraper.importGamelistXml
@@ -423,7 +422,7 @@ internal fun GamelistOptionsMenu(
             onDismiss()
         }
     }
-    Dialog(onDismissRequest = goBack) {
+    ShellDialog(onDismissRequest = goBack) {
         GatePadInThisDialog()
         MenuPanel(
             // A fixed 520dp panel is wider than a phone, and the part

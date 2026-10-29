@@ -29,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.GameUpdates
 import dev.droidtop.library.Library
 import dev.droidtop.library.LibraryEntry
@@ -59,6 +58,7 @@ import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /*
  * A linked source's record, drawn by droidtop from what the source tells it (docs/SPEC.md 7g, "Getting an update";
@@ -282,7 +282,7 @@ internal fun SourceRecordPage(
     }
 
     BackHandler { onClose() }
-    Dialog(onDismissRequest = onClose) {
+    ShellDialog(onDismissRequest = onClose) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(760.dp)),

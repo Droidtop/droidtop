@@ -54,7 +54,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.LibraryEntry
 import java.io.File
@@ -90,6 +89,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /** One flattened row of a sheet: a section marker or a selectable row. */
 private sealed interface FilterEntry {
@@ -261,7 +261,7 @@ internal fun LibraryFilterSheet(
         return
     }
 
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
@@ -330,7 +330,7 @@ internal fun LibrarySortSheet(
     onDismiss: () -> Unit,
 ) {
     var focusIndex by remember { mutableIntStateOf(scope.sorts.indexOf(query.sort).coerceAtLeast(0)) }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(dev.droidtop.shell.gamepad.LocalShellWindow.current.panelWidth(560.dp)),
@@ -829,7 +829,7 @@ internal fun LibrarySearchDialog(
     }
     val entries = lines.filterIsInstance<SearchLine.Entry>()
 
-    if (activeCatalog == null) Dialog(
+    if (activeCatalog == null) ShellDialog(
         // Back from the places of one game returns to the results, as B does.
         onDismissRequest = { if (choosing != null) choosing = null else onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false),

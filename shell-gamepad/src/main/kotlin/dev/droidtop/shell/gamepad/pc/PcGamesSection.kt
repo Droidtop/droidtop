@@ -111,6 +111,7 @@ import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.droidtop.shell.gamepad.query.addedEpochMs
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /**
  * Where the PC Games tab is and what it is on, held by the shell outside
@@ -1650,7 +1651,7 @@ private fun PinnedTabMenu(
         "Close" to onDismiss,
     )
     var focusIndex by remember { mutableIntStateOf(0) }
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         dev.droidtop.shell.gamepad.MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(420.dp)),
             focusLabel = "Tab options",

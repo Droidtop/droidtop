@@ -195,6 +195,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The launch watchdog's alert above the game on its own display (SPEC "The launch watchdog"): the shell's
         // dialog is behind the game. Main process only.
         LaunchAlertOverlay.install(this)
+        // The in-game overlays (SPEC "In-game overlays: HOME chords", tracker#740): the Quick Menu over the app in front on
+        // HOME + R2, without backgrounding it. Main process only.
+        InGameOverlays.install(this)
         // The download policy (docs/SPEC.md "Download rules", tracker#226): every download job is held or let run by
         // the person's rules, and games set to keep themselves up to date are checked a little after start.
         // Main process only: the jobs registry lives there.

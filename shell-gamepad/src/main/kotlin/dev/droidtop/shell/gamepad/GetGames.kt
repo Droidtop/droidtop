@@ -11,7 +11,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.library.integrations.GetGamesEntry
 import dev.droidtop.library.settings.CatalogScreen
@@ -31,7 +30,7 @@ private val CATALOG_SHEET_HINTS = listOf(HintBinding(GamepadAction.A, "Select"),
 @Composable
 internal fun CatalogSheet(root: CatalogScreen, onExit: () -> Unit) {
     val window = LocalShellWindow.current
-    Dialog(
+    ShellDialog(
         onDismissRequest = onExit,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {

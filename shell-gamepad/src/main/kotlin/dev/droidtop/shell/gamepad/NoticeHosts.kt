@@ -29,7 +29,6 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.compose.ui.window.Popup
@@ -92,7 +91,7 @@ private fun NoticeDialogWindow(request: NoticeDialogs.Request) {
     val hasDetails = !request.notice.details.isNullOrBlank()
     val cancel = { NoticeDialogs.answer(request, ConfirmAnswer.Cancel) }
     val proceed = { NoticeDialogs.answer(request, ConfirmAnswer.Proceed) }
-    Dialog(onDismissRequest = cancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    ShellDialog(onDismissRequest = cancel, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         GatePadInThisDialog()
         val hints = remember(hasDetails) {
             listOfNotNull(

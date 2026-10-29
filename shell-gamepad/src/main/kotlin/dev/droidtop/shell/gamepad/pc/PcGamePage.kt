@@ -64,7 +64,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 
@@ -124,6 +123,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /**
  * One PC game's own page (docs/SPEC.md 7i, "The game page", 2026-10-02):
@@ -581,7 +581,7 @@ internal fun PcGamePage(
         EsDeNavigationSounds.play(UiSound.PAGE_IN)
         onDispose { EsDeNavigationSounds.play(UiSound.PAGE_OUT) }
     }
-    Dialog(
+    ShellDialog(
         onDismissRequest = closePage,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
     ) {

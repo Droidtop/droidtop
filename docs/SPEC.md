@@ -3756,7 +3756,26 @@ the `ContainerRuntime` interface that already exists (§3):
     the overlay is drawn.
   - The Retroid Pocket 5's Home button is to be logged on the console (`getevent`); if it is not `KEYCODE_HOME`,
     `HomeChords(homeKeys)` takes that key instead.
-  The overlays themselves, RetroArch's pause while one is open, and their closing are the UI half (#740).
+  The drawing half. **An overlay never pauses or signals the app** (the owner's correction, 2026-10-29: "We don't want
+  to pause the game or etc when we do this, unless we want to tie a specific button to 'tell a game it was
+  backgrounded, even if it wasn't'"): the app keeps running and rendering underneath, nothing is sent to it when an
+  overlay opens or closes, and the only effect on it is that the pad drives the overlay while it is open. An explicit
+  overlay action, "Pause the game" (working name), will tell the game it was backgrounded (RetroArch's PAUSE_TOGGLE
+  over its command port), only when the person presses it. Built so far:
+  - `InGameOverlays` (`:app`) collects the requests and draws the overlay in `GameOverlay`'s window (the accessibility
+    overlay, else "Display over other apps") on the request's display, full-window, at that display's canvas and
+    Interface size (the theme's `ProvideShellCanvas` reads the window's own display). The same chord again closes it,
+    as does B or the menu's own close; another chord replaces it.
+  - HOME + R2 is the shell's own Quick Menu (`QuickMenuStandalone`, the one Desktop's tray and Standard's gesture
+    open), not a copy. Its sheets and pages are `ShellDialog`s, the shell's one modal window: Compose's Dialog in
+    droidtop's own windows, and inside an overlay (`LocalInGameOverlay`) a focusable Popup filling the overlay, a
+    sub-window of it, since a Dialog has no activity to belong to over another app. The UI rule `bare-dialog` fails a
+    Compose `Dialog(` anywhere else in the shell.
+  - The overlay window is focusable, so the pad reaches it, and the sheet it opens, by Android's own focus (as the
+    launch watchdog's card does), rather than through `OverlayRequests.keys`, which delivers to one view and not to a
+    sub-window; the input half keeps that route for a host that wants it.
+  - Not built yet: HOME + L2 (the context menu) and HOME + Start (the left menu), which log that they are not drawn,
+    and "Pause the game".
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a

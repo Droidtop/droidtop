@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.EngineHost
 import dev.droidtop.library.EngineOverridePrefs
 import dev.droidtop.library.EnginesDatabase
@@ -76,6 +75,7 @@ import dev.droidtop.shell.gamepad.MediaViewer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /**
  * The PC-only actions on one PC or engine game -- docs/SPEC.md §7i's
@@ -1244,7 +1244,7 @@ internal fun PcGameMenu(
 /** A minimal full-bleed [Dialog] host for a screen written as a plain fillMaxSize() composable (see the call sites above). */
 @Composable
 private fun FullScreenOverlay(onDismiss: () -> Unit, content: @Composable () -> Unit) {
-    Dialog(
+    ShellDialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
     ) {

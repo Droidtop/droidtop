@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.pluginhost.GrantAnswer
 import dev.droidtop.pluginhost.PermissionTier
 import dev.droidtop.pluginhost.PluginGrantPrompts
@@ -47,7 +46,7 @@ fun PluginGrantSheet(pending: PluginGrantPrompts.Pending) {
         val window = LocalShellWindow.current
 
         // A dismissal that is not a choice (the system closing the dialog) is Not now, never Allow.
-        Dialog(onDismissRequest = { answer(GrantAnswer.NOT_NOW) }) {
+        ShellDialog(onDismissRequest = { answer(GrantAnswer.NOT_NOW) }) {
             GatePadInThisDialog()
             MenuPanel(
                 modifier = Modifier.width(window.panelWidth(460.dp)),

@@ -10,7 +10,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 
@@ -33,7 +32,7 @@ internal fun OfferDialog(
     var selected by remember { mutableIntStateOf(0) }
     fun choose(index: Int) = if (index == 1) onAction() else onDecline()
     val hints = remember(decline) { listOf(HintBinding(GamepadAction.A, "Select"), HintBinding(GamepadAction.B, decline)) }
-    Dialog(onDismissRequest = onDecline) {
+    ShellDialog(onDismissRequest = onDecline) {
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(400.dp)),
             focusLabel = focusLabel,

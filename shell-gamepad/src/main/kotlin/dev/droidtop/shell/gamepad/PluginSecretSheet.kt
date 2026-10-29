@@ -21,7 +21,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.pluginhost.PluginSecrets
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
@@ -47,7 +46,7 @@ fun PluginSecretSheet(shown: PluginSecrets.Shown, onClose: () -> Unit) {
         val choices = listOf(stringResource(R.string.secret_copy) to copy, stringResource(R.string.secret_close) to onClose)
         val copiedWord = stringResource(R.string.secret_copied)
 
-        Dialog(onDismissRequest = onClose) {
+        ShellDialog(onDismissRequest = onClose) {
             GatePadInThisDialog()
             MenuPanel(
                 modifier = Modifier.width(window.panelWidth(460.dp)),

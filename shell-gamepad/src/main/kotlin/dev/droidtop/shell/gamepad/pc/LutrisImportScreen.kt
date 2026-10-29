@@ -23,7 +23,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.PcGameRuntimeRegistry
 import dev.droidtop.library.PcRunnerOptions
@@ -50,6 +49,7 @@ import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /**
  * "Import a Lutris install script" on a Windows game's own screen --
@@ -195,7 +195,7 @@ internal fun LutrisImportScreen(
 
     BackHandler { back() }
     // The system back key steps back a stage, as B does.
-    Dialog(onDismissRequest = { back() }) {
+    ShellDialog(onDismissRequest = { back() }) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(680.dp)),

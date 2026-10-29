@@ -20,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuPanel
 import dev.droidtop.shell.gamepad.MenuRow
@@ -29,6 +28,7 @@ import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.theme.EsDeNavigationSounds
 import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.launch
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /** One game the picker offers: its name, and why it is offered and where it is. */
 internal data class SameGameChoice(val title: String, val subtitle: String)
@@ -93,7 +93,7 @@ internal fun SameGamePicker(
     }
 
     BackHandler { onDismiss() }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),

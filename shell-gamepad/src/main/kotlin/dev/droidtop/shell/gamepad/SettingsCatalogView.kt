@@ -85,7 +85,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.isSpecified
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.settings.ActionItem
 import dev.droidtop.library.settings.ButtonBarItem
 import dev.droidtop.library.settings.ButtonRole
@@ -1735,7 +1734,7 @@ private fun CatalogInfoSheet(item: CatalogItem, status: String?, onDismiss: () -
         NoticeInfoSheet(item, onDismiss)
         return
     }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
@@ -1786,7 +1785,7 @@ internal fun NoticeInfoSheet(item: NoticeItem, onDismiss: () -> Unit) {
             HintBinding(GamepadAction.B, "Close"),
         )
     }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
@@ -1897,7 +1896,7 @@ internal fun TextEditDialog(
     search: Boolean = false,
 ) {
     var value by remember(title, initial) { mutableStateOf(initial) }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         Column(
             Modifier

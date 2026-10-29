@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import dev.droidtop.shell.gamepad.input.HintBinding
 import dev.droidtop.shell.gamepad.input.HintRow
@@ -57,7 +56,7 @@ fun ModeSwitcherSheet(
             choice.choose()
             onDismiss()
         }
-        Dialog(onDismissRequest = onDismiss) {
+        ShellDialog(onDismissRequest = onDismiss) {
             GatePadInThisDialog()
             if (hideSystemBars) HideSystemBarsInThisDialog()
             MenuPanel(

@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.shell.gamepad.input.ControllerLayouts
 
 /**
@@ -35,7 +34,7 @@ internal fun PadCapturePrompt(light: Boolean, onDone: () -> Unit) {
     val context = LocalContext.current
     val window = LocalShellWindow.current
     val pad = ControllerLayouts.activePadName
-    Dialog(onDismissRequest = onDone) {
+    ShellDialog(onDismissRequest = onDone) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier

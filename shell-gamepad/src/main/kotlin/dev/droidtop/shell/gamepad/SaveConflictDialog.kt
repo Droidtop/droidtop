@@ -15,7 +15,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.stores.SaveChoice
 import dev.droidtop.library.stores.SaveConflict
 import dev.droidtop.library.stores.SaveConflictPrompts
@@ -73,7 +72,7 @@ internal fun SaveConflictDialog(gameTitle: String, conflict: SaveConflict, onAns
         val files = "${side.files} ${if (side.files == 1) "file" else "files"}"
         return listOfNotNull(whenText, files, "Newer".takeIf { newer }).joinToString(" · ")
     }
-    Dialog(onDismissRequest = { onAnswer(null) }) {
+    ShellDialog(onDismissRequest = { onAnswer(null) }) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(560.dp)),

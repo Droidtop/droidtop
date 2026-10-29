@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
 import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
@@ -105,7 +104,7 @@ internal fun SidePanelFrame(
         EsDeNavigationSounds.play(UiSound.PANEL_OPEN)
         shown.animateTo(1f, Motion.panelIn())
     }
-    Dialog(
+    ShellDialog(
         onDismissRequest = close,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {

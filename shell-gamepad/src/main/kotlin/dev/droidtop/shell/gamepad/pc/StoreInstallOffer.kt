@@ -23,7 +23,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.InstallVolume
 import dev.droidtop.library.LibraryEntry
@@ -39,6 +38,7 @@ import dev.droidtop.shell.gamepad.selectionFrame
 import dev.droidtop.shell.gamepad.input.GamepadAction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /**
  * The offer droidtop stops on before a store install or update
@@ -138,7 +138,7 @@ internal fun StoreInstallOfferSheet(
             onDismiss = { contentOpen = false },
         )
     }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(window.panelWidth(400.dp)),

@@ -35,7 +35,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
 import dev.droidtop.library.Library
 import dev.droidtop.library.settings.CatalogScreenLink
@@ -57,6 +56,7 @@ import dev.droidtop.shell.gamepad.input.HintRow
 import dev.droidtop.shell.gamepad.input.PadPress
 import dev.droidtop.shell.gamepad.keepInView
 import dev.droidtop.shell.gamepad.menuMove
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /*
  * The Gaming shell's own pieces, handed to the modes that have no Gaming shell around them
@@ -197,7 +197,7 @@ fun HostedListSheet(
     }
     CompositionLocalProvider(LocalShellWindow provides window) {
         // The platform's default dialog width (440dp on the emulator rig) would cap the sheet below its own width.
-        Dialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+        ShellDialog(onDismissRequest = onClose, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             GatePadInThisDialog()
             // Desktop is immersive (Droidtop/tracker#555 D4): a sheet that let its own window show the bars made the
             // desktop under it resize as it opened and closed, unlike the Quick Menu's frame, which already hid them.

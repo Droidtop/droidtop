@@ -21,7 +21,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.scraper.ScrapeLookup
 import dev.droidtop.library.scraper.foundOrNull
@@ -128,7 +127,7 @@ internal fun ManualMatchPicker(
     }
 
     BackHandler { onDismiss() }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(620.dp)),

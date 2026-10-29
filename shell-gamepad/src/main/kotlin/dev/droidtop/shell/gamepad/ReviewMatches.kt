@@ -28,7 +28,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import coil3.compose.AsyncImage
 import dev.droidtop.library.GameTitleParser
 import dev.droidtop.library.LibraryEntry
@@ -217,7 +216,7 @@ internal fun ReviewMatches(onDismiss: () -> Unit) {
     }
 
     BackHandler { onDismiss() }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(760.dp)),
@@ -377,7 +376,7 @@ private fun AcceptAllSheet(cards: List<MatchQueue.Card>, entries: Map<String, Li
     val pages = ((cards.size + SHEET_PAGE - 1) / SHEET_PAGE).coerceAtLeast(1)
     val games = cards.sumOf { it.items.size }
     BackHandler { onDismiss() }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(760.dp)),

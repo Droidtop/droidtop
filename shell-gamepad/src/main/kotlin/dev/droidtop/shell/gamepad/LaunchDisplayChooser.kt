@@ -17,7 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.LaunchDisplayOption
 
 /**
@@ -68,7 +67,7 @@ internal fun LaunchDisplayChooserDialog(
     var selected by remember { mutableStateOf(0) }
 
     val window = LocalShellWindow.current
-    Dialog(onDismissRequest = onCancel) {
+    ShellDialog(onDismissRequest = onCancel) {
         GatePadInThisDialog()
         // The shell's one modal panel: focus, the pipeline's front for this
         // dialog and the pad's presses are handled there (docs/SPEC.md 6e).

@@ -21,7 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import dev.droidtop.library.GameNaming
 import dev.droidtop.library.LibraryEntry
 import dev.droidtop.library.stores.StoreBranch
@@ -43,6 +42,7 @@ import dev.droidtop.shell.gamepad.theme.UiSound
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import dev.droidtop.shell.gamepad.ShellDialog
 
 /**
  * "DLC and versions" (docs/SPEC.md 7g, "Stores", Droidtop/tracker#313): the
@@ -148,7 +148,7 @@ internal fun StoreContentSheet(
             onDismiss = { asking = null },
         )
     }
-    Dialog(onDismissRequest = onDismiss) {
+    ShellDialog(onDismissRequest = onDismiss) {
         GatePadInThisDialog()
         MenuPanel(
             modifier = Modifier.width(LocalShellWindow.current.panelWidth(520.dp)),
