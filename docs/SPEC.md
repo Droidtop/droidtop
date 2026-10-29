@@ -3809,7 +3809,8 @@ the `ContainerRuntime` interface that already exists (§3):
     destinations the UI mode allows (read from storage before it draws, so Kiosk and Kid never show the places), Resume
     first and the cursor on it while a game runs, then Search (`LauncherSearchActivity`, droidtop's one search). A
     destination leaves the game for droidtop: a place through `PlaceLinks` (Gaming on it when Gaming is the mode in
-    use, else the screen host), any other section in Gaming. With Gaming off there is no left menu, and HOME + Start
+    use, else the screen host), any other section in Gaming. It is drawn only while Gaming is the mode in use
+    (`Place.opensInGaming`), so a row never switches the person into a mode they are not using; otherwise HOME + Start
     does nothing. R2 in it swaps to the Quick Menu and Start in the Quick Menu to it, as in Gaming.
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
