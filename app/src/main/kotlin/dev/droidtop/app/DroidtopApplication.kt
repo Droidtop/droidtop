@@ -53,6 +53,18 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The download engine's process (docs/SPEC.md 12a "One download engine") is the same: libaria2 reads untrusted
         // network data there, so droidtop starts nothing beside it, and in the default `:aria2_open` process the UID is droidtop's.
         if (dev.droidtop.runtime.util.IsolatedProcess.runsPluginCode() || dev.droidtop.runtime.util.IsolatedProcess.runsDownloadEngine()) return
+        // A full-access plugin's process (`:pluginhost*`) runs none of droidtop's start (Droidtop/tracker#775): droidtop
+        // starts in its own process, then starts the plugin host, which starts the plugins. Run here, droidtop's start
+        // would restore backups, start modes and start plugins of its own from a plugin's process. It gets only what the
+        // plugin's code there uses: the network platform, the shared Shizuku binder, and the look of its own screen.
+        if (dev.droidtop.runtime.util.IsolatedProcess.runsFullAccessPlugin()) {
+            DebugStrictMode.install(this)
+            dev.droidtop.runtime.windows.OkHttpPlatform.install(this)
+            dev.droidtop.pluginhost.ElevatedAccessHost.install(this)
+            AccessibilityPrefs.install(this)
+            dev.droidtop.ui.shared.MotionWatch.install(this)
+            return
+        }
         // Main-thread file, database and network work is logged in debuggable builds, from here on (Droidtop/tracker#729).
         DebugStrictMode.install(this)
         // A restore staged by "Restore droidtop" goes into place before anything opens a database (Droidtop/tracker#625).
@@ -123,16 +135,9 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // The keyboard's "Follow light or dark" follows droidtop's Light or dark (docs/SPEC.md 7k, Droidtop/tracker#562).
         org.pocketworkstation.pckeyboard.KeyboardAppearance.host =
             org.pocketworkstation.pckeyboard.KeyboardAppearance.Host { context -> dev.droidtop.library.settings.AppearancePrefs.light(context) }
-        // Plugins in every mode (docs/plugin-api.md 1.9): "Plugins" on Standard's home-screen menu, and the plugin
-        // services and schedules the person switched on (E8, E9). Both read manifests off the main thread.
-        dev.droidtop.library.integrations.PluginStandardHooks.install(this)
-        // A plugin an older droidtop disabled after a failure is tried again by this build (PluginStore.retryAfterHostUpdate).
-        kotlin.concurrent.thread(name = "plugin-retry") {
-            dev.droidtop.pluginhost.PluginStore.retryAfterHostUpdate(this)
-            // One disabled by a check that ran mid-update, before installs were atomic, comes back once it verifies.
-            dev.droidtop.pluginhost.PluginStore.recoverVerified(this)
-        }
-        PluginBackgroundHost.install(this)
+        // The plugin host starts after droidtop, by droidtop (Droidtop/tracker#775): PluginHostStart, once droidtop's
+        // first screen has drawn, or a little after a start with no screen. Nothing above or below needs it.
+        PluginHostStart.armAfterStart(this)
         // `library.read` `systems` (docs/plugin-api.md 3 A1): the broker runs on a binder thread, which may block here;
         // the answer comes from the library's in-memory index, never a folder walk.
         dev.droidtop.pluginhost.PluginBrokers.librarySystemsProvider = {
@@ -209,20 +214,12 @@ class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory 
         // Main process only: the jobs registry lives there.
         if (Build.VERSION.SDK_INT < 28 || Application.getProcessName() == packageName) {
             // Apps that carry a droidtop plugin (Droidtop/tracker#547): told to the person once per app version when the app
-            // announces itself at the door, when it is installed or updated while droidtop runs, or, at start, when it
-            // changed while droidtop did not run.
+            // announces itself at the door; the plugin host's start (PluginHostStart) watches installs and catches up.
             dev.droidtop.pluginhost.AppInterfaceAnnouncements.notify = { context, app -> AppInterfaceNotification.show(context, app) }
-            dev.droidtop.pluginhost.AppInterfaceAnnouncements.watch(this)
-            dev.droidtop.pluginhost.AppInterfaceAnnouncements.catchUp(this)
             dev.droidtop.pluginhost.DownloadGate.install(this)
             dev.droidtop.library.stores.StoreAutoUpdates.requestLater(this)
             // PC and engine games get their details by themselves (docs/SPEC.md 7h, Droidtop/tracker#568).
             dev.droidtop.library.scraper.PcAutoScrape.requestLater(this)
-            // With Shizuku, the grants the system controls need are taken now, so they switch in place rather than
-            // opening Android's screens (docs/SPEC.md "Privileged actions", tracker#581).
-            val app = this
-            Thread { dev.droidtop.runtime.tasks.ElevatedGrants.takeAll(app, dev.droidtop.runtime.tasks.TaskManager.shell) }
-                .apply { name = "droidtop-elevated-grants"; isDaemon = true; start() }
         }
         // Shared core too: a games folder added in onboarding or Settings
         // is walked at once, not when Gaming first opens (SPEC 2c).

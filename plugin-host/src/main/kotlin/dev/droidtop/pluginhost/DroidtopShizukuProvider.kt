@@ -12,6 +12,15 @@ import rikka.shizuku.ShizukuProvider
  * without full access the sandbox must keep it from the OS, so it and a contained plugin are refused.
  */
 class DroidtopShizukuProvider : ShizukuProvider() {
+    companion object {
+        init {
+            // ShizukuProvider.onCreate starts Sui by itself, on the main thread at process start; droidtop's start touches
+            // no elevated backend (Droidtop/tracker#775), so Sui starts off the main thread on first use
+            // (ShizukuTransport.ensureStarted). Set before onCreate: the class is loaded before its instance is made.
+            ShizukuProvider.disableAutomaticSuiInitialization()
+        }
+    }
+
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
         val context = context ?: return null
         if (!DroidtopCallers.callerMayUseShizuku(context)) {

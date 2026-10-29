@@ -24,6 +24,20 @@ object IsolatedProcess {
     fun runsPluginCode(): Boolean = isIsolated() || processName()?.substringAfter(':', "")?.startsWith("plugin_open") == true
 
     /**
+     * Whether this is a full-access plugin's process (`:pluginhost`, `:pluginhost1` to `:pluginhost7`, docs/plugin-api.md
+     * 5.3): droidtop's UID, a plugin the person allowed full access in it. droidtop's own start never runs there
+     * (Droidtop/tracker#775): droidtop starts first, in its own process, and then starts the plugin host, which starts
+     * the plugins; a plugin process starting droidtop's start would start plugins of its own.
+     */
+    @JvmStatic
+    fun runsFullAccessPlugin(): Boolean = isFullAccessPlugin(processName())
+
+    /** [runsFullAccessPlugin]'s rule over a process name. Pure, for the test. */
+    @JvmStatic
+    fun isFullAccessPlugin(processName: String?): Boolean =
+        processName?.substringAfter(':', "")?.matches(Regex("pluginhost\\d*")) == true
+
+    /**
      * Whether this is the download engine's process (docs/SPEC.md 12a "One download engine"): `:aria2`, isolated under a UID
      * of its own when Android isolation is on, or `:aria2_open`, which has droidtop's UID and is the default. libaria2
      * runs there and reads untrusted network data, so droidtop's application classes start nothing in it either: no

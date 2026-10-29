@@ -21670,6 +21670,44 @@ where droidtop needs something back"), and the trust-boundary checklist
 below, now applied to droidtop's own install path instead of
 Enginehost's.
 
+**Start order: droidtop first, then the plugin host, then the plugins
+(owner, 2026-10-29, Droidtop/tracker#775).** The owner, verbatim: "Why is
+droidtop depending on a plugin? What do we do if the plugin isn't there?
+Plugins need to be initialized AFTER droidtop, BY droidtop", and the order:
+"droidtop initializes. Then, it intializes the plugin host. which
+initializes the plugins. which register themselves. which starts the
+binding and intialization handshake THROUGH the plugin host, between
+droidtop and the plugin". Five steps, in this order:
+1. **droidtop starts on its own.** droidtop's start (the main process's
+   `Application.onCreate`) needs nothing from the plugin host. It starts
+   no plugin and no plugin process, and reads no plugin's files. A plugin
+   process runs none of droidtop's start (`IsolatedProcess`: the
+   sandbox, the open slots and the full-access `:pluginhost*` slots). A
+   full-access slot gets only what its plugin's code uses there: the
+   network platform, the shared Shizuku binder, and its screen's look.
+   droidtop's own components never live in a plugin process: the Shizuku
+   provider is in the main process (the UI lane's half of #775), and its
+   automatic Sui start-up is off, so nothing elevated runs at start. With
+   no plugins, no plugin host and no Shizuku, droidtop starts the same.
+2. **droidtop starts the plugin host** (`PluginHostStart`): once
+   droidtop's first screen has drawn, or 10 s after a start with no
+   screen, or when droidtop's own plugin schedule job runs. Android never
+   starts it as a side effect.
+3. **The host starts the plugins**, each step on its own, so one failure
+   stays its own: plugins an older build disabled are tried again, then
+   the person's background services and schedules, Standard's plugin
+   entries, the apps that carry a plugin, and the elevated grants (whose
+   backend may be the Shizuku plugin).
+4. **Each plugin registers** once it is loaded (proposed on #775,
+   `host.register`; an app's plugin registers by knocking on the door).
+5. **Registration starts the handshake** between droidtop and the plugin,
+   through the host. droidtop makes no call to a plugin before it has
+   registered. A plugin that fails, or never registers, affects only
+   itself.
+
+Steps 1 to 3 are built. Steps 4 and 5 are proposed on #775, to be built
+next.
+
 **Everything a plugin does goes over the API (owner, 2026-10-16; the rule
 above the rest of 12a).** The owner, verbatim: "Remember that ALL plugin
 activity happens over the API. This means programmatic control should be
