@@ -38,13 +38,13 @@ object OwnGameScreens {
         fun setPadMouse(on: Boolean) {}
 
         /**
-         * The keyboard-and-mouse layout (docs/SPEC.md 5b "Controller layouts", Droidtop/tracker#618): the pad played as
-         * a keyboard and mouse for this screen's game, on or off, or null where the screen has no such layout. The
-         * Quick Menu's Game section shows and turns it.
+         * The pad's layout for this screen's game (docs/SPEC.md 5b "Controller layouts", Droidtop/tracker#618), as the
+         * line the Quick Menu's Controls row shows ("Gamepad" for none), or null where the screen has no layouts.
+         * [nextControls] steps to the next one, keeps it for the game, and returns its line. Main thread.
          */
-        val keyboardMouse: Boolean? get() = null
+        val controls: String? get() = null
 
-        fun setKeyboardMouse(on: Boolean) {}
+        fun nextControls(): String? = null
 
         /** The game's pointer, which mouse mode and the companion's trackpad both drive; null where there is none. */
         val pointer: Pointer? get() = null

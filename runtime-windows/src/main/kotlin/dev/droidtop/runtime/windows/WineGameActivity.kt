@@ -118,11 +118,15 @@ class WineGameActivity : Activity() {
         override fun setPadMouse(on: Boolean) {
             runOnUiThread { this@WineGameActivity.padMouse?.let { it.set(it.settings.copy(on = on)) } }
         }
-        override val keyboardMouse: Boolean? get() = this@WineGameActivity.layoutDriver?.on
-        override fun setKeyboardMouse(on: Boolean) {
-            runOnUiThread { this@WineGameActivity.layoutDriver?.on = on }
-            val id = this@WineGameActivity.entryId ?: return
-            startupExecutor.execute { WineControlsPrefs.setKeyboardMouse(applicationContext, id, on) }
+        override val controls: String?
+            get() = if (this@WineGameActivity.layoutDriver == null) null else controlsChoice?.line ?: WineControls.GAMEPAD_LINE
+        override fun nextControls(): String? {
+            if (this@WineGameActivity.layoutDriver == null) return null
+            val next = WineControls.next(controlsChoice)
+            useControls(next)
+            val id = this@WineGameActivity.entryId
+            if (id != null) startupExecutor.execute { WineControlsPrefs.setLayout(applicationContext, id, next) }
+            return next?.line ?: WineControls.GAMEPAD_LINE
         }
         override fun stop() {
             // The guest's teardown is queued now (off the main thread), so a relaunch that follows
@@ -262,16 +266,20 @@ class WineGameActivity : Activity() {
             }
         }
 
-        // The keyboard-and-mouse layout (Droidtop/tracker#618): read and parsed off the main thread, on when this game
-        // was left with it on.
+        // The pad's layouts (Droidtop/tracker#618): read and parsed off the main thread; the one this game was left
+        // with is played.
         startupExecutor.execute {
-            val layout = runCatching {
-                resources.openRawResource(R.raw.controls_keyboard_mouse).bufferedReader().use { ControllerLayout.parse(it.readText()) }
-            }.getOrNull() ?: return@execute
-            val on = entryId?.let { WineControlsPrefs.keyboardMouse(applicationContext, it) } ?: false
+            val parsed = WineControls.entries.mapNotNull { choice ->
+                runCatching {
+                    choice to resources.openRawResource(choice.raw).bufferedReader().use { ControllerLayout.parse(it.readText()) }
+                }.getOrNull()
+            }.toMap()
+            val chosen = entryId?.let { WineControlsPrefs.layout(applicationContext, it) }
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
-                layoutDriver = LayoutDriver(xServer, pointer, layout).also { it.on = on }
+                controlLayouts = parsed
+                layoutDriver = LayoutDriver(xServer, pointer)
+                useControls(chosen)
             }
         }
 
@@ -555,8 +563,17 @@ class WineGameActivity : Activity() {
 
     private var padMouse: PadMouseDriver? = null
 
-    /** The keyboard-and-mouse layout's driver, once its layout is read; off unless the game was left with it on. */
+    /** The layouts' driver, once they are read; Gamepad unless the game was left with a layout. */
     private var layoutDriver: LayoutDriver? = null
+    private var controlLayouts: Map<WineControls, ControllerLayout> = emptyMap()
+    private var controlsChoice: WineControls? = null
+
+    /** Plays [choice]'s layout (null: Gamepad). Main thread. */
+    private fun useControls(choice: WineControls?) {
+        val layout = choice?.let { controlLayouts[it] }
+        controlsChoice = if (layout != null) choice else null
+        layoutDriver?.use(layout)
+    }
 
     /** The visible sign that the pad is a mouse: a small badge in the top corner while it is on. */
     private val padMouseBadge by lazy {

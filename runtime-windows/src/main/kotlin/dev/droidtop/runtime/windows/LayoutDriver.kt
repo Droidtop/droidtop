@@ -25,10 +25,12 @@ import dev.droidtop.mapping.PadInputs
 internal class LayoutDriver(
     private val xServer: XServer,
     private val pointer: OwnGameScreens.Pointer,
-    private val layout: ControllerLayout,
 ) {
     private val handler = Handler(Looper.getMainLooper())
-    private var engine = MappingEngine(layout)
+
+    /** The layout played while [on]; null plays nothing. */
+    private var layout: ControllerLayout? = null
+    private var engine: MappingEngine? = null
 
     /** Pad key codes whose press the layout took, so their release is taken too. */
     private val taken = HashSet<Int>()
@@ -46,23 +48,32 @@ internal class LayoutDriver(
 
     private val frame = object : Runnable {
         override fun run() {
-            apply(engine.tick(SystemClock.uptimeMillis()))
+            val e = engine ?: return
+            apply(e.tick(SystemClock.uptimeMillis()))
             handler.postDelayed(this, FRAME_MS)
         }
     }
 
     var on: Boolean = false
-        set(value) {
+        private set(value) {
             if (field == value) return
             field = value
             handler.removeCallbacks(frame)
             if (value) {
-                engine = MappingEngine(layout)
+                engine = layout?.let(::MappingEngine)
                 handler.post(frame)
             } else {
                 letGo()
+                engine = null
             }
         }
+
+    /** Plays [next] from now on, letting go of what the last one held; null stops. */
+    fun use(next: ControllerLayout?) {
+        on = false
+        layout = next
+        on = next != null
+    }
 
     /** Stops the frame tick (the screen is going away); what is held is let go. */
     fun close() {
@@ -70,7 +81,8 @@ internal class LayoutDriver(
     }
 
     fun onKey(event: KeyEvent): Boolean {
-        if (!on) return false
+        val engine = engine
+        if (!on || engine == null) return false
         val code = event.keyCode
         val physical = PadInputs.physical(code) ?: return false
         if (!fromPad(event.source)) return false
@@ -92,7 +104,8 @@ internal class LayoutDriver(
     }
 
     fun onMotion(event: MotionEvent): Boolean {
-        if (!on || !fromPad(event.source) || event.action != MotionEvent.ACTION_MOVE) return false
+        val engine = engine
+        if (!on || engine == null || !fromPad(event.source) || event.action != MotionEvent.ACTION_MOVE) return false
         val now = SystemClock.uptimeMillis()
         apply(engine.stick(PadInputs.LEFT_STICK, event.getAxisValue(MotionEvent.AXIS_X), event.getAxisValue(MotionEvent.AXIS_Y), now))
         apply(engine.stick(PadInputs.RIGHT_STICK, event.getAxisValue(MotionEvent.AXIS_Z), event.getAxisValue(MotionEvent.AXIS_RZ), now))

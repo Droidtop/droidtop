@@ -7269,8 +7269,12 @@ percent, in screen widths the sink scales; in `joystick_move` mode it is passed 
 (`output_joystick` 0 left, 1 right, else the stick it came from). Pure; time is passed in. Chords, turbo, joystick
 camera, scroll wheel, menus and layers come next, then the Wine sink and the defaults; until then
 Controller mouse mode above is the pad's only pointer. **The Wine sink** (`LayoutDriver`): a Windows
-game's Quick Menu Game section has a Controls row, Gamepad or "Keyboard and mouse", kept per game
-(`WineControlsPrefs`, off by default); with it on, the pad plays droidtop's bundled "Keyboard (WASD) and Mouse"
+game's Quick Menu Game section has a Controls row that steps through Gamepad (no layout, the default), "Keyboard
+and mouse" and "Mouse only", kept per game (`WineControls`, `WineControlsPrefs`). "Mouse only" is for point-and-click
+games: left stick the pointer, A click, B right-click, the bumpers scroll, the d-pad the arrows, X Enter, Y Space, Start
+Escape (`res/raw/controls_mouse_only.vdf`). A "Gamepad with mouse" layout is not offered: Android gives both sticks in
+one event, so the left stick cannot go to the game as a pad while the right one is the mouse; mouse mode covers it.
+With "Keyboard and mouse" the pad plays droidtop's bundled "Keyboard (WASD) and Mouse"
 layout (`res/raw/controls_keyboard_mouse.vdf`, Steam's format, our own, CC BY 4.0 as the owner chose for layouts:
 left stick WASD and its click Shift, right stick the mouse, R2 left click, L2 right click, A Space, B Ctrl, X R, Y E,
 L1 Q, R1 F, the d-pad 1 to 4, Start Escape, Select Tab). Its keys reach the X server by Steam's key names
