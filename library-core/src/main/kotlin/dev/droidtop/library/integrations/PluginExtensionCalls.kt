@@ -25,6 +25,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.withLock
 import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.toLibraryEntryKind
 import org.json.JSONObject
@@ -256,9 +257,33 @@ object PluginMetadataSources {
 
     fun sources(context: Context): List<Source> = providersOf(context, POINT).map { (record, entry) -> Source(record, entry) }
 
-    /** One scrape pass's connection to the sources. [close] when the pass ends. */
-    class Session(context: Context, private val sources: List<Source>) {
+    /**
+     * One scrape pass's connection to the sources. [close] when the pass ends. The pass paces each source itself
+     * (docs/plugin-api.md 3 A3): calls one at a time, spaced to its `rate.perMinute`, and a source that answers
+     * `RATE_LIMITED` rests for the rest of the pass.
+     */
+    class Session(context: Context, private val sources: List<Source>, private val nowMs: () -> Long = android.os.SystemClock::elapsedRealtime) {
         private val policy = PluginCrashPolicy(context.applicationContext)
+        private val lastCallAt = ConcurrentHashMap<String, Long>()
+        private val resting = ConcurrentHashMap.newKeySet<String>()
+        private val lanes = ConcurrentHashMap<String, kotlinx.coroutines.sync.Mutex>()
+
+        /** [call] to [source], paced; null while the source rests, which reads as no answer. */
+        private suspend fun paced(source: Source, call: PluginCall): dev.droidtop.pluginhost.PluginReply? {
+            val id = source.record.manifest.id
+            return lanes.getOrPut(id) { kotlinx.coroutines.sync.Mutex() }.withLock {
+                if (id in resting) return@withLock null
+                val wait = PluginMetadataProtocol.waitMs(lastCallAt[id], nowMs(), PluginMetadataProtocol.perMinute(source.entry))
+                if (wait > 0) kotlinx.coroutines.delay(wait)
+                lastCallAt[id] = nowMs()
+                val reply = policy.handle(source.record, call)
+                if (!reply.ok && reply.code == dev.droidtop.pluginhost.PluginErrorCode.RATE_LIMITED) {
+                    resting += id
+                    dev.droidtop.library.ScanLog.write("scrape: ${source.label} asked to slow down; not asked again this pass")
+                }
+                reply
+            }
+        }
 
         /** What each source knows about [facts], one entry per source that found something. A failing source is skipped, the pass goes on. */
         suspend fun lookup(facts: JSONObject): List<MetadataFields> = answers(facts).mapNotNull { it.fields }
@@ -277,8 +302,8 @@ object PluginMetadataSources {
         /** Every candidate each source offers for [facts], for the person to pick from ("Choose match"). */
         suspend fun candidates(facts: JSONObject): List<Pair<Source, PluginMetadataProtocol.Candidate>> = sources.flatMap { source ->
             try {
-                val match = policy.handle(source.record, newCall(POINT, "match", "pick", facts, 15_000L))
-                if (!match.ok) emptyList() else PluginMetadataProtocol.candidates(match.data).map { source to it }
+                val match = paced(source, newCall(POINT, "match", "pick", facts, 15_000L))
+                if (match == null || !match.ok) emptyList() else PluginMetadataProtocol.candidates(match.data).map { source to it }
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
@@ -288,8 +313,8 @@ object PluginMetadataSources {
 
         /** The fields and links [source] has for one candidate's [ids]. */
         suspend fun fetch(source: Source, ids: JSONObject): Answer? {
-            val fetch = policy.handle(source.record, newCall(POINT, "fetch", "scrape", JSONObject().put("ids", ids), 15_000L))
-            if (!fetch.ok) return null
+            val fetch = paced(source, newCall(POINT, "fetch", "scrape", JSONObject().put("ids", ids), 15_000L))
+            if (fetch == null || !fetch.ok) return null
             return Answer(
                 source,
                 PluginMetadataProtocol.fields(source.label, fetch.data),
@@ -299,8 +324,8 @@ object PluginMetadataSources {
         }
 
         private suspend fun answerOne(source: Source, facts: JSONObject): Answer? {
-            val match = policy.handle(source.record, newCall(POINT, "match", "scrape", facts, 15_000L))
-            if (!match.ok) return null
+            val match = paced(source, newCall(POINT, "match", "scrape", facts, 15_000L))
+            if (match == null || !match.ok) return null
             return when (val decision = PluginMetadataProtocol.decide(match.data)) {
                 PluginMetadataProtocol.MatchDecision.None -> Answer(source, null, noMatch = true)
                 is PluginMetadataProtocol.MatchDecision.Ambiguous -> Answer(source, null, ambiguous = decision.candidates)
