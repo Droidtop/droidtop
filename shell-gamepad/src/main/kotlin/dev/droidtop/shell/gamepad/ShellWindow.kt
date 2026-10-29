@@ -110,14 +110,6 @@ data class ShellWindow(
     /** The header's and footer's own side gutter ([barGutterDp]). */
     val barPadding: Dp get() = barGutterDp(widthDp).dp
 
-    /** Gap between top-level tabs; the same reasoning as [edgePadding]. */
-    val tabGap: Dp
-        get() = when (widthClass) {
-            ShellWidthClass.COMPACT -> 16.dp
-            ShellWidthClass.MEDIUM -> 24.dp
-            ShellWidthClass.EXPANDED -> 32.dp
-        }
-
     /**
      * Minimum width of a game card in an adaptive grid. A phone fits two
      * readable columns at 150dp and one oversized one at 220dp.

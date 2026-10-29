@@ -70,8 +70,6 @@ object Space {
     val Lg = 16.dp
     /** Between two blocks that do not. */
     val Xl = 24.dp
-    /** Above a section label; around a screen's main content block. */
-    val Xxl = 32.dp
     /** A deliberate hole: an empty state, a bottom-docked action area. */
     val Xxxl = 48.dp
 }
