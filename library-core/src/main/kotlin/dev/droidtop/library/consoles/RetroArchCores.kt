@@ -221,7 +221,16 @@ object RetroArchCores {
             title = "$JOB_DOWNLOAD_CORE (${need.core})",
             onProgress = { _, line -> onStatus(line) },
             userInitiated = true,
-        ) ?: return manual(context, need, asked, "The RetroArch manager is not approved, so it cannot get cores: approve it in Plugins, or install ${need.core} in RetroArch")
+        ) ?: run {
+            // Its page is one press away, never a path to look for (Droidtop/tracker#759).
+            dev.droidtop.library.settings.Notices.flash(
+                "The RetroArch manager is waiting for your approval",
+                source = "RetroArch",
+                context = context,
+                opens = { dev.droidtop.library.settings.SettingsScreenRegistry.get(dev.droidtop.library.integrations.AcquireContentSources.PLUGINS_SCREEN_ID, MANAGER_ID) },
+            )
+            return manual(context, need, asked, "The RetroArch manager is not approved, so it cannot get cores: approve it on its page, or install ${need.core} in RetroArch")
+        }
         val result = PluginJobsCenter.await(jobId) ?: return Outcome.Failed("The core download did not finish")
         if (!result.ok) return Outcome.Failed(result.error ?: "The RetroArch manager could not get ${need.core}")
         if (result.values["installedIntoRetroArch"] == "true") return Outcome.Ready

@@ -43,6 +43,8 @@ object JobOpener {
             is OpenTarget.Folder -> documentIntent(File(target.path), DocumentsContract.Document.MIME_TYPE_DIR)
             is OpenTarget.File -> documentIntent(File(target.path), mimeOf(target.path))
             is OpenTarget.SiteSignIn -> null
+            // The plugin's own page on Plugins, where it is approved (Droidtop/tracker#759).
+            is OpenTarget.Plugin -> CatalogScreenLink.intent(context, Place.ID_PLUGINS, target.pluginId)
         } ?: return false
         return runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
     }

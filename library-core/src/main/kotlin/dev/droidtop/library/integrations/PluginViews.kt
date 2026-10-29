@@ -455,7 +455,7 @@ private class PluginPage(
                                 action = NoticeAction("Permissions") {},
                                 source = record.manifest.label,
                             ),
-                            opens = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id),
+                            opens = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, AcquireContentSources.permissionsLink(record.manifest.id)),
                         ),
                     )
                 } else {
@@ -532,7 +532,7 @@ private class PluginPage(
             id = "pv_${screenId}_${node.id}_off",
             title = node.title,
             subtitle = "Off: turn on \"$what\" in its Permissions to use this",
-            inline = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id),
+            inline = SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, AcquireContentSources.permissionsLink(record.manifest.id)),
         )
     }
 
@@ -599,7 +599,7 @@ private class PluginPage(
         accountNotice(itemId, node)?.let { return it }
         val action = node.action
         val opens: CatalogScreen? = when {
-            node.opensPermissions -> SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, record.manifest.id)
+            node.opensPermissions -> SettingsScreenRegistry.get(AcquireContentSources.PLUGINS_SCREEN_ID, AcquireContentSources.permissionsLink(record.manifest.id))
             action?.kind == ViewAction.Kind.VIEW ->
                 PluginPage(record, point, action.op, action.args(), hostContext, HashMap(values), null, null, onJobDone, extraWhenFailed, extraGroups)
                     .screen("${screenId}_${action.op}_${itemId.hashCode()}", action.title ?: node.title)

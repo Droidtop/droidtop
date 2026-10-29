@@ -156,7 +156,7 @@ object PluginRepoUpdates {
             val access = if (outcome.newAccess.isEmpty) "" else " It asks for new access, which you decide on its page."
             "Updated ${outcome.label} to ${outcome.version}.$access"
         }
-        is RepoUpdateOutcome.NeedsApproval -> "${outcome.label} ${outcome.version} is installed; approve it on the Plugins screen before it runs."
+        is RepoUpdateOutcome.NeedsApproval -> "${outcome.label} ${outcome.version} is installed; open its page to approve it before it runs."
         is RepoUpdateOutcome.Offered -> "${outcome.label} ${outcome.version} is available to install."
         is RepoUpdateOutcome.Refused -> "${outcome.label}: not installed, ${outcome.reason}."
     }
@@ -365,7 +365,11 @@ object PluginRepoUpdates {
             val userKeys = UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context))
             return when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), userKeys, hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
                 is PluginInstallResult.Refused -> "Not installed: ${result.error.reason}"
-                is PluginInstallResult.Installed -> "${result.record.manifest.label} ${result.record.manifest.version} installed. Approve it on the Plugins screen before it runs."
+                is PluginInstallResult.Installed -> {
+                    // Open on the finished job goes to the plugin's page, where it is approved (Droidtop/tracker#759).
+                    dev.droidtop.pluginhost.JobHandle.current()?.open(dev.droidtop.pluginhost.OpenTarget.Plugin(result.record.manifest.id))
+                    "${result.record.manifest.label} ${result.record.manifest.version} installed. Open it to approve it before it runs."
+                }
             }
         } catch (failure: Exception) {
             return "Couldn't download it (${failure.message ?: "no network"})."

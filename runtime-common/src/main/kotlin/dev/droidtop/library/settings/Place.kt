@@ -69,9 +69,13 @@ object CatalogScreenLink {
     const val ACTION = "dev.droidtop.app.action.OPEN_SCREEN"
     const val EXTRA_SCREEN_ID = "dev.droidtop.app.extra.SCREEN_ID"
 
-    fun intent(context: Context, screenId: String): Intent = Intent(ACTION)
+    /** The one argument the screen opens at ([SettingsScreenRegistry.get]'s deep link): a plugin's id on Plugins. */
+    const val EXTRA_DEEP_LINK = "dev.droidtop.app.extra.DEEP_LINK"
+
+    fun intent(context: Context, screenId: String, deepLink: String? = null): Intent = Intent(ACTION)
         .setPackage(context.packageName)
         .putExtra(EXTRA_SCREEN_ID, screenId)
+        .apply { if (deepLink != null) putExtra(EXTRA_DEEP_LINK, deepLink) }
         // The host runs in a task of its own; each opening starts it fresh, so a screen left open
         // never answers for the one asked for (the same rule as Settings, SPEC 2c).
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)

@@ -388,6 +388,12 @@ class CatalogScreen(
      */
     val indexGroups: (suspend (Context) -> List<CatalogGroup>)? = null,
     /**
+     * The settings search also reads the pages this screen's rows open, one level past its usual depth: Plugins, so
+     * each plugin's page (its Approve, its Permissions) can be found by searching (Droidtop/tracker#759). For a short
+     * list of fixed pages only, never a screen that grows with someone's library.
+     */
+    val indexesItsPages: Boolean = false,
+    /**
      * Runs when the person leaves this screen (B, or backing out of Settings): a screen that started
      * something which waits on them, like a GitHub sign-in showing a code, stops it here.
      */

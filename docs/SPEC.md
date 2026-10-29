@@ -18895,8 +18895,15 @@ Settings tab, the left menu's places, Console systems and Containers.
   "Downloads and installs" row; Standard and Desktop, which have no left menu,
   keep it, and Global settings keeps its Updates link for the same reason. Since 2026-10-23 the filter runs after
   Global settings is merged in and on every screen Settings opens (Accounts and sources' Game sources and Plugins
-  links included): in Gaming a place has one way in, the left menu, and Settings no longer shows a second Updates,
-  Plugins or Game sources (Droidtop/tracker#610).
+  links included): in Gaming a place has one way in, the left menu, and Settings no longer shows a second Updates
+  (Droidtop/tracker#610). Only a place the left menu leads to (and its pages: Updates, of Downloads and Updates) is
+  left out (`settingsHiddenPlaceScreens`): Plugins, Social and Game sources are off the left menu (Plugins is in the
+  Quick Menu), so their Settings rows stay (2026-10-29, Droidtop/tracker#759: the filter had dropped the Plugins row
+  too, and with it the only way to a plugin's Approve). **Every "approve it" hint opens the plugin's own page**: a
+  plugin's id is the Plugins screen's deep link to its page (`permissions:<id>` to its Permissions), a finished
+  install job's Open goes there (`OpenTarget.Plugin`), and a notice about an unapproved plugin opens it; none names a
+  path to look for. Settings search reads each plugin's page (`CatalogScreen.indexesItsPages` on Plugins), so
+  "approve" or a plugin's name finds its page.
 - **Rows.** A row is its name and, right-aligned in the screen's one value
   column, what it is set to: a switch for a toggle, an inline track and the
   number for a slider, `‹ value ›` for a short choice, a chevron for a row

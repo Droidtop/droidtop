@@ -1457,9 +1457,11 @@ private fun GamepadShellBody(
                             SettingsCatalogView(
                                 onBack = { nav.openSection(GamingPrefs.defaultSection(context)) },
                                 browseThemesToken = browseThemesRequest,
-                                // The places and their pages (Updates, of Downloads and Updates; Plugins, in the Quick
-                                // Menu): each has its one way in.
-                                placeScreenIds = dev.droidtop.library.settings.Place.reachable(uiMode).map { it.screenId }.toSet(),
+                                // The places the left menu leads to, and their pages (Updates, of Downloads and Updates):
+                                // the menu is their way in. A place off the left menu (Plugins, Social, Game sources) keeps
+                                // its Settings row, or it had none (Droidtop/tracker#759: Plugins, and with it every
+                                // plugin's Approve, could not be found).
+                                placeScreenIds = settingsHiddenPlaceScreens(uiMode),
                                 onHelpRowClaim = { claim ->
                                     if (screenKey == currentScreenKey) {
                                         helpRowClaimant = screenKey to claim
@@ -2195,6 +2197,19 @@ internal const val PLACE_PLUGINS_SCREEN_ID = dev.droidtop.library.settings.Place
  * second copy of the screen inside a sheet, so a screen has one home (docs/SPEC.md 7j "Places"). That covers the
  * places the left menu does not list: Updates, a page of Downloads and Updates, and Plugins, kept in the Quick Menu.
  */
+/**
+ * The places whose Settings row is left out in [mode] because the left menu already leads to them, with their pages
+ * ([GamingSection.menuSection]): never a place off the left menu, whose Settings row is its way in
+ * (Droidtop/tracker#759).
+ */
+internal fun settingsHiddenPlaceScreens(mode: dev.droidtop.library.settings.UiMode): Set<String> {
+    val menu = menuSectionsFor(mode).toSet()
+    return GamingSection.entries
+        .filter { it.isPlace && !it.offLeftMenu && it.menuSection in menu && it.place in dev.droidtop.library.settings.Place.reachable(mode) }
+        .mapNotNull { it.placeScreenId }
+        .toSet()
+}
+
 internal fun placeForScreen(screenId: String, mode: dev.droidtop.library.settings.UiMode): GamingSection? =
     GamingSection.entries.firstOrNull { it.isPlace && it.placeScreenId == screenId && it.place in dev.droidtop.library.settings.Place.reachable(mode) }
 

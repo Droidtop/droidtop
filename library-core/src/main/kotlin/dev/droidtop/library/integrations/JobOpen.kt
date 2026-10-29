@@ -22,6 +22,7 @@ object JobOpen {
         is OpenTarget.File -> "Open the file"
         is OpenTarget.Place -> "Open"
         is OpenTarget.SiteSignIn -> "Sign in again"
+        is OpenTarget.Plugin -> "Open its page"
     }
 
     /** Opens [target]; false when nothing could. */

@@ -54,6 +54,9 @@ sealed interface OpenTarget {
     /** A download site's sign-in, by its domain: a job its expired session stopped (docs/SPEC.md 12a "Download sites"). */
     data class SiteSignIn(val domain: String) : OpenTarget
 
+    /** One plugin's page, by its id: where it is approved, turned on and allowed (Droidtop/tracker#759). */
+    data class Plugin(val pluginId: String) : OpenTarget
+
     companion object {
         fun encode(target: OpenTarget?): String? = when (target) {
             null -> null
@@ -62,6 +65,7 @@ sealed interface OpenTarget {
             is File -> "file:${target.path}"
             is Place -> "place:${target.id}"
             is SiteSignIn -> "signin:${target.domain}"
+            is Plugin -> "plugin:${target.pluginId}"
         }
 
         fun decode(raw: String?): OpenTarget? {
@@ -73,6 +77,7 @@ sealed interface OpenTarget {
                 "file" -> File(value)
                 "place" -> Place(value)
                 "signin" -> SiteSignIn(value)
+                "plugin" -> Plugin(value)
                 else -> null
             }
         }

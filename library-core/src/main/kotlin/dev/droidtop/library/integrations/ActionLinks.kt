@@ -507,7 +507,7 @@ object ActionLinks {
                     lines = listOfNotNull(
                         listed?.description,
                         "From " + (catalog ?: "droidtop's own catalog"),
-                        "droidtop checks its signature and every file. It does not run until you approve it on the Plugins screen",
+                        "droidtop checks its signature and every file. It does not run until you approve it on its page, which opens when it is installed",
                     ),
                     problem = if (source != null || addedEarlier(catalogKey(catalog))) null else "That catalog is not added, and this link does not add it",
                 )

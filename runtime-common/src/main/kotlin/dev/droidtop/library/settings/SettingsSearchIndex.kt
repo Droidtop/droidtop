@@ -63,7 +63,7 @@ object SettingsSearchIndex {
                         itemSubtitle = item.subtitle,
                         icon = item.icon,
                     )
-                    if (depth <= 1 && item is NestedScreenItem) {
+                    if ((depth <= 1 || screen.indexesItsPages) && item is NestedScreenItem) {
                         item.resolve()?.let { indexScreen(it, depth + 1) }
                     }
                 }

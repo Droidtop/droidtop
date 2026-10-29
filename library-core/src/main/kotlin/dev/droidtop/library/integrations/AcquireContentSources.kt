@@ -304,6 +304,14 @@ object AcquireContentSources {
             .filter { it.serves(systemId) }
     }
 
+    /**
+     * The Plugins screen's deep link to one plugin's Permissions screen; the plugin's id alone opens its page, where it
+     * is approved (Droidtop/tracker#759).
+     */
+    fun permissionsLink(pluginId: String): String = PERMISSIONS_LINK + pluginId
+
+    const val PERMISSIONS_LINK = "permissions:"
+
     /** A row opening [pluginId]'s page in Settings, Plugins: where it is approved, turned on, signed in and allowed. */
     fun pluginPageRow(id: String, title: String, pluginId: String): NestedScreenItem {
         val page = SettingsScreenRegistry.get(PLUGINS_SCREEN_ID, pluginId)

@@ -61,7 +61,7 @@ class CatalogScreenActivity : AppCompatActivity() {
             finish()
             return
         }
-        val screen = screenId?.let { SettingsScreenRegistry.get(it) }
+        val screen = screenId?.let { SettingsScreenRegistry.get(it, intent?.getStringExtra(CatalogScreenLink.EXTRA_DEEP_LINK)) }
         if (screen == null) {
             android.util.Log.w("droidtop.Screen", "No catalog screen registered as '$screenId'")
             finish()

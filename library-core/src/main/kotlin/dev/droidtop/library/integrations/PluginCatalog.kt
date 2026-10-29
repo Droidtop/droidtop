@@ -369,12 +369,13 @@ object PluginCatalog {
             // The user-trusted keys too: a bundle from an origin the person trusted verifies like an official one.
             when (val result = PluginBundleInstaller.install(file, PluginStore.root(context), UserOriginKeys.loadBase64(UserOriginKeys.storeFile(context)), hostPermissions = dev.droidtop.pluginhost.AndroidPermissions.heldBy(context), succeeds = dev.droidtop.pluginhost.UserOriginKeys.successorCheck(context))) {
                 is PluginInstallResult.Installed -> {
-                    // Open on the finished job goes to Plugins, where a new plugin is approved and every plugin's page is.
-                    dev.droidtop.pluginhost.JobHandle.current()?.open(dev.droidtop.pluginhost.OpenTarget.Place(dev.droidtop.library.settings.Place.ID_PLUGINS))
+                    // Open on the finished job goes to the plugin's own page, where a new plugin is approved
+                    // (Droidtop/tracker#759: a path to it in words led nowhere).
+                    dev.droidtop.pluginhost.JobHandle.current()?.open(dev.droidtop.pluginhost.OpenTarget.Plugin(result.record.manifest.id))
                     if (result.record.trust == PluginTrustState.APPROVED) {
                         "Updated $label to $version"
                     } else {
-                        "$label $version installed. Approve it on the Plugins screen before it runs"
+                        "$label $version installed. Open it to approve it before it runs"
                     }
                 }
                 is PluginInstallResult.Refused -> "$NOT_INSTALLED ${result.error.reason}"
@@ -478,7 +479,7 @@ object PluginCatalog {
         val names = todo.map { it.first.label }.filter { label -> failures.none { it.startsWith("$label:") } }
         buildString {
             if (done > 0) {
-                append("Installed $done plugin${if (done == 1) "" else "s"}: ${names.joinToString(", ")}. Approve them on the Plugins screen before they run.")
+                append("Installed $done plugin${if (done == 1) "" else "s"}: ${names.joinToString(", ")}. Open Plugins to approve them before they run.")
             }
             if (failures.isNotEmpty()) {
                 if (done > 0) append(' ')

@@ -74,7 +74,10 @@ object ExternalGameLaunch {
         val key = refusalKey(packageName)
         return when (decide(stateOf(context, packageName), PluginRefusals.isNotNow(key, PERMISSION))) {
             Decision.LAUNCH -> true
-            Decision.BLOCKED -> refuse(context, "$name may not start your games. Settings > Accounts and sources > Plugins > Apps that start games changes it")
+            // The screen that changes it opens from the notice, not a path to look for (Droidtop/tracker#759).
+            Decision.BLOCKED -> refuse(context, "$name may not start your games. Open Apps that start games to change it") {
+                dev.droidtop.app.settings.AppSettingsCatalogs.externalLaunchScreen()
+            }
             Decision.NOT_NOW -> refuse(context, "$name may not start your games until you allow it")
             Decision.ASK -> when (PluginGrantPrompts.ask(GrantPromptRequest(key, name, PERMISSION, LABEL, null, PermissionTier.DANGEROUS))) {
                 GrantAnswer.ALLOW -> {
@@ -95,9 +98,9 @@ object ExternalGameLaunch {
         }
     }
 
-    private fun refuse(context: Context, message: String): Boolean {
+    private fun refuse(context: Context, message: String, opens: (() -> dev.droidtop.library.settings.CatalogScreen?)? = null): Boolean {
         android.util.Log.w("droidtop.ExternalLaunch", message)
-        dev.droidtop.library.settings.Notices.flash(message, context = context)
+        dev.droidtop.library.settings.Notices.flash(message, context = context, opens = opens)
         return false
     }
 }

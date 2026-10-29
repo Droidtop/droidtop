@@ -1451,12 +1451,25 @@ object AppSettingsCatalogs {
         title = "Plugins",
         subtitle = "Run only after you approve them",
         groups = { context -> pluginsGroups(context) },
-        // A plugin's own page opens the Permissions screen of one plugin through here (a denied plugin view's way to change it).
-        forDeepLink = { pluginId -> pluginPermissionsScreen(pluginId) },
+        // A plugin's id opens its page, where it is approved: every "approve it" hint, notice and job leads straight there
+        // (Droidtop/tracker#759). "permissions:<id>" opens its Permissions screen (a denied plugin view's way to change it).
+        forDeepLink = { link ->
+            if (link.startsWith(AcquireContentSources.PERMISSIONS_LINK)) {
+                pluginPermissionsScreen(link.removePrefix(AcquireContentSources.PERMISSIONS_LINK))
+            } else {
+                pluginDetailScreen(link, pluginLabels[link] ?: "Plugin")
+            }
+        },
+        // Each plugin's page, its Approve among it, is found by settings search.
+        indexesItsPages = true,
     )
+
+    /** Plugins' names as the list last read them, so a page opened by id alone is titled with its name. */
+    private val pluginLabels = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     private suspend fun pluginsGroups(context: Context): List<CatalogGroup> = withContext(Dispatchers.IO) {
         val installed = PluginStore.installed(context)
+        installed.forEach { pluginLabels[it.manifest.id] = it.manifest.label }
         // Read once here, off the main thread; valueLabel below is a
         // plain (non-suspend) closure the renderer may call on the main
         // thread, so it must not touch the key store itself.
@@ -1623,7 +1636,15 @@ object AppSettingsCatalogs {
             val result = dev.droidtop.pluginhost.AppInterfaces.install(ctx, dev.droidtop.pluginhost.AppInterfaces.inspect(ctx, app.packageName, app.serviceName))
             val record = result.getOrElse { return "${app.appLabel} can't be added: ${it.message}" }
             pluginsChanged(ctx)
-            return if (record.trust == PluginTrustState.APPROVED) "${app.appLabel} is updated" else "${app.appLabel} is in Installed: approve it there to let it run"
+            if (record.trust == PluginTrustState.APPROVED) return "${app.appLabel} is updated"
+            // Its page is one press away, not a list to look through (Droidtop/tracker#759).
+            Notices.flash(
+                "${app.appLabel} is waiting for your approval",
+                source = app.appLabel,
+                context = ctx,
+                opens = { SettingsScreenRegistry.get(SCREEN_PLUGINS, record.manifest.id) },
+            )
+            return "${app.appLabel} is added: open it to approve it before it runs"
         }
         return when (verdict) {
             is dev.droidtop.pluginhost.AppInterfaceTrust.Verdict.NotTrusted -> AsyncActionItem(
@@ -2719,7 +2740,7 @@ object AppSettingsCatalogs {
      * games"): every app that asked, with its answer as the same three chips a plugin's permission has. An app is listed
      * once it asked; nothing here can add one.
      */
-    private fun externalLaunchScreen() = CatalogScreen(
+    internal fun externalLaunchScreen() = CatalogScreen(
         id = "plugins_external_launch_screen",
         title = "Apps that start games",
         subtitle = "An app asks the first time; a change applies to its next request",
