@@ -8,6 +8,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
 import android.util.Log
+import dev.droidtop.runtime.util.guarded
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,12 +41,9 @@ object TaskManager {
     private fun closer(context: Context): AppCloser {
         val am = context.applicationContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
         return AppCloser(shell, killBackground = { pkg ->
-            try {
+            guarded(TAG, "Asking Android to end $pkg", false) {
                 am.killBackgroundProcesses(pkg)
                 true
-            } catch (t: Throwable) {
-                Log.d(TAG, "Couldn't ask Android to end $pkg", t)
-                false
             }
         }, endEnginehostGame = { EnginehostEndGame.request(context.applicationContext) }, sendToBackground = { pkg -> sendToBackground(context.applicationContext, pkg) })
     }
@@ -184,11 +182,8 @@ object TaskManager {
         if (!shell.capabilities().listTasks) {
             return fromLedger("Without More controls droidtop can list only the apps it opened itself, and cannot tell when one of them closed by itself.")
         }
-        val out = try {
+        val out = guarded(TAG, "Reading the task list", null) {
             shell.exec(ActivityDump.COMMAND)
-        } catch (t: Throwable) {
-            Log.d(TAG, "The task list could not be read", t)
-            null
         }
         if (out != null && out.exit == 0 && out.stdout.contains("Display #")) {
             return RunningSnapshot(RunningListing.fromDump(ActivityDump.parse(out.stdout), hidden, label), Fidelity.EXACT)

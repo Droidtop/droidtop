@@ -1,6 +1,7 @@
 package dev.droidtop.library
 
 import android.util.Log
+import dev.droidtop.runtime.util.guarded
 import java.io.File
 import kotlinx.serialization.Serializable
 import java.util.concurrent.ConcurrentHashMap
@@ -1191,13 +1192,8 @@ class Library(
         for (provider in ordered) {
             if (sliceOf(provider) == null) continue
             for (path in units + gone) {
-                val answers = try {
+                val answers = guarded("droidtop.Library", "${provider::class.simpleName} indexing ${path.path}", emptyList()) {
                     provider.indexPath(path)
-                } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    throw cancelled
-                } catch (failed: Throwable) {
-                    Log.w("droidtop.Library", "${provider::class.simpleName} could not index ${path.path}", failed)
-                    emptyList()
                 }
                 for (answer in answers) {
                     if (applyPath(provider, answer)) {
@@ -1590,12 +1586,8 @@ class Library(
     /** One round, cancelled by an ordinary walk starting or by the last observer leaving. */
     private suspend fun runObservedRound() = coroutineScope {
         val round = scanScope.coroutineLaunch(start = kotlinx.coroutines.CoroutineStart.LAZY) {
-            try {
+            guarded("droidtop.Library", "Slow rebuild pass", Unit) {
                 runSlowRound()
-            } catch (t: kotlinx.coroutines.CancellationException) {
-                throw t
-            } catch (t: Throwable) {
-                Log.e("droidtop.Library", "Slow rebuild pass failed", t)
             }
         }
         slowRound = round
@@ -1648,7 +1640,7 @@ class Library(
         var lastRepublishedAt = 0L
         for (provider in providers.filter { it.indexed }) {
             if (sliceOf(provider) == null) continue
-            try {
+            guarded("droidtop.Library", "Slow rebuild of ${provider::class.simpleName}", Unit) {
                 provider.slowRebuildProgressive(index.folderMtimes(provider.indexKey), SLOW_REBUILD_PAUSE_MS)
                     .collect { step ->
                         if (!applyStep(provider, step, generation)) return@collect
@@ -1660,10 +1652,6 @@ class Library(
                             lastRepublishedAt = now
                         }
                     }
-            } catch (t: kotlinx.coroutines.CancellationException) {
-                throw t
-            } catch (t: Throwable) {
-                Log.e("droidtop.Library", "Slow rebuild of ${provider::class.simpleName} failed", t)
             }
         }
         if (changed) republish()
@@ -1841,17 +1829,13 @@ class Library(
                         // provider: see ScanBudget. A provider that never
                         // returns costs the parts it never reached and
                         // nothing else.
-                        try {
+                        guarded("droidtop.Library", "Provider ${provider::class.simpleName} scan", Unit) {
                             val stream = if (rescan) provider.rescanProgressive() else provider.scanProgressive()
                             stream.collect { step ->
                                 applyStep(provider, step, walkGeneration)
                                 if (step is ScanStep.Segment) facts.learn(step.entries)
                                 publish(force = false)
                             }
-                        } catch (t: kotlinx.coroutines.CancellationException) {
-                            throw t
-                        } catch (t: Throwable) {
-                            Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
                         }
                     }
                 }
@@ -2046,19 +2030,17 @@ class Library(
         true
     }
 
-    private suspend fun scanProviderSafely(provider: LibraryProvider): List<LibraryEntry> = try {
-        // Failures are isolated per provider; slowness is bounded per
-        // FOLDER, inside the provider, by a ScanBudget. There used to be a
-        // 15-second timeout here too, and it had the same defect as the
-        // streaming one above: it could not preempt a blocking File I/O
-        // call already in progress (so it never actually stopped the slow
-        // work), and all it could do when it fired was throw away results
-        // the provider had already produced.
-        provider.scan()
-    } catch (t: Throwable) {
-        Log.e("droidtop.Library", "Provider ${provider::class.simpleName} failed to scan", t)
-        emptyList()
-    }
+    private suspend fun scanProviderSafely(provider: LibraryProvider): List<LibraryEntry> =
+        guarded("droidtop.Library", "Provider ${provider::class.simpleName} scan", emptyList()) {
+            // Failures are isolated per provider; slowness is bounded per
+            // FOLDER, inside the provider, by a ScanBudget. There used to be a
+            // 15-second timeout here too, and it had the same defect as the
+            // streaming one above: it could not preempt a blocking File I/O
+            // call already in progress (so it never actually stopped the slow
+            // work), and all it could do when it fired was throw away results
+            // the provider had already produced.
+            provider.scan()
+        }
 
     /**
      * Recorded only after the provider's own [LibraryProvider.launch] call
@@ -2217,14 +2199,13 @@ class Library(
             entry == null -> LaunchResult.Refused("That game isn't in the library. If it was added recently, rescan the library.")
             entry.missing -> LaunchResult.Refused("${entry.title} is missing: its files aren't where the library last found them.")
             entry.needsInstall() -> LaunchResult.NeedsInstall(entry.id, entry.title)
-            else -> try {
+            else -> guarded(
+                "droidtop.Library",
+                "Launch of ${entry.title}",
+                LaunchResult.Refused("${entry.title} could not be started. Check that its emulator or app is installed, then try again."),
+            ) {
                 launch(entry)
                 LaunchResult.Launched
-            } catch (t: kotlinx.coroutines.CancellationException) {
-                throw t
-            } catch (t: Throwable) {
-                Log.e("droidtop.Library", "Launch of ${entry.title} failed", t)
-                LaunchResult.Refused("${entry.title} could not be started. Check that its emulator or app is installed, then try again.")
             }
         }
     }
