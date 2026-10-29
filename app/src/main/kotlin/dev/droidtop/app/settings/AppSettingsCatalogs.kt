@@ -2919,8 +2919,7 @@ object AppSettingsCatalogs {
         PluginStatusWidgetProvider.requestUpdate(context)
         PluginBackground.changed(context)
         // A store a plugin provides comes and goes with it (docs/plugin-api.md 3 A13).
-        val app = context.applicationContext
-        Thread { runCatching { dev.droidtop.library.integrations.PluginStores.refresh(app) } }.start()
+        dev.droidtop.library.integrations.PluginStores.refreshAsync(context)
     }
 
     private fun pluginPermissionGroups(context: Context, pluginId: String): List<CatalogGroup> {
