@@ -79,7 +79,7 @@ class PluginManifestTest {
     }
 
     @Test
-    fun `refuses a contract 1 manifest at install: it needs an update (tracker 766)`() {
+    fun `refuses a contract 1 manifest at install, as needing an update (tracker 766)`() {
         val manifest = PluginManifest.fromJson(manifestJson(contractVersion = 1))!!
         assertEquals(
             listOf("contractVersion 1 is older than this build of droidtop runs ($PLUGIN_MANIFEST_MIN_CONTRACT_VERSION): it needs an update"),
