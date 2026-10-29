@@ -451,10 +451,24 @@ internal fun PcGamePage(
             tab = PageTab.DETAILS,
         )
     }
+    // The kernel drivers this Windows game has installed (docs/SPEC.md 5b, "Kernel drivers"; Droidtop/tracker#607):
+    // one line, read on IO, that opens its Drivers list.
+    val driversLine by produceState<String?>(null, entry.id, windowsRoute, infoScreen) {
+        if (!windowsRoute || infoScreen != null) return@produceState
+        value = withContext(Dispatchers.IO) { dev.droidtop.library.GameDrivers.pageLine(context, entry.id) }
+    }
+    val driversFact = driversLine?.let { line ->
+        PageFact(
+            "Kernel drivers",
+            line,
+            onActivate = { infoScreen = dev.droidtop.library.GameDrivers.screen(entry.id, GameNaming.displayName(entry.title)) },
+            tab = PageTab.DETAILS,
+        )
+    }
     val tabs = remember { PageTab.values() }
-    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, infoRows, copies, oldRows) {
+    val rowsByTab = remember(rows, parts, pluginRows.facts, programFact?.value, programFact?.subtitle, driversFact?.value, infoRows, copies, oldRows) {
         groupRowsByTab(
-            rows + copies + oldRows + listOfNotNull(programFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
+            rows + copies + oldRows + listOfNotNull(programFact, driversFact) + pluginRows.facts + infoRows.map { it.toPageFact(context) { screen -> infoScreen = screen } },
             parts,
         )
     }

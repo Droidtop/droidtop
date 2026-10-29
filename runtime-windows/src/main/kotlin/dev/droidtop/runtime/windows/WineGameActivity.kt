@@ -107,6 +107,9 @@ class WineGameActivity : Activity() {
     private var gameWorkingDir: File? = null
     private var prefixRoot: File? = null
 
+    /** The kernel drivers in the prefix when the run started (Droidtop/tracker#607), to tell which ones it installed. */
+    @Volatile private var driversAtStart: List<dev.droidtop.library.KernelDriver>? = null
+
     /** When the run started, on the wall clock (startedAtMs is the monotonic one): to tell a log this run wrote. */
     private var startedAtWallMs = 0L
 
@@ -241,7 +244,9 @@ class WineGameActivity : Activity() {
         WinePresentation.fullscreenWMClass(target)?.let { renderer.forceFullscreenWMClass = it }
         launchTarget = target
         gameWorkingDir = workingDir
-        prefixRoot = File(prefix.rootDir, ".wine")
+        val wineDir = File(prefix.rootDir, ".wine")
+        prefixRoot = wineDir
+        startupExecutor.execute { driversAtStart = dev.droidtop.library.KernelDrivers.scan(wineDir) }
 
         winHandler = WinHandler(xServer, view).also { handler ->
             xServer.winHandler = handler
@@ -390,7 +395,7 @@ class WineGameActivity : Activity() {
                         "Exit code" to status.toString(),
                         "Ran" to "$ranMs ms",
                         "Showed a window" to if (shownWindow) "yes" else "no",
-                    ) + setupFacts,
+                    ) + setupFacts + driverFacts(context, prefixDir, remember = true),
                     outputLabel = "Wine printed",
                     output = output,
                     attachments = attachments,
@@ -399,6 +404,26 @@ class WineGameActivity : Activity() {
                 RunRecords.save(dev.droidtop.library.ScanLog.logsDir(context), WinePresentation.RUN_RECORD_PREFIX, key, record, now)
             }.onFailure { android.util.Log.w(WinePresentation.LOG_TAG, "could not write the run's record", it) }
         }, "droidtop-wine-record").start()
+    }
+
+    /**
+     * The kernel drivers in the prefix now, one record line each (docs/SPEC.md 5b, "Kernel drivers";
+     * Droidtop/tracker#607), read only. With [remember], at the end of a run, the game's Drivers list learns the ones
+     * this run installed (new since [driversAtStart]) and everything its prefix holds. Disk: off the main thread.
+     */
+    private fun driverFacts(context: android.content.Context, prefixDir: File?, remember: Boolean): List<Pair<String, String>> {
+        val dir = prefixDir ?: return emptyList()
+        val now = dev.droidtop.library.KernelDrivers.scan(dir)
+        val id = entryId
+        if (remember && id != null) {
+            driversAtStart?.map { it.key }?.toSet()?.let { before ->
+                dev.droidtop.library.KernelDriverPrefs.addSeen(context, id, now.filter { it.key !in before })
+            }
+            dev.droidtop.library.KernelDriverPrefs.setPresent(context, id, now)
+        }
+        val approved = id?.let { dev.droidtop.library.KernelDriverPrefs.approved(context, it) }.orEmpty()
+        val allow = id?.let { dev.droidtop.library.KernelDriverPrefs.allowUnlisted(context, it) } ?: false
+        return now.map { "Kernel driver" to dev.droidtop.library.KernelDrivers.recordLine(it, approved = allow || it.key in approved) }
     }
 
     /** Report a problem from the black-screen notice: [report] with the dark frame that was shown. */
@@ -438,7 +463,7 @@ class WineGameActivity : Activity() {
                         "Running for" to "$ranMs ms",
                         "Showed a window" to if (shown) "yes" else "no",
                         screen?.let { "Screen" to it },
-                    ) + setupFacts,
+                    ) + setupFacts + driverFacts(context, prefixDir, remember = false),
                     outputLabel = "Wine printed so far",
                     output = output,
                     attachments = attachments,

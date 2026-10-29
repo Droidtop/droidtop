@@ -35,11 +35,11 @@ object GameProperties {
         id = SCREEN_ID,
         title = "Game properties",
         subtitle = title,
-        groups = { context -> withContext(Dispatchers.IO) { groups(context, entryId, File(gameRoot)) } },
+        groups = { context -> withContext(Dispatchers.IO) { groups(context, entryId, title, File(gameRoot)) } },
         indexGroups = { _ -> emptyList() },
     )
 
-    private suspend fun groups(context: Context, entryId: String, gameRoot: File): List<CatalogGroup> {
+    private suspend fun groups(context: Context, entryId: String, title: String, gameRoot: File): List<CatalogGroup> {
         val settings = WineGameSettingsPrefs.get(context, entryId)
         val options = settings?.launchOptions.orEmpty()
         val environment = settings?.environment.orEmpty()
@@ -95,6 +95,14 @@ object GameProperties {
                 )
             }
         }
+        val drivers = listOf(
+            dev.droidtop.library.settings.NestedScreenItem(
+                id = "properties_drivers",
+                title = "Drivers",
+                subtitle = "Kernel drivers this game installs (anti-cheat, copy protection), and which are approved",
+                inline = GameDrivers.screen(entryId, title),
+            ),
+        )
         val launch = WindowsLaunchResolver.forEntry(context, entryId, gameRoot)
         val show = if (launch == null) {
             listOf(ActionItem("properties_command_none", "Program", "droidtop can't tell which program is the game here; choose one under Program"))
@@ -116,6 +124,7 @@ object GameProperties {
         }
         return listOf(
             CatalogGroup("properties_edit", null, edit),
+            CatalogGroup("properties_drivers", null, drivers),
             CatalogGroup("properties_command", "What will run", show),
         )
     }

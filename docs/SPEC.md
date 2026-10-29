@@ -7264,6 +7264,25 @@ sandbox lane on Droidtop/tracker#584); 1, the managed-prefix registry and the mo
 2, the layer and the read-only game folder in the decider; 3, the kernel-driver discard and the Drivers tab, with
 `Start=4` set when the layer copies `system.reg` up, so a placeholdered driver is never loadable for even one boot.
 
+**Kernel drivers: the read-only half, built ahead of the layer (Droidtop/tracker#607, coordinator 2026-10-29).** The
+list, the approvals and the reporting do not depend on the layer, so they are built first; nothing in this half
+changes a prefix (the owner: no code that edits the prefix's registry before the layer can do it safely).
+`KernelDrivers.scan` reads a prefix's `system.reg` for every service of type 1 (kernel) or 2 (file system) and leaves
+out Wine's own, told by the mark Wine writes into each file it makes ("Wine builtin DLL", "Wine placeholder DLL") or,
+when the file is not in the prefix, by name (`mountmgr`, `nsiproxy`, `winebus`, `winehid`, `wineusb`, `winexinput`).
+A Windows run scans at its start and at its end: the drivers that appeared in between are the ones this game
+installed (a shared prefix holds other games' too), and the game keeps both lists (`KernelDriverPrefs`). Each run's
+record (`wine-last.log` and the game's history, and a Report a problem) has a "Kernel driver" line per driver in the
+prefix, with its file, the product when known and whether the game has it approved. `KnownDrivers` names products
+(EasyAntiCheat, BattlEye, Riot Vanguard, miHoYo protect, XIGNCODE3, FACEIT, Tencent ACE, SafeDisc, StarForce); it
+only names, it never decides. The list lives in droidtop until droidtop-platforms carries data lists. The **Drivers**
+screen (Game properties > Drivers, and the game page's "Kernel drivers" line on Details, which opens it) lists the
+drivers the game installed and the others in its prefix, each with an Approved switch that asks first, and the
+game's default for drivers not approved: Placeholder (deny) unless the person changes it, which asks first and
+says Placeholder is the safe choice. The screen says plainly that the protection is not in place yet: until piece 3
+a driver installs as the game left it. Piece 3 enforces this same list: a driver not approved (and every driver
+while the default is deny) has its write discarded and its service set to `Start=4` at the copy-up.
+
 **The shape.**
 
 - One **base prefix per Wine build** (and, later, per component set such as
