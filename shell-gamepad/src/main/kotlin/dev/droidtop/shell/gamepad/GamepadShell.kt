@@ -1299,8 +1299,12 @@ private fun GamepadShellBody(
             ButtonHintFooter(
                 background = background,
                 // A names what it does on a detail's primary button
-                // ("A Play"), and stays "Select" everywhere else.
-                aLabel = detailPrimaryLabel.takeIf { detailEntry != null } ?: "Select",
+                // ("A Play"). In Retro Games A goes into what the cursor is
+                // on (a system, a game's page): "Open", the verb Home and
+                // the left menu use for it (Droidtop/tracker#681). "Select"
+                // is left for where A chooses.
+                aLabel = detailPrimaryLabel.takeIf { detailEntry != null }
+                    ?: if (!overlayScreen && section == GamingSection.GAMES) "Open" else "Select",
                 canGoBack = canGoBack || overlayScreen,
                 showInfo = infoBound,
                 showSystemSwitch = !overlayScreen && section == GamingSection.GAMES && canGoBack,
