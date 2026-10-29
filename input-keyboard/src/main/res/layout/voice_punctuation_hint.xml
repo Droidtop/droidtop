@@ -33,6 +33,7 @@
             android:paddingRight="8dip"
             android:layout_gravity="center_horizontal"
             android:src="@drawable/ic_suggest_strip_microphone"
+            android:importantForAccessibility="no"
     />
 
     <TextView android:id="@+id/text"

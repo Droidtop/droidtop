@@ -58,6 +58,7 @@
         android:layout_marginTop="20dip"
         android:layout_gravity="center_horizontal"
         android:src="@drawable/mic_slash"
+        android:importantForAccessibility="no"
     />
 
     <ProgressBar android:id="@+id/progress"
