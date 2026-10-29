@@ -78,6 +78,19 @@ class ContainerEnterTest {
     }
 
     @Test
+    fun `droidtop-open, droidtop-view and xdg-open are commands, and an exported xdg-open replaces droidtop's`() {
+        val files = tmp.root
+        val dir = ContainerEnter.hostCommandsDir(files)
+        ContainerEnter.save(files, listOf(htop))
+        listOf("droidtop-open", "droidtop-view", "xdg-open").forEach { assertTrue(it, File(dir, it).let { f -> f.isFile && f.canExecute() }) }
+        assertTrue(File(dir, "droidtop-view").readText().contains("exec sh ${ContainerLauncher.VIEW_HELPER} \"\$@\"\n"))
+        assertTrue(File(dir, "xdg-open").readText().contains("exec sh ${ContainerLauncher.VIEW_HELPER} \"\$t\"\n"))
+        val xdgOpen = ExportedCommand("droidtop-sibling-99", "Debian", "xdg-open")
+        ContainerEnter.save(files, listOf(htop, xdgOpen))
+        assertEquals(ContainerEnter.wrapperScript(xdgOpen), File(dir, "xdg-open").readText())
+    }
+
+    @Test
     fun `a container runs commands from the desktop unless switched off`() {
         val files = tmp.root
         assertTrue(ContainerEnter.allowed(files, htop.containerId))

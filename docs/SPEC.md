@@ -285,6 +285,15 @@ desktop entry for links and everyday document and media types, and a
 `mimeapps.list` beside the library's entries makes it the http(s) default
 only where nothing else is: it is last on `XDG_DATA_DIRS`, so a browser the
 person installs or their own `~/.config/mimeapps.list` wins.
+Both helpers are also commands (`droidtop-open`, `droidtop-view`) in the
+exported-commands directory, last on `PATH` (3d), beside an `xdg-open` for
+an image with none of its own: it makes a relative path absolute and runs
+`droidtop-view`, so `xdg-open https://...` in the terminal opens on Android.
+The distro's xdg-open wins once installed (it is earlier on `PATH`) and
+reaches the same helper through the `mimeapps.list`; an `xdg-open` exported
+from another container replaces droidtop's. On the rig (Android 13,
+v0.2.0-dev.2398) both names were "not found" in the terminal, the helpers
+having lived only at their full paths.
 
 **The desktop panel (decided 2026-10-09, Droidtop/tracker#353).** The sway
 desktop starts Waybar with wofi as its panel and launcher by default, the

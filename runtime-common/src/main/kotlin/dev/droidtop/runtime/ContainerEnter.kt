@@ -192,8 +192,10 @@ object ContainerEnter {
         writeIfChanged(helper, helperScript())
         val dir = hostCommandsDir(filesDir)
         dir.mkdirs()
-        // droidtop's own docker and podman commands live beside them (docs/SPEC.md 3d "The docker command").
-        val wanted = commands.associate { it.name to wrapperScript(it) } + EngineCli.FRONTS.associate { it.name to it.wrapperScript() }
+        // droidtop's own docker and podman commands live beside them (docs/SPEC.md 3d "The docker command"), and so
+        // do droidtop-open, droidtop-view and a fallback xdg-open (2a), which an exported xdg-open replaces.
+        val wanted = ContainerLauncher.pathCommands() + commands.associate { it.name to wrapperScript(it) } +
+            EngineCli.FRONTS.associate { it.name to it.wrapperScript() }
         dir.listFiles()?.forEach { if (it.isFile && it.name !in wanted) it.delete() }
         wanted.forEach { (name, text) ->
             val file = File(dir, name)

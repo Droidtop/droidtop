@@ -189,6 +189,37 @@ object ContainerLauncher {
         appendLine("mv -f \"${'$'}tmp\" \"${'$'}dir/$VIEW_REQUEST_PREFIX${'$'}${'$'}$REQUEST_SUFFIX\"")
     }
 
+    /**
+     * The helpers as commands on the desktop's `PATH`, written into [ContainerEnter.COMMANDS_DIR] with the exported
+     * commands (Droidtop/tracker#388: on the rig `droidtop-open` and `xdg-open` were "not found", the helpers living
+     * only at their full paths). `xdg-open` is for an image with none of its own: that directory is last on `PATH`,
+     * so the distro's xdg-open wins once installed, and reaches Open on Android through [mimeApps] anyway.
+     */
+    fun pathCommands(): Map<String, String> = mapOf(
+        "droidtop-open" to commandScript("droidtop-open", HELPER),
+        "droidtop-view" to commandScript("droidtop-view", VIEW_HELPER),
+        "xdg-open" to xdgOpenScript(),
+    )
+
+    private fun commandScript(name: String, helper: String): String = buildString {
+        appendLine("#!/bin/sh")
+        appendLine("# $name, installed by droidtop (docs/SPEC.md 2a).")
+        appendLine("exec sh $helper \"\$@\"")
+    }
+
+    /** xdg-open's one argument: a link or an absolute path as it is, a relative path made absolute, then [VIEW_HELPER]. */
+    fun xdgOpenScript(): String = buildString {
+        appendLine("#!/bin/sh")
+        appendLine("# xdg-open for a desktop with none of its own: opens the link or file in an Android app (docs/SPEC.md 2a). Installed by droidtop.")
+        appendLine("t=\"\${1:-}\"")
+        appendLine("case \"\$t\" in")
+        appendLine("  '') echo 'usage: xdg-open <link or file>' >&2; exit 1 ;;")
+        appendLine("  *://* | /*) ;;")
+        appendLine("  *) t=\"\$PWD/\$t\" ;;")
+        appendLine("esac")
+        appendLine("exec sh $VIEW_HELPER \"\$t\"")
+    }
+
     /** Whether [fileName] is a whole view request (`view.<pid>.request`). */
     fun isViewRequest(fileName: String): Boolean =
         fileName.startsWith(VIEW_REQUEST_PREFIX) && fileName.endsWith(REQUEST_SUFFIX)
