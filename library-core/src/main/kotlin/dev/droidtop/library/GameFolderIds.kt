@@ -1,5 +1,6 @@
 package dev.droidtop.library
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.security.MessageDigest
 
@@ -110,17 +111,12 @@ class GameFolderIds(
 
     private fun save() {
         runCatching {
-            store.parentFile?.mkdirs()
-            val tmp = File(store.parentFile, store.name + ".tmp")
-            tmp.writeText(
+            AtomicWrite.text(
+                store,
                 byPath.values.joinToString(NL, postfix = NL) {
                     listOf(it.id.toString(), it.stat.orEmpty(), it.fingerprint.orEmpty(), escape(it.path)).joinToString(TAB)
                 },
             )
-            if (!tmp.renameTo(store)) {
-                store.delete()
-                tmp.renameTo(store)
-            }
         }
     }
 

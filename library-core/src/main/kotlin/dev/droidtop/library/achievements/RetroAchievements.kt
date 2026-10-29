@@ -9,6 +9,7 @@ import dev.droidtop.library.achievements.hash.RaHashKind
 import dev.droidtop.library.achievements.hash.RaHasher
 import dev.droidtop.library.credentials.CredentialStore
 import dev.droidtop.library.scraper.ScrapeLookup
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.io.IOException
 
@@ -103,7 +104,7 @@ object RetroAchievements {
         return try {
             when (val answer = RetroAchievementsClient.gameList(key, consoleId)) {
                 is ScrapeLookup.Found -> {
-                    writeAtomically(cached, RaCache.serializeGames(answer.value))
+                    AtomicWrite.text(cached, RaCache.serializeGames(answer.value))
                     answer
                 }
                 else -> answer
@@ -155,7 +156,7 @@ object RetroAchievements {
         synchronized(hashLock) {
             val known = RaCache.readHashes(index)
             known[stamp] = hash.orEmpty()
-            writeAtomically(index, RaCache.serializeHashes(known))
+            AtomicWrite.text(index, RaCache.serializeHashes(known))
         }
         return hash
     }
@@ -182,7 +183,7 @@ object RetroAchievements {
                     if (parsed == null) {
                         old?.let { Progress.Stale(it) } ?: Progress.Unavailable
                     } else {
-                        writeAtomically(cached, answer.value)
+                        AtomicWrite.text(cached, answer.value)
                         Progress.Fresh(parsed)
                     }
                 }
@@ -191,15 +192,6 @@ object RetroAchievements {
             }
         } catch (e: IOException) {
             old?.let { Progress.Stale(it) } ?: throw e
-        }
-    }
-
-    private fun writeAtomically(target: File, text: String) {
-        val temporary = File(target.parentFile, target.name + ".tmp")
-        temporary.writeText(text)
-        if (!temporary.renameTo(target)) {
-            target.writeText(text)
-            temporary.delete()
         }
     }
 }

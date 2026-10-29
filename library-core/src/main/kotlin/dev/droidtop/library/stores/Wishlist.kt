@@ -2,6 +2,7 @@ package dev.droidtop.library.stores
 
 import android.content.Context
 import dev.droidtop.library.StoreIdentity
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 
 /**
@@ -39,16 +40,9 @@ object Wishlist {
     fun read(context: Context, storeId: String): List<WishlistGame> =
         runCatching { file(context, storeId).takeIf { it.isFile }?.readText()?.let(::parse) }.getOrNull().orEmpty()
 
-    /** Replaces the copy with [games], through a temporary file so a read never sees half of one. */
+    /** Replaces the copy with [games], written whole through [AtomicWrite] so a read never sees half of one. */
     fun write(context: Context, storeId: String, games: List<WishlistGame>) {
-        val target = file(context, storeId)
-        target.parentFile?.mkdirs()
-        val temporary = File(target.parentFile, "${target.name}.tmp")
-        temporary.writeText(format(games))
-        if (!temporary.renameTo(target)) {
-            target.delete()
-            temporary.renameTo(target)
-        }
+        AtomicWrite.text(file(context, storeId), format(games))
     }
 
     /** Forgets the copy (a sign-out). */

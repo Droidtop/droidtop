@@ -2,6 +2,7 @@ package dev.droidtop.library
 
 import dev.droidtop.library.consoles.ConsoleSystemDef
 import dev.droidtop.library.consoles.resolveSystem
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
@@ -470,8 +471,8 @@ object PcFolderScan {
         fun save(file: File) {
             if (!dirty.get()) return
             try {
-                val tmp = File(file.path + ".tmp")
-                tmp.bufferedWriter().use { out ->
+                AtomicWrite.stream(file) { stream ->
+                    val out = stream.bufferedWriter()
                     out.write(fingerprint)
                     out.newLine()
                     for ((path, v) in verdicts) {
@@ -483,10 +484,7 @@ object PcFolderScan {
                         )
                         out.newLine()
                     }
-                }
-                if (!tmp.renameTo(file)) {
-                    file.delete()
-                    tmp.renameTo(file)
+                    out.flush()
                 }
                 dirty.set(false)
             } catch (_: java.io.IOException) {

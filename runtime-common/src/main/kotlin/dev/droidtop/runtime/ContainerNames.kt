@@ -1,5 +1,6 @@
 package dev.droidtop.runtime
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.util.Properties
 
@@ -58,10 +59,7 @@ class ContainerNames(private val file: File) {
     }
 
     private fun save(properties: Properties) {
-        file.parentFile?.mkdirs()
-        val temp = File(file.parentFile, ".${file.name}.tmp")
-        temp.outputStream().use { properties.store(it, "droidtop container names, by container id") }
-        check(temp.renameTo(file)) { "couldn't save container names to ${file.path}" }
+        AtomicWrite.stream(file) { properties.store(it, "droidtop container names, by container id") }
     }
 
     companion object {

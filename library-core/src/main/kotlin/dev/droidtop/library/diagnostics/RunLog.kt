@@ -1,5 +1,6 @@
 package dev.droidtop.library.diagnostics
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.io.RandomAccessFile
 import java.time.Instant
@@ -179,8 +180,8 @@ object RunRecords {
         dir.mkdirs()
         val safe = safeKey(key)
         val history = File(dir, "$prefix-run-$safe-$nowMs.log")
-        writeAtomically(history, record)
-        writeAtomically(File(dir, "$prefix-last.log"), record)
+        AtomicWrite.text(history, record)
+        AtomicWrite.text(File(dir, "$prefix-last.log"), record)
         prune(dir, prefix, keepPerKey, keepTotal)
         return history
     }
@@ -188,15 +189,6 @@ object RunRecords {
     /** A game's key as a file-name part: letters, digits, dot, underscore, and dash; short. */
     fun safeKey(key: String): String =
         key.replace(Regex("[^A-Za-z0-9._-]"), "_").take(40).ifBlank { "unknown" }
-
-    private fun writeAtomically(file: File, text: String) {
-        val temp = File(file.parentFile, file.name + ".tmp")
-        temp.writeText(text)
-        if (!temp.renameTo(file)) {
-            file.writeText(text)
-            temp.delete()
-        }
-    }
 
     private class Entry(val file: File, val key: String, val at: Long)
 

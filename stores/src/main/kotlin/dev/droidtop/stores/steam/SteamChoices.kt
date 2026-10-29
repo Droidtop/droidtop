@@ -1,6 +1,7 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.MapSerializer
@@ -48,11 +49,7 @@ internal object SteamChoices {
         val all = readAll(context).toMutableMap()
         // The default needs no row.
         if (choice == SteamChoice()) all.remove(appId) else all[appId] = choice
-        val file = file(context)
-        file.parentFile?.mkdirs()
-        val temp = File(file.path + ".tmp")
-        temp.writeText(encode(all))
-        check(temp.renameTo(file)) { "Could not save the content choice" }
+        AtomicWrite.text(file(context), encode(all))
     }
 
     private fun readAll(context: Context): Map<Int, SteamChoice> =

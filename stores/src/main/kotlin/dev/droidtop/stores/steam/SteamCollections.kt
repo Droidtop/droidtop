@@ -1,6 +1,7 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import `in`.dragonbra.javasteam.base.PacketClientMsgProtobuf
 import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesCloudconfigstoreSteamclient.CCloudConfigStore_Download_Request
 import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesCloudconfigstoreSteamclient.CCloudConfigStore_Download_Response
@@ -114,8 +115,6 @@ internal object SteamCollections {
 
     /** Not for the main thread. */
     fun save(context: Context, parsed: Parsed) {
-        val target = file(context)
-        target.parentFile?.mkdirs()
         val collections = JSONArray()
         parsed.collections.forEach { collection ->
             collections.put(
@@ -125,11 +124,9 @@ internal object SteamCollections {
                     .put("apps", JSONArray(collection.appIds.sorted())),
             )
         }
-        val temp = File(target.path + ".tmp")
         val dynamic = JSONArray()
         parsed.dynamic.forEach { dynamic.put(JSONObject().put("id", it.id).put("name", it.name).put("filterSpec", it.filterSpec)) }
-        temp.writeText(JSONObject().put("collections", collections).put("dynamic", dynamic).toString())
-        temp.renameTo(target)
+        AtomicWrite.text(file(context), JSONObject().put("collections", collections).put("dynamic", dynamic).toString())
     }
 
     /** The last answer saved; null when Steam has never given one. Not for the main thread. */

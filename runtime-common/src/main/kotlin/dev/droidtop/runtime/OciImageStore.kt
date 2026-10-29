@@ -1,6 +1,7 @@
 package dev.droidtop.runtime
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -226,9 +227,7 @@ class OciImageStore(
 
     private fun writeIndex(index: JsonObject, manifests: List<JsonObject>) {
         val updated = JsonObject(index + ("manifests" to JsonArray(manifests)))
-        val temporary = File(root, "index.json.tmp")
-        temporary.writeText(json.encodeToString(JsonElement.serializer(), updated))
-        check(temporary.renameTo(File(root, "index.json"))) { "could not replace $root/index.json" }
+        AtomicWrite.text(File(root, "index.json"), json.encodeToString(JsonElement.serializer(), updated))
     }
 
     private fun manifestsOf(index: JsonObject): List<JsonObject> =

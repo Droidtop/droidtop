@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -69,13 +70,7 @@ class PendingPathChanges(private val file: File) {
         runCatching { if (file.isFile) json.decodeFromString(serializer, file.readText()) else emptyList() }.getOrDefault(emptyList())
 
     private fun write(changes: List<PathChange>) {
-        file.parentFile?.mkdirs()
-        val staged = File(file.parentFile, file.name + ".tmp")
-        staged.writeText(json.encodeToString(serializer, changes))
-        if (!staged.renameTo(file)) {
-            file.delete()
-            staged.renameTo(file)
-        }
+        AtomicWrite.text(file, json.encodeToString(serializer, changes))
     }
 
     companion object {

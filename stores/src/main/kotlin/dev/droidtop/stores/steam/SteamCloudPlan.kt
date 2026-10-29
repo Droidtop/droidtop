@@ -1,5 +1,6 @@
 package dev.droidtop.stores.steam
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -85,11 +86,7 @@ internal data class SteamCloudState(
             file(filesDir, appId).takeIf { it.isFile }?.let { decode(it.readText()) } ?: SteamCloudState()
 
         fun save(filesDir: File, appId: Int, state: SteamCloudState) {
-            val file = file(filesDir, appId)
-            file.parentFile?.mkdirs()
-            val temp = File(file.path + ".tmp")
-            temp.writeText(encode(state))
-            check(temp.renameTo(file)) { "Could not save the cloud save state" }
+            AtomicWrite.text(file(filesDir, appId), encode(state))
         }
     }
 }

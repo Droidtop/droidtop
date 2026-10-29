@@ -12,13 +12,13 @@ import com.android.launcher3.icons.cache.CacheLookupFlag
 import com.android.launcher3.model.data.AppInfo
 import com.android.launcher3.util.Executors
 import app.murinelauncher.settings.hiddenapps.HiddenAppsRepository
+import dev.droidtop.net.AtomicWrite
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
-import java.io.FileOutputStream
 
 /**
  * Scans installed, launchable Android apps and surfaces each as a
@@ -218,18 +218,15 @@ class NativeAppProvider(private val context: Context) : LibraryProvider {
     // returns null and the entry just renders with no artwork (Coil's
     // existing AsyncImage null-model handling), rather than caching a
     // broken/empty file that would then stick around across scans.
-    // Written to a temporary name and renamed, so a reader (or the next
+    // Written whole through AtomicWrite, so a reader (or the next
     // scan's "already cached" check) never sees half a PNG.
     private fun writeIconFile(iconDir: File, name: String, packageName: String, bitmap: Bitmap): String? {
         val file = File(iconDir, name)
-        val temp = File(iconDir, ".$name.tmp")
         return try {
-            FileOutputStream(temp).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
-            if (!temp.renameTo(file)) error("rename to $name failed")
+            AtomicWrite.stream(file) { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
             file.absolutePath
         } catch (t: Throwable) {
             Log.e("droidtop.NativeAppProvider", "Failed to cache icon for $packageName", t)
-            temp.delete()
             null
         }
     }

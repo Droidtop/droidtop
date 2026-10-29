@@ -1,5 +1,6 @@
 package dev.droidtop.library
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.security.MessageDigest
 import kotlinx.serialization.SerialName
@@ -146,7 +147,7 @@ object NoOpGameRecordStore : GameRecordStore {
  * characters illegal on exFAT but legal on ext4, and an id-derived
  * filename can carry the same kind of character a games root can.
  *
- * Written to a temp file and renamed into place, so a crash mid-write
+ * Written whole through AtomicWrite, so a crash mid-write
  * leaves the previous record rather than a torn one. Written only when
  * the record differs from what is already stored -- a walk that finds
  * the same game again writes
@@ -195,15 +196,7 @@ class FileGameRecordStore(private val dir: File) : GameRecordStore {
         // finds the same game again (the common case, most of a rescan)
         // must not rewrite every record file it touches.
         if (file.isFile && runCatching { file.readText() }.getOrNull() == encoded) return
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(encoded)
-        if (!tmp.renameTo(file)) {
-            // The old record is still intact if this also fails, and the
-            // game is simply written again next time it is found.
-            file.delete()
-            tmp.renameTo(file)
-        }
+        AtomicWrite.text(file, encoded)
     }
 
     override fun delete(id: String) {

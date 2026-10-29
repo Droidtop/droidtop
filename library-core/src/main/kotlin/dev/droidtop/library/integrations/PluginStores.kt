@@ -9,6 +9,7 @@ import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.stores.StoreProgress
 import dev.droidtop.library.stores.StoreSignIn
 import dev.droidtop.library.stores.StoreSignInKind
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.pluginhost.AcquireDownloads
 import dev.droidtop.pluginhost.PluginCrashPolicy
 import dev.droidtop.pluginhost.PluginRecord
@@ -16,8 +17,6 @@ import dev.droidtop.pluginhost.PluginWebAccount
 import dev.droidtop.pluginhost.ProvidedPoint
 import dev.droidtop.runtime.SafeDelete
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -167,11 +166,7 @@ class PluginStoreLibrary internal constructor(
         PluginStores.installsOf(runCatching { installsFile(context).readText() }.getOrNull())
 
     private fun writeInstalls(context: Context, installs: Map<String, PluginStores.Install>) {
-        val target = installsFile(context)
-        target.parentFile?.mkdirs()
-        val tmp = File(target.parentFile, target.name + ".tmp")
-        tmp.writeText(PluginStores.installsJson(installs))
-        Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+        AtomicWrite.text(installsFile(context), PluginStores.installsJson(installs))
     }
 
     override fun signedIn(context: Context): Boolean = PluginWebAccount.of(context, record)?.signedIn == true
@@ -202,11 +197,7 @@ class PluginStoreLibrary internal constructor(
             val reply = policy.handle(record, newCall(PluginStores.POINT, "library", "library.stores", JSONObject().put("store", id), SYNC_MS), timeoutMs = SYNC_MS, crashOnTimeout = false, userInitiated = false)
             if (!reply.ok) return@withContext Result.failure(IllegalStateException(reply.message ?: "$label did not answer"))
             val games = PluginStores.gamesOf(id, reply.data)
-            val target = file(context)
-            target.parentFile?.mkdirs()
-            val tmp = File(target.parentFile, target.name + ".tmp")
-            tmp.writeText(PluginStores.rowsJson(games))
-            Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            AtomicWrite.text(file(context), PluginStores.rowsJson(games))
             StoreChanges.announce(context)
             Result.success(games.size)
         } catch (e: Exception) {

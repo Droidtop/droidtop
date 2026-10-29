@@ -11,6 +11,7 @@ import dev.droidtop.library.settings.CatalogScreen
 import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.TextInputItem
 import dev.droidtop.library.settings.ToggleItem
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.pluginhost.GrantState
 import dev.droidtop.pluginhost.LinkPattern
 import dev.droidtop.pluginhost.PluginGrants
@@ -380,9 +381,7 @@ object LinkRouter {
                     JSONObject().put("scheme", h.pattern.scheme).apply { h.pattern.host?.let { put("host", it) } },
                 )
             })
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(array.toString())
-            tmp.renameTo(file)
+            AtomicWrite.text(file, array.toString())
         }
 
         fun add(file: File, handler: Handler) = synchronized(lock) {

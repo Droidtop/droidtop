@@ -1,6 +1,7 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import `in`.dragonbra.javasteam.enums.EResult
 import `in`.dragonbra.javasteam.protobufs.steamclient.SteammessagesPlayerSteamclient.CPlayer_GetOwnedGames_Request
 import `in`.dragonbra.javasteam.rpc.service.Player
@@ -46,11 +47,7 @@ internal object SteamOwnedGames {
 
     /** Not for the main thread. */
     fun save(context: Context, answer: Answer) {
-        val target = file(context)
-        target.parentFile?.mkdirs()
-        val temp = File(target.path + ".tmp")
-        temp.writeText(answer.listed.sorted().joinToString("\n") { if (it in answer.played) "$it played" else "$it" })
-        temp.renameTo(target)
+        AtomicWrite.text(file(context), answer.listed.sorted().joinToString("\n") { if (it in answer.played) "$it played" else "$it" })
     }
 
     /** The last answer saved; [Answer.NONE] when there is none. Not for the main thread. */

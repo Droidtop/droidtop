@@ -1,6 +1,7 @@
 package dev.droidtop.stores.steam
 
 import android.content.Context
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -40,16 +41,9 @@ internal data class SteamCredentials(
             .getOrNull()
             ?.takeIf { it.accountName.isNotBlank() && it.refreshToken.isNotBlank() }
 
-        /** Writes [credentials] in place of what was there (a temporary file renamed over it). */
+        /** Writes [credentials] in place of what was there (written whole through [AtomicWrite]). */
         fun save(context: Context, credentials: SteamCredentials) {
-            val file = file(context)
-            file.parentFile?.mkdirs()
-            val temp = File(file.parentFile, file.name + ".tmp")
-            temp.writeText(JSON.encodeToString(serializer(), credentials))
-            if (!temp.renameTo(file)) {
-                temp.copyTo(file, overwrite = true)
-                temp.delete()
-            }
+            AtomicWrite.text(file(context), JSON.encodeToString(serializer(), credentials))
         }
 
         /**

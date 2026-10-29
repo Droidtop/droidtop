@@ -6,6 +6,7 @@ import com.winlator.container.Container
 import com.winlator.core.FileUtils
 import com.winlator.core.envvars.EnvVars
 import dev.droidtop.library.stores.StoreLibraries
+import dev.droidtop.net.AtomicWrite
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import java.io.File
@@ -126,7 +127,12 @@ object LsfgVkManager {
         val ok = runCatching {
             installLayer(context, home) &&
                 copyIfDifferent(dll, installedDll) &&
-                writeAtomic(configFile, configToml(installedDll.absolutePath, multiplier))
+                // The layer rereads conf.toml on a change of its mtime and must never see half a file.
+                runCatching {
+                    AtomicWrite.text(configFile, configToml(installedDll.absolutePath, multiplier))
+                    FileUtils.chmod(configFile, 0b110100100)
+                    true
+                }.getOrDefault(false)
         }.getOrElse {
             Timber.tag(TAG).e(it, "could not set frame generation up")
             false
@@ -155,7 +161,12 @@ object LsfgVkManager {
         if (!copyIfDifferent(source, lib)) return false
         FileUtils.chmod(lib, 0b111101101)
         val manifest = File(home, "$LAYER_RELATIVE_DIR/$MANIFEST_FILENAME")
-        if (!writeAtomic(manifest, manifestJson())) return false
+        val wrote = runCatching {
+            AtomicWrite.text(manifest, manifestJson())
+            FileUtils.chmod(manifest, 0b110100100)
+            true
+        }.getOrDefault(false)
+        if (!wrote) return false
         return lib.isFile && manifest.isFile
     }
 
@@ -170,20 +181,6 @@ object LsfgVkManager {
         return try {
             from.inputStream().use { input -> tmp.outputStream().use { input.copyTo(it) } }
             tmp.renameTo(to)
-        } catch (t: Throwable) {
-            tmp.delete()
-            false
-        }
-    }
-
-    // The layer rereads conf.toml on a change of its mtime and must never see half a file.
-    private fun writeAtomic(file: File, text: String): Boolean {
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        return try {
-            if (!FileUtils.writeString(tmp, text)) return false
-            FileUtils.chmod(tmp, 0b110100100)
-            tmp.renameTo(file)
         } catch (t: Throwable) {
             tmp.delete()
             false

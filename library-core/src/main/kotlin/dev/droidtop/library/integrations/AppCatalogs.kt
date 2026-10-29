@@ -2,6 +2,7 @@ package dev.droidtop.library.integrations
 
 import android.content.Context
 import android.os.Build
+import dev.droidtop.net.AtomicWrite
 import dev.droidtop.net.GitHubAuth
 import dev.droidtop.net.GitHubTokenStore
 import dev.droidtop.pluginhost.AcquireDownloadDescriptor
@@ -374,9 +375,7 @@ object AppCatalogs {
                     }),
                 ),
             )
-            val tmp = File(file.parentFile, file.name + ".tmp")
-            tmp.writeText(root.toString())
-            tmp.renameTo(file)
+            AtomicWrite.text(file, root.toString())
         }
     }
 

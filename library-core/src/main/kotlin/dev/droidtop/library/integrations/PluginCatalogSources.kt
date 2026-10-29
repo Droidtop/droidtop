@@ -8,6 +8,7 @@ import com.google.zxing.DecodeHintType
 import com.google.zxing.RGBLuminanceSource
 import com.google.zxing.common.HybridBinarizer
 import com.google.zxing.qrcode.QRCodeReader
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 import java.net.URI
 import org.json.JSONArray
@@ -43,7 +44,7 @@ data class KnownCatalog(val id: String, val name: String, val address: String, v
 
 /**
  * The catalogs the person added, in droidtop's own private storage (`filesDir/plugin-catalogs.json`),
- * written through a temp file and a rename like the key store beside it. The official catalog is not
+ * written whole through AtomicWrite like the key store beside it. The official catalog is not
  * in the file and cannot be: it is [OFFICIAL], first in [all].
  */
 object PluginCatalogSources {
@@ -113,13 +114,7 @@ object PluginCatalogSources {
                     },
             )
         }
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, "${file.name}.tmp")
-        tmp.writeText(array.toString())
-        if (!tmp.renameTo(file)) {
-            tmp.delete()
-            throw java.io.IOException("couldn't replace ${file.name}")
-        }
+        AtomicWrite.text(file, array.toString())
     }
 
     private fun text(json: JSONObject, key: String): String? =

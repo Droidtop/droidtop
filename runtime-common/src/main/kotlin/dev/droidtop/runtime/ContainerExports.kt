@@ -1,5 +1,6 @@
 package dev.droidtop.runtime
 
+import dev.droidtop.net.AtomicWrite
 import java.io.File
 
 /**
@@ -125,8 +126,6 @@ object ContainerExports {
 
     private fun writeIfChanged(file: File, text: String) {
         if (file.isFile && file.readText() == text) return
-        val tmp = File(file.parentFile, ".${file.name}")
-        tmp.writeText(text)
-        if (!tmp.renameTo(file)) tmp.delete()
+        AtomicWrite.text(file, text)
     }
 }
