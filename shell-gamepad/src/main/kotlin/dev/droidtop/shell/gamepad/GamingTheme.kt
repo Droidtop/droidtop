@@ -359,31 +359,50 @@ object GamingTheme {
         runCatching { android.provider.Settings.Secure.getInt(context.contentResolver, "high_text_contrast_enabled", 0) == 1 }
             .getOrDefault(false)
 
+    /** A theme's font; a file that is not one is logged by its path and the theme draws in the default face. */
     private fun loadTypeface(path: String?): android.graphics.Typeface? {
         if (path == null) return null
         return try {
             android.graphics.Typeface.createFromFile(path)
-        } catch (t: Throwable) {
+        } catch (e: Exception) {
+            android.util.Log.w(LOG_TAG, "theme font $path", e)
             null
         }
     }
 
+    /**
+     * A theme's background texture, decoded no larger than [TEXTURE_MAX_EDGE] on a side. Out of memory halves it
+     * again, down to [TEXTURE_MIN_EDGE]; a file that does not decode is logged by its path and the theme draws flat.
+     */
     private fun loadTexture(path: String?): Brush? {
         if (path == null) return null
-        return try {
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        try {
             BitmapFactory.decodeFile(path, bounds)
-            var sample = 1
-            while (bounds.outWidth / sample > TEXTURE_MAX_EDGE || bounds.outHeight / sample > TEXTURE_MAX_EDGE) sample *= 2
-            val bitmap = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
-                ?: return null
-            ShaderBrush(ImageShader(bitmap.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
-        } catch (t: Throwable) {
-            null
+        } catch (e: Exception) {
+            android.util.Log.w(LOG_TAG, "theme texture $path", e)
+            return null
         }
+        var sample = 1
+        while (bounds.outWidth / sample > TEXTURE_MAX_EDGE || bounds.outHeight / sample > TEXTURE_MAX_EDGE) sample *= 2
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample >= TEXTURE_MIN_EDGE) {
+            try {
+                val bitmap = BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+                return ShaderBrush(ImageShader(bitmap.asImageBitmap(), TileMode.Repeated, TileMode.Repeated))
+            } catch (e: OutOfMemoryError) {
+                android.util.Log.w(LOG_TAG, "theme texture $path at 1/$sample: out of memory, trying smaller")
+                sample *= 2
+            } catch (e: Exception) {
+                android.util.Log.w(LOG_TAG, "theme texture $path", e)
+                return null
+            }
+        }
+        return null
     }
 
     private const val TEXTURE_MAX_EDGE = 1024
+    private const val TEXTURE_MIN_EDGE = 64
+    private const val LOG_TAG = "droidtop.theme"
 }
 
 /**
