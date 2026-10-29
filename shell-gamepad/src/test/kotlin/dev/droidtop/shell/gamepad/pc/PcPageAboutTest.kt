@@ -230,7 +230,11 @@ class PcPageAboutTest {
         )
 
         val bare = factsStrip(entry(), now, folderSizeBytes = null, installedVersion = null, runsWith = null)
-        assertEquals(listOf("Last played" to "Never", "Play time" to "Never played"), bare)
+        assertEquals(listOf("Last played" to "Never"), bare)
+
+        // Counted but not timed: the count is Overview's "Times played", not a play time.
+        val counted = factsStrip(entry().copy(playCount = 14), now, folderSizeBytes = null, installedVersion = null, runsWith = null)
+        assertEquals(listOf("Last played" to "Never"), counted)
     }
 
     @Test

@@ -338,15 +338,6 @@ class PcShelvesTest {
     }
 
     @Test
-    fun `play time reads as a person says it`() {
-        assertEquals("Never played", playtimeLine(0, 0))
-        assertEquals("Under a minute, played once", playtimeLine(30, 1))
-        assertEquals("45 min, played 3 times", playtimeLine(45 * 60, 3))
-        assertEquals("2 h 5 min, played 7 times", playtimeLine(2 * 3600 + 5 * 60, 7))
-        assertEquals("Played once", playtimeLine(0, 1))
-    }
-
-    @Test
     fun `the tab holds every game that is not a console system's`() {
         assertTrue(game("/vn").onPcGamesTab)
         assertTrue(game("steam:1", kind = LibraryEntryKind.WINE_PROFILE).onPcGamesTab)

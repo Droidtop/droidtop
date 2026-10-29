@@ -765,6 +765,9 @@ internal fun PcGamePage(
                                 }
                             }
                         } else {
+                            // A tab whose rows have no second line keeps no room for one: a lone "Times played 14"
+                            // was a four-line box with one line in it (Droidtop/tracker#662).
+                            val summaryLines = if (current.any { it.subtitle != null }) 2 else 0
                             itemsIndexed(current, key = { index, fact -> "$tab:$index:${fact.title}" }) { index, fact ->
                                 Box(
                                     modifier = Modifier
@@ -778,6 +781,7 @@ internal fun PcGamePage(
                                         chevron = fact.onActivate != null,
                                         selected = zone == PageZone.CONTENT && row == index,
                                         uniformHeight = true,
+                                        uniformSummaryLines = summaryLines,
                                         ownScrollKeeping = true,
                                         onClick = {
                                             zone = PageZone.CONTENT
@@ -1561,21 +1565,6 @@ private fun pageRows(
 private fun folderSizeBytes(path: String): Long = dev.droidtop.library.FolderSizes.measure(path)?.bytes ?: 0L
 
 /**
- * "2 h 15 min, played 7 times", "Never played": the one play-time sentence of
- * the facts strip and the Details tab. Pure, for the tests.
- */
-internal fun playtimeLine(seconds: Long, playCount: Int): String {
-    if (seconds <= 0 && playCount <= 0) return "Never played"
-    val time = dev.droidtop.library.format.ValueFormat.duration(seconds).takeIf { seconds > 0 }
-    val times = when (playCount) {
-        0 -> null
-        1 -> "played once"
-        else -> "played $playCount times"
-    }
-    return listOfNotNull(time, times).joinToString(", ").replaceFirstChar { it.uppercase() }
-}
-
-/**
  * The labelled "About this game" facts, in the order a store page lists
  * them; only the ones that exist (docs/SPEC.md 7h).
  */
@@ -1747,7 +1736,8 @@ internal fun factsStrip(
     runsWith: String?,
 ): List<Pair<String, String>> = listOfNotNull(
     "Last played" to (entry.lastPlayedEpochMs?.let { dev.droidtop.library.format.ValueFormat.daysAgo(now, it).replaceFirstChar { c -> c.uppercase() } } ?: "Never"),
-    "Play time" to playtimeLine(entry.playtimeSeconds, entry.playCount),
+    // Play time is time; how many times is Overview's "Times played", said once (Droidtop/tracker#662).
+    entry.playtimeSeconds.takeIf { it > 0 }?.let { "Play time" to dev.droidtop.library.format.ValueFormat.duration(it) },
     versionFact(installedVersion, entry.availableUpdate)?.let { "Version" to it },
     (folderSizeBytes ?: entry.pcInfo?.sizeBytes)?.takeIf { it > 0 }?.let { "Size" to dev.droidtop.library.format.ValueFormat.size(it) },
     runsWith?.takeIf { it.isNotBlank() }?.let { "Runs with" to it },
