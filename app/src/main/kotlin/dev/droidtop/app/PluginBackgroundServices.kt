@@ -16,10 +16,7 @@ import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.IBinder
 import dev.droidtop.library.integrations.PluginBackground
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
@@ -94,7 +91,7 @@ class PluginServicesService : Service() {
 
 /** The periodic system job that runs plugin schedules that are due (docs/plugin-api.md 3 E9). */
 class PluginScheduleJobService : JobService() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
     private var running: Job? = null
 
     override fun onStartJob(params: JobParameters): Boolean {

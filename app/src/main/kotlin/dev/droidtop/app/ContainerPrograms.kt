@@ -13,10 +13,8 @@ import dev.droidtop.runtime.nameOf
 import java.io.File
 import java.util.Properties
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,7 +29,7 @@ import kotlinx.coroutines.withContext
  */
 internal object ContainerPrograms {
     private const val TAG = "droidtop.Programs"
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
     private val jobs = ConcurrentHashMap<String, Job>()
 
     /** The ports each started program's image says it listens on, by container id, with its name: what a start is checked against. */

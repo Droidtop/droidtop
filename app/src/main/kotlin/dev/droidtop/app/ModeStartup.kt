@@ -78,9 +78,7 @@ object ModeStartup {
         // resolution does its own loading and does not need this.
         if (on(ModePiece.GAMING_PLATFORMS_DATABASE) && !platformsWarmed) {
             platformsWarmed = true
-            Thread {
-                runCatching { dev.droidtop.library.consoles.PlatformsDatabase.builtIns(app) }
-            }.start()
+            dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.library.consoles.PlatformsDatabase.builtIns(app) }
         }
 
         // Other apps' "Open with" lists offer droidtop only while Desktop

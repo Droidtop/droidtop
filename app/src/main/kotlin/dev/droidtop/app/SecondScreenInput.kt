@@ -115,7 +115,7 @@ object ForegroundShell {
 
     private var appContext: Context? = null
 
-    private val refocusScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    private val refocusScope = dev.droidtop.runtime.util.AppScopes.io
 
     private fun displayIdOf(activity: Activity): Int? =
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
@@ -327,7 +327,7 @@ class SecondScreenInputView(
     /** Re-reads the screens and the controllers off the main thread, then names the target. */
     private fun refreshFacts() {
         val app = context.applicationContext
-        Thread {
+        dev.droidtop.runtime.util.AppScopes.io.launch {
             val outputs = runCatching { dev.droidtop.runtime.DisplayOutputRepository(app).currentOutputsSnapshot() }.getOrDefault(emptyList())
             val names = runCatching { dev.droidtop.runtime.ScreenNaming.names(app, outputs) }.getOrDefault(emptyMap())
             screens = outputs.map { InputTarget.Screen(it.androidDisplayId, it.uniqueId, names[it.androidDisplayId] ?: it.name) }
@@ -339,7 +339,7 @@ class SecondScreenInputView(
                 syncPointerHelp()
                 status.text = statusText()
             }
-        }.apply { isDaemon = true }.start()
+        }
     }
 
     private fun targetId(): Int? = InputTarget.displayId(
@@ -365,10 +365,10 @@ class SecondScreenInputView(
         val app = context.applicationContext
         val pinned = dev.droidtop.library.settings.CompanionPrefs.settings.value.inputPin
         val next = if (pinned != null) null else screens.firstOrNull { it.id == targetId() }?.uniqueId
-        Thread {
+        dev.droidtop.runtime.util.AppScopes.io.launch {
             dev.droidtop.library.settings.CompanionPrefs.setInputPin(app, next)
             post { syncTarget() }
-        }.apply { isDaemon = true }.start()
+        }
     }
 
     override fun onAttachedToWindow() {
@@ -383,9 +383,9 @@ class SecondScreenInputView(
         syncImePicker()
         syncImeSuppression()
         syncPointerHelp()
-        Thread {
+        dev.droidtop.runtime.util.AppScopes.io.launch {
             elevated = runCatching { dev.droidtop.runtime.tasks.TaskManager.shell.capabilities().shellCommand }.getOrDefault(false)
-        }.apply { isDaemon = true }.start()
+        }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
@@ -514,7 +514,7 @@ class SecondScreenInputView(
             // to the left brings the next one (Droidtop/tracker#426).
             return object : TrackpadOutput by seatSink {
                 override fun onSwipe(leftward: Boolean) {
-                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    dev.droidtop.runtime.util.AppScopes.io.launch {
                         session.windows.switchWorkspace(next = leftward)
                     }
                 }

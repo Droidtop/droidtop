@@ -34,9 +34,7 @@ import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.UserOriginKeys
 import dev.droidtop.shell.standard.BackButtonMenu
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -152,7 +150,7 @@ object UpdatesPage {
     /** The rows being updated now, by row id: drawn as Updating with the moving bar until their update returns. */
     private val busy: MutableSet<String> = ConcurrentHashMap.newKeySet()
     private val changes = MutableStateFlow(0)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
 
     /** Reads [section] in the background unless it is being read or was read within [FRESH_MS] ([force] reads it anyway). */
     private fun refresh(context: Context, section: Section, force: Boolean = false) {

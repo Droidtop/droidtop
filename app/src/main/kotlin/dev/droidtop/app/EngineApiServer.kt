@@ -22,7 +22,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.withLock
@@ -148,7 +147,7 @@ internal object EngineApiServer {
         }
     }
 
-    private val cleanup = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val cleanup = dev.droidtop.runtime.util.AppScopes.io
 
     private suspend fun serve(app: Context, connection: LocalSocket) {
         connection.use { socket ->
@@ -608,7 +607,7 @@ internal object EngineApiServer {
     /** The execs this session made, the oldest finished one dropped past [MAX_EXECS]. */
     private val execs = java.util.concurrent.ConcurrentHashMap<String, Exec>()
     private const val MAX_EXECS = 256
-    private val execScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val execScope = dev.droidtop.runtime.util.AppScopes.io
 
     /**
      * Attach's stream (docs/SPEC.md 3d, "Attach"), and logs' with follow: a program's output goes to its log, so attach follows that file and

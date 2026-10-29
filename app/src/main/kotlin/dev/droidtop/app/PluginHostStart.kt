@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.launch
 
 /**
  * The plugin host's start, after droidtop's and by droidtop (docs/SPEC.md 12a "Start order", Droidtop/tracker#775). The
@@ -52,7 +53,7 @@ object PluginHostStart {
     fun start(context: Context) {
         if (!started.compareAndSet(false, true)) return
         val app = context.applicationContext
-        kotlin.concurrent.thread(name = "plugin-host-start", isDaemon = true) {
+        dev.droidtop.runtime.util.AppScopes.io.launch {
             step("retry") {
                 // A plugin an older droidtop disabled after a failure is tried again by this build.
                 dev.droidtop.pluginhost.PluginStore.retryAfterHostUpdate(app)

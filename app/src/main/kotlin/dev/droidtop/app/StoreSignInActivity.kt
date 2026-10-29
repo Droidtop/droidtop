@@ -105,7 +105,7 @@ class StoreSignInActivity : AppCompatActivity() {
             // A plugin's store (docs/plugin-api.md 3 A13): the plugin's own site account opens its own view; this one closes.
             is StoreSignIn.Delegated -> {
                 val app = applicationContext
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                dev.droidtop.runtime.util.AppScopes.main.launch {
                     if (signIn.run(app)) dev.droidtop.library.stores.StoreChanges.announce(app)
                 }
                 finish()

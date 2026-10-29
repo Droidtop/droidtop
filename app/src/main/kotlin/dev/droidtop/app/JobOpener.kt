@@ -10,6 +10,7 @@ import dev.droidtop.library.settings.CatalogScreenLink
 import dev.droidtop.library.settings.Place
 import dev.droidtop.pluginhost.OpenTarget
 import java.io.File
+import kotlinx.coroutines.launch
 
 /**
  * Open on a job or a line of its report (docs/SPEC.md "Jobs and their results", review finding 15), installed into
@@ -32,7 +33,7 @@ object JobOpener {
             val site = dev.droidtop.pluginhost.DownloadSites.byDomain(context, target.domain) ?: return false
             val app = context.applicationContext
             // Sign-in waits for the web view to close: never on the main thread.
-            Thread { dev.droidtop.pluginhost.DownloadSites.signIn(app, site) }.start()
+            dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.pluginhost.DownloadSites.signIn(app, site) }
             return true
         }
         val inStandard = dev.droidtop.library.settings.Modes.lastMode(context) == dev.droidtop.library.settings.Mode.LAUNCHER.id

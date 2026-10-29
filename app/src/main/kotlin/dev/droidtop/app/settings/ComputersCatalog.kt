@@ -30,6 +30,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.launch
 
 /**
  * Settings > Accounts and sources > Computers (docs/SPEC.md 7o): the person's
@@ -272,10 +273,10 @@ object ComputersCatalog {
                                 subtitle = "Plugins stop seeing it; to use it again, pair it again",
                                 confirmTitle = "Forget ${device.name}?",
                                 run = { ctx ->
-                                    Thread {
+                                    dev.droidtop.runtime.util.AppScopes.io.launch {
                                         Computers.remove(ctx.applicationContext, device.id)
                                         runCatching { PairedDevices.changed(ctx.applicationContext) }
-                                    }.start()
+                                    }
                                 },
                             ),
                         ),
@@ -378,10 +379,10 @@ object ComputersCatalog {
                         subtitle = "Stops syncing with it; to sync again, pair it again",
                         confirmTitle = "Forget ${computer.name}?",
                         run = { ctx ->
-                            Thread {
+                            dev.droidtop.runtime.util.AppScopes.io.launch {
                                 Computers.remove(ctx.applicationContext, computer.id)
                                 runCatching { PairedDevices.changed(ctx.applicationContext) }
-                            }.start()
+                            }
                         },
                     ),
                 ),

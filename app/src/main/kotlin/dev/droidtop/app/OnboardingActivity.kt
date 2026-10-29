@@ -104,10 +104,8 @@ import dev.droidtop.shell.standard.BackButtonMenu
 import dev.droidtop.shell.standard.HomeRolePrefs
 import dev.droidtop.shell.standard.HomeRolePrefs.HomeImplementation
 import androidx.compose.runtime.collectAsState
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -1743,7 +1741,7 @@ private fun ScreensStep(
             val all = screens.map { it.first }
             if (choice != null) {
                 // A preferences write that outlives this step, which closes as Next is pressed.
-                kotlin.concurrent.thread(name = "screen-roles") {
+                dev.droidtop.runtime.util.AppScopes.io.launch {
                     val home = android.view.Display.DEFAULT_DISPLAY
                     if (choice != home) {
                         all.firstOrNull { it.displayId == choice }?.let { dev.droidtop.runtime.ScreenRoles.set(context, it.uniqueId, dev.droidtop.runtime.ScreenRole.MAIN) }
@@ -1902,7 +1900,7 @@ private object OnboardingThemeDownload {
 
     enum class Status { NOT_STARTED, DOWNLOADING, SUCCEEDED, FAILED }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
     private val mutableStatus = MutableStateFlow(Status.NOT_STARTED)
     val status: StateFlow<Status> = mutableStatus
     private var job: Job? = null

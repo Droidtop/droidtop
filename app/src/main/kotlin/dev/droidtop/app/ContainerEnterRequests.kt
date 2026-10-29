@@ -19,9 +19,7 @@ import dev.droidtop.runtime.EngineOptions
 import dev.droidtop.runtime.OciImageStore
 import java.io.File
 import java.io.FileOutputStream
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -36,7 +34,7 @@ import kotlinx.coroutines.withContext
  */
 internal object ContainerEnterRequests {
     private const val TAG = "droidtop.Enter"
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
 
     /** Handles the request directory [name] in [requestsDir], or ignores it when it is not an enter request. */
     fun handle(context: Context, requestsDir: File, name: String): Boolean {

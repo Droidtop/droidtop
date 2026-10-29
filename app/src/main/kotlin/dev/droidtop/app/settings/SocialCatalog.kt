@@ -29,9 +29,7 @@ import dev.droidtop.runtime.systemstatus.NotificationsStore
 import dev.droidtop.runtime.systemstatus.RestrictedSettings
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -53,7 +51,7 @@ import kotlinx.coroutines.withContext
 internal object SocialCatalog {
     const val SCREEN_ID = "social"
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
 
     /**
      * When the plugin providers were last asked: once per visit to the place, and again after [ASK_AGAIN_MS] at
