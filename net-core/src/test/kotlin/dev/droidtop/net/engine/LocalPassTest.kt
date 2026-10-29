@@ -96,7 +96,13 @@ class LocalPassTest {
         for (text in listOf("8.8.8.8", "100.128.0.1", "172.32.0.1", "2606:4700::1111", "64:ff9b::808:808")) {
             assertFalse("$text is public", local(text))
         }
-        assertEquals(emptyList<Pair<InetAddress, Int>>(), LocalAddresses.passesFor("ftp://192.168.1.1/x", { listOf(InetAddress.getByName("192.168.1.1")) }))
+        // FTP and a tracker's udp:// are addresses droidtop hands the engine too (7e7951f6): they get the pass for their own port.
+        val lan = InetAddress.getByName("192.168.1.1")
+        assertEquals(listOf(lan to 21), LocalAddresses.passesFor("ftp://192.168.1.1/x", { listOf(lan) }))
+        assertEquals(listOf(lan to 6969), LocalAddresses.passesFor("udp://192.168.1.1:6969/announce", { listOf(lan) }))
+        // A scheme the engine does not fetch from, or a udp:// address with no port, gets none.
+        assertEquals(emptyList<Pair<InetAddress, Int>>(), LocalAddresses.passesFor("sftp://192.168.1.1/x", { listOf(lan) }))
+        assertEquals(emptyList<Pair<InetAddress, Int>>(), LocalAddresses.passesFor("udp://192.168.1.1/announce", { listOf(lan) }))
         assertEquals(emptyList<Pair<InetAddress, Int>>(), LocalAddresses.passesFor("https://nowhere.invalid/x", { throw java.net.UnknownHostException(it) }))
     }
 
