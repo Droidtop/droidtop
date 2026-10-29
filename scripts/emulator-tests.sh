@@ -28,7 +28,6 @@ say() { echo "$*" | tee -a "$summary"; }
 # removed as the issue is fixed and cannot go stale; any other failure is a failure.
 KNOWN_FAILING=(
   "dev.droidtop.app.ContainedFilesRigTest#theOwnFolderBehavesForPathsListingChmodUtimesPrefsAndSqlite|Droidtop/tracker#741"
-  "dev.droidtop.app.ContainedFilesRigTest#theQuotaRefusesANewFileWithEnospcAndOneFileWithEfbig|Droidtop/tracker#741"
 )
 
 # The "class#method" of every test am instrument says failed, one per line ("1) method(class)").
