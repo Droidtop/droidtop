@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import dev.droidtop.runtime.R
 
 /**
  * The Play time page of Settings (docs/SPEC.md 7f "Play-time limits", Droidtop/tracker#421): the daily and
@@ -18,16 +19,16 @@ object PlayTimeSettings {
 
     fun screen() = CatalogScreen(
         id = "play_time",
-        title = "Play time",
-        subtitle = "Limits for Kid mode",
+        title = words(R.string.play_time_play_time),
+        subtitle = words(R.string.play_time_limits_for_kid_mode),
         groups = { context -> groups(context) },
     )
 
     /** The row that opens the page; its value is today's and this week's play against the limits. */
     fun link() = NestedScreenItem(
         id = ID_LINK,
-        title = "Play time",
-        subtitle = "Daily and weekly limits for Kid mode",
+        title = words(R.string.play_time_play_time),
+        subtitle = words(R.string.play_time_daily_and_weekly_limits_for),
         inline = screen(),
         valueLabel = { context ->
             val (limits, today, week) = PlayTimePrefs.snapshot(context)
@@ -44,23 +45,23 @@ object PlayTimeSettings {
                 items = listOf(
                     ChoiceItem(
                         id = ID_DAILY,
-                        title = "Each day",
-                        subtitle = "All games together",
+                        title = words(R.string.play_time_each_day),
+                        subtitle = words(R.string.play_time_all_games_together),
                         options = options(PlayTime.DAILY_CHOICES),
                         current = limits.dailyMinutes.toString(),
                         onSelect = { ctx, value -> PlayTimePrefs.setDaily(ctx, value.toIntOrNull() ?: 0) },
                     ),
                     ChoiceItem(
                         id = ID_WEEKLY,
-                        title = "Each week",
-                        subtitle = "From Monday",
+                        title = words(R.string.play_time_each_week),
+                        subtitle = words(R.string.play_time_from_monday),
                         options = options(PlayTime.WEEKLY_CHOICES),
                         current = limits.weeklyMinutes.toString(),
                         onSelect = { ctx, value -> PlayTimePrefs.setWeekly(ctx, value.toIntOrNull() ?: 0) },
                     ),
                     TextBlockItem(
                         id = "play_time_used",
-                        title = "Played in Kid mode",
+                        title = words(R.string.play_time_played_in_kid_mode),
                         text = PlayTime.summary(limits, today, week),
                     ),
                     TextBlockItem(

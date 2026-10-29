@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import dev.droidtop.runtime.R
 
 /**
  * How droidtop's pages present their words (docs/SPEC.md 7k, "Explanations: no tooltips"; Droidtop/
@@ -49,16 +50,16 @@ object ReadingPrefs {
 
     fun highContrastItem(context: Context): ToggleItem = ToggleItem(
         id = KEY_HIGH_CONTRAST,
-        title = "High contrast",
-        subtitle = "Solid backgrounds behind text, stronger text and focus, no art behind words",
+        title = words(R.string.reading_high_contrast),
+        subtitle = words(R.string.reading_solid_backgrounds_behind_text_stronger),
         current = highContrast(context),
         onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_HIGH_CONTRAST, on).apply() },
     )
 
     fun sentenceCaseItem(context: Context): ToggleItem = ToggleItem(
         id = KEY_SENTENCE_CASE,
-        title = "Sentence case labels",
-        subtitle = "Section labels and tabs as written instead of in capitals; always on with High contrast",
+        title = words(R.string.reading_sentence_case_labels),
+        subtitle = words(R.string.reading_section_labels_and_tabs_as),
         current = sentenceCase(context),
         onToggle = { ctx, on -> CatalogPrefs.prefs(ctx).edit().putBoolean(KEY_SENTENCE_CASE, on).apply() },
     )
@@ -66,8 +67,8 @@ object ReadingPrefs {
     /** The Settings row that chooses it, for the Accessibility group. */
     fun infoTextItem(context: Context): ChoiceItem = ChoiceItem(
         id = KEY_INFO_TEXT,
-        title = "Info text",
-        subtitle = "Where a setting's explanation shows",
+        title = words(R.string.reading_info_text),
+        subtitle = words(R.string.reading_where_a_setting_s_explanation),
         options = listOf(ChoiceOption(INFO_BOTTOM, "Bottom line"), ChoiceOption(INFO_UNDER_ROWS, "Under each row")),
         current = infoText(context),
         onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_INFO_TEXT, value).apply() },

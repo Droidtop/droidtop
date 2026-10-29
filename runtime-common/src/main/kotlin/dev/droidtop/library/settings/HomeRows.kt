@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import dev.droidtop.runtime.R
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -140,8 +141,8 @@ object HomeRows {
     /** Settings > Shell > Home rows: each row Home has shown with its state, the pinned rows' order, and Reset. */
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_ID,
-        title = "Home rows",
-        subtitle = "Pin rows to the top of Home or hide them; the others go where your use puts them",
+        title = words(R.string.home_rows_home_rows),
+        subtitle = words(R.string.home_rows_pin_rows_to_the_top),
         groups = { context ->
             withContext(Dispatchers.IO) { load(context) }
             val rules = state.value
@@ -176,7 +177,7 @@ object HomeRows {
                 rules.pinned.takeIf { it.size > 1 }?.let { pinned ->
                     CatalogGroup(
                         id = "home_rows_pinned",
-                        title = "Pinned order",
+                        title = words(R.string.home_rows_pinned_order),
                         items = pinned.mapIndexed { slot, id ->
                             ChoiceItem(
                                 id = "home_rows_pinned_$slot",
@@ -194,15 +195,15 @@ object HomeRows {
                     items = listOf(
                         ActionItem(
                             id = "home_rows_reset_all",
-                            title = "Reset",
-                            subtitle = "No row pinned or hidden",
+                            title = words(R.string.home_rows_reset),
+                            subtitle = words(R.string.home_rows_no_row_pinned_or_hidden),
                             confirmTitle = "Show every row and unpin them all?",
                             run = { ctx -> set(ctx, Rules()) },
                         ),
                         AsyncActionItem(
                             id = "home_rows_forget_use",
-                            title = "Forget when I play",
-                            subtitle = "Clears the launch log behind Usual at this time, and the order your use gave the rows",
+                            title = words(R.string.home_rows_forget_when_i_play),
+                            subtitle = words(R.string.home_rows_clears_the_launch_log_behind),
                             confirmTitle = "Forget when you play and which rows you use?",
                             run = { ctx, _ ->
                                 withContext(Dispatchers.IO) { forgetUse(ctx) }

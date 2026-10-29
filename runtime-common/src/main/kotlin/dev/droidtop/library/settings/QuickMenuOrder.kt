@@ -1,6 +1,7 @@
 package dev.droidtop.library.settings
 
 import android.content.Context
+import dev.droidtop.runtime.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -69,8 +70,8 @@ object QuickMenuOrder {
     /** Settings > Shell: one row per slot, as the companion's tabs are chosen ("1st: Game"). */
     fun screen(): CatalogScreen = CatalogScreen(
         id = SCREEN_ID,
-        title = "Quick Menu order",
-        subtitle = "Which section comes where on the Quick Menu's rail. Picking one for a place swaps it with the one there",
+        title = words(R.string.quick_menu_order_quick_menu_order),
+        subtitle = words(R.string.quick_menu_order_which_section_comes_where_on),
         groups = { context ->
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { load(context) }
             val current = state.value

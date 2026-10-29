@@ -8,6 +8,8 @@ import dev.droidtop.library.settings.AsyncActionItem
 import dev.droidtop.library.settings.CatalogItem
 import dev.droidtop.library.settings.ChoiceItem
 import dev.droidtop.library.settings.ChoiceOption
+import dev.droidtop.library.settings.words
+import dev.droidtop.runtime.R
 import dev.droidtop.runtime.tasks.RiskyActions
 import dev.droidtop.runtime.tasks.RiskyClass
 import dev.droidtop.runtime.tasks.RiskyPrompts
@@ -100,8 +102,8 @@ object AccessibilityControls {
             add(
                 ChoiceItem(
                     id = ID_FONT,
-                    title = "Font size",
-                    subtitle = "Text size in every app",
+                    title = words(R.string.accessibility_font_size),
+                    subtitle = words(R.string.accessibility_text_size_in_every_app),
                     options = FONT_SCALES.map { ChoiceOption(it.toString(), "${(it * 100).toInt()}%" + if (it == 1.0f) " (default)" else "") },
                     current = FONT_SCALES.minByOrNull { kotlin.math.abs(it - font) }.toString(),
                     onSelect = { _, value -> Thread { put("system", "font_scale", value) }.start() },
@@ -111,8 +113,8 @@ object AccessibilityControls {
                 add(
                     ChoiceItem(
                         id = ID_DISPLAY_SIZE,
-                        title = "Display size",
-                        subtitle = "How big everything on screen is, in every app",
+                        title = words(R.string.accessibility_display_size),
+                        subtitle = words(R.string.accessibility_how_big_everything_on_screen),
                         options = DISPLAY_FACTORS.map { (factor, label) -> ChoiceOption(factor.toString(), label) },
                         current = factorOf(physical, override ?: physical).toString(),
                         onSelect = { _, value ->
@@ -131,8 +133,8 @@ object AccessibilityControls {
             add(
                 AsyncActionItem(
                     id = ID_TALKBACK,
-                    title = "TalkBack",
-                    subtitle = "Android's screen reader speaks what is on screen",
+                    title = words(R.string.accessibility_talkback),
+                    subtitle = words(R.string.accessibility_android_s_screen_reader_speaks),
                     value = if (talkBack) "On" else "Off",
                     confirmTitle = if (talkBack) "Turn TalkBack off? The screen stops being read aloud." else null,
                     run = { ctx, _ ->

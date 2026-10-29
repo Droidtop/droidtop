@@ -2,6 +2,7 @@ package dev.droidtop.library.settings
 
 import android.content.Context
 import android.content.res.Configuration
+import dev.droidtop.runtime.R
 
 /**
  * Light or dark for droidtop's whole UI (docs/SPEC.md 7k, "Light and dark"; decided 2026-10-16, Droidtop/tracker#559):
@@ -40,7 +41,7 @@ object AppearancePrefs {
         val scheme = chosenScheme(context)
         return ChoiceItem(
             id = KEY_APPEARANCE,
-            title = "Light or dark",
+            title = words(R.string.appearance_light_or_dark),
             subtitle = scheme?.let {
                 "The Gaming theme's colour scheme is set to $it, which droidtop's screens keep whatever this says; " +
                     "set Theme color scheme to Automatic to follow it"

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Catalog words of :runtime-common, English as the source language (Droidtop/tracker#177). Names start with the
+  screen they belong to, since Android merges every module's strings into one set. Read through Words.
+-->
+<resources>
+    <string name="play_time_play_time">Play time</string>
+    <string name="play_time_limits_for_kid_mode">Limits for Kid mode</string>
+    <string name="play_time_daily_and_weekly_limits_for">Daily and weekly limits for Kid mode</string>
+    <string name="play_time_each_day">Each day</string>
+    <string name="play_time_all_games_together">All games together</string>
+    <string name="play_time_each_week">Each week</string>
+    <string name="play_time_from_monday">From Monday</string>
+    <string name="play_time_played_in_kid_mode">Played in Kid mode</string>
+    <string name="home_rows_home_rows">Home rows</string>
+    <string name="home_rows_pin_rows_to_the_top">Pin rows to the top of Home or hide them; the others go where your use puts them</string>
+    <string name="home_rows_pinned_order">Pinned order</string>
+    <string name="home_rows_reset">Reset</string>
+    <string name="home_rows_no_row_pinned_or_hidden">No row pinned or hidden</string>
+    <string name="home_rows_forget_when_i_play">Forget when I play</string>
+    <string name="home_rows_clears_the_launch_log_behind">Clears the launch log behind Usual at this time, and the order your use gave the rows</string>
+    <string name="reading_high_contrast">High contrast</string>
+    <string name="reading_solid_backgrounds_behind_text_stronger">Solid backgrounds behind text, stronger text and focus, no art behind words</string>
+    <string name="reading_sentence_case_labels">Sentence case labels</string>
+    <string name="reading_section_labels_and_tabs_as">Section labels and tabs as written instead of in capitals; always on with High contrast</string>
+    <string name="reading_info_text">Info text</string>
+    <string name="reading_where_a_setting_s_explanation">Where a setting\'s explanation shows</string>
+    <string name="quick_menu_order_quick_menu_order">Quick Menu order</string>
+    <string name="quick_menu_order_which_section_comes_where_on">Which section comes where on the Quick Menu\'s rail. Picking one for a place swaps it with the one there</string>
+    <string name="appearance_light_or_dark">Light or dark</string>
+    <string name="accessibility_font_size">Font size</string>
+    <string name="accessibility_text_size_in_every_app">Text size in every app</string>
+    <string name="accessibility_display_size">Display size</string>
+    <string name="accessibility_how_big_everything_on_screen">How big everything on screen is, in every app</string>
+    <string name="accessibility_talkback">TalkBack</string>
+    <string name="accessibility_android_s_screen_reader_speaks">Android\'s screen reader speaks what is on screen</string>
+</resources>

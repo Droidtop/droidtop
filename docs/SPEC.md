@@ -17633,8 +17633,14 @@ capitalised literal fails `--check`. It is on, with the modules not yet cleared 
 allowlist in the commit that moves its words into resources. `:shell-gamepad` is the first cleared
 (`shell-gamepad/src/main/res/values/strings.xml`), then `:shell-desktop`, `:ui-shared` and `:app`, whose names carry the
 module or screen (`desktop_`, `ui_shared_`, `pair_computer_`, `companion_power_`) because Android merges every module's strings into one set and a second module's
-`close` would silently replace the first's. Catalog titles and lines (`title = "..."`) are the next step, with
-the rule widened to them module by module.
+`close` would silently replace the first's. Catalog titles and lines are
+string resources too, written `title = words(R.string.x)`: a catalog screen is often built where no Context is at
+hand, so `Words` holds the Application's, set in `DroidtopApplication.attachBaseContext` before the content
+providers that register the catalogs, and a word read before that fails loudly. Renderers and the settings search
+still read plain strings, so the catalog model is unchanged; a language change applies from the next start of the
+process. The rule `catalog-literals` (on) fails a capitalised `title = "..."` or `subtitle = "..."` outside its
+allowlist, which shrinks module by module and file by file; `:runtime-common` is cleared except
+`GamingSettingsCatalog.kt` (Droidtop/tracker#177).
 
 **Accessibility is part of the system.** droidtop's chrome is driven by a pad, a finger or a
 screen reader through one focus order: every focusable is reachable by D-pad and by linear

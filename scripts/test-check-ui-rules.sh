@@ -28,6 +28,7 @@ fixture permission-titles plugin-host/src/main/kotlin/A.kt 'PluginPermission("x"
 fixture raw-dialog shell-gamepad/src/main/kotlin/A.kt 'Dialog(onDismissRequest = onDismiss) { Text("Pick") }'
 fixture copy-budget app/src/main/kotlin/A.kt 'ActionItem(id = "x", title = "A title that runs well past the forty character budget")'
 fixture literal-text shell-gamepad/src/main/kotlin/A.kt 'Text("Loading")'
+fixture catalog-literals runtime-common/src/main/kotlin/A.kt 'ActionItem(id = "x", title = "Reset")'
 
 status=0
 for dir in "$tmp"/*/; do

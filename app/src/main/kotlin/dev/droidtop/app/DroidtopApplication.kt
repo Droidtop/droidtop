@@ -37,6 +37,13 @@ import dev.droidtop.runtime.AudioHandOff
  * `LauncherApplication` declaration merged in from that module.
  */
 class DroidtopApplication : LauncherApplication(), SingletonImageLoader.Factory {
+    override fun attachBaseContext(base: android.content.Context) {
+        super.attachBaseContext(base)
+        // Catalog words are string resources read through Words (Droidtop/tracker#177); the content providers that
+        // register the catalogs start before onCreate, so it gets the Context here, first.
+        dev.droidtop.library.settings.Words.init(base)
+    }
+
     override fun onCreate() {
         super.onCreate()
         // A contained plugin's isolated process (docs/plugin-api.md 5.3) starts nothing of droidtop's: it has no files,
