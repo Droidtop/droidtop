@@ -24310,7 +24310,7 @@ failure mode), checked byte-for-byte against
 disables the plugin with that reason rather than failing deep inside
 native engine init. Settings → Plugins gets the same "separate, explicit
 download" row shape the Python runtime already has
-(`AppSettingsCatalogs.kt`).
+(`PluginsCatalog.kt`).
 
 **The readiness handshake (found needed 2026-09-26, part of the
 flutter_embed contract).** The acquire_content UI's own first real
@@ -24390,7 +24390,7 @@ and fixed before a flutter_embed plugin could actually run at all:**
 1. **`PluginCrashPolicy` never let a flutter_embed plugin run.** The
    Settings UI's "Call ... status tile" action goes through
    `PluginCrashPolicy.invoke()`/`startJob()` (called from
-   `AppSettingsCatalogs.kt`), NOT directly through
+   `PluginsCatalog.kt`), NOT directly through
    `PluginRuntimeService`'s own dispatch. That class's own kind gate was
    still `!= PluginKind.NATIVE_BUNDLE && != PluginKind.PYTHON` -- never
    updated when the flutter_embed runner landed earlier the same day. A
