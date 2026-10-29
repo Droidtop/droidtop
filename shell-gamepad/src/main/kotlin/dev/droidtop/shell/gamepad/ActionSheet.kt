@@ -18,14 +18,14 @@ import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import dev.droidtop.shell.gamepad.input.HintBinding
 
 /** What an [ActionSheet] lists: its rows, and the headings and notes between them that the cursor passes over. */
-internal sealed interface ActionSheetItem
+sealed interface ActionSheetItem
 
 /**
  * One row of an [ActionSheet]: what it is called, a line under it when the name needs one, and what A on it does;
  * null where the row states something and has nothing to do (a version already open). [danger] draws a row that
  * loses something in the danger look (docs/SPEC.md 7k).
  */
-internal class ActionRow(
+class ActionRow(
     val title: String,
     val detail: String? = null,
     val danger: Boolean = false,
@@ -33,10 +33,10 @@ internal class ActionRow(
 ) : ActionSheetItem
 
 /** A heading over the rows that follow it, named in the section-label style. */
-internal class ActionHeading(val title: String) : ActionSheetItem
+class ActionHeading(val title: String) : ActionSheetItem
 
 /** A line of text between rows (a status, a fact about the thing); the cursor never stops on it. */
-internal class ActionNote(val text: String) : ActionSheetItem
+class ActionNote(val text: String) : ActionSheetItem
 
 /**
  * The one sheet of choices for a thing (Droidtop/tracker#610: "a shared ActionSheet and row model"): [title], a
@@ -51,7 +51,7 @@ internal class ActionNote(val text: String) : ActionSheetItem
  * (the game menu disarms Uninstall when it does) or put it back at the top.
  */
 @Composable
-internal fun ActionSheet(
+fun ActionSheet(
     title: String,
     rows: List<ActionSheetItem>,
     onDismiss: () -> Unit,

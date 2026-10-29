@@ -24271,8 +24271,11 @@ under its title (the game menu's source, engine and size). Up and Down move, A c
 the system Back go back: out of a page first where the sheet has pages (the game menu's categories), else they close
 it. The sheet holds the pad and keeps the system bars hidden. A row that has a choice of its own opens a page or a
 task, never a second sheet. The Quick Menu's Game section is a pane of the Quick Menu, not a sheet, but its rows are
-`ActionRow`s too (its `GameQuickTile` is gone). Desktop's window and taskbar menus and Standard's dialogs move onto
-it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left (`raw-dialog`, off until its last site is
+`ActionRow`s too (its `GameQuickTile` is gone). Desktop's taskbar menus are on it since Droidtop/tracker#690 (a
+window's, a pin's, an Android app's and the clipboard notice's), so `:shell-desktop` has no `DropdownMenu` left, and
+`ActionSheet` and its rows are public for it. The same change made the bar's window, pin and app rows and its tray
+and clipboard buttons at least 48 dp tall, the touch target (DESIGN-LANGUAGE); the tray and clipboard items are the
+bar's own `TaskbarButton` chip, not Material's `TextButton`. Standard's dialogs move onto it in later steps. `scripts/check-ui-rules.sh` lists the raw dialogs left (`raw-dialog`, off until its last site is
 moved).
 
 **Run once with…, and Manage (owner, 2026-10-23, Droidtop/tracker#636).** The owner, asked to run MGQ Paradox's

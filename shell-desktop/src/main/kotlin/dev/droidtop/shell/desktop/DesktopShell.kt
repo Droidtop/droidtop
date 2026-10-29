@@ -27,8 +27,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -93,6 +91,9 @@ import dev.droidtop.runtime.tasks.TaskPolicy
 import dev.droidtop.runtime.tasks.text
 import dev.droidtop.shell.gamepad.AppIcon
 import dev.droidtop.shell.gamepad.currentShellWindow
+import dev.droidtop.shell.gamepad.ActionNote
+import dev.droidtop.shell.gamepad.ActionRow
+import dev.droidtop.shell.gamepad.ActionSheet
 import dev.droidtop.shell.gamepad.hosted.HostedArt
 import dev.droidtop.shell.gamepad.query.LauncherSearchApp
 import dev.droidtop.shell.gamepad.query.LauncherSearchScreen
@@ -654,7 +655,8 @@ private fun TaskbarButton(onClick: () -> Unit, content: @Composable () -> Unit) 
     // A flat chip in the Gaming palette, not Material's filled pill (Droidtop/tracker#555 D4).
     androidx.compose.material3.Surface(
         onClick = onClick,
-        modifier = Modifier.padding(horizontal = 3.dp).heightIn(min = 36.dp),
+        // 48 dp, the touch target every one of droidtop's controls keeps (DESIGN-LANGUAGE, Droidtop/tracker#690).
+        modifier = Modifier.padding(horizontal = 3.dp).heightIn(min = 48.dp),
         shape = dev.droidtop.shell.gamepad.MenuTokens.RowShape,
         color = dev.droidtop.shell.gamepad.MenuTokens.Card,
         contentColor = dev.droidtop.shell.gamepad.MenuTokens.OnSurface,
@@ -936,6 +938,7 @@ private fun TaskbarWindowRow(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .widthIn(max = 180.dp)
+                .heightIn(min = 48.dp)
                 .combinedClickable(onClick = onTap, onLongClick = { menuOpen = true })
                 .background(
                     if (minimized) {
@@ -944,11 +947,11 @@ private fun TaskbarWindowRow(
                         MaterialTheme.colorScheme.surface
                     },
                 )
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp),
         ) {
             if (icon != null) HostedArt(icon, modifier = Modifier.padding(end = 6.dp), size = 20.dp)
             Text(
-                toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } },
+                windowTitle(toplevel),
                 color = if (toplevel.activated) {
                     MaterialTheme.colorScheme.onSurface
                 } else {
@@ -959,39 +962,30 @@ private fun TaskbarWindowRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text(if (minimized) "Restore" else "Minimize") },
-                onClick = { menuOpen = false; onMinimize() },
-            )
-            // A title bar's buttons and an edge drag, which sway's windows do not have (Droidtop/tracker#686).
-            if (onPlace != null && !minimized) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.desktop_maximize)) },
-                    onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.MAXIMIZE) },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.desktop_snap_left)) },
-                    onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_LEFT) },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.desktop_snap_right)) },
-                    onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_RIGHT) },
-                )
-                if (placed) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.desktop_restore_size)) },
-                        onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.RESTORE) },
-                    )
+        if (menuOpen) {
+            val maximize = stringResource(R.string.desktop_maximize)
+            val snapLeft = stringResource(R.string.desktop_snap_left)
+            val snapRight = stringResource(R.string.desktop_snap_right)
+            val restoreSize = stringResource(R.string.desktop_restore_size)
+            val close = stringResource(R.string.desktop_close)
+            // The one sheet of choices, which a pad drives too (docs/SPEC.md 7k, Droidtop/tracker#690).
+            val rows = buildList {
+                add(ActionRow(if (minimized) "Restore" else "Minimize", onSelect = { menuOpen = false; onMinimize() }))
+                // A title bar's buttons and an edge drag, which sway's windows do not have (Droidtop/tracker#686).
+                if (onPlace != null && !minimized) {
+                    add(ActionRow(maximize, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.MAXIMIZE) }))
+                    add(ActionRow(snapLeft, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_LEFT) }))
+                    add(ActionRow(snapRight, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_RIGHT) }))
+                    if (placed) add(ActionRow(restoreSize, onSelect = { menuOpen = false; onPlace(DesktopWindows.Placement.RESTORE) }))
                 }
+                add(ActionRow(close, onSelect = { menuOpen = false; onClose() }))
             }
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.desktop_close)) },
-                onClick = { menuOpen = false; onClose() },
-            )
+            ActionSheet(title = windowTitle(toplevel), rows = rows, onDismiss = { menuOpen = false })
         }
     }
 }
+
+private fun windowTitle(toplevel: Toplevel): String = toplevel.title.ifBlank { toplevel.appId.ifBlank { "(untitled window)" } }
 
 /**
  * What is pinned to the taskbar (docs/SPEC.md 2b, Droidtop/tracker#348): each pin as its picture, when it has
@@ -1010,8 +1004,9 @@ private fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Unit
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier
                         .widthIn(max = 140.dp)
+                        .heightIn(min = 48.dp)
                         .combinedClickable(onClick = { onOpen(pin) }, onLongClick = { menuOpen = true })
-                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                        .padding(horizontal = 8.dp),
                 ) {
                     pin.art?.let { HostedArt(it, size = 24.dp) }
                     Text(
@@ -1021,10 +1016,12 @@ private fun TaskbarPinChips(pins: List<TaskbarPin>, onOpen: (TaskbarPin) -> Unit
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.desktop_unpin)) },
-                        onClick = { menuOpen = false; onUnpin(pin) },
+                if (menuOpen) {
+                    val unpin = stringResource(R.string.desktop_unpin)
+                    ActionSheet(
+                        title = pin.title,
+                        rows = listOf(ActionRow(unpin, onSelect = { menuOpen = false; onUnpin(pin) })),
+                        onDismiss = { menuOpen = false },
                     )
                 }
             }
@@ -1042,9 +1039,10 @@ private fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> Un
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             modifier = Modifier
                 .widthIn(max = 180.dp)
+                .heightIn(min = 48.dp)
                 .combinedClickable(onClick = onOpen, onLongClick = { menuOpen = true })
                 .background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 10.dp),
         ) {
             AppIcon(app.packageName, size = 20.dp)
             Text(
@@ -1055,10 +1053,12 @@ private fun TaskbarAppRow(app: RunningApp, onOpen: () -> Unit, onClose: () -> Un
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.desktop_close)) },
-                onClick = { menuOpen = false; onClose() },
+        if (menuOpen) {
+            val close = stringResource(R.string.desktop_close)
+            ActionSheet(
+                title = app.label,
+                rows = listOf(ActionRow(close, onSelect = { menuOpen = false; onClose() })),
+                onDismiss = { menuOpen = false },
             )
         }
     }
@@ -1078,18 +1078,19 @@ private fun ClipboardNotice() {
     val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
     Box {
-        androidx.compose.material3.TextButton(onClick = { open = !open }) {
-            Text(stringResource(R.string.desktop_clipboard_on_focus), color = MaterialTheme.colorScheme.onSurface)
+        TaskbarButton(onClick = { open = !open }) {
+            Text(stringResource(R.string.desktop_clipboard_on_focus))
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Text(
-                dev.droidtop.hostbridge.ClipboardAccess.WHY_BLOCKED,
-                modifier = Modifier.padding(horizontal = 16.dp).widthIn(max = 320.dp),
-                style = MaterialTheme.typography.bodySmall,
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.desktop_switch_keyboard)) },
-                onClick = { open = false; dev.droidtop.library.settings.Keyboards.showPicker(context) },
+        if (open) {
+            val title = stringResource(R.string.desktop_clipboard_on_focus)
+            val switchKeyboard = stringResource(R.string.desktop_switch_keyboard)
+            ActionSheet(
+                title = title,
+                rows = listOf(
+                    ActionNote(dev.droidtop.hostbridge.ClipboardAccess.WHY_BLOCKED),
+                    ActionRow(switchKeyboard, onSelect = { open = false; dev.droidtop.library.settings.Keyboards.showPicker(context) }),
+                ),
+                onDismiss = { open = false },
             )
         }
     }
@@ -1111,7 +1112,7 @@ private fun SystemTray(onClick: () -> Unit) {
     // What is waiting, so the tray says so without opening the Quick Menu, whose first section it is once
     // notification access is granted. Ongoing notifications (a foreground service's) are not waiting for anyone.
     val waiting = NotificationsStore.items.collectAsState().value.count { it.clearable }
-    androidx.compose.material3.TextButton(onClick = onClick) {
+    TaskbarButton(onClick = onClick) {
         val network = when (status.network) {
             dev.droidtop.runtime.systemstatus.NetworkKind.WIFI ->
                 "◤" + (status.wifiLevel?.let { " $it/4" } ?: "")
