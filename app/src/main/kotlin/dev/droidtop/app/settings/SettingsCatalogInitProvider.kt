@@ -122,9 +122,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         dev.droidtop.pluginhost.PluginJobsCenter.attach(appContext)
         // The engines database decides the "Engine" badge (runsInEnginehost, docs/SPEC.md after the 7e2b table): read
         // it now, off the main thread, so the first cards drawn already have it.
-        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-            runCatching { dev.droidtop.library.EnginesDatabase.defs(appContext) }
-        }
+        dev.droidtop.runtime.util.AppScopes.io.launch { dev.droidtop.library.EnginesDatabase.defs(appContext) }
         dev.droidtop.app.JobsSummaryNotification.start(appContext)
         // A download ending is one short flash, grouped while it is up (Droidtop/tracker#643).
         dev.droidtop.library.integrations.JobNotices.start()

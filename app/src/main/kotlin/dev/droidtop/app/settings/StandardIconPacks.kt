@@ -6,9 +6,6 @@ import com.android.launcher3.LauncherAppState
 import dev.droidtop.app.LibraryCore
 import dev.droidtop.library.LibraryKinds
 import dev.droidtop.library.settings.IconPacks
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
@@ -17,7 +14,7 @@ import kotlinx.coroutines.launch
  * then rescans the Apps kinds, so Gaming's Apps tiles, which come from the same icon cache, follow.
  */
 internal object StandardIconPacks : IconPacks.Source {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
 
     override fun installed(context: Context): List<Pair<String, String>> =
         IconPackManager.getInstalledPacks(context).map { it.packageName to it.label.toString() }

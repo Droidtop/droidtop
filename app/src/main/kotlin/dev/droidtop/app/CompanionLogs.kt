@@ -33,6 +33,7 @@ import dev.droidtop.runtime.systemstatus.LogReader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
 
 /** What Save and Share warn of, once, above their buttons. */
 internal const val LOG_PRIVACY_LINE = "Logs can hold personal data, such as names, addresses and account names."
@@ -163,7 +164,7 @@ class LogSaveActivity : Activity() {
         text = ""
         if (resultCode == RESULT_OK && uri != null) {
             val resolver = contentResolver
-            Thread { runCatching { resolver.openOutputStream(uri)?.use { it.write(body.toByteArray()) } } }.apply { isDaemon = true }.start()
+            dev.droidtop.runtime.util.AppScopes.io.launch { resolver.openOutputStream(uri)?.use { it.write(body.toByteArray()) } }
         }
         finish()
     }

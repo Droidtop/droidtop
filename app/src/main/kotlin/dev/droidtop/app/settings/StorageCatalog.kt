@@ -22,10 +22,8 @@ import dev.droidtop.library.stores.StoreLibraries
 import dev.droidtop.library.stores.StoreLibrary
 import dev.droidtop.library.userFacingErrorMessage
 import java.io.File
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -75,7 +73,7 @@ internal object StorageCatalog {
 
     /** Bumped as folder sizes arrive, at most a few times a second: the page is built again from what is measured. */
     private val sizesChanged = MutableStateFlow(0)
-    private val measureScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val measureScope = dev.droidtop.runtime.util.AppScopes.io
 
     @Volatile
     private var measuring: Job? = null

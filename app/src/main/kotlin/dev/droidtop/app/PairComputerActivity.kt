@@ -111,7 +111,7 @@ class PairComputerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         // Ends the listener the moment the screen goes: nothing listens once it is closed.
-        Thread { AgentNative.call("pair_cancel") }.start()
+        dev.droidtop.runtime.util.AppScopes.io.launch { AgentNative.call("pair_cancel") }
         runCatching { multicast?.release() }
         multicast = null
         super.onDestroy()

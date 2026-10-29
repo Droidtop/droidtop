@@ -25,10 +25,8 @@ import dev.droidtop.library.stores.StoreAutoUpdates
 import dev.droidtop.net.DownloadPolicy
 import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.UserOriginKeys
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -241,7 +239,7 @@ object UpdateChecks {
 
 /** Runs [UpdateChecks.scheduled] when Android's job scheduler says it is time. */
 class UpdateCheckJobService : JobService() {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
     private var running: Job? = null
 
     override fun onStartJob(params: JobParameters): Boolean {

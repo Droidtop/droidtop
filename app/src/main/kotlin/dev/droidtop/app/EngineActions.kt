@@ -17,9 +17,7 @@ import dev.droidtop.runtime.LogTimes
 import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.Pod
 import dev.droidtop.runtime.RootfsImage
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -102,7 +100,7 @@ internal object EngineActions {
         return Result.success(Made(created, name, notes, start, program.isNotEmpty()))
     }
 
-    private val watchers = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val watchers = dev.droidtop.runtime.util.AppScopes.io
 
     /** How long `--rm` waits for a container's program to be started (by `start`, after `create`) before giving up. */
     private const val START_WAIT_MS = 10 * 60_000L

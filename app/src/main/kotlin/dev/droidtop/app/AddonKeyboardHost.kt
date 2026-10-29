@@ -32,9 +32,6 @@ import dev.droidtop.runtime.tasks.LaunchLedger
 import dev.droidtop.runtime.tasks.TaskManager
 import dev.droidtop.shell.gamepad.KeyboardTargets
 import dev.droidtop.shell.gamepad.INLINE_KEYBOARD_HEIGHT_PERCENT
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -111,7 +108,7 @@ object ImePolicyTool {
  */
 object AddonKeyboardHost {
     private const val TAG = "droidtop.keyboard"
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val scope = dev.droidtop.runtime.util.AppScopes.io
     private val syncLock = Mutex()
 
     /** What the last completed pass saw; a pass with the same inputs runs no command. */

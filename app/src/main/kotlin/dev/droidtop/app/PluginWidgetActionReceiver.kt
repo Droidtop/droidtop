@@ -7,9 +7,6 @@ import android.content.Intent
 import android.net.Uri
 import dev.droidtop.library.integrations.PluginWidgets
 import dev.droidtop.library.settings.Notices
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 /**
@@ -47,7 +44,7 @@ class PluginWidgetActionReceiver : BroadcastReceiver() {
         private const val EXTRA_WIDGET = "appWidgetId"
 
         // A press must outlive the receiver's own onReceive; goAsync keeps the process for it.
-        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val scope = dev.droidtop.runtime.util.AppScopes.io
 
         /**
          * The tap for [actionId] (null for a tile's press) on [sourceKey] ([PluginWidgets.Source.key]) in widget

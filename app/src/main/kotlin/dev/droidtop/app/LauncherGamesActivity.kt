@@ -25,9 +25,7 @@ import dev.droidtop.library.settings.Modes
 import dev.droidtop.library.search.LibraryArtwork
 import dev.droidtop.shell.gamepad.LauncherGamesScreen
 import dev.droidtop.shell.standard.OnboardingGate
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -159,7 +157,7 @@ class LauncherGamesActivity : AppCompatActivity() {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 
         /** Off the process scope: an icon being built must not die with the screen that asked. */
-        private val pinScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        private val pinScope = dev.droidtop.runtime.util.AppScopes.io
 
         /** Pixel edge of a pinned icon's bitmap; the launcher scales it to its own icon size. */
         private const val ICON_PX = 192
