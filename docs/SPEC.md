@@ -528,6 +528,13 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   since nothing in droidtop decodes it. Rows, pins and window buttons draw the file with `HostedArt`, and a
   pin made before its app had an icon takes the icon now. Search's rows hold a bitmap rather than a picture
   to load, so they decode the PNG icons once while the search is open, and an SVG icon shows there as none.
+- **Settings in one chrome** (Droidtop/tracker#692, the coordinator's Desktop review, decided 2026-10-29). Start >
+  System > Settings opens Desktop's settings page (`desktop_settings`) in droidtop's screen host
+  (`CatalogScreenLink`, `CatalogScreenActivity`), the Gaming-look host Containers and the places open in. It
+  opened Launcher3's settings activity with `SettingsDesktopFragment`, which drew the same catalog as stock
+  Android preferences, so Desktop's two System rows looked like two different apps. Desktop's page is first, and
+  its last row, "All settings", opens the rest of Settings (`global_settings`). Reached from Global settings'
+  own Desktop row it leads back there, a step B undoes. The Launcher3 fragment stays Standard's.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
   then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and

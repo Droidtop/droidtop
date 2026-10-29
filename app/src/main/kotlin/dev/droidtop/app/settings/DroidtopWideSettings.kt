@@ -364,6 +364,14 @@ object DroidtopWideSettings {
                             registryId = ContainersCatalog.SCREEN_ID,
                             icon = dev.droidtop.library.settings.CatalogIcon.CONTAINERS,
                         ),
+                        // Desktop's Start > Settings opens this page in droidtop's screen host (Droidtop/tracker#692):
+                        // the rest of Settings is one row away.
+                        dev.droidtop.library.settings.NestedScreenItem(
+                            id = "pref_desktop_all_settings",
+                            title = "All settings",
+                            subtitle = "droidtop's other settings: the library, games, display, network and more",
+                            registryId = SCREEN_GLOBAL,
+                        ),
                     ),
                 ),
             )

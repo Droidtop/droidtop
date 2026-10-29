@@ -1190,15 +1190,17 @@ internal fun openModes(context: Context) {
     context.startActivity(intent)
 }
 
+/**
+ * Desktop's settings in droidtop's screen host, the chrome Containers and the places open in (Droidtop/tracker#692),
+ * with Desktop's page first and the rest of Settings one row away at its end. It opened Launcher3's settings
+ * activity, which drew the same catalog as stock Android preferences; that page stays Standard's.
+ */
 internal fun openSettings(context: Context) {
-    val intent = Intent(Intent.ACTION_MAIN).apply {
-        component = ComponentName(context.packageName, "com.android.launcher3.settings.SettingsActivity")
-        putExtra(":settings:fragment", "app.murinelauncher.settings.SettingsDesktopFragment")
-        // Settings has its own task (SPEC 2c): open this page fresh.
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-    }
-    context.startActivity(intent)
+    context.startActivity(CatalogScreenLink.intent(context, DESKTOP_SETTINGS_SCREEN_ID))
 }
+
+/** `DroidtopWideSettings.SCREEN_DESKTOP` in :app, which this module cannot see. */
+private const val DESKTOP_SETTINGS_SCREEN_ID = "desktop_settings"
 
 /**
  * "Companion" on the taskbar while the device has one screen (docs/SPEC.md "The companion's tabs", One screen): the
