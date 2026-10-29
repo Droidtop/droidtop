@@ -15080,9 +15080,14 @@ of that walk and could disagree about what a game is; they now share
    (`SystemData::populateFolder`): a directory containing that file, and
    everything under it, is skipped. droidtop honours the existing
    mechanism rather than inventing a second one.
+6. A file named as a BIOS image the BIOS database knows (any system's,
+   compared without case or folder, `BiosDatabase.fileNames`) is never a
+   game, wherever it sits: a PS2 BIOS dropped beside the games carries the
+   system's `.bin` and was a library entry, "ps2 0230a 20080220" on Home's
+   What's new (Droidtop/tracker#665).
 
-Every skipped directory is logged with its reason, so this never loses
-files silently.
+Every skipped directory and file is logged with its reason, so this never
+loses files silently.
 
 ### A folder that holds games is a container, in both walks (rig, 2026-09-16)
 

@@ -54,8 +54,8 @@ import java.io.File
  *     the user wants a directory hidden that the rule does not catch,
  *     `noload.txt` is the answer.
  *
- * Directories skipped are reported back in [RomScanResult.skipped] so the
- * caller can say so out loud rather than silently losing files.
+ * Directories skipped, and BIOS images left out (rule 6 of docs/SPEC.md 7g's walk), are reported back in
+ * [RomScanResult.skipped] so the caller can say so out loud rather than silently losing files.
  */
 object RomScanWalk {
 
@@ -143,6 +143,9 @@ object RomScanWalk {
         systemFolder: File,
         extensions: Set<String>? = null,
         newBudget: () -> dev.droidtop.library.ScanBudget? = { null },
+        // File names (lower case) that are never games wherever they sit: the BIOS images the database knows, which
+        // carry a system's own ROM extension (Droidtop/tracker#665). A BIOS folder is already skipped by name.
+        notGames: Set<String> = BiosDatabase.fileNames,
     ): RomScanResult {
         val files = mutableListOf<File>()
         val skipped = mutableListOf<Pair<File, String>>()
@@ -168,6 +171,8 @@ object RomScanWalk {
                 if (child.isDirectory) {
                     val reason = skipReason(child, systemFolder)
                     if (reason != null) skipped += child to reason else queue += child
+                } else if (child.name.lowercase() in notGames) {
+                    skipped += child to "it is a BIOS image, not a game"
                 } else if (extensions == null || child.extension.lowercase() in extensions) {
                     files += child
                 }

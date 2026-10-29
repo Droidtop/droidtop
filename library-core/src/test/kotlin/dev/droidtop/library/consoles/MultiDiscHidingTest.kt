@@ -52,4 +52,15 @@ class MultiDiscHidingTest {
         write(psx, "Game (Disc 2).chd")
         assertEquals(listOf("Game (Disc 1).chd", "Game (Disc 2).chd"), listed(psx, "chd"))
     }
+
+    @Test
+    fun aBiosImageBesideTheGamesIsNotAGame() {
+        // Droidtop/tracker#665: the PS2 BIOS dropped in the system folder showed on Home as "ps2 0230a 20080220".
+        val ps2 = temp.newFolder("ps2")
+        write(ps2, "ps2-0230a-20080220.bin")
+        write(ps2, "Okami.bin")
+        val walked = RomScanWalk.walk(ps2, setOf("bin"), notGames = setOf("ps2-0230a-20080220.bin"))
+        assertEquals(listOf("Okami.bin"), walked.files.map { it.name })
+        assertEquals(listOf("ps2-0230a-20080220.bin"), walked.skipped.map { it.first.name })
+    }
 }

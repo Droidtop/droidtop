@@ -33,6 +33,15 @@ object BiosDatabase {
     @Volatile
     private var cached: Map<String, SystemBiosSpec>? = null
 
+    /**
+     * The file names (lower case, without their folder) of every BIOS image the database knows, for any system: a ROM
+     * walk never makes one a game ([RomScanWalk.walk]), so a PS2 BIOS dropped beside the games is not "ps2 0230a
+     * 20080220" on Home (Droidtop/tracker#665). Empty until [all] has loaded.
+     */
+    @Volatile
+    var fileNames: Set<String> = emptySet()
+        private set
+
     fun forSystem(context: Context, systemId: String): SystemBiosSpec? = all(context)[systemId]
 
     fun all(context: Context): Map<String, SystemBiosSpec> {
@@ -45,6 +54,7 @@ object BiosDatabase {
                 ?: runCatching { parse(context.assets.open(DB_FILE_NAME).bufferedReader().use { it.readText() }) }
                     .getOrElse { emptyMap() }
             cached = loaded
+            fileNames = loaded.values.flatMapTo(HashSet()) { system -> system.files.map { it.file.substringAfterLast('/').lowercase() } }
             return loaded
         }
     }

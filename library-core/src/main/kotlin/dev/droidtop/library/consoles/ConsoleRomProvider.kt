@@ -608,11 +608,13 @@ class ConsoleRomProvider(
         val place = SystemFolders.systemFolderFor(context, GamesRoots.current(context), path, systemsById) ?: return emptyList()
         val (root, systemFolder, system) = place
         if (path.path == systemFolder.path) return emptyList()
+        // The BIOS names a walk leaves out are the database's: loaded once (cached), before the first walk.
+        BiosDatabase.all(context)
         val files = if (path.isFile) {
             val blocked = generateSequence(path.parentFile) { it.parentFile }
                 .takeWhile { it.path.length >= systemFolder.path.length }
                 .any { RomScanWalk.skipReason(it, systemFolder) != null }
-            listOf(path).filter { !blocked && it.extension.lowercase() in system.extensions }
+            listOf(path).filter { !blocked && it.extension.lowercase() in system.extensions && it.name.lowercase() !in BiosDatabase.fileNames }
         } else {
             RomScanWalk.walk(path, system.extensions) { ScanBudget.start(ScanBudget.DEFAULT_FOLDER_BUDGET_MS) }.files
         }
@@ -689,6 +691,8 @@ class ConsoleRomProvider(
         // timeout and a line per skipped directory -- see ScanBudget and
         // ScanLog for the rig evidence behind each.
         val startedAt = System.currentTimeMillis()
+        // The BIOS names the walk leaves out are the database's: loaded once (cached), before the first walk.
+        BiosDatabase.all(context)
         val romScan = RomScanWalk.walk(systemFolder, system.extensions) { ScanBudget.start(folderBudgetMs) }
         val romFiles = romScan.files
         // Real, genuine file detection beyond what either ES-DE or EmuDeck
