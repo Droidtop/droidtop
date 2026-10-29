@@ -127,20 +127,4 @@ class PluginRegistryTest {
         }
         assertTrue(official.structuralProblems().isEmpty())
     }
-
-    @Test
-    fun `a v1 manifest derives nothing the registries do not know`() {
-        val json = JSONObject().apply {
-            put("id", "acme.old"); put("origin", "acme"); put("kind", "native_bundle")
-            put("capabilities", JSONArray(PluginCapability.entries.map { it.id }))
-            put("contractVersion", 1); put("requestsRoot", true)
-            put("boundServiceTargets", JSONArray(listOf("org.example")))
-            put("subscribedEvents", JSONArray(listOf("default_player_changed")))
-            put("abis", JSONArray(listOf("arm64-v8a", "x86_64"))); put("entryClass", "acme.Old")
-            put("payload", JSONArray(listOf(JSONObject().put("path", "classes.jar").put("sha256", "a".repeat(64)))))
-        }
-        val m = PluginManifest.fromJson(json)!!
-        assertEquals(emptyList<String>(), m.unsupportedDeclarations())
-        assertEquals(emptyList<String>(), m.structuralProblems())
-    }
 }

@@ -71,8 +71,6 @@ class FlutterDroidtopPlugin internal constructor(
     private val pluginId: String,
     private val appContext: Context,
     private val source: FlutterSource,
-    /** The manifest's contract: 2 means the Dart code answers `handle` itself. */
-    private val contractVersion: Int,
 ) : DroidtopPlugin, HostedScreen {
     private var engine: FlutterEngine? = null
     private var channel: MethodChannel? = null
@@ -358,12 +356,6 @@ class FlutterDroidtopPlugin internal constructor(
         return decode(raw)
     }
 
-    /**
-     * The contract 2 envelope (docs/plugin-api.md 1.3, 1.6): a contract 2 plugin's
-     * Dart code answers the channel method `handle` with the envelope in and the
-     * reply out, both JSON text. A contract 1 plugin keeps the translation onto its
-     * capabilities, so nothing changes for a bundle built before this existed.
-     */
     override fun onEvent(event: PluginEvent, args: PluginArgs): PluginResult {
         val argsJson = JSONObject().apply { args.keys().forEach { put(it, args.string(it)) } }
         val payload = JSONObject().put("event", event.id).put("args", argsJson).toString()
@@ -376,15 +368,15 @@ class FlutterDroidtopPlugin internal constructor(
         return decode(raw)
     }
 
+    /**
+     * The envelope (docs/plugin-api.md 1.3, 1.6): the plugin's Dart code answers the
+     * channel method `handle` with the envelope in and the reply out, both JSON text.
+     */
     override fun handle(call: PluginCall): PluginReply {
-        if (!speaksContract2) return LegacyHandle.translate(this, call)
         val (replyJson, errorMessage) = callDart("handle", call.toJson().toString())
         errorMessage?.let { return PluginReply.error(PluginErrorCode.FAILED, it) }
         return PluginReply.parse(replyJson)
     }
-
-    /** Whether this plugin's own manifest is contract 2, read once from its installed payload. */
-    private val speaksContract2: Boolean get() = contractVersion >= 2
 
     // ---------------------------------------------------------------
     // ui.main drawn into a surface droidtop owns (contained, docs/plugin-api.md 1.7)
@@ -659,10 +651,7 @@ class FlutterDroidtopPlugin internal constructor(
             if (FlutterRuntimeManager.libflutterSoPath(context) == null) {
                 return Result.failure(IllegalStateException("Flutter runtime not installed -- download it in Settings > Plugins first"))
             }
-            val contract = runCatching {
-                PluginManifest.fromJson(JSONObject(File(installDir, "manifest.json").readText()))?.contractVersion ?: 1
-            }.getOrDefault(1)
-            return runCatching { FlutterDroidtopPlugin(pluginId, context, FlutterSource.installed(context, pluginId, installDir), contract) }
+            return runCatching { FlutterDroidtopPlugin(pluginId, context, FlutterSource.installed(context, pluginId, installDir)) }
         }
     }
 }

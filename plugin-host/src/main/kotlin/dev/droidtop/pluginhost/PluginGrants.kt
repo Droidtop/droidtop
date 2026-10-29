@@ -39,15 +39,13 @@ data class PermissionDiff(
             val oldPermissions = old.v2.permissions.map { it.id }.toSet()
             val oldPoints = old.v2.provides.map { it.point }.toSet()
             val oldExports = old.v2.exports.map { it.grantKey }.toSet()
-            // A contract 1 plugin holds what it could always do: only its high-risk news is asked about.
-            val v2 = new.contractVersion >= 2
             return PermissionDiff(
                 permissions = new.v2.permissions
-                    .filter { it.id !in oldPermissions && !it.id.startsWith(PluginPermissions.PROVIDE_PREFIX) && (v2 || PluginGrants.tierOf(it) != PermissionTier.NORMAL) }
+                    .filter { it.id !in oldPermissions && !it.id.startsWith(PluginPermissions.PROVIDE_PREFIX) }
                     .map { it.id }
                     .distinct(),
                 points = new.v2.provides
-                    .filter { it.point !in oldPoints && ExtensionPoints.find(it.point)?.let { p -> v2 || p.risk.needsConsent } == true }
+                    .filter { it.point !in oldPoints && ExtensionPoints.find(it.point) != null }
                     .map { it.point }
                     .distinct(),
                 exports = new.v2.exports.map { it.grantKey }.filter { it !in oldExports }.distinct(),
@@ -65,11 +63,9 @@ data class PermissionDiff(
  * an API the plugin offers other plugins.
  *
  * A permission with no explicit entry has a default that depends on what
- * the plugin is ([defaultFor]): normal permissions are granted, dangerous
- * and critical ones are `ask`, and a contract 1 plugin holds everything it
- * could already do (docs/plugin-api.md 6, "no new prompts for existing
- * behaviour"). A file that cannot be read is treated as `ask` for
- * everything, never as `granted`.
+ * the permission is ([defaultFor]): normal permissions are granted, and
+ * dangerous and critical ones are `ask`. A file that cannot be read is
+ * treated as `ask` for everything, never as `granted`.
  */
 class PluginGrants(private val dir: File) {
     /** [wanted]: permissions a call reached while still `ask`. [fresh]: items an update added that still wait for the user. */
@@ -180,16 +176,14 @@ class PluginGrants(private val dir: File) {
      * the plugin declares `required` stays `ask` (the first-use sheet can still ask for it); every other
      * unticked item, an optional permission, a normal permission, an extension point or an export,
      * is `denied`. Null [ticked] is the list as first shown
-     * ([defaultTicked]). A contract 1 plugin keeps the permissions it always
-     * had (its root tick becomes the `priv.shell.root` grant); its points
-     * and the rest follow [ticked] like any other.
+     * ([defaultTicked]).
      */
     fun initialiseOnApproval(record: PluginRecord, ticked: Set<String>? = null) = synchronized(LOCK) {
         val on = ticked ?: approvalTicked(record, readLocked(record.manifest.id))
         val states = linkedMapOf<String, GrantState>()
         for (declared in record.manifest.v2.permissions) {
             if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
-            states[declared.id] = if (record.manifest.contractVersion < 2) defaultFor(record, declared) else answerFor(declared.id, tierOf(declared), on, declared.required)
+            states[declared.id] = answerFor(declared.id, tierOf(declared), on, declared.required)
         }
         for (entry in record.manifest.v2.provides) {
             if (ExtensionPoints.find(entry.point) == null) continue
@@ -309,18 +303,16 @@ class PluginGrants(private val dir: File) {
         /**
          * What the approval list starts as (docs/SPEC.md 12a, "Approval is a list"): every item ticked,
          * except what SPEC already holds back, a dangerous or critical permission and a high-risk
-         * extension point, which start unticked. A contract 1 plugin holds what it could always do, so
-         * all of its points start ticked.
+         * extension point, which start unticked.
          */
         fun defaultTicked(record: PluginRecord): Set<String> = buildSet {
-            val v2 = record.manifest.contractVersion >= 2
             for (declared in record.manifest.v2.permissions) {
                 if (declared.id.startsWith(PluginPermissions.PROVIDE_PREFIX)) continue
-                if (v2 && tierOf(declared) == PermissionTier.NORMAL) add(declared.id)
+                if (tierOf(declared) == PermissionTier.NORMAL) add(declared.id)
             }
             for (entry in record.manifest.v2.provides) {
                 val point = ExtensionPoints.find(entry.point) ?: continue
-                if (!v2 || !point.risk.needsConsent) add(PluginPermissions.PROVIDE_PREFIX + entry.point)
+                if (!point.risk.needsConsent) add(PluginPermissions.PROVIDE_PREFIX + entry.point)
             }
             for (export in record.manifest.v2.exports) add(EXPORT_PREFIX + export.grantKey)
         }
@@ -358,8 +350,6 @@ class PluginGrants(private val dir: File) {
 
         /** What a permission is when nothing was stored for it. */
         fun defaultFor(record: PluginRecord, declared: DeclaredPermission): GrantState = when {
-            record.manifest.contractVersion < 2 ->
-                if (declared.id == "priv.shell.root") (if (record.rootApproved) GrantState.GRANTED else GrantState.ASK) else GrantState.GRANTED
             tierOf(declared) == PermissionTier.NORMAL -> GrantState.GRANTED
             else -> GrantState.ASK
         }
@@ -374,12 +364,12 @@ class PluginGrants(private val dir: File) {
             return snapshot.states[permission] ?: defaultFor(record, declared)
         }
 
-        /** Whether the plugin may provide [point]: high-risk points of a contract 2 plugin wait for a grant. */
+        /** Whether the plugin may provide [point]: high-risk points wait for a grant. */
         fun provideState(record: PluginRecord, snapshot: Snapshot, point: String): GrantState {
             if (snapshot.corrupt) return GrantState.ASK
             snapshot.states[PluginPermissions.PROVIDE_PREFIX + point]?.let { return it }
             val risky = ExtensionPoints.find(point)?.risk?.needsConsent == true
-            return if (record.manifest.contractVersion < 2 || !risky) GrantState.GRANTED else GrantState.ASK
+            return if (!risky) GrantState.GRANTED else GrantState.ASK
         }
 
         /**
@@ -455,9 +445,9 @@ class PluginGrants(private val dir: File) {
         }
 
         /**
-         * Why a job must not start, or null when it may. A contract 2 job names its point in the envelope it carries
-         * (`args["call"]`) and is checked as that point; a contract 1 job has no envelope and is checked as the point
-         * its [capability] replaced.
+         * Why a job must not start, or null when it may. A job names its point in the envelope it carries
+         * (`args["call"]`) and is checked as that point; one started without an envelope is checked as the point its
+         * [capability] is served for ([LegacyManifest.CAPABILITY_POINTS]).
          */
         fun jobRefusal(record: PluginRecord, snapshot: Snapshot, capability: PluginCapability, args: Map<String, String>): String? {
             val point = args["call"]?.let { PluginCall.fromJson(it)?.point } ?: LegacyManifest.CAPABILITY_POINTS[capability] ?: return null

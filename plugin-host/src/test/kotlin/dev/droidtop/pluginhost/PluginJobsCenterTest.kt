@@ -105,7 +105,7 @@ class PluginJobsCenterTest {
             version = "1.0",
             kind = PluginKind.NATIVE_BUNDLE,
             capabilities = setOf(PluginCapability.APP_STATUS),
-            contractVersion = 1,
+            contractVersion = 2,
             requestsRoot = false,
             abis = emptySet(),
             entryClass = "dev.droidtop.test.Fake",

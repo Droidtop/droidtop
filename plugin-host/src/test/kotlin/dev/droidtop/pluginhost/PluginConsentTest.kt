@@ -9,11 +9,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PluginConsentTest {
-    private fun manifest(id: String = "acme.vpn", origin: String = "acme", contract: Int = 2, build: (JSONObject) -> Unit): PluginManifest {
+    private fun manifest(id: String = "acme.vpn", origin: String = "acme", build: (JSONObject) -> Unit): PluginManifest {
         val json = JSONObject().apply {
             put("id", id); put("origin", origin); put("label", "Acme VPN"); put("kind", "native_bundle")
-            put("capabilities", JSONArray(if (contract == 1) listOf("status_tile") else emptyList<String>()))
-            put("contractVersion", contract)
+            put("contractVersion", 2)
             put("abis", JSONArray(listOf("arm64-v8a", "x86_64"))); put("entryClass", "acme.Vpn")
             put("payload", JSONArray(listOf(JSONObject().put("path", "classes.jar").put("sha256", "a".repeat(64)))))
             build(this)
@@ -103,20 +102,5 @@ class PluginConsentTest {
         assertEquals("Needs ADB-level access. Restart the app.", shell.line.detail)
         assertFalse("never the interface's id (#516)", shell.line.title.contains("priv."))
         assertNull(view.uses[1].providerLabel)
-        assertFalse(view.olderPluginFullAccess)
-    }
-
-    @Test
-    fun `a v1 plugin is shown as full access with its derived asks`() {
-        val m = manifest(contract = 1) {}
-        val view = PluginConsent.of(m, listOf(record(m)), badgeFor = { "Official" })
-        assertTrue(view.olderPluginFullAccess)
-        assertEquals(listOf("Status tiles and widgets"), view.adds.single().second.map { it.title })
-        // An older plugin's permissions are shown as full access, not as tick boxes.
-        assertTrue(view.asks.all { it.line.id == null } && view.can.all { it.id == null })
-        assertTrue(view.asks.any { it.line.title.startsWith("Send information to other apps") })
-        assertTrue(view.asks.any { it.line.title == "Full access" })
-        assertTrue(view.can.any { it.title.startsWith("Check whether listed apps are installed") })
-        assertEquals(emptyList<String>(), view.unsupported)
     }
 }

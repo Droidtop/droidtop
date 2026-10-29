@@ -259,7 +259,7 @@ abstract class PluginProcessService : Service() {
             val call = PluginCall.fromJson(envelopeJson)
                 ?: return PluginReply.error(PluginErrorCode.INVALID_ARGS, "the call envelope is not valid").encode()
             return try {
-                LegacyHandle.dispatch(plugin, call).encode()
+                plugin.handle(call).encode()
             } catch (t: Throwable) {
                 reportCrash(pluginId, call.point, t.message ?: t::class.java.simpleName)
                 null
@@ -537,7 +537,7 @@ internal open class BrokerPluginContext(private val broker: IPluginHostBroker, p
         PluginFileReply(PluginReply.error(PluginErrorCode.FAILED, "droidtop could not be reached: ${t.message ?: t::class.java.simpleName}").encode(), null)
     }
 
-    /** The contract 1 methods below are the broker calls they became (docs/plugin-api.md 6); a refused or failed call reads as false, as before. */
+    /** The [PluginContext] convenience methods below are the broker calls they stand for (docs/plugin-api.md 6); a refused or failed call reads as false. */
     private fun flag(api: String, op: String, args: JSONObject, key: String): Boolean = runCatching {
         val reply = JSONObject(call(api, 1, op, args.toString()))
         reply.optBoolean("ok") && reply.optJSONObject("data")?.optBoolean(key) == true

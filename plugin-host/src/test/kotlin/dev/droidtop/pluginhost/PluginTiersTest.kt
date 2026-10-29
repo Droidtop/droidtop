@@ -30,12 +30,10 @@ class PluginTiersTest {
     }
 
     @Test
-    fun `full access runs isolated only with its switch, from Android 11, for a contract 2 plugin`() {
-        val r = record(manifest { it.put("permissions", arr(fullTrust)) })
-        assertFalse("the switch is off by default", PluginTiers.fullAccessRunsIsolated(r, switchOn = false, sdk = 34))
-        assertTrue(PluginTiers.fullAccessRunsIsolated(r, switchOn = true, sdk = 30))
-        assertFalse("its sockets need API 30", PluginTiers.fullAccessRunsIsolated(r, switchOn = true, sdk = 29))
-        assertFalse("contract 1 predates the API", PluginTiers.fullAccessRunsIsolated(record(manifest(contract = 1)), switchOn = true, sdk = 34))
+    fun `full access runs isolated only with its switch, from Android 11`() {
+        assertFalse("the switch is off by default", PluginTiers.fullAccessRunsIsolated(switchOn = false, sdk = 34))
+        assertTrue(PluginTiers.fullAccessRunsIsolated(switchOn = true, sdk = 30))
+        assertFalse("its sockets need API 30", PluginTiers.fullAccessRunsIsolated(switchOn = true, sdk = 29))
         assertFalse("no device property in a unit test", PluginTiers.fullAccessIsolated())
     }
 
@@ -49,10 +47,11 @@ class PluginTiersTest {
     }
 
     @Test
-    fun `a contract 1 plugin keeps full access`() {
-        val r = record(manifest(contract = 1))
-        assertEquals(PluginTier.FULL_TRUST, PluginTiers.of(r, grants()))
-        assertEquals("Full access (older plugin)", PluginTiers.badge(r, grants()))
+    fun `an installed contract 1 plugin is never run and needs an update`() {
+        val r = record(manifest(contract = 1, label = "Old Tile") { it.put("capabilities", JSONArray(listOf("status_tile"))) })
+        assertEquals("Old Tile was written for an older droidtop and needs an update", PluginTiers.refusal(r, grants()))
+        assertEquals("not full access", PluginTier.CONTAINED, PluginTiers.of(r, grants()))
+        assertNull(PluginTiers.badge(r, grants()))
     }
 
     @Test

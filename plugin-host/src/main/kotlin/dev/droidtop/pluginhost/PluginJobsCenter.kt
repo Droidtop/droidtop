@@ -82,7 +82,7 @@ object PluginJobsCenter {
         val jobId: String,
         val pluginId: String,
         val pluginLabel: String,
-        /** Null for a job a provider runs for another plugin (docs/plugin-api.md 2.4): those have no contract 1 capability. */
+        /** Null for a job a provider runs for another plugin (docs/plugin-api.md 2.4): those have no capability. */
         val capability: PluginCapability?,
         val title: String,
         val startedAtMs: Long,

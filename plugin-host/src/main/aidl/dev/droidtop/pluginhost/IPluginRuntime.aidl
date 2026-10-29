@@ -137,9 +137,9 @@ interface IPluginRuntime {
     /**
      * The v2 call envelope (docs/plugin-api.md 1.3): envelopeJson is a
      * PluginCall as JSON, the return value a PluginReply as JSON, or null
-     * when the plugin threw or is not loaded. A plugin compiled before the
-     * envelope existed is answered through its contract 1 capability
-     * (LegacyHandle). Bound by the caller's own watchdog, like invoke.
+     * when the plugin threw or is not loaded. A plugin that does not
+     * implement handle answers UNSUPPORTED (DroidtopPlugin.handle's
+     * default). Bound by the caller's own watchdog, like invoke.
      */
     String handle(String pluginId, String envelopeJson);
 

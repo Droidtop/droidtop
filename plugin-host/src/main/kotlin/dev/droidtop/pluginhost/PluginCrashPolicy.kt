@@ -182,9 +182,9 @@ class PluginCrashPolicy(
 
     /**
      * Sends one v2 call to [record]'s `handle` (docs/plugin-api.md 1.3), the
-     * one path for extension points that have no contract 1 capability
-     * (quick tiles, `api:<id>` calls for a provider) and for the ones that
-     * do. The same runnable and re-verify gates as [invoke]; a plugin that
+     * one path for extension points that have no capability ([invoke]'s
+     * path: quick tiles, `api:<id>` calls for a provider) and for the ones
+     * that do. The same runnable and re-verify gates as [invoke]; a plugin that
      * is Waiting, or whose `provide:` grant for [PluginCall.point] is not
      * given, is refused. [timeoutMs] is the budget of docs/plugin-api.md 8:
      * a miss is a crash only for the default 15 s budget ([crashOnTimeout]),

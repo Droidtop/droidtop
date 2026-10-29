@@ -80,8 +80,8 @@ open class PluginSandboxService : PluginProcessService() {
         val context = BrokerPluginContext(broker, applicationInfo.dataDir)
         return when (manifest.kind) {
             PluginKind.NATIVE_BUNDLE -> loadDex(pluginId, manifest, files, context)
-            PluginKind.PYTHON -> loadPython(pluginId, manifest, files, context)
-            PluginKind.FLUTTER_EMBED -> loadFlutter(pluginId, manifest, files, context)
+            PluginKind.PYTHON -> loadPython(pluginId, files, context)
+            PluginKind.FLUTTER_EMBED -> loadFlutter(pluginId, files, context)
             // Its code is its own app, bound by AppInterfaces; it never loads in a droidtop process.
             PluginKind.APP_INTERFACE -> failLoad(pluginId, "an app's plugin runs in its own app, not in a droidtop process")
         }
@@ -111,7 +111,7 @@ open class PluginSandboxService : PluginProcessService() {
         }
     }
 
-    private fun loadPython(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, context: PluginContext): Boolean {
+    private fun loadPython(pluginId: String, files: Map<String, ParcelFileDescriptor>, context: PluginContext): Boolean {
         val script = files[ContainedFiles.PLUGIN_PY] ?: return failLoad(pluginId, "its plugin.py was not handed over")
         val source = try {
             FileInputStream(script.fileDescriptor).bufferedReader().readText()
@@ -123,11 +123,11 @@ open class PluginSandboxService : PluginProcessService() {
         if (!report.optBoolean("ok")) {
             return failLoad(pluginId, "the Python runtime did not start in the contained process: ${report.optString("error")}")
         }
-        val plugin = PythonDroidtopPlugin(pluginId, scriptPath = "", dataDir = "", contractVersion = manifest.contractVersion, source = source)
+        val plugin = PythonDroidtopPlugin(pluginId, scriptPath = "", dataDir = "", source = source)
         return start(pluginId, plugin, context)
     }
 
-    private fun loadFlutter(pluginId: String, manifest: PluginManifest, files: Map<String, ParcelFileDescriptor>, context: PluginContext): Boolean {
+    private fun loadFlutter(pluginId: String, files: Map<String, ParcelFileDescriptor>, context: PluginContext): Boolean {
         val libflutter = files[ContainedFiles.FLUTTER_ENGINE] ?: return failLoad(pluginId, "the Flutter engine was not handed over")
         val libapp = files[ContainedFiles.FLUTTER_APP] ?: return failLoad(pluginId, "its libapp.so was not handed over")
         val assets = files[ContainedFiles.FLUTTER_ASSETS] ?: return failLoad(pluginId, "its flutter_assets were not handed over")
@@ -151,7 +151,7 @@ open class PluginSandboxService : PluginProcessService() {
             val registrant = files.filterKeys { it.startsWith(ContainedFiles.FLUTTER_DEX) }.toSortedMap().values.map { fd ->
                 java.nio.ByteBuffer.wrap(FileInputStream(fd.fileDescriptor).readBytes())
             }
-            start(pluginId, FlutterDroidtopPlugin(pluginId, applicationContext, FlutterSource.contained(registrant, softwareRendering, served), manifest.contractVersion), context)
+            start(pluginId, FlutterDroidtopPlugin(pluginId, applicationContext, FlutterSource.contained(registrant, softwareRendering, served)), context)
         } catch (t: Throwable) {
             loadCrashed(pluginId, t)
         }

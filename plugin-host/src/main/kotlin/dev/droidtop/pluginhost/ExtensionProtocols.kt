@@ -43,7 +43,7 @@ object ContextActionFilter {
     fun targets(entry: ProvidedPoint): List<String> =
         strings(runCatching { JSONObject(entry.extra) }.getOrDefault(JSONObject()), "targets").ifEmpty { listOf("game") }
 
-    /** True when the entry asks to run as a contract 1 job (`"job": true` in its own fields) instead of a quick call. */
+    /** True when the entry asks to run as a job (`"job": true` in its own fields, started through `startJob`) instead of a quick call. */
     fun runsAsJob(entry: ProvidedPoint): Boolean =
         runCatching { JSONObject(entry.extra).optBoolean("job", false) }.getOrDefault(false)
 
@@ -124,7 +124,7 @@ class SourceSystems private constructor(private val ids: Set<String>?, private v
         fun of(entry: ProvidedPoint): SourceSystems =
             runCatching { parse(JSONObject(entry.extra).opt("systems")) }.getOrDefault(UNDECLARED)
 
-        /** The systems a plugin's manifest says its sources serve: the union of its `library.sources` entries, undeclared when any entry (or the contract 1 capability) says nothing. */
+        /** The systems a plugin's manifest says its sources serve: the union of its `library.sources` entries, undeclared when there is none or any entry says nothing. */
         fun of(manifest: PluginManifest): SourceSystems {
             val entries = manifest.v2.provides.filter { it.point == "library.sources" }
             if (entries.isEmpty()) return UNDECLARED
