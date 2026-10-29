@@ -70,11 +70,26 @@ internal fun FloatingStatusCluster(onClick: () -> Unit, modifier: Modifier = Mod
     val window = LocalShellWindow.current
     val density = LocalDensity.current
     DisposableEffect(Unit) { onDispose { StatusClusterRoom.size = DpSize.Zero } }
-    Box(
+    StatusPill(
+        onClick = onClick,
         modifier = modifier
             .onSizeChanged { px -> StatusClusterRoom.size = with(density) { DpSize(px.width.toDp(), px.height.toDp()) } }
-            .padding(horizontal = window.barPadding, vertical = 8.dp)
-            .background(MenuTokens.FloatingPlate, Corners.Pill)
+            .padding(horizontal = window.barPadding, vertical = STATUS_INSET),
+    )
+}
+
+/** How far the status pill sits from the window's top edge, floating or in Home's band (Droidtop/tracker#675). */
+internal val STATUS_INSET = 8.dp
+
+/**
+ * The status cluster on its pill: the one look of the facts wherever they float, the page's corner and Home's band
+ * alike (Droidtop/tracker#675). [plate] is the pill's fill: the floating plate over a page, the surface in Home's band.
+ */
+@Composable
+internal fun StatusPill(onClick: () -> Unit, modifier: Modifier = Modifier, plate: Color = MenuTokens.FloatingPlate) {
+    Box(
+        modifier = modifier
+            .background(plate, Corners.Pill)
             .padding(horizontal = 10.dp, vertical = 4.dp),
     ) {
         StatusCluster(showBatteryPercent = true, onClick = onClick)

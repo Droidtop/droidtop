@@ -58,7 +58,8 @@ import dev.droidtop.shell.gamepad.Corners
 import dev.droidtop.shell.gamepad.LocalShellWindow
 import dev.droidtop.shell.gamepad.MenuTokens
 import dev.droidtop.shell.gamepad.Space
-import dev.droidtop.shell.gamepad.StatusCluster
+import dev.droidtop.shell.gamepad.STATUS_INSET
+import dev.droidtop.shell.gamepad.StatusPill
 import dev.droidtop.shell.gamepad.TypeRole
 import dev.droidtop.shell.gamepad.ViewStrip
 import dev.droidtop.shell.gamepad.focusRing
@@ -207,7 +208,9 @@ internal fun HomeTopBand(
             .background(Brush.verticalGradient(0f to MenuTokens.Ground.copy(alpha = 0.6f), 1f to Color.Transparent)),
     ) {
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd).padding(horizontal = window.edgePadding),
+            // The same inset from the top edge as the status pill floating over every other page, so the pill keeps
+            // its rounded top in portrait (Droidtop/tracker#675).
+            modifier = Modifier.align(Alignment.CenterEnd).padding(horizontal = window.edgePadding, vertical = STATUS_INSET),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(Space.Xs),
         ) {
@@ -253,12 +256,8 @@ internal fun HomeTopBand(
                 }
             }
             Box(Modifier.padding(horizontal = Space.Xs).width(1.dp).height(24.dp).background(MenuTokens.CardOutline))
-            // The facts, drawn by the status cluster itself, on a solid plate in full ink.
-            Box(
-                Modifier
-                    .background(MenuTokens.Surface, Corners.Pill)
-                    .padding(horizontal = 10.dp, vertical = 4.dp),
-            ) { StatusCluster(showBatteryPercent = true, onClick = onQuickMenu) }
+            // The facts, on the one status pill, here on a solid plate in full ink.
+            StatusPill(onClick = onQuickMenu, plate = MenuTokens.Surface)
         }
     }
 }

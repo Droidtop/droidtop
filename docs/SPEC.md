@@ -18449,6 +18449,8 @@ shared components (`MenuRow`, `SettingsCatalogView`):
 Gaming screens have no top bar. Their content uses the available space above the
 hint row, and a non-focusable status cluster floats over the top-right content
 on a token-based soft scrim. Tapping the cluster opens the Quick Menu (R2).
+Home's band draws the same pill (`StatusPill`, on the surface plate there) at the
+same 8dp inset from the top edge, never a copy of its own (Droidtop/tracker#675).
 The hint row retains its footer plate and starts with the Start / Menu touch
 control; the left menu is the only destination navigation. L1/R1 belong only
 to the current page's nearest strip, and do nothing to navigation on pages
