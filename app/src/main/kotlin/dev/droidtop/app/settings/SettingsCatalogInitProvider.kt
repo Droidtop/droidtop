@@ -46,7 +46,7 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // a job each (docs/SPEC.md 7g, "Stores").
         dev.droidtop.stores.BuiltInStores.register()
         // A plugin's stores beside them (docs/plugin-api.md 3 A13), once the plugins are read: off this thread.
-        Thread { runCatching { dev.droidtop.library.integrations.PluginStores.refresh(appContext) } }.start()
+        dev.droidtop.library.integrations.PluginStores.refreshAsync(appContext)
         dev.droidtop.library.stores.StoreInstallJob.register(appContext)
         // The desktop's fonts for all languages, a job of its own (Droidtop/tracker#390).
         dev.droidtop.app.DesktopFontsJob.register(appContext)

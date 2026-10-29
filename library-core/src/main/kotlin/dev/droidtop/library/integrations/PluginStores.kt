@@ -18,6 +18,7 @@ import dev.droidtop.pluginhost.ProvidedPoint
 import dev.droidtop.runtime.SafeDelete
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -60,6 +61,27 @@ object PluginStores {
         registered.clear()
         registered.addAll(wanted.map { it.id })
         if (changed) StoreChanges.announce(app)
+    }
+
+    private val refreshScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO)
+    private val refreshQueued = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /**
+     * [refresh] in the background, for callers on any thread (start, a change to the plugins). Calls that come while
+     * one is still waiting to run join it; one that comes while a refresh runs queues one more after it, so the last
+     * change is always read. A failure is logged and changes nothing.
+     */
+    fun refreshAsync(context: Context) {
+        if (!refreshQueued.compareAndSet(false, true)) return
+        val app = context.applicationContext
+        refreshScope.launch {
+            refreshQueued.set(false)
+            try {
+                refresh(app)
+            } catch (e: Exception) {
+                android.util.Log.w("droidtop.stores", "plugin stores refresh", e)
+            }
+        }
     }
 
     /** The rows a `library` answer gives, for [store]: each game once, an id and a title required. Pure. */
