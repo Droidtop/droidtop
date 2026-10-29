@@ -405,6 +405,12 @@ class DesktopSessionService : Service() {
         /** Observed by DesktopShell/MainActivity instead of a null/null placeholder. */
         val state: StateFlow<DesktopSessionState> = _stateHolder.asStateFlow()
 
+        init {
+            // Home and droidtop's icon go back to a running desktop (SPEC 2c, Droidtop/tracker#352). Nothing reads
+            // the session before this class loads, and before then none is running.
+            dev.droidtop.library.settings.Modes.desktopLive = { _stateHolder.value is DesktopSessionState.Connected }
+        }
+
         @Volatile
         private var sessionScope: CoroutineScope? = null
 

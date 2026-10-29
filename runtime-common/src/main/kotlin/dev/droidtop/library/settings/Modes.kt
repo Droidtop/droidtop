@@ -166,12 +166,22 @@ object ModeGate {
         defaultId: String?,
         lastId: String?,
         enabled: Set<Mode>,
+        desktopLive: Boolean = false,
     ): Mode? {
         fun usable(id: String?): Mode? =
             Mode.byId(id)?.takeIf { it != Mode.LAUNCHER && it in enabled }
-        return usable(explicitId) ?: usable(defaultId) ?: usable(lastId)
+        return usable(explicitId) ?: liveDesktop(lastId, enabled, desktopLive) ?: usable(defaultId) ?: usable(lastId)
             ?: enabled.firstOrNull { it != Mode.LAUNCHER }
     }
+
+    /**
+     * Desktop, while the person is in it: the last mode is Desktop and its session runs (docs/SPEC.md 2c, "Back to a
+     * running desktop", Droidtop/tracker#352). An Android app opened from Desktop's Start menu covers the desktop; a
+     * Home press, or droidtop's icon, over it goes back to that desktop rather than to the default mode, which would
+     * be a jump between modes (#639).
+     */
+    private fun liveDesktop(lastId: String?, enabled: Set<Mode>, desktopLive: Boolean): Mode? =
+        Mode.DESKTOP.takeIf { desktopLive && lastId == Mode.DESKTOP.id && it in enabled }
 
     /**
      * Where the Home key takes a person (docs/SPEC.md 2c, "Home goes to
@@ -185,10 +195,10 @@ object ModeGate {
      * every Home press forwarded straight back into Gaming, because Home
      * followed only the last-used mode.
      */
-    fun homeTarget(defaultId: String?, lastId: String?, enabled: Set<Mode>): Mode {
+    fun homeTarget(defaultId: String?, lastId: String?, enabled: Set<Mode>, desktopLive: Boolean = false): Mode {
         fun usable(id: String?): Mode? =
             Mode.byId(id)?.takeIf { it == Mode.LAUNCHER || it in enabled }
-        return usable(defaultId) ?: usable(lastId) ?: Mode.LAUNCHER
+        return liveDesktop(lastId, enabled, desktopLive) ?: usable(defaultId) ?: usable(lastId) ?: Mode.LAUNCHER
     }
 }
 
@@ -356,12 +366,21 @@ object Modes {
         editor.apply()
     }
 
+    /**
+     * Whether a desktop session is running, for [ModeGate]'s "back to a running desktop". The app's
+     * DesktopSessionService installs it; runtime-common cannot see that service.
+     */
+    @Volatile
+    @JvmStatic
+    var desktopLive: () -> Boolean = { false }
+
     /** The app-hosted shell to render; see [ModeGate.resolveAppMode]. */
     fun resolveAppMode(context: Context, explicitId: String?): Mode? = ModeGate.resolveAppMode(
         explicitId = explicitId,
         defaultId = defaultMode(context),
         lastId = lastMode(context),
         enabled = snapshot,
+        desktopLive = desktopLive(),
     )
 
     /**
@@ -374,5 +393,6 @@ object Modes {
         defaultId = defaultMode(context),
         lastId = lastMode(context),
         enabled = snapshot,
+        desktopLive = desktopLive(),
     ).id
 }

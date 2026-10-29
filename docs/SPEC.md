@@ -796,6 +796,20 @@ Default mode offers Android whenever droidtop holds the home screen, so
 onboarding's answer reads back there instead of "Whichever was used last";
 "Whichever was used last" keeps the old behaviour for whoever picks it.
 
+**Back to a running desktop (lane default, 2026-10-29, Droidtop/tracker#352).** While Desktop is the mode in use
+and its session runs, a Home press and a plain start of droidtop (its icon, `MainActivity` with no mode named) go
+back to Desktop, ahead of the default mode. An Android app opened from Desktop's Start menu is a fullscreen Activity
+over the desktop; on the dual-screen rig (Android 13, v0.2.0-dev.2398) Home over Calendar and then droidtop's icon
+brought back Gaming, the default, so the person had left Desktop for another mode without asking, which the owner
+ruled out in #639: "we absolutely should NOT be seeing jumps between modes." Back in Desktop, the app is a chip in
+the bar ("Android apps and games started from Desktop are in the bar"). A desktop kept running after a switch to
+another mode does not count: the mode in use is then that other one. A mode the person names (the mode menu and
+switcher, "Android") still wins. The session state reaches runtime-common through `Modes.desktopLive`, which
+`DesktopSessionService` installs. On that rig the main screen is display 2, not Android's default display, so Home
+there opens the secondary-display home (`SECONDARY_HOME`), which is droidtop's only when droidtop holds the home
+role; with another launcher holding it, Home shows that launcher's secondary screen, and droidtop's icon is the way
+back.
+
 Checked again 2026-09-26 after a UX review reported Home landing on the
 Standard shell with Default mode = Gaming: on a genuinely cold process start
 (`am force-stop` then Home, or a reboot) `Launcher.onCreate`'s redirect is

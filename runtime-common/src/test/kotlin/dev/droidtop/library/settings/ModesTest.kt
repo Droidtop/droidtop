@@ -151,6 +151,28 @@ class ModesTest {
     }
 
     @Test
+    fun `home and a plain start go back to a running desktop the person is in`() {
+        val all = setOf(Mode.LAUNCHER, Mode.GAMING, Mode.DESKTOP)
+        // Desktop > Start > Calendar, then Home, with Gaming as the default (rig 2398, Droidtop/tracker#352).
+        assertEquals(Mode.DESKTOP, ModeGate.homeTarget("gaming", "desktop", all, desktopLive = true))
+        assertEquals(Mode.DESKTOP, ModeGate.resolveAppMode(null, "gaming", "desktop", all, desktopLive = true))
+        // A switch the person names still wins.
+        assertEquals(Mode.GAMING, ModeGate.resolveAppMode("gaming", "gaming", "desktop", all, desktopLive = true))
+    }
+
+    @Test
+    fun `a desktop that is not running, or not the mode in use, leaves home to the default`() {
+        val all = setOf(Mode.LAUNCHER, Mode.GAMING, Mode.DESKTOP)
+        assertEquals(Mode.GAMING, ModeGate.homeTarget("gaming", "desktop", all, desktopLive = false))
+        // Kept running in the background while the person went to Gaming.
+        assertEquals(Mode.GAMING, ModeGate.homeTarget("gaming", "gaming", all, desktopLive = true))
+        assertEquals(Mode.LAUNCHER, ModeGate.homeTarget("standard", "standard", all, desktopLive = true))
+        // Switched off mid-session.
+        assertEquals(Mode.GAMING, ModeGate.homeTarget("gaming", "desktop", setOf(Mode.GAMING), desktopLive = true))
+        assertEquals(Mode.GAMING, ModeGate.resolveAppMode(null, "gaming", "desktop", setOf(Mode.GAMING), desktopLive = true))
+    }
+
+    @Test
     fun `every piece is owned by at least one mode`() {
         assertTrue(ModePiece.entries.all { it.owners.isNotEmpty() })
         // Nothing mode-specific is left running when every mode is off.
