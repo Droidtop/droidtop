@@ -11,7 +11,6 @@ import dev.droidtop.library.RoomFavoritesStore
 import dev.droidtop.library.RoomGameLinksStore
 import dev.droidtop.library.RoomPlayHistoryStore
 import dev.droidtop.library.consoles.ConsoleRomProvider
-import dev.droidtop.runtime.PrimaryContainerSession
 import dev.droidtop.runtime.windows.PcGameProvider
 
 /**
@@ -57,28 +56,6 @@ object LibraryCore {
         // One store behind every provider's records (docs/SPEC.md 7g,
         // step 2) -- files/library/games/, per that section's own layout.
         val records = records(app)
-        // Fills library-core's PcGameRuntime seam, which is what makes the
-        // WINE_PREFIX / LINUX_CONTAINER launch strategies real rather than
-        // error() stubs. The session supplier is only for the native-Linux
-        // half; Windows games go through the WineEngine seam and need
-        // neither a desktop session nor root. It stays a supplier because
-        // DesktopSessionService may still be connecting when this runs --
-        // and, with Desktop disabled, never connects at all, which the
-        // supplier already expresses as "no primary session".
-        dev.droidtop.library.PcGameRuntimeRegistry.runtime =
-            dev.droidtop.runtime.windows.DroidtopPcGameRuntime(
-                context = app,
-                primarySession = {
-                    (DesktopSessionService.state.value as? DesktopSessionState.Connected)
-                        ?.let { PrimaryContainerSession(it.runtime, it.container) }
-                },
-            )
-        // Where a store game's Wine prefix is, for its cloud saves (docs/SPEC.md 7g, "Stores").
-        dev.droidtop.library.stores.StoreSaves.locator = dev.droidtop.runtime.windows.DroidtopWinePrefixLocator
-        // Install on a GOG installer's row (docs/SPEC.md 7g, "Installers in a games folder"): the one install door.
-        dev.droidtop.library.FolderInstalls.runner = { context, installer, title, onStatus ->
-            dev.droidtop.runtime.windows.WindowsInstalls.install(context, installer, null, title, onStatus)
-        }
         return Library(
             listOf(
                 NativeAppProvider(app),
