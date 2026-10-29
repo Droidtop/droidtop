@@ -312,12 +312,12 @@ internal fun GamesSection(
             LibraryQuery()
         }
     }
-    // The default draws until the stored view, read off the main thread, lands.
-    var retroQuery by remember(retroScope.id) { mutableStateOf(retroDefault) }
-    var retroQueryLoaded by remember(retroScope.id) { mutableStateOf(false) }
-    PersistQuery(retroScope.id, retroQuery, retroQueryLoaded, default = retroDefault) {
-        retroQuery = it
-        retroQueryLoaded = true
+    // The group's own list state, one holder per group: moving to another system starts its own. The default
+    // query draws until the stored view, read off the main thread, lands.
+    val gamelist = remember(selectedGroup, retroScope.id) { GamelistState(retroDefault) }
+    PersistQuery(retroScope.id, gamelist.query, gamelist.queryLoaded, default = retroDefault) {
+        gamelist.query = it
+        gamelist.queryLoaded = true
     }
     val retroSaved = rememberSavedViews(retroScope.id)
     val retroBase = remember(entries, selectedGroup, collectionGroupMembers) {
@@ -328,22 +328,19 @@ internal fun GamesSection(
             else -> entries.filter { it.gameGroup() == group }
         }
     }
-    var retroSortOpen by remember { mutableStateOf(false) }
-    var retroFilterOpen by remember { mutableStateOf(false) }
-    val systemGamesBeforeSearch = remember(selectedGroup, sortVersion, retroQuery, retroScope, retroBase) {
+    val systemGamesBeforeSearch = remember(selectedGroup, sortVersion, gamelist.query, retroScope, retroBase) {
         // The stored per-group sort and filter: NAME by default, which is real ES-DE's own gamelist
         // default, and no filter. A collection is a list like any other.
-        if (selectedGroup == null) emptyList() else retroQuery.applyTo(retroBase, retroScope)
+        if (selectedGroup == null) emptyList() else gamelist.query.applyTo(retroBase, retroScope)
     }
     // The console gamelist's search (Select menu -> Search, the shared
     // LibrarySearchDialog, docs/SPEC.md 12a "Search fan-out"): narrows the
     // list by the one shared text rule.
-    var gamelistSearchText by remember(selectedGroup) { mutableStateOf("") }
-    val systemGamesForGroup = remember(systemGamesBeforeSearch, gamelistSearchText) {
-        if (gamelistSearchText.isBlank()) {
+    val systemGamesForGroup = remember(systemGamesBeforeSearch, gamelist.searchText) {
+        if (gamelist.searchText.isBlank()) {
             systemGamesBeforeSearch
         } else {
-            systemGamesBeforeSearch.filter { dev.droidtop.shell.gamepad.query.matchesSearchText(it, gamelistSearchText) }
+            systemGamesBeforeSearch.filter { dev.droidtop.shell.gamepad.query.matchesSearchText(it, gamelist.searchText) }
         }
     }
     // Which game the gamelist is on. Restored from the stack, so coming
@@ -370,45 +367,45 @@ internal fun GamesSection(
                 },
                 onDismiss = { gamelistOptionsOpen = false },
                 games = systemGamesForGroup,
-                searchText = gamelistSearchText,
+                searchText = gamelist.searchText,
                 totalGames = systemGamesBeforeSearch.size,
                 onSearchTextChange = if (group == null) null else { text ->
-                    gamelistSearchText = text
+                    gamelist.searchText = text
                     focusedGameIndex = 0
                 },
                 onJumpTo = { index ->
                     focusedGameIndex = index.coerceIn(0, (systemGamesForGroup.lastIndex).coerceAtLeast(0))
                 },
-                onOpenSort = if (group == null) null else ({ retroSortOpen = true }),
-                onOpenFilter = if (group == null) null else ({ retroFilterOpen = true }),
+                onOpenSort = if (group == null) null else ({ gamelist.sortOpen = true }),
+                onOpenFilter = if (group == null) null else ({ gamelist.filterOpen = true }),
             )
         }
     }
-    if (retroSortOpen) {
+    if (gamelist.sortOpen) {
         LibrarySortSheet(
             scope = retroScope,
-            query = retroQuery,
+            query = gamelist.query,
             onQueryChange = {
-                retroQuery = it
+                gamelist.query = it
                 focusedGameIndex = 0
             },
-            onDismiss = { retroSortOpen = false },
+            onDismiss = { gamelist.sortOpen = false },
         )
     }
-    if (retroFilterOpen) {
+    if (gamelist.filterOpen) {
         LibraryFilterSheet(
             scope = retroScope,
             base = retroBase,
-            query = retroQuery,
+            query = gamelist.query,
             savedViews = retroSaved.views,
             onQueryChange = {
-                retroQuery = it
+                gamelist.query = it
                 focusedGameIndex = 0
             },
-            onSaveView = { retroSaved.save(it, retroQuery) },
+            onSaveView = { retroSaved.save(it, gamelist.query) },
             onForgetView = { retroSaved.forget(it) },
             onSearch = null,
-            onDismiss = { retroFilterOpen = false },
+            onDismiss = { gamelist.filterOpen = false },
         )
     }
 
@@ -1102,7 +1099,7 @@ internal fun GamesSection(
                 // Same "don't request focus on an unattached FocusRequester" fix
                 // as the system-list view above -- games can be empty here too
                 // (the "recent" filter selected with zero recently-played entries).
-                LaunchedEffect(group, retroQuery) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
+                LaunchedEffect(group, gamelist.query) { if (games.isNotEmpty()) requestFocusWhenAttached(firstFocus, "Game grid") }
                 // Same real per-system accent as GroupCard's own border, applied
                 // as a subtle top-down vignette behind the whole grid -- carries
                 // the "dynamic per-system," not just per-card, through into the
@@ -1122,11 +1119,11 @@ internal fun GamesSection(
                 ) {
                     // The one pill the other lists draw while something filters ("Favourites, 12 of 80"),
                     // cleared by one press; no count line and no chip row otherwise.
-                    retroQuery.pillText(retroScope, games.size, retroQuery.totalIn(retroBase, retroScope))?.let { pill ->
+                    gamelist.query.pillText(retroScope, games.size, gamelist.query.totalIn(retroBase, retroScope))?.let { pill ->
                         Row(
                             modifier = Modifier.padding(horizontal = LocalShellWindow.current.edgePadding, vertical = 8.dp),
                         ) {
-                            ShellChip(pill, on = true, onClick = { retroQuery = retroQuery.cleared })
+                            ShellChip(pill, on = true, onClick = { gamelist.query = gamelist.query.cleared })
                         }
                     }
                     val pad = rememberGridPad()
@@ -1222,3 +1219,17 @@ internal val EMPTY_FOLDERS_HINTS = listOf(
     HintBinding(GamepadAction.A, "Select"),
     HintBinding(GamepadAction.B, "Back"),
 )
+
+/**
+ * One gamelist's own state, held together (Droidtop/tracker#763): the sort and filter it shows ([query], stored per
+ * list by PersistQuery once [queryLoaded]), whether its Sort or Filter sheet is open, and the text its Select menu's
+ * Search narrows it by. GamesSection remembers one per group.
+ */
+@androidx.compose.runtime.Stable
+internal class GamelistState(default: LibraryQuery) {
+    var query by mutableStateOf(default)
+    var queryLoaded by mutableStateOf(false)
+    var sortOpen by mutableStateOf(false)
+    var filterOpen by mutableStateOf(false)
+    var searchText by mutableStateOf("")
+}
