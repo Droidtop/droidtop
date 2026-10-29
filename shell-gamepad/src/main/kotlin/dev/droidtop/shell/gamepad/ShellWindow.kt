@@ -3,7 +3,6 @@ package dev.droidtop.shell.gamepad
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -399,15 +398,18 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
     )
 }
 
-/** Reads the live configuration. Recomposes on rotation, which is what makes one screen serve both orientations. */
+/**
+ * Reads the live configuration and whether a pad is attached ([ControllerLayouts.padPresent]). Recomposes on
+ * rotation, which is what makes one screen serve both orientations, and when a pad comes or goes.
+ */
 @Composable
-@ReadOnlyComposable
 fun currentShellWindow(): ShellWindow {
     val configuration = LocalConfiguration.current
+    val padPresent by ControllerLayouts.padPresent.collectAsState()
     return ShellWindow(
         widthDp = configuration.screenWidthDp,
         heightDp = configuration.screenHeightDp,
-        padPresent = ControllerLayouts.attachedControllers().isNotEmpty(),
+        padPresent = padPresent,
         minTouchTarget = LocalTouchTarget.current,
     )
 }

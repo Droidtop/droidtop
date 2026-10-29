@@ -120,6 +120,22 @@ object ControllerLayouts {
      */
     val padOrKeyboard: StateFlow<Boolean> = padOrKeyboardState
 
+    private val padPresentState = MutableStateFlow(false)
+    private var padSeeded = false
+
+    /**
+     * Whether a gamepad ([attachedControllers]) is attached right now, kept live from the device list like
+     * [padOrKeyboard], so a screen that reads it follows a pad plugged in or out. Before [listen] it is read once.
+     */
+    val padPresent: StateFlow<Boolean>
+        get() {
+            if (!listening && !padSeeded) {
+                padSeeded = true
+                padPresentState.value = attachedControllers().isNotEmpty()
+            }
+            return padPresentState
+        }
+
     /** Registers for device changes and starts the first load. Call from the shell and from onboarding. */
     fun attach(context: Context) {
         val app = context.applicationContext
@@ -158,10 +174,9 @@ object ControllerLayouts {
     }
 
     private fun refreshPadOrKeyboard() {
-        padOrKeyboardState.value = InputDevice.getDeviceIds().any { id ->
-            val device = InputDevice.getDevice(id) ?: return@any false
-            device.isGamepad() || device.isHardwareKeyboard()
-        }
+        val devices = InputDevice.getDeviceIds().toList().mapNotNull { InputDevice.getDevice(it) }
+        padOrKeyboardState.value = devices.any { it.isGamepad() || it.isHardwareKeyboard() }
+        padPresentState.value = devices.any { it.isGamepad() }
     }
 
     /** A real typing keyboard: letters, not a handheld's volume and power keys, and not Android's virtual one. */
