@@ -73,6 +73,18 @@ object GamesRoots {
             .mapNotNull { (path, value) -> (value as? Long)?.let { path to it } }.toMap()
 
     /**
+     * The games folder among [roots] that holds [file]: the longest one that is the file itself or a folder above it,
+     * by whole path segments, so `/games` never claims `/games2/rom.zip`. Null when none holds it. Pure.
+     */
+    fun rootOf(roots: List<File>, file: File): File? {
+        val path = file.absolutePath.trimEnd('/')
+        return roots.filter { root ->
+            val r = root.absolutePath.trimEnd('/')
+            path == r || path.startsWith("$r/")
+        }.maxByOrNull { it.absolutePath.length }
+    }
+
+    /**
      * Whether [root] can be read now: it is a folder and lists. An SD card
      * that is not in reads as not available, and its games are kept, not
      * marked gone ("An unmounted root is skipped by every walk, never

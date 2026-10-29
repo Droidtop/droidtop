@@ -25,13 +25,8 @@ internal object AcquireBios {
     }
 
     /** The games folder [destination] is in (the longest of [roots] holding it, or the root itself), else its own parent. */
-    fun rootFor(roots: List<File>, destination: File): File {
-        val path = destination.absolutePath.trimEnd('/')
-        return roots.filter { root ->
-            val r = root.absolutePath.trimEnd('/')
-            path == r || path.startsWith("$r/")
-        }.maxByOrNull { it.absolutePath.length } ?: destination.parentFile ?: destination
-    }
+    fun rootFor(roots: List<File>, destination: File): File =
+        dev.droidtop.library.GamesRoots.rootOf(roots, destination) ?: destination.parentFile ?: destination
 
     /** The file [entry] names under [root]: `<root>/bios/...` as the database spells it. */
     fun targetFor(root: File, entry: BiosFileSpec): File = File(root, entry.file)

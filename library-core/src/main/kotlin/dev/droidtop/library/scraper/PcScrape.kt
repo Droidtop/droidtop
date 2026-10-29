@@ -1188,8 +1188,7 @@ object PcScraper {
      */
     private fun mediaRootFor(context: Context, entry: LibraryEntry): File? {
         val roots = GamesRoots.current(context)
-        val path = File(entry.id)
-        return roots.firstOrNull { path.absolutePath.startsWith(it.absolutePath) } ?: roots.firstOrNull()
+        return GamesRoots.rootOf(roots, File(entry.id)) ?: roots.firstOrNull()
     }
 }
 

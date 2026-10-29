@@ -621,8 +621,7 @@ suspend fun applyManualMatch(
             (ScraperReadiness.credentialFix(lookup)?.let { " $it" } ?: "")
     }
 
-    val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
-        .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }
+    val gamesRoot = dev.droidtop.library.GamesRoots.rootOf(dev.droidtop.library.GamesRoots.current(context), romFile)
         ?: romFile.parentFile?.parentFile
     val baseName = romFile.nameWithoutExtension
     if (gamesRoot != null && metadata.coverUrl != null) {

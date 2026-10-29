@@ -1742,8 +1742,7 @@ internal fun EntryDetailScreen(
     val media by produceState(emptyList<Pair<String, String>>(), entry) {
         value = withContext(Dispatchers.IO) {
             val romFile = java.io.File(entry.id)
-            val gamesRoot = dev.droidtop.library.GamesRoots.current(context)
-                .firstOrNull { romFile.absolutePath.startsWith(it.absolutePath) }
+            val gamesRoot = dev.droidtop.library.GamesRoots.rootOf(dev.droidtop.library.GamesRoots.current(context), romFile)
             val systemId = entry.systemId
             if (gamesRoot != null && systemId != null) {
                 dev.droidtop.library.EsDeArtwork.allMedia(gamesRoot, systemId, romFile.nameWithoutExtension)
