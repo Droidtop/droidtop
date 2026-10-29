@@ -16783,7 +16783,10 @@ Consequences:
   the themed view gets the whole area in portrait that it gets in
   landscape. An opaque plate there covers the plate the theme drew for
   this row, which is what still read as "a strip below the canvas" after
-  the bar had already moved onto it (rig, build 548). The claim is about
+  the bar had already moved onto it (rig, build 548). With no bar plate, each pill carries its own small plate
+  (`MenuTokens.FloatingPlate`, a pill shape), never a full bar, so a hint
+  stays readable over busy art (Droidtop/tracker#668); the Start and R2
+  pair beside a theme's own legend is drawn the same way. The claim is about
   the CANVAS, not about the element: a theme that declares no
   `<helpsystem>` still draws the whole window and still has a help
   position -- ES-DE's own component default, `0.012` of the width and

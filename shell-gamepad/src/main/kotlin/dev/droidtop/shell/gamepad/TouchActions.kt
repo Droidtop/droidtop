@@ -131,7 +131,9 @@ internal fun TouchHintBar(
         // plus the pill's own side padding on a touch-first window. Without the padding a portrait bar
         // accepted a stage 16dp a hint too wide and wrapped "B Back" alone onto a second line, never
         // reaching the later drops (Droidtop/tracker#660).
-        val pill = if (window.touchFirst) TOUCH_PILL_PADDING * 2 else 0.dp
+        // Over a theme's own canvas there is no bar plate, so each pill carries its own (Droidtop/tracker#668).
+        val plated = background.alpha == 0f
+        val pill = if (window.touchFirst || plated) TOUCH_PILL_PADDING * 2 else 0.dp
         val shown = remember(hints, maxWidth, tight, pill, density.fontScale, labelStyle, glyphStyle) {
             with(density) {
                 val available = (maxWidth - sidePadding * 2).toPx()
@@ -166,7 +168,7 @@ internal fun TouchHintBar(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 shown.forEach { hint ->
-                    TouchHint(action = hint.action, label = hint.label, onPress = { press(hint.action) })
+                    TouchHint(action = hint.action, label = hint.label, plated = plated, onPress = { press(hint.action) })
                 }
             }
         } else {
@@ -179,7 +181,7 @@ internal fun TouchHintBar(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 shown.forEach { hint ->
-                    TouchHint(action = hint.action, label = hint.label, onPress = { press(hint.action) })
+                    TouchHint(action = hint.action, label = hint.label, plated = plated, onPress = { press(hint.action) })
                 }
             }
         }
@@ -193,7 +195,7 @@ private val TOUCH_PILL_PADDING = 8.dp
 private val TIGHT_HINT_BAR_WIDTH = 600.dp
 
 @Composable
-private fun TouchHint(action: GamepadAction, label: String?, onPress: () -> Unit) {
+private fun TouchHint(action: GamepadAction, label: String?, plated: Boolean, onPress: () -> Unit) {
     val window = LocalShellWindow.current
     // The tap target and the drawn chip are two different sizes (owner,
     // on the RP5 console, 2026-09-25: "the pills are also too big"): the
@@ -222,6 +224,9 @@ private fun TouchHint(action: GamepadAction, label: String?, onPress: () -> Unit
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .heightIn(min = MenuTokens.HintChipMinHeight)
+                // A pill over a theme's art has no bar under it: it carries its own small plate, so "A Select"
+                // reads over a busy bookshelf as well as over the shell's ground. Never a full bar.
+                .then(if (plated) Modifier.background(MenuTokens.FloatingPlate, Corners.Pill) else Modifier)
                 .then(
                     if (window.touchFirst) {
                         Modifier.border(1.dp, MenuTokens.HintPillOutline, Corners.Pill)
@@ -229,7 +234,7 @@ private fun TouchHint(action: GamepadAction, label: String?, onPress: () -> Unit
                         Modifier
                     },
                 )
-                .padding(horizontal = if (window.touchFirst) TOUCH_PILL_PADDING else 0.dp, vertical = 2.dp),
+                .padding(horizontal = if (window.touchFirst || plated) TOUCH_PILL_PADDING else 0.dp, vertical = 2.dp),
         ) {
             Keycap(GamepadKeyMap.labelFor(action).takeIf { it.isNotBlank() } ?: label.orEmpty())
             // Null: the fit rule folded this hint to its glyph (HintFit).

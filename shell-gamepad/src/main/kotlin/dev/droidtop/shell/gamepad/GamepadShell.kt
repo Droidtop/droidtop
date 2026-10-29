@@ -1575,11 +1575,11 @@ private fun GamepadShellBody(
             // is not tappable: the Start and R2 pills sit in the corner
             // beside it (docs/SPEC.md 7j, "Gaming controls").
             if (helpRowOwner == HelpRowOwner.THEME && !screensaverOn) {
+                // Each pill carries its own plate (TouchHintBar over a theme), so the pair needs none of its own.
                 ShellMenuPills(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
-                        .padding(end = shellWindow.edgePadding, bottom = 4.dp)
-                        .background(MenuTokens.FloatingPlate, RoundedCornerShape(12.dp)),
+                        .padding(end = shellWindow.edgePadding, bottom = 4.dp),
                 )
             }
             // Over the themed canvas, at the place the theme itself laid
