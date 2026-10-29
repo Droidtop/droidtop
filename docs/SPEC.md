@@ -5459,6 +5459,12 @@ droidtop 0.2.0-dev.1931).
   11 and later, any screen). The picture goes to Pictures/Screenshots (MediaStore), as Android's own do. Screenshot is
   a row on the Game tab, with Share after it, and a catalog item a person can pin on Home. Without either route the
   row says what would make it work.
+  - **Filed under the game (2026-10-29, Droidtop/tracker#596).** As Steam's screenshot manager does: while a game
+    droidtop started is running (`LaunchDisplay.runningGame`), the shot is also kept in droidtop's own pictures
+    folder for that game (`GameScreenshots`, one folder per game id), and the game's media viewer lists those shots
+    first, newest first, as "Your screenshot". The copy in Pictures/Screenshots stays, and the line says where it
+    went. Nothing is written into the person's games folders, and the scraper's own screenshot (ES-DE's
+    `screenshots`) is never replaced.
 - **Power and performance (slice C16).** System > Power keeps performance mode and adds: the battery's health,
   temperature and charge rate (the battery broadcast), Battery saver (Android's screen), and what `PowerProbe` finds
   on this device rather than assumes per model. A fan mode or a charge limit is shown with its value where the device

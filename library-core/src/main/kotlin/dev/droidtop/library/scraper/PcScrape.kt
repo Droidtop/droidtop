@@ -1084,7 +1084,8 @@ object PcScraper {
         val names = listOfNotNull(PcMediaLayout.fileSafe(baseNameFor(entry)), alsoUnder).distinct()
         val found = names.flatMap { dev.droidtop.library.EsDeArtwork.allMedia(root, systemFolder, it) }
         val icon = entry.iconUri?.let { listOf("Icon" to it) }.orEmpty()
-        return (found + icon).distinctBy { it.second }
+        // The person's own shots of it come first (Droidtop/tracker#596).
+        return (dev.droidtop.library.GameScreenshots.of(context, entry.id) + found + icon).distinctBy { it.second }
     }
 
     /** The Steam app id behind an entry: its own id, or the store id a store-installed engine game carries. */

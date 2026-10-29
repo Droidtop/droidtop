@@ -128,6 +128,8 @@ internal object Seams {
             )
         // Where a store game's Wine prefix is, for its cloud saves (docs/SPEC.md 7g, "Stores").
         dev.droidtop.library.stores.StoreSaves.locator = dev.droidtop.runtime.windows.DroidtopWinePrefixLocator
+        // A screenshot taken during a game is filed under it too (Droidtop/tracker#596).
+        dev.droidtop.runtime.Capture.fileUnderGame = { context, name, bytes -> dev.droidtop.library.GameScreenshots.save(context, name, bytes) }
         // Install on a GOG installer's row (docs/SPEC.md 7g, "Installers in a games folder"): the one install door.
         dev.droidtop.library.FolderInstalls.runner = { context, installer, title, onStatus ->
             dev.droidtop.runtime.windows.WindowsInstalls.install(context, installer, null, title, onStatus)
