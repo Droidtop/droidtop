@@ -21,7 +21,7 @@ class NewGamesTest {
 
     private fun find(title: String) = NewGames.Find(
         "Source",
-        AcquireContentResult(id = title, title = title, subtitle = null, sizeLabel = null, platform = null, artUrl = null, options = emptyList(), raw = "{}"),
+        AcquireContentResult(id = title, title = title, subtitle = null, sizeLabel = null, platform = null, artUrl = null, raw = "{}"),
     )
 
     @Test
