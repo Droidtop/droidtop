@@ -363,7 +363,12 @@ internal object StoresCatalog {
             iconFile = store.own?.let { dev.droidtop.library.stores.StoreMarks.cached(context, it.id)?.path },
             // A status row says it with the glyph alone; the bar is Game sources'.
             progress = busy.takeIf { !mark },
-            statusMark = if (mark && busy != null) StatusMark.WORKING else null,
+            // Signed in or not is drawn too, beside the words (show, then say: Droidtop/tracker#738).
+            statusMark = when {
+                mark && busy != null -> StatusMark.WORKING
+                signedIn -> StatusMark.SIGNED_IN
+                else -> StatusMark.SIGNED_OUT
+            },
         )
     }
 

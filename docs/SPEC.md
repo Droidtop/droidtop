@@ -17773,7 +17773,11 @@ shown: Settings' rows and their Info sheet, the PC library's own options (`ListO
 metadata editor, the controller's "Swap A and B" tile (`ActionItem.state`), a source's controls on its record page
 (`RecordRow.on`), a plugin's game-page rows (`PluginGameSections.Row.on`, `PageFact.on`) and the companion's rows and
 pinned tiles. A link to a page keeps its word for the page's state ("Risky actions: On"): a switch there would promise
-a flip that A does not do. The rest of the shell moves one surface at a time.
+a flip that A does not do. Sign-in and sync are glyphs beside their words (`StatusMark`'s SIGNED_IN, SIGNED_OUT,
+SYNCED and OFFLINE, each its own shape: a circle with a check, a crossed-out person, a cloud with a check, a crossed-out
+cloud): the stores' rows, the GitHub account row, the download sites' rows (an expired sign-in is ATTENTION), and the
+PC game page's Cloud saves row (`cloudSavesMark`: syncing turns, offline, a failed sync waits for the person, synced).
+The rest of the shell moves one surface at a time.
 
 **Colour.** One source per surface family, and the families are named so a screen cannot pick
 the wrong one. The shell's palette (`MenuTokens`) is absolute against its own grounds, so any

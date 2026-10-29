@@ -1226,14 +1226,21 @@ object AppSettingsCatalogs {
             else -> "Signed in"
         }
         val subtitle = "Your sign-in stays in droidtop, and plugins never see it"
+        // The state drawn beside its words (show, then say: Droidtop/tracker#738); an expired sign-in waits for the person.
+        val mark = when (state) {
+            "Signed in" -> dev.droidtop.library.settings.StatusMark.SIGNED_IN
+            "Expired" -> dev.droidtop.library.settings.StatusMark.ATTENTION
+            else -> dev.droidtop.library.settings.StatusMark.SIGNED_OUT
+        }
         if (site.shipped && state != "Signed in") {
-            return@map AsyncActionItem(id = id, title = site.name, subtitle = subtitle, value = state, run = { ctx, _ -> signInToSite(ctx, site) })
+            return@map AsyncActionItem(id = id, title = site.name, subtitle = subtitle, value = state, statusMark = mark, run = { ctx, _ -> signInToSite(ctx, site) })
         }
         NestedScreenItem(
             id = id,
             title = site.name,
             subtitle = subtitle,
             valueLabel = { state },
+            statusMark = mark,
             inline = CatalogScreen(
                 id = "${id}_screen",
                 title = site.name,

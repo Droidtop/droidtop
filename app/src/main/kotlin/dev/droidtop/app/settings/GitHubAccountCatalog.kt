@@ -110,6 +110,7 @@ object GitHubAccountCatalog {
             id = "accounts_github_token",
             title = "GitHub",
             inline = accountScreen(),
+            statusMark = if (signedIn) dev.droidtop.library.settings.StatusMark.SIGNED_IN else dev.droidtop.library.settings.StatusMark.SIGNED_OUT,
             valueLabel = {
                 when {
                     !signedIn -> "Not signed in"

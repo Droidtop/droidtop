@@ -276,6 +276,18 @@ class PcPageAboutTest {
     }
 
     @Test
+    fun `the cloud saves row draws its state too: syncing, offline, failed, synced`() {
+        val mark = dev.droidtop.library.settings.StatusMark
+        val synced = dev.droidtop.library.stores.StoreSaves.LastSync(okAt = 1L, failedAt = null)
+        assertEquals(mark.WORKING, cloudSavesMark(true, synced, online = true, syncing = true))
+        assertEquals(mark.OFFLINE, cloudSavesMark(true, synced, online = false, syncing = false))
+        assertEquals(mark.ATTENTION, cloudSavesMark(true, synced.copy(failedAt = 2L), online = true, syncing = false))
+        assertEquals(mark.SYNCED, cloudSavesMark(true, synced, online = true, syncing = false))
+        assertEquals(null, cloudSavesMark(true, null, online = true, syncing = false))
+        assertEquals(null, cloudSavesMark(false, synced, online = true, syncing = false))
+    }
+
+    @Test
     fun `details lead with where it came from, then ownership, size and cloud saves, and More last`() {
         val rows = listOf("Install location", "Runner", MORE_ROW, "Cloud saves", "Size", "Ownership", "Source", "Store id").map { PageFact(it, tab = PageTab.DETAILS) }
         assertEquals(

@@ -301,6 +301,8 @@ class AsyncActionItem(
     /** A read-gate ([TextBlockItem.gate]): the row is greyed ("Read it first") and does nothing until the renderer has opened that gate. */
     val gate: String? = null,
     override val chip: RowTag? = null,
+    /** One status glyph beside the title, as [ActionItem.statusMark]. */
+    override val statusMark: StatusMark? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
 ) : CatalogItem
 

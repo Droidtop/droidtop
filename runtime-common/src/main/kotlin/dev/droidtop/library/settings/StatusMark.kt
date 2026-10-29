@@ -13,4 +13,16 @@ enum class StatusMark {
 
     /** It cannot run: stopped, denied, turned off by a crash. */
     ERROR,
+
+    /** An account or a site the person is signed in to (show, then say: Droidtop/tracker#738). */
+    SIGNED_IN,
+
+    /** An account or a site the person is not signed in to. */
+    SIGNED_OUT,
+
+    /** Saves or a library brought up to date with their copy elsewhere. */
+    SYNCED,
+
+    /** It cannot reach the network it needs right now. */
+    OFFLINE,
 }

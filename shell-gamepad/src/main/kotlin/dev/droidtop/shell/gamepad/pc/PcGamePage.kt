@@ -306,10 +306,11 @@ internal fun PcGamePage(
                 "Cloud saves",
                 cloudStatus ?: line.first,
                 subtitle = line.second,
+                mark = cloudSavesMark(store.hasCloudSaves, lastSync, online, syncing = cloudStatus == SYNCING),
                 onActivate = if (store.hasCloudSaves && entry.isStoreRow()) {
                     {
                         scope.launch {
-                            cloudStatus = "Syncing\u2026"
+                            cloudStatus = SYNCING
                             cloudStatus = dev.droidtop.library.stores.StoreSaves
                                 .sync(context, entry.id, GameNaming.displayName(entry.title), dev.droidtop.library.stores.SaveSyncPhase.MANUAL)
                                 ?.line ?: "No cloud saves for this game"
@@ -780,6 +781,7 @@ internal fun PcGamePage(
                                         subtitle = fact.subtitle,
                                         value = fact.value,
                                         switchOn = fact.on,
+                                        statusMark = fact.mark,
                                         chevron = fact.onActivate != null,
                                         selected = zone == PageZone.CONTENT && row == index,
                                         uniformHeight = true,
@@ -1279,6 +1281,24 @@ internal fun cloudSavesLine(
     }
 }
 
+/** The cloud saves row's glyph beside [cloudSavesLine]'s words: syncing, offline, a failed sync, synced. Pure. */
+internal fun cloudSavesMark(
+    hasCloudSaves: Boolean,
+    last: dev.droidtop.library.stores.StoreSaves.LastSync?,
+    online: Boolean,
+    syncing: Boolean,
+): dev.droidtop.library.settings.StatusMark? = when {
+    !hasCloudSaves -> null
+    syncing -> dev.droidtop.library.settings.StatusMark.WORKING
+    !online -> dev.droidtop.library.settings.StatusMark.OFFLINE
+    last?.failedAt != null -> dev.droidtop.library.settings.StatusMark.ATTENTION
+    last?.okAt != null -> dev.droidtop.library.settings.StatusMark.SYNCED
+    else -> null
+}
+
+/** The cloud saves row's line while a sync it started runs. */
+private const val SYNCING = "Syncing\u2026"
+
 /** Whether the device has a network that reaches the internet now; a system service read, no I/O. */
 private fun isOnline(context: android.content.Context): Boolean = runCatching {
     val manager = context.getSystemService(android.net.ConnectivityManager::class.java)
@@ -1306,6 +1326,8 @@ internal data class PageFact(
     val onOptions: (() -> Unit)? = null,
     /** An on/off row's state, drawn as a switch (show, then say: Droidtop/tracker#738); null for any other row. */
     val on: Boolean? = null,
+    /** A state drawn as its glyph beside the title (synced, offline, working); null for none. */
+    val mark: dev.droidtop.library.settings.StatusMark? = null,
 )
 
 /**
