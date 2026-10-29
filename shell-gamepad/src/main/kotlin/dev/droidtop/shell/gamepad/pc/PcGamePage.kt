@@ -1043,6 +1043,16 @@ private fun PageActionBand(
             )
         }
     }
+    val detail: @Composable () -> Unit = {
+        if (play.detail.isNotBlank()) {
+            Text(
+                play.detail,
+                color = if (play.pressable) MenuTokens.Value else MenuTokens.OnSurfaceDisabled,
+                style = TypeRole.supporting,
+                modifier = Modifier.padding(top = Space.Sm),
+            )
+        }
+    }
     Column(modifier = Modifier.padding(top = Space.Sm)) {
         if (portrait) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1050,6 +1060,9 @@ private fun PageActionBand(
                 Spacer(Modifier.weight(1f))
                 icons()
             }
+            // Why the button says what it says sits right under it, before the facts (Droidtop/tracker#657); a
+            // download's line is its time left and stays under its bar.
+            if (play.look == null) detail()
             if (strip.isNotEmpty()) PageFactsStrip(strip, Modifier.fillMaxWidth().padding(top = Space.Sm))
         } else {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1070,14 +1083,7 @@ private fun PageActionBand(
                 look,
             )
         }
-        if (play.detail.isNotBlank()) {
-            Text(
-                play.detail,
-                color = if (play.pressable) MenuTokens.Value else MenuTokens.OnSurfaceDisabled,
-                style = TypeRole.supporting,
-                modifier = Modifier.padding(top = Space.Sm),
-            )
-        }
+        if (!portrait || play.look != null) detail()
     }
 }
 

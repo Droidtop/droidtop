@@ -49,6 +49,11 @@ data class RunnerOption(
     val reason: String? = null,
     val action: RunnerAction? = null,
     val caveat: String? = null,
+    /**
+     * The words on the button that takes [action]: what it gets, never a bare verb, so a runner's install can never
+     * read like the game's own Install (Droidtop/tracker#657). Null where the action has a fixed name.
+     */
+    val actionLabel: String? = null,
 ) {
     /** Whether this row can be chosen at all: the two "no" states cannot. */
     val selectable: Boolean get() = state == RunnerState.READY || state == RunnerState.NEEDS_SETUP
@@ -169,7 +174,10 @@ object RunnerAvailability {
             return RunnerOption(strategy, RunnerState.NOT_FOR_THIS_GAME, "No Enginehost plugin covers this game's engine")
         }
         if (!facts.enginehostInstalled) {
-            return RunnerOption(strategy, RunnerState.NEEDS_SETUP, "Install Enginehost", RunnerAction.INSTALL_ENGINEHOST)
+            return RunnerOption(
+                strategy, RunnerState.NEEDS_SETUP, "Install Enginehost", RunnerAction.INSTALL_ENGINEHOST,
+                actionLabel = "Install Enginehost",
+            )
         }
         if (!facts.enginehostCanReachFolder) {
             // No action id: nothing droidtop can press fixes this. The
@@ -199,6 +207,7 @@ object RunnerAvailability {
                 RunnerState.NEEDS_SETUP,
                 "Install the ${facts.engine.displayName()} plugin",
                 RunnerAction.INSTALL_ENGINEHOST_PLUGIN,
+                actionLabel = "Get ${facts.engine.displayName()} support",
             )
         }
         return RunnerOption(strategy, RunnerState.READY)
@@ -210,7 +219,10 @@ object RunnerAvailability {
             return RunnerOption(strategy, RunnerState.NOT_FOR_THIS_GAME, "Not a KiriKiri game")
         }
         if (!facts.kirikiroid2Installed) {
-            return RunnerOption(strategy, RunnerState.NEEDS_SETUP, "Install Kirikiroid2", RunnerAction.INSTALL_KIRIKIROID2)
+            return RunnerOption(
+                strategy, RunnerState.NEEDS_SETUP, "Install Kirikiroid2", RunnerAction.INSTALL_KIRIKIROID2,
+                actionLabel = "Install Kirikiroid2",
+            )
         }
         // Real limitation of the app's own intent surface, stated where
         // the choice is made rather than buried in a doc comment.

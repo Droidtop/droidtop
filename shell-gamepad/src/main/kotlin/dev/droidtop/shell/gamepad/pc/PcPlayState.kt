@@ -198,9 +198,9 @@ internal fun playStateOf(
                 progress = windowsSetup.percent?.let { it / 100f },
             )
         option?.action == RunnerAction.SET_UP_WINDOWS_GAMES && windowsSetup is WindowsSetup.State.Failed ->
-            PcPlayState(primaryActionLabel(option.action), WindowsSetup.label(windowsSetup), pressable = true, ready = false)
+            PcPlayState(primaryActionLabel(option), WindowsSetup.label(windowsSetup), pressable = true, ready = false)
         option?.action != null ->
-            PcPlayState(primaryActionLabel(option.action), option.reason ?: "One step, then this becomes Play", pressable = true, ready = false)
+            PcPlayState(primaryActionLabel(option), setupLine(option, label), pressable = true, ready = false)
         else ->
             PcPlayState("Choose a runner", option?.reason ?: noRunnerLine, pressable = true, ready = false, chooseEngine = true)
     }
@@ -218,14 +218,30 @@ internal fun installerPlayState(installer: dev.droidtop.library.FolderInstaller)
     ready = false,
 )
 
-/** The verb used by both the primary control and the shell's A hint. */
-internal fun primaryActionLabel(action: RunnerAction?): String = when (action) {
-    RunnerAction.INSTALL_ENGINEHOST,
-    RunnerAction.INSTALL_ENGINEHOST_PLUGIN,
-    RunnerAction.INSTALL_KIRIKIROID2 -> "Install"
+/**
+ * The words on the primary control and the shell's A hint for a runner's setup step: what it gets ("Install
+ * Enginehost", "Get Ren'Py support"), never a bare "Install", which on a game's page reads as installing the game
+ * (Droidtop/tracker#657; the game's own Install is [installerPlayState]'s). Pure.
+ */
+internal fun primaryActionLabel(option: dev.droidtop.library.RunnerOption): String = option.actionLabel ?: when (option.action) {
+    RunnerAction.INSTALL_ENGINEHOST -> "Install Enginehost"
+    RunnerAction.INSTALL_ENGINEHOST_PLUGIN -> "Get engine support"
+    RunnerAction.INSTALL_KIRIKIROID2 -> "Install Kirikiroid2"
     RunnerAction.SET_UP_WINDOWS_GAMES -> "Set up Windows games"
     RunnerAction.CHOOSE_ENGINE_VERSION,
     null -> "Choose a runner"
+}
+
+/** The line under a setup step's button: which runner it is for and why, then that Play follows. Pure. */
+internal fun setupLine(option: dev.droidtop.library.RunnerOption, runnerLabel: String): String {
+    val why = option.reason?.takeIf { it.isNotBlank() && it != option.actionLabel }
+    val runner = runnerLabel.takeIf { it.isNotBlank() }
+    return when {
+        why != null && runner != null -> "$why for $runner, then this becomes Play"
+        why != null -> "$why, then this becomes Play"
+        runner != null -> "$runner runs this game. One step, then this becomes Play"
+        else -> "One step, then this becomes Play"
+    }
 }
 
 /**

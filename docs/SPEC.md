@@ -16161,7 +16161,13 @@ states, and the last two are different things:
 - **Ready** — it can run this game now.
 - **Needs setup** — possible on this device, one named action away. The
   row shows the action ("Install the Ren'Py plugin", "Set up Windows
-  games", "Sign in to GOG"), never a failure.
+  games", "Sign in to GOG"), never a failure. On the game page the
+  primary button names what the step gets ("Install Enginehost", "Get
+  Ren'Py support", "Install Kirikiroid2", `RunnerOption.actionLabel`), never
+  a bare "Install": that word is only ever the game's own install (a
+  store's, an installer's). The line under the button says which runner it
+  is for and why, and in portrait it sits directly under the button, above
+  the facts (Droidtop/tracker#657).
 - **Not on this device** — the requirement cannot be met by anything
   droidtop can do here. Shown, dimmed, with its one-line reason. Never
   silently absent: a user who does not know an option exists cannot decide
