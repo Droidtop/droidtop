@@ -3453,7 +3453,8 @@ the `ContainerRuntime` interface that already exists (§3):
   completes. Container runtime and storage work stays inside
   `withContext(Dispatchers.IO)` in the catalog handler; the UI callback never
   waits for it synchronously. Leaving the screen cancels its pending UI update.
-  Still not built: Start with droidtop (autostart with the session).
+  Start with the desktop (autostart with the session) is built: `ContainerPrograms.startWithDesktop`, run by
+  `DesktopSessionService` once the session is up, switched per container program on its page.
   **Backup (Droidtop/tracker#81, 2026-09-28).** A container's own data
   (what was installed and made inside it: programs, config, a Wine prefix,
   documents) had no way out. The container page has a Backup group with two
@@ -3704,7 +3705,7 @@ the `ContainerRuntime` interface that already exists (§3):
   raw reference. A container's own page holds, as rows of the one row
   anatomy: Rename; Image (the reference and digest, and "Recreate from
   the image" as a two-step action); Storage used; Start, Stop and
-  Restart as the primary action, whichever applies; Start with droidtop
+  Restart as the primary action, whichever applies; Start with the desktop
   (autostart with the session); Sockets (Wayland and audio switches,
   on by default); Mounts (shared storage on or off, and a list of extra
   host folder to container path binds, each added with the system
