@@ -11,7 +11,6 @@ object Http {
     data class Timeouts(val connectMs: Int, val readMs: Int)
     object Api { val timeouts = Timeouts(15_000, 30_000) }
     object Media { val timeouts = Timeouts(8_000, 20_000) }
-    object BigFile { val timeouts = Timeouts(20_000, 300_000) }
     data class Response(val status: Int, val body: ByteArray, val headers: Map<String, String?>) {
         fun text(): String = body.toString(Charsets.UTF_8)
         fun header(name: String): String? = headers[name.lowercase()]

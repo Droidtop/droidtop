@@ -69,7 +69,7 @@ object EngineHost {
     /** Global enginehost settings (2026-08-31 10:55 response) -- the emulator's own settings screen, surfaced like any player's. */
     const val ACTION_CONFIGURE_SETTINGS = EnginehostIntents.ACTION_CONFIGURE_SETTINGS
 
-    /** Narrower saves-only alias of [ACTION_CONFIGURE_SETTINGS]; kept for surfaces that want to deep-link saves directly. */
+    /** Enginehost's save settings on their own ([savesSettingsIntent]): the Saves rows of Enginehost's settings and of a game's menu. */
     const val ACTION_CONFIGURE_SAVES = EnginehostIntents.ACTION_CONFIGURE_SAVES
     private const val ACTION_LAUNCH = EnginehostIntents.ACTION_LAUNCH
 

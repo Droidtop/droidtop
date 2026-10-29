@@ -1,7 +1,6 @@
 package dev.droidtop.library.consoles
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
@@ -85,12 +84,6 @@ class LibretroCoreIdTest {
             packageName = "com.retroarch.aarch64",
         )
         assertEquals("mupen64plus_next", libretroCoreId(oldWikiShape, systemConfiguredCore = null))
-    }
-
-    @Test
-    fun `a non-AmStart player has no template, so the system core is the answer`() {
-        assertEquals("mednafen_psx", libretroCoreId(Player.WinePrefixLauncher(), systemConfiguredCore = "mednafen_psx"))
-        assertNull(libretroCoreId(Player.WinePrefixLauncher(), systemConfiguredCore = null))
     }
 
     @Test

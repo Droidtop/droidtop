@@ -33,54 +33,6 @@ data class ParsedGogGame(
 )
 
 /**
- * Raw API Response details from gameDetails endpoint (Used for reference)
- */
-data class RawGogApiResponse(
-    val id: String?,
-    val title: String?,
-    val slug: String?,
-    val images: Images?,
-    val developers: List<Developer>?,
-    val publisher: Any?, // Can be object with name or plain string
-    val genres: List<Genre>?,
-    val languages: Map<String, String>?, // Language code -> Language name
-    val description: Description?,
-    val release_date: String?,
-    val downloads: Downloads?
-) {
-    data class Images(
-        val background: String?,
-        val logo2x: String?,
-        val logo: String?,
-        val icon: String?
-    )
-
-    data class Developer(
-        val name: String?
-    )
-
-    data class Genre(
-        val name: String?
-    )
-
-    data class Description(
-        val lead: String?
-    )
-
-    data class Downloads(
-        val installers: List<Installer>?
-    )
-
-    data class Installer(
-        val id: String?,
-        val name: String?,
-        val os: String?,
-        val language: String?,
-        val total_size: Long?
-    )
-}
-
-/**
  * Direct HTTP client for GOG API operations.
  * Uses GOGAuthManager for authentication tokens.
  */
