@@ -53,7 +53,8 @@ class EngineCli private constructor(val front: Front) {
         if (front == Front.PODMAN) add("run takes --pod POD to join a pod, or --pod new:NAME to make one.")
         add("-p takes a port on its own number (-p 80:80), which is what happens anyway: a port is the device's own.")
         add("--rm removes the container once its program has run and ended.")
-        add("Not yet: -w, --entrypoint, -u. Options that need a kernel feature (-p 8080:80, --memory, --network,")
+        add("run takes -w FOLDER (an absolute folder) and --entrypoint PROGRAM (\"\" clears the image's).")
+        add("Not yet: -u. Options that need a kernel feature (-p 8080:80, --memory, --network,")
         add("--hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.")
         add("Containers here share the device's network and processes: a port is the device's own.")
     }.joinToString("\n") + "\n"
@@ -252,9 +253,19 @@ class EngineCli private constructor(val front: Front) {
         var autoRemove = false
         var detach = false
         val labels = linkedMapOf<String, String>()
+        var entrypoint: List<String>? = null
+        var workdir: String? = null
+        // `--entrypoint ""` clears the image's entrypoint, as Docker's does (Droidtop/tracker#715).
+        fun entrypointOf(value: String) = if (value.isEmpty()) emptyList() else listOf(value)
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
+                "-w", "--workdir" -> {
+                    val dir = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs a folder\n", 1)
+                    if (!validWorkdir(dir)) return EngineRequest.Answer("${front.command} $sub: $a needs an absolute folder, not $dir\n", 1)
+                    workdir = dir
+                }
+                "--entrypoint" -> entrypoint = entrypointOf(args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: --entrypoint needs a program\n", 1))
                 "-d", "--detach", "-dit", "-itd", "-dt", "-td", "-di", "-id" -> detach = true
                 "-i", "-t", "-it", "-ti", "--interactive", "--tty" -> Unit
                 "--name" -> name = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: --name needs a name\n", 1)
@@ -304,6 +315,12 @@ class EngineCli private constructor(val front: Front) {
                             return EngineRequest.Answer(EngineOptions.refusal("${front.command} $sub", option, features) + "\n", 1)
                         }
                     }
+                    a.startsWith("--entrypoint=") -> entrypoint = entrypointOf(a.substringAfter('='))
+                    a.startsWith("--workdir=") -> {
+                        val dir = a.substringAfter('=')
+                        if (!validWorkdir(dir)) return EngineRequest.Answer("${front.command} $sub: --workdir needs an absolute folder, not $dir\n", 1)
+                        workdir = dir
+                    }
                     a.startsWith("--name=") -> name = a.substringAfter('=')
                     a.startsWith("--label=") -> a.substringAfter('=').let { kv -> labels[kv.substringBefore('=')] = kv.substringAfter('=', "") }
                     a.startsWith("--env=") -> {
@@ -340,7 +357,7 @@ class EngineCli private constructor(val front: Front) {
         }
         return EngineRequest.Run(
             image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish,
-            start = sub == "run", labels = labels, autoRemove = autoRemove,
+            start = sub == "run", labels = labels, autoRemove = autoRemove, entrypoint = entrypoint, workdir = workdir,
             // `create` starts nothing to attach to.
             detach = detach || sub != "run",
         )
@@ -438,7 +455,7 @@ class EngineCli private constructor(val front: Front) {
     }
 
     /** `run` flags droidtop knows of and has not built: said as such, not as unknown. */
-    private val NOT_YET_RUN = setOf("-w", "--workdir", "--entrypoint", "-u", "--user")
+    private val NOT_YET_RUN = setOf("-u", "--user")
 
     private fun restartRefused(words: String, sub: String) = EngineRequest.Answer(
         "${front.command} $sub: --restart takes no, on-failure[:N], always or unless-stopped, not $words\n",
@@ -714,6 +731,9 @@ class EngineCli private constructor(val front: Front) {
     }
 
     companion object {
+        /** A working directory droidtop takes: an absolute path with no line breaks, as Docker requires one. Pure. */
+        fun validWorkdir(dir: String): Boolean = dir.startsWith("/") && dir.none { it == '\n' || it == '\r' || it == '\u0000' }
+
         /** `ps --format`'s fields, with the column each heads under `table`, as Docker names them. */
         private val PS_FIELDS = linkedMapOf(
             "ID" to "CONTAINER ID", "Image" to "IMAGE", "Command" to "COMMAND", "CreatedAt" to "CREATED AT",

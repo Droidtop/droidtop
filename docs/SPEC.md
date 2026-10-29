@@ -2862,8 +2862,11 @@ the `ContainerRuntime` interface that already exists (§3):
   too). A host path, another target or an unknown name is refused, so a path still never comes from the container.
   The command and environment are kept beside the container's log (`ContainerProgram.RunOverrides`) and applied by
   `ContainerProgram.effectiveConfig` wherever the program starts or is shown: `docker run`, the page's Start it and
-  "Its own program", and the start with the desktop. `-w`, `--entrypoint` and `-u` answer
-  "not built in droidtop yet". Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
+  "Its own program", and the start with the desktop. `-w FOLDER` (an absolute folder) and
+  `--entrypoint PROGRAM` are taken too (Droidtop/tracker#715, 2026-10-29), kept with the same overrides:
+  `--entrypoint` replaces the image's entrypoint and drops its `Cmd` unless a command follows the image, as
+  Docker does, and `--entrypoint ""` clears it. `-u` answers "not built in droidtop yet": a program as
+  another user needs the backends to switch user, which neither does. Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
   `--tmpfs`, `--read-only`, ...) answer from the one table in "Kernel features, detected at runtime" (section 3);
   `--network host` and `--pid host` are taken, being what the containers already are. `docker info` (D10) says the
   engine, the backend running now and each feature in plain words. A compose subset of droidtop's own is not built
@@ -2960,7 +2963,9 @@ the `ContainerRuntime` interface that already exists (§3):
     `PortBindings` on a port's own number.
   - Answered from the D10 feature table: resource limits (`Memory`, `NanoCpus`, `CpuShares`, `PidsLimit`, ...),
     `Hostname`, and port bindings on another number.
-  - Answered 501, not built: `Entrypoint`, `WorkingDir`, a `User` other than root, `Volumes`, `Mounts`, a network
+  - Taken since Droidtop/tracker#715: `Entrypoint` (`[""]` clears it) and `WorkingDir` (an absolute
+    folder; another is refused 400), as `--entrypoint` and `-w` are; libpod's `entrypoint` and `work_dir` alike.
+  - Answered 501, not built: a `User` other than root, `Volumes`, `Mounts`, a network
     of the container's own other than a network droidtop has (below), `CapAdd`,
     `Devices`, `SecurityOpt`.
   - Refused 400: `Privileged`, which droidtop's containers never are.
@@ -3055,8 +3060,8 @@ the `ContainerRuntime` interface that already exists (§3):
     mapped, where `-v` puts it), `portmappings` on a port's own number, `pod`, and `Networks` (a network of
     droidtop's own; `podman`, Podman's default network, is the device's, as bridge and host are). Answered from
     the D10 feature table: `resource_limits` (`--memory`, `--cpus`, `--pids-limit`), `hostname`, a read-only
-    root, `--network none` and a port on another number. Answered not built: `entrypoint`, `work_dir`, a non-root
-    `user`, a terminal or open input, `mounts` (a bind mount by path, tmpfs), devices, capabilities, secrets, DNS
+    root, `--network none` and a port on another number. Taken since Droidtop/tracker#715: `entrypoint` and
+    `work_dir` (an absolute folder). Answered not built: a non-root `user`, a terminal or open input, `mounts` (a bind mount by path, tmpfs), devices, capabilities, secrets, DNS
     settings, extra hosts, sysctls, health checks. Refused: `privileged`, and `--rm` with a restart policy (409).
     The fields Podman's client always sends with what droidtop does anyway (its id mappings, umask, stop timeout,
     systemd mode) are left alone.

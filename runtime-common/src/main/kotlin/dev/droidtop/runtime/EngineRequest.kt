@@ -55,6 +55,13 @@ sealed interface EngineRequest {
         /** `--rm`, the Engine API's AutoRemove: the container is removed once its program has run and ended. */
         val autoRemove: Boolean = false,
         /**
+         * `--entrypoint`, the APIs' Entrypoint: replaces the image's entrypoint, and with it the image's `Cmd` when no
+         * [args] are given, as Docker does. An empty list clears it (`--entrypoint ""`). Null keeps the image's.
+         */
+        val entrypoint: List<String>? = null,
+        /** `-w`, the APIs' WorkingDir: the absolute folder the program starts in. Null keeps the image's. */
+        val workdir: String? = null,
+        /**
          * False for a `run` without `-d`: the command front stays attached, printing the program's output as it comes
          * and ending with its exit code, as Docker's and Podman's do. True for `-d` and for the APIs, whose clients
          * attach on their own.

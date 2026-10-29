@@ -192,8 +192,10 @@ object LibpodApi {
         val image = string(o, "image") ?: return refuse(400, "a container needs an image")
         if (!EngineCli.PODMAN.validReference(image)) return refuse(400, "not an image reference: $image")
         if (bool("privileged")) return refuse(400, "droidtop's containers never run privileged")
-        if (strings("entrypoint").isNotEmpty()) return notYet("entrypoint (podman run --entrypoint)")
-        string(o, "work_dir")?.let { return notYet("work_dir (podman run -w)") }
+        // entrypoint and work_dir are taken (Droidtop/tracker#715).
+        val entrypoint = strings("entrypoint").takeIf { o["entrypoint"] is JsonArray }?.let { list -> if (list == listOf("")) emptyList() else list }
+        val workdir = string(o, "work_dir")
+        if (workdir != null && !EngineCli.validWorkdir(workdir)) return refuse(400, "work_dir must be an absolute folder: $workdir")
         string(o, "user")?.takeIf { it.substringBefore(':') !in setOf("root", "0") }?.let { return notYet("user (podman run -u)") }
         if (bool("terminal") || bool("stdin")) return notYet("a container with a terminal or open input (podman run -t, -i)")
         string(o, "hostname")?.let { return feature("--hostname") }
@@ -273,6 +275,8 @@ object LibpodApi {
             labels = map("labels"),
             networks = joins,
             autoRemove = autoRemove,
+            entrypoint = entrypoint,
+            workdir = workdir,
         ) to null
     }
 

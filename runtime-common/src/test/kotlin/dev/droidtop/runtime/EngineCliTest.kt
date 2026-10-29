@@ -153,7 +153,14 @@ class EngineCliTest {
         assertEquals(true, (EngineCli.DOCKER.parse(listOf("run", "-dit", "redis")) as EngineRequest.Run).detach)
         // Known flags droidtop has not built say so; a command after the image is refused, not ignored.
         assertTrue(answer(listOf("run", "-p", "8080:80", "nginx")).text.contains("-p is not built in droidtop yet"))
-        assertTrue(answer(listOf("run", "--entrypoint=sh", "nginx")).text.contains("not built in droidtop yet"))
+        assertTrue(answer(listOf("run", "-u", "1000", "nginx")).text.contains("not built in droidtop yet"))
+        // -w and --entrypoint are taken (#715); "" clears the entrypoint, and -w needs an absolute folder.
+        val ep = EngineCli.DOCKER.parse(listOf("run", "--entrypoint=sh", "-w", "/srv", "nginx")) as EngineRequest.Run
+        assertEquals(listOf("sh"), ep.entrypoint)
+        assertEquals("/srv", ep.workdir)
+        assertEquals(emptyList<String>(), (EngineCli.DOCKER.parse(listOf("run", "--entrypoint", "", "nginx")) as EngineRequest.Run).entrypoint)
+        assertEquals("/data", (EngineCli.DOCKER.parse(listOf("create", "--workdir=/data", "nginx")) as EngineRequest.Run).workdir)
+        assertEquals(1, answer(listOf("run", "-w", "srv", "nginx")).code)
         assertEquals(1, answer(listOf("run", "--privileged", "nginx")).code)
         assertEquals(1, answer(listOf("run")).code)
 
@@ -209,6 +216,12 @@ class EngineCliTest {
         assertEquals(null, ContainerProgram.RunOverrides.decode("not json"))
         val labelled = ContainerProgram.RunOverrides(labels = mapOf("a" to "1"))
         assertEquals(labelled, ContainerProgram.RunOverrides.decode(labelled.encode()))
+        // --entrypoint replaces the entrypoint and drops the image's Cmd, unless a command is given; -w the folder (#715).
+        val entry = ContainerProgram.RunOverrides(entrypoint = listOf("/bin/sh"), workingDir = "/srv")
+        assertEquals(listOf("/bin/sh"), entry.applyTo(image).program())
+        assertEquals("/srv", entry.applyTo(image).workingDir)
+        assertEquals(listOf("/bin/sh", "-c", "id"), entry.copy(args = listOf("-c", "id")).applyTo(image).program())
+        assertEquals(entry, ContainerProgram.RunOverrides.decode(entry.encode()))
         assertEquals(
             mapOf("com.docker.compose.project" to "demo", "tier" to ""),
             (EngineCli.DOCKER.parse(listOf("run", "-l", "com.docker.compose.project=demo", "--label=tier", "alpine")) as EngineRequest.Run).labels,

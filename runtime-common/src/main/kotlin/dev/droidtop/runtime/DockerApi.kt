@@ -224,8 +224,10 @@ object DockerApi {
 
         val image = string(o, "Image") ?: return refuse(400, "a container needs an Image")
         if (!EngineCli.DOCKER.validReference(image)) return refuse(400, "not an image reference: $image")
-        strings(o["Entrypoint"])?.takeIf { it.isNotEmpty() }?.let { return notYet("Entrypoint (docker run --entrypoint)") }
-        string(o, "WorkingDir")?.let { return notYet("WorkingDir (docker run -w)") }
+        // Entrypoint and WorkingDir are taken (Droidtop/tracker#715); [""] is Docker's "clear the entrypoint".
+        val entrypoint = strings(o["Entrypoint"])?.let { list -> if (list == listOf("")) emptyList() else list }
+        val workdir = string(o, "WorkingDir")
+        if (workdir != null && !EngineCli.validWorkdir(workdir)) return refuse(400, "WorkingDir must be an absolute folder: $workdir")
         string(o, "User")?.takeIf { it.substringBefore(':') !in setOf("root", "0") }?.let { return notYet("User (docker run -u)") }
         string(o, "Hostname")?.let { return refuse(501, EngineOptions.refusal("docker create", "--hostname", features)) }
         (o["Volumes"] as? JsonObject)?.takeIf { it.isNotEmpty() }?.let { return notYet("Volumes (volumes of droidtop's own)") }
@@ -291,6 +293,8 @@ object DockerApi {
             labels = labels,
             networks = joins,
             autoRemove = autoRemove,
+            entrypoint = entrypoint,
+            workdir = workdir,
         ).let { run ->
             if (autoRemove && run.restart != ContainerProgram.RestartPolicy.No) return refuse(409, "AutoRemove and a restart policy cannot be used together")
             run

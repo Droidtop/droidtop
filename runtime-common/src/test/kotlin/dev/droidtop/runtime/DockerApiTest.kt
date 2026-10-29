@@ -192,7 +192,11 @@ class DockerApiTest {
         assertEquals(404, answer("""{"Image":"alpine","HostConfig":{"NetworkMode":"demo_default"}}""").first)
         assertEquals(404, answer("""{"Image":"alpine","NetworkingConfig":{"EndpointsConfig":{"demo_default":{}}}}""").first)
         assertTrue(answer("""{"Image":"alpine","HostConfig":{"NetworkMode":"none"}}""").second.contains("network namespaces"))
-        assertEquals(501, answer("""{"Image":"alpine","Entrypoint":["/bin/sh"]}""").first)
+        // Entrypoint and WorkingDir are taken (#715); a relative WorkingDir is refused.
+        assertEquals(listOf("/bin/sh"), create("""{"Image":"alpine","Entrypoint":["/bin/sh"]}""").first!!.entrypoint)
+        assertEquals(emptyList<String>(), create("""{"Image":"alpine","Entrypoint":[""]}""").first!!.entrypoint)
+        assertEquals("/srv", create("""{"Image":"alpine","WorkingDir":"/srv"}""").first!!.workdir)
+        assertEquals(400, answer("""{"Image":"alpine","WorkingDir":"srv"}""").first)
         assertEquals(501, answer("""{"Image":"alpine","User":"1000"}""").first)
         assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"volume","Source":"data","Target":"/data"}]}}""").first)
         assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"CapAdd":["NET_ADMIN"]}}""").first)

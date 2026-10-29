@@ -82,9 +82,9 @@ internal object EngineActions {
         }
         // The tools' own default, no restart, unless --restart said otherwise (docs/SPEC.md 3d, "Restart policies").
         withContext(Dispatchers.IO) { ContainerPrograms.setRestartPolicy(app, created.id, request.restart) }
-        if (request.args != null || request.env.isNotEmpty() || request.labels.isNotEmpty()) {
+        if (request.args != null || request.env.isNotEmpty() || request.labels.isNotEmpty() || request.entrypoint != null || request.workdir != null) {
             withContext(Dispatchers.IO) {
-                ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(request.args, request.env, request.labels))
+                ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(request.args, request.env, request.labels, request.entrypoint, request.workdir))
             }
         }
         val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()

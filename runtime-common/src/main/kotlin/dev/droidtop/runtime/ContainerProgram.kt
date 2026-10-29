@@ -95,22 +95,34 @@ object ContainerProgram {
 
     /**
      * What `docker run` asked for beyond the image (Droidtop/tracker#555 D6d): [args] replace the image's `Cmd` (never
-     * its entrypoint, as Docker does) and [env] (`NAME=VALUE`) is added after the image's own, so it wins. Kept beside
-     * the container's log, so the page's Start it and the start with the desktop run the same program as the command.
+     * its entrypoint, as Docker does) and [env] (`NAME=VALUE`) is added after the image's own, so it wins.
+     * [entrypoint] (`--entrypoint`) replaces the image's, and its `Cmd` too unless [args] are given, and [workingDir]
+     * (`-w`) the folder it starts in (Droidtop/tracker#715). Kept beside the container's log, so the page's Start it
+     * and the start with the desktop run the same program as the command.
      */
     data class RunOverrides(
         val args: List<String>? = null,
         val env: List<String> = emptyList(),
         /** The labels it was made with (`--label`, the Engine API's `Labels`): what `docker compose` finds it by. */
         val labels: Map<String, String> = emptyMap(),
+        val entrypoint: List<String>? = null,
+        val workingDir: String? = null,
     ) {
         /** [config] as this container runs it. Pure. */
-        fun applyTo(config: ImageRunConfig): ImageRunConfig = config.copy(cmd = args ?: config.cmd, env = config.env + env)
+        fun applyTo(config: ImageRunConfig): ImageRunConfig = config.copy(
+            entrypoint = entrypoint ?: config.entrypoint,
+            // Docker: a new entrypoint drops the image's Cmd, which was written for the old one.
+            cmd = args ?: if (entrypoint != null) emptyList() else config.cmd,
+            env = config.env + env,
+            workingDir = workingDir ?: config.workingDir,
+        )
 
         fun encode(): String = kotlinx.serialization.json.buildJsonObject {
             args?.let { a -> put("args", kotlinx.serialization.json.JsonArray(a.map { kotlinx.serialization.json.JsonPrimitive(it) })) }
             put("env", kotlinx.serialization.json.JsonArray(env.map { kotlinx.serialization.json.JsonPrimitive(it) }))
             if (labels.isNotEmpty()) put("labels", kotlinx.serialization.json.JsonObject(labels.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
+            entrypoint?.let { e -> put("entrypoint", kotlinx.serialization.json.JsonArray(e.map { kotlinx.serialization.json.JsonPrimitive(it) })) }
+            workingDir?.let { put("workingDir", kotlinx.serialization.json.JsonPrimitive(it)) }
         }.toString()
 
         companion object {
@@ -120,7 +132,8 @@ object ContainerProgram {
                     ?.map { (it as kotlinx.serialization.json.JsonPrimitive).content }
                 val labels = (o["labels"] as? kotlinx.serialization.json.JsonObject)
                     ?.mapValues { (it.value as kotlinx.serialization.json.JsonPrimitive).content }.orEmpty()
-                RunOverrides(list("args"), list("env").orEmpty(), labels)
+                val workingDir = (o["workingDir"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                RunOverrides(list("args"), list("env").orEmpty(), labels, list("entrypoint"), workingDir)
             }.getOrNull()
         }
     }

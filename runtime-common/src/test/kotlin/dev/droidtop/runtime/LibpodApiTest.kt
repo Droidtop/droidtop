@@ -194,7 +194,10 @@ class LibpodApiTest {
 
         fun answer(json: String) = LibpodApi.createRequest(json, null, listOf(network)).let { (r, a) -> assertNull(r); a!!.status to a.body.toString(Charsets.UTF_8) }
         val image = "\"image\":\"nginx\""
-        assertEquals(501, answer("{$image,\"work_dir\":\"/srv\"}").first)
+        // work_dir and entrypoint are taken (#715).
+        assertEquals("/srv", LibpodApi.createRequest("{$image,\"work_dir\":\"/srv\"}", null, listOf(network)).first!!.workdir)
+        assertEquals(listOf("/bin/sh"), LibpodApi.createRequest("{$image,\"entrypoint\":[\"/bin/sh\"]}", null, listOf(network)).first!!.entrypoint)
+        assertEquals(400, answer("{$image,\"work_dir\":\"srv\"}").first)
         assertEquals(501, answer("{$image,\"mounts\":[{\"destination\":\"/x\",\"type\":\"bind\",\"source\":\"/etc\"}]}").first)
         assertTrue(answer("{$image,\"resource_limits\":{\"memory\":{\"limit\":1}}}").second.contains("--memory"))
         assertEquals(501, answer("{$image,\"portmappings\":[{\"container_port\":80,\"host_port\":8080}]}").first)
