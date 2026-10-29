@@ -22,12 +22,12 @@ class CompositorProvisioningTest {
     }
 
     @Test
-    fun `the Waybar panel installs waybar and wofi and starts sway with droidtop's config`() {
+    fun `the Waybar panel installs waybar and starts sway with droidtop's config`() {
         val plan = CompositorProvisioning.plan("alpine", "sway", panel = DesktopPanel.WAYBAR)!!
-        assertTrue(plan.installCommand.endsWith("&& apk add --no-cache waybar wofi"))
+        assertTrue(plan.installCommand.endsWith("&& apk add --no-cache waybar"))
         assertEquals("sway -c /run/droidtop-app-storage/desktop-launcher/panel/sway.config", plan.compositorCommand)
         val debian = CompositorProvisioning.plan("debian", "sway", panel = DesktopPanel.WAYBAR)!!
-        assertTrue(debian.installCommand.endsWith("&& apt-get install -y --no-install-recommends waybar wofi"))
+        assertTrue(debian.installCommand.endsWith("&& apt-get install -y --no-install-recommends waybar"))
         // Sway's own bar is the plain plan; labwc takes no panel.
         assertEquals("sway", CompositorProvisioning.plan("alpine", "sway", panel = DesktopPanel.SWAYBAR)!!.compositorCommand)
         assertEquals("labwc", CompositorProvisioning.plan("alpine", "labwc", panel = DesktopPanel.WAYBAR)!!.compositorCommand)
@@ -39,8 +39,11 @@ class CompositorProvisioningTest {
         assertTrue("include /etc/sway/config" in lines)
         assertTrue("bar bar-0 swaybar_command true" in lines)
         assertTrue("exec waybar -c /run/droidtop-app-storage/desktop-launcher/panel/waybar.json" in lines)
-        assertTrue("bindsym --no-warn \$mod+d exec wofi --show drun" in lines)
-        assertTrue(DesktopPanel.waybarConfig().contains("\"custom/apps\": { \"format\": \"Apps\", \"tooltip\": false, \"on-click\": \"wofi --show drun\" }"))
+        // The launcher key opens droidtop's Start menu; Waybar has no launcher or window title of its own (#683).
+        assertTrue("bindsym --no-warn \$mod+d exec sh /run/droidtop-app-storage/desktop-launcher/bin/droidtop-open start" in lines)
+        val waybar = DesktopPanel.waybarConfig()
+        assertTrue(waybar.contains("\"modules-left\": [\"sway/workspaces\", \"sway/mode\"]"))
+        assertFalse(waybar.contains("wofi") || waybar.contains("custom/apps") || waybar.contains("sway/window"))
         assertEquals(DesktopPanel.WAYBAR, DesktopPanel.fromId(null))
         assertEquals(DesktopPanel.SWAYBAR, DesktopPanel.fromId("swaybar"))
     }

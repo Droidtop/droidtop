@@ -258,6 +258,10 @@ fun DesktopShell(
             if (entry != null) currentPlay(entry) else launchById(id)
         }
     }
+    // The desktop's launcher key (Super+D in sway) opens this Start menu, the desktop's one launcher (#683).
+    LaunchedEffect(Unit) {
+        DesktopLaunchRequests.startMenuRequests.collect { startMenuOpen = true }
+    }
 
     // Desktop's chrome wears the Gaming theme (Droidtop/tracker#555 D4): the bar, its sheets and the Quick Menu
     // read the same palette Gaming does, through MaterialTheme and MenuTokens alike, instead of stock Material.

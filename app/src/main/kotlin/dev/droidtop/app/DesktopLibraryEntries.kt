@@ -103,6 +103,12 @@ internal class DesktopLibraryEntries(private val context: Context, private val l
                     openOnAndroid(File(requestsDir, name))
                     return
                 }
+                // The desktop's launcher key (Super+D): droidtop's Start menu, the desktop's one launcher (#683).
+                if (ContainerLauncher.isStartRequest(name)) {
+                    File(requestsDir, name).delete()
+                    if (!DesktopLaunchRequests.offerStartMenu()) Log.w(TAG, "No Desktop shell is showing to open Start; request dropped")
+                    return
+                }
                 val token = ContainerLauncher.requestToken(name) ?: return
                 File(requestsDir, name).delete()
                 val id = published.get()[token]

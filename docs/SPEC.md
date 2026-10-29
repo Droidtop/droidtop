@@ -295,20 +295,35 @@ from another container replaces droidtop's. On the rig (Android 13,
 v0.2.0-dev.2398) both names were "not found" in the terminal, the helpers
 having lived only at their full paths.
 
-**The desktop panel (decided 2026-10-09, Droidtop/tracker#353).** The sway
-desktop starts Waybar with wofi as its panel and launcher by default, the
-sway-native pair, both ordinary distro packages (`waybar wofi`, the same
-names in Alpine and Debian) added to the plan. Desktop settings has "Desktop
-panel": Waybar and wofi (default) or Sway's own bar; sfwbar and nwg-panel
-are alternatives for later. Waybar's plan starts `sway -c
+**The desktop panel (decided 2026-10-09, Droidtop/tracker#353; a status
+strip since 2026-10-29, #683).** The sway desktop starts Waybar by default,
+an ordinary distro package (`waybar`, the same name in Alpine and Debian)
+added to the plan. Desktop settings has "Desktop panel": Waybar (default) or
+Sway's own bar; sfwbar and nwg-panel are alternatives for later. Waybar's
+plan starts `sway -c
 /run/droidtop-app-storage/desktop-launcher/panel/sway.config`, a file
 droidtop rewrites before every start (`DesktopPanel`): it includes
 `/etc/sway/config` (every distro binding and config.d stays), makes the
 stock bar (`bar-0`) run `true` instead of swaybar, starts Waybar with
-droidtop's Waybar config, and binds the stock launcher key to `wofi --show
-drun`. That Waybar config has an Apps button (a touch screen has no Super
-key), workspaces, the focused window, the tray and a clock from `date`, so
-it reads the container's POSIX `TZ`. Sway's own bar is plain `sway`, which
+droidtop's Waybar config, and binds the stock launcher key (`$mod+d`) to
+`droidtop-open start`, which opens droidtop's Start menu. That Waybar config
+is a 26 px status strip with only what droidtop's bar lacks: the
+workspaces, the tray of the Linux programs and a clock from `date`, so it
+reads the container's POSIX `TZ`.
+
+The coordinator's Desktop review (#683) found two launchers and two window
+lists: Waybar's Apps button ran wofi, a list with no library art, pins or
+search, beside droidtop's Start, and Waybar's focused-window title sat beside
+droidtop's window list; Super+D opened wofi. Decided: one launcher and one
+window list, droidtop's, because only it has the library, pins, the one
+search and Android's apps. Waybar keeps the workspaces, the Linux tray and
+the clock, which droidtop's bar does not show, and wofi is no longer
+installed (a desktop made before keeps the copy it has, unused). The launch
+helper takes one word besides a token, `start`: it drops
+`start.<pid>.request`, and droidtop opens the showing Desktop shell's Start
+menu (`DesktopLaunchRequests.offerStartMenu`), or logs and drops it when none
+shows. Someone who wants their own launcher picks Sway's own bar, which runs
+their own sway config. Sway's own bar is plain `sway`, which
 also reads the person's own `~/.config/sway/config`; it is the choice for
 someone who keeps their own. labwc takes no panel here. Whichever panel
 runs, the library's games are in its launcher, since they are desktop
@@ -469,8 +484,8 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   companion and clipboard items, and the tray (network, VPN, battery, notifications), which opens the Quick
   Menu. Terminal, Containers and Settings are Start's System rows, not bar buttons. There is no second clock:
   the clock is the panel's (Waybar's `custom/clock`, or swaybar's status line from the stock sway config),
-  and the panel choice is unchanged. The container's windows stay in the bar's list, because Waybar's
-  config has no window list and a finger needs a way to raise, minimise and close one.
+  and the panel choice is unchanged. The container's windows are in the bar's list, the desktop's only one
+  since Waybar dropped its window title (#683): a finger needs a way to raise, minimise and close one.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
   then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and

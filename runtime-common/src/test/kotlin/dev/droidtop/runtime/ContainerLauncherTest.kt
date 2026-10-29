@@ -50,10 +50,21 @@ class ContainerLauncherTest {
     }
 
     @Test
+    fun `the launcher key's request is the Start menu's and names no game`() {
+        assertTrue(ContainerLauncher.isStartRequest("start.4242.request"))
+        assertFalse(ContainerLauncher.isStartRequest(".start.4242"))
+        assertFalse(ContainerLauncher.isStartRequest("start.4242"))
+        assertFalse(ContainerLauncher.isStartRequest("restart.1.request"))
+        assertNull(ContainerLauncher.requestToken("start.4242.request"))
+    }
+
+    @Test
     fun `the helper refuses anything but a token and renames the request into place`() {
         val script = ContainerLauncher.helperScript()
         assertTrue(script.startsWith("#!/bin/sh\n"))
         assertTrue(script.contains("*[!0-9a-f]* | '') echo 'usage: droidtop-open <entry>' >&2; exit 2 ;;"))
+        // The one word besides a token, the launcher key's, comes before the refusal.
+        assertTrue(script.indexOf("  start) ;;") in 0 until script.indexOf("*[!0-9a-f]*"))
         assertTrue(script.contains("dir=/run/droidtop-app-storage/desktop-launcher/requests"))
         assertTrue(script.trimEnd().lines().last().startsWith("mv -f "))
     }

@@ -47,6 +47,12 @@ object ContainerLauncher {
     /** The launch helper, a POSIX shell script ([helperScript]). */
     const val HELPER = "$IN_CONTAINER_DIR/bin/droidtop-open"
 
+    /**
+     * The one word the helper takes besides a token: open droidtop's Start menu (Droidtop/tracker#683). The
+     * desktop's launcher key runs `droidtop-open start`, so the container has one launcher, droidtop's.
+     */
+    const val START = "start"
+
     /** Where the helper drops requests. */
     const val REQUESTS_DIR = "$IN_CONTAINER_DIR/requests"
 
@@ -115,6 +121,7 @@ object ContainerLauncher {
         appendLine("# Asks droidtop to launch one library game (docs/SPEC.md 2a). Installed by droidtop.")
         appendLine("set -eu")
         appendLine("case \"${'$'}{1:-}\" in")
+        appendLine("  $START) ;;")
         appendLine("  *[!0-9a-f]* | '') echo 'usage: droidtop-open <entry>' >&2; exit 2 ;;")
         appendLine("esac")
         appendLine("dir=$REQUESTS_DIR")
@@ -258,6 +265,10 @@ object ContainerLauncher {
         return ViewTarget.SharedFile(segments.first(), segments.drop(1).joinToString("/"))
     }
 
+    /** Whether [fileName] is a whole request for the Start menu (`start.<pid>.request`). */
+    fun isStartRequest(fileName: String): Boolean =
+        fileName.startsWith("$START.") && fileName.endsWith(REQUEST_SUFFIX)
+
     /** The token a request file named [fileName] asks for, or null when it is not a request. */
     fun requestToken(fileName: String): String? {
         if (!fileName.endsWith(REQUEST_SUFFIX) || fileName.startsWith(".")) return null
@@ -278,4 +289,12 @@ object DesktopLaunchRequests {
 
     /** Hands [entryId] to the showing Desktop shell; false when none is collecting. */
     fun offer(entryId: String): Boolean = flow.subscriptionCount.value > 0 && flow.tryEmit(entryId)
+
+    private val startFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** The desktop's launcher key ([ContainerLauncher.START]): the Desktop shell opens its Start menu. */
+    val startMenuRequests: SharedFlow<Unit> = startFlow.asSharedFlow()
+
+    /** Asks the showing Desktop shell for its Start menu; false when none is collecting. */
+    fun offerStartMenu(): Boolean = startFlow.subscriptionCount.value > 0 && startFlow.tryEmit(Unit)
 }
