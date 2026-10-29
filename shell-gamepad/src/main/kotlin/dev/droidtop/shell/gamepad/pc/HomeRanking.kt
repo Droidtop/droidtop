@@ -38,18 +38,26 @@ internal fun usualNowShelf(starts: List<PlayStart>, all: List<LibraryEntry>, now
 }
 
 /**
- * Home's rows in the order this person uses them (Droidtop/tracker#611): Usual now first when there is one (it is
- * about this hour), then the rows that started the most games ([use], starts from each row id), and rows used alike
- * keep the order they came in, so a new person sees today's order. Pure.
+ * Home's rows in the order this person uses them (Droidtop/tracker#611): the rows they pinned first, in their order
+ * ([rules]), then Usual now when there is one (it is about this hour), then the rows that started the most games
+ * ([use], starts from each row id), rows used alike keeping the order they came in, so a new person sees today's
+ * order. Rows they hid are left out. Pure.
  */
-internal fun rankHomeShelves(shelves: List<PcShelf>, use: Map<String, Int>): List<PcShelf> =
-    shelves.withIndex()
+internal fun rankHomeShelves(
+    shelves: List<PcShelf>,
+    use: Map<String, Int>,
+    rules: dev.droidtop.library.settings.HomeRows.Rules = dev.droidtop.library.settings.HomeRows.Rules(),
+): List<PcShelf> {
+    val shown = shelves.filter { it.id !in rules.hidden }
+    val pinned = rules.pinned.mapNotNull { id -> shown.firstOrNull { it.id == id } }
+    return pinned + shown.filter { it.id !in rules.pinned }.withIndex()
         .sortedWith(
             compareByDescending<IndexedValue<PcShelf>> { it.value.id == SHELF_USUAL_NOW }
                 .thenByDescending { use[it.value.id] ?: 0 }
                 .thenBy { it.index },
         )
         .map { it.value }
+}
 
 /**
  * How many games each Home row has started (Droidtop/tracker#611), the ranking's sign of use: a preferences map, read

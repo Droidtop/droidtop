@@ -57,4 +57,14 @@ class HomeRankingTest {
         val withUsual = rows + shelf(SHELF_USUAL_NOW)
         assertEquals(SHELF_USUAL_NOW, rankHomeShelves(withUsual, mapOf(SHELF_RECOMMENDED to 5)).first().id)
     }
+
+    @Test
+    fun `pinned rows lead in the person's order and hidden rows are gone`() {
+        val rows = listOf(shelf(SHELF_USUAL_NOW), shelf(SHELF_RECENT_GAMES), shelf(SHELF_MOST_PLAYED), shelf(SHELF_RECOMMENDED))
+        val rules = dev.droidtop.library.settings.HomeRows.Rules(pinned = listOf(SHELF_RECOMMENDED, "gone-row"), hidden = setOf(SHELF_MOST_PLAYED))
+        assertEquals(
+            listOf(SHELF_RECOMMENDED, SHELF_USUAL_NOW, SHELF_RECENT_GAMES),
+            rankHomeShelves(rows, mapOf(SHELF_RECENT_GAMES to 9), rules).map { it.id },
+        )
+    }
 }

@@ -511,7 +511,11 @@ internal fun PcGamesSection(
     val homeUse by produceState(initialValue = emptyMap<String, Int>(), state.home) {
         value = if (state.home) withContext(Dispatchers.IO) { HomeRowUse.load(context) } else emptyMap()
     }
-    LaunchedEffect(games, others, ownership, recentlyAdded, homeUse) {
+    // What the person pinned and hid (Settings > Shell > Home rows), read when Home opens.
+    val homeRules by produceState(initialValue = dev.droidtop.library.settings.HomeRows.Rules(), state.home) {
+        value = withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.load(context) }
+    }
+    LaunchedEffect(games, others, ownership, recentlyAdded, homeUse, homeRules) {
         val all = games ?: return@LaunchedEffect
         onHomeActivityChanged(all + others)
         val own = withContext(Dispatchers.Default) { homeShelves(all, others, options = ownership, isRecentlyAdded = recentlyAdded) }
@@ -548,7 +552,9 @@ internal fun PcGamesSection(
             pluginHomeShelves(dev.droidtop.library.integrations.PluginShelves.shelvesFor(context, home), home)
         }
         pluginShelfList = fresh
-        val next = rankHomeShelves(ownRows + fresh, homeUse)
+        val candidates = ownRows + fresh
+        if (state.home) withContext(Dispatchers.IO) { dev.droidtop.library.settings.HomeRows.noteSeen(context, candidates.map { it.id to it.title }) }
+        val next = rankHomeShelves(candidates, homeUse, homeRules)
         if (next != homeShelfList) {
             if (state.home && !state.stripFocused) keepCursor(homeShelfList, next)
             homeShelfList = next

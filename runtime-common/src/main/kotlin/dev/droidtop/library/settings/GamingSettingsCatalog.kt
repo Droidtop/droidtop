@@ -216,6 +216,15 @@ object GamingSettingsCatalog {
                         inline = QuickMenuOrder.screen(),
                     ),
                 )
+                // The person's say over Home's rows (Droidtop/tracker#611): pinned, hidden, and the pinned order.
+                add(
+                    NestedScreenItem(
+                        id = "pref_gaming_home_rows",
+                        title = "Home rows",
+                        subtitle = "Pin rows to the top of Home or hide them",
+                        inline = HomeRows.screen(),
+                    ),
+                )
                 add(showHintsItem(context))
                 add(animationsItem(context))
                 add(navigationSoundsItem(context))

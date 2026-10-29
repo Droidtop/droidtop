@@ -97,7 +97,8 @@ object QuickMenuOrder {
 
     const val SCREEN_ID = "quick_menu_order"
 
-    private fun ordinal(n: Int): String = n.toString() + when {
+    /** "1st", "2nd", "11th": a slot's name on the order screens (this one and [HomeRows]). */
+    internal fun ordinal(n: Int): String = n.toString() + when {
         n % 100 in 11..13 -> "th"
         n % 10 == 1 -> "st"
         n % 10 == 2 -> "nd"
