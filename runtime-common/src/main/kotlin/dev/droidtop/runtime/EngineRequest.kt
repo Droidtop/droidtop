@@ -14,11 +14,14 @@ sealed interface EngineRequest {
     /** `images`: the images droidtop's store holds. */
     data class Images(val quiet: Boolean) : EngineRequest
 
+    /** `rmi`: takes each of [images] out of the store ([ImageRemoval]); one a container came from only with [force]. */
+    data class RemoveImages(val images: List<String>, val force: Boolean) : EngineRequest
+
     /**
      * `logs`: the last [tail] lines of a container's program log; with [follow] (`-f`), then what it writes next, until
-     * its program ends (Droidtop/tracker#715).
+     * its program ends (Droidtop/tracker#715). [sinceMs] and [untilMs] bound the lines by when they were written
+     * ([LogTimes]); null is no bound.
      */
-    /** [sinceMs] and [untilMs] bound the lines by when they were written ([LogTimes]); null is no bound. */
     data class Logs(
         val container: String,
         val tail: Int,

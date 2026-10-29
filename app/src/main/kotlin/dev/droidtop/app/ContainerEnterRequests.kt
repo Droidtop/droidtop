@@ -180,6 +180,14 @@ internal object ContainerEnterRequests {
                 }
                 answer(dir, cli.formatImages(images, command), "", 0)
             }
+            is EngineRequest.RemoveImages -> {
+                val outcomes = runCatching { EngineActions.removeImages(app, containers, command.images, command.force) }.getOrElse {
+                    refuse(dir, "${cli.name} rmi: ${it.message ?: it.javaClass.simpleName}", 1)
+                    return
+                }
+                val printed = cli.formatRmi(outcomes)
+                answer(dir, printed.out, printed.err, printed.code)
+            }
             is EngineRequest.Logs -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
                 val lines = EngineActions.logs(app, info, command.tail, command.sinceMs, command.untilMs)

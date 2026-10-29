@@ -22,15 +22,17 @@ object EngineHttp {
         val query: Map<String, String>,
         val headers: Map<String, String>,
         val body: ByteArray,
+        /** Every value of each query key, for the keys a client repeats (libpod's `images=a&images=b`). */
+        val queryAll: Map<String, List<String>> = emptyMap(),
     ) {
         /** The client wants the connection closed after this request. */
         val closes: Boolean get() = headers["connection"]?.equals("close", ignoreCase = true) == true
 
         override fun equals(other: Any?): Boolean =
             other is Request && method == other.method && path == other.path && query == other.query &&
-                headers == other.headers && body.contentEquals(other.body)
+                headers == other.headers && body.contentEquals(other.body) && queryAll == other.queryAll
 
-        override fun hashCode(): Int = listOf(method, path, query, headers, body.contentHashCode()).hashCode()
+        override fun hashCode(): Int = listOf(method, path, query, headers, body.contentHashCode(), queryAll).hashCode()
     }
 
     /** A request that could not be read: [status] and why, answered before the connection closes. */
@@ -84,10 +86,12 @@ object EngineHttp {
             else -> ByteArray(0)
         }
         val path = target.substringBefore('?')
-        val query = target.substringAfter('?', "").split('&').filter { it.isNotEmpty() }.associate { pair ->
+        val pairs = target.substringAfter('?', "").split('&').filter { it.isNotEmpty() }.map { pair ->
             decode(pair.substringBefore('=')) to decode(pair.substringAfter('=', ""))
         }
-        return Request(method, decode(path), query, headers, body)
+        val query = pairs.toMap()
+        val queryAll = pairs.groupBy({ it.first }, { it.second })
+        return Request(method, decode(path), query, headers, body, queryAll)
     }
 
     /**

@@ -12,6 +12,7 @@ import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.Crane
 import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.HomeChoice
+import dev.droidtop.runtime.ImageRemoval
 import dev.droidtop.runtime.LogTimes
 import dev.droidtop.runtime.OciImageStore
 import dev.droidtop.runtime.Pod
@@ -265,6 +266,17 @@ internal object EngineActions {
     }
 
     /** The last [tail] lines of [info]'s program log. */
+    /**
+     * `rmi` (Droidtop/tracker#715): each of [names] taken out of the image store, unless a container among
+     * [containers] came from it and there is no [force] ([ImageRemoval.plan]). Blobs another image shares stay.
+     */
+    suspend fun removeImages(app: Context, containers: List<ContainerInfo>, names: List<String>, force: Boolean): List<ImageRemoval.Outcome> {
+        val store = OciImageStore.of(app)
+        val outcomes = ImageRemoval.plan(store.entries(), containers, names, force)
+        outcomes.filterIsInstance<ImageRemoval.Removed>().forEach { store.remove(it.entry.digest) }
+        return outcomes
+    }
+
     suspend fun logs(app: Context, info: ContainerInfo, tail: Int, sinceMs: Long? = null, untilMs: Long? = null): List<String> =
         withContext(Dispatchers.IO) {
             val log = ContainerProgram.hostLogFile(app.filesDir, info.container.id)

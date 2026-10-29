@@ -33,7 +33,7 @@ class EngineCli private constructor(val front: Front) {
         add("droidtop's containers, through droidtop's own engine (${front.daemon}):")
         add("  ps [-a] [-q]                 List containers (running ones without -a)")
         add("  images [-q]                  List the images droidtop holds")
-        add("  logs [-n N] CONTAINER        Show the last lines of a container's program")
+        add("  logs [-n N] [-f] CONTAINER   Show the last lines of a container's program (-f follows it)")
         add("  start CONTAINER...           Start a container's own program")
         add("  stop CONTAINER...            Stop a container's own program")
         add("  exec [-e K=V] [-w DIR] CONTAINER COMMAND [ARG...]")
@@ -44,6 +44,7 @@ class EngineCli private constructor(val front: Front) {
         add("  restart CONTAINER...         Stop a container's own program and start it again")
         add("  inspect CONTAINER...         A container's details as JSON")
         add("  rm [-f] CONTAINER...         Delete a container (-f stops its program first)")
+        add("  rmi [-f] IMAGE...            Delete an image (-f even when a container came from it)")
         add("  info                         The engine, and the kernel features this device gives it")
         if (front == Front.PODMAN) add("  pod create|ps|rm|start|stop  Pods: a named group of containers started and stopped together")
         add("  network create|ls|rm         Networks: names containers on one can reach each other by")
@@ -54,6 +55,7 @@ class EngineCli private constructor(val front: Front) {
         add("-p takes a port on its own number (-p 80:80), which is what happens anyway: a port is the device's own.")
         add("--rm removes the container once its program has run and ended.")
         add("run takes -w FOLDER (an absolute folder) and --entrypoint PROGRAM (\"\" clears the image's).")
+        add("logs takes --since and --until: 10m, 2026-10-29T10:00:00Z, or Unix seconds.")
         add("Not yet: -u. Options that need a kernel feature (-p 8080:80, --memory, --network,")
         add("--hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.")
         add("Containers here share the device's network and processes: a port is the device's own.")
@@ -91,6 +93,12 @@ class EngineCli private constructor(val front: Front) {
             "network" -> network(rest)
             "info" -> flags(rest, emptySet())?.let { bad -> error("info", bad) } ?: EngineRequest.Info
             "rm" -> remove(rest)
+            "rmi" -> {
+                rest.firstOrNull { it.startsWith("-") && it !in setOf("-f", "--force") }?.let { return error(sub, it) }
+                val images = rest.filterNot { it.startsWith("-") }
+                if (images.isEmpty()) return EngineRequest.Answer("${front.command} rmi: name at least one image\n", 1)
+                EngineRequest.RemoveImages(images, force = rest.any { it == "-f" || it == "--force" })
+            }
             in later -> EngineRequest.Answer("${front.command} $sub: not built in droidtop yet\n", 1)
             in NEVER -> EngineRequest.Answer("${front.command} $sub: droidtop's containers do not have this (${front.daemon})\n", 1)
             else -> EngineRequest.Answer("${front.command}: '$sub' is not a ${front.command} command. See '${front.command} --help'\n", 1)
@@ -648,6 +656,41 @@ class EngineCli private constructor(val front: Front) {
         )
     }
 
+    /** What `rmi` printed and its exit code. */
+    data class Printed(val out: String, val err: String, val code: Int)
+
+    /**
+     * `rmi`'s answer in this front's words: for each image removed, the name it had and its id, as both tools print
+     * them; for each that was not, why. Exit 1 when any image was not there, as both do, and 2 when one was in use,
+     * as Podman does (Docker says 1 for both).
+     */
+    fun formatRmi(outcomes: List<ImageRemoval.Outcome>): Printed {
+        val out = StringBuilder()
+        val err = StringBuilder()
+        var code = 0
+        outcomes.forEach { o ->
+            when (o) {
+                is ImageRemoval.Removed -> {
+                    val name = if (front == Front.DOCKER) "${repository(o.entry.reference)}:${tag(o.entry.reference)}" else fullImage(o.entry.reference)
+                    val id = if (front == Front.DOCKER) o.entry.digest else o.entry.digest.removePrefix("sha256:")
+                    out.append("Untagged: ").append(name).append('\n').append("Deleted: ").append(id).append('\n')
+                }
+                is ImageRemoval.Missing -> {
+                    err.append(if (front == Front.DOCKER) "Error response from daemon: No such image: ${o.name}\n" else "Error: ${o.name}: image not known\n")
+                    code = maxOf(code, 1)
+                }
+                is ImageRemoval.InUse -> {
+                    err.append(
+                        "Error: ${o.name} is the image of container ${o.containers.joinToString(", ")}; " +
+                            "-f removes it anyway, and the container keeps its own copy\n",
+                    )
+                    code = if (front == Front.DOCKER) maxOf(code, 1) else 2
+                }
+            }
+        }
+        return Printed(out.toString(), err.toString(), code)
+    }
+
     /** An image as Docker's `ps` shows it: Docker Hub's prefix dropped, the tag kept. */
     internal fun shortImage(reference: String): String =
         reference.removePrefix("docker.io/").removePrefix("library/")
@@ -765,7 +808,7 @@ class EngineCli private constructor(val front: Front) {
         const val MAX_TAIL = 2000
 
         /** Subcommands droidtop does not answer yet on either front, said as such rather than as unknown. */
-        private val LATER = setOf("rmi", "compose")
+        private val LATER = setOf("compose")
 
         /** Subcommands droidtop will not have: they need a daemon or image building it does not have. */
         private val NEVER = setOf("build", "buildx", "push", "login", "volume", "swarm", "service", "commit", "save", "load", "cp", "attach", "kill", "pause", "unpause", "top", "stats", "events", "port", "update", "wait", "export", "import", "tag", "history", "diff", "system", "context", "plugin", "secret", "config", "node", "stack", "trust", "manifest", "image", "container", "version", "search", "logout", "rename", "machine")

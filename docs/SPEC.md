@@ -2863,7 +2863,14 @@ the `ContainerRuntime` interface that already exists (§3):
   image names no program says so), and `exec [-e K=V] [-w DIR] CONTAINER
   COMMAND...` (the enter path with any command, behind the same
   per-container "Run its commands from the desktop" switch; `-i` and
-  `-t` are taken, and it runs on pipes). A container is named by its name
+  `-t` are taken, and it runs on pipes), and `rmi [-f] IMAGE...`
+  (Droidtop/tracker#715, `ImageRemoval`: an image named any way `inspect`
+  reads one, its id or a start of it, taken out of the store with the
+  blobs no other image shares; one a container came from only with `-f`,
+  which breaks nothing in the container, as it keeps its own tree and its
+  own copy of the image's run settings; each image's "Untagged" and
+  "Deleted" lines, or why not, and exit 1 for one not there, 2 on
+  Podman's front for one in use). A container is named by its name
   or its id. **Second slice (2026-10-16):** `pull IMAGE` puts an image in droidtop's
   one store (`OciImageStore`); `run [-d] [--name NAME] IMAGE` makes a sibling from the image under that name (droidtop's
   default name otherwise), gives it a Private home (an app container keeps its files to itself, the review's
@@ -2965,7 +2972,9 @@ the `ContainerRuntime` interface that already exists (§3):
   `DELETE /containers/{id}` (409 for a running one without `force`, and for the desktop's own), `images/create`
   (a pull; its progress lines all at once after it), `containers/{id}/logs` (Docker's multiplexed frames, the
   program's log as stdout; with `follow`, the tail and then what the program writes, until it ends, read as attach
-  reads it (Droidtop/tracker#715); `since` and `until` as below; `timestamps` not built) and `containers/{id}/wait`
+  reads it (Droidtop/tracker#715); `since` and `until` as the `logs` command above; `timestamps` not built),
+  `DELETE /images/{name}` (`rmi`: Docker's Untagged and Deleted list, 404, or 409 for an image a container came
+  from without `force`) and `containers/{id}/wait`
   (until the program is over, or for a program not started yet its start and end: "Wait before a start", below; its
   exit code, 125 when it could not start). `version` gives every field of Docker's own reply (GitCommit and GoVersion
   name droidtop's engine, which has neither), the Engine component's Details all strings, as Docker's CLI reads them
@@ -3050,7 +3059,9 @@ the `ContainerRuntime` interface that already exists (§3):
   under the host's runtime info, the one place Podman's info carries free text), `containers/json` (the same
   filters as Docker's), `containers/{id}/json`, `images/json`, `images/{name}/json` (a name may hold slashes),
   `pods/json` (filters name and id; others not built), `pods/{id}/json`, `networks/json`, `networks/{id}/json`,
-  and `exists` for each of containers, images, pods and networks (204, or 404). Podman's `ps` writes STATUS itself
+  `DELETE images/{name}` and `DELETE images/remove` (`rmi`; Podman's client sends every name as its own `images`,
+  so a request keeps each repeated query key, `EngineHttp.Request.queryAll`; Podman's report of Deleted, Untagged,
+  Errors and ExitCode; `all` not built), and `exists` for each of containers, images, pods and networks (204, or 404). Podman's `ps` writes STATUS itself
   from State, StartedAt, ExitedAt and ExitCode, so droidtop now records when each program last started and ended
   (`ContainerPrograms.times`, for this run of droidtop); inspect gives them as State.StartedAt and FinishedAt on
   every front. Image ids are the digest's hex without `sha256:`, as Podman writes them. Checked against Podman's own

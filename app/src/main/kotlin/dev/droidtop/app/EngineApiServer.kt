@@ -193,7 +193,7 @@ internal object EngineApiServer {
     private suspend fun answer(app: Context, request: EngineHttp.Request): EngineHttp.Response {
         // A libpod path is read by LibpodApi into the same calls, and answered in its version's shapes.
         val libpod = LibpodApi.version(request.path)
-        val call = if (libpod != null) LibpodApi.route(request.method, request.path, request.query) else DockerApi.route(request.method, request.path, request.query)
+        val call = if (libpod != null) LibpodApi.route(request.method, request.path, request.query, request.queryAll) else DockerApi.route(request.method, request.path, request.query)
         val runtime = (DesktopSessionService.state.value as? DesktopSessionState.Connected)?.runtime
         return when (call) {
             DockerApi.Call.Ping -> EngineHttp.Response.text(200, "OK")
@@ -335,6 +335,11 @@ internal object EngineApiServer {
                     }
                     EngineHttp.Response.json(200, if (libpod != null) LibpodApi.waited(code) else DockerApi.waited(code))
                 }
+            }
+            is DockerApi.Call.ImageRemove -> {
+                runtime ?: return DockerApi.error(500, "the desktop is not running")
+                val outcomes = EngineActions.removeImages(app, runtime.listContainers(), call.names, call.force)
+                if (libpod != null) LibpodApi.imageRemoval(outcomes, call.batch, call.ignoreMissing) else DockerApi.imageRemoval(outcomes.single())
             }
             is DockerApi.Call.ImageGet -> {
                 val store = OciImageStore.of(app)

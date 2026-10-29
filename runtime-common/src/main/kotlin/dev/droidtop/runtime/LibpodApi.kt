@@ -51,7 +51,7 @@ object LibpodApi {
     }
 
     /** The call a libpod [method] and [path] (with [query]) ask for. Pure. */
-    fun route(method: String, path: String, query: Map<String, String>): DockerApi.Call {
+    fun route(method: String, path: String, query: Map<String, String>, queryAll: Map<String, List<String>> = emptyMap()): DockerApi.Call {
         val p = path.replaceFirst(PREFIX, "").trimEnd('/').ifEmpty { "/" }
         val segments = p.removePrefix("/").split('/')
         val read = method == "GET" || method == "HEAD"
@@ -84,6 +84,17 @@ object LibpodApi {
                 else -> DockerApi.Call.Remove(segments[1], force = flag(query["force"]), ignoreMissing = flag(query["ignore"]))
             }
             p == "/images/pull" && method == "POST" -> pull(query)
+            // Podman's client removes images through images/remove, every name as its own `images`.
+            p == "/images/remove" && method == "DELETE" -> {
+                val names = queryAll["images"] ?: listOfNotNull(query["images"])
+                when {
+                    flag(query["all"]) -> DockerApi.Call.NotBuilt("rmi --all")
+                    names.isEmpty() -> DockerApi.Call.Refused(400, "name at least one image")
+                    else -> DockerApi.Call.ImageRemove(names, force = flag(query["force"]), batch = true, ignoreMissing = flag(query["ignore"]))
+                }
+            }
+            p.startsWith("/images/") && p.length > "/images/".length && method == "DELETE" ->
+                DockerApi.Call.ImageRemove(listOf(p.removePrefix("/images/")), force = flag(query["force"]))
             segments.size == 3 && segments[0] == "exec" && segments[2] == "remove" && method == "POST" -> DockerApi.Call.ExecRemove(segments[1])
             p == "/pods/create" && method == "POST" -> DockerApi.Call.PodCreate
             segments.size == 3 && segments[0] == "pods" && method == "POST" && segments[2] in setOf("start", "stop", "restart", "kill") -> when {
@@ -509,6 +520,36 @@ object LibpodApi {
                 "Config" to JsonObject(config + ("Entrypoint" to entrypoint)),
             ),
         ).toString() + "\n"
+    }
+
+    /**
+     * libpod's answer to an image removal: Podman's report (`Deleted` ids, `Untagged` names, `Errors`, `ExitCode`: 1
+     * for an image not there, 2 for one in use, as `podman rmi` exits). One image by name is 404 or 409 when it did not
+     * come off; [batch] (images/remove) always answers the report, leaving out a missing image with [ignoreMissing].
+     */
+    fun imageRemoval(outcomes: List<ImageRemoval.Outcome>, batch: Boolean, ignoreMissing: Boolean): EngineHttp.Response {
+        if (!batch) {
+            when (val only = outcomes.single()) {
+                is ImageRemoval.Missing -> return missing(DockerApi.Kind.IMAGE, only.name)
+                is ImageRemoval.InUse -> return error(409, "image used by ${only.containers.first()}: image is in use by a container", "image is in use by a container")
+                is ImageRemoval.Removed -> Unit
+            }
+        }
+        val removed = outcomes.filterIsInstance<ImageRemoval.Removed>()
+        val errors = outcomes.mapNotNull { o ->
+            when (o) {
+                is ImageRemoval.Missing -> if (ignoreMissing) null else 1 to "${o.name}: image not known"
+                is ImageRemoval.InUse -> 2 to "image used by ${o.containers.first()}: image is in use by a container"
+                is ImageRemoval.Removed -> null
+            }
+        }
+        val report = buildJsonObject {
+            putJsonArray("Deleted") { removed.forEach { add(JsonPrimitive(imageId(it.entry.digest))) } }
+            putJsonArray("Untagged") { removed.forEach { add(JsonPrimitive(EngineCli.PODMAN.fullImage(it.entry.reference))) } }
+            putJsonArray("Errors") { errors.forEach { add(JsonPrimitive(it.second)) } }
+            put("ExitCode", errors.maxOfOrNull { it.first } ?: 0)
+        }
+        return EngineHttp.Response.json(200, report.toString() + "\n")
     }
 
     /** `GET /libpod/images/json`: the image store's entries, named as Podman names them. */

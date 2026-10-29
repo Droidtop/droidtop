@@ -85,6 +85,17 @@ object DockerApi {
         data class PodAction(val id: String, val action: String, val signal: String? = null) : Call
         data class PodRemove(val id: String, val force: Boolean) : Call
 
+        /**
+         * `rmi` (Droidtop/tracker#715): [names] out of the image store. [batch] is libpod's `images/remove`, which
+         * answers one report for them all; [ignoreMissing] its `ignore`.
+         */
+        data class ImageRemove(
+            val names: List<String>,
+            val force: Boolean,
+            val batch: Boolean = false,
+            val ignoreMissing: Boolean = false,
+        ) : Call
+
         /** A request Docker would take that droidtop refuses as asked: answered [status] with [message]. */
         data class Refused(val status: Int, val message: String) : Call
 
@@ -127,6 +138,9 @@ object DockerApi {
             p == "/images/create" && method == "POST" -> pull(query)
             p.startsWith("/images/") && p.endsWith("/json") && p.length > "/images//json".length && read ->
                 Call.ImageGet(p.removePrefix("/images/").removeSuffix("/json"))
+            // An image's name may hold slashes (`docker.io/library/nginx`): all of the path after /images/ is it.
+            p.startsWith("/images/") && p.length > "/images/".length && method == "DELETE" ->
+                Call.ImageRemove(listOf(p.removePrefix("/images/")), force = flag(query["force"]))
             p == "/networks" && read -> filters(query["filters"])?.let { Call.Networks(it) } ?: Call.Refused(400, "filters is not the JSON object Docker sends")
             p == "/networks/create" && method == "POST" -> Call.NetworkCreate()
             p == "/networks/prune" -> Call.NotBuilt("POST /networks/prune")
@@ -436,6 +450,28 @@ object DockerApi {
         return entries.firstOrNull { EngineCli.PODMAN.fullImage(it.reference) == wanted }
             ?: entries.firstOrNull { it.digest == ref }
             ?: entries.filter { ref.removePrefix("sha256:").length >= 3 && it.digest.removePrefix("sha256:").startsWith(ref.removePrefix("sha256:")) }.singleOrNull()
+    }
+
+    /**
+     * `DELETE /images/{name}`'s answer: what came off (the name it had, then its id) as Docker lists them, 404 for an
+     * image not there, 409 for one a container came from without force.
+     */
+    fun imageRemoval(outcome: ImageRemoval.Outcome): EngineHttp.Response = when (outcome) {
+        is ImageRemoval.Removed -> EngineHttp.Response.json(
+            200,
+            JsonArray(
+                listOf(
+                    JsonObject(mapOf("Untagged" to JsonPrimitive("${EngineCli.DOCKER.repository(outcome.entry.reference)}:${EngineCli.DOCKER.tag(outcome.entry.reference)}"))),
+                    JsonObject(mapOf("Deleted" to JsonPrimitive(outcome.entry.digest))),
+                ),
+            ).toString() + "\n",
+        )
+        is ImageRemoval.Missing -> missing(Kind.IMAGE, outcome.name)
+        is ImageRemoval.InUse -> error(
+            409,
+            "conflict: unable to remove repository reference \"${outcome.name}\" (must force) - container " +
+                "${outcome.containers.first()} is using its referenced image ${outcome.entry.digest.removePrefix("sha256:").take(12)}",
+        )
     }
 
     /** `GET /images/{name}/json`: what droidtop knows of a stored image, in Docker's shape. */
