@@ -3728,20 +3728,16 @@ the `ContainerRuntime` interface that already exists (§3):
   both backends implement as suspend work (`ProotRuntime.stop`,
   `DroidSpacesRuntime.stop`), and neither backend module contains a
   `runBlocking` at all. The `runBlocking`s that do remain in the app:
-  - **On the main thread, in this section's own surface (the known
-    gap).** The container page's Sockets switches (Wayland, Audio), the
-    Devices toggles and the Mounts "Add a folder" pick wrap their
-    `ContainerRuntime` config write in `runBlocking(Dispatchers.IO)`
-    (`ContainersCatalog.kt:394`, `:411`, `:465`, `:736`) — but both
-    renderers call a `ToggleItem.onToggle` and a `FolderPickItem.onPicked`
-    synchronously on the main thread (`CatalogPreferenceBuilder.kt:111`,
-    `:387`; `CatalogNavigator.kt:501`, `:434`), and `runBlocking` parks
-    its caller whatever dispatcher the body runs on, so each of those
-    rows holds the UI thread for a container-config write. That is the
-    remaining violation of the settings catalog's own C4 rule ("an
-    action that touches a database or disk is an `AsyncActionItem` ...
-    Never `runBlocking` in a catalog callback", §7c); the fix is to make
-    those rows async like the rule says, and it is not built yet.
+  - **The container page's own rows (was the known gap, closed;
+    checked against the code 2026-10-29, Droidtop/tracker#718).** The
+    Sockets switches (Wayland, Audio), the Devices toggles and the Mounts
+    "Add a folder" pick used to wrap their `ContainerRuntime` config write
+    in `runBlocking(Dispatchers.IO)`, which parked the main thread because
+    both renderers called the callback there. `ToggleItem.onToggle` and
+    `FolderPickItem.onPicked` are `suspend` now (`SettingsCatalog.kt`), the
+    rows write inside `withContext(Dispatchers.IO)`, and no `runBlocking`
+    is left under `app/.../settings/`, which is the settings catalog's own
+    C4 rule ("Never `runBlocking` in a catalog callback", §7c) kept.
   - **Off the main thread, by structure.** The Backup rows' tar
     export/restore (`ContainersCatalog.kt:302`, `:317`) run inside a
     `DocumentPickItem.onPicked`, which both renderers already run under
@@ -9575,7 +9571,7 @@ app-drawer icon or a floating switcher button:
     against a post-09:13 build confirms it (`dq-settingsui-01`). What this pass found and fixed
     instead: the paragraph above claiming Global/Desktop settings were still XML — stale, left
     over from before H4 landed and corrected in this change.
-  - **Still open, not built in this pass**: search across settings (the design target of typing
+  - **Was open when this pass was written, built since**: search across settings (the design target of typing
     a few letters and jumping to any row in any catalog, across every screen the registry
     knows) — the catalog model's per-screen, lazily-built `groups` lambdas make a flat searchable
     index a real feature (walk every registered `CatalogScreen`, force-build its groups, index
@@ -17716,12 +17712,6 @@ false "you have nothing", while it runs.
 
 ### Known gaps, left open rather than shipped half-built
 
-- **"Recently added"** remains a shelf the owner named and the tab does
-  not have. The library index now records `firstSeenEpochMs` on each game
-  row: a newly indexed game gets the current epoch time, rescans preserve
-  it, and preexisting rows migrate with 0. A rebuild from game records
-  also uses 0 because records do not establish when a game was first
-  indexed. The shelf is still future UI work.
 - **Achievements (2026-10-24, Droidtop/tracker#230):** a Steam game's page has the Achievements row of Overview, "3 of
   41", from the signed-in account (`StoreLibrary.achievements`, Steam's `SteamAchievements` over the session droidtop
   holds, kept ten minutes per game). Read-only and for display (owner, 2026-10-23): droidtop sets no stat and unlocks
