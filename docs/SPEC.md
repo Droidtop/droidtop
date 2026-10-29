@@ -17179,10 +17179,11 @@ window's width (4 percent from 1500dp, never under 16dp), so shelves, page conte
 share one left edge; the header and footer use 12dp plus 1.4 percent (`barPadding`) and are 40dp
 tall at least. The shell is laid out on one canvas, the console's landscape 1280x720dp, which every
 type size and spacing was tuned at (`ProvideShellCanvas`, `canvasDensity`, decided 2026-10-29 with the owner: "We need
-responsive design and intelligent scaling"). A pad-first window whose short side is under 720dp at Android's density is
-drawn at the density that makes it 720dp tall, so a Retroid Pocket 5's 5.5" 1080p panel (853x480dp at 360dpi) shows the
+responsive design and intelligent scaling"). A window with a pad whose short side is under 720dp at Android's density is
+drawn at the density that makes its short side 720dp, in either orientation, so a Retroid Pocket 5's 5.5" 1080p panel (853x480dp at 360dpi) shows the
 same layout and proportions as the 1080p DP screen instead of 1.5 times the text and spacing. A window already at the
-canvas keeps its own density, and a touch-first window keeps Android's, because its targets must stay a finger's size.
+canvas keeps its own density, and a window with no pad (a phone) keeps Android's, because its targets must stay a
+finger's size.
 The Text size setting still scales text on top. Corners follow the visual language (decided 2026-10-24, Droidtop/tracker#644,
 docs/DESIGN-LANGUAGE.md "The approved design"): 8dp on rows, buttons and chips that are not pills
 (`Corners.Crisp`), 12dp on art tiles and cards (`Corners.Tile`) and on panels, sheets and dialogs

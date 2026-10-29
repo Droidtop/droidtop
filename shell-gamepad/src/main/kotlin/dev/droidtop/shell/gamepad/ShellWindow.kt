@@ -289,16 +289,17 @@ val LocalShellWindow = staticCompositionLocalOf {
 const val CANVAS_SHORT_SIDE_DP = 720
 
 /**
- * The density a window [widthDp] by [heightDp] at [density] lays the shell out at. A pad-first window draws the
- * shell's canvas whatever its panel's dpi: a 1080p panel is 720dp tall on its short side, so a Retroid Pocket 5's
- * 5.5" panel (1080x1920 at 360dpi, 853x480dp) gets the same layout and the same proportions as the 1080p DP screen,
+ * The density a window [widthDp] by [heightDp] at [density] lays the shell out at. A window with a pad draws the
+ * shell's canvas whatever its panel's dpi: a 1080p panel is 720dp on its short side, so a Retroid Pocket 5's 5.5"
+ * panel (1080x1920 at 360dpi, 853x480dp) gets the same layout and the same proportions as the 1080p DP screen,
  * instead of 1.5 times the text and spacing in the same pixels (owner, 2026-10-29: the text needed to come "WWAAYY
  * down"; "We need responsive design and intelligent scaling"). A window that is already at least the canvas keeps its
- * own density, so a bigger screen is never shrunk below Android's own size. A touch-first window (a phone, upright or
- * without a pad) keeps Android's density too: its touch targets have to stay a finger's size. Pure.
+ * own density, so a bigger screen is never shrunk below Android's own size. The console held upright keeps the canvas
+ * too: it is still pad-driven. A window with no pad (a phone) keeps Android's density, because touch is all it has and
+ * its targets must stay a finger's size. Pure.
  */
-fun canvasDensity(density: Float, widthDp: Int, heightDp: Int, touchFirst: Boolean): Float {
-    if (touchFirst) return density
+fun canvasDensity(density: Float, widthDp: Int, heightDp: Int, padPresent: Boolean): Float {
+    if (!padPresent) return density
     val shortSidePx = minOf(widthDp, heightDp) * density
     return minOf(density, shortSidePx / CANVAS_SHORT_SIDE_DP)
 }
@@ -317,7 +318,7 @@ fun ProvideShellCanvas(content: @Composable () -> Unit) {
         density.density,
         configuration.screenWidthDp,
         configuration.screenHeightDp,
-        currentShellWindow().touchFirst,
+        currentShellWindow().padPresent,
     )
     if (target >= density.density * 0.99f) {
         content()
