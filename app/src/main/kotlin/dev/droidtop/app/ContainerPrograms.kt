@@ -6,6 +6,7 @@ import android.util.Log
 import dev.droidtop.runtime.Container
 import dev.droidtop.runtime.ContainerProgram
 import dev.droidtop.runtime.ContainerRuntime
+import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.ExposedPort
 import dev.droidtop.runtime.LogTimes
 import dev.droidtop.runtime.nameOf
@@ -119,6 +120,8 @@ internal object ContainerPrograms {
                 return@launch
             }
             val log = ContainerProgram.hostLogFile(app.filesDir, container.id).apply { parentFile?.mkdirs() }
+            // As its image's user, or -u's (Droidtop/tracker#715). The script opens the log before it switches.
+            val user = ContainerUser.parse(config.user)
             // Each second the log grew, its length and the time (`logs --since`, Droidtop/tracker#715); every
             // TRIM_EVERY_MS it is trimmed, and the times move with it. One loop, so the two never cross.
             val trimmer = launch {
@@ -153,7 +156,7 @@ internal object ContainerPrograms {
                     set(container.id, State.Running(now))
                     Log.i(TAG, "${container.id}: starting ${config.program().joinToString(" ")}")
                     val result = runCatching {
-                        runtime.exec(container, ContainerProgram.command(config, container.id), ContainerProgram.environment(config))
+                        runtime.exec(container, ContainerProgram.command(config, container.id), ContainerProgram.environment(config), user)
                     }
                     if (!isActive) break
                     val exit = result.getOrNull()?.exitCode ?: -1

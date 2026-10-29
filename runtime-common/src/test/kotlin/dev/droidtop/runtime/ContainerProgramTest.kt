@@ -30,6 +30,14 @@ class ContainerProgramTest {
     }
 
     @Test
+    fun `-u is kept with the run settings and takes the image's own user's place`() {
+        val overrides = ContainerProgram.RunOverrides(user = "nginx:www-data")
+        assertEquals(overrides, ContainerProgram.RunOverrides.decode(overrides.encode()))
+        assertEquals("nginx:www-data", overrides.applyTo(ImageRunConfig(user = "postgres")).user)
+        assertEquals("postgres", ContainerProgram.RunOverrides().applyTo(ImageRunConfig(user = "postgres")).user)
+    }
+
+    @Test
     fun `waits grow after each quick failure up to a minute, and a working program restarts only on failure`() {
         assertEquals(listOf(2_000L, 4_000L, 8_000L, 16_000L, 32_000L, 60_000L, 60_000L), (1..7).map { ContainerProgram.restartDelayMs(it) })
         val onFailure = RestartPolicy.OnFailure()

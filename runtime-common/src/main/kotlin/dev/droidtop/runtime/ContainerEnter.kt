@@ -70,7 +70,7 @@ object ContainerEnter {
             "/bin/sh",
             "-c",
             "d=\$1; shift; [ -n \"\$DROIDTOP_CWD\" ] && cd \"\$DROIDTOP_CWD\" 2>/dev/null; " +
-                "exec \"\$@\" <\"\$d/in\" >\"\$d/out\" 2>\"\$d/err\"",
+                "exec <\"\$d/in\" >\"\$d/out\" 2>\"\$d/err\"; " + ContainerUser.EXEC_TAIL,
             "sh",
             requestDir,
             command,
@@ -82,7 +82,7 @@ object ContainerEnter {
      * script is the same constant text and the command is argv entries, never shell text.
      */
     fun directCommand(command: List<String>): List<String> =
-        listOf("/bin/sh", "-c", "[ -n \"\$DROIDTOP_CWD\" ] && cd \"\$DROIDTOP_CWD\" 2>/dev/null; exec \"\$@\"", "sh") + command
+        listOf("/bin/sh", "-c", "[ -n \"\$DROIDTOP_CWD\" ] && cd \"\$DROIDTOP_CWD\" 2>/dev/null; " + ContainerUser.EXEC_TAIL, "sh") + command
 
     /** The environment [execCommand] reads its working folder from. */
     fun execEnvironment(cwd: String?): Map<String, String> = if (cwd.isNullOrBlank()) emptyMap() else mapOf("DROIDTOP_CWD" to cwd)

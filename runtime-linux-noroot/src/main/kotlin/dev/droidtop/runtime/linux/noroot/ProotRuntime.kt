@@ -12,6 +12,7 @@ import dev.droidtop.runtime.ContainerBackend
 import dev.droidtop.runtime.ContainerDiskUsage
 import dev.droidtop.runtime.ContainerExecResult
 import dev.droidtop.runtime.ContainerSockets
+import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ImageRunConfig
 import dev.droidtop.runtime.ContainerInfo
@@ -380,8 +381,18 @@ class ProotRuntime(
      * logged line by line. Cancelling the caller kills the session, every
      * process of it ([ProotProcesses.killSession]), not proot alone.
      */
-    override suspend fun exec(container: Container, command: List<String>, env: Map<String, String>): ContainerExecResult {
+    override suspend fun exec(
+        container: Container,
+        command: List<String>,
+        env: Map<String, String>,
+        user: ContainerUser.Spec?,
+    ): ContainerExecResult {
         requireRootfs(container)
+        // Another user (Droidtop/tracker#715): proot shows its ids instead of root's; a name the image cannot resolve
+        // fails the exec in Docker's words.
+        val ids = user?.takeUnless { it.isRoot }?.let { spec ->
+            withContext(Dispatchers.IO) { ContainerUser.resolveIn(rootfsOf(container.id), spec) }.getOrThrow().let { "${it.uid}:${it.gid}" }
+        }
         withContext(Dispatchers.IO) {
             prepareSharedDirectories()
             writeNetworkFiles()
@@ -389,7 +400,7 @@ class ProotRuntime(
         val name = command.firstOrNull()?.substringAfterLast('/') ?: "exec"
         log.line("exec in ${container.id}: ${command.joinToString(" ")}")
         val sessionId = UUID.randomUUID().toString()
-        val process = withContext(Dispatchers.IO) { startSession(container.id, sessionId, command, env, mergeStderr = false) }
+        val process = withContext(Dispatchers.IO) { startSession(container.id, sessionId, command, env, mergeStderr = false, ids = ids) }
         val stdout = OutputTail(maxLines = CAPTURE_LINES)
         val stderr = OutputTail(maxLines = CAPTURE_LINES)
         val outThread = pump(process.inputStream, "${container.id}/$name") { stdout.add(it) }
@@ -511,7 +522,10 @@ class ProotRuntime(
      *
      *  - `--kill-on-exit`: ending the session ends everything it started.
      *  - `--root-id`: uid/gid 0 as far as the guest can tell; a distro's
-     *    package manager refuses to run otherwise.
+     *    package manager refuses to run otherwise. With [ids] ("uid:gid"),
+     *    `--change-id` shows those instead: a program run as its image's
+     *    user, or `-u` (Droidtop/tracker#715). Either way the files it
+     *    writes are droidtop's own on disk.
      *  - `--link2symlink`: hard links the guest makes become proot-managed
      *    symlinks (dpkg makes them; Android refuses an app most of them).
      *  - `--sysvipc`: System V IPC emulated in proot; Android's kernel
@@ -527,6 +541,7 @@ class ProotRuntime(
         guestCommand: List<String>,
         env: Map<String, String>,
         mergeStderr: Boolean,
+        ids: String? = null,
     ): Process {
         val rootfs = rootfsOf(containerId)
         val marker = ProotProcesses.sessionEnvironment(containerId, sessionId)
@@ -545,7 +560,7 @@ class ProotRuntime(
         val argv = buildList {
             add(File(nativeLibraryDir, PROOT).absolutePath)
             add("--kill-on-exit")
-            add("--root-id")
+            add(if (ids != null) "--change-id=$ids" else "--root-id")
             add("--link2symlink")
             add("--sysvipc")
             add("--ashmem-memfd")

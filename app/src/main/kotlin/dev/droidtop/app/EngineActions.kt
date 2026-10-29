@@ -86,7 +86,7 @@ internal object EngineActions {
         withContext(Dispatchers.IO) { ContainerPrograms.setRestartPolicy(app, created.id, request.restart) }
         if (request.args != null || request.env.isNotEmpty() || request.labels.isNotEmpty() || request.entrypoint != null || request.workdir != null) {
             withContext(Dispatchers.IO) {
-                ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(request.args, request.env, request.labels, request.entrypoint, request.workdir))
+                ContainerProgram.saveOverrides(app.filesDir, created.id, ContainerProgram.RunOverrides(request.args, request.env, request.labels, request.entrypoint, request.workdir, request.user))
             }
         }
         val program = runCatching { runtime.imageRunConfig(created) }.getOrNull()

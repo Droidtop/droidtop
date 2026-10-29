@@ -257,7 +257,8 @@ object DockerApi {
         val entrypoint = strings(o["Entrypoint"])?.let { list -> if (list == listOf("")) emptyList() else list }
         val workdir = string(o, "WorkingDir")
         if (workdir != null && !EngineCli.validWorkdir(workdir)) return refuse(400, "WorkingDir must be an absolute folder: $workdir")
-        string(o, "User")?.takeIf { it.substringBefore(':') !in setOf("root", "0") }?.let { return notYet("User (docker run -u)") }
+        // User (Droidtop/tracker#715): who the program runs as; whether the image has that user is the start's to say.
+        val user = string(o, "User")?.let { ContainerUser.parse(it)?.toString() ?: return refuse(400, "User takes a user or uid, with a group or gid after a colon: $it") }
         string(o, "Hostname")?.let { return refuse(501, EngineOptions.refusal("docker create", "--hostname", features)) }
         (o["Volumes"] as? JsonObject)?.takeIf { it.isNotEmpty() }?.let { return notYet("Volumes (volumes of droidtop's own)") }
         val env = strings(o["Env"]).orEmpty()
@@ -324,6 +325,7 @@ object DockerApi {
             autoRemove = autoRemove,
             entrypoint = entrypoint,
             workdir = workdir,
+            user = user,
         ).let { run ->
             if (autoRemove && run.restart != ContainerProgram.RestartPolicy.No) return refuse(409, "AutoRemove and a restart policy cannot be used together")
             run
@@ -496,7 +498,7 @@ object DockerApi {
     }.toString() + "\n"
 
     /** A command an exec runs: what `POST /containers/{id}/exec` asked for, after droidtop checked it. */
-    data class ExecSpec(val command: List<String>, val env: Map<String, String>, val workdir: String?)
+    data class ExecSpec(val command: List<String>, val env: Map<String, String>, val workdir: String?, val user: String? = null)
 
     private val ENV_NAME = Regex("[A-Za-z_][A-Za-z0-9_]*")
 
@@ -516,14 +518,14 @@ object DockerApi {
         if (bool("AttachStdin") || bool("Tty")) {
             return null to notBuilt("exec with input or a terminal over the Engine API (droidtop's own docker command, at the end of the PATH, streams them)")
         }
-        string("User")?.takeIf { it.substringBefore(':') !in setOf("root", "0") }?.let { return null to notBuilt("exec as User $it") }
+        val user = string("User")?.let { ContainerUser.parse(it)?.toString() ?: return null to error(400, "User takes a user or uid, with a group or gid after a colon: $it") }
         val env = linkedMapOf<String, String>()
         (o["Env"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content }?.forEach { kv ->
             val name = kv.substringBefore('=')
             if (!kv.contains('=') || !ENV_NAME.matches(name)) return null to error(400, "not NAME=VALUE: $kv")
             env[name] = kv.substringAfter('=')
         }
-        return ExecSpec(command, env, string("WorkingDir")) to null
+        return ExecSpec(command, env, string("WorkingDir"), user) to null
     }
 
     /** `POST /containers/{id}/exec`'s answer. */
@@ -554,7 +556,7 @@ object DockerApi {
             putJsonArray("arguments") { spec.command.drop(1).forEach { add(JsonPrimitive(it)) } }
             put("tty", false)
             put("privileged", false)
-            put("user", "")
+            put("user", spec.user ?: "")
         }
         put("OpenStdin", false)
         put("OpenStdout", true)

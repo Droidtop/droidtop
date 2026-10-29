@@ -74,6 +74,8 @@ sealed interface EngineRequest {
         val entrypoint: List<String>? = null,
         /** `-w`, the APIs' WorkingDir: the absolute folder the program starts in. Null keeps the image's. */
         val workdir: String? = null,
+        /** `-u`, the APIs' User ([ContainerUser]): who the program runs as. Null keeps the image's own `User`. */
+        val user: String? = null,
         /**
          * False for a `run` without `-d`: the command front stays attached, printing the program's output as it comes
          * and ending with its exit code, as Docker's and Podman's do. True for `-d` and for the APIs, whose clients
@@ -94,8 +96,14 @@ sealed interface EngineRequest {
     /** `rm`: deletes each container; [force] stops a running program first, as Docker's `-f` does. */
     data class Remove(val containers: List<String>, val force: Boolean) : EngineRequest
 
-    /** `exec`: runs [command] in [container], through pipes ([ContainerEnter]), with [env] and in [workdir]. */
-    data class Exec(val container: String, val command: List<String>, val env: Map<String, String>, val workdir: String?) : EngineRequest
+    /** `exec`: runs [command] in [container], through pipes ([ContainerEnter]), with [env], in [workdir], as [user] (root when null). */
+    data class Exec(
+        val container: String,
+        val command: List<String>,
+        val env: Map<String, String>,
+        val workdir: String?,
+        val user: String? = null,
+    ) : EngineRequest
 
     /** Not run: [text] goes to stdout when [code] is 0 (help), to stderr otherwise. */
     data class Answer(val text: String, val code: Int) : EngineRequest

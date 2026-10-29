@@ -26,6 +26,7 @@ class ContainerTerminalTest {
             container: Container,
             command: List<String>,
             env: Map<String, String>,
+            user: ContainerUser.Spec?,
         ): ContainerExecResult {
             lastContainer = container
             lastCommand = command

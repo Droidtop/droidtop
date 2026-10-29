@@ -12,6 +12,7 @@ import dev.droidtop.runtime.ContainerNames
 import dev.droidtop.runtime.ContainerRole
 import dev.droidtop.runtime.ContainerRuntime
 import dev.droidtop.runtime.ContainerSockets
+import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.EnvironmentMounts
 import dev.droidtop.runtime.ImageRunConfig
 import dev.droidtop.runtime.ImageCachePolicy
@@ -336,7 +337,27 @@ class DroidSpacesRuntime(
      * inline POSIX shell assignments, the same pattern droidspaces' own
      * CLI docs use (`run sh -c "id && env"`).
      */
-    override suspend fun exec(container: Container, command: List<String>, env: Map<String, String>): ContainerExecResult {
+    override suspend fun exec(
+        container: Container,
+        command: List<String>,
+        env: Map<String, String>,
+        user: ContainerUser.Spec?,
+    ): ContainerExecResult {
+        // Another user (Droidtop/tracker#715): real root switches with the image's own `su`, at the end of droidtop's
+        // script (ContainerUser.EXEC_TAIL), after its redirections. `su` takes a name and gives that user's own group.
+        // The tree is root's, so its two files are read inside the container, where its own root applies.
+        val switchTo = user?.takeUnless { it.isRoot }?.let { spec ->
+            val passwd = RootProcess.run(binaryPath, "--name=${container.id}", "run", "cat", "/etc/passwd").stdout
+            val group = RootProcess.run(binaryPath, "--name=${container.id}", "run", "cat", "/etc/group").stdout
+            val resolved = ContainerUser.resolve(spec, passwd, group).getOrThrow()
+            val name = resolved.name
+                ?: throw IllegalArgumentException("uid ${spec.user} has no line in the image's /etc/passwd, which the rooted backend's su needs")
+            val own = ContainerUser.resolve(spec.copy(group = null), passwd, group).getOrThrow().gid
+            if (resolved.gid != own) {
+                throw IllegalArgumentException("a group other than $name's own (${spec.group}) is not built on the rooted backend")
+            }
+            name
+        }
         val waylandSocketName = if (readSockets(container.id).waylandShared) {
             ContainerLayout.findWaylandSocket(socketsDir)?.name
         } else {
@@ -344,7 +365,8 @@ class DroidSpacesRuntime(
         }
         // Same reasoning as writeConfig: PULSE_SERVER is droidspaces' own
         // to set, not ContainerLayout's.
-        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false) + env
+        val fullEnv = ContainerLayout.clientEnvironment(waylandSocketName, audioShared = false) + env +
+            (switchTo?.let { mapOf(ContainerUser.SWITCH_ENV to it) } ?: emptyMap())
         val envPrefix = fullEnv.entries.joinToString(" ") { (k, v) -> "$k=${shellQuote(v)}" }
         val commandLine = command.joinToString(" ") { shellQuote(it) }
         val shellScript = if (envPrefix.isEmpty()) commandLine else "$envPrefix $commandLine"

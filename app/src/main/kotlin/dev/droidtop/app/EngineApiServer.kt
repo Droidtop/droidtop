@@ -428,6 +428,7 @@ internal object EngineApiServer {
                                 info.container,
                                 dev.droidtop.runtime.ContainerEnter.directCommand(exec.spec.command),
                                 exec.spec.env + dev.droidtop.runtime.ContainerEnter.execEnvironment(exec.spec.workdir),
+                                dev.droidtop.runtime.ContainerUser.parse(exec.spec.user),
                             )
                         }.getOrNull().also { exec.exitCode = it?.exitCode ?: 126 }
                     } finally {

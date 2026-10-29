@@ -206,7 +206,9 @@ class DockerApiTest {
         assertEquals(emptyList<String>(), create("""{"Image":"alpine","Entrypoint":[""]}""").first!!.entrypoint)
         assertEquals("/srv", create("""{"Image":"alpine","WorkingDir":"/srv"}""").first!!.workdir)
         assertEquals(400, answer("""{"Image":"alpine","WorkingDir":"srv"}""").first)
-        assertEquals(501, answer("""{"Image":"alpine","User":"1000"}""").first)
+        // User is who the program runs as (#715); one that is not a user or uid is refused.
+        assertEquals("postgres:70", create("""{"Image":"alpine","User":"postgres:70"}""").first!!.user)
+        assertEquals(400, answer("""{"Image":"alpine","User":"a b"}""").first)
         assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"Mounts":[{"Type":"volume","Source":"data","Target":"/data"}]}}""").first)
         assertEquals(501, answer("""{"Image":"alpine","HostConfig":{"CapAdd":["NET_ADMIN"]}}""").first)
         assertNull(create("""{"Image":"alpine","User":"root"}""").second)
@@ -312,7 +314,8 @@ class DockerApiTest {
         assertEquals(400, DockerApi.execRequest("""{"Cmd":[]}""").second!!.status)
         assertEquals(400, DockerApi.execRequest("""{"Cmd":["ls"],"Env":["1A=x"]}""").second!!.status)
         assertEquals(400, DockerApi.execRequest("""{"Cmd":["ls"],"Privileged":true}""").second!!.status)
-        assertEquals(501, DockerApi.execRequest("""{"Cmd":["ls"],"User":"1000"}""").second!!.status)
+        assertEquals(DockerApi.ExecSpec(listOf("ls"), emptyMap(), null, "1000"), DockerApi.execRequest("""{"Cmd":["ls"],"User":"1000"}""").first)
+        assertEquals(400, DockerApi.execRequest("""{"Cmd":["ls"],"User":"$(id)"}""").second!!.status)
 
         val frames = DockerApi.outputFrames("out\n", "err\n")
         assertEquals(listOf<Byte>(1, 0, 0, 0, 0, 0, 0, 4), frames.take(8))

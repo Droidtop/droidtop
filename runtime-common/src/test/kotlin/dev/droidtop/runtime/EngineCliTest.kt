@@ -162,7 +162,11 @@ class EngineCliTest {
         assertEquals(true, (EngineCli.DOCKER.parse(listOf("run", "-dit", "redis")) as EngineRequest.Run).detach)
         // Known flags droidtop has not built say so; a command after the image is refused, not ignored.
         assertTrue(answer(listOf("run", "-p", "8080:80", "nginx")).text.contains("-p is not built in droidtop yet"))
-        assertTrue(answer(listOf("run", "-u", "1000", "nginx")).text.contains("not built in droidtop yet"))
+        // -u is who the program runs as (#715), on run, create and exec; one that is not a user or uid is refused.
+        assertEquals("nginx:www-data", (EngineCli.DOCKER.parse(listOf("run", "-u", "nginx:www-data", "nginx")) as EngineRequest.Run).user)
+        assertEquals("1000", (EngineCli.PODMAN.parse(listOf("create", "--user=1000", "nginx")) as EngineRequest.Run).user)
+        assertEquals("postgres", (EngineCli.DOCKER.parse(listOf("exec", "-u", "postgres", "db", "psql")) as EngineRequest.Exec).user)
+        assertTrue(answer(listOf("run", "-u", "a;b", "nginx")).text.contains("-u takes a user or uid"))
         // -w and --entrypoint are taken (#715); "" clears the entrypoint, and -w needs an absolute folder.
         val ep = EngineCli.DOCKER.parse(listOf("run", "--entrypoint=sh", "-w", "/srv", "nginx")) as EngineRequest.Run
         assertEquals(listOf("sh"), ep.entrypoint)

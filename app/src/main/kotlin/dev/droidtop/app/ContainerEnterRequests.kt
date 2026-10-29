@@ -8,6 +8,7 @@ import dev.droidtop.runtime.ContainerInfo
 import dev.droidtop.runtime.ContainerLauncher
 import dev.droidtop.runtime.ContainerPods
 import dev.droidtop.runtime.ContainerProgram
+import dev.droidtop.runtime.ContainerUser
 import dev.droidtop.runtime.EngineCli
 import dev.droidtop.runtime.EngineRequest
 import dev.droidtop.runtime.EngineFeatureProbe
@@ -82,7 +83,17 @@ internal object ContainerEnterRequests {
      * Runs [argv] in [target]'s container with its streams on the request's FIFOs, when the container still exists and
      * runs commands from the desktop, starting it first where the backend needs that.
      */
-    private suspend fun enter(app: Context, dir: File, target: Target, argv: List<String>, cwd: String?, env: Map<String, String>, seenAt: Long, writtenAt: Long?) {
+    private suspend fun enter(
+        app: Context,
+        dir: File,
+        target: Target,
+        argv: List<String>,
+        cwd: String?,
+        env: Map<String, String>,
+        seenAt: Long,
+        writtenAt: Long?,
+        user: ContainerUser.Spec? = null,
+    ) {
         if (!ContainerEnter.allowed(app.filesDir, target.containerId)) {
             refuse(dir, "${target.who}: ${target.containerName} does not run commands from the desktop (its page in Containers)", 126)
             return
@@ -104,6 +115,7 @@ internal object ContainerEnterRequests {
                     info.container,
                     ContainerEnter.execCommand(inContainer, argv.first(), argv.drop(1), cwd),
                     env + ContainerEnter.execEnvironment(cwd),
+                    user,
                 )
             }
             val runMs = SystemClock.elapsedRealtime() - runAt
@@ -220,7 +232,7 @@ internal object ContainerEnterRequests {
             }
             is EngineRequest.Exec -> {
                 val info = find(command.container) ?: return refuse(dir, "Error: No such container: ${command.container}", 1)
-                enter(app, dir, Target(info.container.id, info.displayName, "${cli.name} exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt)
+                enter(app, dir, Target(info.container.id, info.displayName, "${cli.name} exec"), command.command, command.workdir ?: cwd, command.env, seenAt, writtenAt, ContainerUser.parse(command.user))
             }
             is EngineRequest.Pull -> {
                 EngineActions.pull(app, command.image).fold(

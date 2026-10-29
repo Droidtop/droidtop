@@ -107,6 +107,8 @@ object ContainerProgram {
         val labels: Map<String, String> = emptyMap(),
         val entrypoint: List<String>? = null,
         val workingDir: String? = null,
+        /** `-u`, the APIs' User: replaces the image's own `User` (Droidtop/tracker#715). */
+        val user: String? = null,
     ) {
         /** [config] as this container runs it. Pure. */
         fun applyTo(config: ImageRunConfig): ImageRunConfig = config.copy(
@@ -115,6 +117,7 @@ object ContainerProgram {
             cmd = args ?: if (entrypoint != null) emptyList() else config.cmd,
             env = config.env + env,
             workingDir = workingDir ?: config.workingDir,
+            user = user ?: config.user,
         )
 
         fun encode(): String = kotlinx.serialization.json.buildJsonObject {
@@ -123,6 +126,7 @@ object ContainerProgram {
             if (labels.isNotEmpty()) put("labels", kotlinx.serialization.json.JsonObject(labels.mapValues { kotlinx.serialization.json.JsonPrimitive(it.value) }))
             entrypoint?.let { e -> put("entrypoint", kotlinx.serialization.json.JsonArray(e.map { kotlinx.serialization.json.JsonPrimitive(it) })) }
             workingDir?.let { put("workingDir", kotlinx.serialization.json.JsonPrimitive(it)) }
+            user?.let { put("user", kotlinx.serialization.json.JsonPrimitive(it)) }
         }.toString()
 
         companion object {
@@ -133,7 +137,8 @@ object ContainerProgram {
                 val labels = (o["labels"] as? kotlinx.serialization.json.JsonObject)
                     ?.mapValues { (it.value as kotlinx.serialization.json.JsonPrimitive).content }.orEmpty()
                 val workingDir = (o["workingDir"] as? kotlinx.serialization.json.JsonPrimitive)?.content
-                RunOverrides(list("args"), list("env").orEmpty(), labels, list("entrypoint"), workingDir)
+                val user = (o["user"] as? kotlinx.serialization.json.JsonPrimitive)?.content
+                RunOverrides(list("args"), list("env").orEmpty(), labels, list("entrypoint"), workingDir, user)
             }.getOrNull()
         }
     }
@@ -166,7 +171,7 @@ object ContainerProgram {
             "/bin/sh",
             "-c",
             "log=\$1; shift; [ -n \"\$DROIDTOP_WORKDIR\" ] && cd \"\$DROIDTOP_WORKDIR\"; " +
-                "echo \"--- started \$(date) ---\" >> \"\$log\"; exec \"\$@\" >> \"\$log\" 2>&1",
+                "echo \"--- started \$(date) ---\" >> \"\$log\"; exec >> \"\$log\" 2>&1; " + ContainerUser.EXEC_TAIL,
             "sh",
             containerLogPath(containerId),
         ) + config.program(args)

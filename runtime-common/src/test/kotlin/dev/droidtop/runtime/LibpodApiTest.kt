@@ -216,6 +216,7 @@ class LibpodApiTest {
         assertEquals(400, answer("{$image,\"privileged\":true}").first)
         assertEquals(400, answer("{$image,\"volumes\":[{\"Name\":\"\",\"Dest\":\"/data\",\"IsAnonymous\":true}]}").first)
         assertEquals(true, LibpodApi.createRequest("{$image,\"remove\":true,\"user\":\"root\",\"Networks\":{\"podman\":{}}}", null, emptyList()).first?.autoRemove)
+        assertEquals("postgres", LibpodApi.createRequest("{$image,\"user\":\"postgres\"}", null, emptyList()).first?.user)
     }
 
     @Test

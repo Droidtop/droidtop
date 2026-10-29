@@ -276,7 +276,8 @@ interface ContainerRuntime {
      * the primitive a native-Linux-depot launch (§5a) needs: something
      * that actually starts a process *inside* the container, as opposed
      * to the container lifecycle operations above. [env] is merged into
-     * the process' environment (e.g. `WAYLAND_DISPLAY`).
+     * the process' environment (e.g. `WAYLAND_DISPLAY`). [user] ([ContainerUser]) is who it runs as, root when
+     * null; one the image's /etc/passwd and /etc/group cannot name fails the exec with Docker's own words.
      *
      * Windows software deliberately does NOT come through here. Wine
      * runs through `:runtime-windows`'s own `WineEngine`, against the
@@ -284,7 +285,12 @@ interface ContainerRuntime {
      * docs/SPEC.md 5b. A droidspaces `exec` may become a desktop-mode
      * optimisation for it later; it is not a precondition.
      */
-    suspend fun exec(container: Container, command: List<String>, env: Map<String, String> = emptyMap()): ContainerExecResult
+    suspend fun exec(
+        container: Container,
+        command: List<String>,
+        env: Map<String, String> = emptyMap(),
+        user: ContainerUser.Spec? = null,
+    ): ContainerExecResult
 
     /**
      * Why this backend cannot share a device node (a USB serial adapter, a

@@ -530,7 +530,7 @@ object ContainersCatalog {
         }
         config.ports.forEach { port -> add(portItem(container.id, port, info.container.backend)) }
         if (!config.runsAsRoot) {
-            add(TextBlockItem(id = "container_program_user", title = "User", text = "The image asks for ${config.user}; containers here run everything as root"))
+            add(TextBlockItem(id = "container_program_user", title = "User", text = "Runs as ${config.user}"))
         }
         val log = withContext(Dispatchers.IO) { ContainerProgram.lastLines(ContainerProgram.hostLogFile(app.filesDir, container.id)) }
         add(TextBlockItem(id = "container_program_log", title = "Log", text = log.joinToString("\n").ifEmpty { "Nothing yet" }, last = true))

@@ -1905,8 +1905,8 @@ differ only in the `RootfsUnpacker` that writes the tree.
   replace the command, never the entrypoint, as Docker runs it. A base
   image (alpine, debian) names none. The container page shows a section
   "Its own program" (the program as a shell line, its working folder and
-  environment, and a note when the image asks for a user other than root,
-  since containers here run everything as root) when the image names one.
+  environment, and "Runs as ..." when the image, or `-u`, names a user other
+  than root) when the image names one.
   **Running it** (D6b, 2026-10-15). The section has **Start it** / **Stop
   it** with what the program is doing (running, restarting in N s,
   exited with a code, stopped after failing, couldn't start), **Restart
@@ -2891,8 +2891,20 @@ the `ContainerRuntime` interface that already exists (§3):
   "Its own program", and the start with the desktop. `-w FOLDER` (an absolute folder) and
   `--entrypoint PROGRAM` are taken too (Droidtop/tracker#715, 2026-10-29), kept with the same overrides:
   `--entrypoint` replaces the image's entrypoint and drops its `Cmd` unless a command follows the image, as
-  Docker does, and `--entrypoint ""` clears it. `-u` answers "not built in droidtop yet": a program as
-  another user needs the backends to switch user, which neither does. Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
+  Docker does, and `--entrypoint ""` clears it.
+  **Users (Droidtop/tracker#715, 2026-10-29).** A program runs as its image's own `User`, or as `-u USER[:GROUP]`
+  (run, create and exec; the APIs' `User` and libpod's `user`), read as Docker reads them (a name or uid, a group
+  name or gid after a colon) against the image's own /etc/passwd and /etc/group (`ContainerUser`); a name the image
+  does not have fails the start in Docker's words ("unable to find user ..."), and a uid without a line runs with
+  gid 0, as Docker's does. Before this every program ran as root, whatever the image said. Decided, one way per
+  backend: **proot** shows the user's ids in place of root's (`--change-id=uid:gid` for that session, where it
+  passed `--root-id`); the files it writes are droidtop's own on disk either way, as with root. **droidspaces**
+  (real root) switches with the image's own `su`, at the very end of droidtop's script, after the script has opened
+  the program's log or a request's pipes as root, so the user writes to them through what is already open
+  (`ContainerUser.EXEC_TAIL`; `su` without `-` keeps the environment). There `su` needs a name, so a uid without a
+  passwd line, a group other than the user's own, and an image without `su` are refused, saying which. The two
+  passwd files are read inside the container on droidspaces (its tree is root's) and from the tree on proot, never
+  through a link that leaves it. Options that need a kernel feature (`--memory`, `--cpus`, `--network`, `--hostname`,
   `--tmpfs`, `--read-only`, ...) answer from the one table in "Kernel features, detected at runtime" (section 3);
   `--network host` and `--pid host` are taken, being what the containers already are. `docker info` (D10) says the
   engine, the backend running now and each feature in plain words. A compose subset of droidtop's own is not built
@@ -3026,7 +3038,7 @@ the `ContainerRuntime` interface that already exists (§3):
   folder and environment given the way the enter path gives them (`ContainerEnter.directCommand`, the same constant
   script), never shell text. It runs on pipes and its output comes back when it ends, so input and a terminal
   (`docker exec -i`, `-t`) answer not built: droidtop's own docker command, at the end of the PATH, streams them. A
-  non-root `User` is not built and `Privileged` is refused. The execs a session made are kept in memory, at most 256.
+  `User` runs it as that user ("Users", above) and `Privileged` is refused. The execs a session made are kept in memory, at most 256.
   **Attach and --rm (built 2026-10-16, D14 fifth slice).** `POST /containers/{id}/attach` is how `docker run` and
   `docker compose up` without `-d` show a program's output: a program's output goes to its log, so attach follows
   that file (`EngineApiServer.followLog`) and sends what is added as stdout frames, from where it ends now, or from

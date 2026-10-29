@@ -56,7 +56,8 @@ class EngineCli private constructor(val front: Front) {
         add("--rm removes the container once its program has run and ended.")
         add("run takes -w FOLDER (an absolute folder) and --entrypoint PROGRAM (\"\" clears the image's).")
         add("logs takes --since and --until: 10m, 2026-10-29T10:00:00Z, or Unix seconds.")
-        add("Not yet: -u. Options that need a kernel feature (-p 8080:80, --memory, --network,")
+        add("run, create and exec take -u USER[:GROUP] (a name or number the image's /etc/passwd knows).")
+        add("Options that need a kernel feature (-p 8080:80, --memory, --network,")
         add("--hostname, --tmpfs, ...) say which one and whether this device has it; see ${front.command} info.")
         add("Containers here share the device's network and processes: a port is the device's own.")
     }.joinToString("\n") + "\n"
@@ -174,6 +175,7 @@ class EngineCli private constructor(val front: Front) {
     private fun exec(args: List<String>): EngineRequest {
         val env = linkedMapOf<String, String>()
         var workdir: String? = null
+        var user: String? = null
         var i = 0
         while (i < args.size && args[i].startsWith("-")) {
             when (val a = args[i]) {
@@ -185,14 +187,21 @@ class EngineCli private constructor(val front: Front) {
                     env(kv)?.let { (k, v) -> env[k] = v } ?: return EngineRequest.Answer("${front.command} exec: not NAME=VALUE: $kv\n", 1)
                 }
                 "-w", "--workdir" -> workdir = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} exec: $a needs a folder\n", 1)
-                else -> return error("exec", a)
+                "-u", "--user" -> {
+                    val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} exec: $a needs a user\n", 1)
+                    user = userOf(spec) ?: return userRefused(spec, "exec")
+                }
+                else -> when {
+                    a.startsWith("--user=") -> user = userOf(a.substringAfter('=')) ?: return userRefused(a.substringAfter('='), "exec")
+                    else -> return error("exec", a)
+                }
             }
             i++
         }
         val container = args.getOrNull(i) ?: return EngineRequest.Answer("${front.command} exec: name a container and a command\n", 1)
         val command = args.drop(i + 1)
         if (command.isEmpty()) return EngineRequest.Answer("${front.command} exec: name a command to run in $container\n", 1)
-        return EngineRequest.Exec(container, command, env, workdir)
+        return EngineRequest.Exec(container, command, env, workdir, user)
     }
 
     /**
@@ -276,6 +285,7 @@ class EngineCli private constructor(val front: Front) {
         val labels = linkedMapOf<String, String>()
         var entrypoint: List<String>? = null
         var workdir: String? = null
+        var user: String? = null
         // `--entrypoint ""` clears the image's entrypoint, as Docker's does (Droidtop/tracker#715).
         fun entrypointOf(value: String) = if (value.isEmpty()) emptyList() else listOf(value)
         var i = 0
@@ -287,6 +297,10 @@ class EngineCli private constructor(val front: Front) {
                     workdir = dir
                 }
                 "--entrypoint" -> entrypoint = entrypointOf(args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: --entrypoint needs a program\n", 1))
+                "-u", "--user" -> {
+                    val spec = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: $a needs a user\n", 1)
+                    user = userOf(spec) ?: return userRefused(spec, sub)
+                }
                 "-d", "--detach", "-dit", "-itd", "-dt", "-td", "-di", "-id" -> detach = true
                 "-i", "-t", "-it", "-ti", "--interactive", "--tty" -> Unit
                 "--name" -> name = args.getOrNull(++i) ?: return EngineRequest.Answer("${front.command} $sub: --name needs a name\n", 1)
@@ -358,8 +372,7 @@ class EngineCli private constructor(val front: Front) {
                         val spec = a.substringAfter('=')
                         volumes += volume(spec) ?: return volumeRefused(spec, sub)
                     }
-                    a in NOT_YET_RUN || NOT_YET_RUN.any { a.startsWith("$it=") } ->
-                        return EngineRequest.Answer("${front.command} $sub: $a is not built in droidtop yet\n", 1)
+                    a.startsWith("--user=") -> user = userOf(a.substringAfter('=')) ?: return userRefused(a.substringAfter('='), sub)
                     else -> return error(sub, a)
                 }
             }
@@ -378,7 +391,7 @@ class EngineCli private constructor(val front: Front) {
         }
         return EngineRequest.Run(
             image, name?.trim(), command, envs, volumes, restart, podName, newPod, publish,
-            start = sub == "run", labels = labels, autoRemove = autoRemove, entrypoint = entrypoint, workdir = workdir,
+            start = sub == "run", labels = labels, autoRemove = autoRemove, entrypoint = entrypoint, workdir = workdir, user = user,
             // `create` starts nothing to attach to.
             detach = detach || sub != "run",
         )
@@ -475,8 +488,13 @@ class EngineCli private constructor(val front: Front) {
         }
     }
 
-    /** `run` flags droidtop knows of and has not built: said as such, not as unknown. */
-    private val NOT_YET_RUN = setOf("-u", "--user")
+    /** `-u`'s value as given, when it is one ([ContainerUser.parse]); whether the image has that user is the start's to say. */
+    private fun userOf(spec: String): String? = ContainerUser.parse(spec)?.toString()
+
+    private fun userRefused(spec: String, sub: String) = EngineRequest.Answer(
+        "${front.command} $sub: -u takes a user or uid, with a group or gid after a colon, not $spec\n",
+        1,
+    )
 
     private fun restartRefused(words: String, sub: String) = EngineRequest.Answer(
         "${front.command} $sub: --restart takes no, on-failure[:N], always or unless-stopped, not $words\n",

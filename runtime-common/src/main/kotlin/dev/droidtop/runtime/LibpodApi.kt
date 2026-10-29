@@ -207,7 +207,7 @@ object LibpodApi {
         val entrypoint = strings("entrypoint").takeIf { o["entrypoint"] is JsonArray }?.let { list -> if (list == listOf("")) emptyList() else list }
         val workdir = string(o, "work_dir")
         if (workdir != null && !EngineCli.validWorkdir(workdir)) return refuse(400, "work_dir must be an absolute folder: $workdir")
-        string(o, "user")?.takeIf { it.substringBefore(':') !in setOf("root", "0") }?.let { return notYet("user (podman run -u)") }
+        val user = string(o, "user")?.let { ContainerUser.parse(it)?.toString() ?: return refuse(400, "user takes a user or uid, with a group or gid after a colon: $it") }
         if (bool("terminal") || bool("stdin")) return notYet("a container with a terminal or open input (podman run -t, -i)")
         string(o, "hostname")?.let { return feature("--hostname") }
         if (bool("read_only_filesystem")) return feature("--read-only")
@@ -288,6 +288,7 @@ object LibpodApi {
             autoRemove = autoRemove,
             entrypoint = entrypoint,
             workdir = workdir,
+            user = user,
         ) to null
     }
 
