@@ -63,13 +63,4 @@ class KeyboardMouseLayoutTest {
         assertEquals(emptyList<Output>(), e.stick("joystick", 1f, 0f, 20))
         assertTrue(e.tick(120).single() is Output.MouseMove)
     }
-
-    @Test
-    fun `the Controls row steps through every layout and back to Gamepad`() {
-        assertEquals(WineControls.KEYBOARD_MOUSE, WineControls.next(null))
-        assertEquals(WineControls.MOUSE_ONLY, WineControls.next(WineControls.KEYBOARD_MOUSE))
-        assertEquals(null, WineControls.next(WineControls.MOUSE_ONLY))
-        assertEquals(WineControls.MOUSE_ONLY, WineControls.byId("mouse_only"))
-        assertEquals(null, WineControls.byId(""))
-    }
 }

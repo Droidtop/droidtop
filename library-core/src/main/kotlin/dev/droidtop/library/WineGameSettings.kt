@@ -41,11 +41,13 @@ data class WineGameSettings(
     val launchOptions: String? = null,
     /** Variables the person set for this game ([GameLaunchOptions.parseEnvironment]); applied to the one launch, never to the prefix. */
     val environment: Map<String, String> = emptyMap(),
+    /** The game's own language as Steam names it ([GameLanguage.steam]); null is the device's. */
+    val language: String? = null,
 ) {
     /** Nothing set: the game is on detection and has no options of its own. */
     val isEmpty: Boolean
         get() = executable == null && arguments.isEmpty() && workingDir == null && source == null &&
-            launchOptions.isNullOrBlank() && environment.isEmpty()
+            launchOptions.isNullOrBlank() && environment.isEmpty() && language == null
 }
 
 /** [WineGameSettings] by [LibraryEntry.id], the same keying as [LaunchStrategyOverridePrefs]. */
@@ -79,8 +81,8 @@ object WineGameSettingsPrefs {
 
 /**
  * Replaces the program half of [entryId]'s settings with [program] (null:
- * back to detection) and keeps the person's own launch options and
- * environment, which belong to the game and not to the program. Both
+ * back to detection) and keeps the person's own launch options,
+ * environment and language, which belong to the game and not to the program. Both
  * program writers use this.
  */
 fun WineGameSettingsPrefs.setProgram(context: Context, entryId: String, program: WineGameSettings?) {
@@ -88,7 +90,11 @@ fun WineGameSettingsPrefs.setProgram(context: Context, entryId: String, program:
     set(
         context,
         entryId,
-        (program ?: WineGameSettings()).copy(launchOptions = old?.launchOptions, environment = old?.environment.orEmpty()),
+        (program ?: WineGameSettings()).copy(
+            launchOptions = old?.launchOptions,
+            environment = old?.environment.orEmpty(),
+            language = old?.language,
+        ),
     )
 }
 
