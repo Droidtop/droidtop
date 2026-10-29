@@ -87,9 +87,10 @@ internal object InGameOverlays {
             Log.i(TAG, "HOME + L2 with no game droidtop started in front")
             return
         }
-        // The left menu's destinations are Gaming's: with Gaming off there is no left menu to draw.
-        if (request.kind == OverlayRequest.Kind.LEFT_MENU && Mode.GAMING !in Modes.enabled) {
-            Log.i(TAG, "HOME + Start with Gaming off")
+        // The left menu is Gaming's, and its rows open Gaming: it is drawn only when Gaming is the mode in use, so a row
+        // never switches the person into a mode they are not using (the mode boundary, as PlaceLinks).
+        if (request.kind == OverlayRequest.Kind.LEFT_MENU && !Place.opensInGaming(Modes.lastMode(app), Modes.enabled)) {
+            Log.i(TAG, "HOME + Start with Gaming not the mode in use")
             return
         }
         val (windowContext, type) = GameOverlay.windowContext(app, request.displayId) ?: run {

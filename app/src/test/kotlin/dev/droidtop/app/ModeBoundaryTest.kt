@@ -38,6 +38,7 @@ class ModeBoundaryTest {
         "app/src/main/kotlin/dev/droidtop/app/FullPageWidgetProvider.kt" to (2 to "the full-page widget's mode buttons, the person's switch"),
         "app/src/main/kotlin/dev/droidtop/app/GameLaunchActivity.kt" to (1 to "a pinned icon or widget on the Android home screen, which is Standard, opens Standard's games screen"),
         "app/src/main/kotlin/dev/droidtop/app/HomeOverlayKeys.kt" to (1 to "asks whether droidtop is the home screen, for the HOME chords' key filter; starts nothing"),
+        "app/src/main/kotlin/dev/droidtop/app/InGameOverlays.kt" to (2 to "the in-game left menu, drawn only while Gaming is the mode in use, opens Gaming's section the person picked"),
         "app/src/main/kotlin/dev/droidtop/app/JobOpener.kt" to (1 to "a job row's game opens Standard's games screen only in Standard"),
         "app/src/main/kotlin/dev/droidtop/app/LauncherGamesActivity.kt" to (4 to "Standard's own games screen: its icon entry, its pinned icons, and Back to Standard's home only in Standard"),
         "app/src/main/kotlin/dev/droidtop/app/LauncherSearchActivity.kt" to (1 to "Standard's search opens Standard's games screen"),
