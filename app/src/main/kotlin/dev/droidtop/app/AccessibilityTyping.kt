@@ -43,11 +43,18 @@ class TypingAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         AccessibilityTyping.connect(this)
         AccessibilityPointer.connect(this)
+        HomeOverlayKeys.connect(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        event?.let { AccessibilityTyping.onEvent(this, it) }
+        event?.let {
+            HomeOverlayKeys.onEvent(this, it)
+            AccessibilityTyping.onEvent(this, it)
+        }
     }
+
+    /** The HOME chords' key filter (Droidtop/tracker#740), asked for only while droidtop is the default home. */
+    override fun onKeyEvent(event: KeyEvent): Boolean = HomeOverlayKeys.onKey(this, event)
 
     override fun onInterrupt() = Unit
 

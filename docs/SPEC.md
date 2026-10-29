@@ -3706,6 +3706,33 @@ the `ContainerRuntime` interface that already exists (§3):
   and root is never the standard path (the Battery tile paragraph in "What Gaming offers beyond the theme" stands). Not built: an overlay
   position or size setting, a frame-time graph, and plugin-supplied readings (`perf.source` is declared and
   has no consumer yet).
+- **In-game overlays: HOME chords (decided 2026-10-29, Droidtop/tracker#740).** The owner: "As for the keyboard
+  shortcut: we only care about it working when droidtop is the home, so can we use home + something else?" and
+  "Home + r2 gets the quick menu, and home +l2 gives the local contextual menu/companion-style overlay. This gives us
+  something much more steam-like. Also, home + whatever opens our left menu can give us a left menu overlay, maybe
+  we can draw just the launcher stuff into the overlay. Not backgrounding the game, just drawing over it". While
+  another app is in front, **HOME + R2** opens the Quick Menu, **HOME + L2** the context menu (what L2 Options shows
+  for the current game, as the companion draws it) and **HOME + Start** the left menu's launcher content, drawn over
+  the app without backgrounding it; **HOME alone** is HOME, as before. The input half (built 2026-10-29):
+  - Even the home app never receives HOME, so the chord is read by droidtop's accessibility service ("droidtop
+    keyboard and pointer", `TypingAccessibilityService`), whose key filter (`canRequestFilterKeyEvents`) is asked for
+    only while droidtop is the default home (`HomeOverlayKeys`, read again when a window changes, at most every 2 s).
+    With the service off, or another home, the service sees no keys and the chords do not exist. Its description in
+    Android's settings says so.
+  - `HomeChords` (`:runtime-common`, pure, tested) decides each key at once. HOME down is held; R2, L2 or Start while
+    it is held raises `OverlayRequest(kind, displayId)` on `OverlayRequests.requests`, and both keys are eaten, the
+    button through its release. A second request of the same kind while it is open is the UI's to close it. Every
+    other key goes on untouched, with no delay.
+  - HOME let go alone is passed on as `GLOBAL_ACTION_HOME`: a key the service ate cannot go on as the key itself, and
+    Android acts on HOME's release anyway, so it opens home as before. A long press of HOME (the Assistant) is not
+    passed on while the filter is on.
+  - While an overlay is open it sets `OverlayRequests.keys`; the pad's presses (gamepad or joystick sources) go there
+    and none reach the app, each release with its press. A keyboard stays the app's.
+  - `displayId` is the display of the window that last came to the front (its accessibility window's display), where
+    the overlay is drawn.
+  - The Retroid Pocket 5's Home button is to be logged on the console (`getevent`); if it is not `KEYCODE_HOME`,
+    `HomeChords(homeKeys)` takes that key instead.
+  The overlays themselves, RetroArch's pause while one is open, and their closing are the UI half (#740).
 - **Quick Menu: a branching panel (decided 2026-10-02, Droidtop/tracker#258, #273)**: the
   Quick Menu is the shell's RIGHT menu and is quick management only; the left menu (Start) is
   navigation and the places things live. The owner's direction: "branch our quick menu out a
