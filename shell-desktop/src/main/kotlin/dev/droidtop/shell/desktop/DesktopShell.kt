@@ -400,6 +400,18 @@ private fun BoxScope.DesktopViewport(
         // break the single normalized seat :input-seat exists to be.
         val seat = remember(hostBridge) { InputSeats.of(hostBridge) }
         val router = remember(hostBridge) { DesktopInputRouter().also { it.seat = seat } }
+        // The pad's chords (docs/SPEC.md 6b "Pad chords", Droidtop/tracker#383): the bundled layout, read off the main
+        // thread; until it is in, the pad behaves as it always has.
+        val context = LocalContext.current
+        LaunchedEffect(router) {
+            router.chords = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    context.resources.openRawResource(dev.droidtop.input.R.raw.desktop_pad_chords).bufferedReader().use {
+                        dev.droidtop.mapping.ControllerLayout.parse(it.readText())
+                    }
+                }.onFailure { android.util.Log.w("DesktopShell", "The pad chord layout did not load", it) }.getOrNull()
+            }
+        }
 
         // The router is inert with no seat, so tearing the session down is
         // just clearing it -- and clearing it releases whatever the

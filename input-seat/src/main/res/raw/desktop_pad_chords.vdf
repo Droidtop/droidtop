@@ -1,0 +1,186 @@
+// droidtop's Desktop pad chords (Droidtop/tracker#383), written for droidtop, CC BY 4.0.
+// Steam's controller layout format, so Steam loads it as it is. Held, L2 puts the face buttons and the D-pad on the
+// chord groups; released, they are droidtop's again.
+"controller_mappings"
+{
+	"version"		"3"
+	"revision"		"1"
+	"title"		"#title"
+	"description"		"#description"
+	"creator"		"droidtop"
+	"controller_type"		"controller_xboxone"
+	"actions"
+	{
+		"Default"
+		{
+			"title"		"#set_default"
+			"legacy_set"		"1"
+		}
+	}
+	"localization"
+	{
+		"english"
+		{
+			"title"		"Desktop chords"
+			"description"		"Hold L2: A copies, B pastes, X cuts, Y undoes, the D-pad is the arrow keys."
+			"set_default"		"Default"
+		}
+	}
+	"group"
+	{
+		"id"		"0"
+		"mode"		"trigger"
+		"inputs"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"mode_shift button_diamond 1, Chords, "
+							"binding"		"mode_shift dpad 2, Arrows, "
+						}
+					}
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"1"
+		"mode"		"four_buttons"
+		"inputs"
+		{
+			"button_a"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press LEFT_CONTROL, Copy, "
+							"binding"		"key_press C, Copy, "
+						}
+					}
+				}
+			}
+			"button_b"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press LEFT_CONTROL, Paste, "
+							"binding"		"key_press V, Paste, "
+						}
+					}
+				}
+			}
+			"button_x"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press LEFT_CONTROL, Cut, "
+							"binding"		"key_press X, Cut, "
+						}
+					}
+				}
+			}
+			"button_y"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press LEFT_CONTROL, Undo, "
+							"binding"		"key_press Z, Undo, "
+						}
+					}
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"2"
+		"mode"		"dpad"
+		"inputs"
+		{
+			"dpad_north"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press UP_ARROW, Up, "
+						}
+					}
+				}
+			}
+			"dpad_south"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press DOWN_ARROW, Down, "
+						}
+					}
+				}
+			}
+			"dpad_west"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press LEFT_ARROW, Left, "
+						}
+					}
+				}
+			}
+			"dpad_east"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"key_press RIGHT_ARROW, Right, "
+						}
+					}
+				}
+			}
+		}
+	}
+	"preset"
+	{
+		"id"		"0"
+		"name"		"Default"
+		"group_source_bindings"
+		{
+			"0"		"left_trigger active"
+			"1"		"button_diamond active modeshift"
+			"2"		"dpad active modeshift"
+		}
+	}
+}

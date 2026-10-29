@@ -50,6 +50,24 @@ class DesktopInputRouter {
      */
     var gamepadPointerEnabled: Boolean = true
 
+    /**
+     * The pad's chord layout (docs/SPEC.md 6b "Pad chords", Droidtop/tracker#383), Steam's controller layout format
+     * played by the one mapping engine: by default, held, L2 puts the face buttons and the D-pad on key chords (copy,
+     * paste, cut, undo, the arrow keys). A pad button the layout leaves unbound is not taken, so D-pad and A keep
+     * driving droidtop's own focus, and nothing changes while no layout is set. The host parses it off the main thread.
+     */
+    var chords: dev.droidtop.mapping.ControllerLayout? = null
+        set(value) {
+            releaseChords()
+            field = value
+            chordEngine = value?.let { dev.droidtop.mapping.MappingEngine(it) }
+        }
+
+    private var chordEngine: dev.droidtop.mapping.MappingEngine? = null
+
+    /** The pad buttons the chord engine took the press of, so it also gets their release. */
+    private val chordHeld = mutableSetOf<dev.droidtop.mapping.MappingEngine.Physical>()
+
     private var touchButtonDown = false
     private var touchScrolling = false
     private var lastTouchCentroidX = 0f
@@ -101,6 +119,7 @@ class DesktopInputRouter {
      * that behaves as though Ctrl is permanently pressed.
      */
     fun releaseHeldInput() {
+        releaseChords()
         val current = seat
         if (current != null) {
             heldButtons.forEach { current.onPointerButton(InputSource.TOUCH, it, pressed = false) }
@@ -349,6 +368,7 @@ class DesktopInputRouter {
         // clicks are claimed; everything else is left to the shell so
         // D-pad/A navigation keeps working (see onJoystickMotion).
         if (event.isFromSource(InputDevice.SOURCE_GAMEPAD) || event.isFromSource(InputDevice.SOURCE_JOYSTICK)) {
+            if (onPadChord(event.keyCode, event.action, event.repeatCount, event.eventTime)) return true
             if (!gamepadPointerEnabled) return false
             val button = when (event.keyCode) {
                 KeyEvent.KEYCODE_BUTTON_THUMBR -> EvdevKeys.BTN_LEFT
@@ -364,6 +384,56 @@ class DesktopInputRouter {
         }
 
         return onKeyEvent(event.keyCode, event.action, event.repeatCount, event.metaState, typed = isTyped(event))
+    }
+
+    /**
+     * A pad button through the chord layout ([chords]): taken when the layout binds it now (L2 itself, or a face
+     * button or D-pad direction while L2 holds the chord groups), and its release always, so nothing stays held. The
+     * keys it plays go through [onKeyEvent]'s own translation, as if typed on a keyboard. False leaves the button to
+     * the shell. Ints, so a JVM unit test can drive it.
+     */
+    internal fun onPadChord(keyCode: Int, action: Int, repeatCount: Int, now: Long): Boolean {
+        val engine = chordEngine ?: return false
+        val physical = dev.droidtop.mapping.PadInputs.physical(keyCode) ?: return false
+        when (action) {
+            KeyEvent.ACTION_DOWN -> {
+                if (repeatCount > 0) return physical in chordHeld
+                if (engine.groupOn(physical.source)?.input(physical.input)?.activators.isNullOrEmpty()) return false
+                chordHeld += physical
+                play(engine.press(physical.source, physical.input, now))
+                return true
+            }
+            KeyEvent.ACTION_UP -> {
+                if (!chordHeld.remove(physical)) return false
+                play(engine.release(physical.source, physical.input, now))
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun play(outputs: List<dev.droidtop.mapping.MappingEngine.Output>) {
+        for (output in outputs) {
+            when (output) {
+                is dev.droidtop.mapping.MappingEngine.Output.KeyDown ->
+                    dev.droidtop.mapping.SteamKeys.androidKeyCode(output.key)?.let { onKeyEvent(it, KeyEvent.ACTION_DOWN, 0, 0) }
+                is dev.droidtop.mapping.MappingEngine.Output.KeyUp ->
+                    dev.droidtop.mapping.SteamKeys.androidKeyCode(output.key)?.let { onKeyEvent(it, KeyEvent.ACTION_UP, 0, 0) }
+                // The desktop layout binds keys only; a layout with more would add its outputs here.
+                else -> Unit
+            }
+        }
+    }
+
+    /** Lets go of every chord held, through the engine, so a chord's keys are released in order. */
+    private fun releaseChords() {
+        val engine = chordEngine ?: return
+        if (chordHeld.isNotEmpty()) {
+            val now = android.os.SystemClock.uptimeMillis()
+            chordHeld.toList().forEach { play(engine.release(it.source, it.input, now)) }
+            chordHeld.clear()
+        }
+        chords?.let { chordEngine = dev.droidtop.mapping.MappingEngine(it) }
     }
 
     /**

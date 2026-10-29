@@ -7744,6 +7744,20 @@ navigation in exactly the case a gamepad pointer is for (no mouse attached). Sta
 are droidtop's while Desktop shows and open those sheets (2b "Desktop chrome with a pad").
 The right stick and stick clicks are the controls that navigation does not use.
 
+**Pad chords (lane default, 2026-10-29, Droidtop/tracker#383).** The owner, 2026-10-08: "we might wanna do key-combination mapping, extra controls"; the issue scopes it as one mapping mechanism, never a second one, Desktop first since the container gets raw keys. So the desktop's chords are a controller layout in Steam's format, played by the same `MappingEngine` that runs Windows games' layouts (5b "Controller layouts"). The bundled layout is `input-seat/src/main/res/raw/desktop_pad_chords.vdf`, our own, CC BY 4.0.
+
+Held, L2 mode-shifts the face buttons and the D-pad onto chord groups:
+- A is Ctrl+C, B Ctrl+V, X Ctrl+X, Y Ctrl+Z;
+- the D-pad is the arrow keys.
+
+Released, they are droidtop's again: `DesktopInputRouter.onPadChord` takes a pad button only while the layout binds it, plus the release of any button it took. So the D-pad and A keep driving the shell's focus, and nothing is held after a chord.
+
+The chord keys go to the container through the router's own key translation (Steam's key names to Android key codes, `SteamKeys`, then the one Android-to-evdev table).
+
+L2 rather than L1, as first proposed on #383, because L1 is already the windows list here (2b "Desktop chrome with a pad") and L2 was the one shoulder droidtop did not use in Desktop.
+
+Still to come, in the same format: per-app and per-game layouts, the RP5's back buttons, and a "send this chord" macro key for the keyboard (#340).
+
 Known gaps, stated rather than guessed at: no long-press-to-right-click on the
 touchscreen (a hold threshold is not worth inventing without a device to tune
 it on). The second-screen trackpad surface of §6 is built on top of this

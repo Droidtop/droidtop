@@ -23,6 +23,8 @@ android {
 dependencies {
     implementation(project(":runtime-common"))
     api(project(":host-bridge"))
+    // The desktop's pad chords are a controller layout the one mapping engine plays (Droidtop/tracker#383).
+    api(project(":input-mapping"))
     implementation(libs.androidx.core.ktx)
 
     testImplementation(libs.junit)
