@@ -8743,7 +8743,7 @@ app-drawer icon or a floating switcher button:
   `wlr-foreign-toplevel-management-unstable-v1` beside screencopy and the
   virtual-input protocols (`wayland_client.cpp`'s `ToplevelState`/
   `kToplevelManagerListener`), and the taskbar (`TaskbarWindowList` in
-  `DesktopShell.kt`) lists every toplevel the compositor reports — title,
+  `DesktopTaskbar.kt`) lists every toplevel the compositor reports — title,
   app id, activated/minimized/maximized/fullscreen state — tap activates
   the row (and un-minimizes it first if needed), a second tap on the
   already-activated row minimizes it, and its long-press menu offers
