@@ -664,10 +664,19 @@ internal fun PcGameMenu(
                 install.add(ActionRow("DLC and versions", "Which DLC to have and which version to follow", onSelect = { contentOpen = true }))
             }
             downloads[key]?.let { job ->
-                install.add(ActionRow("Downloads", dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job), onSelect = {
-                    onClose()
-                    onOpenDownloads()
-                }))
+                install.add(
+                    ActionRow(
+                        "Downloads",
+                        dev.droidtop.library.integrations.PluginJobsScreen.oneLine(job),
+                        onSelect = {
+                            onClose()
+                            onOpenDownloads()
+                        },
+                        // The job's bar and how it moves, with its line under it (Droidtop/tracker#738).
+                        progress = if (job.done) null else job.fraction() ?: -1f,
+                        look = dev.droidtop.library.integrations.PluginJobsScreen.lookOf(job),
+                    ),
+                )
             }
             if (installed && store.hasCloudSaves) {
                 saves.add(
