@@ -7845,8 +7845,14 @@ proposal) is not built; these helpers are in the one settings tree that already 
   and never trimmed, a repeat moves to the top. `ClipboardHistoryStore` records `primaryClip` text when the
   clipboard changes (no polling; allowed because droidtop's keyboard is the current input method, 6d; a read
   Android refuses is skipped), never a clip flagged `android.content.extra.IS_SENSITIVE`, never while incognito,
-  and keeps the file (`clipboard_history.txt`, app-private) on one background thread; the main thread only
-  touches memory. The panel lists entries with Pin, Delete and Clear (pinned stay). A tap on an entry types it at
+  and never a copy made while the keyboard serves a password field (text, web, visible or numeric) or an editor
+  that asked for no personalised learning, until the next field starts (`IncognitoRules.sensitiveField`, noted by
+  `LatinIME.onStartInputView`), since apps before Android 13 never set the flag. The file
+  (`clipboard_history.bin`, app-private) is encrypted at rest (Droidtop/tracker#772): AES-GCM under a key kept in
+  the Android Keystore (`ClipboardVault`), so no copied text is on disk in the clear, and a file the key no longer
+  opens (the key was reset) is dropped. The plaintext `clipboard_history.txt` an older build wrote is read once,
+  saved sealed and deleted. Encoding, sealing and the file work run on one background thread; the main thread only
+  touches memory. Loading merges with what was recorded meanwhile, so a copy made before the file was read is kept. The panel lists entries with Pin, Delete and Clear (pinned stay). A tap on an entry types it at
   the cursor where the sink takes text; into a container, which has no text channel, it sets the Android
   clipboard, which the clipboard bridge hands to the container, and the panel says to paste there.
 - **Incognito.** One preference, toggled from the strip. While on: no clipboard recording, turning it on forgets

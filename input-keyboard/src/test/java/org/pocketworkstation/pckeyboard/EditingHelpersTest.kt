@@ -1,5 +1,6 @@
 package org.pocketworkstation.pckeyboard
 
+import android.view.inputmethod.EditorInfo
 import android.view.KeyEvent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -69,6 +70,38 @@ class EditingHelpersTest {
         val back = ClipboardHistory()
         back.restore(h.encode())
         assertEquals(h.entries, back.entries)
+    }
+
+    @Test fun restoreMergesWithWhatWasRecordedWhileLoading() {
+        val saved = ClipboardHistory()
+        saved.add("from the file", 5)
+        saved.add("both", 6)
+        val h = ClipboardHistory()
+        h.add("copied before the load finished", 9)
+        h.add("both", 10)
+        h.restore(saved.encode())
+        assertEquals(listOf("both", "copied before the load finished", "from the file"), h.entries.map { it.text })
+        assertEquals(10L, h.entries.first { it.text == "both" }.at)
+    }
+
+    @Test fun aSensitiveFieldKeepsCopiesOutOfTheHistory() {
+        val text = EditorInfo.TYPE_CLASS_TEXT
+        val number = EditorInfo.TYPE_CLASS_NUMBER
+        assertTrue(IncognitoRules.sensitiveField(text or EditorInfo.TYPE_TEXT_VARIATION_PASSWORD, 0))
+        assertTrue(IncognitoRules.sensitiveField(text or EditorInfo.TYPE_TEXT_VARIATION_WEB_PASSWORD, 0))
+        assertTrue(IncognitoRules.sensitiveField(number or EditorInfo.TYPE_NUMBER_VARIATION_PASSWORD, 0))
+        assertTrue(IncognitoRules.sensitiveField(text, EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING))
+        assertFalse(IncognitoRules.sensitiveField(text or EditorInfo.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 0))
+        assertFalse(IncognitoRules.sensitiveField(number, 0))
+    }
+
+    @Test fun aSealedBlobFramesItsIvAndRefusesAnotherVersion() {
+        val iv = ByteArray(ClipboardVault.IV_BYTES) { it.toByte() }
+        val body = byteArrayOf(9, 8, 7)
+        val (backIv, backBody) = ClipboardVault.unframe(ClipboardVault.frame(iv, body))!!
+        assertTrue(iv.contentEquals(backIv) && body.contentEquals(backBody))
+        assertEquals(null, ClipboardVault.unframe(byteArrayOf(2) + iv + body))
+        assertEquals(null, ClipboardVault.unframe(byteArrayOf(ClipboardVault.VERSION) + iv))
     }
 
     @Test fun restoreSkipsLinesThatDoNotParse() {

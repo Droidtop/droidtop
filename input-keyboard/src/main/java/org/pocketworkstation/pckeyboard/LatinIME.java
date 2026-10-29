@@ -841,6 +841,9 @@ public class LatinIME extends InputMethodService implements
                 mPasswordText = true;
             }
         }
+        // droidtop patch (Droidtop/tracker#772): the clipboard history keeps nothing copied while a password field,
+        // or an editor that asked for no personalised learning, has the keyboard.
+        ClipboardHistoryStore.noteField(attribute.inputType, attribute.imeOptions);
 
         mEnableVoiceButton = shouldShowVoiceButton(attribute);
         final boolean enableVoiceButton = mEnableVoiceButton && mEnableVoice;

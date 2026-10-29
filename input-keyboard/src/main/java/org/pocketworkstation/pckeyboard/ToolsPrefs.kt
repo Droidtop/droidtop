@@ -75,4 +75,22 @@ object IncognitoRules {
     @JvmStatic
     fun learningAllowed(incognito: Boolean, imeOptions: Int, passwordField: Boolean): Boolean =
         !incognito && !passwordField && imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING == 0
+
+    /**
+     * Whether a field of [inputType] and [imeOptions] holds something the clipboard history must not keep
+     * (Droidtop/tracker#772): any password variation, text, web, visible or numeric, or an editor that asked for no
+     * personalised learning. A copy made while such a field has the keyboard is not recorded.
+     */
+    @JvmStatic
+    fun sensitiveField(inputType: Int, imeOptions: Int): Boolean {
+        val variation = inputType and EditorInfo.TYPE_MASK_VARIATION
+        val password = when (inputType and EditorInfo.TYPE_MASK_CLASS) {
+            EditorInfo.TYPE_CLASS_TEXT -> variation == EditorInfo.TYPE_TEXT_VARIATION_PASSWORD ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+                variation == EditorInfo.TYPE_TEXT_VARIATION_WEB_PASSWORD
+            EditorInfo.TYPE_CLASS_NUMBER -> variation == EditorInfo.TYPE_NUMBER_VARIATION_PASSWORD
+            else -> false
+        }
+        return password || imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING != 0
+    }
 }

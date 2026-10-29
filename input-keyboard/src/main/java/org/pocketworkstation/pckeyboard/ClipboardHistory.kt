@@ -56,16 +56,15 @@ class ClipboardHistory(private val maxUnpinned: Int = 50, private val maxChars: 
         }
     }
 
-    /** One entry per line: `P` or `-`, a tab, the time, a tab, the text with backslash, newline, tab and return escaped. */
-    fun encode(): String = buildString {
-        for (entry in items) {
-            append(if (entry.pinned) 'P' else '-').append('\t').append(entry.at).append('\t').append(escape(entry.text)).append('\n')
-        }
-    }
+    /** [encode] of these entries. */
+    fun encode(): String = encode(items)
 
-    /** Replaces the entries with those in [encoded]; a line that does not parse is skipped. */
+    /**
+     * Adds the entries in [encoded] to those already here; a line that does not parse is skipped. Merged, not
+     * replaced: a clip recorded while the file was still loading stays (Droidtop/tracker#772), and on a text both
+     * have, the one here wins.
+     */
     fun restore(encoded: String) {
-        items.clear()
         for (line in encoded.split('\n')) {
             val parts = line.split('\t', limit = 3)
             if (parts.size != 3) continue
@@ -77,8 +76,18 @@ class ClipboardHistory(private val maxUnpinned: Int = 50, private val maxChars: 
         trim()
     }
 
-    private companion object {
-        fun escape(text: String): String = buildString {
+    companion object {
+        /**
+         * One entry per line: `P` or `-`, a tab, the time, a tab, the text with backslash, newline, tab and return
+         * escaped. Takes a copy of the entries, so the store can encode off the main thread.
+         */
+        fun encode(entries: List<Entry>): String = buildString {
+            for (entry in entries) {
+                append(if (entry.pinned) 'P' else '-').append('\t').append(entry.at).append('\t').append(escape(entry.text)).append('\n')
+            }
+        }
+
+        private fun escape(text: String): String = buildString {
             for (c in text) {
                 when (c) {
                     '\\' -> append("\\\\")
@@ -90,7 +99,7 @@ class ClipboardHistory(private val maxUnpinned: Int = 50, private val maxChars: 
             }
         }
 
-        fun unescape(text: String): String = buildString {
+        private fun unescape(text: String): String = buildString {
             var i = 0
             while (i < text.length) {
                 val c = text[i]
