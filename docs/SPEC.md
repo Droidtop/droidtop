@@ -4253,7 +4253,8 @@ the `ContainerRuntime` interface that already exists (§3):
       the overlay; the game never left), **Pause the game** for a console game (RetroArch's `PAUSE_TOGGLE` over its
       command port, `RetroArchCommands`, sent only on that press; pressed again carries on), **Emulator** (the game's
       own choice, `GameEmulatorChoice`), **Report a problem**, **Mouse mode** and **Controls** for a game in
-      droidtop's own screen, **Guides** (the game's guides over it, the game menu's own `GuidesScreen`; 7i "Guides";
+      droidtop's own screen, **Screenshot** (closes the sheet first, then saves the game's screen; "The companion's
+      tabs", Screenshots), **Guides** (the game's guides over it, the game menu's own `GuidesScreen`; 7i "Guides";
       B comes back), the console's **Search** where the host has one (Gaming), **Game options** (what L2 opens on the
       game in Gaming: a PC or engine game's `PcGameMenu`, whose Game page is drawn over the game too, or a console
       game's game menu, `AppOptionsMenu`, whose Game details is Gaming's detail screen; B there comes back), and
@@ -5506,6 +5507,12 @@ droidtop 0.2.0-dev.1931).
     first, newest first, as "Your screenshot". The copy in Pictures/Screenshots stays, and the line says where it
     went. Nothing is written into the person's games folders, and the scraper's own screenshot (ES-DE's
     `screenshots`) is never replaced.
+  - **From the running game's L2 sheet (2026-10-29, Droidtop/tracker#626; in the Quick Menu's Game section until
+    that moved to L2, #740).** `RunningGameSheet` has Screenshot: one press closes the sheet, and the shot is taken a
+    moment later (`Capture.takeSoon`, 0.7 s) of the screen the game runs on (`LaunchDisplay.parkedDisplayId`, else
+    the main screen), so it shows the game and not the menu. A flash says where it went. It follows the same access
+    rule as the companion's row (`GameRow.SCREENSHOT`, `ControlRow.GAME_SCREENSHOT`). A controller chord and clips
+    are later work.
 - **Power and performance (slice C16).** System > Power keeps performance mode and adds: the battery's health,
   temperature and charge rate (the battery broadcast), Battery saver (Android's screen), and what `PowerProbe` finds
   on this device rather than assumes per model. A fan mode or a charge limit is shown with its value where the device

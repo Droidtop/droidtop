@@ -84,6 +84,7 @@ internal fun GameOptionsOfRunningGame(content: @Composable () -> Unit) {
  * - Resume ([onResume]), and Pause the game for a console game (RetroArch's PAUSE_TOGGLE, sent only on this press);
  * - Emulator, the game's own choice ([GameEmulatorChoice], the companion's model too);
  * - Report a problem, Mouse mode and Controls for a game in droidtop's own screen;
+ * - Screenshot, which closes the sheet first so the picture is of the game (Droidtop/tracker#626);
  * - Guides; the console's own search where the host has one; Game options, the game's own menu ([onGameOptions]);
  * - Quit, Restart and Kill, which ask in the one [ConfirmDialog] when [GameControls.asks] says so, say their outcome on
  *   the row, and close the sheet once the game really ended; Restart starts it again only then.
@@ -197,6 +198,19 @@ internal fun RunningGameSheet(
         }
         controls?.let { line ->
             add(ActionRow("Controls", line) { controls = ownScreen?.nextControls() ?: line })
+        }
+        // One press during play (Droidtop/tracker#626): the sheet closes first so the shot is of the game, on the
+        // screen the game runs on; a flash says where it went.
+        if (GameRow.SCREENSHOT in shown) {
+            add(
+                ActionRow("Screenshot", "Closes this menu and saves a picture of the game") {
+                    onDismiss()
+                    val display = dev.droidtop.library.LaunchDisplay.parkedDisplayId ?: android.view.Display.DEFAULT_DISPLAY
+                    dev.droidtop.runtime.Capture.takeSoon(context, display) { shot ->
+                        dev.droidtop.library.settings.Notices.flash(shot.message, context = context.applicationContext)
+                    }
+                },
+            )
         }
         add(ActionRow("Guides", "Walkthroughs and readmes, with your place kept") { guidesOpen = true })
         // A console game's system, searched (owner, 2026-10-14: "We also want per-console search items").
