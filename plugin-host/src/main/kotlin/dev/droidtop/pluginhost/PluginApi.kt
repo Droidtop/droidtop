@@ -153,6 +153,18 @@ interface PluginContext {
         privateDataDir().takeIf { it.isNotEmpty() }?.let { ContainedPreferences.of(java.io.File(it), name) }
 
     /**
+     * The plugin's database named [name] in its folder (`databases/<name>`), opened on droidtop's own SQLite
+     * (docs/plugin-api.md 5.3, "Preferences and SQLite are droidtop's"), never Android's. The plugin closes it. Null
+     * where the host has no folder for the plugin.
+     */
+    fun database(name: String, readOnly: Boolean = false): PluginDatabase? {
+        val folder = privateDataDir().takeIf { it.isNotEmpty() } ?: return null
+        require('/' !in name) { "a database name is one file name: $name" }
+        val file = java.io.File(java.io.File(folder, "databases").apply { mkdirs() }, name)
+        return BundledSqlite.open(file.path, readOnly)
+    }
+
+    /**
      * The real, already-configured destination folder for one system, by
      * id -- present only when this plugin declared [PluginCapability.ACQUIRE_CONTENT]
      * and the call came from that system's own settings screen (the same

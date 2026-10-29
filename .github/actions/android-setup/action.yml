@@ -289,6 +289,21 @@ runs:
       shell: bash
       run: bash build-scripts/fetch-agent-lib.sh
 
+    - name: Cache the bundled SQLite
+      id: sqlite-cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+      with:
+        path: plugin-host/native/sqlite
+        key: sqlite-${{ hashFiles('plugin-host/sqlite.pin') }}
+
+    - name: Fetch the bundled SQLite
+      # The SQLite amalgamation a plugin's databases use, never Android's own
+      # (docs/plugin-api.md 5.3, "Preferences and SQLite are droidtop's"),
+      # checked against plugin-host/sqlite.pin's size and SHA3-256.
+      if: steps.sqlite-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: bash build-scripts/fetch-sqlite.sh
+
     - name: Cache the aria2 download engine
       id: aria2engine-cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

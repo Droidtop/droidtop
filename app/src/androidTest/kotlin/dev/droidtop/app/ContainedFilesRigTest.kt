@@ -103,9 +103,9 @@ class ContainedFilesRigTest {
                         val reread = ContainedPreferences.read(File(context.privateDataDir(), "shared_prefs/rig.xml"))["k"]
                         require(reread == "v") { "read back $reread" }
                     }
-                    // Android's own SQLite is not a plugin's: droidtop's bundled one answers here once it is built.
-                    check("sqlite") { error("droidtop's SQLite is not built yet (Droidtop/tracker#741)") }
-                    check("sqlite-wal") { error("droidtop's SQLite is not built yet (Droidtop/tracker#741)") }
+                    // droidtop's own SQLite, never Android's (docs/plugin-api.md 5.3), with a rollback journal and with WAL.
+                    check("sqlite") { sqlite("rig.db", wal = false) }
+                    check("sqlite-wal") { sqlite("rig-wal.db", wal = true) }
                 }
                 "quota" -> {
                     dir.mkdirs()
@@ -137,6 +137,19 @@ class ContainedFilesRigTest {
                 }
             }
             return PluginReply.ok(out)
+        }
+
+        private fun sqlite(name: String, wal: Boolean) {
+            requireNotNull(context.database(name)) { "no database for the plugin" }.use { db ->
+                if (wal) {
+                    val mode = db.query("PRAGMA journal_mode=WAL").rows.single().single()
+                    require(mode == "wal") { "journal mode is $mode" }
+                }
+                db.execute("create table if not exists t(x text)")
+                require(db.insert("insert into t values (?)", listOf("row")) > 0) { "no row id" }
+                val count = db.query("select count(*) from t").rows.single().single() as Long
+                require(count >= 1) { "no row" }
+            }
         }
     }
 

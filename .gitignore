@@ -38,6 +38,8 @@ runtime-windows/lsfg/
 net-core/agent/
 # The aria2 download engine's AAR as a local Maven repository (build-scripts/fetch-aria2-engine.sh).
 net-core/aria2-engine/
+# The SQLite amalgamation droidtop builds for plugins (build-scripts/fetch-sqlite.sh).
+plugin-host/native/sqlite/
 
 # Signing (real release key + passwords — never commit these; CI reads
 # them from repo secrets instead, see .github/workflows/android-build.yml)

@@ -4126,9 +4126,34 @@ internals". So:
   `PluginContext.preferences(name)`, and `privateDataDir()` is its own folder
   by path in every tier. Both tiers, contained and open, get the same store.
 - **SQLite** is a bundled SQLite at a pinned version, never Android's
-  framework SQLite: droidtop answers `sqflite`'s method channel itself, and a
-  Kotlin plugin gets a small plugin-host API for it. Being built; until then
-  the rig test's `sqlite` checks say so.
+  framework SQLite: the amalgamation named by `plugin-host/sqlite.pin`
+  (3.54.1, checked against the SHA3-256 sqlite.org lists by
+  `build-scripts/fetch-sqlite.sh`), built into droidtop's native library with
+  its symbols hidden (FTS3/4/5, R*Tree and the math functions on; temporary
+  tables in memory, since a plugin process has no temporary folder). A
+  Kotlin plugin opens one with `PluginContext.database(name)`
+  (`<folder>/databases/<name>`; `execute`, `insert`, `update`, `query`,
+  `cursor`). In a Flutter plugin's engine droidtop answers `sqflite`'s
+  channel (`com.tekartik.sqflite`) itself, after the plugin's registrant, so
+  the package's Dart half is unchanged (`SqfliteCalls`): all sixteen methods
+  of its Android half (`sqflite_android`, read at tekartik/sqflite 52dbf98),
+  with its replies, its error codes and data, its transaction ids and paged
+  cursors, and SQLite's errors worded as Android words them ("... (code 2067
+  SQLITE_CONSTRAINT_UNIQUE)"), which the Dart half reads. Where it differs
+  from the Android half:
+  - `getPlatformVersion` answers droidtop's own Android ("Android 14", its
+    target SDK), never the device's.
+  - `androidSetLocale` is accepted and not honoured: SQLite's own collations
+    only, no ICU.
+  - A `BEGIN` inside an open transaction fails as SQLite fails it ("cannot
+    start a transaction within a transaction"); Android's session layer
+    turned it into a savepoint. `sqflite`'s own `transaction()` never nests.
+  - No `android_metadata` table is created in a new database.
+  - One worker thread for every database (`androidThreadCount` and
+    `androidThreadPriority` are accepted and not used), and the
+    `com.tekartik.sqflite.wal_enabled` manifest flag is not read: a plugin
+    turns WAL on with `PRAGMA journal_mode=WAL`.
+  - `options`' `logLevel` is kept for `debug`, and nothing is logged.
 - **The guard** is the emulator job: `ContainedFilesRigTest` runs on Android
   13 and 14 and must answer the same on both. Its probe uses only what
   droidtop gives a plugin (its `PluginContext`), never Android's context or a

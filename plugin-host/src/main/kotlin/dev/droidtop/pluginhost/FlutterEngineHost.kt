@@ -5,6 +5,8 @@ import dalvik.system.DexClassLoader
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterJNI
 import io.flutter.embedding.engine.loader.FlutterLoader
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.StandardMethodCodec
 import java.io.File
 import java.nio.ByteBuffer
 
@@ -104,6 +106,9 @@ internal object FlutterEngineHost {
         // (emulator-5560). There the engine waits for vsync through FlutterJNI, and droidtop answers it on a timer.
         if (IsolatedVsync.needed()) flutterJNI.setAsyncWaitForVsyncDelegate(IsolatedVsync(flutterJNI))
         registerGeneratedPlugins(source, engine)
+        // After the registrant: droidtop's sqflite answers in place of the package's Android half, which would open
+        // Android's own SQLite (docs/plugin-api.md 5.3, "Preferences and SQLite are droidtop's").
+        if (context is PluginProcessContext) installSqflite(engine, File(context.dataDir, "databases").path)
         return Built(engine, flutterLoader.findAppBundlePath())
     }
 
@@ -128,6 +133,24 @@ internal object FlutterEngineHost {
      * A plugin whose Dart code needs no plugin package has no such class, which is normal. A dependency that needs a
      * manifest entry this process does not declare, or files (contained plugins have none), can still fail at use.
      */
+    /** `sqflite`'s channel answered by [SqfliteCalls]; a handler set later replaces the package's own. */
+    private fun installSqflite(engine: FlutterEngine, databasesPath: String) {
+        val messenger = engine.dartExecutor.binaryMessenger
+        val calls = SqfliteCalls(databasesPath)
+        MethodChannel(messenger, SqfliteCalls.CHANNEL, StandardMethodCodec.INSTANCE, messenger.makeBackgroundTaskQueue())
+            .setMethodCallHandler { call, result ->
+                calls.call(
+                    call.method,
+                    call.arguments,
+                    object : SqfliteCalls.Reply {
+                        override fun success(value: Any?) = result.success(value)
+                        override fun error(code: String, message: String?, data: Any?) = result.error(code, message, data)
+                        override fun notImplemented() = result.notImplemented()
+                    },
+                )
+            }
+    }
+
     private fun registerGeneratedPlugins(source: FlutterSource, engine: FlutterEngine) {
         val loader = source.registrantLoader() ?: return
         val registrantClass = try {
