@@ -113,15 +113,29 @@ jobs:
           name: lint-report
           if-no-files-found: ignore
 
-      - name: Run unit tests
-        # Every module that actually has a src/test tree (app,
-        # library-core, runtime-common, shell-gamepad, input-seat,
-        # runtime-windows, input-keyboard, host-bridge and display), not just library-core — that
-        # narrower scope meant roughly 30% of this repo's test methods had
-        # never once run in CI. Add the module here the moment it grows its
-        # first test; a test nothing runs is not a test.
+      - name: Every module with tests is run below
+        # Droidtop/tracker#730: :net-core, the one download engine, had ten test files and was not in the list
+        # below, so a regression in it would have shipped green. A module with a src/test tree that the
+        # next step does not run fails here, naming it.
         if: always()
-        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest --stacktrace
+        run: |
+          missing=""
+          for dir in */src/test; do
+            module="${dir%%/*}"
+            grep -q ":${module}:testDebugUnitTest" .github/workflows/android-checks.yml || missing="$missing $module"
+          done
+          if [ -n "$missing" ]; then
+            echo "Modules with src/test that 'Run unit tests' does not run:$missing" >&2
+            exit 1
+          fi
+
+      - name: Run unit tests
+        # Every module that actually has a src/test tree (app, library-core, runtime-common, shell-gamepad,
+        # input-seat, runtime-windows, input-keyboard, host-bridge, display, net-core and the rest), not just
+        # library-core — that narrower scope meant roughly 30% of this repo's test methods had never once run in
+        # CI. Add the module here the moment it grows its first test; the step above fails when one is missing.
+        if: always()
+        run: ./gradlew :app:testDebugUnitTest :library-core:testDebugUnitTest :runtime-common:testDebugUnitTest :shell-gamepad:testDebugUnitTest :input-seat:testDebugUnitTest :input-mapping:testDebugUnitTest :runtime-windows:testDebugUnitTest :input-keyboard:testDebugUnitTest :host-bridge:testDebugUnitTest :runtime-linux-noroot:testDebugUnitTest :plugin-host:testDebugUnitTest :plugin-host-testing:testDebugUnitTest :stores:testDebugUnitTest :display:testDebugUnitTest :ui-shared:testDebugUnitTest :net-core:testDebugUnitTest --stacktrace
 
       - name: Plugin conformance (python fixture)
         # docs/plugin-api.md 3 I2 (Droidtop/tracker#71): the python kind's fixture through the same
