@@ -10685,7 +10685,10 @@ every other choice is one-way, as in the cloud-save conflict), the row under the
 cursor the solid selected inversion; the page behind is dimmed to the scrim
 role's 80% (`ModalScrim`). The launch failure dialog, the launch screen chooser
 (which gained a Cancel row in place of its "B cancels" line) and the cloud-save
-conflict dialog use it.
+conflict dialog use it, and so do the shell's three one-time offers (fetch box
+art, a theme is ready, set up Windows) through one `OfferDialog`: the way out
+first and focused, the footer naming B as that way out, no legend of their own
+in the body (Droidtop/tracker#669).
 
 **Launch audio hand-off (2026-09-30, redecided 2026-10-01, tracker#160).**
 When another app comes in front, droidtop has NO audio output stream of
@@ -11403,7 +11406,7 @@ own Appearance step:
    after the download finishes, always wins — this is a pre-selected default, not a forced one.
 4. If it finishes anywhere else (the person moved past the step, or setup is done and they are in Gaming), the
    theme in use does not change: `ThemeOffer` (`:runtime-common`) keeps the offer and Gaming asks once, "Your
-   theme is ready: Art Book Next", Use it or Later (`ThemeReadyDialog`, restored after a restart, dropped when a
+   theme is ready: Art Book Next", Later (first, focused) or Use it (`ThemeReadyDialog`, restored after a restart, dropped when a
    theme was chosen meanwhile; Droidtop/tracker#532). The look never changes under the person —
    `ThemeAssets.defaultThemeFor`'s own doc comment already states this rule for the portrait
    default ("the theme moving under the user is the one thing this rule must not do"); the same
@@ -15416,7 +15419,8 @@ stays direct.
 **The one-time offer.** When the library's first walk of the games roots
 finishes with games on it, droidtop asks "Fetch box art and details for your
 games?" once (`ScrapeOffer`, the shell's `ScrapeOfferDialog` on the §6e input
-pipeline: A on "Fetch now", B or "No thanks" declines). The answer is stored
+pipeline: "Not now" first and focused, then "Fetch now"; B or "Not now"
+declines; Droidtop/tracker#669). The answer is stored
 at once and the question is never raised again; a question the process dies
 before the person answers is restored. Settings > Scraper > "After the first
 library scan" shows the answer and changes it: *Ask me* (the unanswered state,
