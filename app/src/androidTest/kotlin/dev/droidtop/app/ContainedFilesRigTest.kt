@@ -2,7 +2,6 @@ package dev.droidtop.app
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import dev.droidtop.pluginhost.ContainedPreferences
 import dev.droidtop.pluginhost.DroidtopPlugin
 import dev.droidtop.pluginhost.NativePluginRunner
 import dev.droidtop.pluginhost.PluginArgs
@@ -79,7 +78,7 @@ class ContainedFilesRigTest {
                     check("list") {
                         // Which half fails, when one does: opening the folder (File.list answers null) or reading it.
                         val opened = runCatching {
-                            android.system.Os.open(files.path, android.system.OsConstants.O_RDONLY or android.system.OsConstants.O_DIRECTORY, 0)
+                            android.system.Os.open(files.path, android.system.OsConstants.O_RDONLY, 0)
                         }
                         opened.getOrNull()?.let { android.system.Os.close(it) }
                         require(files.list()?.contains("rig") == true) {
@@ -100,8 +99,8 @@ class ContainedFilesRigTest {
                     check("prefs") {
                         val prefs = requireNotNull(context.preferences("rig")) { "no preferences for the plugin" }
                         require(prefs.edit().putString("k", "v").commit()) { "commit answered false" }
-                        val reread = ContainedPreferences.read(File(context.privateDataDir(), "shared_prefs/rig.xml"))["k"]
-                        require(reread == "v") { "read back $reread" }
+                        val saved = File(context.privateDataDir(), "shared_prefs/rig.xml").readText()
+                        require(saved.contains("<string name=\"k\">v</string>")) { "saved as $saved" }
                     }
                     // droidtop's own SQLite, never Android's (docs/plugin-api.md 5.3), with a rollback journal and with WAL.
                     check("sqlite") { sqlite("rig.db", wal = false) }

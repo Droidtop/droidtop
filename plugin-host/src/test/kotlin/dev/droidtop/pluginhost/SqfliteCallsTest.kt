@@ -77,12 +77,14 @@ class SqfliteCallsTest {
         }
     }
 
+    // The handler makes a database's folder as sqflite does, so paths are under a folder this test may write.
+    private val a = java.nio.file.Files.createTempDirectory("sqflite").resolve("a.db").toString()
     private val opened = HashMap<String, FakeDatabase>()
     private val calls = SqfliteCalls("/data/user/0/app/databases", { path, _ -> FakeDatabase(path).also { opened[path] = it } }, Executor { it.run() })
 
     private fun call(method: String, args: Any? = null): Answer = Answer().also { calls.call(method, args, it) }
 
-    private fun open(path: String = "/db/a.db"): Int = ((call("openDatabase", mapOf("path" to path)).value as Map<*, *>)["id"] as Int)
+    private fun open(path: String = a): Int = ((call("openDatabase", mapOf("path" to path)).value as Map<*, *>)["id"] as Int)
 
     @Test
     fun theDeviceIsNeverNamedAndTheLocaleIsAcceptedAsIs() {
@@ -97,7 +99,7 @@ class SqfliteCallsTest {
     @Test
     fun aSingleInstanceIsRecoveredAndAMemoryDatabaseNever() {
         val id = open()
-        assertEquals(mapOf("id" to id, "recovered" to true), call("openDatabase", mapOf("path" to "/db/a.db")).value)
+        assertEquals(mapOf("id" to id, "recovered" to true), call("openDatabase", mapOf("path" to a)).value)
         val memory1 = call("openDatabase", mapOf("path" to ":memory:")).value as Map<*, *>
         val memory2 = call("openDatabase", mapOf("path" to ":memory:")).value as Map<*, *>
         assertFalse(memory2.containsKey("recovered"))
@@ -115,13 +117,13 @@ class SqfliteCallsTest {
         assertEquals(1L, inside.value)
         call("execute", mapOf("id" to id, "sql" to "COMMIT", "inTransaction" to false, "transactionId" to 1))
         assertTrue(outside.answered)
-        assertEquals(listOf("BEGIN IMMEDIATE", "INSERT inside", "COMMIT", "INSERT outside"), opened.getValue("/db/a.db").ran)
+        assertEquals(listOf("BEGIN IMMEDIATE", "INSERT inside", "COMMIT", "INSERT outside"), opened.getValue(a).ran)
     }
 
     @Test
     fun anErrorIsWordedAsAndroidWordsItWithTheStatement() {
         val id = open()
-        opened.getValue("/db/a.db").failNext = SqliteException(2067, "UNIQUE constraint failed: t.a")
+        opened.getValue(a).failNext = SqliteException(2067, "UNIQUE constraint failed: t.a")
         val answer = call("insert", mapOf("id" to id, "sql" to "INSERT INTO t VALUES (?)", "arguments" to listOf(1)))
         assertEquals("sqlite_error", answer.code)
         assertEquals("UNIQUE constraint failed: t.a (code 2067 SQLITE_CONSTRAINT_UNIQUE)", answer.message)
@@ -132,7 +134,7 @@ class SqfliteCallsTest {
     @Test
     fun aTransactionSqliteRolledBackIsClosedAndTheQueueRuns() {
         val id = open()
-        val db = opened.getValue("/db/a.db")
+        val db = opened.getValue(a)
         call("execute", mapOf("id" to id, "sql" to "BEGIN", "inTransaction" to true, "transactionId" to null))
         val waiting = call("execute", mapOf("id" to id, "sql" to "UPDATE later"))
         db.failNext = SqliteException(13, "database or disk is full")
@@ -145,7 +147,7 @@ class SqfliteCallsTest {
     @Test
     fun aBatchAnswersEachOperationAndStopsAtAnErrorUnlessToldToGoOn() {
         val id = open()
-        val db = opened.getValue("/db/a.db")
+        val db = opened.getValue(a)
         val ops = listOf(
             mapOf("method" to "execute", "sql" to "CREATE TABLE t(a)"),
             mapOf("method" to "insert", "sql" to "INSERT INTO t VALUES (1)"),
@@ -166,7 +168,7 @@ class SqfliteCallsTest {
     @Test
     fun aQueryWithNoRowsIsAnEmptyMapAndAPagedOneKeepsItsCursor() {
         val id = open()
-        val db = opened.getValue("/db/a.db")
+        val db = opened.getValue(a)
         assertEquals(emptyMap<String, Any>(), call("query", mapOf("id" to id, "sql" to "SELECT a FROM t")).value)
         db.rows = listOf(listOf(1L), listOf(2L), listOf(3L))
         val first = call("query", mapOf("id" to id, "sql" to "SELECT a FROM t", "cursorPageSize" to 2)).value as Map<*, *>
@@ -182,8 +184,8 @@ class SqfliteCallsTest {
     @Test
     fun aDeletedSingleInstanceIsClosedAndForgotten() {
         open()
-        call("deleteDatabase", mapOf("path" to "/db/a.db"))
-        assertFalse(call("openDatabase", mapOf("path" to "/db/a.db")).value.let { (it as Map<*, *>).containsKey("recovered") })
+        call("deleteDatabase", mapOf("path" to a))
+        assertFalse(call("openDatabase", mapOf("path" to a)).value.let { (it as Map<*, *>).containsKey("recovered") })
     }
 
     @Test
