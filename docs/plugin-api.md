@@ -2308,7 +2308,11 @@ talk over the API".
       fetches it itself for a game with no cover: the address and every
       redirect must be on the plugin's `net.domains`, and the answer a PNG,
       JPEG, WebP or GIF of at most 10 MiB (SPEC 7h). `screenshots` are not
-      taken yet.
+      taken yet. It is filed by its real shape (SPEC 7h, "Artwork roles",
+      2026-10-29, #585): box art is the cover; a landscape picture (a
+      thread's banner) goes to the game's landscape slot when that is empty,
+      and is never squashed into the cover. A plugin with landscape art only
+      may still send it as `cover`.
     - `sourceLinks` (`{<key>: <id>}`), the record the source matched:
       droidtop links the game under that key (one of the plugin's own
       `library.updates` entry ids; any other key is ignored), unless it
