@@ -1371,6 +1371,18 @@ something no facet kind or target can do, that need is droidtop's work first: it
 as a candidate kind or target before the plugin falls back to a full UI. Every gamegrab-sources plugin moves its
 bespoke UI onto facets wherever they cover it, and its old path is deleted, not kept beside the facets.
 
+The owner, 2026-10-23, the rule of thumb for every plugin: "they should use facets whenever it's practiceable. Full
+UIs are available, but they'll rarely be something the user actually uses. facets turn the plugins from 'little bubble
+the user has to do work to use' into 'part of the application'". In every plugin review, a feature reachable only
+through a plugin's own UI is a finding; the one exception is a feature no facet kind can express, and then the fix is
+the facet kind to propose here (Droidtop/tracker#602).
+
+**Facets go where they fit (the owner, 2026-10-24: "Facets go where they fit. No clunky redirects, no weird pathing.
+That's one of the main reasons I designed the facets system, so the app can surface information where it makes
+sense").** A surface that exists to act on an item shows that item's facets in place, inline or as a sheet over the
+current screen; it never navigates to another screen just to reach a facet (first applied on Droidtop/tracker#639: an
+Updates row presents its download facet). In a review, a redirect to reach a facet is a finding.
+
 *The owner: "The facets system would benefit from being standardized as a system for presenting small surfaces to
 the droidtop frontend to provide specific information."; "We can provide a set of 'facets' a plugin can surface for
 things (download, metadata, store, description, etc), which lets us surface and attach data to."; "Rather than a
