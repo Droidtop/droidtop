@@ -15,9 +15,9 @@ import kotlinx.coroutines.flow.asSharedFlow
  * button of their own. Four buttons are droidtop's, three of them the ones Gaming gives its menus: Start opens the
  * Start menu (Gaming's left menu), R2 the Quick Menu (Gaming's R2; Select stays the container's), L1 the list of windows, R1 the search. They are claimed only from a gamepad. D-pad and face buttons are left alone, as before. The activity [claim]s the key before any view sees it; the shell collects [requests].
  *
- * A keyboard's keys are the container's, but for four shortcuts every desktop OS has (docs/SPEC.md 6b "Where
- * Meta goes", Droidtop/tracker#697), read by [KeyShortcuts]: a tap of Super alone opens Start, Super+S the
- * search, Alt+Tab the list of windows and Ctrl+Esc Start.
+ * A keyboard's keys are the container's, but for three shortcuts to droidtop's chrome (docs/SPEC.md 6b "Where
+ * Meta goes", Droidtop/tracker#697), read by [KeyShortcuts]: Ctrl+Esc opens Start, Alt+Esc the list of windows and
+ * Alt+Space the search.
  */
 object DesktopPadRoutes {
     enum class Route { START_MENU, QUICK_MENU, WINDOWS, SEARCH }
@@ -61,27 +61,20 @@ object DesktopPadRoutes {
     /**
      * The keyboard's way to droidtop's chrome (Droidtop/tracker#697). Pure: [onKey] says whether droidtop takes the
      * key and which route, if any, it raises.
-     * - A tap of Super, pressed and let go with no other key or modifier, raises Start. Super itself always goes on
-     *   to the container (it is sway's Mod4), and sway does nothing with Super alone.
-     * - Super+S raises the search, Alt+Tab the windows, Ctrl+Esc Start. droidtop takes the S, Tab or Esc, its press
-     *   and its release, so the container never sees half of it; the modifier went to the container already, alone,
-     *   which does nothing there. Super+S takes the place of sway's stock `$mod+s` (stacking layout), which the
-     *   floating desktop (#686) has little use for.
+     *
+     * Android keeps Meta and Alt+Tab from every app: PhoneWindowManager.interceptKeyBeforeDispatching consumes the
+     * Meta keys themselves and "all the META modifier combos" (Android 13 and 14; current AOSP the same), and shows
+     * Recents for Alt+Tab, unless the focused window holds OVERRIDE_SYSTEM_KEY_BEHAVIOR_IN_FOCUSED_WINDOW, which is
+     * signature|privileged. The rig (2026-10-29) saw it: a Super tap opened the Assistant, Super+S Messages, and
+     * Alt+Tab never reached droidtop. So droidtop's shortcuts use chords Android leaves to the app:
+     * - Ctrl+Esc raises Start, Alt+Esc the windows, Alt+Space the search. droidtop takes the Esc or the Space, its
+     *   press and its release, so the container never sees half of it; the modifier went to the container already,
+     *   alone, which does nothing there.
      */
     internal class KeyShortcuts {
-        private var superAlone = false
         private var taken: Int? = null
 
         fun onKey(keyCode: Int, down: Boolean, repeatCount: Int, metaState: Int): Pair<Boolean, Route?> {
-            if (keyCode == KeyEvent.KEYCODE_META_LEFT || keyCode == KeyEvent.KEYCODE_META_RIGHT) {
-                if (down) {
-                    if (repeatCount == 0) superAlone = metaState and OTHER_MODIFIERS == 0
-                    return false to null
-                }
-                val route = if (superAlone) Route.START_MENU else null
-                superAlone = false
-                return false to route
-            }
             if (!down) {
                 if (taken == keyCode) {
                     taken = null
@@ -89,11 +82,11 @@ object DesktopPadRoutes {
                 }
                 return false to null
             }
-            superAlone = false
+            val modifiers = metaState and MODIFIERS
             val route = when {
-                keyCode == KeyEvent.KEYCODE_S && metaState and KeyEvent.META_META_ON != 0 -> Route.SEARCH
-                keyCode == KeyEvent.KEYCODE_TAB && metaState and KeyEvent.META_ALT_ON != 0 -> Route.WINDOWS
-                keyCode == KeyEvent.KEYCODE_ESCAPE && metaState and KeyEvent.META_CTRL_ON != 0 -> Route.START_MENU
+                keyCode == KeyEvent.KEYCODE_ESCAPE && modifiers == KeyEvent.META_CTRL_ON -> Route.START_MENU
+                keyCode == KeyEvent.KEYCODE_ESCAPE && modifiers == KeyEvent.META_ALT_ON -> Route.WINDOWS
+                keyCode == KeyEvent.KEYCODE_SPACE && modifiers == KeyEvent.META_ALT_ON -> Route.SEARCH
                 else -> return false to null
             }
             taken = keyCode
@@ -101,7 +94,8 @@ object DesktopPadRoutes {
         }
 
         private companion object {
-            const val OTHER_MODIFIERS = KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON or KeyEvent.META_SHIFT_ON
+            /** The modifiers a chord is read by, one side or the other; Shift and the locks are left out. */
+            const val MODIFIERS = KeyEvent.META_CTRL_ON or KeyEvent.META_ALT_ON
         }
     }
 }

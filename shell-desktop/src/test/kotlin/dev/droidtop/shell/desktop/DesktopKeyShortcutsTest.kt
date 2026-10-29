@@ -12,40 +12,29 @@ class DesktopKeyShortcutsTest {
     private fun down(code: Int, meta: Int = 0, repeat: Int = 0) = keys.onKey(code, true, repeat, meta)
     private fun up(code: Int, meta: Int = 0) = keys.onKey(code, false, 0, meta)
 
-    @Test
-    fun `a tap of Super alone opens Start, and Super still reaches the container`() {
-        assertEquals(false to null, down(KeyEvent.KEYCODE_META_LEFT, KeyEvent.META_META_ON))
-        assertEquals(false to Route.START_MENU, up(KeyEvent.KEYCODE_META_LEFT))
-    }
+    private val ctrl = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+    private val alt = KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
 
     @Test
-    fun `Super used with another key is not a tap`() {
-        down(KeyEvent.KEYCODE_META_LEFT, KeyEvent.META_META_ON)
-        assertEquals(false to null, down(KeyEvent.KEYCODE_B, KeyEvent.META_META_ON))
-        up(KeyEvent.KEYCODE_B, KeyEvent.META_META_ON)
-        assertEquals(false to null, up(KeyEvent.KEYCODE_META_LEFT))
-        // Ctrl held as Super goes down is not a tap either.
-        down(KeyEvent.KEYCODE_META_LEFT, KeyEvent.META_META_ON or KeyEvent.META_CTRL_ON)
-        assertEquals(false to null, up(KeyEvent.KEYCODE_META_LEFT, KeyEvent.META_CTRL_ON))
-    }
-
-    @Test
-    fun `Super S, Alt Tab and Ctrl Esc are droidtop's, press and release`() {
-        assertEquals(true to Route.SEARCH, down(KeyEvent.KEYCODE_S, KeyEvent.META_META_ON))
-        assertEquals(true to null, up(KeyEvent.KEYCODE_S))
-        assertEquals(true to Route.WINDOWS, down(KeyEvent.KEYCODE_TAB, KeyEvent.META_ALT_ON))
-        // A held Tab repeats without raising the sheet again.
-        assertEquals(true to null, down(KeyEvent.KEYCODE_TAB, KeyEvent.META_ALT_ON, repeat = 1))
-        assertEquals(true to null, up(KeyEvent.KEYCODE_TAB))
-        assertEquals(true to Route.START_MENU, down(KeyEvent.KEYCODE_ESCAPE, KeyEvent.META_CTRL_ON))
+    fun `Ctrl Esc, Alt Esc and Alt Space are droidtop's, press and release`() {
+        assertEquals(true to Route.START_MENU, down(KeyEvent.KEYCODE_ESCAPE, ctrl))
         assertEquals(true to null, up(KeyEvent.KEYCODE_ESCAPE))
+        assertEquals(true to Route.WINDOWS, down(KeyEvent.KEYCODE_ESCAPE, alt))
+        // A held Esc repeats without raising the sheet again.
+        assertEquals(true to null, down(KeyEvent.KEYCODE_ESCAPE, alt, repeat = 1))
+        assertEquals(true to null, up(KeyEvent.KEYCODE_ESCAPE, alt))
+        assertEquals(true to Route.SEARCH, down(KeyEvent.KEYCODE_SPACE, alt or KeyEvent.META_SHIFT_ON))
+        assertEquals(true to null, up(KeyEvent.KEYCODE_SPACE))
     }
 
     @Test
     fun `everything else is the container's`() {
-        assertEquals(false to null, down(KeyEvent.KEYCODE_S))
-        assertEquals(false to null, up(KeyEvent.KEYCODE_S))
-        assertEquals(false to null, down(KeyEvent.KEYCODE_TAB))
-        assertEquals(false to null, down(KeyEvent.KEYCODE_ESCAPE, KeyEvent.META_ALT_ON))
+        assertEquals(false to null, down(KeyEvent.KEYCODE_ESCAPE))
+        assertEquals(false to null, up(KeyEvent.KEYCODE_ESCAPE))
+        assertEquals(false to null, down(KeyEvent.KEYCODE_SPACE, ctrl))
+        assertEquals(false to null, down(KeyEvent.KEYCODE_ESCAPE, ctrl or alt))
+        assertEquals(false to null, down(KeyEvent.KEYCODE_TAB, alt))
+        assertEquals(false to null, down(KeyEvent.KEYCODE_S, KeyEvent.META_META_ON))
+        assertEquals(false to null, down(KeyEvent.KEYCODE_META_LEFT, KeyEvent.META_META_ON))
     }
 }
