@@ -5236,6 +5236,13 @@ version was bumped.
 - The catalog can refuse to *offer* (not uninstall) a plugin whose only
   implemented major is gone.
 
+**Contract 2.2: the old op names go (owner, 2026-10-29, Droidtop/tracker#766).** The names contract 2.1 renamed
+(`HostOpNames.DEPRECATED`, 21 of them, §3 "Naming") are served as aliases until contract 2.2, and 2.2 comes once no
+official plugin calls one: the bundle workflow warns on every old name it finds, so its logs are the check (the
+retroarch and fdroid plugins were the last callers, Droidtop/tracker#762). The bump deletes the map, `HostOpNames.current`,
+the broker's two helpers that apply it and `host.get_info`'s `deprecatedOps`; a plugin still calling an old name then
+gets `UNSUPPORTED` like any op droidtop does not serve.
+
 **Refusals.**
 
 - A manifest whose `contractVersion` is newer than the host supports is
