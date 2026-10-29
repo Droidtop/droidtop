@@ -4,6 +4,7 @@ import dev.droidtop.pluginhost.TestPlugins.arr
 import dev.droidtop.pluginhost.TestPlugins.obj
 import java.io.File
 import java.nio.file.Files
+import org.json.JSONArray
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -228,6 +229,23 @@ class PluginGrantsTest {
         val snap = grants.read("acme.tool")
         assertEquals(GrantState.GRANTED, snap.states["apps.launch"])
         assertEquals(GrantState.ASK, snap.states["containers.exec"])
+    }
+
+    @Test
+    fun `an update that only adds facet targets keeps the source's grant and asks nothing (tracker 746)`() {
+        // Repacks 0.6.0 to 0.7.0: the same points, ui.facets gaining search.filter and item.page.
+        fun repacks(vararg targets: String) = plugin(2, "gamegrab.repacks") {
+            it.put("provides", arr(obj("point" to "library.sources"), obj("point" to "ui.facets", "targets" to JSONArray(targets.toList()))))
+        }
+        val old = repacks("settings.page")
+        grants.initialiseOnApproval(old, ticked = setOf("provide:library.sources", "provide:ui.facets"))
+        val new = repacks("settings.page", "search.filter", "item.page")
+        val diff = grants.applyUpdate(old, new)
+        assertTrue("nothing is new: $diff", diff.isEmpty)
+        val snap = grants.read("gamegrab.repacks")
+        assertEquals(GrantState.GRANTED, PluginGrants.provideState(new, snap, "library.sources"))
+        assertNull(PluginGrants.pointRefusal(new, snap, "library.sources"))
+        assertFalse("no new-access sheet that could deny it", snap.wantsNewAccess)
     }
 
     @Test
