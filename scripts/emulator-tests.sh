@@ -31,6 +31,8 @@ instrument() {
     return 0
   fi
   say "- $class: FAILED ($(grep -m1 -E 'FAILURES!!!|INSTRUMENTATION_FAILED|Process crashed|Error' "$log" || echo 'no result line'))"
+  # What failed and where, in the log and the summary: the full output is only in the uploaded results.
+  { echo '```'; sed -n '/^There w\|^Error in\|INSTRUMENTATION_RESULT: shortMsg\|^java\.\|^junit\.\|^Caused by/,$p' "$log" | head -45; echo '```'; } | tee -a "$summary"
   return 1
 }
 
