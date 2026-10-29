@@ -501,6 +501,17 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   draw their own maximize and close buttons, the menu stays Minimize and Close. A finger-wide 48 dp grab
   area on the edge is not possible in sway, whose resize area is the border itself. The 8 px border plus
   Maximize and Snap are the compromise.
+- **Restart, Stop and Lock** (Droidtop/tracker#687, the coordinator's Desktop review, decided 2026-10-29).
+  Start's System section ends with "Restart desktop" and "Stop desktop" while a session runs, and "Lock
+  screen" always. Before, a setting that applies when the desktop next starts (scale, resolution, panel, Tile
+  windows, keyboard layout), or a compositor that stopped answering, needed a trip out of Desktop or the
+  notification's Stop. Restart is `DesktopSessionService.restart`: it stops the session as Stop does, and the
+  destroyed service starts the next one itself, so the new one waits for the old container stop
+  (`pendingStop`). Keep the desktop running and its answer are untouched. Desktop settings has the same action
+  as "Restart the desktop", under the rows it applies. Lock screen is the accessibility service's
+  `GLOBAL_ACTION_LOCK_SCREEN`, the lock Standard's double tap uses. Without that service it says where to turn
+  it on, and does not open Android's accessibility settings past the disclosure Standard shows first. Sleep is
+  not offered: Android gives an app no way to sleep the device but that lock.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
   then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and

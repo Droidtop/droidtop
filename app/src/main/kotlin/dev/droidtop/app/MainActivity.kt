@@ -438,6 +438,9 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                         onLaunchFailure = { DesktopSessionService.reportLaunchFailure(it) },
                         onStartSession = { DesktopSessionService.start(this@MainActivity) },
                         onOpenSetup = { startActivity(DesktopSetupPrefs.setupIntent(this@MainActivity)) },
+                        onRestartSession = { DesktopSessionService.restart(this@MainActivity) },
+                        onStopSession = { DesktopSessionService.stop(this@MainActivity) },
+                        onLockScreen = { lockScreen(this@MainActivity) },
                     )
                     if (askDesktopNotifications) {
                         DesktopNotificationPermission.Dialog(

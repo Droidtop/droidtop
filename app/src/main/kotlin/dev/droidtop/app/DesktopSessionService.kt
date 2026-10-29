@@ -144,6 +144,12 @@ class DesktopSessionService : Service() {
         dev.droidtop.input.InputSeats.clear()
         scope.cancel()
         super.onDestroy()
+        // Restart desktop (Droidtop/tracker#687): the new session starts once this one has ended; its connect()
+        // waits for the container stop launched above.
+        if (restartAfterStop) {
+            restartAfterStop = false
+            start(applicationContext)
+        }
     }
 
     private suspend fun connect() {
@@ -393,6 +399,24 @@ class DesktopSessionService : Service() {
         fun stop(context: android.content.Context) {
             context.stopService(Intent(context, DesktopSessionService::class.java))
         }
+
+        /**
+         * Stops the desktop session and starts it again (Start > System > Restart desktop, Droidtop/tracker#687),
+         * so the settings that apply "when the desktop next starts" apply now. Keep the desktop running and its
+         * answer are untouched. With no session running it is a plain start.
+         */
+        fun restart(context: android.content.Context) {
+            if (_stateHolder.value is DesktopSessionState.Idle) {
+                start(context)
+                return
+            }
+            restartAfterStop = true
+            stop(context)
+        }
+
+        /** Set by [restart]: the destroyed service starts the next session itself, after its own teardown. */
+        @Volatile
+        private var restartAfterStop = false
 
         /** Where a destroyed service's container stop runs; process-lifetime, never cancelled. */
         private val reaperScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

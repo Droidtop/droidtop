@@ -156,6 +156,10 @@ fun DesktopShell(
     onStartSession: () -> Unit = {},
     /** Opens Desktop setup: the button on the not-set-up and failed screens (Droidtop/tracker#370). */
     onOpenSetup: () -> Unit = {},
+    /** Start > System's Restart desktop, Stop desktop and Lock screen (Droidtop/tracker#687); null leaves the row out. */
+    onRestartSession: (() -> Unit)? = null,
+    onStopSession: (() -> Unit)? = null,
+    onLockScreen: (() -> Unit)? = null,
 ) {
     var startMenuOpen by remember { mutableStateOf(false) }
     // The Quick Menu is the tray's, and the windows sheet the taskbar's window list, each a sheet a pad
@@ -302,6 +306,9 @@ fun DesktopShell(
                     searchOpen = true
                 },
                 onDismiss = { startMenuOpen = false },
+                onRestartDesktop = onRestartSession,
+                onStopDesktop = onStopSession,
+                onLockScreen = onLockScreen,
             )
         }
         if (searchOpen) {

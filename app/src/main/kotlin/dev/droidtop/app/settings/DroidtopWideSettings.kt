@@ -341,6 +341,13 @@ object DroidtopWideSettings {
                             current = dev.droidtop.app.DesktopSetupPrefs.tileWindows(context),
                             onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setTileWindows(ctx, on) },
                         ),
+                        // The rows above that apply "when the desktop next starts" can apply now (Droidtop/tracker#687).
+                        ActionItem(
+                            id = "pref_desktop_restart",
+                            title = "Restart the desktop",
+                            subtitle = "Applies the changes above now. Closes every window open on the desktop",
+                            run = { ctx -> dev.droidtop.app.DesktopSessionService.restart(ctx) },
+                        ),
                         ActionItem(
                             id = "pref_desktop_root_compositor_setup",
                             title = "Desktop setup",

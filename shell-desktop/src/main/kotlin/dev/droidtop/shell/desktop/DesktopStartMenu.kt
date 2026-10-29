@@ -70,6 +70,10 @@ internal fun StartMenu(
     onOpenTerminal: (() -> Unit)?,
     onSearch: (String) -> Unit,
     onDismiss: () -> Unit,
+    /** The session's own rows (Droidtop/tracker#687): Restart and Stop while it runs, and Lock screen. */
+    onRestartDesktop: (() -> Unit)? = null,
+    onStopDesktop: (() -> Unit)? = null,
+    onLockScreen: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     // The library as its index holds it (docs/SPEC.md 7g): shown at once
@@ -82,6 +86,9 @@ internal fun StartMenu(
     val dismiss by rememberUpdatedState(onDismiss)
     val search by rememberUpdatedState(onSearch)
     val terminal by rememberUpdatedState(onOpenTerminal)
+    val restartDesktop by rememberUpdatedState(onRestartDesktop)
+    val stopDesktop by rememberUpdatedState(onStopDesktop)
+    val lockScreen by rememberUpdatedState(onLockScreen)
     var menuFor by remember { mutableStateOf<StartTarget?>(null) }
 
     LaunchedEffect(library) {
@@ -106,7 +113,8 @@ internal fun StartMenu(
     val places = remember { Place.visible(UiModePrefs.get(context)) }
     val unread = remember { SocialBadge.unread }
 
-    val rows = remember(grouped, entries, linuxApps, linuxAppsError, sessionLive, pluginShelves, places, pins.list, onOpenTerminal != null) {
+    val rows = remember(grouped, entries, linuxApps, linuxAppsError, sessionLive, pluginShelves, places, pins.list, onOpenTerminal != null,
+        onRestartDesktop != null, onStopDesktop != null, onLockScreen != null) {
         val pinned = pins.list.map { it.key }.toSet()
         val byId = entries?.associateBy { it.id }.orEmpty()
         val out = ArrayList<HostedRow>()
@@ -208,6 +216,35 @@ internal fun StartMenu(
         out.add(HostedRow(key = "system:containers", title = "Containers", section = "System", onSelect = { openContainers(context); dismiss() }))
         out.add(HostedRow(key = "system:modes", title = "Modes", subtitle = "Switch to Gaming, Android or Desktop", section = "System", onSelect = { openModes(context); dismiss() }))
         out.add(HostedRow(key = "system:settings", title = "Settings", section = "System", onSelect = { openSettings(context); dismiss() }))
+        // A way out from inside Desktop (Droidtop/tracker#687): a setting that applies when the desktop next starts,
+        // or a desktop that stopped answering, needed a trip out of the mode or the notification's Stop.
+        if (sessionLive) {
+            restartDesktop?.let { restart ->
+                out.add(
+                    HostedRow(
+                        key = "system:restart",
+                        title = "Restart desktop",
+                        subtitle = "Closes every window and starts it again, with your latest Desktop settings",
+                        section = "System",
+                        onSelect = { dismiss(); restart() },
+                    ),
+                )
+            }
+            stopDesktop?.let { stop ->
+                out.add(
+                    HostedRow(
+                        key = "system:stop",
+                        title = "Stop desktop",
+                        subtitle = "Closes every window and stops the Linux system",
+                        section = "System",
+                        onSelect = { dismiss(); stop() },
+                    ),
+                )
+            }
+        }
+        lockScreen?.let { lock ->
+            out.add(HostedRow(key = "system:lock", title = "Lock screen", section = "System", onSelect = { dismiss(); lock() }))
+        }
         places.forEach { place ->
             out.add(
                 HostedRow(
