@@ -197,7 +197,7 @@ class DesktopSessionService : Service() {
 
         booting = runtime to primary
         // The panel's files are read by sway as it starts; written every time, so an update reaches them.
-        runCatching { dev.droidtop.runtime.DesktopPanel.writeConfigs(filesDir) }
+        runCatching { dev.droidtop.runtime.DesktopPanel.writeConfigs(filesDir, DesktopSetupPrefs.tileWindows(applicationContext)) }
             .onFailure { android.util.Log.w(TAG, "Writing the desktop panel's config failed", it) }
         try {
             runtime.start(primary, provisioning) { line ->

@@ -44,6 +44,10 @@ class CompositorProvisioningTest {
         val waybar = DesktopPanel.waybarConfig()
         assertTrue(waybar.contains("\"modules-left\": [\"sway/workspaces\", \"sway/mode\"]"))
         assertFalse(waybar.contains("wofi") || waybar.contains("custom/apps") || waybar.contains("sway/window"))
+        // Windows float unless the person tiles them (#686).
+        assertTrue("for_window [all] floating enable" in lines)
+        assertTrue("default_floating_border normal 8" in lines)
+        assertFalse(DesktopPanel.swayConfig(tileWindows = true).contains("floating"))
         assertEquals(DesktopPanel.WAYBAR, DesktopPanel.fromId(null))
         assertEquals(DesktopPanel.SWAYBAR, DesktopPanel.fromId("swaybar"))
     }

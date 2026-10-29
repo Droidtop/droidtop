@@ -333,6 +333,14 @@ object DroidtopWideSettings {
                                 dev.droidtop.app.DesktopSetupPrefs.setPanel(ctx, dev.droidtop.runtime.DesktopPanel.fromId(value))
                             },
                         ),
+                        ToggleItem(
+                            id = "pref_desktop_tile_windows",
+                            title = "Tile windows",
+                            subtitle = "New windows share the screen side by side, sway's own way, instead of floating where a " +
+                                "finger can move and resize them. For keyboard use. Applies when the desktop next starts",
+                            current = dev.droidtop.app.DesktopSetupPrefs.tileWindows(context),
+                            onToggle = { ctx, on -> dev.droidtop.app.DesktopSetupPrefs.setTileWindows(ctx, on) },
+                        ),
                         ActionItem(
                             id = "pref_desktop_root_compositor_setup",
                             title = "Desktop setup",

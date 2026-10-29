@@ -486,6 +486,21 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   the clock is the panel's (Waybar's `custom/clock`, or swaybar's status line from the stock sway config),
   and the panel choice is unchanged. The container's windows are in the bar's list, the desktop's only one
   since Waybar dropped its window title (#683): a finger needs a way to raise, minimise and close one.
+- **Window controls** (Droidtop/tracker#686, the coordinator's Desktop review, decided 2026-10-29). Under
+  sway, windows float by default: droidtop's sway config adds `for_window [all] floating enable` and an
+  8 px floating border (`DesktopPanel.swayConfig`). Decided floating, not tiling, because the desktop is
+  driven by a finger first. A new tiled window halved the others, and a finger could not move, resize,
+  snap or maximize any of them. A floating window opens at its own size, moves by its title bar and
+  resizes by its border, with no modifier key. Desktop settings > "Tile windows" (off) gives sway's
+  tiling back, for keyboard use, from the next start. Sway's title bars have no buttons, so a window's bar
+  menu (long press) has them: Minimize, Maximize, Snap left, Snap right, Restore size once one of those
+  was used, and Close. They are IPC commands on the window's container (`DesktopWindows.place`): it
+  floats, then `resize set` and `move position` in percent of the workspace, which is the desktop less
+  Waybar, so the status strip stays visible. Restore size returns it to the size and absolute position it
+  had before its first placement, or back into the tiling when it was tiled. Under labwc, whose windows
+  draw their own maximize and close buttons, the menu stays Minimize and Close. A finger-wide 48 dp grab
+  area on the edge is not possible in sway, whose resize area is the border itself. The 8 px border plus
+  Maximize and Snap are the compromise.
 - **Start's order and density** (Droidtop/tracker#555 D4, 2026-10-15). Top to bottom: the search row,
   Pinned, Linux apps (what the desktop runs, right after the pins), System, droidtop's places, plugin shelves,
   then the library. Its rows are 56 dp (`START_ROW_HEIGHT`, passed to `HostedListSheet`'s `rowMinHeight` and

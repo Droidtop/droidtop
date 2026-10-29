@@ -54,6 +54,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import dev.droidtop.hostbridge.DesktopWindows
 import dev.droidtop.hostbridge.HiddenWindow
 import dev.droidtop.hostbridge.HostBridge
+import dev.droidtop.hostbridge.SwayWindow
 import dev.droidtop.hostbridge.Toplevel
 import dev.droidtop.input.DesktopInputRouter
 import dev.droidtop.input.InputSeats
@@ -696,6 +697,7 @@ private fun TaskbarWindowList(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val hidden by rememberHiddenWindows(windows)
+    val placed by remember(windows) { windows?.placed ?: MutableStateFlow(emptyMap<Long, SwayWindow>()) }.collectAsState()
 
     if (toplevels.isEmpty() && androidApps.isEmpty()) {
         Spacer(modifier = modifier)
@@ -717,6 +719,17 @@ private fun TaskbarWindowList(
                     scope.launch { if (minimized) windows?.raise(toplevel) else minimizeWindow(context, windows, toplevel) }
                 },
                 onClose = { hostBridge?.closeToplevel(toplevel.id) },
+                placed = toplevel.id in placed,
+                onPlace = windows?.takeIf { it.canPlace }?.let { w ->
+                    { placement: DesktopWindows.Placement ->
+                        scope.launch {
+                            if (!w.place(toplevel, placement)) {
+                                dev.droidtop.library.settings.Notices.flash("Couldn't move this window", tone = dev.droidtop.library.settings.NoticeTone.Caution, context = context)
+                            }
+                        }
+                        Unit
+                    }
+                },
             )
         }
         // The Android apps and games started from here, after the container's windows (Droidtop/tracker#352).
@@ -887,6 +900,8 @@ private fun TaskbarWindowRow(
     onTap: () -> Unit,
     onMinimize: () -> Unit,
     onClose: () -> Unit,
+    placed: Boolean = false,
+    onPlace: ((DesktopWindows.Placement) -> Unit)? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Box {
@@ -917,6 +932,27 @@ private fun TaskbarWindowRow(
                 text = { Text(if (minimized) "Restore" else "Minimize") },
                 onClick = { menuOpen = false; onMinimize() },
             )
+            // A title bar's buttons and an edge drag, which sway's windows do not have (Droidtop/tracker#686).
+            if (onPlace != null && !minimized) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.desktop_maximize)) },
+                    onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.MAXIMIZE) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.desktop_snap_left)) },
+                    onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_LEFT) },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.desktop_snap_right)) },
+                    onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.SNAP_RIGHT) },
+                )
+                if (placed) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.desktop_restore_size)) },
+                        onClick = { menuOpen = false; onPlace(DesktopWindows.Placement.RESTORE) },
+                    )
+                }
+            }
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.desktop_close)) },
                 onClick = { menuOpen = false; onClose() },

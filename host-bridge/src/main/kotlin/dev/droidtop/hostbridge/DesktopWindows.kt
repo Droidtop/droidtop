@@ -40,6 +40,45 @@ class DesktopWindows(
     /** The toplevels this moved to sway's scratchpad, by toplevel id. Always empty under labwc. */
     val hidden: StateFlow<Map<Long, HiddenWindow>> = _hidden.asStateFlow()
 
+    private val _placed = MutableStateFlow<Map<Long, SwayWindow>>(emptyMap())
+
+    /**
+     * The windows this maximized or snapped, by toplevel id, each with where it was before (Droidtop/tracker#686),
+     * so the bar offers Restore size. Always empty under labwc, whose windows have their own title-bar buttons.
+     */
+    val placed: StateFlow<Map<Long, SwayWindow>> = _placed.asStateFlow()
+
+    /** Whether the bar can place windows: sway only, as labwc draws its own maximize and close buttons. */
+    val canPlace: Boolean get() = sway
+
+    /**
+     * Maximizes, snaps or restores [toplevel] (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686): what a
+     * title bar's buttons and an edge drag do on DeX or Android's desktop windowing, which sway's title bars do not
+     * have. The window floats for it, so it can be put anywhere; [Placement.RESTORE] puts it back where it was,
+     * tiled again when it was tiled. False when sway could not be asked.
+     */
+    suspend fun place(toplevel: Toplevel, placement: Placement): Boolean {
+        if (!sway) return false
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val ipc = ipc() ?: return@runCatching false
+                val window = findWindow(ipc, toplevel) ?: return@runCatching false
+                val before = _placed.value[toplevel.id]
+                if (placement == Placement.RESTORE && before == null) return@runCatching false
+                ipc.run(placeCommand(window.conId, placement, before)).also { done ->
+                    if (!done) return@also
+                    _placed.update {
+                        when (placement) {
+                            Placement.RESTORE -> it - toplevel.id
+                            // The first placement remembers where the window was; snapping it again keeps that.
+                            else -> if (toplevel.id in it) it else it + (toplevel.id to window)
+                        }
+                    }
+                }
+            }.onFailure { Log.w(TAG, "sway $placement failed", it) }.getOrDefault(false)
+        }
+    }
+
     /** Whether [toplevel] is minimized, given the current [hidden]. */
     fun isMinimized(toplevel: Toplevel, hidden: Map<Long, HiddenWindow>): Boolean = toplevel.minimized || toplevel.id in hidden
 
@@ -57,6 +96,7 @@ class DesktopWindows(
                 toplevel != null && (!toplevel.activated || now - entry.at < SETTLE_NS)
             }
         }
+        _placed.update { current -> current.filterKeys { it in byId } }
     }
 
     /** Puts [toplevel] away. False when the compositor could not be asked. */
@@ -122,11 +162,39 @@ class DesktopWindows(
         return null
     }
 
-    private companion object {
+    /** Where the bar can put a window. */
+    enum class Placement { MAXIMIZE, SNAP_LEFT, SNAP_RIGHT, RESTORE }
+
+    internal companion object {
         const val TAG = "DesktopWindows"
         const val FOCUS_POLLS = 10
         const val FOCUS_POLL_MS = 50L
         const val SETTLE_NS = 1_000_000_000L
+
+        /**
+         * The sway command that puts container [conId] at [placement]. Sizes in `ppt` are of the workspace, the
+         * desktop less Waybar (sway-ipc's `resize set` and `move position` on a floating container), so a
+         * maximized window leaves the status strip showing. [before] is the window as it was before its first
+         * placement, which [Placement.RESTORE] returns it to: back into the tiling when it was tiled, otherwise
+         * its old size and absolute position.
+         */
+        fun placeCommand(conId: Long, placement: Placement, before: SwayWindow?): String {
+            val target = "[con_id=$conId]"
+            return when (placement) {
+                Placement.MAXIMIZE -> "$target floating enable, resize set width 100 ppt height 100 ppt, move position 0 ppt 0 ppt"
+                Placement.SNAP_LEFT -> "$target floating enable, resize set width 50 ppt height 100 ppt, move position 0 ppt 0 ppt"
+                Placement.SNAP_RIGHT -> "$target floating enable, resize set width 50 ppt height 100 ppt, move position 50 ppt 0 ppt"
+                Placement.RESTORE -> {
+                    val rect = before?.rect
+                    when {
+                        before == null || !before.floating -> "$target floating disable"
+                        rect == null -> "$target move position center"
+                        else -> "$target resize set width ${rect.width} px height ${rect.height} px, " +
+                            "move absolute position ${rect.x} px ${rect.y} px"
+                    }
+                }
+            }
+        }
     }
 }
 

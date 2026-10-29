@@ -44,15 +44,27 @@ enum class DesktopPanel(val id: String, val label: String) {
          * `true` instead of swaybar, Waybar starts, and the stock launcher
          * key asks droidtop for its Start menu ([ContainerLauncher.START]),
          * so a keyboard's Super+D opens the same menu as the bar's Start.
+         *
+         * Windows float unless [tileWindows] (docs/SPEC.md 2b "Window controls", Droidtop/tracker#686): a new
+         * window opens at its own size instead of halving the others, a finger moves it by its title bar and
+         * resizes it by its border, and droidtop's bar maximizes and snaps it.
          */
-        fun swayConfig(): String = buildString {
+        fun swayConfig(tileWindows: Boolean = false): String = buildString {
             appendLine("# droidtop's desktop panel (docs/SPEC.md 2a). droidtop rewrites this file at every desktop start.")
             appendLine("# To run your own sway config, choose \"Sway's own bar\" in Desktop settings and edit ~/.config/sway/config.")
             appendLine("include /etc/sway/config")
             appendLine("bar bar-0 swaybar_command true")
             appendLine("exec waybar -c $WAYBAR_CONFIG")
             appendLine("bindsym --no-warn ${'$'}mod+d exec sh ${ContainerLauncher.HELPER} ${ContainerLauncher.START}")
+            if (!tileWindows) {
+                appendLine("for_window [all] floating enable")
+                // A border wide enough to take a fingertip's drag; the title bar stays, to move the window by.
+                appendLine("default_floating_border normal $FLOATING_BORDER_PX")
+            }
         }
+
+        /** The floating windows' border, in pixels: what a finger drags to resize one. */
+        const val FLOATING_BORDER_PX = 8
 
         /**
          * Waybar along the top, a status strip: the workspaces, the tray of
@@ -76,10 +88,10 @@ enum class DesktopPanel(val id: String, val label: String) {
             """.trimIndent() + "\n"
 
         /** Writes both files under [filesDir]; small, done before each start, off the main thread. */
-        fun writeConfigs(filesDir: File) {
+        fun writeConfigs(filesDir: File, tileWindows: Boolean = false) {
             val dir = hostDir(filesDir)
             dir.mkdirs()
-            File(dir, "sway.config").writeText(swayConfig())
+            File(dir, "sway.config").writeText(swayConfig(tileWindows))
             File(dir, "waybar.json").writeText(waybarConfig())
         }
     }

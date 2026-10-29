@@ -20,6 +20,7 @@ object DesktopSetupPrefs {
     private const val KEY_MICROPHONE = "droidtop_desktop_microphone"
     private const val KEY_ALL_LANGUAGE_FONTS = "droidtop_desktop_all_language_fonts"
     private const val KEY_PANEL = "droidtop_desktop_panel"
+    private const val KEY_TILE_WINDOWS = "droidtop_desktop_tile_windows"
     private const val KEY_KEEP_RUNNING = "droidtop_desktop_keep_running"
     /**
      * Whether the person chose. Not "droidtop_desktop_keep_running_answered": up to 0.2.0-dev.2398 the offer, asked
@@ -74,6 +75,17 @@ object DesktopSetupPrefs {
 
     fun setPanel(context: Context, panel: dev.droidtop.runtime.DesktopPanel) {
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_PANEL, panel.id).apply()
+    }
+
+    /**
+     * Whether sway tiles new windows instead of floating them (dev.droidtop.runtime.DesktopPanel.swayConfig,
+     * Droidtop/tracker#686). Off by default: floating is what a finger can move and resize.
+     */
+    fun tileWindows(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getBoolean(KEY_TILE_WINDOWS, false)
+
+    fun setTileWindows(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putBoolean(KEY_TILE_WINDOWS, on).apply()
     }
 
     /**

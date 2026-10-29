@@ -88,7 +88,10 @@ class SwayIpc(private val socketPath: String) {
                     val nodeAppId = if (node.isNull("app_id")) "" else node.optString("app_id")
                     val nodeTitle = if (node.isNull("name")) "" else node.optString("name")
                     if (nodeAppId == appId && nodeTitle == title) {
-                        add(SwayWindow(node.getLong("id"), floating, node.optBoolean("focused")))
+                        val rect = node.optJSONObject("rect")?.let {
+                            SwayRect(it.optInt("x"), it.optInt("y"), it.optInt("width"), it.optInt("height"))
+                        }
+                        add(SwayWindow(node.getLong("id"), floating, node.optBoolean("focused"), rect))
                     }
                 }
                 node.optJSONArray("nodes")?.let { children ->
@@ -103,5 +106,11 @@ class SwayIpc(private val socketPath: String) {
     }
 }
 
-/** One window in sway's tree: its container id (criteria `con_id`), whether it floats, and whether it has focus. */
-data class SwayWindow(val conId: Long, val floating: Boolean, val focused: Boolean)
+/**
+ * One window in sway's tree: its container id (criteria `con_id`), whether it floats, whether it has focus, and
+ * where it is in the layout's absolute pixels ([rect], decorations included; null when the tree did not say).
+ */
+data class SwayWindow(val conId: Long, val floating: Boolean, val focused: Boolean, val rect: SwayRect? = null)
+
+/** A container's place in sway's layout, absolute pixels (GET_TREE's `rect`). */
+data class SwayRect(val x: Int, val y: Int, val width: Int, val height: Int)
