@@ -1,0 +1,100 @@
+// droidtop's "Mouse mode" layout (Droidtop/tracker#565, #618 C4), written for droidtop, CC BY 4.0.
+// Steam's controller layout format, so Steam loads it as it is. Only the right stick and the shoulders are bound;
+// every other button and the left stick still reach the game as the pad.
+"controller_mappings"
+{
+	"version"		"3"
+	"revision"		"1"
+	"title"		"#title"
+	"description"		"#description"
+	"creator"		"droidtop"
+	"controller_type"		"controller_xboxone"
+	"actions"
+	{
+		"Default"
+		{
+			"title"		"#set_default"
+			"legacy_set"		"1"
+		}
+	}
+	"localization"
+	{
+		"english"
+		{
+			"title"		"Mouse mode"
+			"description"		"Right stick the pointer, its click held a wheel, R1 clicks, L1 right-clicks."
+			"set_default"		"Default"
+		}
+	}
+	"group"
+	{
+		"id"		"0"
+		"mode"		"joystick_mouse"
+		"inputs"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"mode_shift right_joystick 1, Scroll, "
+						}
+					}
+				}
+			}
+		}
+	}
+	"group"
+	{
+		"id"		"1"
+		"mode"		"scrollwheel"
+	}
+	"group"
+	{
+		"id"		"2"
+		"mode"		"switches"
+		"inputs"
+		{
+			"right_bumper"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"mouse_button LEFT, Click, "
+						}
+					}
+				}
+			}
+			"left_bumper"
+			{
+				"activators"
+				{
+					"Full_Press"
+					{
+						"bindings"
+						{
+							"binding"		"mouse_button RIGHT, Right click, "
+						}
+					}
+				}
+			}
+		}
+	}
+	"preset"
+	{
+		"id"		"0"
+		"name"		"Default"
+		"group_source_bindings"
+		{
+			"0"		"right_joystick active"
+			"1"		"right_joystick active modeshift"
+			"2"		"switch active"
+		}
+	}
+}
