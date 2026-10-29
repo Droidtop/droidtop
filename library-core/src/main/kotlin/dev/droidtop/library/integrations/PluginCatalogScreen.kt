@@ -588,9 +588,9 @@ object PluginCatalogScreen {
         },
     )
 
-    private const val UNOFFICIAL = "Unofficial"
+    private val UNOFFICIAL = dev.droidtop.library.settings.RowTag.UNOFFICIAL
 
-    private fun chipFor(source: PluginCatalogSource): String? = if (source.official) null else UNOFFICIAL
+    private fun chipFor(source: PluginCatalogSource): dev.droidtop.library.settings.RowTag? = if (source.official) null else UNOFFICIAL
 
     /**
      * One plugin of a catalog (Droidtop/tracker#514): its name, its one-line summary and what pressing on would do, and

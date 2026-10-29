@@ -57,6 +57,21 @@ enum class CatalogIcon {
     INTEGRATIONS, SEARCH,
 }
 
+/**
+ * The words a row's tag may say ([CatalogItem.chip]): a short, fixed set, so every tag is a word or two and the same
+ * fact always reads the same (Droidtop/tracker#677). The sentence behind a tag belongs in the row's subtitle.
+ */
+enum class RowTag(val label: String) {
+    /** A plugin from a catalog or an app that is not droidtop's own. */
+    UNOFFICIAL("Unofficial"),
+
+    /** An app its store marks with anti-features. */
+    ANTI_FEATURES("Anti-features"),
+
+    /** A setting the Gaming theme's own colour scheme overrides. */
+    SET_BY_THEME("Set by theme"),
+}
+
 sealed interface CatalogItem {
     val id: String
     val title: String
@@ -103,9 +118,10 @@ sealed interface CatalogItem {
 
     /**
      * A short tag drawn beside the title, on the row itself ("Unofficial" on a plugin from a catalog that is not
-     * droidtop's): a fact the person must see without opening anything, never a tooltip. Null draws none.
+     * droidtop's): a fact the person must see without opening anything, never a tooltip. One of a fixed set of words
+     * ([RowTag]), never free text, so a tag never takes the title's room (Droidtop/tracker#677). Null draws none.
      */
-    val chip: String? get() = null
+    val chip: RowTag? get() = null
 
     /**
      * True when [subtitle] is the row's one-line summary, shown under the title on every surface at all times (a
@@ -134,7 +150,7 @@ class ChoiceItem(
     val options: List<ChoiceOption>,
     val current: String?,
     val onSelect: (Context, String) -> Unit,
-    override val chip: String? = null,
+    override val chip: RowTag? = null,
 ) : CatalogItem {
     fun currentLabel(): String? = options.firstOrNull { it.value == current }?.label ?: current
 
@@ -215,7 +231,7 @@ class ActionItem(
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
     override val statusMark: StatusMark? = null,
-    override val chip: String? = null,
+    override val chip: RowTag? = null,
     override val iconFile: String? = null,
     // What A does. A row given none is a fact or a state, not an action (Droidtop/tracker#587): no renderer promises A
     // on it ([inert]), and pressing it does nothing.
@@ -277,7 +293,7 @@ class AsyncActionItem(
     val confirmTitle: String? = null,
     /** A read-gate ([TextBlockItem.gate]): the row is greyed ("Read it first") and does nothing until the renderer has opened that gate. */
     val gate: String? = null,
-    override val chip: String? = null,
+    override val chip: RowTag? = null,
     val run: suspend (Context, onStatus: (String) -> Unit) -> String,
 ) : CatalogItem
 
@@ -425,7 +441,7 @@ class NestedScreenItem(
     override val progress: Float? = null,
     override val progressLook: JobLook? = JobLook.of(progress),
     override val statusMark: StatusMark? = null,
-    override val chip: String? = null,
+    override val chip: RowTag? = null,
     override val iconFile: String? = null,
     override val summaryShown: Boolean = false,
 ) : CatalogItem {

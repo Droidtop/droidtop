@@ -494,7 +494,8 @@ internal fun MenuRow(
     // A leading picture the caller draws (an app's own icon in the task manager's list); [accent] and
     // [icon] win when given, since a row carries one leading mark at most.
     leading: (@Composable () -> Unit)? = null,
-    // A short tag on the row beside its title (CatalogItem.chip): "Unofficial". A fact, drawn on the row, not a tooltip.
+    // A short tag on the row beside its title (CatalogItem.chip, one of RowTag's words): "Unofficial". A fact, drawn on
+    // the row, not a tooltip.
     chip: String? = null,
     // The value drawn as a state chip (ChoiceItem.toned): in [valueTone]'s colours, or neutral when it has none
     // (Droidtop/tracker#519).
@@ -599,7 +600,8 @@ internal fun MenuRow(
                 }
                 if (chip != null) {
                     Spacer(Modifier.width(Space.Sm))
-                    StatusChip(chip, ink = MenuTokens.OnSurface, fill = MenuTokens.SurfaceSelected)
+                    // Capped, so a tag never takes the title's room (Droidtop/tracker#677); the words are RowTag's.
+                    StatusChip(chip, ink = MenuTokens.OnSurface, fill = MenuTokens.SurfaceSelected, modifier = Modifier.widthIn(max = ROW_TAG_MAX_WIDTH))
                 }
             }
             if (progress != null) {
@@ -1043,6 +1045,9 @@ internal fun ModalScrim() {
     val strength = MenuTokens.Scrim.alpha
     androidx.compose.runtime.SideEffect { dialogWindow?.setDimAmount(strength) }
 }
+
+/** The widest a row's tag ([MenuRow]'s chip) may draw: room for "Anti-features" at the label size, never more. */
+private val ROW_TAG_MAX_WIDTH = 120.dp
 
 /** One choice of a modal dialog ([DialogChoices]): its label, a short line under it (a date, what it will do), and whether it is one-way. */
 internal class DialogChoice(val label: String, val detail: String? = null, val danger: Boolean = false)

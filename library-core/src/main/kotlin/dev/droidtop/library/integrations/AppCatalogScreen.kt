@@ -158,7 +158,7 @@ object AppCatalogScreen {
         title = row.name,
         subtitle = listOfNotNull(row.summary, row.source?.let { "from $it" }).joinToString(" - ").ifEmpty { null },
         inline = appScreen(record, row.id, row.name),
-        chip = if (row.antiFeatures.isNotEmpty()) "Anti-features" else null,
+        chip = if (row.antiFeatures.isNotEmpty()) dev.droidtop.library.settings.RowTag.ANTI_FEATURES else null,
     )
 
     // ------------------------------------------------------------------

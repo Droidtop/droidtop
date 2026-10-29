@@ -27,15 +27,15 @@ class AppearancePrefsTest {
     }
 
     @Test
-    fun `a named theme scheme is on the row by its own label`() {
+    fun `a named theme scheme is said by its own label`() {
         val labels = mapOf("dark-shots" to "Dark [Screenshots]")
-        assertEquals("Theme keeps Dark [Screenshots]", AppearancePrefs.schemeChip(AppearancePrefs.schemeLabel("dark-shots", labels)))
+        assertEquals("Dark [Screenshots]", AppearancePrefs.schemeLabel("dark-shots", labels))
         // A scheme the theme gave no label is named by its id rather than not at all.
-        assertEquals("Theme keeps night", AppearancePrefs.schemeChip(AppearancePrefs.schemeLabel("night", labels)))
+        assertEquals("night", AppearancePrefs.schemeLabel("night", labels))
     }
 
     @Test
-    fun `automatic puts nothing on the row`() {
-        assertNull(AppearancePrefs.schemeChip(AppearancePrefs.schemeLabel(null, mapOf("a" to "A"))))
+    fun `automatic names no scheme`() {
+        assertNull(AppearancePrefs.schemeLabel(null, mapOf("a" to "A")))
     }
 }

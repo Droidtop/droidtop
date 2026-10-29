@@ -680,7 +680,7 @@ class CatalogPreferenceNavigator(
     private fun toPreference(context: Context, item: CatalogItem): Preference = when (item) {
         is ChoiceItem -> ListPreference(context).apply {
             key = item.id
-            title = titleWithChip(item.title, item.chip)
+            title = titleWithChip(item.title, item.chip?.label)
             isPersistent = false
             isIconSpaceReserved = false
             entries = item.options.map { it.label }.toTypedArray()
@@ -806,7 +806,7 @@ class CatalogPreferenceNavigator(
         }
         is ActionItem -> rowFor(context, item).apply {
             key = item.id
-            title = titleWithChip(item.title, item.chip)
+            title = titleWithChip(item.title, item.chip?.label)
             summary = item.subtitle
             isIconSpaceReserved = false
             setOnPreferenceClickListener {
@@ -887,7 +887,7 @@ class CatalogPreferenceNavigator(
         }
         is AsyncActionItem -> Preference(context).apply {
             key = item.id
-            title = titleWithChip(item.title, item.chip)
+            title = titleWithChip(item.title, item.chip?.label)
             summary = statusById[item.id] ?: item.subtitle
             isIconSpaceReserved = false
             val gate = item.gate
@@ -921,7 +921,7 @@ class CatalogPreferenceNavigator(
         }
         is NestedScreenItem -> rowFor(context, item).apply {
             key = item.id
-            title = titleWithChip(item.title, item.chip)
+            title = titleWithChip(item.title, item.chip?.label)
             summary = listOfNotNull(item.subtitle, item.valueLabel?.invoke(context)?.takeIf { it.isNotBlank() })
                 .joinToString("  ·  ")
                 .ifBlank { null }

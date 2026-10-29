@@ -1797,8 +1797,8 @@ object AppSettingsCatalogs {
             valueLabel = { "$state · v${m.version}" },
             // An app's plugin is trusted by its app's signature, not an origin key (Droidtop/tracker#547).
             chip = if (m.kind == PluginKind.APP_INTERFACE) {
-                if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) null else "Unofficial"
-            } else if (isUnofficial(m.origin, userKeys)) "Unofficial" else null,
+                if (dev.droidtop.pluginhost.AppInterfaces.isOfficial(record)) null else dev.droidtop.library.settings.RowTag.UNOFFICIAL
+            } else if (isUnofficial(m.origin, userKeys)) dev.droidtop.library.settings.RowTag.UNOFFICIAL else null,
             // Its own icon and its summary, always shown (#513, #514). Built on IO, like the whole list.
             iconFile = PluginStore.iconFile(context, record),
             summaryShown = true,

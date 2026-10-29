@@ -1595,7 +1595,7 @@ private fun CatalogRowView(
     MenuRow(
         title = if (confirmArmed) "${item.title}: ${PressWords.again} to confirm" else item.title,
         value = if (locked) "Read it first" else status ?: value ?: if (placeholder) (if ((item as? TextInputItem)?.search == true) "Type to search" else "not set") else null,
-        chip = item.chip,
+        chip = item.chip?.label,
         // A state with a tone (a plugin's Allowed / Ask first / Blocked) is a chip in that tone (tracker#519).
         valueChip = status == null && !locked && (item as? ChoiceItem)?.toned == true,
         valueTone = (item as? ChoiceItem)?.currentTone(),

@@ -17371,9 +17371,11 @@ UI through the one palette (`GamingPalette`) every token reads:
   at 80 percent, washed the page out. A dialog's own dim was already black. When the Gaming theme has a colour scheme
   of its own chosen, it wins over Light or dark on every Gaming-themed screen, settings included, so the Light or
   dark row says so and that Theme color scheme > Automatic makes them follow it. It says so ON the row, as the row's
-  chip with the scheme's own label ("Theme keeps Dark [Screenshots]", `AppearancePrefs.schemeChip`; `ChoiceItem.chip`),
-  and how to undo it in its explanation: the follow-up rig (2026-10-16, v0.2.0-dev.2011) never saw the explanation
-  alone, because Gaming keeps a subtitle on the focus line and in Info.
+  tag **Set by theme** (`RowTag.SET_BY_THEME`; `ChoiceItem.chip`), and names the scheme and how to undo it in its
+  explanation: the follow-up rig (2026-10-16, v0.2.0-dev.2011) never saw the explanation alone, because Gaming keeps
+  a subtitle on the focus line and in Info. A row's tag is one of `RowTag`'s fixed words (Unofficial, Anti-features,
+  Set by theme), never free text, and is capped at 120dp, so it never takes the title's room: "Theme keeps Dark
+  [Screenshots]" did (Droidtop/tracker#677).
 - **The Desktop session's Start menu and its Switch mode sheet follow Light or dark the same way (follow-up rig
   2026-10-16).** They are Gaming-themed (the Desktop shell is wrapped in `GamingTheme`; the Switch mode sheet takes it
   through `rememberGamingThemed`), so they follow Appearance through the theme's matching scheme, and a colour scheme

@@ -53,12 +53,9 @@ object AppearancePrefs {
             ),
             current = choice(context),
             onSelect = { ctx, value -> CatalogPrefs.prefs(ctx).edit().putString(KEY_APPEARANCE, value).apply() },
-            chip = schemeChip(scheme),
+            chip = if (scheme != null) RowTag.SET_BY_THEME else null,
         )
     }
-
-    /** The row's chip while the theme's named scheme [schemeLabel] overrides it, or null. Pure, for tests. */
-    fun schemeChip(schemeLabel: String?): String? = schemeLabel?.let { "Theme keeps $it" }
 
     /** The label [schemeLabels] gives [scheme], else [scheme] itself; null stays null. Pure, for tests. */
     fun schemeLabel(scheme: String?, schemeLabels: Map<String, String>): String? = scheme?.let { schemeLabels[it] ?: it }
