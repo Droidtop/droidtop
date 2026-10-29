@@ -4,20 +4,24 @@ name: Emulator tests
 # on an Android emulator, with the rig tests that make sense on a stock emulator and a start-up check
 # (scripts/emulator-tests.sh). Nightly, by hand (optionally for a given android-build run), and when this workflow,
 # its script or the tests change. It tests the APKs android-build already made, so it does not build droidtop a
-# second time. The emulator is started the way Droidtop/enginehost's conformance-emulator.yml starts its own.
+# second time. Which build: a push tests the build of the SAME commit (waiting for it, or starting it: ci/ branches are not
+# built on push), main's nightly and by-hand runs test main's latest successful build, and another commit's build is
+# never the fallback (scripts/emulator-build.py; a batch that tested main's build never tested its own change). The emulator is started the way Droidtop/enginehost's conformance-emulator.yml starts its own.
 on:
   schedule:
     - cron: "17 4 * * *"
   workflow_dispatch:
     inputs:
       run_id:
-        description: "The android-build run whose APKs are tested (default: the latest successful one on main)"
+        description: "The android-build run whose APKs are tested (default: main's latest successful one on main, this commit's own build on any other branch)"
         required: false
         type: string
   push:
     paths:
       - ".github/workflows/emulator-tests.yml"
       - "scripts/emulator-tests.sh"
+      - "scripts/emulator-build.py"
+      - "scripts/test_emulator_build.py"
       - "app/src/androidTest/**"
 
 permissions:
@@ -29,7 +33,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  build:
+    name: Find the build to test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    # Starting a build of a branch that has none needs actions: write; nothing else here writes.
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      id: ${{ steps.build.outputs.id }}
+    steps:
+      - name: Checkout (scripts only)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: The choice's own tests
+        run: python3 -m unittest discover -s scripts -p 'test_emulator_build.py' -v
+
+      - name: Find the build to test
+        id: build
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID_INPUT: ${{ inputs.run_id }}
+        run: |
+          python3 scripts/emulator-build.py --repo "$GITHUB_REPOSITORY" --event "$GITHUB_EVENT_NAME" \
+            --ref-name "$GITHUB_REF_NAME" --sha "$GITHUB_SHA" --run-id "$RUN_ID_INPUT" | tee -a "$GITHUB_OUTPUT"
+          echo "Testing the APKs of android-build run $(sed -n 's/^id=//p' "$GITHUB_OUTPUT" | tail -1)" | tee -a "$GITHUB_STEP_SUMMARY"
+
   emulator:
+    needs: build
     # Android 13 is the rig's (BlueStacks) and 14 is what newer handhelds ship: a test that passes on one and fails on the
     # other is a difference in Android, not in the emulator.
     name: Android API ${{ matrix.api-level }}
@@ -70,7 +106,7 @@ jobs:
         with:
           name: droidtop-apk
           path: apk
-          run-id: ${{ steps.build.outputs.id }}
+          run-id: ${{ needs.build.outputs.id }}
           github-token: ${{ github.token }}
 
       - name: Download the build's test APK
@@ -78,7 +114,7 @@ jobs:
         with:
           name: droidtop-android-test
           path: apk
-          run-id: ${{ steps.build.outputs.id }}
+          run-id: ${{ needs.build.outputs.id }}
           github-token: ${{ github.token }}
 
       - name: Let the emulator use KVM
