@@ -15865,6 +15865,26 @@ the same care as the art.
     WebP or GIF of at most 10 MiB, and is kept whole or not at all. It is filed where a scraped cover goes and
     recorded under the plugin's name; a cover already there, or one the person chose, is never replaced. Screenshots
     are later work.
+  - **By its shape (2026-10-29, Droidtop/tracker#585).** The picture a source names as the cover is measured once
+    it is here (its header only), and filed by the role its shape is (Artwork roles, below): box art stays the
+    cover; a landscape picture (a forum thread's banner) goes to the landscape slot (ES-DE `fanart`, droidtop's
+    hero), recorded under the plugin's name as Hero art, when that slot is empty and not the person's; otherwise it
+    is not kept. It is never squashed into the cover.
+- **Artwork roles (2026-10-29, Droidtop/tracker#585).** The owner: "There's a steamgriddb plugin for decky that
+  handles metadata, we should learn from it for what each image looks like and is used for". Steam's library, and
+  SteamGridDB and its Decky plugin with it, give art five roles, each a shape and a place; droidtop files and shows
+  a picture by its role (`ArtworkRole`, `ArtworkRoles.ofShape`), and a slot only ever shows a picture of its shape.
+
+  | Role | Steam's size | Shape | droidtop's slot | ES-DE media folder |
+  |---|---|---|---|---|
+  | Capsule | 600x900 | 2:3 portrait (square box art too, up to 1.25:1) | grid and shelf capsules | `covers` |
+  | Wide capsule | 920x430 | about 2.1:1, and 16:9 banners | the hero card (Home's first card) | `fanart` |
+  | Hero | 1920x620 | about 3.1:1 (from 2.6:1) | the game page's banner, and the hero card | `fanart` |
+  | Logo | free, transparent | any | drawn over the hero | `marquees` |
+  | Icon | square | 1:1 | small lists | droidtop's own `icons` |
+
+  Built so far: a plugin's cover is filed by its shape (above). Not yet: the same check on scraped pictures from
+  the built-in sources and on folder and store art, and a role a plugin names itself (docs/plugin-api.md 3 A3).
   - **Fewer requests (2026-10-17).** The owner: "Maybe caching might reduce our hits to the service somewhat". A
     game that already has a description, a developer, a genre and a cover is not sent to plugin sources. A source
     that found nothing for a game is not asked about it again for a week (`PluginScrapeMemory`), unless the game

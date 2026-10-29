@@ -867,10 +867,41 @@ object PcScraper {
                 .isSuccess
         } ?: return
         val base = row ?: GameMetadataEntity(id = entry.id)
+        // A picture is filed by its real shape (docs/SPEC.md 7h, "Artwork roles", Droidtop/tracker#585): a forum
+        // thread's banner offered as the cover is landscape art, and squashed into a box it is no cover at all.
+        val role = imageSize(destination)?.let { (width, height) -> ArtworkRoles.ofShape(width, height) } ?: ArtworkRole.CAPSULE
+        if (role != ArtworkRole.CAPSULE) {
+            val landscape = PcMediaLayout.mediaFile(gamesRoot, systemFolder, role.mediaFolder, destination.nameWithoutExtension)
+            val heroFree = row?.heroPath?.let { File(it).isFile } != true && FieldSources.writable(row?.fieldSources, FieldSources.HERO)
+            if (!heroFree || !moveFile(destination, landscape)) {
+                destination.delete()
+                dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] picture from ${won.source.label} is landscape, not a cover; not kept")
+                return
+            }
+            dao.upsertGameMetadata(
+                base.copy(heroPath = landscape.absolutePath, fieldSources = FieldSources.merge(base.fieldSources, mapOf(FieldSources.HERO to won.source.label))),
+            )
+            dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] landscape art from ${won.source.label} (${role.name.lowercase()})")
+            return
+        }
         dao.upsertGameMetadata(
             base.copy(artworkPath = destination.absolutePath, fieldSources = FieldSources.merge(base.fieldSources, mapOf(FieldSources.COVER to won.source.label))),
         )
         dev.droidtop.library.ScanLog.write("scrape: ${entry.title} [pc] cover from ${won.source.label}")
+    }
+
+    /** A picture's width and height, read from its header only; null when Android cannot read it. */
+    private fun imageSize(file: File): Pair<Int, Int>? {
+        val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        runCatching { android.graphics.BitmapFactory.decodeFile(file.absolutePath, options) }
+        return (options.outWidth to options.outHeight).takeIf { it.first > 0 && it.second > 0 }
+    }
+
+    /** [from] moved to [to], replacing it; false when it could not be. */
+    private fun moveFile(from: File, to: File): Boolean {
+        to.parentFile?.mkdirs()
+        if (from.renameTo(to)) return true
+        return runCatching { from.copyTo(to, overwrite = true); from.delete(); true }.getOrDefault(false)
     }
 
     private suspend fun writePluginFields(context: Context, entry: LibraryEntry, found: List<MetadataFields>, replace: Boolean = false) {
