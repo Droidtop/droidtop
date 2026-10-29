@@ -279,6 +279,8 @@ object GamingSettingsCatalog {
             title = "Library",
             category = "Library",
             items = buildList {
+                // The person's own play, by game and system (docs/SPEC.md 7f "Your play").
+                add(PlaySummaryScreen.link())
                 add(
                     NestedScreenItem(
                         id = ID_SCRAPER,
