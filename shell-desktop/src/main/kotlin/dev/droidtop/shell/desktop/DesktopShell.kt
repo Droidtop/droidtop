@@ -405,7 +405,8 @@ sealed interface DesktopSessionMessage {
     data object Idle : DesktopSessionMessage
     /** [detail]: the latest line the booting container reported (a first boot installs the desktop), if any. */
     data class Connecting(val detail: String? = null) : DesktopSessionMessage
-    data class Failed(val reason: String) : DesktopSessionMessage
+    /** [stopped]: the desktop was running and stopped on its own, rather than failing to start. */
+    data class Failed(val reason: String, val stopped: Boolean = false) : DesktopSessionMessage
     /** No desktop image has been chosen, so there is no session to start until Desktop setup runs. */
     data object NeedsSetup : DesktopSessionMessage
 }
@@ -545,7 +546,7 @@ private fun BoxScope.DesktopViewport(
                     }
                 }
                 is DesktopSessionMessage.Failed -> {
-                    Text(stringResource(R.string.desktop_start_failed), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(if (sessionMessage.stopped) R.string.desktop_stopped else R.string.desktop_start_failed), color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.titleLarge)
                     Text(
                         sessionMessage.reason,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

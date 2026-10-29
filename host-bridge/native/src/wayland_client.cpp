@@ -1289,6 +1289,7 @@ void WaylandClient::dispatchLoop() {
     }
     if (broken) {
         LOGW("the compositor connection failed (%s); dispatch thread exiting", strerror(errno));
+        connectionLost_ = true;
     }
     // Anything posted from now on runs inline in its caller; anything
     // already posted runs here, so no caller waits forever.

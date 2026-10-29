@@ -290,6 +290,16 @@ Java_dev_droidtop_hostbridge_HostBridge_nativeDisconnect(JNIEnv* env, jobject th
     g_clients.erase(key);
 }
 
+// Whether the compositor ended the connection (Droidtop/tracker#688). A
+// client that is gone (never connected, or disconnected by droidtop) is not
+// lost: only the compositor's side closing counts.
+extern "C" JNIEXPORT jboolean JNICALL
+Java_dev_droidtop_hostbridge_HostBridge_nativeConnectionLost(JNIEnv* env, jobject thiz) {
+    std::lock_guard<std::mutex> lock(g_clientsMutex);
+    auto* client = findClient(identityHash(env, thiz));
+    return client && client->connectionLost() ? JNI_TRUE : JNI_FALSE;
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_dev_droidtop_hostbridge_HostBridge_nativePresentOutput(JNIEnv* env, jobject thiz, jobject surface) {
     std::lock_guard<std::mutex> lock(g_clientsMutex);

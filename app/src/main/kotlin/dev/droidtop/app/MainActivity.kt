@@ -407,7 +407,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
                                 if (desktopSetUp) DesktopSessionMessage.Idle else DesktopSessionMessage.NeedsSetup
                             is DesktopSessionState.Connecting -> DesktopSessionMessage.Connecting(state.detail)
                             is DesktopSessionState.Connected -> DesktopSessionMessage.Idle
-                            is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message)
+                            is DesktopSessionState.Failed -> DesktopSessionMessage.Failed(state.message, state.stopped)
                         },
                         // Programs (the terminal, the Start menu's Linux apps)
                         // run in the session, not in this screen: see

@@ -48,7 +48,8 @@ sealed interface DesktopSessionState {
         val runtime: ContainerRuntime,
         val container: Container,
     ) : DesktopSessionState
-    data class Failed(val message: String) : DesktopSessionState
+    /** [stopped]: the desktop was running and its compositor went away, rather than failing to start. */
+    data class Failed(val message: String, val stopped: Boolean = false) : DesktopSessionState
 }
 
 /**
@@ -97,6 +98,10 @@ class DesktopSessionService : Service() {
     @Volatile
     private var libraryEntries: DesktopLibraryEntries? = null
 
+    /** Why the session is ending on its own (its compositor went away), for the page shown after it; null when it was stopped. */
+    @Volatile
+    private var endedBecause: String? = null
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) stopSelf()
         return START_NOT_STICKY
@@ -136,7 +141,7 @@ class DesktopSessionService : Service() {
             }
         }
         booting = null
-        _stateHolder.value = DesktopSessionState.Idle
+        _stateHolder.value = endedBecause?.let { DesktopSessionState.Failed(it, stopped = true) } ?: DesktopSessionState.Idle
         sessionScope = null
         // The seat belongs to the bridge that has just gone away. Dropped
         // here so no surface -- the desktop viewport or the second screen
@@ -241,6 +246,7 @@ class DesktopSessionService : Service() {
             runtime,
             primary,
         )
+        scope.launch { watchCompositor(hostBridge) }
         libraryEntries = DesktopLibraryEntries(applicationContext, LibraryCore.library(applicationContext)).also { it.start(scope) }
         // The Docker Engine API on docker.sock and the libpod API on podman.sock, for clients that talk to a daemon
         // (docs/SPEC.md 3d, D14, D15).
@@ -259,6 +265,20 @@ class DesktopSessionService : Service() {
                 if (!installed) DesktopFontsJob.ensure(applicationContext)
             }
         }
+    }
+
+    /**
+     * Ends the session when its compositor goes away (docs/SPEC.md 6b "When the desktop stops",
+     * Droidtop/tracker#688): sway crashed, or something in the container killed it. Nothing reaches the desktop
+     * after that, yet the session read "Connected" and the viewport kept its last frame with input going nowhere.
+     * The session ends as a stop does, so the container's leftovers are stopped and Try again boots it afresh,
+     * and the page says the desktop stopped.
+     */
+    private suspend fun watchCompositor(hostBridge: HostBridge) {
+        while (!hostBridge.connectionLost()) kotlinx.coroutines.delay(COMPOSITOR_CHECK_MS)
+        android.util.Log.e(TAG, "The compositor closed the connection; ending the desktop session")
+        endedBecause = "Its compositor exited, and the windows that were open on it closed with it."
+        stopSelf()
     }
 
     /**
@@ -432,6 +452,9 @@ class DesktopSessionService : Service() {
         @Volatile
         private var pendingStop: kotlinx.coroutines.Job? = null
         private const val NOTIFICATION_ID = 1
+
+        /** How often a running session asks whether its compositor is still there; one cheap native call. */
+        private const val COMPOSITOR_CHECK_MS = 1_000L
         private val _stateHolder = MutableStateFlow<DesktopSessionState>(DesktopSessionState.Idle)
 
         /** Observed by DesktopShell/MainActivity instead of a null/null placeholder. */

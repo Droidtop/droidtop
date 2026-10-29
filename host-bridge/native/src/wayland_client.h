@@ -91,6 +91,12 @@ public:
 
     bool isConnected() const { return display_ != nullptr; }
 
+    // True once the dispatch thread has seen the connection fail: the
+    // compositor exited or closed the socket (Droidtop/tracker#688). Set
+    // from the dispatch thread, read from any thread; disconnect() does not
+    // set it, so a connection droidtop closed itself never reads as lost.
+    bool connectionLost() const { return connectionLost_; }
+
     // Starts (or restarts, if already presenting) a continuous screencopy
     // capture loop targeting the primary output — MVP is single-output only,
     // matching the current DisplayOutput model's merged-desktop default; see
@@ -200,6 +206,7 @@ private:
 
     void* dispatchThreadHandle_ = nullptr; // pthread_t, opaque here to avoid pulling <pthread.h> into the header
     std::atomic<bool> dispatchThreadRunning_{false};
+    std::atomic<bool> connectionLost_{false};
 
     // Wakes the dispatch thread out of poll(): posted tasks, shutdown.
     int wakeFd_ = -1;

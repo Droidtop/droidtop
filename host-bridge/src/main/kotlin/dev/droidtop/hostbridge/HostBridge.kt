@@ -47,6 +47,7 @@ data class Toplevel(
  *     for the taskbar, and its activate/minimize/close requests.
  */
 class HostBridge : HostBridgeInput {
+    @Volatile
     private var connected = false
 
     /** The embedded US keymap's modifiers, read from the text the compositor was given. */
@@ -79,6 +80,13 @@ class HostBridge : HostBridgeInput {
             connected = false
         }
     }
+
+    /**
+     * Whether the compositor ended the connection: it exited, or closed the socket (Droidtop/tracker#688). Nothing
+     * reaches the desktop after that, so the session is over. False when droidtop disconnected itself. Cheap and
+     * safe from any thread; the session service asks it every second.
+     */
+    fun connectionLost(): Boolean = connected && nativeConnectionLost()
 
     /**
      * Starts a continuous frame-capture loop targeting [surface]. [output]
@@ -233,6 +241,7 @@ class HostBridge : HostBridgeInput {
 
     private external fun nativeConnect(waylandSocketPath: String): Boolean
     private external fun nativeDisconnect()
+    private external fun nativeConnectionLost(): Boolean
     private external fun nativePresentOutput(surface: Surface): Boolean
     private external fun nativeStopPresenting()
     private external fun nativeSetOutputSize(width: Int, height: Int, scale: Double): Boolean

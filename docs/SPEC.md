@@ -7909,6 +7909,17 @@ sends as keys (Enter, Backspace, arrows, Ctrl, Esc) go as they are; both take th
 keyboard shows when asked for, not when a Linux text field takes focus: that needs host-bridge to speak Wayland's
 text-input and input-method protocols, the next step on #685.
 
+**When the desktop stops** (Droidtop/tracker#688, the coordinator's Desktop review: a dead compositor still showed
+"Connected", with the last frame frozen and input going nowhere). host-bridge's dispatch thread is the one reader of
+the Wayland socket; when a read, flush or dispatch on it fails (the compositor exited, or closed the socket), it marks
+the connection lost (`WaylandClient::connectionLost`, `HostBridge.connectionLost`). A connection droidtop closed
+itself never reads as lost. `DesktopSessionService` asks once a second while the session runs, and on a lost
+connection ends the session as a stop does, so the container's leftovers are stopped and Try again boots it afresh.
+The viewport then says "The desktop stopped", with the reason and the same Try again and Desktop setup buttons as a
+failed start. Decided: no automatic restart. A compositor that dies on start would restart in a loop, and the person
+should see that it stopped; Try again is one press. A poll rather than a call from the dispatch thread: one cheap
+native call a second, and nothing has to attach that thread to the JVM on its way out.
+
 The second-screen trackpad surface of §6 is built on top of this router's relative-motion path; see §6c.
 
 ### Keyboard layout (decided 2026-10-09, Droidtop/tracker#387)
