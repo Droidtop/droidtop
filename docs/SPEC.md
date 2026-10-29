@@ -1026,7 +1026,11 @@ name from each surface, because the long press alone is invisible to a
 newcomer and BlueStacks never delivers it: the Android home screen's
 long-press menu ("droidtop modes"), Gaming's Quick Menu, System tab
 ("Switch mode"), and the Desktop taskbar ("Modes"). A surface with no
-Activity of its own to hand opens it through `ModeSwitcherActivity`.
+Activity of its own to hand opens it through `ModeSwitcherActivity`. Over Gaming or Desktop, which hide Android's
+bars, the sheet's window hides them too, so it draws as the shell's own
+sheet; over Standard (Android's home screen) they stay (console
+2026-10-29, Droidtop/tracker#750: Android's status bar showed over it on
+Desktop; one host kept, agreed with the coordinator).
 "Modes and settings" opens Global settings, where each mode is switched on
 and off (Settings runs in a task of its own and every opening from a
 switcher, the home screen menu or the Desktop taskbar starts it fresh, so a

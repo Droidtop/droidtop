@@ -36,6 +36,9 @@ class ModeSwitcherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Over Gaming or Desktop, which hide Android's bars, the sheet hides them too (Droidtop/tracker#750); over
+        // Standard, Android's home screen, they stay.
+        val immersive = dev.droidtop.library.settings.Modes.lastMode(this) != dev.droidtop.library.settings.Mode.LAUNCHER.id
         setContent {
             dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                 // The question and the Home role request both outlive the first sheet's own dismissal: the sheet
@@ -63,6 +66,7 @@ class ModeSwitcherActivity : ComponentActivity() {
                         choices = answers,
                         title = "Android mode needs droidtop as Home",
                         onDismiss = { if (!requesting) finish() },
+                        hideSystemBars = immersive,
                     )
                 } else {
                     val choices = remember {
@@ -77,7 +81,7 @@ class ModeSwitcherActivity : ComponentActivity() {
                             )
                         }
                     }
-                    ModeSwitcherSheet(choices = choices, onDismiss = { if (!asking) finish() })
+                    ModeSwitcherSheet(choices = choices, onDismiss = { if (!asking) finish() }, hideSystemBars = immersive)
                 }
             }
         }

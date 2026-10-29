@@ -1,6 +1,7 @@
 package dev.droidtop.shell.gamepad
 
 import dev.droidtop.shell.gamepad.input.GatePadInThisDialog
+import dev.droidtop.shell.gamepad.input.HideSystemBarsInThisDialog
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
@@ -38,10 +39,17 @@ class ModeSwitcherChoice(
  * (rig, build 1535). The first row holds the cursor from the start, so one A chooses it; Up/Down move,
  * B closes, and the hint row under the rows is the touch route to the same presses, since the window
  * hosting this has no shell footer of its own. [title] lets the same sheet ask a question ("Make droidtop your Home
- * app...") with its answers as the rows.
+ * app...") with its answers as the rows. [hideSystemBars] is for a sheet over a shell that hides Android's bars
+ * (Gaming, Desktop): its window hides them too, so it draws as the shell's own sheet rather than a separate window
+ * under Android's status bar (Droidtop/tracker#750, console 2026-10-29).
  */
 @Composable
-fun ModeSwitcherSheet(choices: List<ModeSwitcherChoice>, onDismiss: () -> Unit, title: String = "Switch mode") {
+fun ModeSwitcherSheet(
+    choices: List<ModeSwitcherChoice>,
+    onDismiss: () -> Unit,
+    title: String = "Switch mode",
+    hideSystemBars: Boolean = false,
+) {
     CompositionLocalProvider(LocalShellWindow provides currentShellWindow()) {
         var focus by remember { mutableIntStateOf(0) }
         fun choose(index: Int) {
@@ -51,6 +59,7 @@ fun ModeSwitcherSheet(choices: List<ModeSwitcherChoice>, onDismiss: () -> Unit, 
         }
         Dialog(onDismissRequest = onDismiss) {
             GatePadInThisDialog()
+            if (hideSystemBars) HideSystemBarsInThisDialog()
             MenuPanel(
                 modifier = Modifier.width(LocalShellWindow.current.panelWidth(420.dp)),
                 focusLabel = title,
