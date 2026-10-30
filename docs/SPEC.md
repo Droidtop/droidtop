@@ -19016,8 +19016,12 @@ menu still list every `listed` place.
   metered network when the person asked for Wi-Fi only), the check runs as the one job, and the list re-reads its
   plugin and app sections when it ends. A kind set to install automatically then installs, as after the scheduled
   check (`UpdateChecks.applyPolicies`, the one policy step), except droidtop itself: a place that shows updates can be
-  over a game, so droidtop's own install waits for its press or the schedule, and the schedule does not start it
-  while a game runs (`LaunchDisplay.running`), since it ends in Android's confirmation over the screen. **Where Updates is reached:** the Quick Menu's Downloads tab; Settings > About
+  over a game, so droidtop's own install waits for its press or the schedule. **Nothing installs by itself while a
+  game runs** (2026-10-30, DroidDeck's "when idle", Droidtop/tracker#363): a plugin or app replaced under a game can
+  stop what the game uses, and droidtop's install ends in Android's confirmation over the screen, so while
+  `LaunchDisplay.running` holds a game the policy step waits and runs once when the game ends; a scheduled pass's
+  wait keeps its droidtop install and its notification. "Only on Wi-Fi" already holds every check and install to an
+  unmetered network, and a capsule's top-left corner already marks a game with an update. **Where Updates is reached:** the Quick Menu's Downloads tab; Settings > About
   droidtop > Updates, whose value says when droidtop has a newer build ("droidtop 0.2.0-dev.2700 is out"; it was a
   group of its own under System, now in About, one row); a plugin's page (its version and Update), in Settings and
   as its panel in the Quick Menu and on the companion; the plugin list's "N updates" row, each row's value naming the

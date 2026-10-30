@@ -27,6 +27,7 @@ import dev.droidtop.pluginhost.PluginStore
 import dev.droidtop.pluginhost.UserOriginKeys
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -191,11 +192,17 @@ object UpdateChecks {
      * Android's own confirmation, which would cover the game (Droidtop/tracker#792).
      */
     private suspend fun applyPolicies(app: Context, includeDroidtop: Boolean): Int {
+        // Nothing installs by itself while a game runs (DroidDeck's "when idle", Droidtop/tracker#363): a plugin or app
+        // replaced under a game can stop what the game uses. The same step runs again when the game ends.
+        if (dev.droidtop.library.LaunchDisplay.running.value != null) {
+            afterTheGame(app, includeDroidtop)
+            return 0
+        }
         var asking = 0
         if (AppSelfUpdate.newerSeenVersionName(app) != null) {
             // Installing droidtop always ends in Android's own confirmation; Install automatically fetches it first.
             val auto = UpdateKinds.policy(app, UpdateKinds.Kind.DROIDTOP) == UpdateKinds.Policy.AUTO
-            if (auto && includeDroidtop && dev.droidtop.library.LaunchDisplay.running.value == null) UpdateNow.start(app) else asking++
+            if (auto && includeDroidtop) UpdateNow.start(app) else asking++
         }
         val plugins = PluginCatalog.offersFor(
             PluginStore.installed(app), PluginCatalog.listings(app), UserOriginKeys.load(UserOriginKeys.storeFile(app)),
@@ -220,6 +227,27 @@ object UpdateChecks {
             }
         }
         return asking
+    }
+
+    @Volatile private var waitingForGame: Job? = null
+
+    /** Whether a pass that waits for the game asked for droidtop's own install too (a scheduled pass does). */
+    @Volatile private var droidtopAfterGame = false
+
+    /**
+     * Runs [applyPolicies] once the running game ends, one wait at a time. If any pass that waited was scheduled, its
+     * ask for droidtop's own install is kept, and what is left to ask about is the scheduled pass's notification.
+     */
+    private fun afterTheGame(app: Context, includeDroidtop: Boolean) {
+        if (includeDroidtop) droidtopAfterGame = true
+        if (waitingForGame?.isActive == true) return
+        waitingForGame = dev.droidtop.runtime.util.AppScopes.io.launch {
+            dev.droidtop.library.LaunchDisplay.running.first { it == null }
+            val scheduled = droidtopAfterGame
+            droidtopAfterGame = false
+            val asking = applyPolicies(app, scheduled)
+            if (scheduled) notifyAsking(app, asking)
+        }
     }
 
     /**
