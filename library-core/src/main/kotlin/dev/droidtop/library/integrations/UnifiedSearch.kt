@@ -131,12 +131,20 @@ class UnifiedState(
     /** Installed plugins that cannot answer at all (waiting for approval, turned off). */
     val unavailable: List<UnavailableSource>,
     val settled: Boolean,
+    /**
+     * The sources the person turned off in Get games' source filter ([SourceSelection]): not asked, still listed so the
+     * filter can draw them, off (owner, 2026-10-30, Droidtop/tracker#825: "a filter to choose where it searches").
+     */
+    val off: List<GameSourceProvider> = emptyList(),
+    /** With no query: [rows] are what the sources feature now, not matches (Droidtop/tracker#825). */
+    val featured: Boolean = false,
 ) {
     /** Every source hit in [rows]: what the next query carries over while its sources answer. */
     val sourceHits: List<SourceHit> get() = rows.mapNotNull { it.hit }
 
     companion object {
-        fun empty(query: String = "") = UnifiedState(query, emptyList(), emptyList(), emptyList(), settled = true)
+        fun empty(query: String = "", off: List<GameSourceProvider> = emptyList()) =
+            UnifiedState(query, emptyList(), emptyList(), emptyList(), settled = true, off = off)
     }
 }
 
@@ -201,6 +209,10 @@ object UnifiedSearch {
      * with every keystroke. [keep] drops a source result the surface has no
      * use for before it is ranked (the PC library drops the console systems'
      * results), so what a source answers for other platforms never reaches the list.
+     *
+     * Get games is this one search (owner, 2026-10-30, Droidtop/tracker#825: "We want a single get games section, and
+     * a filter to choose where it searches"): the sources the person turned off ([SourceSelection]) are not asked, and
+     * with [featuredWhenEmpty] an empty query asks every source for what it features now, merged the same way.
      */
     fun search(
         context: Context,
@@ -209,18 +221,24 @@ object UnifiedSearch {
         local: suspend (String) -> List<LocalSearchRow>,
         carry: List<SourceHit> = emptyList(),
         keep: (AcquireContentResult) -> Boolean = { true },
-    ): Flow<UnifiedState> = stream(
-        query = query,
-        local = local,
-        carry = carry,
-        keep = keep,
-        loadSources = {
-            withContext(Dispatchers.IO) { GameSources.plugins(context, platform) to AcquireContentSources.unavailablePlugins(context, platform) }
-        },
-        // One search per source in flight, the newest query asked next ("Fetchers answer in the one search").
-        fetch = { source -> SourceSearchFlight.shared.run(source.id) { source.search(context, query.trim(), platform) } },
-        needOf = { source -> PluginSearchAggregator.runtimeNeedOf(context, source) },
-    )
+        featuredWhenEmpty: Boolean = false,
+    ): Flow<UnifiedState> {
+        val off = SourceSelection.off(context)
+        return stream(
+            query = query,
+            local = local,
+            carry = carry,
+            keep = keep,
+            loadSources = {
+                withContext(Dispatchers.IO) { GameSources.plugins(context, platform) to AcquireContentSources.unavailablePlugins(context, platform) }
+            },
+            // One search per source in flight, the newest query asked next ("Fetchers answer in the one search").
+            fetch = { source -> SourceSearchFlight.shared.run(source.id) { source.search(context, query.trim(), platform) } },
+            needOf = { source -> PluginSearchAggregator.runtimeNeedOf(context, source) },
+            isOff = { it.id in off },
+            featured = if (featuredWhenEmpty) { source -> source.featured(context, platform, MAX_ROWS_PER_SOURCE) } else null,
+        )
+    }
 
     /** [search] with the Android parts injected: what the unit tests drive with fake sources. */
     internal fun stream(
@@ -233,28 +251,37 @@ object UnifiedSearch {
         loadSources: suspend () -> Pair<List<GameSourceProvider>, List<UnavailableSource>>,
         fetch: suspend (GameSourceProvider) -> Result<List<AcquireContentResult>>,
         needOf: (GameSourceProvider) -> RuntimeNeed? = { null },
+        isOff: (GameSourceProvider) -> Boolean = { false },
+        featured: (suspend (GameSourceProvider) -> Result<List<AcquireContentResult>>)? = null,
     ): Flow<UnifiedState> = channelFlow {
         val q = query.trim()
-        if (q.isEmpty()) {
+        // No query: nothing, or what the sources feature now when the surface asks for it (Droidtop/tracker#825).
+        if (q.isEmpty() && featured == null) {
             send(UnifiedState.empty(q))
             return@channelFlow
         }
-        val localRows = local(q)
+        val showFeatured = q.isEmpty()
+        val ask = if (showFeatured) featured!! else fetch
+        val localRows = if (showFeatured) emptyList() else local(q)
         var statuses: List<SourceStatus> = emptyList()
         var unavailable: List<UnavailableSource> = emptyList()
+        var off: List<GameSourceProvider> = emptyList()
         val answered = LinkedHashMap<String, SourceOutcome>()
-        val stale = carry.filter { SearchRank.score(it.result.title, q) < SearchRank.OTHER && keep(it.result) }
+        val stale = if (showFeatured) emptyList() else carry.filter { SearchRank.score(it.result.title, q) < SearchRank.OTHER && keep(it.result) }
 
         fun state(settled: Boolean): UnifiedState {
             // A source that has not answered yet keeps its carried rows; one that has answered replaces them.
             val kept = stale.filter { it.source.id !in answered }
             val order = statuses.map { it.source }
-            return UnifiedState(q, rank(q, localRows, answered.values.toList(), kept, order), statuses, unavailable, settled)
+            val rows = rank(q, localRows, answered.values.toList(), kept, order, interleave = showFeatured)
+            return UnifiedState(q, rows, statuses, unavailable, settled, off, featured = showFeatured)
         }
 
         send(state(settled = false))
-        delay(debounceMs)
-        val (sources, notRunnable) = loadSources()
+        if (!showFeatured) delay(debounceMs)
+        val (all, notRunnable) = loadSources()
+        val (offSources, sources) = all.partition(isOff)
+        off = offSources
         unavailable = notRunnable
         statuses = sources.map { SourceStatus(it, null) }
         if (sources.isEmpty()) {
@@ -266,7 +293,7 @@ object UnifiedSearch {
         coroutineScope {
             for (source in sources) {
                 launch {
-                    val asked = PluginSearchAggregator.fanOutOutcomes(listOf(source), timeoutMs, fetch).single()
+                    val asked = PluginSearchAggregator.fanOutOutcomes(listOf(source), timeoutMs, ask).single()
                     val outcome = if (asked.failure == null) asked.copy(results = asked.results.filter(keep)) else asked.copy(runtimeNeed = needOf(source))
                     gate.withLock {
                         answered[source.id] = outcome
@@ -284,7 +311,8 @@ object UnifiedSearch {
      * own order (alphabetical for the device, the source's own relevance for
      * a source). Pure, so it is unit-tested. [sourceOrder] is the sources in
      * the order they were asked: it decides which source's rows come first
-     * on an exact tie.
+     * on an exact tie. With [interleave] (what the sources feature, with no query to rank by), the sources' rows take
+     * turns: every source's first, then every source's second, so no one source fills the top of the list.
      */
     internal fun rank(
         query: String,
@@ -292,6 +320,7 @@ object UnifiedSearch {
         outcomes: List<SourceOutcome>,
         carried: List<SourceHit>,
         sourceOrder: List<GameSourceProvider>,
+        interleave: Boolean = false,
     ): List<SearchRow> {
         val rows = ArrayList<SearchRow>()
         local.sortedBy { it.title.lowercase() }.forEachIndexed { index, row ->
@@ -306,7 +335,7 @@ object UnifiedSearch {
                 detail = sourceDetail(hit),
                 icon = null,
                 score = SearchRank.score(hit.result.title, query),
-                order = sourceIndex * SOURCE_ORDER_STRIDE + index,
+                order = if (interleave) index * SOURCE_ORDER_STRIDE + sourceIndex else sourceIndex * SOURCE_ORDER_STRIDE + index,
                 open = null,
                 hit = hit,
             )

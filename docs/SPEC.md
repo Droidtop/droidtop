@@ -25995,6 +25995,21 @@ without its runtime said "Running". Decisions:
   empty-library states) keeps a "Get games" entry, and it opens the one search, empty and ready for typing,
   scoped as that place is (a system's entry searches that system and downloads to its folder; PC Games searches
   PC). It is still not in the Quick Menu or any System group (owner, 2026-10-01).
+  **One Get games section, with a filter for where it searches (owner, 2026-10-30, Droidtop/tracker#825: "Why do we
+  have plugin-specific searches? We want a single get games section, and a filter to choose where it searches").**
+  There is no page per source plugin, and no source's `form` is drawn as a page. Get games is the one search:
+  - a freeform search field;
+  - every source the person has not turned off, asked at once and merged into one list, each result naming its
+    source. The same game from several sources is one entry (`UnifiedSearch.merge`), whose pick asks which;
+  - a source filter, one chip per source, kept across launches (`SourceSelection`, which keeps the sources turned
+    off, so a new source is searched). `UnifiedState.off` lists the ones off for the chips;
+  - with no query, what each source features now (`featured`), the sources taking turns and merged the same way
+    (`UnifiedSearch.search(featuredWhenEmpty = true)`, `UnifiedState.featured`);
+  - per source, a spinner while it is asked (`SourceStatus.pending`) and one line when it fails (`SourceStatus.failure`
+    with its fix, `SourceFix`).
+
+  A source's settings (sign-in, account, options) stay on its plugin page. The data and the merging are
+  library-core's; the Gaming shell draws the section (the UI lane).
   **Get new games: under the results, and a page of Updates (owner, 2026-10-23, Droidtop/tracker#612, #621).** "Get new
   games should be presented under the search results, presenting matches that are relevant (so roms from romgi, abd
   etc). Also add a 'get new games' under 'updates' that's its own UI." Earlier the same day: Get More Games "is

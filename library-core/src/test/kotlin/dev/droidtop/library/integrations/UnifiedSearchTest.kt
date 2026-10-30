@@ -243,4 +243,53 @@ class UnifiedSearchTest {
         assertEquals(3, rows.size)
         assertTrue(rows.all { it.others.isEmpty() })
     }
+
+    @Test
+    fun `a source the person turned off is not asked, and is listed as off`() = runBlocking {
+        val on = source("on", results = listOf(result("o", "Sonic On")))
+        val off = source("off", results = listOf(result("x", "Sonic Off")))
+        val last = UnifiedSearch.stream(
+            query = "sonic", local = { emptyList() }, debounceMs = 0, timeoutMs = 2_000,
+            loadSources = { listOf(on, off) to emptyList() },
+            fetch = { it.search(android.content.ContextWrapper(null), "sonic", null) },
+            isOff = { it.id == "off" },
+        ).toList().last()
+        assertEquals(listOf("Sonic On"), last.rows.map { it.title })
+        assertEquals(listOf("on"), last.sources.map { it.source.id })
+        assertEquals(listOf("off"), last.off.map { it.id })
+    }
+
+    @Test
+    fun `with no query, what the sources feature takes turns and one game from two sources is one card`() = runBlocking {
+        val a = source("a")
+        val b = source("b")
+        val features = mapOf(
+            "a" to listOf(result("a1", "Alpha"), result("a2", "Shared Game")),
+            "b" to listOf(result("b1", "Beta"), result("b2", "Shared Game")),
+        )
+        val last = UnifiedSearch.stream(
+            query = "", local = { listOf(local(SearchRowKind.GAME, "Not asked")) }, debounceMs = 0, timeoutMs = 2_000,
+            loadSources = { listOf(a, b) to emptyList() },
+            fetch = { error("a search is not asked with no query") },
+            featured = { Result.success(features.getValue(it.id)) },
+        ).toList().last()
+        assertTrue(last.featured)
+        assertTrue(last.settled)
+        assertEquals(listOf("Alpha", "Beta", "Shared Game"), last.rows.map { it.title })
+        assertEquals(listOf("a2", "b2"), last.rows[2].choices.map { it.hit!!.result.id })
+    }
+
+    @Test
+    fun `with no query and no featured asked, the search is empty`() = runBlocking {
+        val last = run("", sources = listOf(source("s", results = listOf(result("r", "R"))))).toList().last()
+        assertTrue(last.rows.isEmpty())
+        assertFalse(last.featured)
+    }
+
+    @Test
+    fun `the filter keeps the sources turned off, so a new source is on`() {
+        assertEquals(setOf("a"), SourceSelection.toggled(emptySet(), "a", on = false))
+        assertEquals(emptySet<String>(), SourceSelection.toggled(setOf("a"), "a", on = true))
+        assertEquals(setOf("a"), SourceSelection.toggled(setOf("a"), "b", on = true))
+    }
 }
