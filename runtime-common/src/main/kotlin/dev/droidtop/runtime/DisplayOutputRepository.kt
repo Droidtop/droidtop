@@ -16,11 +16,11 @@ import kotlinx.coroutines.flow.callbackFlow
  * fixed set decided once at Activity start.
  *
  * [DisplayOutputKind] is assigned from [Display.getDisplayId] alone
- * ([Display.DEFAULT_DISPLAY] = PRIMARY_SCREEN, anything else = SECOND_SCREEN
- * for now — no real signal yet distinguishes "the Retroid's second screen"
- * from "an external lapdock monitor" among non-default displays; both are
- * folded into SECOND_SCREEN until real hardware differentiates them,
- * `DisplayOutputKind.EXTERNAL` stays unused). This is deliberately just
+ * ([Display.DEFAULT_DISPLAY] = PRIMARY_SCREEN, anything else = SECOND_SCREEN):
+ * droidtop has two screens, and every non-default display is the second one.
+ * Whether that display is the Retroid's add-on panel or an external monitor
+ * is read from its Android type and FLAG_PRESENTATION ([ScreenClass]), below
+ * in [DisplayOutput.androidType] and [DisplayOutput.isPresentation]. This is deliberately just
  * *enumeration*, not physical position — see [ScreenRoles] for
  * why `DisplayOutputKind` is only ever a starting guess, never trusted as
  * "which one is physically upper/lower" (§4).

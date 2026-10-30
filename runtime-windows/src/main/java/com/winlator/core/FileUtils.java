@@ -438,35 +438,6 @@ public abstract class FileUtils {
         }
     }
 
-    public static boolean extractZipFromAssets(Context context, String assetName, File destinationDir) {
-        try (InputStream inputStream = context.getAssets().open(assetName);
-             ZipInputStream zis = new ZipInputStream(inputStream)) {
-            ZipEntry entry = zis.getNextEntry();
-            while (entry != null) {
-                File outFile = new File(destinationDir, entry.getName());
-                if (entry.isDirectory()) {
-                    if (!outFile.isDirectory()) outFile.mkdirs();
-                } else {
-                    File parent = outFile.getParentFile();
-                    if (parent != null && !parent.isDirectory()) parent.mkdirs();
-                    try (FileOutputStream fos = new FileOutputStream(outFile)) {
-                        byte[] buffer = new byte[8192];
-                        int len;
-                        while ((len = zis.read(buffer)) != -1) {
-                            fos.write(buffer, 0, len);
-                        }
-                    }
-                    chmod(outFile, 0771);
-                }
-                zis.closeEntry();
-                entry = zis.getNextEntry();
-            }
-            return true;
-        } catch (IOException e) {
-            return false;
-        }
-    }
-
     public static boolean extractZipFromFile(java.io.File zipFile, File destinationDir) {
         try (java.io.FileInputStream fis = new java.io.FileInputStream(zipFile);
              ZipInputStream zis = new ZipInputStream(fis)) {
@@ -494,30 +465,6 @@ public abstract class FileUtils {
         } catch (IOException e) {
             return false;
         }
-    }
-
-    public static String readZipManifestNameFromAssets(Context context, String assetName) {
-        try (InputStream inputStream = context.getAssets().open(assetName);
-             ZipInputStream zis = new ZipInputStream(inputStream)) {
-            ZipEntry entry = zis.getNextEntry();
-            while (entry != null) {
-                if (!entry.isDirectory() && entry.getName().endsWith(".json")) {
-                    byte[] bytes = StreamUtils.copyToByteArray(zis);
-                    try {
-                        org.json.JSONObject json = new org.json.JSONObject(new String(bytes));
-                        String name = json.optString("name", json.optString("libraryName", "")).trim();
-                        if (!name.isEmpty()) {
-                            return name;
-                        }
-                    } catch (org.json.JSONException ignored) {
-                    }
-                }
-                zis.closeEntry();
-                entry = zis.getNextEntry();
-            }
-        } catch (IOException ignored) {
-        }
-        return null;
     }
 
     public static String readZipManifestNameFromFile(java.io.File file) {

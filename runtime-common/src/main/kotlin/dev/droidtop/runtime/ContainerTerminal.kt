@@ -17,9 +17,8 @@ package dev.droidtop.runtime
  *    [ContainerExecResult] with captured stdout/stderr. An interactive shell
  *    needs a pty and a live stream, so the Android-side option starts by
  *    adding a pty/streaming primitive to [ContainerRuntime], which every
- *    backend then owes an implementation of — including the one that is
- *    still `TODO()`. That deepens the interface for a feature that does not
- *    need it.
+ *    backend then owes an implementation of. That deepens the interface for a
+ *    feature that does not need it.
  *  - Above that pty it still needs a VT parser and renderer, i.e. a terminal
  *    emulator, forked from Termux or Jackpal (§3d names both as candidates).
  *    A real terminal already exists in every distro's own package repository

@@ -120,10 +120,14 @@ class PythonDroidtopPlugin(
             runCatching { PythonBridge.nativeCallFunction(uniqueName, "run_job", run) }
                 .onFailure { failed.set(it.message ?: it::class.java.simpleName) }
         }, "python-job").apply { isDaemon = true }.start()
+        // The job is polled at 50 ms while it reports progress, and less often, up to every 500 ms, while it is quiet
+        // (Droidtop/tracker#765), so a long download does not cost a call into Python twenty times a second.
+        var pollMs = POLL_MIN_MS
         while (true) {
             failed.get()?.let { progress.complete(PluginResult.failure("python plugin job failed: $it")); return }
             val result = JSONObject(PythonBridge.nativeCallFunction(uniqueName, "poll_job", JSONObject().put("job_id", jobId).toString()))
             val reports = result.optJSONArray("progress")
+            pollMs = if (reports != null && reports.length() > 0) POLL_MIN_MS else (pollMs * 2).coerceAtMost(POLL_MAX_MS)
             if (reports != null) for (index in 0 until reports.length()) {
                 val report = reports.optJSONObject(index) ?: continue
                 progress.report(report.optInt("percent", -1), report.optString("status", ""))
@@ -136,7 +140,7 @@ class PythonDroidtopPlugin(
                 } else PluginResult.failure(reply.optString("error", "python plugin job failed")))
                 return
             }
-            Thread.sleep(50L)
+            Thread.sleep(pollMs)
         }
     }
 
@@ -145,6 +149,9 @@ class PythonDroidtopPlugin(
     }
 
     companion object {
+        private const val POLL_MIN_MS = 50L
+        private const val POLL_MAX_MS = 500L
+
         /**
          * Builds the [PythonDroidtopPlugin] for [pluginId] if this
          * device has both the runtime installed and the plugin's own

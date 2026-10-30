@@ -40,7 +40,6 @@ import java.io.File
 import java.util.concurrent.Executors
 import timber.log.Timber
 import dev.droidtop.runtime.windows.PrefManager as GameNativePrefManager
-import com.winlator.PrefManager as WinlatorPrefManager
 
 /**
  * Where a Windows game is actually seen and played.
@@ -154,10 +153,10 @@ class WineGameActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Both preference stores are read from deep inside the Winlator
-        // view and renderer code, and both inits are no-ops once done.
+        // Both preference files are read from deep inside the Winlator
+        // view and renderer code. Opening them does no disk work; the
+        // runtime's start loaded them off the main thread (PrefManager.load).
         GameNativePrefManager.init(this)
-        WinlatorPrefManager.init(this)
         // The failure screen's colours, droidtop's own for its Light or dark (docs/SPEC.md 7k, Droidtop/tracker#561):
         // read once here, off the main thread, since they come from a preference.
         startupExecutor.execute { chrome = runCatching { dev.droidtop.library.theme.RoleTokens.current(applicationContext) }.getOrNull() }

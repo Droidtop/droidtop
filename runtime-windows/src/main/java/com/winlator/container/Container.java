@@ -93,7 +93,6 @@ public class Container {
     private String drives = DEFAULT_DRIVES;
     private String wineVersion = WineInfo.MAIN_WINE_VERSION.identifier();
     private boolean showFPS;
-    private boolean launchImmersiveMode = dev.droidtop.runtime.windows.BuildConfig.XR_BUILD;
     private boolean launchRealSteam;
     private boolean launchBionicSteam;
     private boolean allowSteamUpdates;
@@ -137,8 +136,8 @@ public class Container {
     private byte dinputMapperType = 1;  // 1=standard, 2=XInput mapper
     // Disable external mouse input
     private boolean disableMouseInput = false;
-    // Touchscreen mode (defaults on for XR builds)
-    private boolean touchscreenMode = dev.droidtop.runtime.windows.BuildConfig.XR_BUILD;
+    // Touchscreen mode
+    private boolean touchscreenMode = false;
     // Shooter mode
     private boolean shooterMode = true;
     // Serialised JSON gesture configuration (used when touchscreenMode is true)
@@ -404,14 +403,6 @@ public class Container {
 
     public void setShowFPS(boolean showFPS) {
         this.showFPS = showFPS;
-    }
-
-    public boolean isLaunchImmersiveMode() {
-        return launchImmersiveMode;
-    }
-
-    public void setLaunchImmersiveMode(boolean launchImmersiveMode) {
-        this.launchImmersiveMode = launchImmersiveMode;
     }
 
     public boolean isLaunchRealSteam() {
@@ -792,7 +783,6 @@ public class Container {
             data.put("wincomponents", wincomponents);
             data.put("drives", drives);
             data.put("showFPS", showFPS);
-            data.put("launchImmersiveMode", launchImmersiveMode);
             data.put("launchRealSteam", launchRealSteam);
             data.put("launchBionicSteam", launchBionicSteam);
             data.put("allowSteamUpdates", allowSteamUpdates);
@@ -931,9 +921,6 @@ public class Container {
                     break;
                 case "showFPS" :
                     setShowFPS(data.getBoolean(key));
-                    break;
-                case "launchImmersiveMode" :
-                    setLaunchImmersiveMode(data.getBoolean(key));
                     break;
                 case "launchRealSteam" :
                     setLaunchRealSteam(data.getBoolean(key));

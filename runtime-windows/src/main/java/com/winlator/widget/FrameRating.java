@@ -11,7 +11,6 @@ import android.widget.TextView;
 import com.winlator.xenvironment.ImageFs;
 
 import dev.droidtop.runtime.windows.R;
-import dev.droidtop.runtime.windows.powercontrol.metrics.FrameTimeRing;
 import timber.log.Timber;
 
 import java.io.File;
@@ -55,7 +54,6 @@ public class FrameRating extends FrameLayout implements Runnable {
     }
 
     public void update() {
-        FrameTimeRing.record();
         if (lastTime == 0) {
             lastTime = SystemClock.elapsedRealtime();
             sessionStartTime = SystemClock.elapsedRealtime();

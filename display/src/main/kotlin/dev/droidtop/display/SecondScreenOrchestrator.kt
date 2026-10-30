@@ -354,92 +354,37 @@ class SecondScreenOrchestrator(
                 )
                 val shellOnSecond = shellOnSecondNow || move == DualScreenOrchestration.ShellMove.TO_SECOND
 
-                val launchTarget = if (gaming && second != null) DisplayRolePrefs.gameLaunchTarget(context) else null
-                val targetDisplayId = when (launchTarget) {
-                    // No preference is the shell's own screen (LaunchScreenResolution.resolveDisplay); the built-in
-                    // screen only when it is the one chosen.
-                    null, DisplayRolePrefs.GameLaunchTarget.ASK -> null
-                    DisplayRolePrefs.GameLaunchTarget.BUILT_IN -> Display.DEFAULT_DISPLAY
-                    DisplayRolePrefs.GameLaunchTarget.FOLLOW_SHELL ->
-                        if (shellOnSecondNow) second!!.androidDisplayId else null
-                    DisplayRolePrefs.GameLaunchTarget.SECOND -> second!!.androidDisplayId
-                }
-                // Every screen's name (docs/SPEC.md 4c, "Screen names"), kept for the rows that name a screen.
-                val screenNames = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    dev.droidtop.runtime.ScreenNaming.names(context, outputs)
-                }
-                dev.droidtop.runtime.ScreenNaming.current = screenNames
-                val askOptions = if (launchTarget == DisplayRolePrefs.GameLaunchTarget.ASK) {
-                    DualScreenOrchestration.chooserCandidates(
-                        outputs.map { it.androidDisplayId },
-                        screenNames,
-                        currentDisplay,
-                        second?.androidDisplayId,
-                        mainDisplayId = arrangement.mainId,
-                        companionDisplayId = arrangement.companionId,
-                    )
-                } else {
-                    null
-                }
-                host.publishLaunchTargeting(currentDisplay, second?.androidDisplayId, targetDisplayId, askOptions)
+                publishLaunchTargeting(
+                    outputs, currentDisplay, second?.androidDisplayId, gaming, shellOnSecondNow,
+                    mainId = arrangement.mainId, companionId = arrangement.companionId,
+                )
 
-                val presentationDisplayId = if (showCompanion) DualScreenOrchestration.companionPresentationDisplayId(
-                    shellDisplayId = currentDisplay,
-                    secondDisplayId = second?.androidDisplayId,
-                    secondParked = !secondAvailable,
+                showCompanionPresentation(
+                    if (showCompanion) DualScreenOrchestration.companionPresentationDisplayId(
+                        shellDisplayId = currentDisplay,
+                        secondDisplayId = second?.androidDisplayId,
+                        secondParked = !secondAvailable,
+                        move = move,
+                    ) else null,
+                )
+
+                if (currentDisplay == second?.androidDisplayId &&
+                    SecondScreenPlan.wantsSecond(move, second?.androidDisplayId, shellOnSecondNow, wantShellOnSecond)
+                ) {
+                    relocationAttempts = 0
+                }
+                val now = android.os.SystemClock.elapsedRealtime()
+                val step = SecondScreenPlan.relocation(
                     move = move,
-                ) else null
-                if (presentationDisplayId != null) {
-                    if (secondScreenPresentation?.display?.displayId != presentationDisplayId) {
-                        secondScreenPresentation?.dismiss()
-                        val display = displayManager.getDisplay(presentationDisplayId)
-                        secondScreenPresentation = display?.let {
-                            SecondScreenPresentation(context, it).also { p -> p.show() }
-                        }
-                    }
-                } else {
-                    secondScreenPresentation?.dismiss()
-                    secondScreenPresentation = null
-                }
-
-                if (move == DualScreenOrchestration.ShellMove.TO_BUILT_IN) {
-                    // The Main screen choice moved off the second screen: bring the
-                    // shell home, under the same cooldown as the other direction
-                    // (tracker#163).
-                    val now = android.os.SystemClock.elapsedRealtime()
-                    if (now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS) {
-                        lastRelocationAttemptMs = now
-                        runCatching { host.relaunchOnDisplay(Display.DEFAULT_DISPLAY) }
-                            .onFailure { Log.w(TAG, "Relocation to the built-in display refused", it) }
-                    }
-                } else if (second != null && (move == DualScreenOrchestration.ShellMove.TO_SECOND || (shellOnSecondNow && wantShellOnSecond))) {
-                    val now = android.os.SystemClock.elapsedRealtime()
-                    if (currentDisplay == second.androidDisplayId) {
-                        relocationAttempts = 0
-                    }
-                    if (currentDisplay != second.androidDisplayId &&
-                        now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
-                    ) {
-                        lastRelocationAttemptMs = now
-                        relocationAttempts++
-                        runCatching {
-                            if (!appOnCompanionScreen) host.startCompanionOnBuiltIn()
-                            host.relaunchOnDisplay(second.androidDisplayId)
-                        }.onFailure {
-                            Log.w(TAG, "Relocation to display ${second.androidDisplayId} refused", it)
-                            relocationAttempts = DualScreenOrchestration.MAX_RELOCATION_ATTEMPTS
-                            roleRefresh.value++
-                        }
-                    } else if (currentDisplay == second.androidDisplayId && !host.companionVisible() &&
-                        !appOnCompanionScreen &&
-                        now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS
-                    ) {
-                        lastRelocationAttemptMs = now
-                        // Starting the companion makes it the top activity; it hands the
-                        // pad straight back to the shell itself (TouchOnlySurfaceFocus).
-                        host.startCompanionOnBuiltIn()
-                    }
-                }
+                    currentDisplay = currentDisplay,
+                    secondId = second?.androidDisplayId,
+                    shellOnSecond = shellOnSecondNow,
+                    wantShellOnSecond = wantShellOnSecond,
+                    companionVisible = host.companionVisible(),
+                    appOnCompanionScreen = appOnCompanionScreen,
+                    cooledDown = now - lastRelocationAttemptMs > RELOCATION_COOLDOWN_MS,
+                )
+                relocate(step, second?.androidDisplayId, now)
 
                 host.setDualScreenBroken(
                     DualScreenOrchestration.secondScreenNeedsReinit(
@@ -451,5 +396,83 @@ class SecondScreenOrchestrator(
                     ),
                 )
             }
+    }
+
+    /**
+     * Where a game opens and, under Ask, which screens are offered (docs/SPEC.md 4c), published for the launch path,
+     * with every screen's name kept for the rows that name a screen.
+     */
+    private suspend fun publishLaunchTargeting(
+        outputs: List<dev.droidtop.runtime.DisplayOutput>,
+        currentDisplay: Int,
+        secondId: Int?,
+        gaming: Boolean,
+        shellOnSecond: Boolean,
+        mainId: Int,
+        companionId: Int?,
+    ) {
+        val launchTarget = if (gaming && secondId != null) DisplayRolePrefs.gameLaunchTarget(context) else null
+        val targetDisplayId = SecondScreenPlan.gameLaunchDisplay(launchTarget, shellOnSecond, secondId)
+        // Every screen's name (docs/SPEC.md 4c, "Screen names"), kept for the rows that name a screen.
+        val screenNames = withContext(Dispatchers.IO) { dev.droidtop.runtime.ScreenNaming.names(context, outputs) }
+        dev.droidtop.runtime.ScreenNaming.current = screenNames
+        val askOptions = if (launchTarget == DisplayRolePrefs.GameLaunchTarget.ASK) {
+            DualScreenOrchestration.chooserCandidates(
+                outputs.map { it.androidDisplayId },
+                screenNames,
+                currentDisplay,
+                secondId,
+                mainDisplayId = mainId,
+                companionDisplayId = companionId,
+            )
+        } else {
+            null
+        }
+        host.publishLaunchTargeting(currentDisplay, secondId, targetDisplayId, askOptions)
+    }
+
+    /** Shows the companion as a Presentation on [displayId], moving it there if it is elsewhere; null takes it down. */
+    private fun showCompanionPresentation(displayId: Int?) {
+        if (displayId == null) {
+            secondScreenPresentation?.dismiss()
+            secondScreenPresentation = null
+            return
+        }
+        if (secondScreenPresentation?.display?.displayId == displayId) return
+        secondScreenPresentation?.dismiss()
+        secondScreenPresentation = displayManager.getDisplay(displayId)?.let { SecondScreenPresentation(context, it).also { p -> p.show() } }
+    }
+
+    /** Takes [step] ([SecondScreenPlan.relocation]) at [now]; a refused move to the second screen stops further tries. */
+    private fun relocate(step: SecondScreenPlan.Relocation, secondId: Int?, now: Long) {
+        when (step) {
+            SecondScreenPlan.Relocation.NONE -> Unit
+            // The Main screen choice moved off the second screen: bring the shell home, under the same cooldown as
+            // the other direction (tracker#163).
+            SecondScreenPlan.Relocation.TO_BUILT_IN -> {
+                lastRelocationAttemptMs = now
+                runCatching { host.relaunchOnDisplay(Display.DEFAULT_DISPLAY) }
+                    .onFailure { Log.w(TAG, "Relocation to the built-in display refused", it) }
+            }
+            SecondScreenPlan.Relocation.TO_SECOND, SecondScreenPlan.Relocation.TO_SECOND_WITH_COMPANION -> {
+                val target = secondId ?: return
+                lastRelocationAttemptMs = now
+                relocationAttempts++
+                runCatching {
+                    if (step == SecondScreenPlan.Relocation.TO_SECOND_WITH_COMPANION) host.startCompanionOnBuiltIn()
+                    host.relaunchOnDisplay(target)
+                }.onFailure {
+                    Log.w(TAG, "Relocation to display $target refused", it)
+                    relocationAttempts = DualScreenOrchestration.MAX_RELOCATION_ATTEMPTS
+                    roleRefresh.value++
+                }
+            }
+            // Starting the companion makes it the top activity; it hands the pad straight back to the shell itself
+            // (TouchOnlySurfaceFocus).
+            SecondScreenPlan.Relocation.COMPANION_ON_BUILT_IN -> {
+                lastRelocationAttemptMs = now
+                host.startCompanionOnBuiltIn()
+            }
+        }
     }
 }

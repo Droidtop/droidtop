@@ -40,15 +40,14 @@ android {
             }
         }
 
-        // The three build switches the runtime's code reads. Android
-        // refuses exec() of an extracted binary above targetSdk 28, so the
-        // runtime is GameNative's "modern" flavor: MODERN_ANDROID, and every
-        // guest process LD_PRELOADs the W^X redirect library that
-        // ImageFsInstaller copies out of the assets (PRELOAD_BIONIC_SO).
-        // XR_BUILD is GameNative's Meta Quest build, which droidtop is not.
-        buildConfigField("boolean", "MODERN_ANDROID", "true")
+        // Android refuses exec() of an extracted binary above targetSdk 28,
+        // so the runtime only has GameNative's "modern" path (its legacy
+        // branches are deleted, Droidtop/tracker#765): every guest process
+        // runs through /system/bin/linker64 and LD_PRELOADs the W^X redirect
+        // library that ImageFsInstaller copies out of the assets
+        // (PRELOAD_BIONIC_SO).
+        // GameNative's Meta Quest (XR) build is not carried either.
         buildConfigField("String", "PRELOAD_BIONIC_SO", "\"libredirect-bionic-wx.so\"")
-        buildConfigField("boolean", "XR_BUILD", "false")
     }
 
     sourceSets {

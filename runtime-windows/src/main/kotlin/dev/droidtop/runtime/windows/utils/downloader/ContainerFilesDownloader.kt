@@ -1,7 +1,6 @@
 package dev.droidtop.runtime.windows.utils.downloader
 
 import android.content.Context
-import dev.droidtop.runtime.windows.BuildConfig
 import dev.droidtop.runtime.windows.RuntimeDownloads
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -34,10 +33,9 @@ object ContainerFilesDownloader {
         val id: String,
         val name: String,
         val url: String,
-        // True for components that exist ONLY as a download (no bundled-asset
-        // copy in any variant) -- e.g. the Steam Runtime rootfs, which is far
-        // too large to ship in the APK. These download on the legacy variant
-        // too, instead of taking the bundled-assets branch below.
+        // True for components too large to fetch ahead of need (e.g. the ~300MB
+        // Steam Runtime rootfs): preloadAllContainerFiles skips them, and they
+        // download the first time something actually needs them.
         val alwaysDownload: Boolean = false,
         // True for components hosted somewhere other than the GameNative
         // manifest server (e.g. Valve's own repo.steampowered.com) -- these
@@ -73,26 +71,18 @@ object ContainerFilesDownloader {
      * @param context Android context
      * @param componentId Component identifier (e.g., "extras", "container_pattern_common")
      * @param onProgress Progress callback (0.0 to 1.0)
-     * @return File pointing to the downloaded component, or null if using bundled assets (legacy variant)
+     * @return File pointing to the downloaded component
      */
     suspend fun ensureContainerFileAvailable(
         context: Context,
         componentId: String,
         onProgress: (Float) -> Unit = {}
-    ): File? = withContext(Dispatchers.IO) {
-        // Validate component exists in manifest first (for both legacy and modern variants)
+    ): File = withContext(Dispatchers.IO) {
+        // Validate component exists in manifest first
         val manifest = loadContainerFilesManifest(context)
         val component = manifest.components.find { it.id == componentId }
             ?: throw Exception("Container file $componentId not found in $CONTAINER_FILES_MANIFEST_FILE")
 
-        // Legacy variant: use bundled assets (unless the component only
-        // exists as a download)
-        if (!BuildConfig.MODERN_ANDROID && !component.alwaysDownload) {
-            Timber.d("Legacy variant: Container file $componentId will be extracted from bundled assets")
-            return@withContext null
-        }
-
-        // Modern variant: download from server
         // Check if already downloaded and cached
         val cacheDir = File(context.filesDir, CONTAINER_FILES_CACHE_DIR)
         val destFile = getCacheFile(cacheDir, component)
@@ -162,11 +152,6 @@ object ContainerFilesDownloader {
      * Safe to call on app startup - runs in background and doesn't block.
      */
     suspend fun preloadAllContainerFiles(context: Context) = withContext(Dispatchers.IO) {
-        if (!BuildConfig.MODERN_ANDROID) {
-            Timber.d("Legacy variant: Skipping container files preload (using bundled assets)")
-            return@withContext
-        }
-
         try {
             val manifest = loadContainerFilesManifest(context)
             Timber.i("Preloading ${manifest.components.size} container files in background")
@@ -217,7 +202,7 @@ fun ensureContainerFileAvailableBlocking(
     context: Context,
     componentId: String,
     onProgress: ProgressCallback? = null
-): File? {
+): File {
     return runBlocking {
         ContainerFilesDownloader.ensureContainerFileAvailable(context, componentId) { progress ->
             onProgress?.onProgress(progress)

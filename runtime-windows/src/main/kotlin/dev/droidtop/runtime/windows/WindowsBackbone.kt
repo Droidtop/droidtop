@@ -53,7 +53,7 @@ object WindowsBackbone {
         scope.launch {
             try {
                 if (Timber.treeCount == 0) Timber.plant(Timber.DebugTree())
-                runCatching { PrefManager.init(application) }
+                runCatching { PrefManager.load(application) }
                     .onFailure { android.util.Log.w(TAG, "Windows runtime preferences unreadable", it) }
                 runCatching { StoragePaths.init(application) }
                     .onFailure { android.util.Log.w(TAG, "Windows runtime storage paths unreadable", it) }

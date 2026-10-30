@@ -3,6 +3,7 @@ package dev.droidtop.runtime.windows
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.byteArrayPreferencesKey
@@ -13,14 +14,76 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import java.util.concurrent.CompletableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import timber.log.Timber
+
+private fun corruptionReset() = ReplaceFileCorruptionHandler {
+    Timber.e("Preferences (somehow got) corrupted, resetting.")
+    emptyPreferences()
+}
+
+private val Context.gameNativeStore by preferencesDataStore(name = "PluviaPreferences", corruptionHandler = corruptionReset())
+private val Context.winlatorStore by preferencesDataStore(name = "WinlatorPreferences", corruptionHandler = corruptionReset())
+
+/**
+ * One DataStore preferences file, read from memory (Droidtop/tracker#765). Once [open], a collector keeps the file's
+ * latest values in [snapshot], so a read is a map lookup, never a blocking read of the file; only a read that comes
+ * before the first load waits for it, once. [WindowsBackbone] opens and loads both files off the main thread when the
+ * runtime starts, so the reads from the Winlator view and launch code find them in memory.
+ */
+internal class StoredPrefs(private val storeOf: (Context) -> DataStore<Preferences>) {
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    @Volatile
+    private var store: DataStore<Preferences>? = null
+
+    @Volatile
+    private var snapshot: Preferences? = null
+
+    /** Idempotent, and does no disk work itself. */
+    @Synchronized
+    fun open(context: Context) {
+        if (store != null) return
+        val opened = storeOf(context.applicationContext)
+        store = opened
+        scope.launch { opened.data.collect { snapshot = it } }
+    }
+
+    /** Waits, suspending, until the file has been read once; for a caller that can load it ahead of the reads. */
+    suspend fun load() {
+        if (snapshot == null) snapshot = checkNotNull(store) { "preferences not open" }.data.first()
+    }
+
+    val isOpen: Boolean get() = store != null
+
+    private fun current(): Preferences =
+        snapshot ?: runBlocking { checkNotNull(store) { "preferences not open" }.data.first() }.also { snapshot = it }
+
+    fun <T> get(key: Preferences.Key<T>, defaultValue: T): T = current()[key] ?: defaultValue
+
+    fun <T> getOrNull(key: Preferences.Key<T>): T? = current()[key]
+
+    /** Writes off the calling thread; the future completes once the value is in the file (and in memory). */
+    fun <T> set(key: Preferences.Key<T>, value: T): CompletableFuture<Unit> = scope.future {
+        edit { it[key] = value }
+    }
+
+    suspend fun edit(change: (MutablePreferences) -> Unit) {
+        snapshot = checkNotNull(store) { "preferences not open" }.edit { change(it) }
+    }
+
+    fun launchEdit(change: (MutablePreferences) -> Unit) {
+        scope.launch { edit(change) }
+    }
+}
 
 /**
  * The preferences the Windows runtime reads, in the same DataStore file and
@@ -35,26 +98,24 @@ import timber.log.Timber
  */
 object PrefManager {
 
-    private val Context.datastore by preferencesDataStore(
-        name = "PluviaPreferences",
-        corruptionHandler = ReplaceFileCorruptionHandler {
-            Timber.e("Preferences (somehow got) corrupted, resetting.")
-            emptyPreferences()
-        },
-    )
+    private val prefs = StoredPrefs { it.gameNativeStore }
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    private lateinit var dataStore: DataStore<Preferences>
-
-    /** Idempotent; disk work (the first read), so never on the main thread. */
-    @Synchronized
+    /** Idempotent, no disk work: opens GameNative's file and Winlator's ([Winlator]). */
+    @JvmStatic
     fun init(context: Context) {
-        if (::dataStore.isInitialized) return
-        dataStore = context.applicationContext.datastore
-        // Read once before anything writes: on a fresh install a write racing
-        // the first read made DataStore rethrow FileNotFoundException.
-        runBlocking { dataStore.data.first() }
+        prefs.open(context)
+        Winlator.init(context)
+    }
+
+    /**
+     * Opens both files and waits, suspending, until both have been read once, so no later read blocks. Done off
+     * the main thread when the runtime starts ([WindowsBackbone]); reading before anything writes also keeps a write
+     * racing the first read on a fresh install from making DataStore rethrow FileNotFoundException.
+     */
+    suspend fun load(context: Context) {
+        init(context)
+        prefs.load()
+        Winlator.prefs.load()
     }
 
     fun getBoolean(key: String, defaultValue: Boolean): Boolean =
@@ -69,14 +130,10 @@ object PrefManager {
     fun setFloat(key: String, value: Float): Unit =
         setPref(floatPreferencesKey(key), value)
 
-    private fun <T> getPref(key: Preferences.Key<T>, defaultValue: T): T = runBlocking {
-        dataStore.data.first()[key] ?: defaultValue
-    }
+    private fun <T> getPref(key: Preferences.Key<T>, defaultValue: T): T = prefs.get(key, defaultValue)
 
     private fun <T> setPref(key: Preferences.Key<T>, value: T) {
-        scope.launch {
-            dataStore.edit { pref -> pref[key] = value }
-        }
+        prefs.set(key, value)
     }
 
     /**
@@ -85,12 +142,10 @@ object PrefManager {
      * so the caller asks again later.
      */
     fun forgetComponentManifest(): Boolean {
-        if (!::dataStore.isInitialized) return false
-        scope.launch {
-            dataStore.edit { pref ->
-                pref.remove(stringPreferencesKey("component_manifest_json"))
-                pref.remove(longPreferencesKey("component_manifest_fetched_at"))
-            }
+        if (!prefs.isOpen) return false
+        prefs.launchEdit { pref ->
+            pref.remove(stringPreferencesKey("component_manifest_json"))
+            pref.remove(longPreferencesKey("component_manifest_fetched_at"))
         }
         return true
     }
@@ -133,7 +188,7 @@ object PrefManager {
      * setter hands its write to a coroutine and returns before it lands). "Add a game" (docs/SPEC.md 7g).
      */
     suspend fun addCustomGameManualFolder(folder: String) {
-        dataStore.edit { pref ->
+        prefs.edit { pref ->
             val current = runCatching { Json.decodeFromString<Set<String>>(pref[CUSTOM_GAME_MANUAL_FOLDERS] ?: "[]") }.getOrDefault(emptySet())
             if (folder !in current) pref[CUSTOM_GAME_MANUAL_FOLDERS] = Json.encodeToString(current + folder)
         }
@@ -155,11 +210,35 @@ object PrefManager {
         }
 
     private val CLIENT_ID = longPreferencesKey("client_id")
-    val clientId: Long? get() = runBlocking { dataStore.data.first()[CLIENT_ID] }
+    val clientId: Long? get() = prefs.getOrNull(CLIENT_ID)
 
     private val STEAM_USER_STEAM_ID_64 = longPreferencesKey("steam_user_steam_id_64")
     val steamUserSteamId64: Long get() = getPref(STEAM_USER_STEAM_ID_64, 0L)
 
     private val EXTERNAL_STORAGE_PATH = stringPreferencesKey("external_storage_path")
     val externalStoragePath: String get() = getPref(EXTERNAL_STORAGE_PATH, "")
+
+    /**
+     * Winlator's own preferences file ("WinlatorPreferences"), under the keys its view and launch code use: the box64
+     * and FEXCore presets, the last box86/box64 versions set up, the GPU found, the input-controls version and the
+     * log switches. Its file and keys are kept, so nothing moves. Java reads it as `PrefManager.Winlator`.
+     */
+    object Winlator {
+        internal val prefs = StoredPrefs { it.winlatorStore }
+
+        @JvmStatic
+        fun init(context: Context) = prefs.open(context)
+
+        @JvmStatic
+        fun getString(key: String, defaultValue: String): String = prefs.get(stringPreferencesKey(key), defaultValue)
+
+        @JvmStatic
+        fun putString(key: String, value: String): CompletableFuture<Unit> = prefs.set(stringPreferencesKey(key), value)
+
+        @JvmStatic
+        fun getBoolean(key: String, defaultValue: Boolean): Boolean = prefs.get(booleanPreferencesKey(key), defaultValue)
+
+        @JvmStatic
+        fun putBoolean(key: String, value: Boolean): CompletableFuture<Unit> = prefs.set(booleanPreferencesKey(key), value)
+    }
 }

@@ -5,7 +5,7 @@ import android.icu.util.TimeZone;
 import android.os.Process;
 import android.util.Log;
 
-import com.winlator.PrefManager;
+import dev.droidtop.runtime.windows.PrefManager;
 import com.winlator.box86_64.Box86_64Preset;
 import com.winlator.box86_64.Box86_64PresetManager;
 import com.winlator.container.Container;
@@ -184,8 +184,8 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     private int execGuestProgram() {
         Context context = environment.getContext();
 
-        PrefManager.init(context);
-        boolean enableBox86_64Logs = PrefManager.getBoolean("enable_box86_64_logs", false);
+        PrefManager.Winlator.init(context);
+        boolean enableBox86_64Logs = PrefManager.Winlator.getBoolean("enable_box86_64_logs", false);
 
         EnvVars envVars = new EnvVars();
         if (!wow64Mode) addBox86EnvVars(envVars, enableBox86_64Logs);
@@ -250,25 +250,25 @@ public class GuestProgramLauncherComponent extends EnvironmentComponent {
     private void extractBox86_64Files() {
         ImageFs imageFs = environment.getImageFs();
         Context context = environment.getContext();
-        PrefManager.init(context);
-        String currentBox86Version = PrefManager.getString("current_box86_version", "");
-        String currentBox64Version = PrefManager.getString("current_box64_version", "");
+        PrefManager.Winlator.init(context);
+        String currentBox86Version = PrefManager.Winlator.getString("current_box86_version", "");
+        String currentBox64Version = PrefManager.Winlator.getString("current_box64_version", "");
         File rootDir = imageFs.getRootDir();
 
         if (wow64Mode) {
             File box86File = new File(rootDir, "/usr/local/bin/box86");
             if (box86File.isFile()) {
                 box86File.delete();
-                PrefManager.putString("current_box86_version", "");
+                PrefManager.Winlator.putString("current_box86_version", "");
             }
         } else if (!box86Version.equals(currentBox86Version)) {
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context.getAssets(), "box86_64/box86-" + box86Version + ".tzst", rootDir);
-            PrefManager.putString("current_box86_version", box86Version);
+            PrefManager.Winlator.putString("current_box86_version", box86Version);
         }
 
         if (!box64Version.equals(currentBox64Version)) {
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context.getAssets(), "box86_64/box64-" + box64Version + ".tzst", rootDir);
-            PrefManager.putString("current_box64_version", box64Version);
+            PrefManager.Winlator.putString("current_box64_version", box64Version);
         }
     }
 

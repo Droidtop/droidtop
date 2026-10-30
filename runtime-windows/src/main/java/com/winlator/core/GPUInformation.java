@@ -6,7 +6,7 @@ import android.util.Log;
 
 import androidx.collection.ArrayMap;
 
-import com.winlator.PrefManager;
+import dev.droidtop.runtime.windows.PrefManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -107,10 +107,10 @@ public abstract class GPUInformation {
             gpuInfo.put("vendor", gpuVendor);
             gpuInfo.put("version", gpuVersion);
 
-            PrefManager.init(context);
-            PrefManager.putString(RENDERER_PREF_KEY, gpuRenderer);
-            PrefManager.putString("gpu_vendor", gpuVendor);
-            PrefManager.putString("gpu_version", gpuVersion);
+            PrefManager.Winlator.init(context);
+            PrefManager.Winlator.putString(RENDERER_PREF_KEY, gpuRenderer);
+            PrefManager.Winlator.putString("gpu_vendor", gpuVendor);
+            PrefManager.Winlator.putString("gpu_version", gpuVersion);
 
             synchronized (thread) {
                 thread.notify();
@@ -128,8 +128,8 @@ public abstract class GPUInformation {
     }
 
     public static String getRenderer(Context context) {
-        PrefManager.init(context);
-        String value = PrefManager.getString(RENDERER_PREF_KEY, "");
+        PrefManager.Winlator.init(context);
+        String value = PrefManager.Winlator.getString(RENDERER_PREF_KEY, "");
         if (!value.isEmpty()) return value;
 
         ArrayMap<String, String> gpuInfo = loadGPUInformation(context);
@@ -137,8 +137,8 @@ public abstract class GPUInformation {
     }
 
     public static String getVendor(Context context) {
-        PrefManager.init(context);
-        String value = PrefManager.getString("gpu_vendor", "");
+        PrefManager.Winlator.init(context);
+        String value = PrefManager.Winlator.getString("gpu_vendor", "");
         if (!value.isEmpty()) return value;
 
         ArrayMap<String, String> gpuInfo = loadGPUInformation(context);
@@ -146,8 +146,8 @@ public abstract class GPUInformation {
     }
 
     public static String getVersion(Context context) {
-        PrefManager.init(context);
-        String value = PrefManager.getString("gpu_version", "");
+        PrefManager.Winlator.init(context);
+        String value = PrefManager.Winlator.getString("gpu_version", "");
         if (!value.isEmpty()) return value;
 
         ArrayMap<String, String> gpuInfo = loadGPUInformation(context);

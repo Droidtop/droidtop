@@ -6,7 +6,7 @@ import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 
 import dev.droidtop.runtime.windows.R;
-import com.winlator.PrefManager;
+import dev.droidtop.runtime.windows.PrefManager;
 import com.winlator.core.envvars.EnvVars;
 
 import java.util.ArrayList;
@@ -158,8 +158,8 @@ public abstract class Box86_64PresetManager {
     }
 
     private static Iterable<String[]> customPresetsIterator(String prefix, Context context) {
-        PrefManager.init(context);
-        final String customPresetsStr = PrefManager.getString(prefix + "_custom_presets", "");
+        PrefManager.Winlator.init(context);
+        final String customPresetsStr = PrefManager.Winlator.getString(prefix + "_custom_presets", "");
         final String[] customPresets = customPresetsStr.split(",");
         final int[] index = {0};
         return () -> new Iterator<String[]>() {
@@ -185,8 +185,8 @@ public abstract class Box86_64PresetManager {
 
     public static String editPreset(String prefix, Context context, String id, String name, EnvVars envVars) {
         String key = prefix + "_custom_presets";
-        PrefManager.init(context);
-        String customPresetsStr = PrefManager.getString(key, "");
+        PrefManager.Winlator.init(context);
+        String customPresetsStr = PrefManager.Winlator.getString(key, "");
         String presetId = id;
 
         if (presetId != null) {
@@ -205,7 +205,7 @@ public abstract class Box86_64PresetManager {
             customPresetsStr += (!customPresetsStr.isEmpty() ? "," : "") + preset;
         }
         try {
-            PrefManager.putString(key, customPresetsStr).get();
+            PrefManager.Winlator.putString(key, customPresetsStr).get();
         } catch (Exception e) {
             Timber.e("Failed to edit preset: " + e);
         }
@@ -241,8 +241,8 @@ public abstract class Box86_64PresetManager {
 
     public static void removePreset(String prefix, Context context, String id) {
         String key = prefix + "_custom_presets";
-        PrefManager.init(context);
-        String oldCustomPresetsStr = PrefManager.getString(key, "");
+        PrefManager.Winlator.init(context);
+        String oldCustomPresetsStr = PrefManager.Winlator.getString(key, "");
         String newCustomPresetsStr = "";
 
         String[] customPresets = oldCustomPresetsStr.split(",");
@@ -252,7 +252,7 @@ public abstract class Box86_64PresetManager {
                 newCustomPresetsStr += (!newCustomPresetsStr.isEmpty() ? "," : "") + customPresets[i];
         }
 
-        PrefManager.putString(key, newCustomPresetsStr);
+        PrefManager.Winlator.putString(key, newCustomPresetsStr);
     }
 
     public static void loadSpinner(String prefix, Spinner spinner, String selectedId) {

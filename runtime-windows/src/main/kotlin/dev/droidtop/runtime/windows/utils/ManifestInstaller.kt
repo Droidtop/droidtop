@@ -1,5 +1,6 @@
 package dev.droidtop.runtime.windows.utils
 
+import dev.droidtop.runtime.windows.utils.downloader.ComponentDownloader
 import android.content.Context
 import android.net.Uri
 import dev.droidtop.runtime.windows.R
@@ -88,7 +89,7 @@ object ManifestInstaller {
     /**
      * dxvk/vkd3d distributed as raw .tzst archives have no ContentProfile; they are extracted
      * directly into the wine prefix at launch. "Installing" one just means caching the .tzst in
-     * the DXWrapperDownloader cache dir so the launch path finds it instead of downloading.
+     * the ComponentDownloader's DX wrapper cache so the launch path finds it instead of downloading.
      */
     private fun isTzstEntry(entry: ManifestEntry): Boolean = entry.url.endsWith(".tzst")
 
@@ -98,7 +99,7 @@ object ManifestInstaller {
         onProgress: (Float) -> Unit,
     ): ManifestInstallResult = withContext(Dispatchers.IO) {
         try {
-            val cacheDir = File(context.filesDir, "assets/dxwrapper")
+            val cacheDir = ComponentDownloader.cacheDir(context, ComponentDownloader.Kind.DX_WRAPPER)
             cacheDir.mkdirs()
             val dest = File(cacheDir, entry.url.substringAfterLast("/"))
             RuntimeDownloads.fetchUrls(context, entry.downloadUrls(), dest, entry.sha256, onProgress)

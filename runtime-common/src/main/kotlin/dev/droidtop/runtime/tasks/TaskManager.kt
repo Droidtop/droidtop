@@ -2,11 +2,15 @@ package dev.droidtop.runtime.tasks
 
 import android.app.ActivityManager
 import android.app.ActivityOptions
+import android.app.usage.UsageEvents
+import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.hardware.display.DisplayManager
+import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import dev.droidtop.runtime.util.guarded
 import kotlinx.coroutines.Dispatchers
@@ -48,14 +52,21 @@ object TaskManager {
         }, endEnginehostGame = { EnginehostEndGame.request(context.applicationContext) }, sendToBackground = { pkg -> sendToBackground(context.applicationContext, pkg) })
     }
 
-    /** How long the Home press is given to take the app off the screen before the background kill, which spares a visible app. */
+    /**
+     * The most the Home press is given to take the app off the screen before the background kill, which spares a
+     * visible app. The wait ends sooner, at the app's own stop, when Android reports it ([awaitStopped]).
+     */
     private const val BACKGROUND_SETTLE_MS = 1_200L
+
+    /** How often Android's record of app events is read while waiting for the app to stop. */
+    private const val STOP_POLL_MS = 100L
 
     /**
      * Without a helper the only way to end an app is [ActivityManager.killBackgroundProcesses], which leaves an app that
      * is on screen alone (console, build 1773: RetroArch kept running after Kill). So the app droidtop opened is first put
-     * in the background the way the person would, by a Home press on the screen it is on, and given a moment to stop.
-     * Does nothing for an app droidtop did not open (its screen is unknown) or for droidtop itself. Blocks: IO thread only.
+     * in the background the way the person would, by a Home press on the screen it is on, and the kill waits for the app
+     * to stop ([awaitStopped]). Does nothing for an app droidtop did not open (its screen is unknown) or for droidtop
+     * itself. Blocks: IO thread only.
      */
     private fun sendToBackground(context: Context, packageName: String) {
         if (packageName == context.packageName) return
@@ -65,13 +76,44 @@ object TaskManager {
         val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             .putExtra(dev.droidtop.library.settings.Modes.EXTRA_MODE_IN_USE, true)
         try {
+            val pressedAtMs = System.currentTimeMillis()
             context.startActivity(home, ActivityOptions.makeBasic().setLaunchDisplayId(display).toBundle())
-            Thread.sleep(BACKGROUND_SETTLE_MS)
+            if (!awaitStopped(context, packageName, pressedAtMs)) {
+                Log.d(TAG, "No stop of $packageName reported within $BACKGROUND_SETTLE_MS ms (usage access off, or it is still going)")
+            }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
         } catch (t: Throwable) {
             Log.d(TAG, "Couldn't put $packageName in the background", t)
         }
+    }
+
+    /**
+     * Waits until Android records [packageName]'s activity as stopped after [sinceMs] (Droidtop/tracker#765), which is
+     * when the background kill can take it, and says whether it did; gives up after [BACKGROUND_SETTLE_MS]. The record
+     * is Android's own app-event log ([UsageStatsManager.queryEvents]), readable with the usage access droidtop asks for;
+     * without it the log reads empty and the wait is the whole limit, as it always was. Blocks: IO thread only.
+     */
+    private fun awaitStopped(context: Context, packageName: String, sinceMs: Long): Boolean {
+        val usage = context.getSystemService(UsageStatsManager::class.java) ?: return false
+        // Before Android 10 the log has no stop, only the move to the background (the pause).
+        @Suppress("DEPRECATION")
+        val stopped = if (Build.VERSION.SDK_INT >= 29) UsageEvents.Event.ACTIVITY_STOPPED else UsageEvents.Event.MOVE_TO_BACKGROUND
+        val deadline = SystemClock.elapsedRealtime() + BACKGROUND_SETTLE_MS
+        val event = UsageEvents.Event()
+        while (SystemClock.elapsedRealtime() < deadline) {
+            val events = try {
+                usage.queryEvents(sinceMs, System.currentTimeMillis() + 1)
+            } catch (e: SecurityException) {
+                null
+            }
+            while (events != null && events.hasNextEvent()) {
+                events.getNextEvent(event)
+                if (event.packageName == packageName && event.eventType == stopped) return true
+            }
+            Thread.sleep(STOP_POLL_MS)
+        }
+        return false
     }
 
     private val snapshotFlow = MutableStateFlow<RunningSnapshot?>(null)

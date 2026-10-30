@@ -34,7 +34,8 @@ import kotlinx.coroutines.withContext
  * `dev.droidtop.runtime.PrimaryContainerSession` -- a droidspaces
  * container, root-only -- and executed Wine through
  * `ContainerRuntime.exec`. That made Windows games root-only by
- * accident (the no-root backend's `exec` was a `TODO()`), and had it
+ * accident (the no-root backend's `exec` was then a `TODO()`; it has long
+ * since been implemented), and had it
  * ever worked, it would have run downloaded binaries as root. The
  * seam stays because the execution *mechanism* varies per prefix (an
  * x86_64 Wine under Box64, an arm64ec Wine with FEXCore or Box64 as its
@@ -90,9 +91,9 @@ sealed interface WineEngineReadiness {
  * The no-root Wine engine: gamenative's own bionic execution model,
  * which is the one that works on this target.
  *
- * `:runtime-windows` builds the runtime with
- * `MODERN_ANDROID = true`, because Android refuses to `exec()` extracted
- * binaries above `targetSdk 28`. On that path gamenative runs the guest
+ * `:runtime-windows` has only GameNative's "modern" path, because Android
+ * refuses to `exec()` extracted binaries above `targetSdk 28`. On that path
+ * gamenative runs the guest
  * with a plain `ProcessHelper` exec against the [ImageFs] root, loaded
  * through `/system/bin/linker64` -- no proot, and no Linux container.
  * proot is the *glibc* variant's mechanism, and upstream deleted the

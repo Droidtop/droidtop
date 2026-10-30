@@ -4051,8 +4051,11 @@ a close path of its own. Every call works off the main thread.
      always tried last. It ends a process only while it is cached, and nothing confirms the result, so
      it is never reported as a close. It spares an app that is on screen, which is where a game is, so
      just before it droidtop presses Home on the display the app was opened on (`TaskManager.sendToBackground`,
-     from `LaunchLedger`; an app droidtop did not open has no known display and is not moved) and gives
-     the app 1.2 s to stop. This is a best effort and it is not known to work: on the console (build 1809) RetroArch
+     from `LaunchLedger`; an app droidtop did not open has no known display and is not moved) and waits
+     for the app to stop. That wait ends at the stop itself when Android's app-event log reports it
+     (`UsageStatsManager.queryEvents`, `ACTIVITY_STOPPED`, readable with the usage access droidtop asks for), and
+     after 1.2 s at most, which is the whole wait when there is no usage access (Droidtop/tracker#765: it was a fixed
+     1.2 s guess). This is a best effort and it is not known to work: on the console (build 1809) RetroArch
      was still in `ps` after it, hidden but alive (Droidtop/tracker#412), so the result stays "cannot confirm" and the
      person is told that only a helper's force-stop ends an app for sure. A helper's force-stop needs none of
      this and is never preceded by it.
@@ -7008,10 +7011,11 @@ The obvious repair — "port `DefaultProotContainerBackend` into
 `ProotRuntime`" — does not work as stated, and the entry in §7g saying so
 is now wrong:
 
-- `runtime-windows` compiles the vendored tree with
-  `MODERN_ANDROID = true`, which is not a preference: Android refuses to
-  `exec()` extracted binaries above `targetSdk 28`, so it is the only
-  value that can work for droidtop.
+- `runtime-windows` compiles only the vendored tree's "modern" path, which
+  is not a preference: Android refuses to `exec()` extracted binaries above
+  `targetSdk 28`, so it is the only one that can work for droidtop. The
+  legacy branches and their `MODERN_ANDROID` switch are deleted
+  (Droidtop/tracker#765).
 - On that path gamenative uses the **bionic** container variant, and
   `BionicProgramLauncherComponent` runs the guest with a plain
   `ProcessHelper.exec` against the ImageFs root. **No proot, and no Linux
@@ -7099,7 +7103,7 @@ Packaging was not one omission but three, each fatal on its own and each
 found by the next one failing on the device:
 
 - the vendored `jniLibs` (fixed previously);
-- the modern flavor's **assets**. `MODERN_ANDROID` makes every guest
+- the modern flavor's **assets**. The modern path makes every guest
   process `LD_PRELOAD` `libredirect-bionic-wx.so`, which
   `ImageFsInstaller` copies out of `src/modern/assets` -- a source dir
   nothing referenced;
@@ -20482,7 +20486,7 @@ on GameNative"; stay as close to upstream as possible). So the module holds:
   in-prefix Steam client (lsteamclient bridge, `SteamBootstrap`,
   `extractSteamFiles`) and the Epic overlay are not carried, since droidtop's
   stores are `:stores`.
-- `src/main/kotlin/dev/droidtop/runtime/windows/{utils,data,ui,powercontrol}`:
+- `src/main/kotlin/dev/droidtop/runtime/windows/{utils,data,ui}`:
   the GameNative-authored files that runtime reaches, under the same
   sub-packages (`app.gamenative.X` became `dev.droidtop.runtime.windows.X`):
   `ContainerUtils` (device defaults, ContainerData in and out),
@@ -20497,10 +20501,18 @@ on GameNative"; stay as close to upstream as possible). So the module holds:
 - `PrefManager`: the runtime's keys only, in GameNative's own DataStore file
   ("PluviaPreferences") under the same keys, so nothing a device already has
   moves; `WindowsBackbone` replaces `PluviaApp.bootstrap` (preferences,
-  storage paths, a Timber tree).
+  storage paths, a Timber tree). Winlator's own file ("WinlatorPreferences":
+  presets, box versions, the GPU found, log switches) is `PrefManager.Winlator`,
+  not a second object (Droidtop/tracker#765). Both are read from memory
+  (`StoredPrefs`): a collector keeps each file's latest values, and
+  `WindowsBackbone` loads both off the main thread when the runtime starts, so
+  no read blocks on the file; writes go to DataStore off the calling thread.
 - `src/main/res`: only the resources that code reaches (collected by script).
-- namespace `dev.droidtop.runtime.windows`; `BuildConfig` carries the three
-  switches the code reads (`MODERN_ANDROID`, `PRELOAD_BIONIC_SO`, `XR_BUILD`).
+- namespace `dev.droidtop.runtime.windows`; `BuildConfig` carries the
+  one setting the code reads, `PRELOAD_BIONIC_SO`. GameNative's legacy
+  variant (`MODERN_ANDROID`) and its Meta Quest build (`XR_BUILD`, the XR
+  frame bridges and the immersive launch) are deleted, not switched off
+  (Droidtop/tracker#765).
 
 Gone with it: GameNative's UI, Hilt (`DroidtopApplication` is a plain
 Application), Room's `PluviaDatabase` (`:stores` imported it), the unused

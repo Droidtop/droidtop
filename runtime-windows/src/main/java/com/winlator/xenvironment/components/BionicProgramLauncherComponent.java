@@ -15,7 +15,7 @@ import android.util.Log;
 
 import androidx.annotation.NonNull;
 
-import com.winlator.PrefManager;
+import dev.droidtop.runtime.windows.PrefManager;
 
 import dev.droidtop.runtime.windows.utils.LsfgVkManager;
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs;
@@ -80,16 +80,12 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
     public Container getContainer() { return this.container; }
     public void setContainer(Container container) { this.container = container; }
 
-    // Resolve which libredirect shim to preload. Normally the flavor default
-    // (PRELOAD_BIONIC_SO). When the container disables libredirect, modern falls
-    // back to the W^X-only minimal shim (still required to run Wine on a strict
-    // W^X kernel) and legacy preloads nothing. Returns null to preload nothing.
+    // Resolve which libredirect shim to preload: normally PRELOAD_BIONIC_SO.
+    // When the container disables libredirect, the W^X-only minimal shim, which
+    // is still required to run Wine on a strict W^X kernel.
     private String resolveLibredirectPreload(ImageFs imageFs) {
         if (container != null && container.isDisableLibredirect()) {
-            if (BuildConfig.MODERN_ANDROID) {
-                return imageFs.getLibDir() + "/libredirect-bionic-wx-minimal.so";
-            }
-            return null;
+            return imageFs.getLibDir() + "/libredirect-bionic-wx-minimal.so";
         }
         return imageFs.getLibDir() + "/" + BuildConfig.PRELOAD_BIONIC_SO;
     }
@@ -222,10 +218,10 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         ImageFs imageFs = ImageFs.find(context);
         File rootDir = imageFs.getRootDir();
 
-        PrefManager.init(context);
-        boolean enableBox86_64Logs = PrefManager.getBoolean("enable_box86_64_logs", true);
-        boolean shareAndroidClipboard = PrefManager.getBoolean("share_android_clipboard", false);
-        boolean enablePebLogs = PrefManager.getBoolean("enable_peb_logs", false);
+        PrefManager.Winlator.init(context);
+        boolean enableBox86_64Logs = PrefManager.Winlator.getBoolean("enable_box86_64_logs", true);
+        boolean shareAndroidClipboard = PrefManager.Winlator.getBoolean("share_android_clipboard", false);
+        boolean enablePebLogs = PrefManager.Winlator.getBoolean("enable_peb_logs", false);
 
         // Always set this to defer handling to WineRequestComponent
         envVars.put("WINE_OPEN_WITH_ANDROID_BROwSER", "1"); // Pipetto wine has a typo, so we need 2 envvar for it to work
@@ -275,10 +271,10 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
 
         envVars.put("PATH", winePath + ":" +
                 rootDir.getPath() + "/usr/bin");
-        if (BuildConfig.MODERN_ANDROID) envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
+        envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
 
         String ldLibraryPath = rootDir.getPath() + "/usr/lib" + ":" + "/system/lib64";
-        if (BuildConfig.MODERN_ANDROID) ldLibraryPath += ":" + imageFs.getWinePath() + "/lib";
+        ldLibraryPath += ":" + imageFs.getWinePath() + "/lib";
         envVars.put("LD_LIBRARY_PATH", ldLibraryPath);
         envVars.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
         envVars.put("FONTCONFIG_PATH", rootDir.getPath() + "/usr/etc/fonts");
@@ -323,7 +319,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
 
 
         ld_preload += ":" + evshimPath;
-        if (replacePath != null) ld_preload += ":" + replacePath;
+        ld_preload += ":" + replacePath;
 
         envVars.put("LD_PRELOAD", ld_preload);
         envVars.put("EVSHIM_WINE", 1);
@@ -364,14 +360,6 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         // Merge any additional environment variables from external sources
         if (this.envVars != null) {
             envVars.putAll(this.envVars);
-        }
-
-        if (BuildConfig.XR_BUILD) {
-            String shimPath = context.getApplicationInfo().nativeLibraryDir + "/libkgslshim.so";
-            if (new File(shimPath).exists()) {
-                String cur = envVars.get("LD_PRELOAD");
-                envVars.put("LD_PRELOAD", cur.isEmpty() ? shimPath : shimPath + ":" + cur);
-            }
         }
 
         // Last word on library paths, preloads and the X display for an
@@ -552,10 +540,10 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
         Log.d("BionicProgramLauncherComponent", "WinePath is " + winePath);
 
         envVars.put("PATH", winePath + ":" + rootDir.getPath() + "/usr/bin");
-        if (BuildConfig.MODERN_ANDROID) envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
+        envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
 
         String ldLibraryPath = rootDir.getPath() + "/usr/lib" + ":" + "/system/lib64";
-        if (BuildConfig.MODERN_ANDROID) ldLibraryPath += ":" + imageFs.getWinePath() + "/lib";
+        ldLibraryPath += ":" + imageFs.getWinePath() + "/lib";
         envVars.put("LD_LIBRARY_PATH", ldLibraryPath);
         envVars.put("ANDROID_SYSVSHM_SERVER", rootDir.getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
         envVars.put("WINE_NO_DUPLICATE_EXPLORER", "1");
@@ -569,7 +557,7 @@ public class BionicProgramLauncherComponent extends GuestProgramLauncherComponen
 
         if (new File(sysvPath).exists()) ld_preload += sysvPath;
 
-        if (replacePath != null) ld_preload += ":" + replacePath;
+        ld_preload += ":" + replacePath;
 
         envVars.put("LD_PRELOAD", ld_preload);
 

@@ -1,7 +1,6 @@
 package dev.droidtop.runtime.windows.utils
 
 import android.content.Context
-import dev.droidtop.runtime.windows.BuildConfig
 import com.winlator.contents.AdrenotoolsManager
 import com.winlator.contents.ContentProfile
 import com.winlator.contents.ContentsManager
@@ -156,13 +155,6 @@ object ManifestComponentHelper {
         return names.map { it.removePrefix(prefix).removeSuffix(".tzst") }
     }
 
-    /**
-     * On modern builds, dxvk/vkd3d are not bundled wholesale; the un-greyed base comes from what is
-     * actually on disk (see [dxWrapperOnDiskVersions]) plus the manifest. Legacy keeps the full list.
-     */
-    fun bundledDxWrapperBase(entries: List<String>): List<String> =
-        if (BuildConfig.MODERN_ANDROID) emptyList() else entries
-
     suspend fun loadComponentAvailability(context: Context): ComponentAvailability = withContext(Dispatchers.IO) {
         val installed = loadInstalledContentLists(context)
         val manifest = ComponentCatalog.offered(context)
@@ -174,11 +166,7 @@ object ManifestComponentHelper {
     }
 
     fun bundledGraphicsDriverBase(resourceEntries: List<String>): List<String> {
-        return if (BuildConfig.MODERN_ANDROID) {
-            resourceEntries.filter { it.equals("System", ignoreCase = true) }
-        } else {
-            resourceEntries
-        }
+        return resourceEntries.filter { it.equals("System", ignoreCase = true) }
     }
 
     fun buildAvailableVersions(base: List<String>, installed: List<String>, manifest: List<ManifestEntry>, ): List<String> {

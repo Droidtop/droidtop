@@ -647,12 +647,14 @@ object WineOptions {
                     ),
                     dxwrappers = res.getStringArray(R.array.dxwrapper_entries).map { WineOptionChoice(StringUtils.parseIdentifier(it), it) },
                     dxvk = versions(
-                        ManifestComponentHelper.bundledDxWrapperBase(res.getStringArray(R.array.dxvk_version_entries).toList()),
+                        // Not bundled: what is on disk and in the catalog (ManifestComponentHelper.dxWrapperOnDiskVersions).
+                        emptyList(),
                         installed.dxvk,
                         ManifestContentTypes.DXVK,
                     ),
                     vkd3d = versions(
-                        ManifestComponentHelper.bundledDxWrapperBase(res.getStringArray(R.array.vkd3d_version_entries).toList()),
+                        // Not bundled: what is on disk and in the catalog (ManifestComponentHelper.dxWrapperOnDiskVersions).
+                        emptyList(),
                         installed.vkd3d,
                         ManifestContentTypes.VKD3D,
                     ),

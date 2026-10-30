@@ -353,13 +353,8 @@ public class ContainerManager {
             }
         });
 
-        if (componentFile == null) {
-            Log.d("Extraction", "Using bundled asset for container_pattern_common");
-            return TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context.getAssets(), "container_pattern_common.tzst", containerDir, onExtractFileListener);
-        } else {
-            Log.d("Extraction", "Using downloaded file for container_pattern_common: " + componentFile.getAbsolutePath());
-            return TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, componentFile, containerDir, onExtractFileListener);
-        }
+        Log.d("Extraction", "Using downloaded file for container_pattern_common: " + componentFile.getAbsolutePath());
+        return TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, componentFile, containerDir, onExtractFileListener);
     }
 
     public boolean extractContainerPatternFile(String wineVersion, ContentsManager contentsManager, File containerDir, OnExtractFileListener onExtractFileListener) {
@@ -372,14 +367,8 @@ public class ContainerManager {
                     Log.d("Extraction", "Downloading container_pattern_gamenative: " + (int)(progress * 100) + "%");
                 }
             });
-            boolean result;
-            if (componentFile == null) {
-                Log.d("Extraction", "Using bundled asset for container_pattern_gamenative");
-                result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context.getAssets(), "container_pattern_gamenative.tzst", containerDir, onExtractFileListener);
-            } else {
-                Log.d("Extraction", "Using downloaded file for container_pattern_gamenative: " + componentFile.getAbsolutePath());
-                result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, componentFile, containerDir, onExtractFileListener);
-            }
+            Log.d("Extraction", "Using downloaded file for container_pattern_gamenative: " + componentFile.getAbsolutePath());
+            boolean result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, componentFile, containerDir, onExtractFileListener);
 
             if (result) {
                 try {
@@ -416,13 +405,8 @@ public class ContainerManager {
                     }
                 });
 
-                if (componentFile == null) {
-                    Log.d("Extraction", "Using bundled asset for " + containerPatternId);
-                    result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context, containerPattern, containerDir, onExtractFileListener);
-                } else {
-                    Log.d("Extraction", "Using downloaded file for " + containerPatternId + ": " + componentFile.getAbsolutePath());
-                    result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, componentFile, containerDir, onExtractFileListener);
-                }
+                Log.d("Extraction", "Using downloaded file for " + containerPatternId + ": " + componentFile.getAbsolutePath());
+                result = TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, componentFile, containerDir, onExtractFileListener);
             } catch (Exception e) {
                 Log.w("Extraction", "Failed to download/extract " + containerPatternId + ": " + e.getMessage() + ", trying prefix pack");
             }

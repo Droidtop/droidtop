@@ -5,11 +5,8 @@ import android.util.Log
 import androidx.compose.runtime.MutableState
 import dev.droidtop.runtime.windows.ui.data.XServerState
 import dev.droidtop.runtime.windows.utils.AssetUtils
-import dev.droidtop.runtime.windows.utils.downloader.CoreDriverDownloader
+import dev.droidtop.runtime.windows.utils.downloader.ComponentDownloader
 import dev.droidtop.runtime.windows.utils.ManifestComponentHelper
-import dev.droidtop.runtime.windows.utils.downloader.DXWrapperDownloader
-import dev.droidtop.runtime.windows.utils.downloader.GraphicsDriverDownloader
-import dev.droidtop.runtime.windows.utils.downloader.WinComponentDownloader
 import dev.droidtop.runtime.windows.utils.X86_64GuestLibs
 import com.winlator.container.Container
 import com.winlator.container.ContainerManager
@@ -41,7 +38,7 @@ import java.io.File
 import java.util.Arrays
 import java.util.Locale
 import kotlin.text.lowercase
-import com.winlator.PrefManager as WinlatorPrefManager
+import dev.droidtop.runtime.windows.PrefManager.Winlator as WinlatorPrefManager
 
 /*
  * What has to be true of a Wine prefix before a guest starts in it: drive
@@ -181,24 +178,14 @@ internal suspend fun setupWineSystemFiles(
         if (needsOpenalDlls) {
             val windowsDir = File(imageFs.rootDir, ImageFs.WINEPREFIX + "/drive_c/windows")
 
-            // Download or use cached/bundled openal component
-            val openalFile = WinComponentDownloader.ensureWinComponentAvailable(context, "openal") { progress ->
+            // Download or use the cached openal component
+            val openalFile = ComponentDownloader.require(context, ComponentDownloader.Kind.WIN_COMPONENT, "openal") { progress ->
                 Timber.d("Downloading openal component: ${(progress * 100).toInt()}%")
             }
-
-            if (openalFile == null) {
-                // Legacy variant: use bundled asset
-                TarCompressorUtils.extract(
-                    TarCompressorUtils.Type.ZSTD, context.assets,
-                    "wincomponents/openal.tzst", windowsDir, onExtractFileListener,
-                )
-            } else {
-                // Modern variant: use downloaded file
-                TarCompressorUtils.extract(
-                    TarCompressorUtils.Type.ZSTD, openalFile,
-                    windowsDir, onExtractFileListener,
-                )
-            }
+            TarCompressorUtils.extract(
+                TarCompressorUtils.Type.ZSTD, openalFile,
+                windowsDir, onExtractFileListener,
+            )
         }
         container.putExtra("openal_dlls", openalState)
         containerDataChanged = true
@@ -315,8 +302,8 @@ private fun refreshComponentsFiles(context: Context) {
 }
 
 /**
- * Helper function to extract a graphics driver component, downloading if needed (modern variant)
- * or using bundled assets (legacy variant).
+ * Extracts a graphics driver component, from the component cache or downloaded into it
+ * ([ComponentDownloader]). One the catalog does not have is skipped.
  */
 private suspend fun extractGraphicsDriverComponent(
     context: Context,
@@ -324,35 +311,29 @@ private suspend fun extractGraphicsDriverComponent(
     rootDir: File,
     onExtractFileListener: OnExtractFileListener? = null
 ) {
-    val componentFile = GraphicsDriverDownloader.ensureGraphicsDriverAvailable(context, componentId) { progress ->
+    val componentFile = ComponentDownloader.ensure(context, ComponentDownloader.Kind.GRAPHICS_DRIVER, componentId) { progress ->
         Timber.d("Downloading graphics driver $componentId: ${(progress * 100).toInt()}%")
     }
-
     if (componentFile == null) {
-        // Legacy variant: use bundled asset
-        Timber.d("Extracting graphics driver $componentId from bundled assets")
-        TarCompressorUtils.extract(
-            TarCompressorUtils.Type.ZSTD, context.assets,
-            "graphics_driver/$componentId.tzst", rootDir, onExtractFileListener,
-        )
-    } else {
-        // Modern variant: use downloaded file
-        Timber.d("Extracting graphics driver $componentId from downloaded file: ${componentFile.absolutePath}")
-        val extractType = if (componentFile.name.endsWith(".tar.xz")) {
-            TarCompressorUtils.Type.XZ
-        } else {
-            TarCompressorUtils.Type.ZSTD
-        }
-        TarCompressorUtils.extract(
-            extractType, componentFile,
-            rootDir, onExtractFileListener,
-        )
+        // Not in the catalog: nothing to extract, as before (no copy of it is bundled).
+        Timber.w("Graphics driver $componentId is not in the component catalog; not extracted")
+        return
     }
+    Timber.d("Extracting graphics driver $componentId from downloaded file: ${componentFile.absolutePath}")
+    val extractType = if (componentFile.name.endsWith(".tar.xz")) {
+        TarCompressorUtils.Type.XZ
+    } else {
+        TarCompressorUtils.Type.ZSTD
+    }
+    TarCompressorUtils.extract(
+        extractType, componentFile,
+        rootDir, onExtractFileListener,
+    )
 }
 
 /**
- * Helper function to extract a dxwrapper component, downloading if needed (modern variant)
- * or using bundled assets (legacy variant).
+ * Extracts a dxwrapper component, from the component cache or downloaded into it
+ * ([ComponentDownloader]). One the catalog does not have is skipped.
  */
 private suspend fun extractDXWrapperComponent(
     context: Context,
@@ -360,25 +341,19 @@ private suspend fun extractDXWrapperComponent(
     windowsDir: File,
     onExtractFileListener: OnExtractFileListener?
 ) {
-    val componentFile = DXWrapperDownloader.ensureDXWrapperAvailable(context, componentId) { progress ->
+    val componentFile = ComponentDownloader.ensure(context, ComponentDownloader.Kind.DX_WRAPPER, componentId) { progress ->
         Timber.d("Downloading dxwrapper $componentId: ${(progress * 100).toInt()}%")
     }
-
     if (componentFile == null) {
-        // Legacy variant: use bundled asset
-        Timber.d("Extracting dxwrapper $componentId from bundled assets")
-        TarCompressorUtils.extract(
-            TarCompressorUtils.Type.ZSTD, context.assets,
-            "dxwrapper/$componentId.tzst", windowsDir, onExtractFileListener,
-        )
-    } else {
-        // Modern variant: use downloaded file
-        Timber.d("Extracting dxwrapper $componentId from downloaded file: ${componentFile.absolutePath}")
-        TarCompressorUtils.extract(
-            TarCompressorUtils.Type.ZSTD, componentFile,
-            windowsDir, onExtractFileListener,
-        )
+        // Not in the catalog: nothing to extract, as before (no copy of it is bundled).
+        Timber.w("DX wrapper $componentId is not in the component catalog; not extracted")
+        return
     }
+    Timber.d("Extracting dxwrapper $componentId from downloaded file: ${componentFile.absolutePath}")
+    TarCompressorUtils.extract(
+        TarCompressorUtils.Type.ZSTD, componentFile,
+        windowsDir, onExtractFileListener,
+    )
 }
 
 private suspend fun extractDXWrapperFiles(
@@ -594,28 +569,17 @@ private suspend fun extractWinComponentFiles(
 
             // Note: GameNative do not bundle directinput and directinput8 dlls, need to skip them and use wine/proton dll instead
             if (useNative && (identifier != "directinput8" && identifier != "directinput")) {
-                // Download or use cached/bundled wincomponent
-                val componentFile = WinComponentDownloader.ensureWinComponentAvailable(
-                    context, identifier
+                // Download or use the cached wincomponent
+                val componentFile = ComponentDownloader.require(
+                    context, ComponentDownloader.Kind.WIN_COMPONENT, identifier
                 ) { progress ->
                     Timber.d("Downloading wincomponent $identifier: ${(progress * 100).toInt()}%")
                 }
-
-                if (componentFile == null) {
-                    // Legacy variant: use bundled asset
-                    Timber.d("Extracting wincomponent $identifier from bundled assets")
-                    TarCompressorUtils.extract(
-                        TarCompressorUtils.Type.ZSTD, context.assets,
-                        "wincomponents/$identifier.tzst", windowsDir, onExtractFileListener,
-                    )
-                } else {
-                    // Modern variant: use downloaded file
-                    Timber.d("Extracting wincomponent $identifier from downloaded file: ${componentFile.absolutePath}")
-                    TarCompressorUtils.extract(
-                        TarCompressorUtils.Type.ZSTD, componentFile,
-                        windowsDir, onExtractFileListener,
-                    )
-                }
+                Timber.d("Extracting wincomponent $identifier from downloaded file: ${componentFile.absolutePath}")
+                TarCompressorUtils.extract(
+                    TarCompressorUtils.Type.ZSTD, componentFile,
+                    windowsDir, onExtractFileListener,
+                )
             } else {
                 val dlnames = wincomponentsJSONObject.getJSONArray(identifier)
                 for (i in 0 until dlnames.length()) {
@@ -759,18 +723,14 @@ internal suspend fun extractGraphicsDriverFiles(
             )
 
             // Download or get cached core driver
-            val driverFile = CoreDriverDownloader.ensureCoreDriverAvailable(context, assetZip) { progress ->
+            val driverFile = ComponentDownloader.require(
+                context, ComponentDownloader.Kind.CORE_DRIVER, assetZip.substringBeforeLast(".zip"),
+            ) { progress ->
                 Timber.d("Downloading core driver $assetZip: ${(progress * 100).toInt()}%")
             }
 
             // Read manifest name from zip to determine folder name
-            val identifier = if (driverFile != null) {
-                // Modern variant: read from downloaded file
-                com.winlator.core.FileUtils.readZipManifestNameFromFile(driverFile) ?: assetZip.substringBeforeLast('.')
-            } else {
-                // Legacy variant: read from assets
-                readZipManifestNameFromAssets(context, assetZip) ?: assetZip.substringBeforeLast('.')
-            }
+            val identifier = com.winlator.core.FileUtils.readZipManifestNameFromFile(driverFile) ?: assetZip.substringBeforeLast('.')
 
             // Only (re)extract if changed
             val adrenoCacheId = "${graphicsDriver}-${identifier}"
@@ -783,15 +743,8 @@ internal suspend fun extractGraphicsDriverFiles(
                 }
                 destinationDir.mkdirs()
 
-                if (driverFile != null) {
-                    // Modern variant: extract from downloaded file
-                    Timber.d("Extracting core driver from downloaded file: ${driverFile.absolutePath}")
-                    com.winlator.core.FileUtils.extractZipFromFile(driverFile, destinationDir)
-                } else {
-                    // Legacy variant: extract from assets
-                    Timber.d("Extracting core driver from bundled assets: $assetZip")
-                    com.winlator.core.FileUtils.extractZipFromAssets(context, assetZip, destinationDir)
-                }
+                Timber.d("Extracting core driver from downloaded file: ${driverFile.absolutePath}")
+                com.winlator.core.FileUtils.extractZipFromFile(driverFile, destinationDir)
 
                 val targetLibName = "vulkan.adreno.so"
 
@@ -1013,10 +966,6 @@ private fun cleanupBionicSteamAssets(imageFs: ImageFs) {
             Timber.w("Failed to delete bionic-Steam asset at ${target.absolutePath}")
         }
     }
-}
-
-private fun readZipManifestNameFromAssets(context: Context, assetName: String): String? {
-    return com.winlator.core.FileUtils.readZipManifestNameFromAssets(context, assetName)
 }
 
 private fun readLibraryNameFromExtractedDir(destinationDir: File): String? {

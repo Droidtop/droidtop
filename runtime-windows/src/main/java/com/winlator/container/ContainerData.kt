@@ -83,7 +83,7 @@ data class ContainerData(
     /** Disable external mouse input **/
     val disableMouseInput: Boolean = false,
     /** Touchscreen mode (defaults on for XR builds) **/
-    val touchscreenMode: Boolean = dev.droidtop.runtime.windows.BuildConfig.XR_BUILD,
+    val touchscreenMode: Boolean = false,
     /** Shooter mode (auto-replace sticks with dynamic joysticks) **/
     val shooterMode: Boolean = true,
     /** Serialised JSON gesture configuration (used when touchscreenMode is true) **/

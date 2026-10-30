@@ -7,8 +7,7 @@ import android.media.Image;
 import android.os.Process;
 import android.util.Log;
 
-import dev.droidtop.runtime.windows.BuildConfig;
-import com.winlator.PrefManager;
+import dev.droidtop.runtime.windows.PrefManager;
 import com.winlator.box86_64.Box86_64Preset;
 import com.winlator.box86_64.Box86_64PresetManager;
 import com.winlator.contents.ContentProfile;
@@ -169,8 +168,8 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         ImageFs imageFs = ImageFs.find(context);
         File rootDir = imageFs.getRootDir();
 
-        PrefManager.init(context);
-        boolean enableBox86_64Logs = PrefManager.getBoolean("enable_box86_64_logs", true);
+        PrefManager.Winlator.init(context);
+        boolean enableBox86_64Logs = PrefManager.Winlator.getBoolean("enable_box86_64_logs", true);
 
         EnvVars envVars = new EnvVars();
         addBox64EnvVars(envVars, enableBox86_64Logs);
@@ -185,10 +184,10 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         envVars.put("PATH", winePath + ":" +
                 imageFs.getRootDir().getPath() + "/usr/bin:" +
                 imageFs.getRootDir().getPath() + "/usr/local/bin");
-        if (BuildConfig.MODERN_ANDROID) envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
+        envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
 
         envVars.put("LD_LIBRARY_PATH", imageFs.getRootDir().getPath() + "/usr/lib"
-                + (BuildConfig.MODERN_ANDROID ? ":" + imageFs.getWinePath() + "/lib" : ""));
+                + ":" + imageFs.getWinePath() + "/lib");
         envVars.put("BOX64_LD_LIBRARY_PATH", imageFs.getRootDir().getPath() + "/usr/lib/x86_64-linux-gnu");
         envVars.put("ANDROID_SYSVSHM_SERVER", imageFs.getRootDir().getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
         envVars.put("FONTCONFIG_PATH", imageFs.getRootDir().getPath() + "/usr/etc/fonts");
@@ -239,9 +238,9 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
     private void extractBox64Files() {
         ImageFs imageFs = environment.getImageFs();
         Context context = environment.getContext();
-        PrefManager.init(context);
-        String currentBox86Version = PrefManager.getString("current_box86_version", "");
-        String currentBox64Version = PrefManager.getString("current_box64_version", "");
+        PrefManager.Winlator.init(context);
+        String currentBox86Version = PrefManager.Winlator.getString("current_box86_version", "");
+        String currentBox64Version = PrefManager.Winlator.getString("current_box64_version", "");
         File rootDir = imageFs.getRootDir();
 
         ContentProfile profile = contentsManager.getProfileByEntryName("box64-" + box64Version);
@@ -252,7 +251,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
             Log.d("Extraction", "exctracting box64 with box64Version " + box64Version);
             TarCompressorUtils.extract(TarCompressorUtils.Type.ZSTD, context.getAssets(), "box86_64/box64-" + box64Version + ".tzst", rootDir);
         }
-        PrefManager.putString("current_box64_version", box64Version);
+        PrefManager.Winlator.putString("current_box64_version", box64Version);
     }
 
     private void addBox64EnvVars(EnvVars envVars, boolean enableLogs) {
@@ -284,7 +283,7 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         ImageFs imageFs = ImageFs.find(context);
         File rootDir = imageFs.getRootDir();
 
-        PrefManager.init(context);
+        PrefManager.Winlator.init(context);
         EnvVars envVars = new EnvVars();
         envVars.put("HOME", imageFs.home_path);
         envVars.put("USER", ImageFs.USER);
@@ -296,10 +295,10 @@ public class GlibcProgramLauncherComponent extends GuestProgramLauncherComponent
         envVars.put("PATH", winePath + ":" +
                 imageFs.getRootDir().getPath() + "/usr/bin:" +
                 imageFs.getRootDir().getPath() + "/usr/local/bin");
-        if (BuildConfig.MODERN_ANDROID) envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
+        envVars.put("REDIRECT_EXEC__PROC_SELF_EXE", winePath + "/wine");
 
         envVars.put("LD_LIBRARY_PATH", imageFs.getRootDir().getPath() + "/usr/lib"
-                + (BuildConfig.MODERN_ANDROID ? ":" + imageFs.getWinePath() + "/lib" : ""));
+                + ":" + imageFs.getWinePath() + "/lib");
         envVars.put("BOX64_LD_LIBRARY_PATH", imageFs.getRootDir().getPath() + "/usr/lib/x86_64-linux-gnu");
         envVars.put("ANDROID_SYSVSHM_SERVER", imageFs.getRootDir().getPath() + UnixSocketConfig.SYSVSHM_SERVER_PATH);
         envVars.put("FONTCONFIG_PATH", imageFs.getRootDir().getPath() + "/usr/etc/fonts");

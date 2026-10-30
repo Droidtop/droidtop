@@ -12,7 +12,7 @@ import java.util.Iterator;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.winlator.PrefManager;
+import dev.droidtop.runtime.windows.PrefManager;
 import com.winlator.winhandler.WinHandler;
 
 import org.json.JSONArray;
@@ -75,7 +75,7 @@ public class ExternalController {
 
     public void setContext(Context context) {
         this.context = context;
-        PrefManager.init(context);
+        PrefManager.Winlator.init(context);
     }
 
     public int getDeviceId() {

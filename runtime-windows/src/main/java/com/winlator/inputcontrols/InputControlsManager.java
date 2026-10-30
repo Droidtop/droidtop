@@ -8,7 +8,7 @@ import android.os.Environment;
 import android.util.JsonReader;
 import android.util.Log;
 
-import com.winlator.PrefManager;
+import dev.droidtop.runtime.windows.PrefManager;
 import com.winlator.core.AppUtils;
 import com.winlator.core.FileUtils;
 
@@ -57,11 +57,11 @@ public class InputControlsManager {
             return;
         }
 
-        PrefManager.init(context);
+        PrefManager.Winlator.init(context);
         String newVersion = String.valueOf(AppUtils.getVersionCode(context));
-        String oldVersion = PrefManager.getString("inputcontrols_app_version", "0");
+        String oldVersion = PrefManager.Winlator.getString("inputcontrols_app_version", "0");
         if (oldVersion.equals(newVersion)) return;
-        PrefManager.putString("inputcontrols_app_version", newVersion);
+        PrefManager.Winlator.putString("inputcontrols_app_version", newVersion);
 
         File[] files = profilesDir.listFiles();
         if (files == null) return;
