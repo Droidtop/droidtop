@@ -100,6 +100,14 @@ jobs:
           echo "versionCode $code"
           echo "VERSION_REVISION=$code" >> "$GITHUB_ENV"
 
+      - name: Changelog
+        # This build's changelog.json (docs/SPEC.md 10b, "Every build carries its changelog"): the history from the
+        # previous release plus the changelog.d fragments new in this build. The APK bundles it (app/build.gradle.kts)
+        # for What's new; the publish job makes it the release notes and refuses a build whose entry is empty.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 build-scripts/release_channel.py changelog app/build/generated/changelog/changelog.json "$VERSION_REVISION"
+
       - name: Decode signing keystore
         # Only decodes when the secret actually exists — PR builds from
         # forks don't get repo secrets, and this step no-op'ing rather than
@@ -151,7 +159,10 @@ jobs:
       - name: Write release-info.json
         # Beside the APKs, in the same artifact, so that release-promote.yml
         # can later publish exactly this run's bytes to Testing or Stable.
-        run: python3 build-scripts/release_channel.py info app/build/outputs "$VERSION_REVISION" "$GITHUB_SHA"
+        # The changelog goes beside it, for the publish job's notes and the next build's history.
+        run: |
+          python3 build-scripts/release_channel.py info app/build/outputs "$VERSION_REVISION" "$GITHUB_SHA"
+          cp app/build/generated/changelog/changelog.json app/build/outputs/changelog.json
 
       - name: Upload APK
         # The universal APKs are what the channel publishes. The x86_64-only
@@ -168,6 +179,7 @@ jobs:
             app/build/outputs/apk/release/app-x86_64-release.apk
             app/build/outputs/apk/debug/app-x86_64-debug.apk
             app/build/outputs/release-info.json
+            app/build/outputs/changelog.json
           if-no-files-found: error
 
       - name: Upload on-device check APK
