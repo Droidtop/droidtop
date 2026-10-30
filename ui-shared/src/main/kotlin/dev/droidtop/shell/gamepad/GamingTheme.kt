@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -38,6 +39,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import dev.droidtop.library.theme.GamingThemeColors
 import dev.droidtop.library.theme.GamingThemeMapping
+import dev.droidtop.library.theme.OutsideGamingColors
 import dev.droidtop.library.theme.ThemeAssets
 import dev.droidtop.notices.ColorMath
 import dev.droidtop.library.theme.ThemeSafeMode
@@ -45,6 +47,9 @@ import dev.droidtop.ui.shared.LocalNoticePalette
 import dev.droidtop.ui.shared.NoticePalette
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import dev.droidtop.library.theme.ThemePrefs as LibraryThemePrefs
 import dev.droidtop.shell.gamepad.theme.ThemePrefs as ShellThemePrefs
@@ -65,10 +70,12 @@ import dev.droidtop.shell.gamepad.theme.ThemePrefs as ShellThemePrefs
  * that reads [MaterialTheme] instead. There is no second place a Gaming
  * surface can pick its colours from.
  *
- * **Where it applies.** Only while a Gaming surface is on screen:
- * [GamingTheme] holds the palette active between its host's start and
- * stop, so the standard launcher and the desktop, which share these
- * tokens' code, draw droidtop's own palette.
+ * **Where it applies.** The whole palette, typefaces and texture included,
+ * only while a Gaming surface is on screen: [GamingTheme] holds it active
+ * between its host's start and stop. Everywhere else the tokens read the
+ * colours outside Gaming ([OutsideGamingColors], docs/SPEC.md 7k "Colours
+ * outside Gaming"): the Gaming theme's colours by default, or the Custom
+ * droidtop theme. Desktop holds the whole palette too, unless Custom is chosen.
  *
  * **Cost.** The theme is parsed and mapped once per (theme, colour
  * scheme, variant, aspect ratio) on a background thread and cached; the
@@ -241,8 +248,40 @@ object GamingTheme {
      */
     private var appearanceLight by mutableStateOf(false)
 
-    /** What a Gaming surface draws with right now: the theme's palette while one is on screen, droidtop's own otherwise. */
-    val palette: GamingPalette get() = if (holders > 0) current else GamingPalette.defaultFor(appearanceLight)
+    /** The colours outside Gaming as a palette, once [OutsideGamingColors] has published them in this process. */
+    private var outside by mutableStateOf<GamingPalette?>(null)
+    private val following = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** What a Gaming surface draws with right now: the theme's palette while one is on screen, [outsidePalette] otherwise. */
+    val palette: GamingPalette get() = if (holders > 0) current else outsidePalette
+
+    /**
+     * What everything outside Gaming draws with (docs/SPEC.md 7k, "Colours outside Gaming"): the colours
+     * [OutsideGamingColors] resolves, without the theme's typefaces or texture; droidtop's own palette for the
+     * appearance until they are first resolved.
+     */
+    val outsidePalette: GamingPalette get() = outside ?: GamingPalette.defaultFor(appearanceLight)
+
+    /**
+     * Follows [OutsideGamingColors] for the rest of the process, once; every root calls it ([rememberLightAppearance]).
+     * Each palette, its notice colours and Material scheme are built off the main thread and then published.
+     */
+    fun followOutside(context: Context) {
+        if (!following.compareAndSet(false, true)) return
+        val app = context.applicationContext
+        dev.droidtop.runtime.util.AppScopes.main.launch {
+            OutsideGamingColors.colors(app)
+                .map { colors ->
+                    when (colors) {
+                        GamingPalette.Default.colors -> GamingPalette.Default
+                        GamingPalette.DefaultLight.colors -> GamingPalette.DefaultLight
+                        else -> GamingPalette(colors, null, null, null).also { it.notice; it.colorScheme }
+                    }
+                }
+                .flowOn(Dispatchers.Default)
+                .collect { outside = it }
+        }
+    }
 
     fun setAppearance(light: Boolean) {
         if (appearanceLight != light) appearanceLight = light
@@ -291,7 +330,7 @@ object GamingTheme {
     suspend fun refresh(context: Context) {
         val app = context.applicationContext
         val next = withContext(Dispatchers.Default) {
-            // droidtop's own palette's notices and scheme too: Default is drawn whenever no theme is held.
+            // droidtop's own palette's notices and scheme too: Default is drawn until the colours outside Gaming resolve.
             GamingPalette.Default.colorScheme
             GamingPalette.DefaultLight.colorScheme
             paletteFor(app)
@@ -310,7 +349,7 @@ object GamingTheme {
             aspectRatio = name?.let { LibraryThemePrefs.aspectRatio(context, it) },
             screenRatio = metrics.widthPixels.toFloat() / metrics.heightPixels.toFloat(),
             safeMode = ThemeSafeMode.active,
-            highContrast = highTextContrast(context) || dev.droidtop.library.settings.ReadingPrefs.highContrast(context),
+            highContrast = dev.droidtop.library.theme.ThemeColorStore.highContrast(context),
             sentenceCase = dev.droidtop.library.settings.ReadingPrefs.sentenceCase(context),
             light = dev.droidtop.library.settings.AppearancePrefs.light(context),
         )
@@ -323,8 +362,7 @@ object GamingTheme {
         val sentenceCase = key.sentenceCase || highContrast
         // A colour scheme the person named is drawn as the theme wrote it. Otherwise ThemeAssets loaded the scheme
         // matching the appearance, and a theme with none gets its palette derived for it (docs/SPEC.md 7k, "Light and dark").
-        val mapped = GamingThemeMapping.map(theme, light = key.light.takeIf { key.colorScheme == null })
-        val colors = if (highContrast) GamingThemeMapping.highContrast(mapped) else mapped
+        val colors = GamingThemeMapping.resolved(theme, key.light, schemeNamed = key.colorScheme != null, highContrast = highContrast)
         val ownStatusViews = GamingThemeMapping.ownStatusViews(theme)
         val palette = when {
             !colors.declared && ownStatusViews.isEmpty() && !highContrast && !sentenceCase -> GamingPalette.defaultFor(key.light)
@@ -353,11 +391,6 @@ object GamingTheme {
         cache[key] = palette
         return palette
     }
-
-    /** Android's "High contrast text" accessibility switch; a Settings.Secure value with no public getter. */
-    private fun highTextContrast(context: Context): Boolean =
-        runCatching { android.provider.Settings.Secure.getInt(context.contentResolver, "high_text_contrast_enabled", 0) == 1 }
-            .getOrDefault(false)
 
     /** A theme's font; a file that is not one is logged by its path and the theme draws in the default face. */
     private fun loadTypeface(path: String?): android.graphics.Typeface? {
@@ -412,13 +445,22 @@ object GamingTheme {
  * and handed to [MaterialTheme] for code that reads that instead of
  * [MenuTokens]. Safe to nest and to use from every Activity the Gaming
  * mode opens; they share one palette.
+ *
+ * [outsideGaming] is for a surface outside Gaming that wears the Gaming theme
+ * (Desktop): it holds the theme only while the colours outside Gaming match
+ * it, and draws the Custom droidtop theme when that is chosen (docs/SPEC.md
+ * 7k, "Colours outside Gaming").
  */
 @Composable
-fun GamingTheme(content: @Composable () -> Unit) {
+fun GamingTheme(outsideGaming: Boolean = false, content: @Composable () -> Unit) {
     val context = LocalContext.current
     val owner = remember(context) { context.findLifecycleOwner() }
-    DisposableEffect(owner) {
-        if (owner == null) {
+    val custom by OutsideGamingColors.customChosen.collectAsState()
+    val holds = !(outsideGaming && custom)
+    DisposableEffect(owner, holds) {
+        if (!holds) {
+            onDispose { }
+        } else if (owner == null) {
             GamingTheme.acquire()
             onDispose { GamingTheme.release() }
         } else {
@@ -493,7 +535,10 @@ fun rememberLightAppearance(): Boolean {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     val light = dev.droidtop.library.settings.AppearancePrefs.light(choice, uiMode)
-    SideEffect { GamingTheme.setAppearance(light) }
+    SideEffect {
+        GamingTheme.setAppearance(light)
+        GamingTheme.followOutside(context)
+    }
     return light
 }
 

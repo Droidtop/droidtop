@@ -279,8 +279,9 @@ fun DesktopShell(
     }
 
     // Desktop's chrome wears the Gaming theme (Droidtop/tracker#555 D4): the bar, its sheets and the Quick Menu
-    // read the same palette Gaming does, through MaterialTheme and MenuTokens alike, instead of stock Material.
-    dev.droidtop.shell.gamepad.GamingTheme {
+    // read the same palette Gaming does, through MaterialTheme and MenuTokens alike, instead of stock Material. With
+    // the Custom droidtop theme chosen for the colours outside Gaming, it wears that instead (Droidtop/tracker#827).
+    dev.droidtop.shell.gamepad.GamingTheme(outsideGaming = true) {
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         // The bar takes its height from the desktop rather than covering it (Droidtop/tracker#682): the viewport is
         // laid out in the rest, so the compositor's output is exactly what shows and no window's edge is under the bar.

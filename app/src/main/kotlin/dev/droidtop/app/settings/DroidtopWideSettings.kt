@@ -127,9 +127,14 @@ object DroidtopWideSettings {
                 ),
                 CatalogGroup(
                     id = "global_appearance",
-                    title = "Light and dark",
+                    title = "Light, dark and colours",
                     category = "Appearance",
-                    items = listOf(dev.droidtop.library.settings.AppearancePrefs.item(context)),
+                    items = listOf(
+                        dev.droidtop.library.settings.AppearancePrefs.item(context),
+                        // Colours outside Gaming (docs/SPEC.md 7k, Droidtop/tracker#827).
+                        dev.droidtop.library.settings.AppearancePrefs.outsideGamingItem(context),
+                        dev.droidtop.library.settings.AppearancePrefs.customAccentItem(context),
+                    ),
                 ),
                 CatalogGroup(
                     id = "global_accessibility",

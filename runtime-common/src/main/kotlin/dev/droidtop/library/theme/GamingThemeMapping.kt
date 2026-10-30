@@ -10,7 +10,11 @@ import dev.droidtop.notices.ColorMath
  *
  * [DEFAULT] is droidtop's own palette, the exact values the chrome used
  * before any theme reached it. [declared] is false for it.
+ *
+ * Serializable so [ThemeColorStore] can keep a resolved palette across process starts (docs/SPEC.md 7k, "Colours
+ * outside Gaming").
  */
+@kotlinx.serialization.Serializable
 data class GamingThemeColors(
     val ground: Int,
     val overlaySurface: Int,
@@ -219,6 +223,49 @@ object GamingThemeMapping {
                 bodyFont = declared.bodyFont,
                 displayFont = declared.displayFont,
             ),
+        )
+    }
+
+    /**
+     * [map], then High contrast when it is on: the colours a palette draws with for one parse of the active theme
+     * (docs/SPEC.md 7k). [schemeNamed] is whether the person named the theme's colour scheme: a named scheme is drawn
+     * as the theme wrote it; otherwise the palette follows [light]. The one place both the Gaming palette and the
+     * colours outside Gaming ([ThemeColorStore]) are worked out from a theme. Pure.
+     */
+    fun resolved(theme: EsDeTheme?, light: Boolean, schemeNamed: Boolean, highContrast: Boolean): GamingThemeColors {
+        val mapped = map(theme, light = light.takeIf { !schemeNamed })
+        return if (highContrast) highContrast(mapped) else mapped
+    }
+
+    /**
+     * [colors] with [accent] as its accent, every role the accent decides worked out again the way [build] does it (the
+     * accent held to 4.5:1 on the surfaces by lightness alone, the focused row, the primary button and its label): the
+     * Custom droidtop theme's palette (docs/SPEC.md 7k, "Colours outside Gaming"). The same accent gives [colors]
+     * back unchanged. Pure.
+     */
+    fun withAccent(colors: GamingThemeColors, accent: Int): GamingThemeColors {
+        if (accent == colors.accent) return colors
+        val m = ColorMath
+        val ground = colors.ground
+        val ink = if (m.ratio(m.WHITE, ground) >= m.ratio(m.BLACK, ground)) m.WHITE else m.BLACK
+        val surfaces = listOf(
+            ground, colors.overlaySurface, colors.card, colors.cardFocused, colors.cardInset, colors.hintBar,
+            m.mix(colors.overlaySurface, ink, 0.17),
+        )
+        val held = m.ensure(accent, surfaces, TEXT_FLOOR)
+        val primary = colors.onSurface
+        val awayFromInk = if (m.luminance(primary) > 0.4) m.BLACK else m.WHITE
+        val launch = m.ensureFill(m.mix(ground, held, 0.40), primary, TEXT_FLOOR, awayFromInk)
+        val launchFocused = m.ensureFill(m.mix(launch, primary, 0.12), primary, TEXT_FLOOR, awayFromInk)
+        return colors.copy(
+            accent = held,
+            onAccent = m.pickOn(held),
+            rowFillSelected = m.withAlpha(held, 0x38),
+            launch = launch,
+            launchFocused = launchFocused,
+            onLaunchMuted = m.ensure(m.mix(primary, launch, 0.15), listOf(launch, launchFocused), TEXT_FLOOR),
+            // Its Material scheme and notices are built from these roles, not droidtop's stock pair.
+            declared = true,
         )
     }
 

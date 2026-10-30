@@ -8,6 +8,7 @@ import androidx.compose.ui.platform.ComposeView
 import dev.droidtop.library.settings.Notice
 import dev.droidtop.library.settings.NoticePlacement
 import dev.droidtop.library.theme.GamingThemeColors
+import dev.droidtop.library.theme.OutsideGamingColors
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -15,9 +16,11 @@ import java.util.concurrent.ConcurrentHashMap
  * the forked Launcher3 (no Compose of its own), so a notice row there uses the
  * [R.layout.notice_preference] layout and binds through [bind], which puts one
  * ComposeView in the frame and redraws it on every bind. The palette is
- * derived from the surface's own theme (its background, text and accent), the
- * same derivation the Gaming palette uses, so a light settings screen gets
- * light-ground notices.
+ * derived from the surface's own background and text, the same derivation the
+ * Gaming palette uses, so a light settings screen gets light-ground notices,
+ * and from the colours outside Gaming ([OutsideGamingColors], docs/SPEC.md 7k
+ * "Colours outside Gaming") for its accent and the rest, so it matches the
+ * Gaming theme by default.
  */
 object NoticeViews {
     val LAYOUT: Int get() = R.layout.notice_preference
@@ -33,24 +36,22 @@ object NoticeViews {
         }
     }
 
-    private data class Key(val ground: Int, val text: Int, val accent: Int)
+    private data class Key(val ground: Int, val text: Int, val base: GamingThemeColors)
 
     private val palettes = ConcurrentHashMap<Key, NoticePalette>()
 
-    /** The notice palette for a View surface's theme, built once per (background, text, accent). */
+    /** The notice palette for a View surface, built once per (background, text, colours outside Gaming). */
     fun paletteFor(context: Context): NoticePalette {
-        val base = GamingThemeColors.DEFAULT
+        val base = OutsideGamingColors.current(context)
         val ground = attr(context, android.R.attr.colorBackground) ?: base.ground
         val text = attr(context, android.R.attr.textColorPrimary) ?: base.onSurface
-        val accent = attr(context, android.R.attr.colorAccent) ?: base.accent
-        val key = Key(ground, text, accent)
+        val key = Key(ground, text, base)
         return palettes.getOrPut(key) {
-            if (key == Key(base.ground, base.onSurface, base.accent)) {
+            val stock = GamingThemeColors.DEFAULT
+            if (base == stock && ground == stock.ground && text == stock.onSurface) {
                 NoticePalette.Default
             } else {
-                NoticePalette.of(
-                    base.copy(ground = ground, overlaySurface = ground, card = ground, onSurface = text, accent = accent),
-                )
+                NoticePalette.of(base.copy(ground = ground, overlaySurface = ground, card = ground, onSurface = text))
             }
         }
     }

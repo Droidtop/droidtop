@@ -1,14 +1,13 @@
 package dev.droidtop.library.theme
 
 import android.content.Context
-import dev.droidtop.library.settings.AppearancePrefs
 import org.json.JSONObject
 
 /**
  * The role tokens for UI droidtop does not draw itself (docs/SPEC.md 7k, "Light and dark"; Droidtop/tracker#559): a
  * plugin's own pages through `ui.get_theme` (docs/plugin-api.md), and droidtop's own screens built from plain Android
  * views (the web sign-in screen). One set, read from the palette in use and never restated: the Gaming theme's while
- * the Gaming shell holds one ([provider]), droidtop's own light or dark otherwise ([AppearancePrefs]).
+ * the Gaming shell holds one ([provider]), the colours outside Gaming otherwise ([OutsideGamingColors]).
  */
 object RoleTokens {
     /** The token names, in the order SPEC 7k gives them. */
@@ -21,7 +20,7 @@ object RoleTokens {
 
     /**
      * The Gaming theme's set while the Gaming shell holds one (its palette and high-contrast state), set by the shell;
-     * null from it, or no provider, is droidtop's own palette for the appearance.
+     * null from it, or no provider, is the colours outside Gaming.
      */
     @Volatile
     var provider: (() -> Set?)? = null
@@ -72,8 +71,8 @@ object RoleTokens {
         )
     }
 
-    /** The set in use now. Reads a preference: never on the main thread from a plugin call. */
-    fun current(context: Context): Set = provider?.invoke() ?: of(GamingThemeMapping.defaultFor(light = AppearancePrefs.light(context)))
+    /** The set in use now: the Gaming theme's while the shell holds one, else the colours outside Gaming ([OutsideGamingColors]). */
+    fun current(context: Context): Set = provider?.invoke() ?: of(OutsideGamingColors.current(context))
 
     /** Tells [onChanged] when the set in use differs from the last one seen; the first look only remembers it. */
     fun check(context: Context) {

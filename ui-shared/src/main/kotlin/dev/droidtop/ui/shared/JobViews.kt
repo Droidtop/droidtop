@@ -35,9 +35,9 @@ object JobViews {
         }
     }
 
-    /** A View surface's theme as a job's colours: its accent fills, its secondary text tints the track. */
+    /** A View surface as a job's colours: the accent outside Gaming fills, the surface's secondary text tints the track. */
     fun colorsFor(context: Context): JobProgressColors {
-        val accent = NoticeViews.attr(context, android.R.attr.colorAccent)?.let(::Color) ?: Color(dev.droidtop.library.theme.GamingThemeColors.DEFAULT.accent)
+        val accent = Color(dev.droidtop.library.theme.OutsideGamingColors.current(context).accent)
         val muted = NoticeViews.attr(context, android.R.attr.textColorSecondary)?.let(::Color) ?: Color.Gray
         val notices = NoticeViews.paletteFor(context)
         return JobProgressColors(track = muted.copy(alpha = 0.25f), fill = accent, done = accent, failed = notices.dangerFill)

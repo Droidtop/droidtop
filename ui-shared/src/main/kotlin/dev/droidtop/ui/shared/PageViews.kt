@@ -6,13 +6,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import dev.droidtop.library.settings.ButtonBarItem
 import dev.droidtop.library.settings.PageHeader
-import dev.droidtop.library.theme.GamingThemeColors
+import dev.droidtop.library.theme.OutsideGamingColors
 
 /**
  * The page pieces for a View surface (docs/SPEC.md 7k, "Page anatomy"): Standard's settings are Preference
  * rows in the forked Launcher3, so a page's header and button bar there use [LAYOUT] and bind through
  * here, one ComposeView per row, redrawn on every bind, exactly as [NoticeViews] hosts a notice. The
- * colours are the surface's own theme (its background, text and accent).
+ * colours are the surface's own background and text, and the accent of the colours outside Gaming
+ * ([OutsideGamingColors], docs/SPEC.md 7k "Colours outside Gaming").
  */
 object PageViews {
     val LAYOUT: Int get() = R.layout.page_preference
@@ -33,13 +34,13 @@ object PageViews {
         composeIn(frame).setContent { ButtonBarView(bar, selected = null, onPress = onPress, colors = colors) }
     }
 
-    /** The page colours of a View surface's theme; danger is the notice palette's, derived from the same theme. */
+    /** The page colours of a View surface; danger is the notice palette's, derived from the same colours. */
     fun colorsFor(context: Context): PageColors {
-        val base = GamingThemeColors.DEFAULT
+        val base = OutsideGamingColors.current(context)
         val ground = NoticeViews.attr(context, android.R.attr.colorBackground) ?: base.ground
         val text = NoticeViews.attr(context, android.R.attr.textColorPrimary) ?: base.onSurface
         val muted = NoticeViews.attr(context, android.R.attr.textColorSecondary) ?: base.onSurfaceMuted
-        val accent = NoticeViews.attr(context, android.R.attr.colorAccent) ?: base.accent
+        val accent = base.accent
         val notices = NoticeViews.paletteFor(context)
         val onAccent = dev.droidtop.library.theme.FocusRingInks.inner(accent) // black or white, whichever reads on the accent
         return PageColors(

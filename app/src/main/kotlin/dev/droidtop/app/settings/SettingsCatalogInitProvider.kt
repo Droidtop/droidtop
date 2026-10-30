@@ -76,6 +76,10 @@ class SettingsCatalogInitProvider : ContentProvider() {
             dev.droidtop.app.PluginWidgetProvider.requestUpdate(context, id, force = true)
         }
         dev.droidtop.library.theme.RoleTokens.attach(appContext)
+        // The Gaming theme's colours for everything outside Gaming (docs/SPEC.md 7k, "Colours outside Gaming",
+        // Droidtop/tracker#827): read back or worked out now, off the main thread, and again whenever the theme or what
+        // its colours depend on changes, whether or not Gaming ever opens.
+        dev.droidtop.library.theme.ThemeColorStore.install(appContext)
         appearanceWatch = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
             if (key == dev.droidtop.library.settings.AppearancePrefs.KEY_APPEARANCE) dev.droidtop.library.theme.RoleTokens.checkSoon()
         }.also { dev.droidtop.library.settings.CatalogPrefs.prefs(appContext).registerOnSharedPreferenceChangeListener(it) }
