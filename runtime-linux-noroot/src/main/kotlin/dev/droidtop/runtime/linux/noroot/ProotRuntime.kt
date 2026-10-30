@@ -333,6 +333,13 @@ class ProotRuntime(
         return ContainerLook.decode("scale=${config.getProperty(KEY_LOOK_SCALE).orEmpty()}\ntheme=${config.getProperty(KEY_LOOK_THEME).orEmpty()}")
     }
 
+    /**
+     * proot runs a container's programs as droidtop itself, in droidtop's own network: taking it away needs a network
+     * namespace, which needs root (docs/SPEC.md 3d "Network").
+     */
+    override val networkUnavailableReason: String =
+        "Its programs run as droidtop itself, with droidtop's network. Taking it away needs the root backend (droidspaces)"
+
     /** Real now (Droidtop/tracker#95): see [HostAudioServer]. */
     override val audioSharingUnavailableReason: String? = null
 

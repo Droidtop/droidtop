@@ -11,7 +11,8 @@ class ContainerReachTest {
         microphone: Boolean = false,
         devices: Int = 0,
         servesVpn: Boolean = false,
-    ) = ContainerReach.lines(ContainerReach.Settings(mounts, sockets, microphone, devices, servesVpn)).associate { it.kind to it.what }
+        network: Boolean = true,
+    ) = ContainerReach.lines(ContainerReach.Settings(mounts, sockets, microphone, devices, servesVpn, network)).associate { it.kind to it.what }
 
     @Test
     fun `a new container has its own home, shared storage, windows, sound, no microphone, no devices, the device's network`() {
@@ -44,5 +45,11 @@ class ContainerReachTest {
         assertEquals("1 device", lines(devices = 1)["USB devices"])
         assertEquals("3 devices", lines(devices = 3)["USB devices"])
         assertEquals("This device's network, as any app has; it carries the VPN for the apps chosen", lines(servesVpn = true)["Network"])
+    }
+
+    @Test
+    fun `a container with its network taken away says so, VPN or not`() {
+        assertEquals("None at all", lines(network = false)["Network"])
+        assertEquals("None at all", lines(network = false, servesVpn = true)["Network"])
     }
 }

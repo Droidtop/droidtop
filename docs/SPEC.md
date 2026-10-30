@@ -3393,7 +3393,8 @@ the `ContainerRuntime` interface that already exists (§3):
   theme, keyboard and pad) adds its line here. The lines are kinds of
   access only: scale and theme (slice 5) are how its programs look, not
   what it reaches, and add none. The slices are built in the order 1, 5,
-  4, 6, 3, 2 (lane, 2026-10-30).
+  3, 6, 4, 2 (lane, 2026-10-30): GPU (4) is new support, not a switch, so
+  it comes after the rest.
   **Scale and theme (Droidtop/tracker#787 slice 5).** A container's page
   has "Scale and theme". Scale is its programs' size against the
   desktop's own scale, which the compositor already applies to every
@@ -3408,6 +3409,21 @@ the `ContainerRuntime` interface that already exists (§3):
   (`ContainerLook`: proot's config, droidspaces' `<name>.look`), copied
   with it and deleted with it, and apply to programs started after the
   change.
+  **Network (Droidtop/tracker#787 slice 3).** A container's page has
+  "Network": On (the default) gives it this device's network, as any app
+  has; Off gives it none at all. Turning it off asks first and says what
+  stops (the internet and this network, downloads and updates in it, a VPN
+  it carries); its windows, sound and folders stay, since the desktop's
+  sockets are files in a bound folder that no network namespace touches.
+  Turning it on does not ask. Either applies from its next start.
+  - **droidspaces:** off is `net_mode=none` in its generated config, a
+    network namespace with loopback only. It is kept in `<name>.network`,
+    copied and deleted with the container.
+  - **proot:** its programs run as droidtop itself, in droidtop's own
+    network, and taking that away needs a network namespace, which needs
+    root. The row says so in place of the switch
+    (`networkUnavailableReason`).
+  "What it can reach" says "None at all" for a container without network.
   **Clipboard per container (Droidtop/tracker#787 slice 2, owner
   2026-10-30: "A sounds good").** Every container's windows share one
   compositor, and the clipboard is the core protocol's `wl_data_device`,

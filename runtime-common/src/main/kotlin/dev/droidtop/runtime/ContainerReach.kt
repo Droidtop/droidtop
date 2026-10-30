@@ -19,6 +19,8 @@ object ContainerReach {
         val devices: Int,
         /** Whether it carries droidtop's VPN for Android apps. */
         val servesVpn: Boolean,
+        /** Whether it has the device's network at all (slice 3). */
+        val network: Boolean = true,
     )
 
     fun lines(s: Settings): List<Line> = listOf(
@@ -42,7 +44,11 @@ object ContainerReach {
         ),
         Line(
             "Network",
-            "This device's network, as any app has" + if (s.servesVpn) "; it carries the VPN for the apps chosen" else "",
+            if (!s.network) {
+                "None at all"
+            } else {
+                "This device's network, as any app has" + if (s.servesVpn) "; it carries the VPN for the apps chosen" else ""
+            },
         ),
     )
 
