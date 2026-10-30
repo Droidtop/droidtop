@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -48,12 +47,18 @@ internal fun CompanionAsk(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(question, style = MaterialTheme.typography.titleMedium, color = colors.onSurface, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
-        Row(horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically) {
-            AskButton(safe, primary = true, modifier = Modifier.weight(1f), onClick = onSafe)
-            AskButton(action, primary = false, modifier = Modifier.widthIn(min = 120.dp), onClick = onAction)
+        // Both answers are weighted, the safe one wider. The action was sized "at least 120dp", and its button fills
+        // its width, so the Row measured it first at the whole row and Keep playing got none: the console showed a
+        // question with only "Quit" under it and no way back (Droidtop/tracker#835, capture of 2026-10-30).
+        Row(horizontalArrangement = Arrangement.spacedBy(48.dp), verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            AskButton(safe, primary = true, modifier = Modifier.weight(SAFE_WEIGHT), onClick = onSafe)
+            AskButton(action, primary = false, modifier = Modifier.weight(1f), onClick = onAction)
         }
     }
 }
+
+/** How much wider the safe answer is than the action: first and large (rule 8). */
+private const val SAFE_WEIGHT = 1.5f
 
 @Composable
 private fun AskButton(label: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
