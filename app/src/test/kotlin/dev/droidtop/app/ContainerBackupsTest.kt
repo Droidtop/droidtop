@@ -41,7 +41,7 @@ class ContainerBackupsTest {
     @Test
     fun `the folder's backups of one container, oldest first, manifests and others left out`() {
         val points = ContainerBackups.points("Debian", names)
-        assertEquals(7, points.size)
+        assertEquals(6, points.size)
         assertTrue(points.first().full)
         assertFalse(points[1].full)
     }
