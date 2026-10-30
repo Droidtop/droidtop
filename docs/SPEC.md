@@ -11943,7 +11943,8 @@ most one cue sounds per 50 ms, the launch cue excepted (`CueThrottle`); the
 direction roles (move, bump, tab, system, slider) are not played for a
 touch-driven move, as Steam plays nothing for a pointer hover; a direction held
 against an end does not keep bumping (`moveCue`). Every role plays at one level of its own, **Navigation sounds**
-(0 to 100, 70 by default, 0 is silent; a person who had turned the old switch off starts at 0): in Settings > Shell
+(0 to 100, 40 by default, lowered from 70 on 2026-10-30 when the owner found them "VERY harsh" on the
+console, 0 is silent; a person who had turned the old switch off starts at 0): in Settings > Shell
 behaviour and in the Audio controls the Quick Menu and the companion draw (owner, 2026-10-30, Droidtop/tracker#836:
 "navigation sounds should get their own volume"). They play as game audio (`USAGE_GAME`) on the media volume: as
 sonification the RP5 routed them to the system stream, silent while the ringer was muted. `SoundSync` observes the

@@ -255,7 +255,7 @@ object EsDeNavigationSounds : AudioHandOff.Holder {
      * The Navigation sounds volume, 0 to 1 ([SoundSync]; owner, 2026-10-30, Droidtop/tracker#836: "navigation sounds
      * should get their own volume"): every sample plays at it, and at 0 no role plays. Hand-off bookkeeping still runs.
      */
-    @Volatile var volume: Float = 0.7f
+    @Volatile var volume: Float = 0.4f
 
     private val throttle = CueThrottle()
 

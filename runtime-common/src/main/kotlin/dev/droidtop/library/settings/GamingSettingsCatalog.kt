@@ -1067,7 +1067,9 @@ object GamingSettingsCatalog {
     }
 
     const val NAVIGATION_SOUNDS_MAX = 100
-    private const val NAVIGATION_SOUNDS_DEFAULT = 70
+    // 40, not 70 (owner on the console, dev.2778: "the nav noises are VERY harsh"): the bundled samples peak at
+    // about -1 dBFS, and SoundPool's linear gain at 0.4 brings them to about -9 dBFS under game audio.
+    private const val NAVIGATION_SOUNDS_DEFAULT = 40
 
     /**
      * What each screen is for (docs/SPEC.md 4c, ScreenRoles; Droidtop/tracker#776): one row per screen other than the one
