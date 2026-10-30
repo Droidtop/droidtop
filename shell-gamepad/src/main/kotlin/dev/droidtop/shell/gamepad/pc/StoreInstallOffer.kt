@@ -240,7 +240,7 @@ private fun volumeRow(text: String, selected: Boolean, action: () -> Unit, used:
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+            .then(if (window.touchFirst) Modifier.heightIn(min = window.pressTarget) else Modifier)
             .clip(Corners.Crisp)
             .selectionFrame(selected, Corners.Crisp, rest = Color.Transparent)
             .padRow(onClick = action)

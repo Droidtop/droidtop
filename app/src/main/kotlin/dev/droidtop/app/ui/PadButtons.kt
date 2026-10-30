@@ -53,7 +53,7 @@ internal fun PadButton(
     val shape = RoundedCornerShape(50)
     Box(
         modifier = modifier
-            .heightIn(min = currentShellWindow().minTouchTarget)
+            .heightIn(min = currentShellWindow().pressTarget)
             .padSelectable(onFocus = { focused = it }, onPress = onClick)
             .background(if (filled) MenuTokens.Accent else Color.Transparent, shape)
             .border(

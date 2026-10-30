@@ -130,6 +130,13 @@ chips. 8 dp grid, 32 dp safe margin, 16 dp between tiles.
 In a pane under 600dp wide (a sheet, a side panel, the Quick Menu) the ladder steps one rung down: row titles and
 body Label 15, supporting lines and values Caption 13, the pane's title Title 24 (2026-10-29, #739).
 
+The Quick Menu stays dense (owner, 2026-10-30, #740). With the pad, on the 1280x720dp canvas (the console's panel and
+the 1080p DP screen alike): rail tabs 48dp square, all eleven sections in the rail without scrolling; the pane's
+heading Title 24 in a 48dp row; rows at least 48dp. A press target is a finger's size (0.3 inch, about 80dp of the
+console's canvas) only where touch comes first: a phone, the companion held upright. One rule decides it,
+ShellWindow.pressTarget; a screen never reads the finger size itself. A pane inside a window (the Quick Menu's
+catalog tabs) keeps that window's input (ShellWindow.pane): a narrow pane is not a phone held upright.
+
 One sans family (a theme may supply its fonts); tabular figures wherever numbers change; at most two lines in a row,
 then an ellipsis. Focus has two styles, never mixed on one surface: art gets a 3 dp accent ring and a 6% lift; a row
 gets the accent at 22% behind it and a 4 dp accent bar at its leading edge. Focus never gets lost (a list that updates
@@ -240,3 +247,4 @@ like the Settings pane at the same level.
 - 2026-09-25 droidtop: a recovery action must never leave less on screen than it found -- rebuilding an index from records that do not cover every game dropped 168 games to 6; keep what is shown and let the next real walk decide what is gone.
 - 2026-09-25 droidtop: a reference implementation's category art is also its branding -- ES-DE's `pc` is IBM PC/DOS, so a PC-games card drawn from it wore an IBM logo; pick the category that matches (a theme's `windows`) or fall through to the theme's own defaults and a plain name, never fabricate art.
 - 2026-09-25 droidtop: a screen of ours that uses stock widgets reads as someone else's app -- the same card, focus ring, ground, header and hint row everywhere is what makes a second entry point recognisable; build it from the shell's pieces, not a lookalike.
+- 2026-10-30 droidtop: a finger-sized touch target is for touch only; used as a pad-driven size it made the Quick Menu sparse (#740). One rule (pressTarget) picks between them.

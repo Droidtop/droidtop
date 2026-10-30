@@ -65,7 +65,7 @@ internal fun PadCapturePrompt(light: Boolean, onDone: () -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = window.minTouchTarget)
+                    .heightIn(min = window.pressTarget)
                     .clip(Corners.Crisp)
                     .selectionFrame(false, Corners.Crisp, rest = Color.Transparent)
                     .padRow {

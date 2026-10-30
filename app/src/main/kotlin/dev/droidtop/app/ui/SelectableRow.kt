@@ -70,7 +70,7 @@ internal fun SelectableRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(min = window.minTouchTarget + Space.Sm)
+            .heightIn(min = window.pressTarget + Space.Sm)
             // The pad's A answers the row, and the shell's accent ring
             // says which row the pad is on; the fill stays the "chosen"
             // cue. Onboarding showed no focus at all (dq-coordinator-24,

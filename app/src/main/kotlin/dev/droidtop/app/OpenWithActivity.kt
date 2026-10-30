@@ -227,7 +227,7 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(Space.Md, Alignment.End),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onClose, modifier = Modifier.heightIn(min = window.minTouchTarget)) {
+            TextButton(onClick = onClose, modifier = Modifier.heightIn(min = window.pressTarget)) {
                 Text(stringResource(R.string.open_with_close), style = TypeRole.button)
             }
             val ready = state as? OpenWithState.Ready
@@ -240,7 +240,7 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         )
                     },
-                    modifier = Modifier.heightIn(min = window.minTouchTarget),
+                    modifier = Modifier.heightIn(min = window.pressTarget),
                 ) { Text(stringResource(R.string.open_with_start_the_desktop), style = TypeRole.button) }
             }
             if (ready != null && ready.choices.any { it.available }) {
@@ -248,7 +248,7 @@ private fun OpenWithScreen(uri: Uri?, onClose: () -> Unit) {
                     onClick = { open(ready) },
                     enabled = working == null && selectedKey != null,
                     modifier = Modifier
-                        .heightIn(min = window.minTouchTarget)
+                        .heightIn(min = window.pressTarget)
                         .then(if (window.portrait) Modifier.weight(1f) else Modifier),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MenuTokens.Accent,

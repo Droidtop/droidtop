@@ -31,6 +31,7 @@ fixture literal-text shell-gamepad/src/main/kotlin/A.kt 'Text("Loading")'
 fixture catalog-literals runtime-common/src/main/kotlin/A.kt 'ActionItem(id = "x", title = "Reset")'
 fixture bare-click shell-gamepad/src/main/kotlin/A.kt 'Modifier.clickable { open() }'
 fixture raw-corners shell-gamepad/src/main/kotlin/A.kt 'Modifier.clip(RoundedCornerShape(8.dp))'
+fixture press-target shell-gamepad/src/main/kotlin/A.kt 'Modifier.heightIn(min = window.minTouchTarget)'
 
 status=0
 for dir in "$tmp"/*/; do

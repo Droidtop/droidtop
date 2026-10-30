@@ -17988,8 +17988,18 @@ Compose window (`ProvideShellCanvas`); a change redraws the screen. The pixels d
 change, only how many a dp is: a Retroid Pocket 5's 5.5" 1080p panel reports 360dpi (2.25 pixels a dp, 853x480dp), so
 it and a 1080p phone are drawn at 1.5, as the 1080p DP screen is, and show the same layout and proportions instead of
 1.5 times the text and spacing. A window already at the canvas keeps its own density. Touch targets do not shrink with
-it: `touchTargetDp` makes them 0.3 inch on the panel from the dpi the display reports (Android's 48dp where it reports
-none believable), never under 48dp of the canvas. The Text size setting still scales text on top. Corners follow the visual language (decided 2026-10-24, Droidtop/tracker#644,
+it where touch comes first: `touchTargetDp` makes them 0.3 inch on the panel from the dpi the display reports
+(Android's 48dp where it reports none believable), never under 48dp of the canvas. Where the pad drives, a press target
+is the shell's 48dp of the canvas (`Measure.padTarget`), as through 2026-10-28. `ShellWindow.pressTarget` is the one
+place that choice is made, and `check-ui-rules.sh` (press-target) fails a screen that reads the finger size directly.
+**The Quick Menu stays dense** (owner, 2026-10-30, Droidtop/tracker#740: "the QAM redesign made it significantly less
+dense, which is a terrible decision"; "something REALLY wants it to be heavily padded or scaled"). Two things
+together made it sparse. Since 2026-10-29 a finger is 0.3 inch of the panel: about 80dp of the console's canvas, and
+more on an add-on screen whose reported dpi is high. The rail sized its tabs from it whatever the input, and the
+catalog tabs (Social, Downloads, Plugins) saw the window at the pane's width, taller than wide, so it read as a phone
+held upright and every row took the finger size: about 200px a row on the 1080p add-on (console capture
+qam-now-221213). A pane now keeps its window's input (`ShellWindow.pane`), and with the pad the rail's tabs and the
+rows are 48dp; all eleven tabs fit the 720dp canvas (`ShellWindowTest`). The Text size setting still scales text on top. Corners follow the visual language (decided 2026-10-24, Droidtop/tracker#644,
 docs/DESIGN-LANGUAGE.md "The approved design"): 8dp on rows, buttons and chips that are not pills
 (`Corners.Crisp`), 12dp on art tiles and cards (`Corners.Tile`) and on panels, sheets and dialogs
 (`Corners.Panel`), a 16dp plate for a large generic focused surface, pills for tabs, badges and

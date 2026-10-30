@@ -139,7 +139,7 @@ fun StatusCluster(showBatteryPercent: Boolean, onClick: () -> Unit, modifier: Mo
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier
-            .then(if (window.touchFirst) Modifier.heightIn(min = window.minTouchTarget) else Modifier)
+            .then(if (window.touchFirst) Modifier.heightIn(min = window.pressTarget) else Modifier)
             .padRow(onClick = onClick)
             .clearAndSetSemantics {
                 contentDescription = statusDescription(clock, snapshot)

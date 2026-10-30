@@ -1,5 +1,6 @@
 package dev.droidtop.shell.gamepad
 
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -80,5 +81,50 @@ class ShellWindowTest {
         assertEquals(72f, touchTargetDp(xdpi = 0f, systemDensity = 2.25f, layoutDensity = 1.5f), 0.1f)
         // Never under 48dp of the layout.
         assertEquals(48f, touchTargetDp(xdpi = 100f, systemDensity = 1f, layoutDensity = 1f), 0.1f)
+    }
+
+    // The console's panel (5.5" 1080p, 400dpi) on the 1280x720dp canvas: a finger is 0.3 inch, 80dp of it.
+    private val consoleFinger = touchTargetDp(xdpi = 400f, systemDensity = 2.25f, layoutDensity = 1.5f).dp
+
+    @Test
+    fun `where the pad drives, a press target is the shell's 48dp, not a finger's`() {
+        // Droidtop/tracker#740: the finger size made the pad-driven Quick Menu sparse.
+        val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
+        assertEquals(80f, consoleFinger.value, 0.5f)
+        assertEquals(Measure.padTarget, console.pressTarget)
+        // The DP screen at 1920x1080 with the pad: the same.
+        assertEquals(Measure.padTarget, ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true).pressTarget)
+    }
+
+    @Test
+    fun `where touch comes first, a press target is a finger's`() {
+        val phone = ShellWindow(widthDp = 411, heightDp = 731, padPresent = false, minTouchTarget = 64.dp)
+        assertEquals(64.dp, phone.pressTarget)
+        // The companion, held upright, is touch-first.
+        val companion = ShellWindow(widthDp = 480, heightDp = 853, padPresent = true, minTouchTarget = consoleFinger)
+        assertEquals(consoleFinger, companion.pressTarget)
+    }
+
+    @Test
+    fun `every Quick Menu rail tab fits the console's panel with the pad`() {
+        // The 10-28 rail: one 48dp tab per section, all of them in the 720dp-tall canvas less the panel's float margin
+        // and the hint row. At a finger's 80dp they did not, and the rail scrolled ("not showing all the tabs").
+        val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
+        val room = 720.dp - Space.Md * 2 - Measure.padTarget
+        assertTrue(console.pressTarget * QuickSection.entries.size <= room)
+        assertFalse(consoleFinger * QuickSection.entries.size <= room)
+    }
+
+    @Test
+    fun `a pane of the console's window keeps its pad-driven sizes`() {
+        // The Quick Menu's Plugins tab sees the window at its pane's width, about 376dp of the 720dp-tall canvas: taller
+        // than wide, so it read as a phone held upright and its rows took the finger size (#740).
+        val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
+        val pane = console.pane(376)
+        assertEquals(376, pane.widthDp)
+        assertFalse(pane.touchFirst)
+        assertEquals(Measure.padTarget, pane.pressTarget)
+        // A phone's pane stays touch-first.
+        assertTrue(ShellWindow(widthDp = 411, heightDp = 731).pane(300).touchFirst)
     }
 }

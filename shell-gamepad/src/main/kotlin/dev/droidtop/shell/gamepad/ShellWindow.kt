@@ -58,8 +58,17 @@ data class ShellWindow(
      * 48dp where the layout is at Android's density and more of the canvas where it is drawn smaller.
      */
     val minTouchTarget: Dp = 48.dp,
+    /** Set on a pane of a larger window ([pane]): that window's [touchFirst], which narrowing must not change. */
+    val paneTouchFirst: Boolean? = null,
 ) {
     val portrait: Boolean get() = heightDp > widthDp
+
+    /**
+     * The least size of anything pressed in this window: a finger's ([minTouchTarget]) where touch comes first, else
+     * [Measure.padTarget]. The one place that choice is made (Droidtop/tracker#740): sizing a press target from
+     * [minTouchTarget] directly made the pad-driven Quick Menu as sparse as a phone's.
+     */
+    val pressTarget: Dp get() = if (touchFirst) minTouchTarget else Measure.padTarget
 
     val widthClass: ShellWidthClass
         get() = when {
@@ -96,7 +105,15 @@ data class ShellWindow(
      * like an external pad would, so this reuses that answer instead of
      * guessing again from geometry.
      */
-    val touchFirst: Boolean get() = portrait || (minOf(widthDp, heightDp) < 600 && !padPresent)
+    val touchFirst: Boolean get() = paneTouchFirst ?: (portrait || (minOf(widthDp, heightDp) < 600 && !padPresent))
+
+    /**
+     * This window seen by a pane [widthDp] wide inside it (the Quick Menu's catalog tabs, Droidtop/tracker#649): its
+     * gutters and layout follow the pane, its input does not. A plain copy at the pane's width was taller than wide, so
+     * it read as a phone held upright: touch-first, finger-sized rows with the pad attached, about 200px each on the
+     * add-on (Droidtop/tracker#740).
+     */
+    fun pane(widthDp: Int): ShellWindow = copy(widthDp = widthDp, paneTouchFirst = touchFirst)
 
     /**
      * The shell's own screen-edge gutter: one proportion of the window's

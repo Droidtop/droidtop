@@ -535,9 +535,9 @@ internal fun MenuRow(
             // with its text, never a fixed height.
             .then(
                 if (uniformHeight) {
-                    Modifier.heightIn(min = maxOf(uniformRowHeight(uniformSummaryLines), if (window.touchFirst) window.minTouchTarget else 0.dp))
+                    Modifier.heightIn(min = maxOf(uniformRowHeight(uniformSummaryLines), if (window.touchFirst) window.pressTarget else 0.dp))
                 } else {
-                    Modifier.heightIn(min = maxOf(minHeight ?: MenuTokens.RowMinHeight, if (window.touchFirst) window.minTouchTarget else 0.dp))
+                    Modifier.heightIn(min = maxOf(minHeight ?: MenuTokens.RowMinHeight, if (window.touchFirst) window.pressTarget else 0.dp))
                 },
             )
             .clip(MenuTokens.RowShape)
@@ -645,7 +645,7 @@ internal fun MenuRow(
             if (adjustable && onAdjust != null && window.touchFirst) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.valueShare().then(if (columnWidth != null) Modifier.width(columnWidth + window.minTouchTarget * 2) else Modifier),
+                    modifier = Modifier.valueShare().then(if (columnWidth != null) Modifier.width(columnWidth + window.pressTarget * 2) else Modifier),
                 ) {
                     AdjustArrow("‹") { onAdjust(-1) }
                     if (valueChip) {
@@ -725,7 +725,7 @@ internal fun MenuRow(
                     Modifier
                         .clip(Corners.Pill)
                         .padRow(onClick = onInfo)
-                        .size(if (window.touchFirst) window.minTouchTarget else 20.dp)
+                        .size(if (window.touchFirst) window.pressTarget else 20.dp)
                         .wrapContentSize()
                         .size(20.dp)
                 } else {
@@ -893,7 +893,7 @@ private val SliderThumb = 7.dp
 private fun AdjustArrow(glyph: String, onPress: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(LocalShellWindow.current.minTouchTarget)
+            .size(LocalShellWindow.current.pressTarget)
             .clip(Corners.Pill)
             .padRow(onClick = onPress),
         contentAlignment = Alignment.Center,
@@ -1076,7 +1076,7 @@ internal fun DialogChoices(groups: List<List<DialogChoice>>, selected: Int, onCh
                     modifier = Modifier
                         .fillMaxWidth()
                         // A row is a button here, so it is at least as big as a finger on a screen without a pad.
-                        .heightIn(min = if (window.touchFirst) window.minTouchTarget else DialogLook.RowMinHeight)
+                        .heightIn(min = if (window.touchFirst) window.pressTarget else DialogLook.RowMinHeight)
                         .selectionFrame(row == selected, Corners.Crisp, rest = Color.Transparent, selectedFill = MenuTokens.Selected)
                         .padRow { onChoose(row) }
                         .padding(horizontal = Space.Lg, vertical = Space.Sm),

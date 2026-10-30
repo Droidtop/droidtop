@@ -328,7 +328,7 @@ private fun Modifier.sideMenuFocus(selected: Boolean, onClick: () -> Unit, onHov
 @Composable
 private fun sideMenuRowHeight(): Dp {
     val window = currentShellWindow()
-    return maxOf(SideMenu.RowHeight, if (window.touchFirst) window.minTouchTarget else 0.dp)
+    return maxOf(SideMenu.RowHeight, if (window.touchFirst) window.pressTarget else 0.dp)
 }
 
 /**

@@ -94,6 +94,15 @@ object Measure {
     val rowIcon = 32.dp
 
     /**
+     * A press target's least size where the pad drives (Droidtop/tracker#740): the shell's own 48dp of the canvas, as
+     * every row, pill and rail tab was through 2026-10-28. The finger-sized target (ShellWindow's minTouchTarget, 0.3
+     * inch on the panel) is for touch only: on the console's panel it is about 80dp of the canvas, and as the Quick
+     * Menu rail's tab size it took the menu's density away ("It's like the QAM has a ridiculously high scaling or
+     * padding value"). [ShellWindow.pressTarget] chooses between the two; nothing else does.
+     */
+    val padTarget = 48.dp
+
+    /**
      * A theme's own render, shown beside its name (onboarding's Appearance
      * step): the length of its LONGER side. The other side comes from the
      * screen, because a theme lays itself out against a screen's aspect
@@ -701,7 +710,7 @@ object MenuTokens {
 
     /**
      * A hint chip's minimum drawn height, touch or not. Kept well under
-     * [dev.droidtop.shell.gamepad.ShellWindow.minTouchTarget]: the tap
+     * [dev.droidtop.shell.gamepad.ShellWindow.pressTarget]: the tap
      * target is not the drawn chip (see [HintTouchTarget]) so shrinking
      * this does not shrink what a finger can hit.
      */
@@ -709,7 +718,7 @@ object MenuTokens {
 
     /**
      * The actual minimum tap size for a hint chip on a touch-first
-     * window -- [ShellWindow.minTouchTarget]'s own 48dp, same as every
+     * window -- [ShellWindow.pressTarget], same as every
      * other touch control, even though the chip it surrounds draws at
      * [HintChipMinHeight]. The chip sits centred inside this larger,
      * invisible box, so the extra room is a bigger hit area, never a

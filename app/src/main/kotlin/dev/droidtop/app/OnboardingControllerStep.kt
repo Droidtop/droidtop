@@ -160,7 +160,7 @@ internal fun ControllerStep(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = currentShellWindow().minTouchTarget + Space.Lg)
+                    .heightIn(min = currentShellWindow().pressTarget + Space.Lg)
                     .background(MenuTokens.Surface, MenuTokens.RowShape)
                     .focusable()
                     .onKeyEvent { event ->
@@ -221,7 +221,7 @@ internal fun ControllerStep(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = currentShellWindow().minTouchTarget + Space.Lg)
+                .heightIn(min = currentShellWindow().pressTarget + Space.Lg)
                 .background(MenuTokens.Surface, MenuTokens.RowShape)
                 .onFocusChanged { testing = it.isFocused }
                 .focusable()
