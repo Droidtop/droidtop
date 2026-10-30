@@ -87,10 +87,13 @@ internal fun runnerOf(entry: LibraryEntry?): GameRunner =
     if (entry?.kind == LibraryEntryKind.REMOTE_STREAM) GameRunner.STREAM else GameRunner.LOCAL
 
 /**
- * The Game tab, on the bar while a game runs (docs/SPEC.md "The companion's tabs", slice C8): the header (art, name,
- * this session's play time), then the rows [GameControls] gives for the mode and the runner: Resume, Quit (the
- * runner's own label: Disconnect for a stream), Restart and Kill (not for a stream), the overlay level and the
- * performance mode, Guides ([CompanionGuides]), then rows from plugins ([CompanionGamePluginRows]). Quit, Restart and Kill ask first while Ask
+ * The Game tab, on the bar while a game runs (docs/SPEC.md "The companion's tabs", slice C8; dense since
+ * Droidtop/tracker#835 part 2): the header (art, name, this session's play time), then one list of [GameActionRow]s
+ * from the rows [GameControls] gives for the mode and the runner: Resume (the one filled row), Pause the game for a
+ * console game, the emulator, the overlay level, the performance mode and Screenshot, values on the right; Mouse mode,
+ * Controls and Report a problem for a game in droidtop's own screen; Guides ([CompanionGuides]); rows from plugins
+ * ([CompanionGamePluginRows]); and under Stop, Quit (the runner's own label: Disconnect for a stream), Restart and
+ * Kill (not for a stream) in the danger tone. The running game's L2 sheet has the same set. Quit, Restart and Kill ask first while Ask
  * before stopping is on, and always in Kid and Kiosk;
  * the question starts on Keep playing, with the two answers large and well apart.
  */
@@ -164,28 +167,50 @@ internal fun CompanionGameTab() {
                 run()
             }
         }
-        GameControls.rows(uiMode, runner).forEach { row ->
+        // One dense list (Droidtop/tracker#835 part 2): Resume the one filled row, then what the game can be told or
+        // set, then the ending rows together at the bottom in the danger tone. The same set as the running game's L2
+        // sheet (Pause, Mouse mode, Controls, Report a problem), plus what only the companion has; nothing removed.
+        val rows = GameControls.rows(uiMode, runner)
+        val ending = setOf(GameRow.QUIT, GameRow.RESTART, GameRow.KILL)
+        val stopping = stopStatus != null
+        rows.filter { it !in ending }.forEach { row ->
             val label = GameControls.label(row, runner)
             when (row) {
-                GameRow.RESUME -> GameButton(label, primary = true) { CompanionState.onLaunchEntry?.invoke(entry) }
-                GameRow.QUIT -> GameButton(label) { act(row) { CompanionState.quit(context, entry) } }
-                GameRow.RESTART -> GameButton(label) { act(row) { CompanionState.onRestartEntry?.invoke(entry) } }
-                GameRow.KILL -> GameButton(label) { act(row) { CompanionState.quit(context, entry, kill = true) } }
+                // While a Quit or Kill is ending the game, Resume is not the thing to press.
+                GameRow.RESUME -> GameActionRow(label, tone = if (stopping) RowTone.PLAIN else RowTone.PRIMARY) { CompanionState.onLaunchEntry?.invoke(entry) }
                 GameRow.EMULATOR -> CompanionEmulatorChoice(entry)
-                GameRow.OVERLAY -> GameButton("$label: ${overlay.label}") {
+                GameRow.OVERLAY -> GameActionRow(label, value = overlay.label) {
                     if (PerformanceOverlay.canDraw(context)) PerformanceOverlay.setLevel(context, overlay.next())
                 }
                 GameRow.PERFORMANCE_MODE -> performanceItem?.let { item ->
                     CompanionCatalogItems(listOf(item), onChanged = { overlayVersion++ })
                 }
                 GameRow.SCREENSHOT -> CompanionScreenshotRow(label)
+                else -> Unit
             }
+            // Pause right after Resume, for a console game: RetroArch's PAUSE_TOGGLE, sent only on this press.
+            if (row == GameRow.RESUME && entry.systemId != null) CompanionPauseRow()
         }
-        GameButton("Guides") { readingGuides = true }
+        CompanionOwnScreenRows(entry)
+        GameActionRow("Guides") { readingGuides = true }
         // Rows from plugins whose panel declares the game ability (slice C9): RetroArch's save and load, a stream's controls.
         CompanionGamePluginRows(entry)
         // "Save and load from here: Set up" while RetroArch runs it and a step is missing (slice C11).
         CompanionRetroArchSetup(entry, rememberCompanionPanels(pluginMode(LocalCompanionMode.current)))
+        val endings = rows.filter { it in ending }
+        if (endings.isNotEmpty()) {
+            Text(stringResource(R.string.companion_game_stop), style = MaterialTheme.typography.labelLarge, color = colors.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
+            endings.forEach { row ->
+                val label = GameControls.label(row, runner)
+                GameActionRow(label, tone = RowTone.DANGER) {
+                    when (row) {
+                        GameRow.QUIT -> act(row) { CompanionState.quit(context, entry) }
+                        GameRow.RESTART -> act(row) { CompanionState.onRestartEntry?.invoke(entry) }
+                        else -> act(row) { CompanionState.quit(context, entry, kill = true) }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -208,7 +233,7 @@ private fun CompanionEmulatorChoice(entry: LibraryEntry) {
     var open by remember(entry.id) { mutableStateOf(false) }
     val loaded = emulators ?: return
     if (!GameEmulatorChoice.offered(loaded)) return
-    GameButton("Emulator: ${GameEmulatorChoice.summary(loaded, choice)}") { open = !open }
+    GameActionRow("Emulator", value = GameEmulatorChoice.summary(loaded, choice)) { open = !open }
     if (!open) return
     val colors = MaterialTheme.colorScheme
     Column(modifier = Modifier.padding(start = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -248,8 +273,8 @@ private fun CompanionScreenshotRow(label: String) {
     val scope = rememberCoroutineScope()
     var shot by remember { mutableStateOf<dev.droidtop.runtime.Capture.Shot?>(null) }
     var working by remember { mutableStateOf(false) }
-    GameButton(if (working) "Taking a screenshot…" else label) {
-        if (working) return@GameButton
+    GameActionRow(label, value = if (working) "Taking…" else null) {
+        if (working) return@GameActionRow
         working = true
         scope.launch {
             val display = ForegroundShell.current()?.window?.decorView?.display?.displayId ?: android.view.Display.DEFAULT_DISPLAY
@@ -265,19 +290,73 @@ private fun CompanionScreenshotRow(label: String) {
     }
 }
 
-/** A large row button: 56dp, the label saying what it does. */
+/** How a [GameActionRow] reads: the one filled row (Resume), a plain row, or a row that ends the game. */
+private enum class RowTone { PRIMARY, PLAIN, DANGER }
+
+/**
+ * The Game page's one row (Droidtop/tracker#835 part 2): 48dp, the label on the left and its [value] on the right, so
+ * a setting reads at a glance without a second line. [tone] fills Resume and draws the ending rows in the danger tone.
+ */
 @Composable
-private fun GameButton(label: String, primary: Boolean = false, onClick: () -> Unit) {
-    CompanionTile(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+private fun GameActionRow(label: String, value: String? = null, tone: RowTone = RowTone.PLAIN, onClick: () -> Unit) {
+    CompanionTile(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
         val colors = MaterialTheme.colorScheme
+        val ink = when (tone) {
+            RowTone.PRIMARY -> colors.onPrimary
+            RowTone.DANGER -> colors.error
+            RowTone.PLAIN -> colors.onSurface
+        }
         Row(
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(min = 56.dp)
-                .background(if (primary) colors.primary else colors.surface)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .heightIn(min = 48.dp)
+                .background(if (tone == RowTone.PRIMARY) colors.primary else colors.surface)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            Text(label, style = MaterialTheme.typography.titleMedium, color = if (primary) colors.onPrimary else colors.onSurface)
+            Text(label, style = MaterialTheme.typography.titleSmall, color = ink, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            value?.let {
+                Text(it, style = MaterialTheme.typography.bodyMedium, color = if (tone == RowTone.PRIMARY) ink else colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 12.dp))
+            }
+        }
+    }
+}
+
+/** Pause the game, for a console game: RetroArch's PAUSE_TOGGLE over its command port, sent only on this press. */
+@Composable
+private fun CompanionPauseRow() {
+    val scope = rememberCoroutineScope()
+    var sent by remember { mutableStateOf(false) }
+    GameActionRow("Pause the game", value = if (sent) "Sent" else null) {
+        scope.launch {
+            withContext(Dispatchers.IO) { runCatching { dev.droidtop.pluginhost.RetroArchCommands.send("PAUSE_TOGGLE", 0) } }
+            sent = true
+        }
+    }
+}
+
+/**
+ * Mouse mode, Controls and Report a problem, for a game in droidtop's own screen that offers them (docs/SPEC.md 5b,
+ * 7e2): the rows the running game's L2 sheet has, so the companion has them too.
+ */
+@Composable
+private fun CompanionOwnScreenRows(entry: LibraryEntry) {
+    val scope = rememberCoroutineScope()
+    val ownScreen = dev.droidtop.library.OwnGameScreens.current?.takeIf { it.entryId == entry.id } ?: return
+    var padMouse by remember(entry.id) { mutableStateOf(ownScreen.padMouse) }
+    var controls by remember(entry.id) { mutableStateOf(ownScreen.controls) }
+    var reportLine by remember(entry.id) { mutableStateOf<String?>(null) }
+    padMouse?.let { on ->
+        GameActionRow("Mouse mode", value = if (on) "On" else "Off") {
+            ownScreen.setPadMouse(!on)
+            padMouse = !on
+        }
+    }
+    controls?.let { line -> GameActionRow("Controls", value = line) { controls = ownScreen.nextControls() ?: line } }
+    if (ownScreen.canReport) {
+        GameActionRow("Report a problem", value = reportLine) {
+            reportLine = "Saving…"
+            ownScreen.reportProblem { said -> scope.launch { reportLine = said } }
         }
     }
 }
