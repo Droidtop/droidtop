@@ -2106,8 +2106,10 @@ private fun SettingsSearchOverlay(
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = MenuTokens.OnSurface),
                 cursorBrush = androidx.compose.ui.graphics.SolidColor(MenuTokens.Accent),
+                // Android's keyboard only where droidtop raises one with focus (Droidtop/tracker#832).
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                     imeAction = androidx.compose.ui.text.input.ImeAction.Search,
+                    showKeyboardOnFocus = raisesKeyboardWithFocus,
                 ),
                 modifier = Modifier
                     .weight(1f)

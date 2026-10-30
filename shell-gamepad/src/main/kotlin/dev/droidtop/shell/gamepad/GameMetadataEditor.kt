@@ -277,7 +277,8 @@ private fun MetadataTextRow(
         onValueChange = onValueChange,
         label = { Text(label) },
         singleLine = !multiline,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        // Android's keyboard only where droidtop raises one with focus (Droidtop/tracker#832).
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, showKeyboardOnFocus = raisesKeyboardWithFocus),
         colors = TextFieldDefaults.colors(
             focusedTextColor = MenuTokens.OnSurface,
             unfocusedTextColor = MenuTokens.OnSurface,

@@ -992,7 +992,13 @@ internal fun LibrarySearchDialog(
                     if (changed) onTextChange(it.text)
                 },
                 singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
+                // Android's keyboard does not come up just because the field took the cursor: Compose raised it on
+                // every focus, over the Gaming screen, even where droidtop's own keyboard serves the field on the
+                // companion (Droidtop/tracker#832). The one rule every droidtop field follows (raisesKeyboardWithFocus).
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = ImeAction.Search,
+                    showKeyboardOnFocus = dev.droidtop.shell.gamepad.raisesKeyboardWithFocus,
+                ),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                     onSearch = {
                         keyboard?.hide()
