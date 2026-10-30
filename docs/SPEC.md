@@ -13854,6 +13854,17 @@ it over the screen it is on and never navigates away to reach it:
   `GameInPlace`, `JobOpener`).
 - **A Get new games result** opens the one search on its title in place, as it already did.
 
+**droidtop picks the download (2026-10-30, Droidtop/tracker#838).** The owner: "Downloads still don't auto-pick links".
+`DownloadPick.candidates` orders a record's downloads as the mirrors to try:
+- only the game itself, a `build` that is official (patches, extras and unofficial ports are offered, never taken);
+- the system droidtop runs it with first;
+- the build of the installed copy (a Steam copy takes the "Steam" build);
+- then a link droidtop serves without a page (debrid, a host's API), then the person's host order (`HostOrder`, by
+  default hosts that serve a file straight away before those that show a page), then the source's order.
+
+The one-press Get that tries them in turn, the host-order setting's screen, and the session page as a fallback with
+its reason are slice 2b; the record page's own rows stay pickable by hand.
+
 **Getting an update: the source's record page (2026-10-17).** The owner, from
 the console: "we need actual update management. the f95 plugin surfaces
 updates, but tapping on them doesn't give the link list to actually download

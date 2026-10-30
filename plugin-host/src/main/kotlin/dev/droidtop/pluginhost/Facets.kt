@@ -166,6 +166,10 @@ sealed interface FacetBody {
         val systems: List<String> = emptyList(),
         /** The pieces of one split release on one host (2026-10-29): picked together, as one Downloads job. */
         val parts: List<DownloadPart> = emptyList(),
+        /** `build` (the game), `patch` or `extra` (Droidtop/tracker#838): only a build is ever picked by droidtop itself. */
+        val role: String = "build",
+        /** False for an item the source marks unofficial (a thread's `*`). */
+        val official: Boolean = true,
     )
 
     /** One piece of a split release: an address, or a token only the plugin's `download` job understands. */
@@ -195,6 +199,7 @@ object Facets {
     private val INPUT_KINDS = setOf("text", "number", "url", "search")
     private val SHAPES = setOf("capsule", "wide", "square")
     private val DOWNLOAD_KINDS = setOf("page", "file", "torrent", "magnet")
+    private val DOWNLOAD_ROLES = setOf("build", "patch", "extra")
     private val STATUSES = setOf("ongoing", "completed", "onhold", "abandoned")
     private val NOTICE_TONES = setOf("info", "caution", "danger")
 
@@ -525,6 +530,8 @@ object Facets {
                         entryKind = e.optString("kind", "page").let { if (it in DOWNLOAD_KINDS) it else "page" },
                         systems = DownloadSystems.of(DownloadSystems.read(e.optJSONArray("systems")), section),
                         parts = parts,
+                        role = e.optString("role", "build").let { if (it in DOWNLOAD_ROLES) it else "build" },
+                        official = e.optBoolean("official", true),
                     )
                 },
             ).takeIf { it.entries.isNotEmpty() }

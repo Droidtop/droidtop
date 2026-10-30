@@ -73,7 +73,7 @@ object ItemPageFacets {
                     if (partUrl == null && p.link.isNullOrBlank()) null else UpdateSources.Download.Part(p.label, partUrl, p.link, p.size)
                 }
                 if (url == null && d.link.isNullOrBlank() && parts.isEmpty()) return@mapNotNull null
-                UpdateSources.Download(section = d.section, host = d.host, label = d.label, link = d.link.orEmpty(), url = url, systems = d.systems, parts = parts)
+                UpdateSources.Download(section = d.section, host = d.host, label = d.label, link = d.link.orEmpty(), url = url, systems = d.systems, parts = parts, role = d.role, official = d.official)
             },
             controls = controls(facets),
         )
