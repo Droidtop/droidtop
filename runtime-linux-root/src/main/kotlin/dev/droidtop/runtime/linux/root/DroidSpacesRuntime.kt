@@ -289,6 +289,33 @@ class DroidSpacesRuntime(
         check(result.succeeded) { "droidspaces start failed for ${container.id}: ${result.stderr}" }
     }
 
+    override val usageUnavailableReason: String? = null
+
+    /**
+     * A droidspaces container's processes are root's, so they are read through the root shell (Shizuku or Sui): its
+     * init's PID from droidspaces' own `pid` command, then every process in that PID namespace, twice [sampleMs]
+     * apart ([ProcUsage.namespaceScript]). Without the root shell this throws, and the row says why.
+     */
+    override suspend fun usage(container: Container, sampleMs: Long): dev.droidtop.runtime.ContainerUsage? {
+        val pid = RootProcess.run(binaryPath, "--name=${container.id}", "pid")
+        check(pid.launched) { NO_ROOT_SHELL }
+        val init = pid.stdout.trim().toIntOrNull() ?: return null
+        suspend fun sample(): List<dev.droidtop.runtime.ProcUsage.Process> {
+            val result = RootProcess.run("/system/bin/sh", "-c", dev.droidtop.runtime.ProcUsage.namespaceScript(init))
+            check(result.launched) { NO_ROOT_SHELL }
+            return dev.droidtop.runtime.ProcUsage.parse(result.stdout)
+        }
+        val first = sample()
+        if (first.isEmpty()) return null
+        val started = android.os.SystemClock.elapsedRealtime()
+        kotlinx.coroutines.delay(sampleMs)
+        val second = sample()
+        return dev.droidtop.runtime.ProcUsage.usage(
+            first, second, android.os.SystemClock.elapsedRealtime() - started,
+            dev.droidtop.runtime.ProcUsage.ticksPerSecond(), Runtime.getRuntime().availableProcessors(),
+        )
+    }
+
     override suspend fun stop(container: Container) {
         val result = RootProcess.run(binaryPath, "--name=${container.id}", "stop")
         check(result.succeeded) { "droidspaces stop failed for ${container.id}: ${result.stderr}" }
@@ -523,5 +550,6 @@ class DroidSpacesRuntime(
 
     companion object {
         private const val PRIMARY_NAME = "droidtop-primary"
+        private const val NO_ROOT_SHELL = "Reading this container's use needs Shizuku or Sui, which droidtop can't reach right now"
     }
 }

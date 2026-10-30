@@ -3345,6 +3345,24 @@ the `ContainerRuntime` interface that already exists (§3):
   - **Backend:** proot only for now, as with backup. droidspaces shows why
     on the row (`cloneUnavailableReason`); its copy and backup are their
     own queued item (Droidtop/tracker#758).
+  **Resource usage (Droidtop/tracker#757 slice 3).** A running
+  container's page has "Memory and processor" under Storage used: the
+  memory its processes hold (their resident sets, summed) and their share
+  of the whole device's processor ("512 MB · 12% of the processor"), with
+  how many processes there are. It is read from `/proc`
+  (`ContainerRuntime.usage`, `ProcUsage`): each process's CPU time twice,
+  half a second apart when the page opens and a second apart when the
+  row is pressed to measure again, so the share is the ticks used over
+  the ticks the device's cores had in that time (0 to 100). A process
+  that starts or ends between the readings adds memory but no share.
+  - **proot:** the processes are droidtop's own user, found as for Stop
+    (`ProotProcesses.ofContainer`, proot included), and read directly.
+  - **droidspaces:** the processes are root's. droidspaces' own `pid`
+    command names the container's init, and one root shell (Shizuku or
+    Sui) reads every process in that init's PID namespace. Without the
+    root shell the row says so, in place of a number.
+  - Nothing is kept: each reading is made when asked for, and a stopped
+    container has no row.
   **Names (decided 2026-09-25).** A container is called by a name the
   person chooses, never by its id (`droidtop-sibling-8993dfbd` told two
   terminals nothing, dq-desk2-01): `ContainerNames`, one file per backend

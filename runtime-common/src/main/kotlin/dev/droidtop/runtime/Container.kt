@@ -265,6 +265,21 @@ interface ContainerRuntime {
         error(cloneUnavailableReason ?: "not supported")
 
     /**
+     * Why this backend cannot tell what a running container uses; null when it can (docs/SPEC.md 3d, "Resource
+     * usage"; Droidtop/tracker#757 slice 3).
+     */
+    val usageUnavailableReason: String?
+        get() = "This kind of container can't report what it uses"
+
+    /**
+     * What [container]'s processes use now: their count and memory, and their share of the processor over
+     * [sampleMs] (two readings that far apart). Null when it is not running. Disk and, for some backends, a root
+     * shell: never on the main thread.
+     */
+    suspend fun usage(container: Container, sampleMs: Long = USAGE_SAMPLE_MS): ContainerUsage? =
+        error(usageUnavailableReason ?: "not supported")
+
+    /**
      * How [container]'s image says its own program runs (Entrypoint, Cmd, Env, WorkingDir, User), kept from
      * when it was created (docs/SPEC.md 3, "The image's own program"); null for a container made before this
      * was kept, or a backend that does not keep it.
