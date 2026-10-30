@@ -34,7 +34,6 @@ class LeftMenuTest {
             listOf(
                 GamingSection.HOME, GamingSection.PC_GAMES, GamingSection.GAMES, GamingSection.APPS,
                 GamingSection.DOWNLOADS,
-                GamingSection.UPDATES,
                 GamingSection.SETTINGS,
             ),
             menuSectionsFor(UiMode.FULL),
