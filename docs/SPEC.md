@@ -8111,7 +8111,15 @@ Droidtop/tracker#386): it was one logical pixel per 1/200 inch of the
 physical density (xdpi); the console's panel is 319 dpi, not the 400 first
 assumed, so that gave 1.5x, and Linux text was still too small to read.
 Physical density takes no account of how close a handheld is held;
-Android's density does. The viewport sends it with every size. A change
+Android's density does. **One source (2026-10-30, the AVD rig on
+Droidtop/tracker#386):** the density is that of the screen the desktop's
+own surface is on (`view.display`), not the activity's resources or the
+screen Settings is on. On the dual-screen rig the desktop drew at 2.75x
+(420 dpi) while Settings, on the other screen, read "Automatic (1.75x)",
+and coming back from Settings re-sized the desktop to 1.75x. The desktop
+records the density it uses (`DesktopPrefs.screenDpi`) and Settings'
+"Automatic (...)" names the scale for that, so both say the same.
+The viewport sends it with every size. A change
 applies at once to the desktop already showing: the shell follows Desktop
 mode's settings (`DesktopPrefs.changes`, read off the main thread, the one
 definition of their keys, which the settings rows write too) and sends the

@@ -404,12 +404,14 @@ object DroidtopWideSettings {
 
     /**
      * How large the Linux desktop draws (dev.droidtop.runtime.DesktopScale,
-     * Droidtop/tracker#386). Automatic names the scale it works out for this
-     * screen; the desktop takes a change the next time it is shown.
+     * Droidtop/tracker#386). Automatic names the scale it works out for the
+     * desktop's own screen; the desktop takes a change at once.
      */
     private fun desktopScaleChoice(context: Context): ChoiceItem {
-        val metrics = context.resources.displayMetrics
-        val automatic = dev.droidtop.runtime.DesktopScale.automatic(metrics.densityDpi)
+        // The desktop's own screen, as the desktop recorded it (Droidtop/tracker#386): Settings may be on another
+        // screen, whose density would name a scale the desktop does not use.
+        val dpi = dev.droidtop.library.settings.DesktopPrefs.screenDpi(context) ?: context.resources.displayMetrics.densityDpi
+        val automatic = dev.droidtop.runtime.DesktopScale.automatic(dpi)
         return ChoiceItem(
             id = dev.droidtop.runtime.DesktopScale.KEY,
             title = "Desktop scale",
