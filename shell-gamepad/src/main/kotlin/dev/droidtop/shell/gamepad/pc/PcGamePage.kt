@@ -796,6 +796,14 @@ internal fun PcGamePage(
                                             row = index
                                             fact.onActivate?.invoke()
                                         },
+                                        // A copy's Options, Select's on a pad, is a long press by touch (Droidtop/tracker#839).
+                                        onLongClick = fact.onOptions?.let { options ->
+                                            {
+                                                zone = PageZone.CONTENT
+                                                row = index
+                                                options()
+                                            }
+                                        },
                                     )
                                 }
                             }

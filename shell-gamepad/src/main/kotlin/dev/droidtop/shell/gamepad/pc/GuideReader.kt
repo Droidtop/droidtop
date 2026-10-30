@@ -394,7 +394,9 @@ private val READER_HINTS = listOf(
     HintBinding(GamepadAction.B, "Close"),
 )
 
+// Back a page as well as on: each pill is a tap, and a person with no pad must be able to go back (Droidtop/tracker#839).
 private val PDF_HINTS = listOf(
+    HintBinding(GamepadAction.LEFT, "Back a page"),
     HintBinding(GamepadAction.RIGHT, "Page"),
     HintBinding(GamepadAction.Y, "Mark"),
     HintBinding(GamepadAction.X, "Next mark"),
