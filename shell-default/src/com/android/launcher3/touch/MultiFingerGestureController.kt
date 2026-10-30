@@ -58,11 +58,7 @@ class MultiFingerGestureController(private val mLauncher: Launcher) : TouchContr
         return false
     }
 
-    override fun onControllerTouchEvent(ev: MotionEvent): Boolean {
-        // After the action ran, consume until the gesture ends.
-        val action = ev.actionMasked
-        return action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL
-    }
+    override fun onControllerTouchEvent(ev: MotionEvent): Boolean = consumeUntilGestureEnds(ev)
 
     private fun canIntercept(ev: MotionEvent) = !MotionEventsUtils.isTrackpadScroll(ev) &&
             mLauncher.isInState(LauncherState.NORMAL) &&
@@ -82,3 +78,7 @@ class MultiFingerGestureController(private val mLauncher: Launcher) : TouchContr
         )
     }
 }
+
+/** A gesture slot's controller after its action ran: the rest of the gesture is its own, until the finger lifts. */
+internal fun consumeUntilGestureEnds(ev: MotionEvent): Boolean =
+    ev.actionMasked != MotionEvent.ACTION_UP && ev.actionMasked != MotionEvent.ACTION_CANCEL
