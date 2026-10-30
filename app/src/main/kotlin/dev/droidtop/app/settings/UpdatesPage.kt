@@ -185,12 +185,13 @@ object UpdatesPage {
     )
 
     /**
-     * Where the rows come from. The quick ones (droidtop's own build, the library's games) are read each time the rows
-     * are; the slow ones (the plugin catalogs, the package manager's apps) are read in the background and kept, so the
-     * page shows at once and a slow section fills in its own rows when it is ready (Droidtop/tracker#748).
+     * Where the rows come from. The quick ones (droidtop's own build, the plugins, the library's games) are read each
+     * time the rows are; the slow one (the package manager's apps) is read in the background and kept, so the page shows
+     * at once and it fills in its own rows when it is ready (Droidtop/tracker#748). Plugins are read the way Settings >
+     * Plugins reads them, from the catalogs on file each time: a kept copy missed updates the Plugins list showed
+     * (Droidtop/tracker#837).
      */
     private enum class Section(val kind: Kind, val checking: String) {
-        PLUGINS(Kind.PLUGINS, "Checking your plugins"),
         APPS(Kind.APPS, "Checking your apps"),
     }
 
@@ -213,11 +214,13 @@ object UpdatesPage {
         val app = context.applicationContext
         scope.launch {
             try {
+                // Stamped when the read starts: a check that ends while it runs leaves the kept rows older than the
+                // check, so the next look reads them again.
+                val startedAt = System.currentTimeMillis()
                 val found = when (section) {
-                    Section.PLUGINS -> plugins(app)
                     Section.APPS -> apps(app)
                 }
-                kept[section] = System.currentTimeMillis() to found
+                kept[section] = startedAt to found
             } catch (e: Exception) {
                 android.util.Log.w("droidtop.Updates", "reading ${section.name.lowercase()} failed: ${e.message}")
             } finally {
@@ -257,7 +260,7 @@ object UpdatesPage {
         // A section read before the last check ended is read again: the check fetched newer catalogs.
         Section.entries.forEach { refresh(context, it, force = (kept[it]?.first ?: 0L) < checkedAt) }
         val slow = Section.entries.associateWith { kept[it]?.second }
-        val updates = droidtop(context) + slow[Section.PLUGINS].orEmpty() + slow[Section.APPS].orEmpty() + games(context)
+        val updates = droidtop(context) + plugins(context) + slow[Section.APPS].orEmpty() + games(context)
         return updates to Section.entries.filter { slow[it] == null }
     }
 
@@ -383,7 +386,7 @@ object UpdatesPage {
                 sizeBytes = offer.release.bundle.size,
                 from = if (offer.source.official) "droidtop's catalog" else "${offer.source.name}, unofficial",
                 iconFile = PluginStore.iconFile(context, record),
-                install = tracked(id, Section.PLUGINS) { ctx, onStatus ->
+                install = tracked(id, null) { ctx, onStatus ->
                     val outcome = PluginCatalog.installOutcome(ctx, offer.plugin, offer.release) { status -> onStatus("${record.manifest.label}: $status") }
                     Done("${record.manifest.label}: ${outcome.line}", outcome.installed)
                 },

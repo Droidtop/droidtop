@@ -19245,9 +19245,11 @@ menu still list every `listed` place.
     whole run ended, and the page took about 10 s to show anything. Now the screen is live (`CatalogScreen.live`): a
     row whose update is running says Updating with the moving bar (#738), and the moment its update returns its kind
     is read again, so the row goes or says what is left; Update all is those same updates, one after another, so each
-    row changes on its own. The slow kinds (plugins from the catalogs, apps from the package manager) are read in the
-    background and kept for 30 s: the page draws at once from what is known, and a kind not read yet is one loading
-    row of its own ("Checking your plugins") until its rows fill in. Check now reads every kind again when it ends.
+    row changes on its own. The slow kind (apps from the package manager) is read in the background and kept for 30 s:
+    the page draws at once from what is known, and until it is read it is one loading row of its own ("Checking your
+    apps"). Check now reads every kind again when it ends. Plugins are read each time the rows are, from the catalogs
+    on file, exactly as Settings > Plugins reads them: a kept copy showed none while the Plugins list had updates
+    waiting, which the owner then installed from there (#837). One source, so the two lists never disagree.
   - **Update settings**: how often droidtop checks, only on unmetered networks, the build channel, debug builds, and
     Update apps without asking (on by default; the owner's setting of 2026-10-01: it only matters where Android or a
     privilege allows a silent install), after the jobs. Get apps and Get new games are Downloads and Updates' Get games
