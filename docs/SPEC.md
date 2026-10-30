@@ -3969,7 +3969,7 @@ the `ContainerRuntime` interface that already exists (§3):
   with the level or when the ledger forgets the game. It rides droidtop's accessibility overlay when that
   service is on (no grant, as the keyboard overlay does, "Typing on the add-on display") and otherwise an application overlay, which
   needs "Display over other apps": with neither, the Overlay row's value reads "Needs display over apps"
-  and A opens that grant's screen (the permission table under "Access", Droidtop/tracker#830, lists it).
+  and A opens that grant's screen (the permission table under "Permissions", Droidtop/tracker#830, lists it).
   **Where each figure comes from, and what a normal app cannot read.** Nothing Android gives an unprivileged
   app reports another app's frames: Choreographer, FrameMetrics and `dumpsys gfxinfo` see only a process's
   own HWUI windows, and a game draws into a SurfaceView or its own GL surface. The most reliable source is
@@ -10013,7 +10013,7 @@ not allow it, reading or writing failed). Code that already knows the words a pe
 screen (the owner's review, 2026-10-16: "raw exception text → plain sentences, with the throwable logged").
 A sentence that describes a consequence belongs where the consequence is chosen.
 
-### Access: what droidtop and its plugins may do (Droidtop/tracker#830; proposed, for the owner)
+### Permissions: what droidtop and its plugins may do (Droidtop/tracker#830)
 
 The owner, 2026-10-30: "We also need a better system than the 'needs something' UI", and, on how: "we want to look
 at Android's permissions UI as a whole as an example of how to do it well". This section is droidtop's equivalent of
@@ -10030,6 +10030,12 @@ one way to fix in place and one page. Owner decisions so far:
 - **Hints may cover risky choices**, saying the risk plainly; a risky choice is never the default or the focused one.
 - **Removing unused grants can be turned off**, globally and per plugin, and never interrupts: "We want to be
   unobtrusive".
+- **The page is Permissions, for everything** (2026-10-30): "It'll control everything, droidtop internal, companion,
+  plugins, and etc included. We want to make our UI consistent". Every other permission screen or row becomes a link
+  into it, or is deleted.
+- **Don't allow refuses once; "Don't ask again" is its own checkbox** ("A separate checkbox for 'don't ask again'").
+- **Unused is a setting**, 30 days without a call by default ("configurable, defaulting to 30 days with no calls").
+- **Recent use covers 7 days.**
 
 How Android does each part, and droidtop's equivalent:
 
@@ -10045,8 +10051,10 @@ How Android does each part, and droidtop's equivalent:
   always acts; droidtop never toggles anything on its own.
 - **A plugin's permissions:** the sheet asks "Allow <Plugin> to <do this>?", then the plugin's own reason quoted as
   the plugin's ("F95zone says: …"), then the risk in the Danger tone when the permission is dangerous or critical,
-  with Info (Y) for the exact permission. Choices: **Allow**, **Don't allow**; B is Not now. As today (plugin-api
-  §4.3), a call from the background never asks: it fails, and the plugin's row says what it wanted.
+  with Info (Y) for the exact permission. Choices: **Allow**, **Don't allow**, and a separate unticked checkbox
+  **Don't ask again**. Don't allow refuses this call only; with the checkbox ticked it sticks (the permission becomes
+  Don't allow on the plugin's page, and droidtop stops asking until the person changes it there). B is Not now. As
+  today (plugin-api §4.3), a call from the background never asks: it fails, and the plugin's row says what it wanted.
 - **Approval at install stays the tick list** (plugin-api §4.3, "Approval is a list"): consent to everything a plugin
   declares, one line per item, the risky ones unticked.
 
@@ -10058,7 +10066,7 @@ How Android does each part, and droidtop's equivalent:
   choices **Allow**, **Ask every time**, **Don't allow**, its recent use (§4 below) and the exact terms in Info.
   What the plugin adds to droidtop's screens (its extension points) is a third group, **Adds**, with the same
   choices where an extension point can be turned off. At the foot: **Remove access if unused** (§5).
-- **droidtop's own** page is the Allowed tab of the one page (§6), sorted the same way.
+- **droidtop's own** page is the Allowed tab of Permissions (§6), sorted the same way.
 
 **3. Every holder of one permission** (Android: Permission manager).
 - On the Allowed tab, **By permission** lists every permission group (plugin-api §4.1) and droidtop's own grants,
@@ -10074,7 +10082,8 @@ How Android does each part, and droidtop's equivalent:
 - Nothing about recent use is a pop-up or a notification.
 
 **5. Removing access from plugins that go unused** (Android: "Remove permissions if app isn't used").
-- A plugin droidtop has not called for 90 days (no call of any kind, user-started or background) has its dangerous
+- A plugin droidtop has not called for the set time (no call of any kind, user-started or background; **30 days** by
+  default, set under Permissions) has its dangerous
   and critical grants set back to **Ask every time**. Normal permissions, extension points and the approval itself
   are left alone, so nothing stops working that the person did not use.
 - **On by default; can be turned off** in Settings for all plugins, and per plugin at the foot of its Permissions
@@ -10085,7 +10094,8 @@ How Android does each part, and droidtop's equivalent:
 - droidtop's own grants are Android's to remove (Android's own unused-app reset); when Android does, the feature's
   row asks again the next time it is opened, as now.
 
-**6. The one page** (the proposal's "Needs attention", one place for both kinds of grant).
+**6. The one page: Permissions** (every grant: droidtop's own, the companion's and every plugin's). Every other
+permission screen or row is a link into it or is deleted; the Home card still reads "3 things need attention".
 - **To do:** everything something the person turned on, pinned, installed or tried cannot work without, grouped by
   what it blocks, most blocking first: one row each with the status glyph, the name, what does not work, and one verb
   as the value. A runs the fix in place (§1). Below, **Suggestions** (chores such as missing artwork), not counted.

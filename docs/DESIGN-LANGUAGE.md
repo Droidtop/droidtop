@@ -57,7 +57,7 @@ what it learned last.
 - Never tell a person to do something they cannot do from where they are: give them the action.
 - Acknowledgements are past tense with no period ("Saved", "Copied").
 - Something missing is said as what does not work yet ("Brightness can't change yet"), never "Needs …" and never a
-  permission's name; a granted one is a noun ("Your game folders"); the exact name is in Info (SPEC "Access",
+  permission's name; a granted one is a noun ("Your game folders"); the exact name is in Info (SPEC "Permissions",
   Droidtop/tracker#830).
 
 ## System integration
