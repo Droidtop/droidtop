@@ -8629,8 +8629,17 @@ key code or an edge.
   droidtop's own chrome (menus, settings, sheets, pickers, grids) uses
   ES-DE's MEDIUM tiers: half a second before the first repeat, then every
   180 ms, then every 80 ms after 1.6 s, so a long list runs smoothly and a
-  tap is never two steps. A themed ES-DE list uses ES-DE's own default,
-  QUICK (500 ms, then 114 ms, then every frame).
+  tap is never two steps. A themed ES-DE textlist or grid uses ES-DE's own
+  default, QUICK (500 ms, then 114 ms, then every frame). A themed carousel
+  uses what ES-DE builds a carousel with, SLOW (500 ms, then every 200 ms),
+  or MEDIUM when the theme sets `fastScrolling` (CarouselComponent.h:225,
+  :1765), so a held run never outpaces its camera (Droidtop/tracker#782).
+  The carousel's camera follows ES-DE's `onCursorChanged`: every move
+  restarts a 400 ms ease-out from where the camera is; the release after a
+  held run restarts it once over what is left (200 to 400 ms,
+  `esDeCarouselAnimMs`); and the selected colours are drawn on the cursor's
+  entry only once the camera is within one entry of it
+  (CarouselComponent.h:1233), so outline and zoom arrive together.
 - **Menus never wrap.** Real ES-DE's menus are `LIST_NEVER_LOOP`
   (`ComponentList.cpp:17`): the cursor stops at both ends, held or not, so
   a held direction can never spin round a menu (`menuStep`). A themed

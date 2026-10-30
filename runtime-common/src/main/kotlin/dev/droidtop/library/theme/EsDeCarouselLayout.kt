@@ -138,6 +138,23 @@ data class EsDeCarouselConfig(
     val letterCaseCustomCollections: EsDeLetterCase = EsDeLetterCase.UNDEFINED,
 )
 
+
+/**
+ * How long a carousel's camera takes to reach the cursor, ES-DE's own rule (CarouselComponent::onCursorChanged,
+ * Droidtop/tracker#782): 400 ms, unless the cursor is moving by the pad ([scrollVelocity] is the held direction, 1
+ * or -1) and the camera does not start a whole item away. Then it is the distance left times 1.5 of 400 ms,
+ * clamped to 200 to 400. A press made mid-flight is more than one item away and takes the full 400 ms; the release
+ * after a held run restarts the camera over what is left, so it settles in a short slide. Pure.
+ */
+fun esDeCarouselAnimMs(startPos: Float, endPos: Float, scrollVelocity: Int): Int {
+    val timeDiff = when (scrollVelocity) {
+        1 -> endPos - startPos
+        -1 -> startPos - endPos
+        else -> 1f
+    }
+    if (timeDiff == 1f) return 400
+    return kotlin.math.abs(timeDiff * 1.5f * 400f).coerceIn(200f, 400f).toInt()
+}
 /**
  * Where one carousel item lands, in the carousel's own pixel space.
  *
