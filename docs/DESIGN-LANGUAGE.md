@@ -135,7 +135,10 @@ the 1080p DP screen alike): rail tabs 48dp square, all eleven sections in the ra
 heading Title 24 in a 48dp row; rows at least 48dp. A press target is a finger's size (0.3 inch, about 80dp of the
 console's canvas) only where touch comes first: a phone, the companion held upright. One rule decides it,
 ShellWindow.pressTarget; a screen never reads the finger size itself. A pane inside a window (the Quick Menu's
-catalog tabs) keeps that window's input (ShellWindow.pane): a narrow pane is not a phone held upright.
+catalog tabs) keeps that window's input (ShellWindow.pane): a narrow pane is not a phone held upright. In a pane a
+one-line row is its press target and no taller (12dp above and below a 24dp title, where a full screen's 14dp made
+about 52dp), and a section label is 11sp on a hairline, 10dp above it rather than 18dp (DroidDeck's compact settings
+rows, #363; ShellWindow.inPane).
 
 One sans family (a theme may supply its fonts); tabular figures wherever numbers change; at most two lines in a row,
 then an ellipsis. Focus has two styles, never mixed on one surface: art gets a 3 dp accent ring and a 6% lift; a row

@@ -127,4 +127,15 @@ class ShellWindowTest {
         // A phone's pane stays touch-first.
         assertTrue(ShellWindow(widthDp = 411, heightDp = 731).pane(300).touchFirst)
     }
+
+    @Test
+    fun `a pane's one-line rows are its press target, and a full screen keeps its roomier rows`() {
+        // DroidDeck's compact settings rows (Droidtop/tracker#363): a bodyLarge title is 24dp, so 12dp each side is 48dp.
+        val console = ShellWindow(widthDp = 1280, heightDp = 720, padPresent = true, minTouchTarget = consoleFinger)
+        val pane = console.pane(376)
+        assertTrue(pane.inPane)
+        assertEquals(Measure.padTarget, 24.dp + pane.rowVerticalPadding * 2)
+        assertFalse(console.inPane)
+        assertEquals(MenuTokens.RowVerticalPadding, console.rowVerticalPadding)
+    }
 }

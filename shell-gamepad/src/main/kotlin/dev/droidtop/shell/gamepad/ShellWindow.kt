@@ -70,6 +70,16 @@ data class ShellWindow(
      */
     val pressTarget: Dp get() = if (touchFirst) minTouchTarget else Measure.padTarget
 
+    /**
+     * A pane of a larger window ([pane]): the Quick Menu's catalog tabs. Its rows and section labels are compact
+     * (DroidDeck's compact settings rows, Droidtop/tracker#363): a one-line row is [pressTarget] tall and no taller, and
+     * a section label sits closer above its rows on a hairline.
+     */
+    val inPane: Boolean get() = paneTouchFirst != null
+
+    /** A row's padding above and below its text: tighter in a pane ([inPane]), so a one-line row is its press target. */
+    val rowVerticalPadding: Dp get() = if (inPane) MenuTokens.PaneRowVerticalPadding else MenuTokens.RowVerticalPadding
+
     val widthClass: ShellWidthClass
         get() = when {
             widthDp < 600 -> ShellWidthClass.COMPACT

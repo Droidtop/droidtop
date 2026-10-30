@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.gestures.animateScrollBy
 import dev.droidtop.ui.shared.Motion
 import dev.droidtop.ui.shared.tabularFigures
@@ -394,6 +395,20 @@ internal fun MenuHeader(title: String, subtitle: String? = null, modifier: Modif
 /** A group label: a real section marker, not another grey title competing with the rows. */
 @Composable
 internal fun MenuSectionLabel(text: String, modifier: Modifier = Modifier) {
+    // In a pane (the Quick Menu's tabs) a label sits on a hairline, closer to its rows and a step smaller
+    // (DroidDeck's compact SettingsGroup, Droidtop/tracker#363): the pane holds more rows.
+    if (LocalShellWindow.current.inPane) {
+        Column(modifier.padding(top = 10.dp, bottom = 4.dp)) {
+            Box(Modifier.fillMaxWidth().height(1.dp).background(MenuTokens.SectionLabel.copy(alpha = 0.3f)))
+            Text(
+                text.labelCase(),
+                color = MenuTokens.SectionLabel,
+                style = TypeRole.sectionLabel.copy(fontSize = 11.sp),
+                modifier = Modifier.padding(top = 6.dp, start = 4.dp),
+            )
+        }
+        return
+    }
     Text(
         text.labelCase(),
         color = MenuTokens.SectionLabel,
@@ -551,7 +566,7 @@ internal fun MenuRow(
                     else -> Modifier
                 },
             )
-            .padding(horizontal = 16.dp, vertical = MenuTokens.RowVerticalPadding),
+            .padding(horizontal = 16.dp, vertical = window.rowVerticalPadding),
     ) {
         if (accent != null) {
             Box(
@@ -1257,11 +1272,12 @@ internal val LocalValueColumnWidth = androidx.compose.runtime.compositionLocalOf
 @Composable
 internal fun uniformRowHeight(summaryLines: Int = 2): androidx.compose.ui.unit.Dp {
     val density = androidx.compose.ui.platform.LocalDensity.current
+    val padding = LocalShellWindow.current.rowVerticalPadding
     val title = MaterialTheme.typography.bodyLarge
     val summary = MaterialTheme.typography.bodySmall
     return with(density) {
         fun line(style: androidx.compose.ui.text.TextStyle) =
             (if (style.lineHeight.isSpecified) style.lineHeight else style.fontSize * 1.4f).toDp()
-        maxOf(MenuTokens.ListRowMinHeight, line(title) + line(summary) * summaryLines + MenuTokens.RowVerticalPadding * 2)
+        maxOf(MenuTokens.ListRowMinHeight, line(title) + line(summary) * summaryLines + padding * 2)
     }
 }

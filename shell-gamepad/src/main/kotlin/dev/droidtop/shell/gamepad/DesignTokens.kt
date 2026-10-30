@@ -633,6 +633,12 @@ object MenuTokens {
     /** Generous vertical padding inside a row (owner, tracker#154). */
     val RowVerticalPadding = 14.dp
 
+    /**
+     * A row's vertical padding in a pane (ShellWindow.inPane, Droidtop/tracker#363): a one-line title (bodyLarge, 24dp)
+     * and 12dp each side make the 48dp press target, where [RowVerticalPadding] made about 52dp.
+     */
+    val PaneRowVerticalPadding = 12.dp
+
     /** A row's value wraps to this many lines inside [ValueColumnMaxWidth]. */
     const val ValueMaxLines = 3
 
