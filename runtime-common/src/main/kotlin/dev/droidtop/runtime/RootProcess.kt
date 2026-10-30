@@ -161,6 +161,14 @@ object RootProcess {
     suspend fun run(vararg args: String, stdin: ((OutputStream) -> Unit)? = null): RootProcessResult =
         run(TaskManager.shell, args.toList(), stdin)
 
+    /**
+     * Starts [args] as root and hands back the process itself, for a caller that streams its input or output (a
+     * container's backup through tar, Droidtop/tracker#758) rather than collecting it; null with no helper that can
+     * start a process. The caller reads, writes and waits; it must not leave the process running.
+     */
+    suspend fun spawn(vararg args: String): Process? =
+        withContext(Dispatchers.IO) { runCatching { TaskManager.shell.spawn(args.toList()) }.getOrNull() }
+
     internal suspend fun run(shell: PrivilegedShell, argv: List<String>, stdin: ((OutputStream) -> Unit)?): RootProcessResult {
         if (argv.isEmpty()) return RootProcessResult(ProcessRunner.NOT_LAUNCHED, "", "no command to run")
         val process = withContext(Dispatchers.IO) { runCatching { shell.spawn(argv) }.getOrNull() }

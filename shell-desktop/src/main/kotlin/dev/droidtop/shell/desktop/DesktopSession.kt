@@ -187,9 +187,13 @@ internal fun BoxScope.DesktopViewport(
         // here, so a change made while the desktop shows applies at once, not at the next surface change.
         val currentPrefs by rememberUpdatedState(prefs)
         var surfaceSize by remember(hostBridge) { mutableStateOf<Pair<Int, Int>?>(null) }
+        // The density of the screen the desktop's surface is on (Droidtop/tracker#386): the one source the scale is
+        // worked out from, here and in Settings, rather than whichever screen the activity or Settings is on.
+        var surfaceDpi by remember(hostBridge) { mutableStateOf<Int?>(null) }
+        val scope = rememberCoroutineScope()
         fun applySize(width: Int, height: Int) {
-            val metrics = context.resources.displayMetrics
-            val scale = DesktopScale.resolve(currentPrefs.scale, metrics.densityDpi)
+            val dpi = surfaceDpi ?: context.resources.displayMetrics.densityDpi
+            val scale = DesktopScale.resolve(currentPrefs.scale, dpi)
             // Below full resolution the output is asked for fewer pixels than the view
             // has and SurfaceFlinger scales the buffer up (Droidtop/tracker#426); the
             // scale shrinks with it so the layout keeps its size.
@@ -237,6 +241,9 @@ internal fun BoxScope.DesktopViewport(
                             height: Int,
                         ) {
                             surfaceSize = width to height
+                            surfaceDpi = screenDpi(this@apply)?.also { dpi ->
+                                scope.launch(Dispatchers.IO) { DesktopPrefs.setScreenDpi(context.applicationContext, dpi) }
+                            }
                             applySize(width, height)
                         }
 
@@ -390,6 +397,13 @@ internal fun openAndroidApp(context: Context, app: RunningApp) {
     }
 }
 
+/** Brings one of droidtop's own screens back to the front, and says so when Android no longer has it. */
+internal fun openOwnScreen(context: Context, screen: dev.droidtop.runtime.tasks.OwnScreen) {
+    if (!dev.droidtop.runtime.tasks.OwnScreens.bringToFront(context, screen)) {
+        dev.droidtop.library.settings.Notices.flash("${screen.title} is no longer open", context = context)
+    }
+}
+
 /** Closes through the task manager's strongest path and says so only when that did not end it. */
 internal suspend fun closeAndroidApp(context: Context, app: RunningApp) {
     val outcome = TaskManager.close(context, app.packageName)
@@ -399,4 +413,13 @@ internal suspend fun closeAndroidApp(context: Context, app: RunningApp) {
 /** The desktop's surface, for the bar's Keyboard button (Droidtop/tracker#685). Main thread. */
 internal object DesktopKeyboardTarget {
     var surface: java.lang.ref.WeakReference<dev.droidtop.input.DesktopSurfaceView>? = null
+}
+
+/** Android's density for the screen [view] is on, or null before it is attached to one (Droidtop/tracker#386). */
+@Suppress("DEPRECATION")
+private fun screenDpi(view: android.view.View): Int? {
+    val display = view.display ?: return null
+    val metrics = android.util.DisplayMetrics()
+    display.getRealMetrics(metrics)
+    return metrics.densityDpi.takeIf { it > 0 }
 }

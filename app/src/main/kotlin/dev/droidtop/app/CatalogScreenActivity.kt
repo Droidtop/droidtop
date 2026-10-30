@@ -75,6 +75,11 @@ class CatalogScreenActivity : AppCompatActivity() {
             finish()
             return
         }
+        // On Desktop's bar while it is open (Droidtop/tracker#750): droidtop is otherwise left out of the running list.
+        @Suppress("DEPRECATION")
+        dev.droidtop.runtime.tasks.OwnScreens.opened(
+            dev.droidtop.runtime.tasks.OwnScreen(taskId, screen.title, windowManager.defaultDisplay.displayId),
+        )
         setContent {
             val session by DesktopSessionService.state.collectAsState()
             dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
@@ -108,6 +113,11 @@ class CatalogScreenActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         resumed++
+    }
+
+    override fun onDestroy() {
+        if (!isChangingConfigurations) dev.droidtop.runtime.tasks.OwnScreens.closed(taskId)
+        super.onDestroy()
     }
 
     /** Every way out (B at the root, Back, a refused place) goes back to where the person came from. */

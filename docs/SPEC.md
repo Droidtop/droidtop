@@ -482,6 +482,16 @@ OUT from there". So Desktop's chrome is Gaming's own pieces handed outward, not 
   only while Desktop shows). An entry wears the app's icon; a tap opens it where it runs (`TaskActions.bringTo`),
   a long press, or X in the sheet, closes it by the task manager's strongest path and says so only when that
   could not end it. Without Shizuku the list holds the apps droidtop opened itself, as everywhere else.
+- **droidtop's own screens are in the bar too** (Droidtop/tracker#750, rig 2638). The task manager leaves
+  droidtop out of its list, so Settings, a place or the container manager opened from Desktop (each a
+  `CatalogScreenActivity` in a task of its own) is listed from `OwnScreens`, which each such screen joins while it
+  exists: droidtop's icon and the screen's name, a tap brings its task to the front, a long press or X in the
+  windows sheet ends the task. Those screens are no longer excluded from recents: Android removes a hidden task as
+  soon as another one comes to the front, so Settings was gone after one HOME.
+- **A narrow bar gives the windows a strip of their own** (Droidtop/tracker#750, rig 2638). The window list is the
+  bar's one weighted slot, so on a 411 dp phone screen the buttons and tray took the whole width and no window,
+  Android app or droidtop screen could show. Below 600 dp (`BAR_ONE_ROW_MIN`) the pins and the window list sit in
+  a second row on the screen side of the buttons, shown only while there is something in it.
 - **The Start menu reaches the bar's buttons.** A System section (Terminal while a session runs, Containers,
   Modes, Settings) is the bar's own four buttons as rows, so a pad with no way to the bar can still open
   Settings or the mode switcher and then give the pad back to the container by closing the sheet.
@@ -3336,8 +3346,14 @@ the `ContainerRuntime` interface that already exists (§3):
   and only then swaps it in, so a bad or truncated archive leaves the
   container as it was. It replaces the container's files whole; the
   container's own settings (name, sockets, mounts, provisioning plan) live
-  outside the rootfs and stay. Proot backend only: the droidspaces rootfs is
-  an image mounted as root, which shows "not available here". Scheduled or
+  outside the rootfs and stay. On droidspaces (Droidtop/tracker#758) the
+  tree is root's, so the same toybox `tar` runs through the root shell
+  (Shizuku or Sui, `RootArchive`, streamed through `RootProcess.spawn`):
+  the container is stopped first, sockets found with a root `find -type s`
+  are left out, and owners and modes come back as they were on restore,
+  which unpacks beside the tree, checks for `/etc` and `/usr`, and swaps it
+  in with the old tree put back if the swap fails. Without the root shell
+  the row says so. Scheduled or
   incremental backups are later, once the manual path is proven.
   **Copy (Droidtop/tracker#757, #750 part 1).** A sibling's page has a Copy
   group: a Name, defaulting to "<name> copy" and numbered when that is taken
@@ -3358,9 +3374,12 @@ the `ContainerRuntime` interface that already exists (§3):
     copy is always a sibling: everything installed in the desktop, run as
     a container of its own, never a second desktop. Its role is set to
     sibling and the provisioning plan stays with the original.
-  - **Backend:** proot only for now, as with backup. droidspaces shows why
-    on the row (`cloneUnavailableReason`); its copy and backup are their
-    own queued item (Droidtop/tracker#758).
+  - **droidspaces (Droidtop/tracker#758):** the tree is copied as root with
+    `cp -a` (owners, modes, links and special files kept), with the same
+    settings files (image, run settings, home and folders, sockets,
+    devices); a copy of the desktop's own gets a sibling's init, and its
+    provisioning plan stays with the original. A failed copy is deleted
+    whole, through the same guarded root delete as Delete (`RootfsDelete`).
   **What it can reach (Droidtop/tracker#787 slice 1, #750 part 2).** A
   container's page opens with "What it can reach", one line a kind, in
   plain words: Files (its home: its own, the shared home folder or the
@@ -8113,7 +8132,15 @@ Droidtop/tracker#386): it was one logical pixel per 1/200 inch of the
 physical density (xdpi); the console's panel is 319 dpi, not the 400 first
 assumed, so that gave 1.5x, and Linux text was still too small to read.
 Physical density takes no account of how close a handheld is held;
-Android's density does. The viewport sends it with every size. A change
+Android's density does. **One source (2026-10-30, the AVD rig on
+Droidtop/tracker#386):** the density is that of the screen the desktop's
+own surface is on (`view.display`), not the activity's resources or the
+screen Settings is on. On the dual-screen rig the desktop drew at 2.75x
+(420 dpi) while Settings, on the other screen, read "Automatic (1.75x)",
+and coming back from Settings re-sized the desktop to 1.75x. The desktop
+records the density it uses (`DesktopPrefs.screenDpi`) and Settings'
+"Automatic (...)" names the scale for that, so both say the same.
+The viewport sends it with every size. A change
 applies at once to the desktop already showing: the shell follows Desktop
 mode's settings (`DesktopPrefs.changes`, read off the main thread, the one
 definition of their keys, which the settings rows write too) and sends the
@@ -8144,7 +8171,10 @@ forever, and stopping a capture from the UI thread raced the frame
 callback still drawing with it. Capture uses `copy_with_damage` (screencopy
 v2+), so the compositor holds each frame until something on the output
 changed and an idle desktop costs nothing; a buffer is reallocated when the
-frame's geometry changes, not just its byte count.
+frame's geometry changes, not just its byte count. The first copy into a
+newly presented surface is a plain `copy`: an idle desktop has no damage to
+wait for, so a surface presented again (back from an Android app) stayed
+black until the first touch (Droidtop/tracker#386, AVD rig 2026-10-30).
 
 **Keys.** Android keycodes are translated to Linux evdev codes and injected
 raw. There is no second layout table: the layout is entirely the XKB keymap

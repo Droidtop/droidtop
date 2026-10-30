@@ -402,6 +402,84 @@ class DroidSpacesRuntime(
 
     private fun shellQuote(value: String): String = "'" + value.replace("'", "'\\''") + "'"
 
+    override val dataBackupUnavailableReason: String? = null
+
+    /**
+     * The container's whole tree as a tar archive, written as root (docs/SPEC.md 3d "Backup"; Droidtop/tracker#758):
+     * it is stopped first, as on proot, so nothing changes under tar.
+     */
+    override suspend fun exportData(container: Container, out: java.io.OutputStream) {
+        RootProcess.run(binaryPath, "--name=${container.id}", "stop")
+        RootArchive.export(container.rootfsPath, out)
+    }
+
+    /**
+     * Replaces the container's tree with the archive on [input], as proot's restore does: unpacked beside it first,
+     * checked to be a container's filesystem, then swapped in, with the old tree put back if the swap fails. As root,
+     * so owners and modes come back as they were.
+     */
+    override suspend fun importData(container: Container, input: java.io.InputStream) {
+        RootProcess.run(binaryPath, "--name=${container.id}", "stop")
+        val rootfs = container.rootfsPath
+        val staged = "$rootfs.restore"
+        val previous = "$rootfs.previous"
+        RootfsDelete.delete(staged)
+        RootfsDelete.delete(previous)
+        try {
+            RootArchive.import(input, staged)
+            val looks = RootProcess.run("/system/bin/sh", "-c", "[ -d \"\$1/etc\" ] && [ -d \"\$1/usr\" ]", "sh", staged)
+            check(looks.succeeded) { "that archive is not a container's filesystem (no /etc and /usr in it)" }
+        } catch (e: Exception) {
+            RootfsDelete.delete(staged)
+            throw e
+        }
+        check(RootProcess.run("/system/bin/mv", rootfs, previous).succeeded) { "could not set the current filesystem aside" }
+        if (!RootProcess.run("/system/bin/mv", staged, rootfs).succeeded) {
+            RootProcess.run("/system/bin/mv", previous, rootfs)
+            error("could not put the restored filesystem in place; the container is unchanged")
+        }
+        RootfsDelete.delete(previous)
+    }
+
+    override val cloneUnavailableReason: String? = null
+
+    /**
+     * A copy of a stopped container (docs/SPEC.md 3d "Copy"; Droidtop/tracker#758): its tree copied as root with
+     * owners and modes kept, and its settings files (image, run settings, home and folders, sockets, devices). The copy
+     * is always a sibling: a copy of the desktop's own gets a sibling's init and no provisioning plan. A copy that fails
+     * part-way is deleted whole.
+     */
+    override suspend fun clone(container: Container, name: String): Container {
+        val existing = listContainers()
+        val source = existing.firstOrNull { it.container.id == container.id } ?: error("${container.id} no longer exists")
+        check(!source.running) { "${source.displayName} is running: stop it to copy it" }
+        val chosen = name.trim()
+        ContainerNames.problemWith(chosen, existing.map { it.displayName })?.let { error(it) }
+        val id = "droidtop-sibling-${UUID.randomUUID().toString().take(8)}"
+        val rootfs = File(rootfsDir, id).absolutePath
+        try {
+            RootArchive.copy(source.container.rootfsPath, rootfs)
+            if (container.role == ContainerRole.PRIMARY) writeInit(rootfs, null)
+            withContext(Dispatchers.IO) {
+                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile)) {
+                    file(container.id).takeIf { it.isFile }?.copyTo(file(id), overwrite = true)
+                }
+                writeConfig(id, rootfs)
+                names.set(id, chosen)
+            }
+        } catch (e: Throwable) {
+            withContext(kotlinx.coroutines.NonCancellable) {
+                RootfsDelete.delete(rootfs)
+                for (file in listOf(::imageRecordFile, ::runConfigFile, ::mountsFile, ::socketsFile, ::devicesFile)) file(id).delete()
+                File(configsDir, "$id.config").delete()
+                File(configsDir, "$id.env").delete()
+                names.remove(id)
+            }
+            throw e
+        }
+        return Container(id = id, role = ContainerRole.SIBLING, backend = backend, rootfsPath = rootfs)
+    }
+
     override suspend fun destroy(container: Container) {
         // Best-effort stop -- the container may already be stopped, that's
         // not a reason to fail the whole destroy.

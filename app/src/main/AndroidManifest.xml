@@ -642,13 +642,15 @@
           the places for Standard and Desktop, and the container manager.
           A task of its own, opened fresh each time, so Back returns to
           whatever opened it (the home screen, the desktop, a notification)
-          and never into an older droidtop screen.
+          and never into an older droidtop screen. Not excluded from recents:
+          Android removes a hidden task as soon as another task comes to the
+          front, so Settings opened from Desktop was gone after HOME and could
+          not be on the bar (Droidtop/tracker#750, rig 2638).
         -->
         <activity
             android:name="dev.droidtop.app.CatalogScreenActivity"
             android:exported="false"
-            android:taskAffinity="dev.droidtop.app.screen"
-            android:excludeFromRecents="true">
+            android:taskAffinity="dev.droidtop.app.screen">
             <intent-filter>
                 <action android:name="dev.droidtop.app.action.OPEN_SCREEN" />
                 <category android:name="android.intent.category.DEFAULT" />
