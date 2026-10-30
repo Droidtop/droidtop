@@ -21021,7 +21021,10 @@ with the handheld and keeps three things in step, both ways:
 - the saves of the games the two share;
 - the game library: what each side has installed;
 - plugin contexts: a plugin's supporting state that a program on the
-  computer also keeps (docs/plugin-api.md 3 F8).
+  computer also keeps (docs/plugin-api.md 3 F8). Since 2026-10-30
+  (Droidtop/tracker#794) a plugin syncs a copy it publishes, never its live
+  data: each side makes a whole new copy current in one rename, so a sync
+  that stops part way changes nothing on either side.
 
 It never streams or remote-controls anything; that stays windowcast's (7a).
 

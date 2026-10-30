@@ -78,6 +78,13 @@ enum class PluginEvent(val id: String, val version: Int, val display: String) {
      * tell the account's name (`web.session set_account`). Only to a plugin holding `web.session`. No args.
      */
     WEB_SIGNED_IN("web.session.signed_in", 1, "Signed in to the plugin's site"),
+
+    /**
+     * A merged copy of one of the plugin's contexts was made current here (docs/plugin-api.md F8, protocol 2,
+     * Droidtop/tracker#794): it differs from what the plugin last published. The plugin reads it with `context.copy`
+     * and brings it in when that is safe. Only to the plugin that owns the context. Args: `context`, `generation`.
+     */
+    CONTEXT_RECEIVED("context.received", 1, "A synced copy of the plugin's data arrived"),
     ;
 
     companion object {

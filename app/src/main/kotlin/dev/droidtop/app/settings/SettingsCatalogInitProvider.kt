@@ -57,6 +57,10 @@ class SettingsCatalogInitProvider : ContentProvider() {
         // The paired devices plugins see (docs/plugin-api.md D21): they hear of a change, and the paired handhelds
         // are served again while a plugin has announced something to them; a file read and a listener, off this thread.
         dev.droidtop.net.peer.PairedDevices.onChanged = { ctx -> dev.droidtop.library.integrations.notifyDevicesChanged(ctx) }
+        // A synced copy of a plugin's context arrived (docs/plugin-api.md F8): its plugin hears of it (Droidtop/tracker#794).
+        dev.droidtop.pluginhost.PluginContexts.onReceived = { plugin, contextId, generation ->
+            dev.droidtop.library.integrations.notifyContextReceived(appContext, plugin, contextId, generation)
+        }
         Thread({ runCatching { dev.droidtop.net.peer.PairedDevices.serve(appContext) } }, "devices-serve").start()
         // The role tokens UI droidtop does not draw follows (docs/SPEC.md 7k, Droidtop/tracker#559): plugins hear when
         // they change, looked at again on Light or dark, on Android's night mode, and by the Gaming shell on a theme.

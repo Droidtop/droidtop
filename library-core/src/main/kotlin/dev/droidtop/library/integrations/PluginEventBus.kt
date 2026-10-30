@@ -179,3 +179,21 @@ internal fun defaultPlayerChangedArgs(
     "playerPackage" to (playerPackage ?: ""),
     "core" to (core ?: ""),
 )
+
+/**
+ * Fires [PluginEvent.CONTEXT_RECEIVED] (docs/plugin-api.md F8, Droidtop/tracker#794) at the plugin that owns
+ * [contextId], when it subscribed: a merged copy of that context was made current here. Set as
+ * [dev.droidtop.pluginhost.PluginContexts.onReceived] at start; returns at once.
+ */
+fun notifyContextReceived(context: Context, pluginId: String, contextId: String, generation: Long) {
+    CoroutineScope(Dispatchers.IO).launch {
+        val record = PluginStore.installed(context).firstOrNull { it.manifest.id == pluginId } ?: return@launch
+        if (!record.runnable() || !record.manifest.subscribesTo(PluginEvent.CONTEXT_RECEIVED)) return@launch
+        val policy = PluginCrashPolicy(context.applicationContext)
+        try {
+            runCatching { policy.notifyEvent(record, PluginEvent.CONTEXT_RECEIVED, mapOf("context" to contextId, "generation" to generation.toString())) }
+        } finally {
+            policy.shutdown()
+        }
+    }
+}

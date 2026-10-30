@@ -3474,7 +3474,7 @@ droidtop's own Android permissions, gated per plugin by the broker.
 | F5 | Install apps | install or update an APK (an Obtainium-style updater) | `apps.install {file token}` → Android's own installer UI | Android's confirmation | `apps.install` (dangerous) | high | not built |
 | F6 | Bound connections | a live service or binder connection to another app | manifest `boundServiceTargets` (exists); the host binds, the plugin exchanges data through the broker (`apps.bound.call {package, method, args}` for AIDL surfaces the host knows) | — | `apps.bind` (dangerous, per package) | high | declared only |
 | F7 | Privileged operations | Shizuku / root | **plugin-provided** `priv.*`, `root.*` (§2.7) | — | `priv.shell.adb`, `priv.shell.root`, `priv.packages`, `priv.settings`, `root.modules` (all critical) | critical | host shim only |
-| F8 | Context sync | a plugin's supporting state kept in step, both ways, with a program on the person's paired computers (F95Checker's watch list for the F95 plugin is the first) | `context.open {context, fields: [{name, direction, rule}], presence}` → `{records, conflicts}`; `context.get {context, after?, limit ≤ 200}` → `{records, next, conflicts}`; `context.put {context, key, fields}`; `context.remove {context, key}`; `context.sync {context}` → `{lines, conflicts}`; `context.resolve {context, key, field, keep: device\|computer}` | the plugin's own UI; the computer under Settings → Accounts and sources → Computers | `context.sync` (dangerous: the data travels to your computers and changes an app's data there) | high | built (2026-10-08, `PluginContexts`, `HostContextApis`; see "F8 Context sync" below) |
+| F8 | Context sync | a plugin's supporting state kept in step, both ways, with a program on the person's paired computers (F95Checker's watch list for the F95 plugin is the first) | `context.open {context, fields: [{name, direction, rule}], presence}` → `{records, conflicts}`; protocol 2 (syncable data): `context.publish {context, records}` → `{published, generation, lines, conflicts}`, `context.copy {context}` → `{generation, records}`, event `context.received {context, generation}`; protocol 1: `context.get {context, after?, limit ≤ 200}` → `{records, next, conflicts}`; `context.put {context, key, fields}`; `context.remove {context, key}`; `context.sync {context}` → `{lines, conflicts}`; `context.resolve {context, key, field, keep: device\|computer}` | the plugin's own UI; the computer under Settings → Accounts and sources → Computers | `context.sync` (dangerous: the data travels to your computers and changes an app's data there) | high | built (protocol 1 2026-10-08; protocol 2 2026-10-30, Droidtop/tracker#794; `PluginContexts`, `HostContextApis`; see "F8 Context sync" below) |
 | F9 | Apps that start games | another Android app (a frontend, a launcher) asking droidtop to start a library entry; not a plugin, but held to this section's grant model (Droidtop/tracker#124, docs/SPEC.md "Other apps that start games") | the exported `dev.droidtop.app.action.LAUNCH_GAME` intent with `dev.droidtop.app.extra.ENTRY_ID`; the caller is named by `getCallingPackage` or Android 14's shared identity, never the referrer | the first-use sheet (4.3); Accounts and sources > Plugins > Apps that start games (4.4) | `launch.games`, per app (dangerous: asked on first use, Allow / Not now / Never) | medium | built 2026-10-28 (`ExternalGameLaunch`) |
 
 #### F8 Context sync
@@ -3508,6 +3508,40 @@ database on the PC follows.
   F95Checker's `db.sqlite3`, `games` table, one record per watched thread,
   keyed by thread id. It never reads the `cookies` table or the settings'
   passwords and tokens.
+- **Syncable data: the plugin syncs a copy, never its live data (protocol 2,
+  2026-10-30, Droidtop/tracker#794; droidtop-agent docs/DESIGN.md section 8).**
+  The owner: a syncable context "is an explicit NON-USABLE context ... the
+  point is that the sync is atomic, and it's not the live dataset", and "we
+  need atomic syncs to prevent corruption".
+  - **`context.publish {context, records}`** is the plugin's `updated`. The
+    records (`{key: {field: value}}`, at most 5000) become the context's copy
+    whole: droidtop writes it beside the current one and renames it over it,
+    so nothing ever reads half a copy. That is the next `generation`. The
+    context then syncs with every paired computer, and the reply is
+    `context.sync`'s plus `published`, the generation published.
+  - **Sync by copies.** For each computer droidtop runs the agent's
+    `sync_context_copy`: it reads the computer's copy, merges it three ways
+    against that computer's baseline (the rules below), and puts the merged
+    copy back in one step. A computer whose copy changed in between refuses
+    it (`stale`); it is read, merged and put again, three times at most, then
+    left for the next sync. The merged records become this device's copy in
+    one rename, then the baseline does. A computer that fails, is out of
+    reach or is stale changes nothing here or there.
+  - **`context.copy {context}`** → `{generation, records}`: the current copy,
+    `generation` null before the first publish. Nothing runs from it.
+  - **Event `context.received {context, generation}`** (subscribe to it): a
+    merged copy that differs from what the plugin last published was made
+    current here. The plugin reads it with `context.copy` and brings it into
+    its own data when that is safe for it. Only the plugin that owns the
+    context hears it.
+  - **The plugin's live data never syncs.** droidtop reads only the
+    published copy; cookies, tokens and the plugin's own database stay in
+    its data folder.
+  - On the computer the adapter speaks protocol 2: the agent makes a copy
+    current in one rename and runs the adapter's `received`, which brings it
+    in when the app there is closed (`deferred` until then; the copy is
+    current anyway). A context the plugin has never published keeps
+    protocol 1 below, which a protocol-1 adapter still needs.
 - **The plugin declares the context** with `context.open`. A record is a map
   of fields. Each field has:
   - a `direction`: `both`, `to_device` (computer to device) or
@@ -3520,8 +3554,14 @@ database on the PC follows.
   `archived`, `rating` and `notes`, and reads `name`, `url`, `version`,
   `developer`, `status`, `type` and `last_updated` as well.
 - **droidtop keeps the records** in `plugins/<id>/contexts/`, outside the
-  plugin's own data folder, so every change goes through `context.put` or
-  `context.remove` and the next sync sees it.
+  plugin's own data folder, so every change goes through droidtop's ops and
+  the next sync sees it: the copy in `<context>.copy.json`, protocol 1's
+  records in `<context>.json`, a baseline per computer. Each is replaced
+  whole, written beside it and renamed over it.
+- **Protocol 1** (`context.put`, `context.remove`, `context.get`): records
+  changed one at a time and merged with the computer's live store through a
+  protocol-1 adapter. It stays until every adapter speaks protocol 2; a new
+  plugin uses `context.publish`.
 - **Change tracking is a three-way merge per field**, against the baseline
   droidtop keeps for each computer and context (the agent core's
   `context::merge`, the same code the computer runs):

@@ -5,11 +5,16 @@ import org.json.JSONObject
 
 /**
  * The context sync ops (docs/plugin-api.md 3 F8): a plugin declares a context
- * with its fields and rules, reads and changes its records, starts a sync with
- * the paired computers and settles the fields both sides changed.
+ * with its fields and rules, publishes a whole copy of it and reads the current
+ * copy back (protocol 2, syncable data, Droidtop/tracker#794), or changes its
+ * records one at a time (protocol 1), starts a sync with the paired computers
+ * and settles the fields both sides changed.
  */
 internal object HostContextApis {
     private const val PAGE = 200
+
+    /** A copy crosses the broker whole, so it is held to what one reply carries. */
+    private const val MAX_RECORDS = 5000
     private val DIRECTIONS = setOf("both", "to_device", "to_computer")
     private val RULES = setOf("device", "computer", "ask")
     private val KEY = Regex("^[A-Za-z0-9._:-]{1,128}$")
@@ -81,6 +86,23 @@ internal object HostContextApis {
                 .put("records", records)
                 .put("next", if (page.size == limit && keys.last() != page.last()) page.last() else JSONObject.NULL)
                 .put("conflicts", state.conflicts)
+        },
+        // Protocol 2: the whole copy, made current in one step, then synced. Records as `context.get` gives them.
+        HostOp("context", "publish", permission = "context.sync", alwaysAudit = true, target = { it.optString("context") }) { env, record, args ->
+            val id = contextId(record.manifest, args)
+            val records = args.optJSONObject("records") ?: invalid("records is required: {key: {field: value}}")
+            if (records.length() > MAX_RECORDS) invalid("a copy holds at most $MAX_RECORDS records")
+            records.keys().forEach { k -> if (!KEY.matches(k) || records.optJSONObject(k) == null) invalid("each record is {field: value} under a key of 1 to 128 of letters, digits, '.', '_', ':' and '-'") }
+            val contexts = contextsOf(env)
+            val copy = contexts.publish(record.manifest.id, id, records)
+            val synced = contexts.sync(record.manifest.id, id, adapterOffer(record.manifest, id))
+            synced.put("published", copy.generation)
+        },
+        // The current copy, for the plugin to bring in when that is safe; null before the first publish.
+        HostOp("context", "copy", permission = "context.sync", target = { it.optString("context") }) { env, record, args ->
+            val id = contextId(record.manifest, args)
+            val copy = contextsOf(env).copy(record.manifest.id, id)
+            if (copy == null) JSONObject().put("generation", JSONObject.NULL).put("records", JSONObject()) else JSONObject().put("generation", copy.generation).put("records", copy.records)
         },
         HostOp("context", "put", permission = "context.sync", target = { "${it.optString("context")} ${it.optString("key")}" }) { env, record, args ->
             val fields = args.optJSONObject("fields") ?: invalid("fields is required")
