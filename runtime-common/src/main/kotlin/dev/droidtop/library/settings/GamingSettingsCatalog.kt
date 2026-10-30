@@ -58,6 +58,7 @@ object GamingSettingsCatalog {
     const val GROUP_KEYBOARD = "gaming_keyboard"
     const val GROUP_COMPANION_SCREEN = "gaming_companion_screen"
     const val ID_CONTROLLER = "pref_gaming_controller"
+    const val ID_HOME_CHORDS = "pref_gaming_home_chords"
     const val GROUP_OTHER_SHELLS = "other_shells"
 
     const val ID_GLOBAL_SETTINGS = "pref_global_settings"
@@ -443,6 +444,26 @@ object GamingSettingsCatalog {
                             "dev.droidtop.app.OnboardingActivity",
                             "dev.droidtop.app.EXTRA_START_STEP" to "CONTROLLER",
                         ),
+                    ),
+                )
+                // Whether HOME + R2, L2 and Start work over games, and the one press that makes them (Droidtop/tracker#740):
+                // they need droidtop's accessibility service, which nothing else says.
+                val (chordsOn, chordsLine) = dev.droidtop.runtime.keyboard.AccessibilityKeyboard.homeChords(context)
+                add(
+                    AsyncActionItem(
+                        id = ID_HOME_CHORDS,
+                        title = "HOME button combos over games",
+                        subtitle = chordsLine,
+                        value = if (chordsOn) "On" else "Off",
+                        statusMark = if (chordsOn) null else StatusMark.ATTENTION,
+                        run = { ctx, _ ->
+                            if (chordsOn) {
+                                dev.droidtop.runtime.keyboard.AccessibilityKeyboard.openSettings(ctx)
+                                "Turn it off in Android's list"
+                            } else {
+                                dev.droidtop.runtime.keyboard.AccessibilityKeyboard.turnOn(ctx)
+                            }
+                        },
                     ),
                 )
                 // Keyboard. droidtop ships Hacker's Keyboard because a

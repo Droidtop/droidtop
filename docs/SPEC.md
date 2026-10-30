@@ -3830,11 +3830,21 @@ the `ContainerRuntime` interface that already exists (§3):
   whatever is on screen (widened 2026-10-29: "home+ r2 draws over the screen, too. On steanos, the qam can always be
   called up"), **HOME + R2** opens the Quick Menu, **HOME + L2** the menu of what is in front and **HOME + Start** the
   left menu's launcher content, drawn over the screen without backgrounding it; **HOME alone** is HOME, as before. The input half (built 2026-10-29):
-  - Even the home app never receives HOME, so the chord is read by droidtop's accessibility service ("droidtop
-    keyboard and pointer", `TypingAccessibilityService`), whose key filter (`canRequestFilterKeyEvents`) is asked for
-    only while droidtop is the default home (`HomeOverlayKeys`, read again when a window changes, at most every 2 s).
-    With the service off, or another home, the service sees no keys and the chords do not exist. Its description in
-    Android's settings says so.
+  - Even the home app never receives HOME, so the chord is read by droidtop's accessibility service ("droidtop: HOME
+    button combos, keyboard and pointer over other apps", `TypingAccessibilityService`), whose key filter
+    (`canRequestFilterKeyEvents`) is asked for only while droidtop is the default home (`HomeOverlayKeys`, read again
+    when a window changes, at most every 2 s). With the service off, or another home, the service sees no keys and the
+    chords do not exist. Its label and description in Android's settings say so first.
+  - **Saying when they are off, and turning them on (owner on the console, 2026-10-29: "The home + keymaps don't work
+    in retroarch"; the service was off, and nothing said so).** Settings > Controls has a "HOME button combos over
+    games" row, and onboarding's controller step the same one (`AccessibilityKeyboard.homeChords`): On, or Off with
+    why in plain words ("Android needs you to allow droidtop to see button presses over other apps"). Pressed while
+    off, it turns the service on (`AccessibilityKeyboard.turnOn`): with elevated access droidtop adds itself to
+    Android's enabled list, keeping every service already on it (a vendor's, such as Retroid's Game Assistant), else
+    Android's accessibility page opens. Pressed while on, it opens that page, where it is turned off again: every
+    grant stays revocable. A Home press that reaches droidtop while the service is off says once, as a flash, that the
+    combos are off and where to turn them on, so the person learns it before they are in a game. Whether a vendor's
+    own service that also filters keys lets HOME through to droidtop's is the console's to show.
   - `HomeChords` (`:runtime-common`, pure, tested) decides each key at once. HOME down is held; R2, L2 or Start while
     it is held raises `OverlayRequest(kind, displayId)` on `OverlayRequests.requests`, and both keys are eaten, the
     button through its release. A second request of the same kind while it is open is the UI's to close it. Every
