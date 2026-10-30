@@ -168,7 +168,6 @@ object ModeStartup {
      */
     private val LAUNCHER_SYSTEM_COMPONENTS = listOf(
         "com.android.launcher3.notification.NotificationListener",
-        "app.murinelauncher.service.MurineAccessibilityService",
         "com.android.launcher3.SessionCommitReceiver",
         "com.android.launcher3.AppWidgetsRestoredReceiver",
     )

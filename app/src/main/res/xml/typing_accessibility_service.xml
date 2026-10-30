@@ -8,7 +8,9 @@
      are the service's second job: the companion's Screenshot row and pin (Capture). The third is the
      companion trackpad's pointer on the main screen: it plays taps, long presses, drags and swipes there
      (canPerformGestures, AccessibilityPointer). The fourth, while droidtop is the default home only, is the HOME
-     chords that open droidtop's menus over a game (canRequestFilterKeyEvents, HomeOverlayKeys, Droidtop/tracker#740). -->
+     chords that open droidtop's menus over a game (canRequestFilterKeyEvents, HomeOverlayKeys, Droidtop/tracker#740).
+     It is also Standard's: the taskbar's overlay window and keys (StandardTaskbar) and the gesture actions
+     (lock screen, Recents), through AccessibilityHost. Those had a second service of their own, deleted in #740. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:accessibilityEventTypes="typeViewFocused|typeViewClicked|typeWindowStateChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"

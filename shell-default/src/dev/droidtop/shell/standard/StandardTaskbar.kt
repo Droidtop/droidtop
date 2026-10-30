@@ -1,7 +1,6 @@
 package dev.droidtop.shell.standard
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.ActivityOptions
 import android.content.ComponentName
 import android.content.Context
@@ -54,8 +53,8 @@ import dev.droidtop.library.settings.TaskbarPolicy
  * Upstream Launcher3's taskbar is quickstep code that the system binds to
  * its own recents component, which a third-party home cannot host, so this is
  * droidtop's own component. It is an accessibility overlay window owned by
- * [app.murinelauncher.service.MurineAccessibilityService], the service the
- * gesture actions already need, so it adds no permission of its own beyond
+ * droidtop's one accessibility service (`TypingAccessibilityService` in `:app`, through
+ * [dev.droidtop.runtime.keyboard.AccessibilityHost]), so it adds no permission of its own beyond
  * that service's: `TYPE_ACCESSIBILITY_OVERLAY` needs no draw-over-apps grant.
  * From the service's events it reads only the package and activity name of the
  * window that came to the front, never window content.
@@ -113,23 +112,17 @@ class StandardTaskbar(private val service: AccessibilityService) {
         bars.clear()
     }
 
-    private val enabled: Boolean get() = LauncherPrefs.TASKBAR_ENABLED.get(service)
+    /** On while Standard is on and the person turned the taskbar on (Settings > Home > Taskbar). */
+    private val enabled: Boolean
+        get() = LauncherPrefs.TASKBAR_ENABLED.get(service) && Mode.LAUNCHER in Modes.enabled
 
     /**
-     * The service asks for window-change events and the key filter only while
-     * the taskbar is on: a person who enabled it just for the lock-screen
-     * gesture is not sent anything else.
+     * The key filter (Meta and the pad's Mode button) is asked for only while the taskbar is on, through droidtop's
+     * one service ([dev.droidtop.runtime.keyboard.AccessibilityHost]), which other parts share. Window changes come
+     * to the service anyway (its typing and HOME chords need them); [onEvent] ignores them while the taskbar is off.
      */
     private fun applyServiceInfo() {
-        val info = service.serviceInfo ?: return
-        if (enabled) {
-            info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-            info.flags = info.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
-        } else {
-            info.eventTypes = 0
-            info.flags = info.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
-        }
-        service.serviceInfo = info
+        dev.droidtop.runtime.keyboard.AccessibilityHost.wantKeyFilter("taskbar", enabled)
     }
 
     fun onEvent(event: AccessibilityEvent) {

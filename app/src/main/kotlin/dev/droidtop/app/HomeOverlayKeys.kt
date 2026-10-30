@@ -1,7 +1,6 @@
 package dev.droidtop.app
 
 import android.accessibilityservice.AccessibilityService
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.SystemClock
@@ -69,13 +68,7 @@ object HomeOverlayKeys {
         checkedAt = now
         val want = isDefaultHome(s)
         if (want == filtering) return
-        val info = s.serviceInfo ?: return
-        info.flags = if (want) {
-            info.flags or AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
-        } else {
-            info.flags and AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS.inv()
-        }
-        s.serviceInfo = info
+        dev.droidtop.runtime.keyboard.AccessibilityHost.wantKeyFilter("home chords", want)
         filtering = want
     }
 
