@@ -29,6 +29,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -269,7 +270,10 @@ internal fun QuickMenu(
                     // not carry from one to the next, and each keeps its own cursor and scroll while the sheet is open,
                     // so stepping away with L1/R1 and back lands where the person was (DroidDeck's per-page focus
                     // and scroll memory, Droidtop/tracker#363).
-                    sectionStates.SaveableStateProvider(section.name) {
+                    // key() as well: several sections share one call site (the tile grids), and without a new group per
+                    // section the shared one kept its composition across L1/R1, so its focus request never ran again
+                    // and the focus was lost with the old section's rows (Droidtop/tracker#820).
+                    key(section) { sectionStates.SaveableStateProvider(section.name) {
                         when (section) {
                             // Catalog pages (Social, Downloads, Plugins and every plugin's page) pad their rows by the
                             // window's content gutter. Under the window's own size that was 2.8 percent of the whole
@@ -299,7 +303,7 @@ internal fun QuickMenu(
                                 }
                             }
                         }
-                    }
+                    } }
                 }
             }
         }

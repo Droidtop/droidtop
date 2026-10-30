@@ -101,6 +101,7 @@ class MainActivity : AppCompatActivity(), SecondScreenHost {
         focused = { topResumed },
         // The overlays composed in this window own the keys from the moment they are pushed (SPEC 6e).
         overlays = OverlayKeys(),
+        window = { window },
     )
 
     /**

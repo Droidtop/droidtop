@@ -298,7 +298,9 @@ internal fun AppsSection(
     // The first tile takes the focus when the list first arrives, and the
     // empty state when a filter leaves nothing, so X and Y always have a
     // focused element to answer them.
-    LaunchedEffect(list.isEmpty()) {
+    // On open, and again when L1/R1 changes the view: the items under the focus are replaced, so the focus goes to the
+    // first one (Droidtop/tracker#820).
+    LaunchedEffect(list.isEmpty(), query) {
         if (list.isEmpty()) requestFocusWhenAttached(emptyFocus, "Apps") else requestFocusWhenAttached(firstFocus, "Sections")
     }
 
@@ -379,14 +381,16 @@ internal fun AppsSection(
                 }
             }
         } else {
-            var firstAssigned = false
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(32.dp),
                 // The hint bar's own room (MenuTokens.HintBarRoom).
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = MenuTokens.HintBarRoom),
             ) {
-                items(sections, key = { it.title }) { homeSection ->
+                // The first section's first item holds the requester, by position: a flag set while items compose
+                // left it on no item once item 0 composed again on its own, and the grid opened with nothing focused
+                // (Droidtop/tracker#820).
+                itemsIndexed(sections, key = { _, section -> section.title }) { sectionIndex, homeSection ->
                     // Native Android apps get their own dense, icon-first grid
                     // (columns configurable via SettingsGamingFragment's
                     // "Apps grid columns" -- see GamingPrefs.appsGridColumns),
@@ -398,7 +402,7 @@ internal fun AppsSection(
                         AppIconGrid(
                             homeSection,
                             columns = GamingPrefs.appsGridColumns(context),
-                            firstTileFocus = if (!firstAssigned) firstFocus else null,
+                            firstTileFocus = if (sectionIndex == 0) firstFocus else null,
                             onLaunch = onLaunch,
                             onOptions = { optionsFor = it },
                             onFocusedEntryChanged = onFocusedEntryChanged,
@@ -406,14 +410,13 @@ internal fun AppsSection(
                     } else {
                         HomeSectionRow(
                             homeSection,
-                            firstCardFocus = if (!firstAssigned) firstFocus else null,
+                            firstCardFocus = if (sectionIndex == 0) firstFocus else null,
                             onShowDetail = onShowDetail,
                             onOptions = { optionsFor = it },
                             onFocusedEntryChanged = onFocusedEntryChanged,
                             onToggleFavorite = onToggleFavorite,
                         )
                     }
-                    firstAssigned = true
                 }
                 // Games are not apps, but this is where a person on the Apps tab looks for more of anything.
                 // The app catalogs are one screen with two doors, here and under Updates (tracker#501).
@@ -663,16 +666,16 @@ internal fun AppIconTile(
             modifier = Modifier.padding(top = 6.dp).focusMarquee(focused),
         )
         // An app that declares no category says nothing: "Android app" under every tile said nothing
-        // about this one (tracker#500).
-        entry.genre?.takeIf { it.isNotBlank() }?.let { line ->
-            Text(
-                line,
-                color = MenuTokens.OnSurfaceMuted,
-                style = MaterialTheme.typography.labelSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.focusMarquee(focused),
-            )
-        }
+        // about this one (tracker#500). Its line is still kept, empty, so every tile in a row is one height and the
+        // grid's rows line up (Droidtop/tracker#820: "Calendar" was a line shorter than "Azahar / Games").
+        Text(
+            entry.genre?.takeIf { it.isNotBlank() }.orEmpty(),
+            color = MenuTokens.OnSurfaceMuted,
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            minLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.focusMarquee(focused),
+        )
     }
 }

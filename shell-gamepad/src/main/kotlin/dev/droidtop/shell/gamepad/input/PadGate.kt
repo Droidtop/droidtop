@@ -300,6 +300,8 @@ class PadGate(
     /** The window's overlay stack and which layer this window is in it (docs/SPEC.md 6e); none: no overlay rule. */
     val overlays: OverlayKeys? = null,
     private val layer: () -> Int = { 0 },
+    /** The window the gate delivers into, so a pad press can take it out of touch mode ([leaveTouchMode]). */
+    private val window: () -> Window? = { null },
 ) {
     private val handler = Handler(Looper.getMainLooper())
     private val core: PadGateCore = PadGateCore(
@@ -318,6 +320,7 @@ class PadGate(
         emit = { key ->
             if (focused()) {
                 PadModality.padDriving()
+                if (key.down) leaveTouchMode()
                 val event = key.toKeyEvent()
                 val handled = deliverRouted(event)
                 log(event, if (handled) "made-by-gate handled" else "made-by-gate unhandled")
@@ -378,6 +381,7 @@ class PadGate(
         }
         if (event.keyCode != KeyEvent.KEYCODE_BACK && GamepadKeyMap.physicalAction(event.keyCode) != null) {
             PadModality.padDriving()
+            if (event.action == KeyEvent.ACTION_DOWN) leaveTouchMode()
         }
         val handled = deliverRouted(event)
         log(event, if (handled) "handled" else "unhandled")
@@ -389,6 +393,22 @@ class PadGate(
         KeyEvent.isGamepadButton(event.keyCode) ||
             (event.source and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
             (event.source and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
+
+    /**
+     * What Android does for a real key before it delivers it, done for the keys the gate delivers (Droidtop/tracker#820).
+     * A key from the input system takes the window out of touch mode (ViewRootImpl), which gives the focused view back
+     * its focus. The D-pad keys the gate makes from the hat and stick never pass there. So after a touch (the
+     * companion's screen is touch, and touch mode is device-wide before Android 14) the window stayed in touch mode, no
+     * view held the focus, and every D-pad press was dropped as unhandled while A, a real key, worked and woke it ("I
+     * have to hit A for it to work"). [View.requestFocusFromTouch] is that same step: leave touch mode, focus back on the
+     * focused view, or the first one that takes it. The screen's own focus inside it is kept.
+     */
+    private fun leaveTouchMode() {
+        val decor = window()?.peekDecorView() ?: return
+        if (!decor.isInTouchMode) return
+        val target = decor.findFocus() ?: decor
+        runCatching { target.requestFocusFromTouch() }
+    }
 
     /**
      * [deliver], unless an overlay covers this window or the press went to
@@ -516,7 +536,7 @@ class PadGate(
         fun attach(window: Window, overlays: OverlayKeys? = null, layer: () -> Int = { 0 }): () -> Unit {
             val existing = window.callback
             if (existing == null || existing is GatedCallback) return {}
-            val gate = PadGate(deliver = { event -> existing.dispatchKeyEvent(event) }, overlays = overlays, layer = layer)
+            val gate = PadGate(deliver = { event -> existing.dispatchKeyEvent(event) }, overlays = overlays, layer = layer, window = { window })
             val gated = GatedCallback(existing, gate)
             window.callback = gated
             return {

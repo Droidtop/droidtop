@@ -213,6 +213,8 @@ fun GamepadShell(
         // The shell window's one sliding focus ring (FocusGlide.kt); each
         // panel, menu and page that is a window of its own hosts its own.
         FocusGlideHost(Modifier.fillMaxSize()) {
+          // Focus is always somewhere in the shell, so the first D-pad press moves it (Droidtop/tracker#820).
+          PadFocusHolder(Modifier.fillMaxSize()) {
             GamepadShellBody(
                 library = library,
                 onFocusedEntryChanged = onFocusedEntryChanged,
@@ -224,6 +226,7 @@ fun GamepadShell(
                 triggerRescan = triggerRescan,
                 triggerBrowseThemes = triggerBrowseThemes,
             )
+          }
         }
     }
 }

@@ -152,7 +152,7 @@ class OnboardingActivity : AppCompatActivity() {
      * keyboard is driving -- a person setting up with a finger sees no ring
      * (Droidtop/tracker#159).
      */
-    private val padGate = dev.droidtop.shell.gamepad.input.PadGate(deliver = { event -> deliverKey(event) })
+    private val padGate = dev.droidtop.shell.gamepad.input.PadGate(deliver = { event -> deliverKey(event) }, window = { window })
 
     private fun deliverKey(event: android.view.KeyEvent): Boolean = super.dispatchKeyEvent(event)
 

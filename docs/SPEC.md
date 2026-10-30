@@ -4075,6 +4075,11 @@ the `ContainerRuntime` interface that already exists (§3):
   - HOME + R2 draws the Quick Menu over the screen, unchanged: the shell's own (`QuickMenuStandalone`), the one R2 opens
     in Gaming, with nothing added for a game (the owner, 2026-10-29: "Your 'home + r2' implementation is wrong. You
     shouldn't be adding to tbe quick menu. The pause goes in the overlay, which is supposed to be different").
+  - **R2 is global, L2 is contextual (the owner, 2026-10-30, Droidtop/tracker#818: "the L2 menu needs to have access
+    to the memory editor, walkthrough stuff, etc. r2 is the global menu. L2 is everything we can do contextually for
+    this app/game/etc").** Every tool for the thing in front is reached from HOME + L2: its guides and walkthroughs and
+    notes (#817), cheats and the memory editor (#720), achievements, saves and states, its own settings, its controls
+    and Report a problem. Nothing contextual goes in R2, nothing global in L2.
   - HOME + L2 is the menu of what is in front, contextual like L2 itself:
     - the game droidtop launched (in front, or with nothing else known to be): its own overlay
       (`GameOptionsStandalone`), a surface of its own: the game's name and what runs it, **Resume** (closes the
@@ -8988,6 +8993,20 @@ is also its own window for immersive state (`HideSystemBarsInThisDialog`,
 same file): without it, Android's grey status bar paints over the top of
 every dialog-hosted menu (Quick Menu, L2 menu, game page, filter/search),
 leaving the shell's `StatusCluster` under a second OS clock (`tracker#169`).
+
+**A pad press leaves touch mode, as a real key does (Droidtop/tracker#820, 2026-10-30).** Android takes a window out
+of touch mode when a key arrives from the input system (`ViewRootImpl`), which gives the focused view its focus back.
+The D-pad keys the gate makes from the hat and stick are delivered into the window directly and never pass there, so
+after a touch (the companion's screen is touch, and touch mode is device-wide before Android 14) every D-pad press was
+dropped as unhandled until a real key, A, woke the window (console, build 2730: "I have to hit A for it to work"). The
+gate now does that step itself for every pad press it delivers (`PadGate.leaveTouchMode`, `View.requestFocusFromTouch`
+on the focused view), the screen's own focus kept. **And focus is always somewhere:** `PadFocusHolder`, around the
+content of the shell, of every `ShellDialog` and of every in-game overlay window, puts the focus on the first
+focusable item whenever nothing in it holds focus (on open, when a tab, pane or page change removed the focused node,
+on a return to the window), after the screen's own first frames to place it; it only moves the focus, never presses.
+The Quick Menu keeps `key(section)` around each section's saved state: sections share one call site, and without a
+group per section the shared one kept its composition across L1/R1 and lost its focus with the old rows. Checked on a
+console by `PadFirstPressRigTest` (every main section, every Quick Menu tab, the Start and L2 menus, from touch mode).
 
 - **Bounce.** A fresh press of a pad's key less than 25 ms after that key's
   own release is a worn or noisy switch: the press, its repeats and its

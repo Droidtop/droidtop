@@ -33,7 +33,8 @@ fun ShellDialog(
     content: @Composable () -> Unit,
 ) {
     if (!LocalInGameOverlay.current) {
-        Dialog(onDismissRequest = onDismissRequest, properties = properties, content = content)
+        // A dialog is a window of its own: it holds its own focus (PadFocusHolder, Droidtop/tracker#820).
+        Dialog(onDismissRequest = onDismissRequest, properties = properties) { PadFocusHolder(content = content) }
         return
     }
     Popup(
@@ -48,7 +49,7 @@ fun ShellDialog(
         Box(
             modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = OVERLAY_SCRIM_ALPHA)),
             contentAlignment = Alignment.Center,
-        ) { content() }
+        ) { PadFocusHolder(content = content) }
     }
 }
 

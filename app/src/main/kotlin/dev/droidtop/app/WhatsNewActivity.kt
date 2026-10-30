@@ -39,7 +39,7 @@ import kotlinx.coroutines.withContext
  */
 class WhatsNewActivity : AppCompatActivity() {
     // The shell's input pipeline, as onboarding's (docs/SPEC.md 6e): the stick and hat move like the D-pad.
-    private val padGate = dev.droidtop.shell.gamepad.input.PadGate(deliver = { event -> deliverKey(event) })
+    private val padGate = dev.droidtop.shell.gamepad.input.PadGate(deliver = { event -> deliverKey(event) }, window = { window })
 
     private fun deliverKey(event: android.view.KeyEvent): Boolean = super.dispatchKeyEvent(event)
 

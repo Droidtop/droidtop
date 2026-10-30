@@ -1,5 +1,6 @@
 package dev.droidtop.app
 
+import androidx.compose.foundation.layout.fillMaxSize
 import android.app.Application
 import android.content.Intent
 import android.graphics.PixelFormat
@@ -212,7 +213,10 @@ internal object InGameOverlays {
                 dev.droidtop.app.ui.DroidtopTheme(gamingThemed = dev.droidtop.app.ui.rememberGamingThemed()) {
                     // What an activity would give the shell's screens: a catalog tab's pickers and Back.
                     dev.droidtop.shell.gamepad.hosted.ProvideOverlayOwners {
-                        CompositionLocalProvider(LocalInGameOverlay provides true, content = content)
+                        CompositionLocalProvider(LocalInGameOverlay provides true) {
+                            // An overlay window holds its own focus: its first D-pad press moves it (Droidtop/tracker#820).
+                            dev.droidtop.shell.gamepad.PadFocusHolder(androidx.compose.ui.Modifier.fillMaxSize(), content = content)
+                        }
                     }
                 }
             }
